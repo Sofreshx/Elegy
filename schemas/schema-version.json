@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "1.0.0",
+  "policy": {
+    "major": "Increment for breaking schema changes. Requires a package major version bump in Directory.Build.props.",
+    "minor": "Increment for backward-compatible schema additions.",
+    "patch": "Increment for backward-compatible schema corrections or metadata fixes."
+  }
+}

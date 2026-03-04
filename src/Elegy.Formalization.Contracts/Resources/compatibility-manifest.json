@@ -1,0 +1,17 @@
+{
+  "manifestVersion": "1.0.0",
+  "package": {
+    "name": "Elegy.Formalization.Contracts",
+    "version": "0.1.0"
+  },
+  "schemas": [
+    {
+      "name": "canonical-workflow",
+      "schemaVersion": "1.0.0",
+      "file": "canonical-workflow.schema.json",
+      "fixtures": [
+        "fixtures/canonical-workflow.minimal.json"
+      ]
+    }
+  ]
+}

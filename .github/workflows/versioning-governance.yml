@@ -1,0 +1,77 @@
+name: Versioning Governance
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  validate-versioning:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate SemVer and schema governance
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $semver = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
+
+          function Get-Major([string]$version) {
+            return [int]($version.Split('-',2)[0].Split('+',2)[0].Split('.')[0])
+          }
+
+          if (-not (Test-Path 'Directory.Build.props')) {
+            throw 'Directory.Build.props was not found.'
+          }
+
+          [xml]$props = Get-Content -Raw -Path 'Directory.Build.props'
+          $packageVersion = [string]($props.Project.PropertyGroup.VersionPrefix | Select-Object -First 1)
+          if ([string]::IsNullOrWhiteSpace($packageVersion) -or $packageVersion -notmatch $semver) {
+            throw "VersionPrefix '$packageVersion' is not valid SemVer."
+          }
+          Write-Host "Package version is valid: $packageVersion"
+
+          if (-not (Test-Path 'schemas/schema-version.json')) {
+            throw 'schemas/schema-version.json is required.'
+          }
+
+          $schema = Get-Content -Raw -Path 'schemas/schema-version.json' | ConvertFrom-Json
+          $schemaVersion = [string]$schema.schemaVersion
+          if ([string]::IsNullOrWhiteSpace($schemaVersion) -or $schemaVersion -notmatch $semver) {
+            throw "schemaVersion '$schemaVersion' is not valid SemVer."
+          }
+          Write-Host "Schema version is valid: $schemaVersion"
+
+          $hasParent = $true
+          try {
+            git rev-parse --verify HEAD^ | Out-Null
+          } catch {
+            $hasParent = $false
+          }
+
+          if ($hasParent) {
+            $basePropsText = git show HEAD^:Directory.Build.props 2>$null
+            $baseSchemaText = git show HEAD^:schemas/schema-version.json 2>$null
+
+            if ($LASTEXITCODE -eq 0 -and $basePropsText -and $baseSchemaText) {
+              [xml]$baseProps = $basePropsText
+              $basePackageVersion = [string]($baseProps.Project.PropertyGroup.VersionPrefix | Select-Object -First 1)
+              $baseSchema = $baseSchemaText | ConvertFrom-Json
+              $baseSchemaVersion = [string]$baseSchema.schemaVersion
+
+              if ($basePackageVersion -match $semver -and $baseSchemaVersion -match $semver) {
+                $schemaMajorIncreased = (Get-Major $schemaVersion) -gt (Get-Major $baseSchemaVersion)
+                $packageMajorIncreased = (Get-Major $packageVersion) -gt (Get-Major $basePackageVersion)
+                if ($schemaMajorIncreased -and -not $packageMajorIncreased) {
+                  throw "Schema major changed ($baseSchemaVersion -> $schemaVersion) without package major bump ($basePackageVersion -> $packageVersion)."
+                }
+              }
+            }
+          }
+
+          Write-Host 'Versioning governance checks passed.'
