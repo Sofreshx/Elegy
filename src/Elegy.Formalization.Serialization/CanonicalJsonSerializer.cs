@@ -25,12 +25,15 @@ public static class CanonicalJsonSerializer
 
     private static JsonSerializerOptions CreateOptions()
     {
-        return new JsonSerializerOptions
+        var options = new JsonSerializerOptions
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
             DictionaryKeyPolicy = JsonNamingPolicy.CamelCase,
             DefaultIgnoreCondition = JsonIgnoreCondition.Never,
             WriteIndented = false
         };
+
+        options.Converters.Add(new JsonStringEnumConverter(JsonNamingPolicy.CamelCase, false));
+        return options;
     }
 }

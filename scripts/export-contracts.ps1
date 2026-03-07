@@ -14,12 +14,10 @@ if ([string]::IsNullOrWhiteSpace($OutputPath)) {
     $OutputPath = Join-Path $repoRoot 'artifacts\contracts'
 }
 
-$schemaFile = Join-Path $contractsResourcesPath 'canonical-workflow.schema.json'
-$fixtureFile = Join-Path $contractsResourcesPath 'fixtures\canonical-workflow.minimal.json'
 $compatibilityManifestFile = Join-Path $contractsResourcesPath 'compatibility-manifest.json'
 $compatibilityMatrixFile = Join-Path $contractsResourcesPath 'compatibility-matrix.json'
 
-foreach ($requiredPath in @($schemaFile, $fixtureFile, $compatibilityManifestFile, $compatibilityMatrixFile, $propsPath, $schemaVersionPath)) {
+foreach ($requiredPath in @($compatibilityManifestFile, $compatibilityMatrixFile, $propsPath, $schemaVersionPath)) {
     if (-not (Test-Path $requiredPath)) {
         throw "Missing required file: $requiredPath"
     }
@@ -33,6 +31,19 @@ $compatibilityMatrix = Get-Content -Raw -Path $compatibilityMatrixFile | Convert
 
 if ($compatibilityManifest.package.version -ne $packageVersion) {
     throw "Compatibility manifest package version '$($compatibilityManifest.package.version)' does not match Directory.Build.props VersionPrefix '$packageVersion'."
+}
+
+foreach ($schemaEntry in $compatibilityManifest.schemas) {
+    $schemaFilePath = Join-Path $contractsResourcesPath $schemaEntry.file
+    if (-not (Test-Path $schemaFilePath)) {
+        throw "Schema file referenced in manifest not found: $schemaFilePath"
+    }
+    foreach ($fixture in $schemaEntry.fixtures) {
+        $fixturePath = Join-Path $contractsResourcesPath $fixture
+        if (-not (Test-Path $fixturePath)) {
+            throw "Fixture file referenced in manifest not found: $fixturePath"
+        }
+    }
 }
 
 $canonicalSchemaManifest = $compatibilityManifest.schemas | Where-Object { $_.name -eq 'canonical-workflow' } | Select-Object -First 1
@@ -59,8 +70,15 @@ if (Test-Path $OutputPath) {
 New-Item -ItemType Directory -Path $OutputPath -Force | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $OutputPath 'fixtures') -Force | Out-Null
 
-Copy-Item -Path $schemaFile -Destination (Join-Path $OutputPath 'canonical-workflow.schema.json') -Force
-Copy-Item -Path $fixtureFile -Destination (Join-Path $OutputPath 'fixtures\canonical-workflow.minimal.json') -Force
+foreach ($schemaEntry in $compatibilityManifest.schemas) {
+    $schemaFilePath = Join-Path $contractsResourcesPath $schemaEntry.file
+    Copy-Item -Path $schemaFilePath -Destination (Join-Path $OutputPath $schemaEntry.file) -Force
+    foreach ($fixture in $schemaEntry.fixtures) {
+        $fixturePath = Join-Path $contractsResourcesPath $fixture
+        Copy-Item -Path $fixturePath -Destination (Join-Path $OutputPath $fixture) -Force
+    }
+}
+
 Copy-Item -Path $compatibilityManifestFile -Destination (Join-Path $OutputPath 'compatibility-manifest.json') -Force
 Copy-Item -Path $compatibilityMatrixFile -Destination (Join-Path $OutputPath 'compatibility-matrix.json') -Force
 

@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/skill-discovery-index.schema.json",
+  "title": "Skill Discovery Index",
+  "description": "Index of discoverable skills with metadata for search/execute pattern.",
+  "type": "object",
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "type": "integer" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["skill", "name", "description", "triggersOn"],
+        "properties": {
+          "skill": { "type": "string" },
+          "name": { "type": "string" },
+          "description": { "type": "string" },
+          "triggersOn": { "type": "array", "items": { "type": "string" } },
+          "manifest": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "loadMode": { "type": "string" }
+            }
+          }
+        }
+      }
+    }
+  }
+}

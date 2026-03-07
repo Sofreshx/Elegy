@@ -1,6 +1,7 @@
 using Elegy.Formalization.Core.Workflow;
 using Elegy.Formalization.Core.Workflow.Models;
 using Elegy.Formalization.Serialization;
+using System.Text.Json;
 using Xunit;
 
 namespace Elegy.Formalization.Serialization.Tests;
@@ -36,6 +37,9 @@ public sealed class CanonicalJsonSerializerTests
         var json = CanonicalJsonSerializer.Serialize(original);
         var roundTripped = CanonicalJsonSerializer.Deserialize<WorkflowDefinition>(json);
 
+        Assert.Contains("\"canonicalAuthority\":\"blueprint\"", json);
+        Assert.Contains("\"conflictPolicy\":\"reconcile\"", json);
+
         Assert.Equal(original.Id, roundTripped.Id);
         Assert.Equal(original.Name, roundTripped.Name);
         Assert.Equal(original.SpecVersion, roundTripped.SpecVersion);
@@ -46,5 +50,13 @@ public sealed class CanonicalJsonSerializerTests
         Assert.Equal(original.Steps.Single(), roundTripped.Steps.Single());
         Assert.Equal(original.Layout.Groups.Single(), roundTripped.Layout.Groups.Single());
         Assert.Equal(original.Layout.Positions.Single(), roundTripped.Layout.Positions.Single());
+    }
+
+    [Fact]
+    public void Deserialize_Rejects_Numeric_Enum_Tokens()
+    {
+        const string json = "{\"id\":\"wf-1\",\"name\":\"Demo\",\"specVersion\":\"1.0\",\"canonicalAuthority\":1,\"conflictPolicy\":\"reconcile\",\"blueprint\":{\"blueprintId\":\"bp-1\",\"version\":\"2\",\"isPinned\":true},\"triggers\":[],\"steps\":[],\"connections\":[],\"layout\":{\"groups\":[],\"positions\":[]}}";
+
+        Assert.Throws<JsonException>(() => CanonicalJsonSerializer.Deserialize<WorkflowDefinition>(json));
     }
 }

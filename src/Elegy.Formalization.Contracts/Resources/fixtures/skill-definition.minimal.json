@@ -1,0 +1,8 @@
+{
+  "id": "skill-001",
+  "name": "example-skill",
+  "description": null,
+  "triggers": [],
+  "constraints": [],
+  "lifecycleState": "draft"
+}

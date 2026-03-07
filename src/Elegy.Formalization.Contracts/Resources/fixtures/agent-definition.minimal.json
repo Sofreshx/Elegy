@@ -1,0 +1,8 @@
+{
+  "id": "agent-001",
+  "name": "example-agent",
+  "description": null,
+  "capabilities": [],
+  "routingRules": [],
+  "scope": "session"
+}

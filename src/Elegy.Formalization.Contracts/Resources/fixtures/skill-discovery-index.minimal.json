@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "entries": [
+    {
+      "skill": "example-skill",
+      "name": "Example Skill",
+      "description": "A minimal skill for validation.",
+      "triggersOn": ["example"]
+    }
+  ]
+}

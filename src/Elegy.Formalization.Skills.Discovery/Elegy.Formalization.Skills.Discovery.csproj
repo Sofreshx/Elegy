@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Elegy.Formalization.Core\Elegy.Formalization.Core.csproj" />
+    <ProjectReference Include="..\Elegy.Formalization.Skills\Elegy.Formalization.Skills.csproj" />
+  </ItemGroup>
+</Project>

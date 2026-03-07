@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/skill-definition.schema.json",
+  "title": "SkillDefinition",
+  "description": "Canonical skill definition contract for non-.NET consumers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "triggers", "constraints", "lifecycleState"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": ["string", "null"] },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pattern"],
+        "properties": {
+          "pattern": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["constraintId", "required"],
+        "properties": {
+          "constraintId": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] },
+          "required": { "type": "boolean" }
+        }
+      }
+    },
+    "lifecycleState": {
+      "type": "string",
+      "enum": ["draft", "active", "deprecated", "archived"]
+    }
+  }
+}
