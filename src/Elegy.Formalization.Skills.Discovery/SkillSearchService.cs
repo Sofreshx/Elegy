@@ -42,7 +42,7 @@ public sealed class SkillSearchService
         {
             foreach (var result in Search(index, token))
             {
-                if (seen.Add(result.Entry.Id))
+                if (seen.Add(result.Entry.SkillId))
                 {
                     results.Add(result);
                 }
@@ -62,13 +62,25 @@ public sealed class SkillSearchService
         if (entry.Name.Contains(query, comparison))
             return (50, "name-contains");
 
-        foreach (var trigger in entry.Triggers)
+        foreach (var trigger in entry.TriggersOn)
         {
             if (trigger.Contains(query, comparison))
                 return (30, "trigger-contains");
         }
 
-        if (entry.Description is not null && entry.Description.Contains(query, comparison))
+        foreach (var keyword in entry.Keywords)
+        {
+            if (keyword.Contains(query, comparison))
+                return (20, "keyword-contains");
+        }
+
+        foreach (var capabilityHint in entry.CapabilityHints)
+        {
+            if (capabilityHint.Contains(query, comparison))
+                return (15, "capability-hint-contains");
+        }
+
+        if (entry.Description.Contains(query, comparison))
             return (10, "description-contains");
 
         return (0, string.Empty);

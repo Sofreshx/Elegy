@@ -1,16 +1,94 @@
 # Elegy
 
-Elegy provides formalization extraction building blocks with focused packages for core models, serialization, validation, governance, contracts, and projections.
+Elegy is the main monorepo for reusable formalization, governance, MCP-facing analysis, skill definitions, generation-oriented building blocks, and the Rust runtime family that executes or composes those governed artifacts.
+
+The design target is cross-project reuse with focused packages that stay:
+
+- LLM-agnostic
+- provider-agnostic
+- framework-agnostic
+
+The .NET solution remains the contract and formalization authority. Runtime-oriented MCP behavior lives in the in-repo Rust workspace where protocol, transport, host, and IO concerns dominate.
+
+## Ecosystem position
+
+- `Elegy` is the single main repository.
+- governed contracts, schemas, fixtures, and canonical skill models remain authoritative in the .NET package families under `src/`.
+- the first-party Rust runtime family lives under `rust/` and is the preferred implementation surface for behavior-heavy MCP runtime logic.
+- standalone `Elegy-Skills` and `Elegy-CLI` repos should not be treated as the primary implementation surfaces.
+
+See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topology.md) for the current high-level organization and dependency direction.
 
 ## Project map
 
+### Substrate
+
 - `src/Elegy.Formalization.Core` - Core abstractions and domain model primitives.
+- `src/Elegy.Formalization.Contracts` - Shared contracts for integration boundaries.
 - `src/Elegy.Formalization.Serialization` - Serialization support over core formalization models.
 - `src/Elegy.Formalization.Validation` - Validation utilities and rules for formalization artifacts.
-- `src/Elegy.Formalization.Projections.Mermaid` - Mermaid projection output from core formalization structures.
 - `src/Elegy.Formalization.Governance` - Governance policies and enforcement helpers.
-- `src/Elegy.Formalization.Contracts` - Shared contracts for integration boundaries.
+- `src/Elegy.Formalization.Projections.Mermaid` - Mermaid projection output from core formalization structures.
+
+### Skills and generation
+
+- `src/Elegy.Formalization.Skills` - Core skill definitions and lifecycle metadata.
+- `src/Elegy.Formalization.Skills.Discovery` - Discovery-oriented skill surfaces.
+- `src/Elegy.Formalization.DynamicSkills` - Dynamic materialization and runtime-oriented skill helpers.
+- `src/Elegy.Formalization.SkillForge` - Skill and tooling generation/materialization flows.
+
+### MCP and adjacent runtime-facing analysis
+
+- `src/Elegy.Formalization.Mcp` - MCP descriptors, governed analysis artifacts, and canonical MCP-to-skill projection rules.
+
+### Rust Runtime Family
+
+- `rust/` - in-repo Rust workspace for runtime composition, MCP host concerns, contract-consumer utilities, and future Rust replacements for behavior-heavy .NET MCP logic.
+
+### Additional families
+
+- `src/Elegy.Formalization.Agents` - Agent-facing formalization primitives.
+- `src/Elegy.Formalization.AgentFactory` - Agent creation/build helpers.
+- `src/Elegy.Formalization.Monitoring` - Monitoring-oriented formalization surfaces.
 - `tests/*` - Unit test projects aligned to source packages.
+
+## Organization rules
+
+- shared substrate packages must not depend on provider-specific SDKs, app frameworks, or host-specific runtime glue
+- MCP formalization in `src/` remains the schema and canonical projection authority, but behavior-heavy host, transport, filesystem, HTTP, and execution logic should move to the in-repo Rust runtime family when Rust is the stronger implementation fit
+- the exported contract bundle is the machine-readable handshake between authoritative .NET contract families and first-party Rust runtime crates, plus any external consumers
+- generation/tooling concerns belong in `SkillForge`-style packages rather than being conflated with the human-facing CLI concept
+- if a package family later needs its own repository, split only after the package boundary is proven and at least two real consumers exist
+
+## Consolidation posture
+
+The current consolidation direction is:
+
+- keep .NET authoritative for governed contracts, schemas, fixtures, compatibility manifests, and canonical skill definitions
+- keep useful Rust MCP implementation layers in `rust/` instead of treating a sibling repo as the long-term default topology
+- replace .NET with Rust where runtime, protocol, host, transport, or filesystem behavior is the dominant concern
+- start that replacement work with the existing .NET MCP analyzer, generator, and discovery behavior rather than with broader package families such as DynamicSkills or SkillForge
+
+## Documentation and operational posture
+
+`Elegy` is the authoritative public entrypoint for contributor and governance posture.
+
+- [Contributing guide](CONTRIBUTING.md)
+- [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
+- [Changelog](CHANGELOG.md)
+- [Architecture docs](docs/architecture/README.md)
+- [MCP spec baseline](docs/spec-baseline.md)
+
+Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Skills` should be treated as archival or closeout references rather than the primary source of truth.
+
+## Distribution and consumption
+
+Elegy should be consumed through versioned packages and versioned exported artifacts rather than local sibling-repository references.
+
+- .NET package distribution is prepared for GitHub Packages.
+- contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
+- downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Release and versioning
 
@@ -54,9 +132,14 @@ Export publishable contracts artifacts (schema + fixtures + compatibility manife
 pwsh ./scripts/export-contracts.ps1
 ```
 
-This produces deterministic files under `artifacts/contracts`:
+This produces deterministic files under `artifacts/contracts` for downstream consumers such as Node.js tools, the in-repo Rust workspace under `rust/`, and any external integrations:
 
 - `canonical-workflow.schema.json`
+- `skill-definition.schema.json`
+- `skill-discovery-index.schema.json`
+- `mcp-tool-definition.schema.json`
+- `mcp-server-descriptor.schema.json`
+- `mcp-analysis-result.schema.json`
 - `fixtures/canonical-workflow.minimal.json`
 - `compatibility-manifest.json`
 - `compatibility-matrix.json`

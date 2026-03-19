@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/mcp-server-descriptor.schema.json",
+  "title": "MCP Server Descriptor",
+  "description": "Describes a single MCP server, its transport, and the tools it declares.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["serverName", "transport", "tools"],
+  "properties": {
+    "serverName": { "type": "string", "minLength": 1 },
+    "transport": {
+      "type": "string",
+      "enum": ["stdio", "http"]
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] },
+          "inputSchema": { "type": ["object", "null"] }
+        }
+      }
+    }
+  }
+}

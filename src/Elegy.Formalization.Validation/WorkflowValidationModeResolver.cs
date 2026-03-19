@@ -2,24 +2,28 @@ namespace Elegy.Formalization.Validation;
 
 public static class WorkflowValidationModeResolver
 {
-    private static readonly IReadOnlyList<string> AllowedModes = ["strict", "warn"];
+    public const string ValidationModeQueryParameter = "validationMode";
+    public const string ValidationModeHeader = "X-Workflow-Validation-Mode";
+
+    private static readonly IReadOnlyList<string> AllowedModes = ["warn", "strict"];
 
     public static WorkflowValidationModeResolution Resolve(
         IReadOnlyDictionary<string, string?>? queryParameters,
         string? bodyMode,
         IReadOnlyDictionary<string, string?>? headers,
-        WorkflowValidationMode defaultMode = WorkflowValidationMode.Strict)
+        WorkflowValidationMode defaultMode = WorkflowValidationMode.Warn)
     {
         var candidate = FirstPresent(
-            ("query", GetValue(queryParameters, "mode")),
+            ("query", GetValue(queryParameters, ValidationModeQueryParameter)),
             ("body", bodyMode),
-            ("header", GetValue(headers, "x-validation-mode")));
+            ("header", GetValue(headers, ValidationModeHeader)));
 
         if (candidate.Value is null)
         {
             return new WorkflowValidationModeResolution
             {
                 Mode = defaultMode,
+                ModeApplied = ToModeApplied(defaultMode),
                 Source = "default"
             };
         }
@@ -29,16 +33,19 @@ public static class WorkflowValidationModeResolver
             return new WorkflowValidationModeResolution
             {
                 Mode = mode,
+                ModeApplied = ToModeApplied(mode),
                 Source = candidate.Source
             };
         }
 
         return new WorkflowValidationModeResolution
         {
+            Mode = defaultMode,
+            ModeApplied = ToModeApplied(defaultMode),
             Source = candidate.Source,
             Invalid = new InvalidValidationModeResult(
-                "invalid_validation_mode",
-                $"Validation mode '{candidate.Value}' from {candidate.Source} is invalid.",
+                "INVALID_VALIDATION_MODE",
+                "Invalid validation mode. Allowed values: warn, strict.",
                 candidate.Value,
                 candidate.Source,
                 AllowedModes)
@@ -74,6 +81,11 @@ public static class WorkflowValidationModeResolver
 
         mode = default;
         return false;
+    }
+
+    private static string ToModeApplied(WorkflowValidationMode mode)
+    {
+        return mode.ToString().ToLowerInvariant();
     }
 
     private static string? GetValue(IReadOnlyDictionary<string, string?>? values, string key)

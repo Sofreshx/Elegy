@@ -87,12 +87,16 @@ public sealed class SkillDiscoveryIntegrationTests : IDisposable
         // Craft a malicious entry with traversal VaultRef
         var maliciousEntry = new SkillIndexEntry
         {
-            Id = "evil",
+            SkillId = "evil",
             Name = "evil",
-            Description = null,
-            Triggers = [],
-            LoadMode = SkillLoadMode.OnDemand,
-            VaultRef = "../../etc/passwd"
+            Description = string.Empty,
+            TriggersOn = [],
+            Manifest = new SkillIndexManifest
+            {
+                Id = "evil",
+                LoadMode = SkillLoadMode.OnDemand,
+                VaultRef = "../../etc/passwd"
+            }
         };
 
         var result = resolveService.Resolve(maliciousEntry, _tempVaultRoot);
@@ -107,12 +111,16 @@ public sealed class SkillDiscoveryIntegrationTests : IDisposable
 
         var entry = new SkillIndexEntry
         {
-            Id = "missing",
+            SkillId = "missing",
             Name = "missing",
-            Description = null,
-            Triggers = [],
-            LoadMode = SkillLoadMode.OnDemand,
-            VaultRef = null
+            Description = string.Empty,
+            TriggersOn = [],
+            Manifest = new SkillIndexManifest
+            {
+                Id = "missing",
+                LoadMode = SkillLoadMode.OnDemand,
+                VaultRef = null
+            }
         };
 
         var result = resolveService.Resolve(entry, _tempVaultRoot);

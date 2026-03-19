@@ -19,14 +19,14 @@ public sealed class SkillResolveService
 {
     public SkillResolveResult Resolve(SkillIndexEntry entry, string vaultRootPath)
     {
-        if (string.IsNullOrWhiteSpace(entry.VaultRef))
+        var vaultRef = entry.Manifest.VaultRef ?? entry.VaultRef;
+
+        if (string.IsNullOrWhiteSpace(vaultRef))
         {
             return new SkillResolveResult.Failure(
                 SkillResolveError.NotFound,
                 $"No VaultRef for skill '{entry.Id}'.");
         }
-
-        var vaultRef = entry.VaultRef;
 
         // Reject path traversal segments
         if (vaultRef.Contains("..", StringComparison.Ordinal))

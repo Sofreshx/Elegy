@@ -1,7 +1,10 @@
+using Elegy.Formalization.Skills;
+
 namespace Elegy.Formalization.DynamicSkills;
 
 public sealed record DynamicSkillValidationResult
 {
-    public bool IsValid { get; init; }
-    public IReadOnlyList<string> Errors { get; init; } = [];
+    public SkillValidationResult Validation { get; init; } = new();
+    public bool IsValid => Validation.IsValid;
+    public IReadOnlyList<string> Errors => Validation.Errors;
 }

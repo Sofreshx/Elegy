@@ -1,6 +1,8 @@
 [CmdletBinding()]
 param(
-    [string]$OutputPath = ''
+    [string]$OutputPath = '',
+    [switch]$CreateArchive,
+    [string]$ArchiveOutputPath = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -28,6 +30,10 @@ $packageVersion = $propsXml.SelectSingleNode('//Project/PropertyGroup/VersionPre
 $schemaVersion = (Get-Content -Raw -Path $schemaVersionPath | ConvertFrom-Json).schemaVersion
 $compatibilityManifest = Get-Content -Raw -Path $compatibilityManifestFile | ConvertFrom-Json
 $compatibilityMatrix = Get-Content -Raw -Path $compatibilityMatrixFile | ConvertFrom-Json
+
+if ($CreateArchive -and [string]::IsNullOrWhiteSpace($ArchiveOutputPath)) {
+    $ArchiveOutputPath = Join-Path $repoRoot "artifacts\distribution\elegy-contracts-$packageVersion.zip"
+}
 
 if ($compatibilityManifest.package.version -ne $packageVersion) {
     throw "Compatibility manifest package version '$($compatibilityManifest.package.version)' does not match Directory.Build.props VersionPrefix '$packageVersion'."
@@ -79,10 +85,39 @@ foreach ($schemaEntry in $compatibilityManifest.schemas) {
     }
 }
 
+$supplementalFixtureFiles = @(
+    'fixtures\mcp-server-descriptor.parity.json',
+    'fixtures\mcp-analysis-result.parity.json',
+    'fixtures\mcp-parity-expected.json'
+)
+
+foreach ($fixture in $supplementalFixtureFiles) {
+    $fixturePath = Join-Path $contractsResourcesPath $fixture
+    if (-not (Test-Path $fixturePath)) {
+        throw "Supplemental fixture file not found: $fixturePath"
+    }
+
+    Copy-Item -Path $fixturePath -Destination (Join-Path $OutputPath $fixture) -Force
+}
+
 Copy-Item -Path $compatibilityManifestFile -Destination (Join-Path $OutputPath 'compatibility-manifest.json') -Force
 Copy-Item -Path $compatibilityMatrixFile -Destination (Join-Path $OutputPath 'compatibility-matrix.json') -Force
 
 Write-Host "Exported contracts artifacts to: $OutputPath"
 Get-ChildItem -Path $OutputPath -Recurse -File | ForEach-Object {
     Write-Host " - $($_.FullName)"
+}
+
+if ($CreateArchive) {
+    $archiveDirectory = Split-Path -Parent $ArchiveOutputPath
+    if (-not [string]::IsNullOrWhiteSpace($archiveDirectory)) {
+        New-Item -ItemType Directory -Path $archiveDirectory -Force | Out-Null
+    }
+
+    if (Test-Path $ArchiveOutputPath) {
+        Remove-Item -Path $ArchiveOutputPath -Force
+    }
+
+    Compress-Archive -Path (Join-Path $OutputPath '*') -DestinationPath $ArchiveOutputPath -CompressionLevel Optimal
+    Write-Host "Created contracts archive: $ArchiveOutputPath"
 }

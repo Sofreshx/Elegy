@@ -17,7 +17,15 @@ public sealed class SkillResolveServiceTests
 
         try
         {
-            var entry = new SkillIndexEntry { Id = "my-skill", VaultRef = "my-skill/SKILL.md" };
+            var entry = new SkillIndexEntry
+            {
+                SkillId = "my-skill",
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "my-skill",
+                    VaultRef = "my-skill/SKILL.md"
+                }
+            };
             var result = _sut.Resolve(entry, tempDir);
 
             Assert.IsType<SkillResolveResult.Success>(result);
@@ -33,7 +41,15 @@ public sealed class SkillResolveServiceTests
     [Fact]
     public void Resolve_PathTraversal_ReturnsFailure()
     {
-        var entry = new SkillIndexEntry { Id = "evil", VaultRef = "../../etc/passwd" };
+        var entry = new SkillIndexEntry
+        {
+            SkillId = "evil",
+            Manifest = new SkillIndexManifest
+            {
+                Id = "evil",
+                VaultRef = "../../etc/passwd"
+            }
+        };
         var result = _sut.Resolve(entry, "/tmp/vault");
 
         Assert.IsType<SkillResolveResult.Failure>(result);
@@ -50,7 +66,15 @@ public sealed class SkillResolveServiceTests
         try
         {
             // VaultRef that, after GetFullPath, would be absolute and outside vault
-            var entry = new SkillIndexEntry { Id = "evil", VaultRef = Path.GetFullPath("/") };
+            var entry = new SkillIndexEntry
+            {
+                SkillId = "evil",
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "evil",
+                    VaultRef = Path.GetFullPath("/")
+                }
+            };
             var result = _sut.Resolve(entry, tempDir);
 
             // Should be either PathTraversal or OutsideVault depending on whether ".." is in the ref
@@ -73,7 +97,15 @@ public sealed class SkillResolveServiceTests
 
         try
         {
-            var entry = new SkillIndexEntry { Id = "missing", VaultRef = "missing/SKILL.md" };
+            var entry = new SkillIndexEntry
+            {
+                SkillId = "missing",
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "missing",
+                    VaultRef = "missing/SKILL.md"
+                }
+            };
             var result = _sut.Resolve(entry, tempDir);
 
             Assert.IsType<SkillResolveResult.Failure>(result);
@@ -88,7 +120,15 @@ public sealed class SkillResolveServiceTests
     [Fact]
     public void Resolve_NullVaultRef_ReturnsNotFound()
     {
-        var entry = new SkillIndexEntry { Id = "no-ref", VaultRef = null };
+        var entry = new SkillIndexEntry
+        {
+            SkillId = "no-ref",
+            Manifest = new SkillIndexManifest
+            {
+                Id = "no-ref",
+                VaultRef = null
+            }
+        };
         var result = _sut.Resolve(entry, "/tmp/vault");
 
         Assert.IsType<SkillResolveResult.Failure>(result);
@@ -98,7 +138,15 @@ public sealed class SkillResolveServiceTests
     [Fact]
     public void Resolve_EmptyVaultRef_ReturnsNotFound()
     {
-        var entry = new SkillIndexEntry { Id = "empty-ref", VaultRef = "" };
+        var entry = new SkillIndexEntry
+        {
+            SkillId = "empty-ref",
+            Manifest = new SkillIndexManifest
+            {
+                Id = "empty-ref",
+                VaultRef = ""
+            }
+        };
         var result = _sut.Resolve(entry, "/tmp/vault");
 
         Assert.IsType<SkillResolveResult.Failure>(result);

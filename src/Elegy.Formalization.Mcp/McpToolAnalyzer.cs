@@ -4,7 +4,7 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.Mcp;
 
-public sealed class McpToolAnalyzer
+internal sealed class McpToolAnalyzer
 {
     private static readonly Regex CamelCaseBoundary = new(
         @"(?<=[a-z])(?=[A-Z])|(?<=[A-Z])(?=[A-Z][a-z])",

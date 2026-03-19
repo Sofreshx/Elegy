@@ -76,6 +76,22 @@
       "fixtures": [
         "fixtures/mcp-tool-definition.minimal.json"
       ]
+    },
+    {
+      "name": "mcp-server-descriptor",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-server-descriptor.schema.json",
+      "fixtures": [
+        "fixtures/mcp-server-descriptor.minimal.json"
+      ]
+    },
+    {
+      "name": "mcp-analysis-result",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-analysis-result.schema.json",
+      "fixtures": [
+        "fixtures/mcp-analysis-result.minimal.json"
+      ]
     }
   ]
 }

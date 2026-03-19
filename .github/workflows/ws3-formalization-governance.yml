@@ -1,0 +1,194 @@
+name: WS3 Formalization Governance
+
+on:
+  workflow_call:
+    outputs:
+      resolved-mode:
+        description: Resolved WS3 enforcement mode.
+        value: ${{ jobs.ws3-governance.outputs.resolved-mode }}
+      gate-decision:
+        description: Final WS3 gate decision.
+        value: ${{ jobs.ws3-governance.outputs.gate-decision }}
+  workflow_dispatch:
+  pull_request:
+  push:
+    branches:
+      - main
+      - 'release/**'
+
+permissions:
+  contents: read
+
+jobs:
+  ws3-governance:
+    runs-on: windows-latest
+    outputs:
+      resolved-mode: ${{ steps.capture-outputs.outputs.resolved-mode }}
+      gate-decision: ${{ steps.capture-outputs.outputs.gate-decision }}
+
+    steps:
+      - name: Checkout caller repository
+        uses: actions/checkout@v4
+        with:
+          path: caller-repo
+
+      - name: Resolve workflow asset source
+        id: workflow-source
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $workflowRef = '${{ github.workflow_ref }}'
+          if ([string]::IsNullOrWhiteSpace($workflowRef)) {
+            throw 'github.workflow_ref was empty.'
+          }
+
+          $parts = $workflowRef -split '@', 2
+          if ($parts.Count -ne 2) {
+            throw "Unable to parse github.workflow_ref: $workflowRef"
+          }
+
+          $repositoryAndPath = $parts[0]
+          $workflowRefName = $parts[1]
+          $workflowPathMarker = '/.github/workflows/'
+          $markerIndex = $repositoryAndPath.IndexOf($workflowPathMarker, [System.StringComparison]::Ordinal)
+          if ($markerIndex -lt 0) {
+            throw "Unable to derive workflow repository from github.workflow_ref: $workflowRef"
+          }
+
+          $workflowRepository = $repositoryAndPath.Substring(0, $markerIndex)
+          $sameRepository = $workflowRepository.Equals('${{ github.repository }}', [System.StringComparison]::OrdinalIgnoreCase)
+
+          "repository=$workflowRepository" >> $env:GITHUB_OUTPUT
+          "ref=$workflowRefName" >> $env:GITHUB_OUTPUT
+          "same-repository=$($sameRepository.ToString().ToLowerInvariant())" >> $env:GITHUB_OUTPUT
+
+      - name: Checkout governance asset repository
+        if: steps.workflow-source.outputs.same-repository != 'true'
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ steps.workflow-source.outputs.repository }}
+          ref: ${{ steps.workflow-source.outputs.ref }}
+          path: governance-repo
+
+      - name: Resolve enforcement mode
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $callerRoot = Join-Path $PWD 'caller-repo'
+          $governanceRoot = if ('${{ steps.workflow-source.outputs.same-repository }}' -eq 'true') {
+            $callerRoot
+          } else {
+            Join-Path $PWD 'governance-repo'
+          }
+
+          & (Join-Path $governanceRoot 'scripts/ws3/resolve-enforcement-mode.ps1') `
+            -PolicyPath (Join-Path $governanceRoot 'policies/formalization/visual-llm-enforcement-policy.json') `
+            -BranchName '${{ github.ref_name }}' `
+            -WorkflowName '${{ github.workflow }}' `
+            -OutputPath (Join-Path $callerRoot 'artifacts/ws3/mode-selection.json')
+
+      - name: Script smoke validation (warn mode, non-blocking)
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $callerRoot = Join-Path $PWD 'caller-repo'
+          $governanceRoot = if ('${{ steps.workflow-source.outputs.same-repository }}' -eq 'true') {
+            $callerRoot
+          } else {
+            Join-Path $PWD 'governance-repo'
+          }
+
+          $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
+          New-Item -Path $artifactsRoot -ItemType Directory -Force | Out-Null
+          @'
+          {
+            "violations": [
+              {
+                "id": "ws3-smoke-warning",
+                "severity": "low",
+                "message": "smoke validation finding"
+              }
+            ]
+          }
+          '@ | Set-Content -Path (Join-Path $artifactsRoot 'smoke-violations.json') -Encoding utf8
+
+          & (Join-Path $governanceRoot 'scripts/ws3/evaluate-formalization-gates.ps1') `
+            -Mode warn `
+            -ViolationsPath (Join-Path $artifactsRoot 'smoke-violations.json') `
+            -OutputPath (Join-Path $artifactsRoot 'smoke-gate-decision.json')
+
+      - name: Evaluate formalization gates
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $callerRoot = Join-Path $PWD 'caller-repo'
+          $governanceRoot = if ('${{ steps.workflow-source.outputs.same-repository }}' -eq 'true') {
+            $callerRoot
+          } else {
+            Join-Path $PWD 'governance-repo'
+          }
+
+          $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
+          $violationsPath = Join-Path $artifactsRoot 'formalization-violations.json'
+          if (-not (Test-Path -LiteralPath $violationsPath)) {
+            @'
+            {
+              "violations": []
+            }
+            '@ | Set-Content -Path $violationsPath -Encoding utf8
+          }
+
+          & (Join-Path $governanceRoot 'scripts/ws3/evaluate-formalization-gates.ps1') `
+            -ModeSelectionPath (Join-Path $artifactsRoot 'mode-selection.json') `
+            -ViolationsPath $violationsPath `
+            -OutputPath (Join-Path $artifactsRoot 'gate-decision.json')
+
+      - name: Write mode audit artifact
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $callerRoot = Join-Path $PWD 'caller-repo'
+          $governanceRoot = if ('${{ steps.workflow-source.outputs.same-repository }}' -eq 'true') {
+            $callerRoot
+          } else {
+            Join-Path $PWD 'governance-repo'
+          }
+
+          $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
+          & (Join-Path $governanceRoot 'scripts/ws3/write-mode-audit-artifact.ps1') `
+            -ModeSelectionPath (Join-Path $artifactsRoot 'mode-selection.json') `
+            -GateDecisionPath (Join-Path $artifactsRoot 'gate-decision.json') `
+            -OutputPath (Join-Path $artifactsRoot 'mode-audit.json')
+
+      - name: Capture workflow outputs
+        if: always()
+        id: capture-outputs
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactsRoot = Join-Path (Join-Path $PWD 'caller-repo') 'artifacts/ws3'
+          $modeSelectionPath = Join-Path $artifactsRoot 'mode-selection.json'
+          $gateDecisionPath = Join-Path $artifactsRoot 'gate-decision.json'
+
+          if (Test-Path -LiteralPath $modeSelectionPath) {
+            $modeSelection = Get-Content -LiteralPath $modeSelectionPath -Raw | ConvertFrom-Json
+            "resolved-mode=$([string]$modeSelection.resolvedMode)" >> $env:GITHUB_OUTPUT
+          } else {
+            "resolved-mode=unknown" >> $env:GITHUB_OUTPUT
+          }
+
+          if (Test-Path -LiteralPath $gateDecisionPath) {
+            $gateDecision = Get-Content -LiteralPath $gateDecisionPath -Raw | ConvertFrom-Json
+            "gate-decision=$([string]$gateDecision.decision)" >> $env:GITHUB_OUTPUT
+          } else {
+            "gate-decision=unknown" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Upload WS3 governance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ws3-formalization-governance
+          path: caller-repo/artifacts/ws3/*.json
+          if-no-files-found: error

@@ -13,13 +13,13 @@ public sealed class WorkflowMermaidCodecTests
         {
             Steps =
             [
-                new WorkflowStep { Id = "b", Name = "Second", Type = "task" },
-                new WorkflowStep { Id = "a", Name = "First", Type = "task" }
+                new WorkflowStep { Id = "step-b", Name = "Second", Type = "task" },
+                new WorkflowStep { Id = "step-a", Name = "First", Type = "task" }
             ],
             Connections =
             [
-                new WorkflowConnection { Id = "c2", FromStepId = "b", ToStepId = "a", Label = "back" },
-                new WorkflowConnection { Id = "c1", FromStepId = "a", ToStepId = "b", Label = "next" }
+                new WorkflowConnection { Id = "c2", FromStepId = "step-b", FromPort = "result", ToStepId = "step-a", ToPort = "input", Label = "back" },
+                new WorkflowConnection { Id = "c1", FromStepId = "step-a", FromPort = "output", ToStepId = "step-b", ToPort = "input", Label = "next", Condition = "approved" }
             ]
         };
 
@@ -29,9 +29,37 @@ public sealed class WorkflowMermaidCodecTests
             "flowchart TD",
             "    step_a[\"First\"]",
             "    step_b[\"Second\"]",
-            "    step_a -->|next| step_b",
-            "    step_b -->|back| step_a");
+            "    step_a -->|output->input; label:next; when:approved| step_b",
+            "    step_b -->|result->input; label:back| step_a");
 
         Assert.Equal(expected, output);
+    }
+
+    [Fact]
+    public void Serialize_Normalizes_Node_Ids_And_Ignores_Trigger_Nodes()
+    {
+        var workflow = new WorkflowDefinition
+        {
+            Triggers =
+            [
+                new WorkflowTrigger { Id = "trigger-1", Name = "Manual", Type = "manual", TargetStepId = "1 bad-id" }
+            ],
+            Steps =
+            [
+                new WorkflowStep { Id = "1 bad-id", Name = "Start", Type = "task" },
+                new WorkflowStep { Id = "1_bad_id", Name = "Shadow", Type = "task" }
+            ],
+            Connections =
+            [
+                new WorkflowConnection { FromStepId = "1 bad-id", ToStepId = "1_bad_id" }
+            ]
+        };
+
+        var output = WorkflowMermaidCodec.Serialize(workflow);
+
+        Assert.DoesNotContain("trigger_1", output);
+        Assert.Contains("    n_1_bad_id[\"Start\"]", output);
+        Assert.Contains("    n_1_bad_id_2[\"Shadow\"]", output);
+        Assert.Contains("    n_1_bad_id --> n_1_bad_id_2", output);
     }
 }

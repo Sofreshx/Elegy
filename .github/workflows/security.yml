@@ -1,0 +1,88 @@
+name: Security
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  cargo-deny:
+    name: cargo-deny
+    if: ${{ hashFiles('rust/Cargo.toml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: taiki-e/install-action@cargo-deny
+      - name: cargo deny check
+        working-directory: ./rust
+        run: cargo deny check advisories licenses bans sources
+
+  cargo-audit:
+    name: cargo-audit
+    if: ${{ hashFiles('rust/Cargo.toml') != '' }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - uses: taiki-e/install-action@cargo-audit
+      - name: cargo audit
+        working-directory: ./rust
+        run: cargo audit
+
+  gitleaks:
+    name: gitleaks
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  codeql:
+    name: codeql
+    if: ${{ hashFiles('**/*.cs') != '' || hashFiles('rust/**/*.rs') != '' }}
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: csharp,rust
+      - name: Restore .NET solution
+        run: dotnet restore ./Elegy.sln
+      - name: Build .NET solution
+        run: dotnet build ./Elegy.sln --configuration Release --no-restore
+      - name: Build Rust workspace
+        working-directory: ./rust
+        run: cargo build --workspace --all-features --locked
+      - name: Analyze
+        uses: github/codeql-action/analyze@v3

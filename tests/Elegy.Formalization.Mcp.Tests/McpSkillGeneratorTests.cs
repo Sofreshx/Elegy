@@ -42,7 +42,7 @@ public sealed class McpSkillGeneratorTests
         var result = _sut.Generate(CreateTestAnalysis());
 
         Assert.Equal(2, result.GeneratedSkills.Count);
-        Assert.All(result.GeneratedSkills, s => Assert.StartsWith("mcp-", s.Id));
+        Assert.All(result.GeneratedSkills, s => Assert.StartsWith("mcp-", s.EffectiveId));
     }
 
     [Fact]
@@ -55,14 +55,16 @@ public sealed class McpSkillGeneratorTests
     }
 
     [Fact]
-    public void Generate_OriginConstraint_Present()
+    public void Generate_Uses_Canonical_Origin_And_Discovery_Metadata()
     {
         var result = _sut.Generate(CreateTestAnalysis());
 
         foreach (var skill in result.GeneratedSkills)
         {
-            var origin = Assert.Single(skill.Constraints, c => c.ConstraintId == "origin");
-            Assert.Equal("mcp-generated", origin.Description);
+            Assert.Equal(Skills.SkillSourceKind.Generated, skill.Origin.SourceKind);
+            Assert.Equal(Skills.SkillMaterializationKind.Declared, skill.Origin.MaterializationKind);
+            Assert.StartsWith("mcp://test-server/tools/", skill.Origin.SourceRef);
+            Assert.Contains("test-server", skill.Discovery.Keywords);
         }
     }
 
@@ -73,5 +75,13 @@ public sealed class McpSkillGeneratorTests
 
         Assert.All(result.GeneratedSkills, s =>
             Assert.Equal(Skills.SkillLifecycleState.Draft, s.LifecycleState));
+    }
+
+    [Fact]
+    public void Generate_InputSchemaRef_Present_When_Tool_Has_Schema()
+    {
+        var result = _sut.Generate(CreateTestAnalysis());
+
+        Assert.All(result.GeneratedSkills, skill => Assert.Contains("/input-schema", skill.Input.SchemaRef));
     }
 }

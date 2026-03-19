@@ -1,6 +1,7 @@
 # Build outputs
 **/[Bb]in/
 **/[Oo]bj/
+rust/target/
 
 # Test artifacts
 TestResults/

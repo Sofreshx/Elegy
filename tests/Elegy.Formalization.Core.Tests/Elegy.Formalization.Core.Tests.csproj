@@ -15,6 +15,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\\..\\src\\Elegy.Formalization.Core\\Elegy.Formalization.Core.csproj" />
+    <ProjectReference Include="..\\..\\src\\Elegy.Formalization.Contracts\\Elegy.Formalization.Contracts.csproj" />
   </ItemGroup>
 </Project>
 

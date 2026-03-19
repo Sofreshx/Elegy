@@ -9,11 +9,20 @@ public sealed class SkillForgeServiceTests
 {
     private static SkillForgeRequest CreateValidRequest() => new()
     {
+        SkillId = "my-skill",
         Name = "my-skill",
         Description = "A test skill",
         Triggers = [new SkillTrigger { Pattern = "test trigger", Description = "fires on test" }],
         Constraints = [new SkillConstraint { ConstraintId = "c1", Description = "must be valid", Required = true }],
-        DiscoveryKeywords = ["testing", "unit"]
+        DiscoveryKeywords = ["testing", "unit"],
+        Input = new SkillInputContract
+        {
+            Parameters = [new SkillParameter { Name = "query", Type = "string", Description = "Search query" }]
+        },
+        Governance = new SkillGovernanceMetadata
+        {
+            AllowedContexts = ["workspace"]
+        },
     };
 
     private static SkillForgeService CreateService(bool engineEnabled = true) =>
@@ -31,6 +40,7 @@ public sealed class SkillForgeServiceTests
         Assert.True(result.Success);
         Assert.NotNull(result.CreatedSkill);
         Assert.Equal("my-skill", result.CreatedSkill!.Name);
+        Assert.Equal("my-skill", result.CreatedSkill.EffectiveId);
         Assert.Empty(result.GovernanceFindings);
         Assert.Null(result.ErrorMessage);
     }
@@ -43,7 +53,7 @@ public sealed class SkillForgeServiceTests
     public void Forge_InvalidName_ReturnsFalseWithPattern(string badName)
     {
         var service = CreateService();
-        var request = CreateValidRequest() with { Name = badName };
+        var request = CreateValidRequest() with { SkillId = badName, Name = badName };
 
         var result = service.Forge(request);
 
@@ -110,6 +120,37 @@ public sealed class SkillForgeServiceTests
         Assert.True(result.Success);
         Assert.NotNull(result.RegistrationMetadata);
         Assert.Equal("my-skill", result.RegistrationMetadata!.ManifestEntry);
+        Assert.Equal("my-skill", result.RegistrationMetadata.SkillId);
         Assert.Equal(["testing", "unit"], result.RegistrationMetadata.DiscoveryKeywords);
+    }
+
+    [Fact]
+    public void Forge_Preserves_Canonical_Metadata_For_Downstream_Use()
+    {
+        var service = CreateService();
+        var request = CreateValidRequest() with
+        {
+            Name = "My Skill",
+            Identity = new SkillIdentity { DefinitionId = "my-skill", DisplayName = "My Skill" },
+            Discovery = new SkillDiscoveryMetadata { CapabilityHints = ["lookup"] },
+            Origin = new SkillOrigin { SourceKind = SkillSourceKind.Imported, SourceRef = "import://skills/my-skill" },
+            Governance = new SkillGovernanceMetadata
+            {
+                RiskLevel = SkillRiskLevel.Medium,
+                AllowedContexts = ["workspace"],
+            },
+        };
+
+        var result = service.Forge(request);
+
+        Assert.True(result.Success);
+        Assert.NotNull(result.CreatedSkill);
+        Assert.Equal("my-skill", result.CreatedSkill!.EffectiveId);
+        Assert.Equal("My Skill", result.CreatedSkill.EffectiveName);
+        Assert.Equal(SkillMaterializationKind.Dynamic, result.CreatedSkill.Origin.MaterializationKind);
+        Assert.Equal(SkillSourceKind.Imported, result.CreatedSkill.Origin.SourceKind);
+        Assert.Contains("lookup", result.CreatedSkill.Discovery.CapabilityHints);
+        Assert.Equal(SkillRiskLevel.Medium, result.CreatedSkill.Governance.RiskLevel);
+        Assert.True(result.Validation.IsValid);
     }
 }

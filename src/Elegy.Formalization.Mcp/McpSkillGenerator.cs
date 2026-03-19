@@ -3,13 +3,13 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.Mcp;
 
-public sealed record McpSkillGenerationResult
+internal sealed record McpSkillGenerationResult
 {
     public IReadOnlyList<SkillDefinition> GeneratedSkills { get; init; } = [];
     public IReadOnlyList<McpToolDefinition> SkippedTools { get; init; } = [];
 }
 
-public sealed class McpSkillGenerator
+internal sealed class McpSkillGenerator
 {
     public McpSkillGenerationResult Generate(McpAnalysisResult analysisResult)
     {
@@ -25,22 +25,47 @@ public sealed class McpSkillGenerator
             }
 
             var slug = BuildSlug(analysisResult.ServerName, analysis.Tool.Name);
+            var skillId = $"mcp-{slug}";
+            var sourceRef = $"mcp://{analysisResult.ServerName}/tools/{slug}";
             var skill = new SkillDefinition
             {
-                Id = $"mcp-{slug}",
+                Id = skillId,
                 Name = analysis.Tool.Name,
                 Description = analysis.Tool.Description,
                 Triggers = analysis.ExtractedTriggers,
-                Constraints =
-                [
-                    new SkillConstraint
-                    {
-                        ConstraintId = "origin",
-                        Description = "mcp-generated",
-                        Required = true
-                    }
-                ],
-                LifecycleState = SkillLifecycleState.Draft
+                Constraints = [],
+                Identity = new SkillIdentity
+                {
+                    DefinitionId = skillId,
+                    DisplayName = analysis.Tool.Name,
+                    Namespace = analysisResult.ServerName,
+                },
+                Metadata = new SkillMetadata
+                {
+                    Summary = analysis.Tool.Description,
+                    Category = "mcp",
+                    Tags = BuildKeywords(analysisResult.ServerName, analysis.Tool.Name),
+                },
+                Input = new SkillInputContract
+                {
+                    SchemaRef = analysis.Tool.InputSchema is null ? null : $"{sourceRef}/input-schema",
+                },
+                Governance = new SkillGovernanceMetadata
+                {
+                    AllowedContexts = ["mcp"],
+                },
+                Discovery = new SkillDiscoveryMetadata
+                {
+                    Keywords = BuildKeywords(analysisResult.ServerName, analysis.Tool.Name),
+                    CapabilityHints = analysis.ExtractedTriggers.Select(static trigger => trigger.Pattern).ToArray(),
+                },
+                Origin = new SkillOrigin
+                {
+                    MaterializationKind = SkillMaterializationKind.Declared,
+                    SourceKind = SkillSourceKind.Generated,
+                    SourceRef = sourceRef,
+                },
+                LifecycleState = SkillLifecycleState.Draft,
             };
 
             generated.Add(skill);
@@ -65,5 +90,14 @@ public sealed class McpSkillGenerator
                 sb.Append('-');
         }
         return sb.ToString().Trim('-');
+    }
+
+    private static string[] BuildKeywords(string serverName, string toolName)
+    {
+        return new[] { serverName }
+            .Concat(toolName.Split(new[] { '-', '_', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .Select(static keyword => keyword.ToLowerInvariant())
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToArray();
     }
 }

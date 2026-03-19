@@ -1,12 +1,12 @@
 namespace Elegy.Formalization.Mcp;
 
-public sealed record McpToolSummary
+internal sealed record McpToolSummary
 {
     public string Name { get; init; } = string.Empty;
     public string? Description { get; init; }
 }
 
-public sealed class McpToolSearchService
+internal sealed class McpToolSearchService
 {
     public IReadOnlyList<McpToolSummary> Search(McpServerDescriptor descriptor, string? query = null)
     {
@@ -26,7 +26,7 @@ public sealed class McpToolSearchService
     }
 }
 
-public sealed class McpToolResolveService
+internal sealed class McpToolResolveService
 {
     public McpToolDefinition? Resolve(McpServerDescriptor descriptor, string toolName)
     {

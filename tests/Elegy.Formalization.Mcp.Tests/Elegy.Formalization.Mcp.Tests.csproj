@@ -13,5 +13,6 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Elegy.Formalization.Mcp\Elegy.Formalization.Mcp.csproj" />
+    <ProjectReference Include="..\..\src\Elegy.Formalization.Serialization\Elegy.Formalization.Serialization.csproj" />
   </ItemGroup>
 </Project>

@@ -6,5 +6,88 @@
     <VersionPrefix>0.1.0</VersionPrefix>
     <Version>$(VersionPrefix)</Version>
     <PackageVersion>$(Version)</PackageVersion>
+    <Authors>Elegy Contributors</Authors>
+    <Company>Elegy</Company>
+    <RepositoryUrl>https://github.com/Sofreshx/Elegy</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+    <PackageProjectUrl>https://github.com/Sofreshx/Elegy</PackageProjectUrl>
+    <PackageLicenseExpression>Apache-2.0</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <PackageReadmeFile>PACKAGE_README.md</PackageReadmeFile>
+    <PackageTags>elegy;formalization;governance;skills;mcp</PackageTags>
+    <PublishRepositoryUrl>true</PublishRepositoryUrl>
+    <EmbedUntrackedSources>true</EmbedUntrackedSources>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
+    <GeneratePackageOnBuild>false</GeneratePackageOnBuild>
+    <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
+    <IsPackable Condition="$([System.String]::Copy('$(MSBuildProjectName)').EndsWith('.Tests'))">false</IsPackable>
+    <IsPackable Condition="'$(IsPackable)' == ''">true</IsPackable>
   </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Core'">
+    <Description>Core abstractions and domain model primitives for Elegy formalization packages.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Contracts'">
+    <Description>Authoritative governed contracts, schemas, fixtures, and compatibility manifests for Elegy consumers.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Serialization'">
+    <Description>Serialization helpers for Elegy formalization domain models and governed artifacts.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Validation'">
+    <Description>Validation rules and utilities for Elegy formalization artifacts and contracts.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Governance'">
+    <Description>Governance policies, enforcement modes, and decision helpers for Elegy artifacts.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Projections.Mermaid'">
+    <Description>Mermaid projection output for visualizing Elegy formalization structures.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Skills'">
+    <Description>Canonical skill definitions, metadata, and validation surfaces for Elegy skill consumers.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Skills.Discovery'">
+    <Description>Discovery-focused skill indexing, search, and resolution services for Elegy packages.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.DynamicSkills'">
+    <Description>Dynamic skill materialization and validation helpers for governed Elegy skill flows.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.SkillForge'">
+    <Description>Skill and tooling generation services for building governed Elegy artifacts.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Mcp'">
+    <Description>MCP descriptors, governed analysis artifacts, and canonical MCP-to-skill projection rules for Elegy.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Agents'">
+    <Description>Agent-facing formalization primitives for Elegy consumers and integrations.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.AgentFactory'">
+    <Description>Agent creation and composition helpers built on Elegy formalization packages.</Description>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Monitoring'">
+    <Description>Monitoring-oriented formalization surfaces for observing Elegy-driven systems.</Description>
+  </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' == 'true'">
+    <None Include="$(MSBuildThisFileDirectory)PACKAGE_README.md"
+          Pack="true"
+          PackagePath="\" 
+          Link="PACKAGE_README.md"
+          Visible="false" />
+  </ItemGroup>
 </Project>

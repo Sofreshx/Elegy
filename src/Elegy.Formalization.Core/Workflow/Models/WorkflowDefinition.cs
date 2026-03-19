@@ -8,19 +8,27 @@ public sealed record WorkflowDefinition
 
     public string Name { get; init; } = string.Empty;
 
-    public string SpecVersion { get; init; } = "1.0";
+    public string? Description { get; init; }
 
-    public CanonicalAuthority CanonicalAuthority { get; init; } = CanonicalAuthority.Blueprint;
+    public string SpecVersion { get; init; } = BlueprintMetadata.DefaultSpecVersion;
 
-    public ConflictPolicy ConflictPolicy { get; init; } = ConflictPolicy.Reconcile;
+    public CanonicalAuthority CanonicalAuthority { get; init; } = CanonicalAuthority.Dsl;
+
+    public ConflictPolicy ConflictPolicy { get; init; } = ConflictPolicy.Reject;
 
     public BlueprintMetadata Blueprint { get; init; } = new();
 
     public IReadOnlyList<WorkflowTrigger> Triggers { get; init; } = [];
 
+    public string? EntryStepId { get; init; }
+
     public IReadOnlyList<WorkflowStep> Steps { get; init; } = [];
 
     public IReadOnlyList<WorkflowConnection> Connections { get; init; } = [];
 
+    public IReadOnlyDictionary<string, WorkflowVariable> Variables { get; init; } = new Dictionary<string, WorkflowVariable>(StringComparer.Ordinal);
+
     public WorkflowLayout Layout { get; init; } = new();
+
+    public bool StrictValidation { get; init; }
 }

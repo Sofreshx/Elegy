@@ -14,30 +14,45 @@ public sealed class SkillSearchServiceTests
         [
             new SkillIndexEntry
             {
-                Id = "dotnet-api",
+                SkillId = "dotnet-api",
                 Name = "dotnet-api",
                 Description = "Build .NET APIs with ASP.NET Core",
-                Triggers = ["dotnet", "api", "aspnet"],
-                LoadMode = SkillLoadMode.OnDemand,
-                VaultRef = "dotnet-api/SKILL.md"
+                TriggersOn = ["dotnet", "api", "aspnet"],
+                Keywords = ["backend"],
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "dotnet-api",
+                    LoadMode = SkillLoadMode.OnDemand,
+                    VaultRef = "dotnet-api/SKILL.md"
+                }
             },
             new SkillIndexEntry
             {
-                Id = "react-frontend",
+                SkillId = "react-frontend",
                 Name = "react-frontend",
                 Description = "React component patterns and hooks",
-                Triggers = ["react", "frontend", "hooks"],
-                LoadMode = SkillLoadMode.OnDemand,
-                VaultRef = "react-frontend/SKILL.md"
+                TriggersOn = ["react", "frontend", "hooks"],
+                CapabilityHints = ["ui"],
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "react-frontend",
+                    LoadMode = SkillLoadMode.OnDemand,
+                    VaultRef = "react-frontend/SKILL.md"
+                }
             },
             new SkillIndexEntry
             {
-                Id = "skill-forge",
+                SkillId = "skill-forge",
                 Name = "skill-forge",
                 Description = "Create new skills programmatically",
-                Triggers = ["create skill", "forge", "new skill"],
-                LoadMode = SkillLoadMode.OnDemand,
-                VaultRef = "skill-forge/SKILL.md"
+                TriggersOn = ["create skill", "forge", "new skill"],
+                Keywords = ["generator"],
+                Manifest = new SkillIndexManifest
+                {
+                    Id = "skill-forge",
+                    LoadMode = SkillLoadMode.OnDemand,
+                    VaultRef = "skill-forge/SKILL.md"
+                }
             }
         ],
         BuiltAt = DateTimeOffset.UtcNow
@@ -59,7 +74,7 @@ public sealed class SkillSearchServiceTests
         var index = CreateTestIndex();
         var results = _sut.Search(index, "react");
 
-        Assert.Contains(results, r => r.Entry.Id == "react-frontend" && r.Score == 50);
+        Assert.Contains(results, r => r.Entry.SkillId == "react-frontend" && r.Score == 50);
     }
 
     [Fact]
@@ -68,8 +83,8 @@ public sealed class SkillSearchServiceTests
         var index = CreateTestIndex();
         var results = _sut.Search(index, "hooks");
 
-        Assert.Contains(results, r => r.Entry.Id == "react-frontend" && r.Score == 30);
-        Assert.Equal("trigger-contains", results.First(r => r.Entry.Id == "react-frontend").MatchReason);
+        Assert.Contains(results, r => r.Entry.SkillId == "react-frontend" && r.Score == 30);
+        Assert.Equal("trigger-contains", results.First(r => r.Entry.SkillId == "react-frontend").MatchReason);
     }
 
     [Fact]
@@ -78,7 +93,7 @@ public sealed class SkillSearchServiceTests
         var index = CreateTestIndex();
         var results = _sut.Search(index, "programmatically");
 
-        Assert.Contains(results, r => r.Entry.Id == "skill-forge" && r.Score == 10);
+        Assert.Contains(results, r => r.Entry.SkillId == "skill-forge" && r.Score == 10);
     }
 
     [Fact]
@@ -97,7 +112,16 @@ public sealed class SkillSearchServiceTests
         var index = CreateTestIndex();
         var results = _sut.Search(index, "create skill");
 
-        Assert.Contains(results, r => r.Entry.Id == "skill-forge");
+        Assert.Contains(results, r => r.Entry.SkillId == "skill-forge");
+    }
+
+    [Fact]
+    public void Search_KeywordMatch_Returns20Score()
+    {
+        var index = CreateTestIndex();
+        var results = _sut.Search(index, "generator");
+
+        Assert.Contains(results, r => r.Entry.SkillId == "skill-forge" && r.Score == 20);
     }
 
     [Fact]
@@ -107,6 +131,6 @@ public sealed class SkillSearchServiceTests
         var results = _sut.SearchByStack(index, ["dotnet", "api"]);
 
         // "dotnet" and "api" both match dotnet-api; should appear only once
-        Assert.Single(results, r => r.Entry.Id == "dotnet-api");
+        Assert.Single(results, r => r.Entry.SkillId == "dotnet-api");
     }
 }

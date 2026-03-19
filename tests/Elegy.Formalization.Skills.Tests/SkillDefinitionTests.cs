@@ -32,4 +32,50 @@ public sealed class SkillDefinitionTests
         var def = new SkillDefinition();
         Assert.Empty(def.Constraints);
     }
+
+    [Fact]
+    public void Default_Richer_Contract_Blocks_Are_Present()
+    {
+        var def = new SkillDefinition();
+
+        Assert.NotNull(def.Identity);
+        Assert.NotNull(def.Metadata);
+        Assert.NotNull(def.Input);
+        Assert.NotNull(def.Output);
+        Assert.NotNull(def.Execution);
+        Assert.NotNull(def.Governance);
+        Assert.NotNull(def.Discovery);
+        Assert.NotNull(def.Origin);
+    }
+
+    [Fact]
+    public void Effective_Id_And_Name_Fall_Back_To_Legacy_Fields()
+    {
+        var def = new SkillDefinition
+        {
+            Id = "skill.legacy",
+            Name = "Legacy skill",
+        };
+
+        Assert.Equal("skill.legacy", def.EffectiveId);
+        Assert.Equal("Legacy skill", def.EffectiveName);
+    }
+
+    [Fact]
+    public void Effective_Id_And_Name_Prefer_Identity_Block_When_Present()
+    {
+        var def = new SkillDefinition
+        {
+            Id = "skill.legacy",
+            Name = "Legacy skill",
+            Identity = new SkillIdentity
+            {
+                DefinitionId = "skill.authoritative",
+                DisplayName = "Authoritative skill",
+            },
+        };
+
+        Assert.Equal("skill.authoritative", def.EffectiveId);
+        Assert.Equal("Authoritative skill", def.EffectiveName);
+    }
 }

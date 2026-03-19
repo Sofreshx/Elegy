@@ -23,8 +23,9 @@ public sealed class SkillIndexBuilderTests
             Assert.Equal("alpha-skill", index.Entries[0].Name); // sorted alpha first
             Assert.Equal("beta-skill", index.Entries[1].Name);
             Assert.Equal("Alpha skill", index.Entries[0].Description);
-            Assert.Contains("alpha", index.Entries[0].Triggers);
-            Assert.Contains("testing", index.Entries[0].Triggers);
+            Assert.Contains("alpha", index.Entries[0].TriggersOn);
+            Assert.Contains("testing", index.Entries[0].TriggersOn);
+            Assert.Equal("alpha-skill/SKILL.md", index.Entries[0].Manifest.VaultRef);
         }
         finally
         {
@@ -62,8 +63,8 @@ public sealed class SkillIndexBuilderTests
             var index = _sut.Build(tempDir);
 
             Assert.Single(index.Entries);
-            Assert.Null(index.Entries[0].Description);
-            Assert.Empty(index.Entries[0].Triggers);
+            Assert.Equal(string.Empty, index.Entries[0].Description);
+            Assert.Empty(index.Entries[0].TriggersOn);
         }
         finally
         {

@@ -1,0 +1,66 @@
+{
+  "policyId": "visual-llm-formalization-enforcement",
+  "version": "1.0.0",
+  "precedence": [
+    "workflow",
+    "environment",
+    "branch"
+  ],
+  "defaults": {
+    "mode": "warn"
+  },
+  "workflowRules": [],
+  "environmentRules": [
+    {
+      "id": "env-prod-strict",
+      "matchType": "contains",
+      "value": "prod",
+      "mode": "strict",
+      "description": "Production-like environments must run in strict mode."
+    },
+    {
+      "id": "env-dev-warn",
+      "matchType": "contains",
+      "value": "dev",
+      "mode": "warn",
+      "description": "Development-like environments default to warn mode."
+    }
+  ],
+  "branchRules": [
+    {
+      "id": "branch-main-strict",
+      "matchType": "exact",
+      "value": "main",
+      "mode": "strict",
+      "description": "Main branch enforces strict mode."
+    },
+    {
+      "id": "branch-release-strict",
+      "matchType": "prefix",
+      "value": "release/",
+      "mode": "strict",
+      "description": "Release branches enforce strict mode."
+    },
+    {
+      "id": "branch-feature-warn",
+      "matchType": "prefix",
+      "value": "feature/",
+      "mode": "warn",
+      "description": "Feature branches default to warn mode."
+    },
+    {
+      "id": "branch-dev-warn",
+      "matchType": "exact",
+      "value": "dev",
+      "mode": "warn",
+      "description": "Dev branch defaults to warn mode."
+    },
+    {
+      "id": "branch-develop-warn",
+      "matchType": "exact",
+      "value": "develop",
+      "mode": "warn",
+      "description": "Develop branch defaults to warn mode."
+    }
+  ]
+}

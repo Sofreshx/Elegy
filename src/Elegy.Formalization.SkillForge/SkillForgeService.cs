@@ -17,12 +17,14 @@ public sealed class SkillForgeService
 
     public SkillForgeResult Forge(SkillForgeRequest request)
     {
-        if (!Regex.IsMatch(request.Name, _options.NamingPattern))
+        var requestedId = ResolveRequestedId(request);
+
+        if (!Regex.IsMatch(requestedId, _options.NamingPattern))
         {
             return new SkillForgeResult
             {
                 Success = false,
-                ErrorMessage = $"Name '{request.Name}' does not match required pattern '{_options.NamingPattern}'."
+                ErrorMessage = $"Name '{requestedId}' does not match required pattern '{_options.NamingPattern}'."
             };
         }
 
@@ -34,7 +36,7 @@ public sealed class SkillForgeService
         if (request.Constraints.Count == 0)
             findings.Add("At least one constraint is required.");
 
-        if (string.IsNullOrWhiteSpace(request.Description))
+        if (string.IsNullOrWhiteSpace(request.Description) && string.IsNullOrWhiteSpace(request.Metadata.Summary))
             findings.Add("Description must not be empty.");
 
         if (_options.RequireGovernanceBar && findings.Count > 0)
@@ -49,10 +51,36 @@ public sealed class SkillForgeService
 
         var createRequest = new DynamicSkillCreateRequest
         {
+            SkillId = requestedId,
             Name = request.Name,
             Description = request.Description,
             Triggers = request.Triggers,
-            Constraints = request.Constraints
+            Constraints = request.Constraints,
+            Identity = request.Identity with
+            {
+                DefinitionId = string.IsNullOrWhiteSpace(request.Identity.DefinitionId) ? requestedId : request.Identity.DefinitionId,
+                DisplayName = string.IsNullOrWhiteSpace(request.Identity.DisplayName) ? request.Name : request.Identity.DisplayName,
+            },
+            Metadata = request.Metadata with
+            {
+                Summary = request.Metadata.Summary ?? request.Description,
+            },
+            Input = request.Input,
+            Output = request.Output,
+            Execution = request.Execution,
+            Governance = request.Governance,
+            Discovery = request.Discovery with
+            {
+                Keywords = request.Discovery.Keywords
+                    .Concat(request.DiscoveryKeywords)
+                    .Where(static keyword => !string.IsNullOrWhiteSpace(keyword))
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToArray(),
+            },
+            Origin = request.Origin with
+            {
+                SourceRef = string.IsNullOrWhiteSpace(request.Origin.SourceRef) ? $"forge:{requestedId}" : request.Origin.SourceRef,
+            }
         };
 
         var createResult = _engine.Create(createRequest);
@@ -62,6 +90,7 @@ public sealed class SkillForgeService
             return new SkillForgeResult
             {
                 Success = false,
+                Validation = createResult.Validation,
                 GovernanceFindings = findings,
                 ErrorMessage = createResult.ErrorMessage
             };
@@ -69,16 +98,35 @@ public sealed class SkillForgeService
 
         var metadata = new RegistrationMetadata
         {
-            ManifestEntry = request.Name,
-            DiscoveryKeywords = request.DiscoveryKeywords
+            ManifestEntry = requestedId,
+            SkillId = createResult.CreatedSkill!.EffectiveId,
+            DiscoveryKeywords = createResult.CreatedSkill.Discovery.Keywords,
+            SourceKind = createResult.CreatedSkill.Origin.SourceKind,
+            MaterializationKind = createResult.CreatedSkill.Origin.MaterializationKind,
         };
 
         return new SkillForgeResult
         {
             Success = true,
             CreatedSkill = createResult.CreatedSkill,
+            Validation = createResult.Validation,
             GovernanceFindings = findings,
             RegistrationMetadata = metadata
         };
+    }
+
+    private static string ResolveRequestedId(SkillForgeRequest request)
+    {
+        if (!string.IsNullOrWhiteSpace(request.SkillId))
+        {
+            return request.SkillId;
+        }
+
+        if (!string.IsNullOrWhiteSpace(request.Identity.DefinitionId))
+        {
+            return request.Identity.DefinitionId;
+        }
+
+        return request.Name;
     }
 }
