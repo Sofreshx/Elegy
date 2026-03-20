@@ -37,4 +37,12 @@ jobs:
           ./scripts/export-contracts.ps1
 
       - name: Run architecture governance tests
-        run: dotnet test ./tests/Elegy.Formalization.Core.Tests/Elegy.Formalization.Core.Tests.csproj -v minimal
+        run: dotnet test ./tests/Elegy.Formalization.Core.Tests/Elegy.Formalization.Core.Tests.csproj -v minimal --logger "trx;LogFileName=package-boundaries.trx"
+
+      - name: Upload package boundaries test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: package-boundaries-test-results
+          path: tests/Elegy.Formalization.Core.Tests/TestResults/**/*.trx
+          if-no-files-found: warn

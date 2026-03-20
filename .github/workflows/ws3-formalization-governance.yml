@@ -143,6 +143,46 @@ jobs:
             -ViolationsPath $violationsPath `
             -OutputPath (Join-Path $artifactsRoot 'gate-decision.json')
 
+      - name: Summarize WS3 inputs and outputs
+        if: always()
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $artifactsRoot = Join-Path (Join-Path $PWD 'caller-repo') 'artifacts/ws3'
+          $modeSelectionPath = Join-Path $artifactsRoot 'mode-selection.json'
+          $violationsPath = Join-Path $artifactsRoot 'formalization-violations.json'
+          $gateDecisionPath = Join-Path $artifactsRoot 'gate-decision.json'
+
+          if (Test-Path -LiteralPath $modeSelectionPath) {
+            $modeSelection = Get-Content -LiteralPath $modeSelectionPath -Raw | ConvertFrom-Json
+            Write-Host "WS3 resolved mode: $([string]$modeSelection.resolvedMode)"
+            if ($null -ne $modeSelection.source) {
+              Write-Host "WS3 mode source: $([string]$modeSelection.source)"
+            }
+            if ($null -ne $modeSelection.ruleId) {
+              Write-Host "WS3 mode rule: $([string]$modeSelection.ruleId)"
+            }
+          } else {
+            Write-Host 'WS3 mode selection artifact is missing.'
+          }
+
+          if (Test-Path -LiteralPath $violationsPath) {
+            $violationsDocument = Get-Content -LiteralPath $violationsPath -Raw | ConvertFrom-Json
+            $violations = if ($null -ne $violationsDocument.violations) { @($violationsDocument.violations) } elseif ($violationsDocument -is [System.Array]) { @($violationsDocument) } else { @($violationsDocument) }
+            Write-Host "WS3 violations path: $violationsPath"
+            Write-Host "WS3 violation count: $($violations.Count)"
+          } else {
+            Write-Host 'WS3 violations artifact is missing.'
+          }
+
+          if (Test-Path -LiteralPath $gateDecisionPath) {
+            $gateDecision = Get-Content -LiteralPath $gateDecisionPath -Raw | ConvertFrom-Json
+            Write-Host "WS3 gate decision: $([string]$gateDecision.decision)"
+            Write-Host "WS3 gate blocking: $([string]$gateDecision.blocking)"
+          } else {
+            Write-Host 'WS3 gate decision artifact is missing.'
+          }
+
       - name: Write mode audit artifact
         if: always()
         shell: pwsh
