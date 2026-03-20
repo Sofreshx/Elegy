@@ -4,6 +4,7 @@ using Elegy.Formalization.Monitoring;
 
 namespace Elegy.Formalization.DynamicSkills;
 
+[Obsolete("Compatibility surface only. Prefer canonical skill authority or Rust tooling for shared executable behavior.")]
 public sealed class DynamicSkillEngine
 {
     private readonly DynamicSkillEngineOptions _options;

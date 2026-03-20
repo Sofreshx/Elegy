@@ -2,6 +2,7 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.DynamicSkills;
 
+[Obsolete("Compatibility surface only. Prefer canonical skill authority or governed artifacts for durable contracts.")]
 public sealed record DynamicSkillCreateRequest
 {
     public string SkillId { get; init; } = string.Empty;

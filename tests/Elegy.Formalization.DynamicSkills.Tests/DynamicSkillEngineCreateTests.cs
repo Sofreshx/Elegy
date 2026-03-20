@@ -4,6 +4,8 @@ using Xunit;
 
 namespace Elegy.Formalization.DynamicSkills.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class DynamicSkillEngineCreateTests
 {
     private readonly DynamicSkillEngine _engine = new(new DynamicSkillEngineOptions { IsEnabled = true });
@@ -52,3 +54,5 @@ public sealed class DynamicSkillEngineCreateTests
         Assert.Equal(SkillSourceKind.Imported, result.CreatedSkill.Origin.SourceKind);
     }
 }
+
+#pragma warning restore CS0618

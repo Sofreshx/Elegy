@@ -4,6 +4,7 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.SkillForge;
 
+[Obsolete("Compatibility surface only. Prefer canonical skill authority, governed artifacts, or Rust tooling for shared executable behavior.")]
 public sealed class SkillForgeService
 {
     private readonly DynamicSkillEngine _engine;

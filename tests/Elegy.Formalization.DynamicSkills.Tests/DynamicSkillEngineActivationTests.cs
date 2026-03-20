@@ -3,6 +3,8 @@ using Xunit;
 
 namespace Elegy.Formalization.DynamicSkills.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class DynamicSkillEngineActivationTests
 {
     private readonly DynamicSkillEngine _disabledEngine = new(new DynamicSkillEngineOptions { IsEnabled = false });
@@ -15,3 +17,5 @@ public sealed class DynamicSkillEngineActivationTests
         Assert.Contains("not enabled", ex.Message);
     }
 }
+
+#pragma warning restore CS0618

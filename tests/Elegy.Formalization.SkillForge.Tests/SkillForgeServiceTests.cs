@@ -5,6 +5,8 @@ using Xunit;
 
 namespace Elegy.Formalization.SkillForge.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class SkillForgeServiceTests
 {
     private static SkillForgeRequest CreateValidRequest() => new()
@@ -154,3 +156,5 @@ public sealed class SkillForgeServiceTests
         Assert.True(result.Validation.IsValid);
     }
 }
+
+#pragma warning restore CS0618

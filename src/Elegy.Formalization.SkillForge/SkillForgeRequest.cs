@@ -2,6 +2,7 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.SkillForge;
 
+[Obsolete("Compatibility surface only. Prefer governed artifacts for durable forge request contracts.")]
 public sealed record SkillForgeRequest
 {
     public string SkillId { get; init; } = string.Empty;
