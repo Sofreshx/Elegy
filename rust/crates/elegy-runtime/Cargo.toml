@@ -8,12 +8,12 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-elegy-contracts = { path = "../elegy-contracts" }
-elegy-mcp = { path = "../elegy-mcp" }
-elegy-adapter-fs = { path = "../elegy-adapter-fs" }
-elegy-adapter-http = { path = "../elegy-adapter-http" }
-elegy-descriptor = { path = "../elegy-descriptor" }
-elegy-policy = { path = "../elegy-policy" }
+elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
+elegy-mcp = { version = "0.1.0", path = "../elegy-mcp" }
+elegy-adapter-fs = { version = "0.1.0", path = "../elegy-adapter-fs" }
+elegy-adapter-http = { version = "0.1.0", path = "../elegy-adapter-http" }
+elegy-descriptor = { version = "0.1.0", path = "../elegy-descriptor" }
+elegy-policy = { version = "0.1.0", path = "../elegy-policy" }
 serde.workspace = true
 serde_json.workspace = true
 

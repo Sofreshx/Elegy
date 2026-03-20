@@ -8,10 +8,10 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-elegy-contracts = { path = "../elegy-contracts" }
-elegy-descriptor = { path = "../elegy-descriptor" }
-elegy-policy = { path = "../elegy-policy" }
-elegy-runtime = { path = "../elegy-runtime" }
+elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
+elegy-descriptor = { version = "0.1.0", path = "../elegy-descriptor" }
+elegy-policy = { version = "0.1.0", path = "../elegy-policy" }
+elegy-runtime = { version = "0.1.0", path = "../elegy-runtime" }
 serde.workspace = true
 
 [dev-dependencies]
