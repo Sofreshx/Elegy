@@ -491,6 +491,7 @@ fn policy_violation_to_diagnostic(
 mod tests {
     use super::*;
     use std::fs;
+    #[cfg(windows)]
     use std::process::Command;
     use std::time::{SystemTime, UNIX_EPOCH};
 

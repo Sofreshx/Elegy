@@ -3,7 +3,7 @@
   "consumerVersion": "0.1.0",
   "upstreamPackage": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "schemas": {
     "skill-definition": "1.0.0",

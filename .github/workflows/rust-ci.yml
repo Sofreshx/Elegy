@@ -62,6 +62,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.88.0
+      - name: Export contracts artifacts
+        shell: pwsh
+        run: ./scripts/export-contracts.ps1
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: rust -> rust/target

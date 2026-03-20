@@ -2,10 +2,9 @@
 all-features = true
 
 [advisories]
-vulnerability = "deny"
-unmaintained = "warn"
+unmaintained = "workspace"
+unsound = "workspace"
 yanked = "warn"
-notice = "warn"
 ignore = []
 
 [licenses]

@@ -113,7 +113,10 @@ public sealed class PackageBoundaryPolicyTests
             .Descendants("ProjectReference")
             .Select(static element => (string?)element.Attribute("Include"))
             .Where(static include => !string.IsNullOrWhiteSpace(include))
-            .Select(include => Path.GetFullPath(Path.Combine(projectDirectory, include!)))
+            .Select(static include => include!
+                .Replace('\\', Path.DirectorySeparatorChar)
+                .Replace('/', Path.DirectorySeparatorChar))
+            .Select(include => Path.GetFullPath(Path.Combine(projectDirectory, include)))
             .Select(Path.GetFileNameWithoutExtension)
             .Where(static value => !string.IsNullOrWhiteSpace(value))
             .Select(static value => value!)

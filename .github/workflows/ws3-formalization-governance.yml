@@ -100,17 +100,16 @@ jobs:
 
           $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
           New-Item -Path $artifactsRoot -ItemType Directory -Force | Out-Null
-          @'
-          {
-            "violations": [
-              {
-                "id": "ws3-smoke-warning",
-                "severity": "low",
-                "message": "smoke validation finding"
+          $smokeViolations = @{
+            violations = @(
+              @{
+                id = 'ws3-smoke-warning'
+                severity = 'low'
+                message = 'smoke validation finding'
               }
-            ]
-          }
-          '@ | Set-Content -Path (Join-Path $artifactsRoot 'smoke-violations.json') -Encoding utf8
+            )
+          } | ConvertTo-Json -Depth 4
+          Set-Content -Path (Join-Path $artifactsRoot 'smoke-violations.json') -Value $smokeViolations -Encoding utf8
 
           & (Join-Path $governanceRoot 'scripts/ws3/evaluate-formalization-gates.ps1') `
             -Mode warn `
@@ -131,11 +130,7 @@ jobs:
           $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
           $violationsPath = Join-Path $artifactsRoot 'formalization-violations.json'
           if (-not (Test-Path -LiteralPath $violationsPath)) {
-            @'
-            {
-              "violations": []
-            }
-            '@ | Set-Content -Path $violationsPath -Encoding utf8
+            Set-Content -Path $violationsPath -Value '{"violations":[]}' -Encoding utf8
           }
 
           & (Join-Path $governanceRoot 'scripts/ws3/evaluate-formalization-gates.ps1') `
@@ -196,10 +191,16 @@ jobs:
           }
 
           $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
-          & (Join-Path $governanceRoot 'scripts/ws3/write-mode-audit-artifact.ps1') `
-            -ModeSelectionPath (Join-Path $artifactsRoot 'mode-selection.json') `
-            -GateDecisionPath (Join-Path $artifactsRoot 'gate-decision.json') `
-            -OutputPath (Join-Path $artifactsRoot 'mode-audit.json')
+          $modeSelectionPath = Join-Path $artifactsRoot 'mode-selection.json'
+          $gateDecisionPath = Join-Path $artifactsRoot 'gate-decision.json'
+          if ((Test-Path -LiteralPath $modeSelectionPath) -and (Test-Path -LiteralPath $gateDecisionPath)) {
+            & (Join-Path $governanceRoot 'scripts/ws3/write-mode-audit-artifact.ps1') `
+              -ModeSelectionPath $modeSelectionPath `
+              -GateDecisionPath $gateDecisionPath `
+              -OutputPath (Join-Path $artifactsRoot 'mode-audit.json')
+          } else {
+            Write-Host 'Skipping WS3 mode audit artifact because prerequisite artifacts are missing.'
+          }
 
       - name: Capture workflow outputs
         if: always()
