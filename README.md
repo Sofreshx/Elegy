@@ -135,12 +135,14 @@ pwsh ./scripts/export-contracts.ps1
 This produces deterministic files under `artifacts/contracts` for downstream consumers such as Node.js tools, the in-repo Rust workspace under `rust/`, and any external integrations:
 
 - `canonical-workflow.schema.json`
+- `canonical-workflow-graph.schema.json`
 - `skill-definition.schema.json`
 - `skill-discovery-index.schema.json`
 - `mcp-tool-definition.schema.json`
 - `mcp-server-descriptor.schema.json`
 - `mcp-analysis-result.schema.json`
 - `fixtures/canonical-workflow.minimal.json`
+- `fixtures/canonical-workflow-graph.minimal.json`
 - `compatibility-manifest.json`
 - `compatibility-matrix.json`
 

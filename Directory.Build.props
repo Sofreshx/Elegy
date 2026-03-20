@@ -3,7 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
-    <VersionPrefix>0.1.0</VersionPrefix>
+    <VersionPrefix>0.2.0</VersionPrefix>
     <Version>$(VersionPrefix)</Version>
     <PackageVersion>$(Version)</PackageVersion>
     <Authors>Elegy Contributors</Authors>
@@ -86,7 +86,7 @@
   <ItemGroup Condition="'$(IsPackable)' == 'true'">
     <None Include="$(MSBuildThisFileDirectory)PACKAGE_README.md"
           Pack="true"
-          PackagePath="\" 
+          PackagePath="\"
           Link="PACKAGE_README.md"
           Visible="false" />
   </ItemGroup>

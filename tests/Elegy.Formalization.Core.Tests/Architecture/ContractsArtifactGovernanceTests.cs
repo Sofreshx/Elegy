@@ -59,6 +59,22 @@ public sealed class ContractsArtifactGovernanceTests
     }
 
     [Fact]
+    public void Compatibility_Manifest_Advertises_Canonical_Workflow_Graph_Artifacts()
+    {
+        using var manifest = LoadJson(Path.Combine(TestRepoPaths.SourceRoot, "Elegy.Formalization.Contracts", "Resources", "compatibility-manifest.json"));
+
+        var schemaEntry = manifest.RootElement
+            .GetProperty("schemas")
+            .EnumerateArray()
+            .Single(static element => element.GetProperty("name").GetString() == "canonical-workflow-graph");
+
+        Assert.Equal("canonical-workflow-graph.schema.json", schemaEntry.GetProperty("file").GetString());
+        Assert.Contains(
+            "fixtures/canonical-workflow-graph.minimal.json",
+            schemaEntry.GetProperty("fixtures").EnumerateArray().Select(static fixture => fixture.GetString()));
+    }
+
+    [Fact]
     public void Compatibility_Matrix_Defines_At_Least_One_Entry()
     {
         using var matrix = LoadJson(Path.Combine(TestRepoPaths.SourceRoot, "Elegy.Formalization.Contracts", "Resources", "compatibility-matrix.json"));

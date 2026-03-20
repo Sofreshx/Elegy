@@ -5,6 +5,7 @@ public static class FormalizationArtifactNames
     public const string AgentCreateRequestSchema = "agent-create-request.schema.json";
     public const string AgentDefinitionSchema = "agent-definition.schema.json";
     public const string CanonicalWorkflowSchema = "canonical-workflow.schema.json";
+    public const string CanonicalWorkflowGraphSchema = "canonical-workflow-graph.schema.json";
     public const string CompatibilityManifest = "compatibility-manifest.json";
     public const string CompatibilityMatrix = "compatibility-matrix.json";
     public const string DynamicSkillActivationSchema = "dynamic-skill-activation.schema.json";
@@ -17,6 +18,7 @@ public static class FormalizationArtifactNames
     public const string SkillForgeRequestSchema = "skill-forge-request.schema.json";
     public const string AgentCreateRequestMinimalFixture = "fixtures/agent-create-request.minimal.json";
     public const string AgentDefinitionMinimalFixture = "fixtures/agent-definition.minimal.json";
+    public const string CanonicalWorkflowGraphMinimalFixture = "fixtures/canonical-workflow-graph.minimal.json";
     public const string CanonicalWorkflowMinimalFixture = "fixtures/canonical-workflow.minimal.json";
     public const string DynamicSkillActivationMinimalFixture = "fixtures/dynamic-skill-activation.minimal.json";
     public const string McpAnalysisResultMinimalFixture = "fixtures/mcp-analysis-result.minimal.json";
@@ -34,6 +36,7 @@ public static class FormalizationArtifactNames
     [
         AgentCreateRequestSchema,
         AgentDefinitionSchema,
+        CanonicalWorkflowGraphSchema,
         CanonicalWorkflowSchema,
         CompatibilityManifest,
         CompatibilityMatrix,
@@ -47,6 +50,7 @@ public static class FormalizationArtifactNames
         SkillForgeRequestSchema,
         AgentCreateRequestMinimalFixture,
         AgentDefinitionMinimalFixture,
+        CanonicalWorkflowGraphMinimalFixture,
         CanonicalWorkflowMinimalFixture,
         DynamicSkillActivationMinimalFixture,
         McpAnalysisResultMinimalFixture,

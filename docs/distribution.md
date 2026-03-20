@@ -37,8 +37,8 @@ Example `NuGet.config`:
 ### Add a package
 
 ```bash
-dotnet add package Elegy.Formalization.Contracts --version 0.1.0
-dotnet add package Elegy.Formalization.Mcp --version 0.1.0
+dotnet add package Elegy.Formalization.Contracts --version 0.2.0
+dotnet add package Elegy.Formalization.Mcp --version 0.2.0
 ```
 
 In GitHub Actions, prefer `GITHUB_TOKEN` against the repository-owner feed URL and avoid storing a second package secret unless a cross-repository permission boundary requires it.
@@ -57,6 +57,13 @@ Outputs:
 - versioned archive: `artifacts/distribution/elegy-contracts-<packageVersion>.zip`
 
 The archive is intended for downstream consumers that do not restore NuGet packages directly, including Node.js tooling, Rust consumers, and integration environments that only need the governed contract bundle.
+
+Current governed workflow artifacts in that bundle include both the portable workflow contract and the canonical workflow graph contract:
+
+- `canonical-workflow.schema.json`
+- `canonical-workflow-graph.schema.json`
+- `fixtures/canonical-workflow.minimal.json`
+- `fixtures/canonical-workflow-graph.minimal.json`
 
 ## Downstream guidance
 
