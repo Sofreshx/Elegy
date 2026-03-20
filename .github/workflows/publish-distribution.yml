@@ -95,14 +95,28 @@ jobs:
 
       - name: Attach published distribution assets to GitHub release
         if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
-        uses: softprops/action-gh-release@v2
-        with:
-          tag_name: ${{ steps.release_meta.outputs.tag_name }}
-          generate_release_notes: true
-          files: |
-            artifacts/distribution/packages/*.nupkg
-            artifacts/distribution/packages/*.snupkg
-            artifacts/distribution/elegy-contracts-*.zip
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+
+          mapfile -t release_files < <(find artifacts/distribution/packages -maxdepth 1 -type f \( -name '*.nupkg' -o -name '*.snupkg' \) | sort)
+          while IFS= read -r bundle; do
+            release_files+=("${bundle}")
+          done < <(find artifacts/distribution -maxdepth 1 -type f -name 'elegy-contracts-*.zip' | sort)
+
+          if [[ "${#release_files[@]}" -eq 0 ]]; then
+            echo "No published distribution assets were found to attach to release ${RELEASE_TAG}." >&2
+            exit 1
+          fi
+
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            gh release upload "${RELEASE_TAG}" "${release_files[@]}" --clobber
+          else
+            gh release create "${RELEASE_TAG}" "${release_files[@]}" --title "Release ${RELEASE_TAG}" --generate-notes
+          fi
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
