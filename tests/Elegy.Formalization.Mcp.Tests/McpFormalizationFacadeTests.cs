@@ -3,6 +3,8 @@ using Xunit;
 
 namespace Elegy.Formalization.Mcp.Tests;
 
+#pragma warning disable CS0618
+
 public sealed class McpFormalizationFacadeTests
 {
     private readonly IMcpFormalizationFacade _sut = new McpFormalizationFacade();
@@ -76,3 +78,5 @@ public sealed class McpFormalizationFacadeTests
         };
     }
 }
+
+#pragma warning restore CS0618

@@ -2,6 +2,7 @@ using Elegy.Formalization.Skills;
 
 namespace Elegy.Formalization.Mcp;
 
+[Obsolete("Compatibility surface only. Prefer Rust runtime and CLI surfaces for executable MCP behavior.")]
 public sealed record McpSkillProjectionResult
 {
     public IReadOnlyList<SkillDefinition> GeneratedSkills { get; init; } = [];
@@ -9,6 +10,7 @@ public sealed record McpSkillProjectionResult
     public IReadOnlyList<McpToolDefinition> SkippedTools { get; init; } = [];
 }
 
+[Obsolete("Compatibility surface only. Prefer Rust runtime and CLI surfaces for executable MCP behavior.")]
 public sealed record McpToolSearchResult
 {
     public string Name { get; init; } = string.Empty;
@@ -16,6 +18,7 @@ public sealed record McpToolSearchResult
     public string? Description { get; init; }
 }
 
+[Obsolete("Compatibility surface only. Prefer Rust runtime and CLI surfaces for executable MCP behavior.")]
 public sealed class McpFormalizationFacade : IMcpFormalizationFacade
 {
     private readonly McpToolAnalyzer _analyzer = new();

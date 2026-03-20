@@ -18,14 +18,19 @@ The repository should converge on this shape:
 
 This is a consolidation move, not a transfer of contract authority out of the .NET packages.
 
+It is also a burden-of-proof reset. Shared `.NET` code should not survive in Elegy merely because some downstream consumers are `.NET`. If a capability is host-specific runtime behavior, DI composition, persistence, auth, HTTP transport, UI orchestration, or product policy, it belongs in the consuming repo. If a capability is a self-contained shared executable feature, Rust is the default answer inside Elegy.
+
 ## What stays authoritative in .NET
 
 The following remain canonical in the .NET package families:
 
+- core workflow and domain primitives that define shared formalization semantics
 - governed JSON schemas and fixtures under `src/Elegy.Formalization.Contracts/Resources`
 - compatibility manifest and compatibility matrix artifacts
 - canonical skill definitions and validation semantics in `Elegy.Formalization.Skills`
 - the package-boundary policy enforced for `.NET` source packages
+
+The practical goal is a smaller surviving `.NET` authority center rather than a broad `.NET` runtime surface.
 
 ## What should move to Rust first
 
@@ -37,6 +42,8 @@ The first replacement target is the remaining behavior-heavy MCP logic in `Elegy
 - `McpToolResolveService`
 
 These are stronger Rust candidates because they are operational behavior over governed contracts rather than canonical contract ownership.
+
+After the MCP parity path, the same rule should apply to other self-contained shared executable needs such as retrieval/indexing, memory/runtime state handling, and operator-facing tooling.
 
 ## Replacement rule
 
@@ -54,6 +61,13 @@ Keep `.NET` where the main responsibility is:
 - compatibility governance
 - canonical contract definition
 - formalization semantics that other runtimes must consume
+
+Push the capability out to consuming repos when the main responsibility is:
+
+- HTTP endpoints or product transport wrappers
+- auth, tenancy, persistence, and app lifecycle ownership
+- DI composition roots and local orchestration heuristics
+- UI-facing prompt assembly or desktop-host specific behavior
 
 ## Initial implementation slice
 
@@ -83,6 +97,7 @@ The initial consolidation slice should do four things only:
 
 ### Remaining work
 
+- finish the documentation and migration-matrix reset so every package and capability has an explicit authority/runtime/consumer disposition
 - harden and validate the fully imported Rust runtime stack as the day-to-day operator path inside Elegy
 - complete the eventual removal path for the now-internal-only duplicated `.NET` MCP analyzer, generator, and discovery surfaces after remaining consumers finish cutover
 - expand monorepo version-governance rules so the Rust workspace version story is documented as clearly as the `.NET` package and schema story
@@ -145,7 +160,8 @@ Boundary clarification:
 
 - the goal is not to remove all C# from Elegy
 - `.NET` remains the authority for governed contracts, compatibility artifacts, canonical skills, and formalization semantics
-- Rust should continue taking over runtime-heavy MCP, host, transport, filesystem, HTTP, and CLI behavior where that is the better fit
+- Rust should continue taking over runtime-heavy MCP, host, transport, filesystem, HTTP, CLI, retrieval, and memory/runtime behavior where that is the better fit
+- downstream `.NET` consumers should keep their own product-hosted runtime behavior instead of treating Elegy as a generic `.NET` runtime framework
 
 ### Goal: keep skills, MCP, and CLI responsibilities coherent inside Elegy
 
@@ -169,7 +185,7 @@ CLI:
 
 ### Goal: reduce responsibility in Holon or SAASTools by pushing reusable logic into Elegy
 
-Status: barely started outside the contract-authority side.
+Status: barely started outside the contract-authority side, and now subject to a stricter burden-of-proof rule.
 
 Completed:
 
@@ -177,17 +193,18 @@ Completed:
 
 Still required:
 
-- identify concrete Holon and SAASTools responsibilities that should call into Elegy packages instead of owning their own copies of skills, MCP shaping, generation flows, or runtime logic
-- replace app-local logic incrementally with package consumption, starting with the most obviously reusable MCP or skill-related surfaces
-- prove that downstream repos can consume Elegy packages or the in-repo Rust runtime outputs without reintroducing responsibility drift back into those repos
+- identify concrete Holon and SAASTools responsibilities that should call into Elegy authority packages or Rust runtime outputs instead of owning their own copies of shared skills, MCP shaping, or runtime logic
+- replace app-local logic incrementally only where the Elegy surface is clearly reusable and host-agnostic
+- keep app-local auth, persistence, endpoints, DI composition, and host-specific orchestration in the consumer repos unless a stronger shared boundary is proven
 
 The practical implication is that downstream replacement work should begin only after the relevant Elegy surface is stable enough to be consumed. The next likely candidates are MCP-related shaping or runtime responsibilities, not arbitrary application code.
 
 ### Current next sequence
 
-1. validate and harden the imported operator-facing runtime stack in-repo
-2. decide the staged deprecation path for the duplicated `.NET` MCP behavior once the remaining consumer review is complete
-3. continue downstream responsibility extraction only where the relevant Elegy surface is stable enough to consume
+1. finish the documentation and migration-matrix reset so every capability has an explicit burden-of-proof disposition
+2. validate and harden the imported operator-facing runtime stack in-repo
+3. decide the staged deprecation path for the duplicated `.NET` MCP behavior once the remaining consumer review is complete
+4. continue downstream responsibility extraction only where the relevant Elegy surface is stable enough to consume and clearly belongs in shared code
 
 ## Current implementation wave
 

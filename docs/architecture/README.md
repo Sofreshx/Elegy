@@ -8,6 +8,7 @@ This directory contains the current high-level architectural guidance for the ma
 - [Rust consolidation](rust-consolidation.md) - why the Rust runtime family now lives under `rust/`
 - [Substrate governance](substrate-governance.md) - baseline dependency and package-boundary rules
 - [Skill Core V1](skill-core-v1.md) - current authority and boundary decisions for the skills family
+- [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - where MCP analysis, skill generation, and dynamic tooling should live
 - [Terminology](terminology.md) - working vocabulary for package and runtime discussions
 
 ## Companion docs

@@ -36,19 +36,19 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Serialization'">
-    <Description>Serialization helpers for Elegy formalization domain models and governed artifacts.</Description>
+    <Description>Serialization helpers for Elegy formalization domain models and governed artifacts; convenience facade behavior remains under burden-of-proof review.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Validation'">
-    <Description>Validation rules and utilities for Elegy formalization artifacts and contracts.</Description>
+    <Description>Canonical validation semantics for Elegy formalization artifacts and contracts; transport-shaped validation helpers should remain outside the shared authority core.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Governance'">
-    <Description>Governance policies, enforcement modes, and decision helpers for Elegy artifacts.</Description>
+    <Description>Governance metadata and decision semantics for Elegy artifacts; consumer-shaped projection helpers remain under burden-of-proof review.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Projections.Mermaid'">
-    <Description>Mermaid projection output for visualizing Elegy formalization structures.</Description>
+    <Description>Mermaid projection output for visualizing Elegy formalization structures; long-term shared package survival is subject to multi-consumer proof.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Skills'">
@@ -56,31 +56,31 @@
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Skills.Discovery'">
-    <Description>Discovery-focused skill indexing, search, and resolution services for Elegy packages.</Description>
+    <Description>Discovery-oriented skill index and projection helpers; operational search and resolution behavior remains under burden-of-proof review versus Rust runtime or consumer-local ownership.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.DynamicSkills'">
-    <Description>Dynamic skill materialization and validation helpers for governed Elegy skill flows.</Description>
+    <Description>Dynamic skill contract and validation helpers for governed Elegy flows; executable materialization paths remain under review versus Rust tooling or consumer-local ownership.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.SkillForge'">
-    <Description>Skill and tooling generation services for building governed Elegy artifacts.</Description>
+    <Description>Governed skill and tooling request shapes plus generation metadata; operator-facing forge execution should prefer Rust tooling or consumer-local ownership.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Mcp'">
-    <Description>MCP descriptors, governed analysis artifacts, and canonical MCP-to-skill projection rules for Elegy.</Description>
+    <Description>Governed MCP descriptors, analysis artifacts, and canonical MCP-to-skill projection semantics for Elegy; behavior-heavy analysis, search, resolve, and generation lanes belong in Rust runtime surfaces.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Agents'">
-    <Description>Agent-facing formalization primitives for Elegy consumers and integrations.</Description>
+    <Description>Agent-facing formalization primitives and contract shapes for Elegy consumers and integrations; package survival is distinct from contract survival.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.AgentFactory'">
-    <Description>Agent creation and composition helpers built on Elegy formalization packages.</Description>
+    <Description>Agent creation and composition helpers built on Elegy formalization packages; host-specific construction behavior should remain in consumer composition roots unless stronger shared proof appears.</Description>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Elegy.Formalization.Monitoring'">
-    <Description>Monitoring-oriented formalization surfaces for observing Elegy-driven systems.</Description>
+    <Description>Monitoring-oriented formalization and event contract surfaces for observing Elegy-driven systems; standalone package survival remains subject to burden-of-proof review.</Description>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' == 'true'">

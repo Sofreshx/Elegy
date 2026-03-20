@@ -74,11 +74,35 @@ jobs:
               dotnet nuget push $_.FullName --source github --skip-duplicate
             }
 
-      - name: Attach contracts archive to GitHub release
-        if: ${{ github.event_name == 'release' }}
+      - name: Resolve release tag
+        if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          tag_name="${GITHUB_REF_NAME:-}"
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag_name="${{ github.event.release.tag_name }}"
+          fi
+
+          if [[ -z "${tag_name}" ]]; then
+            echo "Unable to determine a release tag for published distribution assets." >&2
+            exit 1
+          fi
+
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Attach published distribution assets to GitHub release
+        if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
         uses: softprops/action-gh-release@v2
         with:
-          files: artifacts/distribution/elegy-contracts-*.zip
+          tag_name: ${{ steps.release_meta.outputs.tag_name }}
+          generate_release_notes: true
+          files: |
+            artifacts/distribution/packages/*.nupkg
+            artifacts/distribution/packages/*.snupkg
+            artifacts/distribution/elegy-contracts-*.zip
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4

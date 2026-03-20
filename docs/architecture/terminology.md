@@ -80,6 +80,12 @@ A derived representation of an underlying model.
 
 Examples include Mermaid output and MCP-derived or generation-derived representations. A projection is not the authority for the original model.
 
+### Slice
+
+A bounded subset of a larger descriptor, analysis result, or capability set that is used to derive a narrower artifact.
+
+A slice is useful for generation and runtime selection, but it is not automatically a new authority surface. If a slice needs a stable serialized contract, that contract should live with governed artifacts rather than inside a runtime helper.
+
 ### Adapter
 
 A framework-specific, host-specific, or environment-specific integration layer that consumes public Elegy contracts.

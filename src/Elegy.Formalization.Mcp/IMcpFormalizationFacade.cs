@@ -1,5 +1,6 @@
 namespace Elegy.Formalization.Mcp;
 
+[Obsolete("Compatibility surface only. Prefer Rust runtime and CLI surfaces for executable MCP behavior.")]
 public interface IMcpFormalizationFacade
 {
     McpAnalysisResult Analyze(McpServerDescriptor descriptor);

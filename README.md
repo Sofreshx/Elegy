@@ -1,6 +1,6 @@
 # Elegy
 
-Elegy is the main monorepo for reusable formalization, governance, MCP-facing analysis, skill definitions, generation-oriented building blocks, and the Rust runtime family that executes or composes those governed artifacts.
+Elegy is the main monorepo for governed formalization artifacts and the Rust runtime family that executes or composes those artifacts.
 
 The design target is cross-project reuse with focused packages that stay:
 
@@ -8,13 +8,13 @@ The design target is cross-project reuse with focused packages that stay:
 - provider-agnostic
 - framework-agnostic
 
-The .NET solution remains the contract and formalization authority. Runtime-oriented MCP behavior lives in the in-repo Rust workspace where protocol, transport, host, and IO concerns dominate.
+The .NET solution remains the contract and formalization authority. Rust is the preferred implementation surface for self-contained, reusable, executable agentic/runtime capabilities where protocol, transport, host, and IO concerns dominate.
 
 ## Ecosystem position
 
 - `Elegy` is the single main repository.
 - governed contracts, schemas, fixtures, and canonical skill models remain authoritative in the .NET package families under `src/`.
-- the first-party Rust runtime family lives under `rust/` and is the preferred implementation surface for behavior-heavy MCP runtime logic.
+- the first-party Rust runtime family lives under `rust/` and is the preferred implementation surface for shared executable capabilities such as CLI, host, policy execution, retrieval, memory, and behavior-heavy MCP runtime logic.
 - standalone `Elegy-Skills` and `Elegy-CLI` repos should not be treated as the primary implementation surfaces.
 
 See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topology.md) for the current high-level organization and dependency direction.
@@ -52,22 +52,40 @@ See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topolo
 - `src/Elegy.Formalization.Monitoring` - Monitoring-oriented formalization surfaces.
 - `tests/*` - Unit test projects aligned to source packages.
 
+## Burden-of-Proof Reset
+
+Elegy now follows a stricter shared-code rule:
+
+- keep shared code only when it proves either canonical authority value or reusable runtime value
+- prefer schemas, fixtures, policy artifacts, and docs over libraries when consumers mainly need to read, validate, or conform
+- keep host-specific runtime behavior, auth, persistence, UI orchestration, HTTP endpoints, and composition-root logic in consuming repos
+
+Under that rule, the current durable `.NET` authority center is intentionally small:
+
+- `src/Elegy.Formalization.Core`
+- `src/Elegy.Formalization.Contracts`
+- `src/Elegy.Formalization.Skills`
+
+Other existing `.NET` package families may still contain useful pieces, but they are under burden-of-proof review and may be collapsed, reduced to artifacts, moved toward Rust runtime ownership, or pushed back to consumers.
+
 ## Organization rules
 
 - shared substrate packages must not depend on provider-specific SDKs, app frameworks, or host-specific runtime glue
-- MCP formalization in `src/` remains the schema and canonical projection authority, but behavior-heavy host, transport, filesystem, HTTP, and execution logic should move to the in-repo Rust runtime family when Rust is the stronger implementation fit
+- MCP formalization in `src/` remains the schema and canonical projection authority, but behavior-heavy host, transport, filesystem, HTTP, execution, and retrieval logic should move to the in-repo Rust runtime family when Rust is the stronger implementation fit
 - the exported contract bundle is the machine-readable handshake between authoritative .NET contract families and first-party Rust runtime crates, plus any external consumers
 - generation/tooling concerns belong in `SkillForge`-style packages rather than being conflated with the human-facing CLI concept
 - if a package family later needs its own repository, split only after the package boundary is proven and at least two real consumers exist
+- new shared executable features should default to Rust unless they are inseparable from canonical `.NET` authority semantics
+- downstream `.NET` consumers should integrate through packages, exported artifacts, or thin adapters rather than using Elegy as a catch-all `.NET` runtime host
 
 ## Consolidation posture
 
-The current consolidation direction is:
+The current reset direction is:
 
-- keep .NET authoritative for governed contracts, schemas, fixtures, compatibility manifests, and canonical skill definitions
-- keep useful Rust MCP implementation layers in `rust/` instead of treating a sibling repo as the long-term default topology
-- replace .NET with Rust where runtime, protocol, host, transport, or filesystem behavior is the dominant concern
-- start that replacement work with the existing .NET MCP analyzer, generator, and discovery behavior rather than with broader package families such as DynamicSkills or SkillForge
+- keep `.NET` authoritative for governed contracts, schemas, fixtures, compatibility manifests, core canonical semantics, and canonical skill definitions
+- keep the Rust runtime family in `rust/` as the shared executable surface for CLI, host, runtime composition, policy execution, retrieval, memory, and behavior-heavy MCP logic
+- shrink or collapse weak shared `.NET` runtime packages unless they prove strong authority value that cannot be expressed as contracts or artifacts
+- keep product-hosted `.NET` runtime logic in downstream consumers such as Holon or SAASTools unless the capability is demonstrably reusable and host-agnostic
 
 ## Documentation and operational posture
 

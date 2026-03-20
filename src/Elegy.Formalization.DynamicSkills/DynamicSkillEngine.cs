@@ -79,35 +79,6 @@ public sealed class DynamicSkillEngine
         };
     }
 
-    public DynamicSkillValidationResult Validate(SkillDefinition definition)
-    {
-        EnsureEnabled();
-
-        return new DynamicSkillValidationResult
-        {
-            Validation = SkillDefinitionValidator.Validate(definition)
-        };
-    }
-
-    public DynamicSkillDeactivateResult Deactivate(string skillId)
-    {
-        EnsureEnabled();
-
-        if (string.IsNullOrWhiteSpace(skillId))
-        {
-            return new DynamicSkillDeactivateResult
-            {
-                Success = false,
-                ErrorMessage = "Skill ID is required."
-            };
-        }
-
-        return new DynamicSkillDeactivateResult
-        {
-            Success = true
-        };
-    }
-
     private void EnsureEnabled()
     {
         if (!_options.IsEnabled)
