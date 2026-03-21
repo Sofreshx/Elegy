@@ -6,109 +6,89 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$sourceRoot = Join-Path $repoRoot 'src'
+$policyPath = Join-Path $repoRoot 'governance\boundary-policy.json'
 
-$allowedReferences = [ordered]@{
-    'Elegy.Formalization.Core' = @()
-    'Elegy.Formalization.Contracts' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Serialization' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Validation' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Governance' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Projections.Mermaid' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Skills' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Skills.Discovery' = @('Elegy.Formalization.Core', 'Elegy.Formalization.Skills')
-    'Elegy.Formalization.DynamicSkills' = @('Elegy.Formalization.Core', 'Elegy.Formalization.Skills', 'Elegy.Formalization.Monitoring')
-    'Elegy.Formalization.Monitoring' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.Mcp' = @('Elegy.Formalization.Skills')
-    'Elegy.Formalization.SkillForge' = @('Elegy.Formalization.Core', 'Elegy.Formalization.Skills', 'Elegy.Formalization.DynamicSkills', 'Elegy.Formalization.Governance')
-    'Elegy.Formalization.Agents' = @('Elegy.Formalization.Core')
-    'Elegy.Formalization.AgentFactory' = @('Elegy.Formalization.Core', 'Elegy.Formalization.Agents', 'Elegy.Formalization.Governance')
+if (-not (Test-Path $policyPath)) {
+    throw "Missing boundary policy: $policyPath"
 }
 
-$projectFiles = Get-ChildItem -Path $sourceRoot -Recurse -Filter *.csproj | Sort-Object FullName
-if ($projectFiles.Count -eq 0) {
-    throw 'No source projects were found under src/.'
-}
+$policy = Get-Content -Raw -Path $policyPath | ConvertFrom-Json
 
-$projectNames = @{}
-foreach ($projectFile in $projectFiles) {
-    $projectName = [System.IO.Path]::GetFileNameWithoutExtension($projectFile.Name)
-    $projectNames[$projectName] = $projectFile.FullName
-}
+$missingFiles = [System.Collections.Generic.List[string]]::new()
+$ruleViolations = [System.Collections.Generic.List[object]]::new()
 
-$missingPolicies = @($projectNames.Keys | Where-Object { -not $allowedReferences.Contains($_) } | Sort-Object)
-$stalePolicies = @($allowedReferences.Keys | Where-Object { -not $projectNames.Contains($_) } | Sort-Object)
-
-$violations = [System.Collections.Generic.List[object]]::new()
-
-foreach ($projectName in ($projectNames.Keys | Sort-Object)) {
-    if (-not $allowedReferences.Contains($projectName)) {
-        continue
+foreach ($relativePath in $policy.requiredFiles) {
+    $fullPath = Join-Path $repoRoot $relativePath
+    if (-not (Test-Path $fullPath)) {
+        $missingFiles.Add($relativePath) | Out-Null
     }
+}
 
-    [xml]$projectXml = Get-Content -Raw -Path $projectNames[$projectName]
-    $references = @($projectXml.SelectNodes('//ProjectReference'))
+foreach ($rule in $policy.rules) {
+    foreach ($relativePath in $rule.files) {
+        $fullPath = Join-Path $repoRoot $relativePath
 
-    foreach ($reference in $references) {
-        $include = [string]$reference.Include
-        if ([string]::IsNullOrWhiteSpace($include)) {
+        if (-not (Test-Path $fullPath)) {
+            $ruleViolations.Add([pscustomobject]@{
+                Rule = $rule.name
+                File = $relativePath
+                Type = 'missing-file'
+                Pattern = $null
+                Message = 'Policy-scoped file was not found.'
+            }) | Out-Null
             continue
         }
 
-        $referencedPath = [System.IO.Path]::GetFullPath((Join-Path (Split-Path -Parent $projectNames[$projectName]) $include))
-        $referencedName = [System.IO.Path]::GetFileNameWithoutExtension($referencedPath)
+        $content = Get-Content -Raw -Path $fullPath
 
-        $violations.Add([pscustomobject]@{
-            Project = $projectName
-            Reference = $referencedName
-            Allowed = $allowedReferences[$projectName] -contains $referencedName
-            KnownReference = $projectNames.Contains($referencedName)
-            Policy = $allowedReferences[$projectName] -join ', '
-        }) | Out-Null
+        foreach ($pattern in $rule.forbiddenPatterns) {
+            if ($content -match $pattern) {
+                $ruleViolations.Add([pscustomobject]@{
+                    Rule = $rule.name
+                    File = $relativePath
+                    Type = 'forbidden-pattern'
+                    Pattern = $pattern
+                    Message = 'Forbidden pattern matched.'
+                }) | Out-Null
+            }
+        }
+
+        foreach ($pattern in $rule.requiredPatterns) {
+            if ($content -notmatch $pattern) {
+                $ruleViolations.Add([pscustomobject]@{
+                    Rule = $rule.name
+                    File = $relativePath
+                    Type = 'required-pattern-missing'
+                    Pattern = $pattern
+                    Message = 'Required pattern was not found.'
+                }) | Out-Null
+            }
+        }
     }
 }
 
-$invalidReferences = @($violations | Where-Object { -not $_.Allowed -or -not $_.KnownReference })
-
 if ($EmitJson) {
     [pscustomobject]@{
-        missingPolicies = $missingPolicies
-        stalePolicies = $stalePolicies
-        references = $violations
-        invalidReferences = $invalidReferences
+        missingFiles = $missingFiles
+        violations = $ruleViolations
     } | ConvertTo-Json -Depth 6
 }
 
-if ($missingPolicies.Count -gt 0) {
-    throw ('Missing package-boundary policy entries for: ' + ($missingPolicies -join ', '))
+if ($missingFiles.Count -gt 0) {
+    throw ('Missing package-boundary required files: ' + ($missingFiles -join ', '))
 }
 
-if ($stalePolicies.Count -gt 0) {
-    throw ('Package-boundary policy contains stale entries for: ' + ($stalePolicies -join ', '))
-}
-
-if ($invalidReferences.Count -gt 0) {
-    $message = $invalidReferences | ForEach-Object {
-        $reason = if (-not $_.KnownReference) {
-            'reference target is not a known source project'
-        }
-        else {
-            'reference is not allowed by policy'
-        }
-
-        "{0} -> {1}: {2}. Allowed references: [{3}]" -f $_.Project, $_.Reference, $reason, $_.Policy
+if ($ruleViolations.Count -gt 0) {
+    $message = $ruleViolations | ForEach-Object {
+        "[{0}] {1}: {2} ({3})" -f $_.Rule, $_.File, $_.Message, $_.Pattern
     }
 
     throw ($message -join [Environment]::NewLine)
 }
 
 Write-Host 'Package-boundary validation passed.'
-foreach ($projectName in ($projectNames.Keys | Sort-Object)) {
-    $allowed = $allowedReferences[$projectName]
-    if ($allowed.Count -eq 0) {
-        Write-Host " - $projectName -> <none>"
-        continue
-    }
-
-    Write-Host (" - {0} -> {1}" -f $projectName, ($allowed -join ', '))
+Write-Host " - required files: $($policy.requiredFiles.Count)"
+Write-Host " - policy rules: $($policy.rules.Count)"
+foreach ($rule in $policy.rules) {
+    Write-Host (" - {0} -> {1} file(s)" -f $rule.name, $rule.files.Count)
 }

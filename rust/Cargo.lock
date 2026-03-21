@@ -292,6 +292,7 @@ dependencies = [
  "clap",
  "elegy-core",
  "elegy-host-mcp",
+ "elegy-tooling",
  "serde",
  "serde_json",
  "tokio",
@@ -372,6 +373,17 @@ dependencies = [
  "elegy-policy",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "elegy-tooling"
+version = "0.1.0"
+dependencies = [
+ "elegy-contracts",
+ "elegy-mcp",
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

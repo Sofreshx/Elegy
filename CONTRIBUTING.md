@@ -4,7 +4,7 @@ Thanks for your interest in contributing.
 
 `Elegy` is the main repository for the project's formalization, governance, MCP-facing analysis, and first-party Rust runtime work. The most valuable contributions right now are:
 
-- keeping docs aligned with the actual mixed-language repository shape
+- keeping docs aligned with the active contracts-first and Rust-first repository shape
 - improving clarity around package boundaries and dependency direction
 - hardening the imported Rust runtime family and its contract-consumer posture
 - tightening contributor ergonomics without widening scope casually
@@ -14,7 +14,7 @@ Thanks for your interest in contributing.
 Please keep these rules in mind:
 
 1. **Be honest about current status.** Do not document commands, examples, or capabilities that do not exist yet.
-2. **Respect the accepted direction.** `Elegy` is the operational center; `.NET` remains the contract authority; the in-repo Rust workspace is the preferred home for behavior-heavy MCP runtime logic.
+2. **Respect the accepted direction.** `contracts/` and `governance/` are the active authority roots, and the in-repo Rust workspace is the preferred home for behavior-heavy MCP runtime logic.
 3. **Keep v1 intentionally narrow.** The current protocol/runtime target is Rust-first, runtime composition, resources-first MCP behavior, and conservative policy defaults.
 4. **Prefer safe defaults.** Validation, policy, and security posture are core project behavior, not extras.
 5. **Do not widen scope casually.** Changes that affect protocol scope, trust boundaries, packaging topology, or repo-split direction should start with an issue or design discussion.
@@ -45,17 +45,15 @@ Good contributions right now include:
 
 Run the narrowest relevant checks for the surfaces you change.
 
-### Formalization / .NET changes
+### Contracts, governance, and workflow changes
 
 Use targeted checks such as:
 
 ```powershell
 pwsh ./scripts/validate-package-boundaries.ps1
 pwsh ./scripts/export-contracts.ps1
-dotnet test ./tests/Elegy.Formalization.Core.Tests/Elegy.Formalization.Core.Tests.csproj -v minimal
+pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
 ```
-
-If you change a specific package family, run the corresponding focused test project(s) under `tests/`.
 
 ### Rust runtime changes
 
@@ -75,7 +73,7 @@ Please keep pull requests:
 
 - small enough to review
 - explicit about user-visible impact
-- explicit about whether the change is docs, workflow/config, `.NET`, Rust, or mixed-language work
+- explicit about whether the change is docs, workflow/config, governed contracts, Rust, or transitional deletion work
 - updated with docs when behavior or posture changes
 
 Every PR should answer:

@@ -50,8 +50,8 @@ impl McpSkillGenerator {
                 continue;
             }
 
+            let skill_id = generated_skill_id(&analysis_result.server_name, &analysis.tool.name);
             let slug = build_slug(&analysis_result.server_name, &analysis.tool.name);
-            let skill_id = format!("mcp-{slug}");
             let source_ref = format!("mcp://{}/tools/{slug}", analysis_result.server_name);
 
             generated.push(SkillDefinition {
@@ -109,6 +109,11 @@ impl McpSkillGenerator {
             skipped_tools: skipped,
         }
     }
+}
+
+pub fn generated_skill_id(server_name: &str, tool_name: &str) -> String {
+    let slug = build_slug(server_name, tool_name);
+    format!("mcp-{slug}")
 }
 
 pub struct McpToolSearchService;
@@ -264,7 +269,10 @@ fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{McpSkillGenerator, McpToolAnalyzer, McpToolResolveService, McpToolSearchService};
+    use super::{
+        generated_skill_id, McpSkillGenerator, McpToolAnalyzer, McpToolResolveService,
+        McpToolSearchService,
+    };
     use elegy_contracts::{
         McpServerDescriptor, McpToolAnalysis, McpToolDefinition, SkillMaterializationKind,
         SkillSourceKind,
@@ -368,6 +376,31 @@ mod tests {
         assert_eq!(
             result.analyses[0].extracted_triggers[0].pattern,
             "list items"
+        );
+    }
+
+    #[test]
+    fn generated_skill_id_and_source_ref_preserve_mcp_prefixed_server_names() {
+        let generator = McpSkillGenerator;
+        let analysis = elegy_contracts::McpAnalysisResult {
+            server_name: "mcp-server".to_string(),
+            analyses: vec![create_analysis("list-items", "List items", true)],
+        };
+
+        let generated = generator.generate(&analysis);
+
+        assert_eq!(generated.generated_skills.len(), 1);
+        assert_eq!(
+            generated_skill_id("mcp-server", "list-items"),
+            "mcp-mcp-server-list-items"
+        );
+        assert_eq!(
+            generated.generated_skills[0].origin.source_ref.as_deref(),
+            Some("mcp://mcp-server/tools/mcp-server-list-items")
+        );
+        assert_eq!(
+            generated.generated_skills[0].input.schema_ref.as_deref(),
+            Some("mcp://mcp-server/tools/mcp-server-list-items/input-schema")
         );
     }
 

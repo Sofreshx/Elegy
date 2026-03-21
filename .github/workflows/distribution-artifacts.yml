@@ -15,42 +15,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  pack-and-export:
+  export:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
-
-      - name: Restore solution
-        run: dotnet restore ./Elegy.sln
-
-      - name: Pack distributable .NET packages
+      - name: Validate canonical authority inventory
         shell: pwsh
         run: |
-          $ErrorActionPreference = 'Stop'
-          $packagesOutput = Join-Path $PWD 'artifacts/distribution/packages'
-          New-Item -ItemType Directory -Path $packagesOutput -Force | Out-Null
-
-          Get-ChildItem ./src -Recurse -Filter *.csproj |
-            Sort-Object FullName |
-            ForEach-Object {
-              dotnet pack $_.FullName `
-                --configuration Release `
-                --no-restore `
-                --output $packagesOutput `
-                -p:ContinuousIntegrationBuild=true `
-                --verbosity minimal
-            }
+          ./scripts/validate-canonical-outputs.ps1
 
       - name: Export contracts bundle
         shell: pwsh
         run: |
           ./scripts/export-contracts.ps1 -CreateArchive
+
+      - name: Validate exported contracts bundle
+        shell: pwsh
+        run: |
+          ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive
 
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
@@ -58,7 +42,5 @@ jobs:
           name: elegy-distribution-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/distribution/packages/*.nupkg
-            artifacts/distribution/packages/*.snupkg
             artifacts/contracts/**
             artifacts/distribution/elegy-contracts-*.zip

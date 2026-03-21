@@ -11,6 +11,7 @@ Imported or added so far:
 - `elegy-contracts`
 - `elegy-policy`
 - `elegy-mcp`
+- `elegy-tooling`
 - `elegy-descriptor`
 - `elegy-adapter-fs`
 - `elegy-adapter-http`
@@ -26,12 +27,13 @@ These crates currently provide:
 - in-repo conformance checks against the exported contract bundle under `artifacts/contracts`
 - reusable policy validation for filesystem and HTTP runtime boundaries
 - parity-first Rust implementations of MCP analyzer, generator, and discovery behavior
+- internal Rust tooling for MCP descriptor authoring and MCP-to-skill generation from governed descriptor inputs
 - normalized project, descriptor, and resource loading for the imported runtime stack
 - policy-bounded filesystem resource composition and read behavior for static and filesystem families
 - policy-bounded HTTP resource composition and bounded GET execution with redirect, timeout, and size-limit normalization
 - family-neutral runtime composition and a caller-facing core facade over descriptor, policy, adapters, and MCP consumers
 - a thin stdio MCP host that serves runtime-composed resources from the imported core/runtime layers
-- a thin operator CLI for config validation, runtime validation, resource inspection, and stdio host startup
+- a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, MCP-to-skill generation, and stdio host startup
 
 ## Current posture
 

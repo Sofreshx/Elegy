@@ -4,6 +4,7 @@ members = [
     "crates/elegy-contracts",
     "crates/elegy-policy",
     "crates/elegy-mcp",
+    "crates/elegy-tooling",
     "crates/elegy-descriptor",
     "crates/elegy-adapter-fs",
     "crates/elegy-adapter-http",

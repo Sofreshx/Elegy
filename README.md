@@ -104,7 +104,7 @@ Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Ski
 
 ## Distribution and consumption
 
-Elegy should be consumed through versioned packages and versioned exported artifacts rather than local sibling-repository references.
+Elegy should be consumed through versioned exported artifacts rather than local sibling-repository references or .NET package restore.
 
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
@@ -144,7 +144,7 @@ pwsh ./scripts/bump-version.ps1 -PackageBump patch -SchemaVersion 1.2.3
 
 The script validates SemVer input and blocks schema-major bumps unless package major is also increased.
 
-## Contracts artifacts for Node.js consumers
+## Contracts artifacts for consumers
 
 Export publishable contracts artifacts (schema + fixtures + compatibility manifest):
 
@@ -152,7 +152,7 @@ Export publishable contracts artifacts (schema + fixtures + compatibility manife
 pwsh ./scripts/export-contracts.ps1
 ```
 
-This produces deterministic files under `artifacts/contracts` for downstream consumers such as Node.js tools, the in-repo Rust workspace under `rust/`, and any external integrations:
+This produces deterministic files under `artifacts/contracts` for downstream consumers such as the in-repo Rust workspace under `rust/` and any external integrations:
 
 - `canonical-workflow.schema.json`
 - `canonical-workflow-graph.schema.json`

@@ -63,21 +63,13 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v4
-      - name: Setup .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: 10.0.x
       - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.88.0
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
-          languages: csharp,rust
-      - name: Restore .NET solution
-        run: dotnet restore ./Elegy.sln
-      - name: Build .NET solution
-        run: dotnet build ./Elegy.sln --configuration Release --no-restore
+          languages: rust
       - name: Build Rust workspace
         working-directory: ./rust
         run: cargo build --workspace --all-features --locked

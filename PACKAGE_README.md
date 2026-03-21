@@ -1,12 +1,12 @@
-# Elegy packages
+# Elegy distribution
 
-Elegy publishes reusable .NET formalization, governance, skill, and MCP-facing packages from the main repository.
+Elegy no longer treats package-feed publication as the supported downstream surface.
 
-Use versioned packages and exported contract bundles for downstream consumption rather than sibling-repository project references.
+Use the governed contract bundle exported from `contracts/` instead of `.NET` package restore or sibling-repository project references.
 
 - Repository: https://github.com/Sofreshx/Elegy
-- Package feed: GitHub Packages (`https://nuget.pkg.github.com/Sofreshx/index.json`)
 - Contracts bundle guidance: see `docs/distribution.md`
+- Export command: `pwsh ./scripts/export-contracts.ps1 -CreateArchive`
 
 Common package families include:
 
