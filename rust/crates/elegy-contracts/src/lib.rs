@@ -551,7 +551,9 @@ pub fn default_support_manifest_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
+    .join("..")
         .join("contracts")
+    .join("support")
         .join("elegy-rust-support.json")
 }
 

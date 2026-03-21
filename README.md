@@ -8,12 +8,12 @@ The design target is cross-project reuse with focused packages that stay:
 - provider-agnostic
 - framework-agnostic
 
-The .NET solution remains the contract and formalization authority. Rust is the preferred implementation surface for self-contained, reusable, executable agentic/runtime capabilities where protocol, transport, host, and IO concerns dominate.
+The neutral authority root under `contracts/` now owns governed schemas, fixtures, manifests, and support metadata for the purge path. Rust is the preferred implementation surface for self-contained, reusable, executable agentic/runtime capabilities where protocol, transport, host, and IO concerns dominate. The remaining `.NET` tree is transitional and is being retired rather than expanded.
 
 ## Ecosystem position
 
 - `Elegy` is the single main repository.
-- governed contracts, schemas, fixtures, and canonical skill models remain authoritative in the .NET package families under `src/`.
+- governed contracts, schemas, fixtures, manifests, and support metadata are moving to the neutral authority root under `contracts/`.
 - the first-party Rust runtime family lives under `rust/` and is the preferred implementation surface for shared executable capabilities such as CLI, host, policy execution, retrieval, memory, and behavior-heavy MCP runtime logic.
 - standalone `Elegy-Skills` and `Elegy-CLI` repos should not be treated as the primary implementation surfaces.
 
@@ -22,6 +22,8 @@ See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topolo
 ## Project map
 
 ### Substrate
+
+- `contracts/` - Authored neutral authority root for schemas, fixtures, manifests, and support metadata.
 
 - `src/Elegy.Formalization.Core` - Core abstractions and domain model primitives.
 - `src/Elegy.Formalization.Contracts` - Shared contracts for integration boundaries.
@@ -82,9 +84,9 @@ Other existing `.NET` package families may still contain useful pieces, but they
 
 The current reset direction is:
 
-- keep `.NET` authoritative for governed contracts, schemas, fixtures, compatibility manifests, core canonical semantics, and canonical skill definitions
+- keep neutral artifacts authoritative for governed contracts, schemas, fixtures, compatibility manifests, and support metadata during the purge
 - keep the Rust runtime family in `rust/` as the shared executable surface for CLI, host, runtime composition, policy execution, retrieval, memory, and behavior-heavy MCP logic
-- shrink or collapse weak shared `.NET` runtime packages unless they prove strong authority value that cannot be expressed as contracts or artifacts
+- shrink or delete shared `.NET` packages unless they prove authority value that cannot be expressed as neutral contracts or artifacts
 - keep product-hosted `.NET` runtime logic in downstream consumers such as Holon or SAASTools unless the capability is demonstrably reusable and host-agnostic
 
 ## Documentation and operational posture
@@ -104,16 +106,16 @@ Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Ski
 
 Elegy should be consumed through versioned packages and versioned exported artifacts rather than local sibling-repository references.
 
-- .NET package distribution is prepared for GitHub Packages.
+- the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 - downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Release and versioning
 
-Elegy uses SemVer for both package versions and schema versions.
+Elegy uses SemVer for both bundle versions and schema versions during the purge transition.
 
-- Package version source of truth: `Directory.Build.props` (`VersionPrefix`).
-- Schema version source of truth: `schemas/schema-version.json` (`schemaVersion`).
+- Bundle and manifest package version source of truth: `governance/version-policy.json`.
+- Active schema version source of truth: `governance/version-policy.json`.
 
 ### Compatibility expectations
 
@@ -125,7 +127,7 @@ Elegy uses SemVer for both package versions and schema versions.
 
 ### Governance rule
 
-If `schemaVersion` major is incremented, the package major version in `Directory.Build.props` must also be incremented in the same change.
+If `schemaVersion` major is incremented, the bundle major version in `governance/version-policy.json` must also be incremented in the same change.
 
 This is enforced by CI in `.github/workflows/versioning-governance.yml`.
 
@@ -159,6 +161,9 @@ This produces deterministic files under `artifacts/contracts` for downstream con
 - `mcp-tool-definition.schema.json`
 - `mcp-server-descriptor.schema.json`
 - `mcp-analysis-result.schema.json`
+- `agent-request-envelope.schema.json`
+- `agent-response-envelope.schema.json`
+- `agent-event-envelope.schema.json`
 - `fixtures/canonical-workflow.minimal.json`
 - `fixtures/canonical-workflow-graph.minimal.json`
 - `compatibility-manifest.json`

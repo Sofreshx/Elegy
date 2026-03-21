@@ -25,16 +25,29 @@ jobs:
             return [int]($version.Split('-',2)[0].Split('+',2)[0].Split('.')[0])
           }
 
-          if (-not (Test-Path 'Directory.Build.props')) {
-            throw 'Directory.Build.props was not found.'
+          if (-not (Test-Path 'governance/version-policy.json')) {
+            throw 'governance/version-policy.json was not found.'
           }
 
-          [xml]$props = Get-Content -Raw -Path 'Directory.Build.props'
-          $packageVersion = [string]($props.Project.PropertyGroup.VersionPrefix | Select-Object -First 1)
-          if ([string]::IsNullOrWhiteSpace($packageVersion) -or $packageVersion -notmatch $semver) {
-            throw "VersionPrefix '$packageVersion' is not valid SemVer."
+          $versionPolicy = Get-Content -Raw -Path 'governance/version-policy.json' | ConvertFrom-Json
+          $bundleVersion = [string]$versionPolicy.bundleVersion
+          $packageVersion = [string]$versionPolicy.manifestPackage.version
+          $packageName = [string]$versionPolicy.manifestPackage.name
+
+          if ([string]::IsNullOrWhiteSpace($bundleVersion) -or $bundleVersion -notmatch $semver) {
+            throw "bundleVersion '$bundleVersion' is not valid SemVer."
           }
-          Write-Host "Package version is valid: $packageVersion"
+
+          if ([string]::IsNullOrWhiteSpace($packageVersion) -or $packageVersion -notmatch $semver) {
+            throw "manifestPackage.version '$packageVersion' is not valid SemVer."
+          }
+
+          if ([string]::IsNullOrWhiteSpace($packageName)) {
+            throw 'manifestPackage.name must be defined in governance/version-policy.json.'
+          }
+
+          Write-Host "Bundle version is valid: $bundleVersion"
+          Write-Host "Manifest package version is valid: $packageVersion"
 
           if (-not (Test-Path 'schemas/schema-version.json')) {
             throw 'schemas/schema-version.json is required.'
@@ -47,6 +60,10 @@ jobs:
           }
           Write-Host "Schema version is valid: $schemaVersion"
 
+          if ([string]$versionPolicy.schemaVersion -ne $schemaVersion) {
+            throw "governance/version-policy.json schemaVersion '$($versionPolicy.schemaVersion)' does not match schemas/schema-version.json '$schemaVersion'."
+          }
+
           $hasParent = $true
           try {
             git rev-parse --verify HEAD^ | Out-Null
@@ -55,20 +72,20 @@ jobs:
           }
 
           if ($hasParent) {
-            $basePropsText = git show HEAD^:Directory.Build.props 2>$null
+            $baseVersionPolicyText = git show HEAD^:governance/version-policy.json 2>$null
             $baseSchemaText = git show HEAD^:schemas/schema-version.json 2>$null
 
-            if ($LASTEXITCODE -eq 0 -and $basePropsText -and $baseSchemaText) {
-              [xml]$baseProps = $basePropsText
-              $basePackageVersion = [string]($baseProps.Project.PropertyGroup.VersionPrefix | Select-Object -First 1)
+            if ($LASTEXITCODE -eq 0 -and $baseVersionPolicyText -and $baseSchemaText) {
+              $baseVersionPolicy = $baseVersionPolicyText | ConvertFrom-Json
+              $baseBundleVersion = [string]$baseVersionPolicy.bundleVersion
               $baseSchema = $baseSchemaText | ConvertFrom-Json
               $baseSchemaVersion = [string]$baseSchema.schemaVersion
 
-              if ($basePackageVersion -match $semver -and $baseSchemaVersion -match $semver) {
+              if ($baseBundleVersion -match $semver -and $baseSchemaVersion -match $semver) {
                 $schemaMajorIncreased = (Get-Major $schemaVersion) -gt (Get-Major $baseSchemaVersion)
-                $packageMajorIncreased = (Get-Major $packageVersion) -gt (Get-Major $basePackageVersion)
-                if ($schemaMajorIncreased -and -not $packageMajorIncreased) {
-                  throw "Schema major changed ($baseSchemaVersion -> $schemaVersion) without package major bump ($basePackageVersion -> $packageVersion)."
+                $bundleMajorIncreased = (Get-Major $bundleVersion) -gt (Get-Major $baseBundleVersion)
+                if ($schemaMajorIncreased -and -not $bundleMajorIncreased) {
+                  throw "Schema major changed ($baseSchemaVersion -> $schemaVersion) without bundle major bump ($baseBundleVersion -> $bundleVersion)."
                 }
               }
             }

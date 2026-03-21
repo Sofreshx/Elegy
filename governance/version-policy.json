@@ -1,0 +1,14 @@
+{
+  "bundleVersion": "0.2.0",
+  "schemaVersion": "1.0.0",
+  "manifestPackage": {
+    "name": "Elegy.Formalization.Contracts",
+    "version": "0.2.0"
+  },
+  "policy": {
+    "bundleMajor": "Increment for breaking changes to the published governed bundle or compatibility contract.",
+    "schemaMajor": "Increment for breaking schema changes. Requires a bundle major version bump in governance/version-policy.json.",
+    "schemaMinor": "Increment for backward-compatible schema additions.",
+    "schemaPatch": "Increment for backward-compatible schema corrections or metadata fixes."
+  }
+}

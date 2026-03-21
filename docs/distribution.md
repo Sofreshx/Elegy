@@ -2,12 +2,14 @@
 
 Elegy is intended to be consumed through versioned packages and versioned exported artifacts, not through brittle sibling-repository workspace references.
 
+The active authority cutover moves governed schemas, fixtures, manifests, and support metadata into `contracts/`, with version policy under `governance/version-policy.json`. Remaining `.NET` packaging guidance is transitional.
+
 ## .NET packages
 
 The `.NET` libraries under `src/` are prepared for NuGet-style distribution. The initial internal/prerelease-ready distribution model is GitHub Packages.
 
 - Feed URL: `https://nuget.pkg.github.com/Sofreshx/index.json`
-- Package version source of truth: `Directory.Build.props`
+- Transitional package version source of truth: `governance/version-policy.json` (`manifestPackage.version`)
 - Release workflow: `.github/workflows/publish-distribution.yml`
 - Validation/artifact workflow: `.github/workflows/distribution-artifacts.yml`
 
@@ -54,7 +56,7 @@ pwsh ./scripts/export-contracts.ps1 -CreateArchive
 Outputs:
 
 - expanded directory: `artifacts/contracts`
-- versioned archive: `artifacts/distribution/elegy-contracts-<packageVersion>.zip`
+- versioned archive: `artifacts/distribution/elegy-contracts-<bundleVersion>.zip`
 
 The archive is intended for downstream consumers that do not restore NuGet packages directly, including Node.js tooling, Rust consumers, and integration environments that only need the governed contract bundle.
 
@@ -74,7 +76,7 @@ Current governed workflow artifacts in that bundle include both the portable wor
 
 ## Maintainer flow
 
-1. Update package metadata/version in `Directory.Build.props`.
+1. Update bundle and manifest package metadata/version in `governance/version-policy.json`.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 3. Run `dotnet pack` for affected source packages.
 4. Publish through the GitHub Actions workflows when ready.

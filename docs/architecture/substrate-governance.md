@@ -119,9 +119,9 @@ That means:
 
 The primary governed artifacts in Phase 1 are:
 
-- `Directory.Build.props` package version baseline
-- `schemas/schema-version.json` schema version baseline
-- contract schemas and fixtures in `src/Elegy.Formalization.Contracts/Resources`
+- `governance/version-policy.json` bundle and manifest package version baseline
+- `schemas/schema-version.json` transitional schema-version mirror
+- contract schemas and fixtures in `contracts/`
 - compatibility manifest and compatibility matrix artifacts
 
 ## Fixture and conformance corpus rule

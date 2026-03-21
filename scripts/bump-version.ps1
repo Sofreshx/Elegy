@@ -16,7 +16,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$propsPath = Join-Path $repoRoot 'Directory.Build.props'
+$versionPolicyPath = Join-Path $repoRoot 'governance\version-policy.json'
 $schemaPath = Join-Path $repoRoot 'schemas\schema-version.json'
 $semVerRegex = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
 
@@ -60,21 +60,24 @@ function Get-Major {
     return [int]($Version.Split('-', 2)[0].Split('+', 2)[0].Split('.')[0])
 }
 
-if (-not (Test-Path $propsPath)) {
-    throw "Missing file: $propsPath"
+if (-not (Test-Path $versionPolicyPath)) {
+    throw "Missing file: $versionPolicyPath"
 }
 
 if (-not (Test-Path $schemaPath)) {
     throw "Missing file: $schemaPath"
 }
 
-[xml]$propsXml = Get-Content -Raw -Path $propsPath
-$versionPrefixNode = $propsXml.SelectSingleNode('//Project/PropertyGroup/VersionPrefix')
-if (-not $versionPrefixNode) {
-    throw "Directory.Build.props must include <VersionPrefix>."
+[pscustomobject]$versionPolicy = Get-Content -Raw -Path $versionPolicyPath | ConvertFrom-Json
+if (-not $versionPolicy.bundleVersion) {
+    throw "governance/version-policy.json must include bundleVersion."
 }
-$currentPackageVersion = [string]$versionPrefixNode.InnerText
+$currentPackageVersion = [string]$versionPolicy.bundleVersion
 Assert-SemVer -Value $currentPackageVersion -Name 'Current package version'
+
+if (-not $versionPolicy.manifestPackage.version) {
+    throw "governance/version-policy.json must include manifestPackage.version."
+}
 
 $schemaJson = Get-Content -Raw -Path $schemaPath | ConvertFrom-Json
 if (-not $schemaJson.schemaVersion) {
@@ -115,16 +118,10 @@ if ($DryRun) {
     exit 0
 }
 
-$versionPrefixNode.InnerText = $nextPackageVersion
-$versionNode = $propsXml.SelectSingleNode('//Project/PropertyGroup/Version')
-if ($versionNode) {
-    $versionNode.InnerText = '$(VersionPrefix)'
-}
-$packageVersionNode = $propsXml.SelectSingleNode('//Project/PropertyGroup/PackageVersion')
-if ($packageVersionNode) {
-    $packageVersionNode.InnerText = '$(Version)'
-}
-$propsXml.Save($propsPath)
+$versionPolicy.bundleVersion = $nextPackageVersion
+$versionPolicy.manifestPackage.version = $nextPackageVersion
+$versionPolicy.schemaVersion = $nextSchemaVersion
+$versionPolicy | ConvertTo-Json -Depth 10 | Set-Content -Path $versionPolicyPath
 
 $schemaJson.schemaVersion = $nextSchemaVersion
 $schemaJson | ConvertTo-Json -Depth 10 | Set-Content -Path $schemaPath

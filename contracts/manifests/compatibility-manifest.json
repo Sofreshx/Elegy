@@ -1,0 +1,129 @@
+{
+  "manifestVersion": "1.0.0",
+  "package": {
+    "name": "Elegy.Formalization.Contracts",
+    "version": "0.2.0"
+  },
+  "schemas": [
+    {
+      "name": "canonical-workflow",
+      "schemaVersion": "1.0.0",
+      "file": "canonical-workflow.schema.json",
+      "fixtures": [
+        "fixtures/canonical-workflow.minimal.json"
+      ]
+    },
+    {
+      "name": "canonical-workflow-graph",
+      "schemaVersion": "1.0.0",
+      "file": "canonical-workflow-graph.schema.json",
+      "fixtures": [
+        "fixtures/canonical-workflow-graph.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-definition",
+      "schemaVersion": "1.0.0",
+      "file": "agent-definition.schema.json",
+      "fixtures": [
+        "fixtures/agent-definition.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-request-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-request-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-request-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-response-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-response-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-response-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-event-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-event-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-event-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "dynamic-skill-activation",
+      "schemaVersion": "1.0.0",
+      "file": "dynamic-skill-activation.schema.json",
+      "fixtures": [
+        "fixtures/dynamic-skill-activation.minimal.json"
+      ]
+    },
+    {
+      "name": "monitoring-event",
+      "schemaVersion": "1.0.0",
+      "file": "monitoring-event.schema.json",
+      "fixtures": [
+        "fixtures/monitoring-event.minimal.json"
+      ]
+    },
+    {
+      "name": "skill-definition",
+      "schemaVersion": "1.0.0",
+      "file": "skill-definition.schema.json",
+      "fixtures": [
+        "fixtures/skill-definition.minimal.json"
+      ]
+    },
+    {
+      "name": "skill-forge-request",
+      "schemaVersion": "1.0.0",
+      "file": "skill-forge-request.schema.json",
+      "fixtures": [
+        "fixtures/skill-forge-request.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-create-request",
+      "schemaVersion": "1.0.0",
+      "file": "agent-create-request.schema.json",
+      "fixtures": [
+        "fixtures/agent-create-request.minimal.json"
+      ]
+    },
+    {
+      "name": "skill-discovery-index",
+      "schemaVersion": "1.0.0",
+      "file": "skill-discovery-index.schema.json",
+      "fixtures": [
+        "fixtures/skill-discovery-index.minimal.json"
+      ]
+    },
+    {
+      "name": "mcp-tool-definition",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-tool-definition.schema.json",
+      "fixtures": [
+        "fixtures/mcp-tool-definition.minimal.json"
+      ]
+    },
+    {
+      "name": "mcp-server-descriptor",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-server-descriptor.schema.json",
+      "fixtures": [
+        "fixtures/mcp-server-descriptor.minimal.json"
+      ]
+    },
+    {
+      "name": "mcp-analysis-result",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-analysis-result.schema.json",
+      "fixtures": [
+        "fixtures/mcp-analysis-result.minimal.json"
+      ]
+    }
+  ]
+}

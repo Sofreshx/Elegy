@@ -1,0 +1,62 @@
+{
+  "serverName": "parity-server",
+  "analyses": [
+    {
+      "tool": {
+        "name": "list-files",
+        "description": "List files in a workspace",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": ["path"]
+        }
+      },
+      "extractedTriggers": [
+        {
+          "pattern": "list files",
+          "description": "Extracted from MCP tool name"
+        }
+      ],
+      "hasValidSchema": true
+    },
+    {
+      "tool": {
+        "name": "readFile",
+        "description": "Read a file from a workspace",
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "type": "string"
+            }
+          },
+          "required": ["path"]
+        }
+      },
+      "extractedTriggers": [
+        {
+          "pattern": "read file",
+          "description": "Extracted from MCP tool name"
+        }
+      ],
+      "hasValidSchema": true
+    },
+    {
+      "tool": {
+        "name": "search_code",
+        "description": "Search source code by text"
+      },
+      "extractedTriggers": [
+        {
+          "pattern": "search code",
+          "description": "Extracted from MCP tool name"
+        }
+      ],
+      "hasValidSchema": false
+    }
+  ]
+}

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/agent-definition.schema.json",
+  "title": "AgentDefinition",
+  "description": "Canonical agent definition contract for non-.NET consumers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "name", "capabilities", "routingRules", "scope"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "name": { "type": "string", "minLength": 1 },
+    "description": { "type": ["string", "null"] },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["capabilityId", "name"],
+        "properties": {
+          "capabilityId": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "routingRules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["ruleId", "pattern", "priority", "targetCapabilityId"],
+        "properties": {
+          "ruleId": { "type": "string", "minLength": 1 },
+          "pattern": { "type": "string", "minLength": 1 },
+          "priority": { "type": "integer" },
+          "targetCapabilityId": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["session", "workspace", "global"]
+    }
+  }
+}
