@@ -1,4 +1,5 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use elegy_contracts::{export_contract_bundle, ContractsBundleExport, ContractsError};
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
     McpAnalysisResult, McpTransportKind, ProjectLocator, ResourceFamily, Severity,
@@ -74,6 +75,10 @@ enum Command {
         #[arg(long)]
         dry_run: bool,
     },
+    Contracts {
+        #[command(subcommand)]
+        command: ContractsCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -134,6 +139,18 @@ enum InspectCommand {
 enum CliTransport {
     Stdio,
     Http,
+}
+
+#[derive(Subcommand, Debug)]
+enum ContractsCommand {
+    Export {
+        #[arg(long)]
+        output_path: Option<PathBuf>,
+        #[arg(long)]
+        create_archive: bool,
+        #[arg(long)]
+        archive_output_path: Option<PathBuf>,
+    },
 }
 
 #[derive(Serialize)]
@@ -251,6 +268,19 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: InspectCommand::SessionContext,
         } => execute_session_context_command(cli.format),
         Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
+        Command::Contracts {
+            command:
+                ContractsCommand::Export {
+                    output_path,
+                    create_archive,
+                    archive_output_path,
+                },
+        } => execute_contracts_export_command(
+            output_path,
+            create_archive,
+            archive_output_path,
+            cli.format,
+        ),
     }
 }
 
@@ -527,6 +557,36 @@ async fn execute_run_command(
     execute_runtime_command(locator, format, vec!["run", "dry-run"])
 }
 
+fn execute_contracts_export_command(
+    output_path: Option<PathBuf>,
+    create_archive: bool,
+    archive_output_path: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match export_contract_bundle(
+        output_path.as_deref(),
+        create_archive,
+        archive_output_path.as_deref(),
+    ) {
+        Ok(result) => {
+            let summary = Summary::default();
+            match format {
+                OutputFormat::Text => print_contracts_export_text(&result),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["contracts".to_string(), "export".to_string()],
+                    status: "ok",
+                    summary,
+                    data: result,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_contracts_error(error, format, vec!["contracts", "export"]),
+    }
+}
+
 fn emit_error<T: Serialize>(
     error: CoreError,
     format: OutputFormat,
@@ -539,6 +599,21 @@ fn emit_error<T: Serialize>(
         error.diagnostics().to_vec(),
         data,
         "invalid",
+        ExitCode::from(1),
+    )
+}
+
+fn emit_contracts_error(
+    error: ContractsError,
+    format: OutputFormat,
+    command: Vec<&str>,
+) -> Result<ExitCode, serde_json::Error> {
+    emit_diagnostics(
+        format,
+        command,
+        vec![Diagnostic::error("CLI-CONTRACTS-001", error.to_string())],
+        json!({}),
+        "error",
         ExitCode::from(1),
     )
 }
@@ -780,6 +855,17 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     }
     for path in &result.written_files {
         println!("written: {}", path);
+    }
+}
+
+fn print_contracts_export_text(result: &ContractsBundleExport) {
+    println!("contracts bundle exported");
+    println!("output: {}", result.output_path.display());
+    println!("package version: {}", result.package_version);
+    println!("schema version: {}", result.schema_version);
+    println!("files: {}", result.files.len());
+    if let Some(archive_path) = &result.archive_path {
+        println!("archive: {}", archive_path.display());
     }
 }
 

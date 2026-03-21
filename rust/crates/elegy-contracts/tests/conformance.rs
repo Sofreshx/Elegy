@@ -1,5 +1,5 @@
 use elegy_contracts::{
-    default_support_manifest_path, load_compatibility_manifest_from_dir,
+    default_support_manifest_path, export_contract_bundle, load_compatibility_manifest_from_dir,
     load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
     load_skill_discovery_index_fixture_from_dir, resolve_upstream_contracts_dir,
@@ -9,6 +9,11 @@ use elegy_contracts::{
     SkillGovernanceMetadata, SkillMaterializationKind, SkillOrigin, SkillSourceKind,
 };
 use std::collections::BTreeSet;
+use std::env;
+use std::fs;
+use std::process;
+use std::time::{SystemTime, UNIX_EPOCH};
+use zip::ZipArchive;
 
 #[test]
 fn upstream_bundle_contains_supported_schema_entries() {
@@ -180,4 +185,38 @@ fn mcp_validators_reject_duplicate_and_inconsistent_entries() {
         &"MCP analysis entries marked as having a valid schema must include an input schema."
             .to_string()
     ));
+}
+
+#[test]
+fn export_contract_bundle_creates_expected_directory_and_archive() {
+    let temp_root = env::temp_dir().join(format!(
+        "elegy-contracts-export-{}-{}",
+        process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix epoch")
+            .as_nanos()
+    ));
+    let output_path = temp_root.join("contracts");
+    let archive_path = temp_root.join("distribution").join("bundle.zip");
+
+    let export = export_contract_bundle(Some(&output_path), true, Some(&archive_path))
+        .expect("export contracts bundle");
+
+    assert_eq!(export.output_path, output_path);
+    assert_eq!(export.archive_path.as_deref(), Some(archive_path.as_path()));
+    assert!(output_path.join("compatibility-manifest.json").is_file());
+    assert!(output_path.join("compatibility-matrix.json").is_file());
+    assert!(output_path.join("canonical-workflow.schema.json").is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("mcp-parity-expected.json")
+        .is_file());
+
+    let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
+    let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
+    assert!(archive.by_name("compatibility-manifest.json").is_ok());
+    assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
+
+    fs::remove_dir_all(&temp_root).expect("remove temp export root");
 }

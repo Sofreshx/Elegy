@@ -3,8 +3,11 @@ use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+use zip::write::SimpleFileOptions;
+use zip::CompressionMethod;
 
 #[derive(Debug, Error)]
 pub enum ContractsError {
@@ -20,11 +23,23 @@ pub enum ContractsError {
         #[source]
         source: serde_json::Error,
     },
+    #[error("failed to write archive {path}: {source}")]
+    Archive {
+        path: PathBuf,
+        #[source]
+        source: zip::result::ZipError,
+    },
     #[error("compatibility manifest is missing schema '{0}'")]
     MissingSchema(String),
     #[error("{0}")]
     Compatibility(String),
 }
+
+const SUPPLEMENTAL_FIXTURE_FILES: &[&str] = &[
+    "fixtures/mcp-server-descriptor.parity.json",
+    "fixtures/mcp-analysis-result.parity.json",
+    "fixtures/mcp-parity-expected.json",
+];
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -207,6 +222,24 @@ pub struct AgentEventEnvelope {
     pub source: AgentEventSource,
     #[serde(default)]
     pub payload: AgentEventPayload,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ContractsBundleExport {
+    pub output_path: PathBuf,
+    pub archive_path: Option<PathBuf>,
+    pub package_version: String,
+    pub schema_version: String,
+    pub files: Vec<PathBuf>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+struct VersionPolicyDocument {
+    bundle_version: String,
+    schema_version: String,
+    manifest_package: ContractPackage,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -548,13 +581,24 @@ impl AgentEnvelopeValidationResult {
 }
 
 pub fn default_support_manifest_path() -> PathBuf {
+    resolve_contracts_source_dir()
+        .join("support")
+        .join("elegy-rust-support.json")
+}
+
+pub fn resolve_repo_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
         .join("..")
-    .join("..")
-        .join("contracts")
-    .join("support")
-        .join("elegy-rust-support.json")
+        .join("..")
+}
+
+pub fn resolve_contracts_source_dir() -> PathBuf {
+    resolve_repo_root().join("contracts")
+}
+
+pub fn default_contracts_output_dir() -> PathBuf {
+    resolve_repo_root().join("artifacts").join("contracts")
 }
 
 pub fn resolve_upstream_contracts_dir() -> PathBuf {
@@ -562,18 +606,190 @@ pub fn resolve_upstream_contracts_dir() -> PathBuf {
         return PathBuf::from(path);
     }
 
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("..")
-        .join("artifacts")
-        .join("contracts")
+    let source_contracts = resolve_contracts_source_dir();
+    if source_contracts
+        .join("manifests")
+        .join("compatibility-manifest.json")
+        .is_file()
+    {
+        return source_contracts;
+    }
+
+    let exported_contracts = default_contracts_output_dir();
+    if exported_contracts
+        .join("compatibility-manifest.json")
+        .is_file()
+    {
+        return exported_contracts;
+    }
+
+    source_contracts
 }
 
 pub fn load_compatibility_manifest_from_dir(
     dir: &Path,
 ) -> Result<CompatibilityManifest, ContractsError> {
-    load_json_file(&dir.join("compatibility-manifest.json"))
+    let bundled_manifest = dir.join("compatibility-manifest.json");
+    if bundled_manifest.is_file() {
+        return load_json_file(&bundled_manifest);
+    }
+
+    load_json_file(&dir.join("manifests").join("compatibility-manifest.json"))
+}
+
+pub fn export_contract_bundle(
+    output_dir: Option<&Path>,
+    create_archive: bool,
+    archive_output_path: Option<&Path>,
+) -> Result<ContractsBundleExport, ContractsError> {
+    let repo_root = resolve_repo_root();
+    let contracts_source_dir = resolve_contracts_source_dir();
+    let version_policy_path = repo_root.join("governance").join("version-policy.json");
+    let compatibility_manifest_path = contracts_source_dir
+        .join("manifests")
+        .join("compatibility-manifest.json");
+    let compatibility_matrix_path = contracts_source_dir
+        .join("manifests")
+        .join("compatibility-matrix.json");
+
+    for required_path in [
+        &compatibility_manifest_path,
+        &compatibility_matrix_path,
+        &version_policy_path,
+    ] {
+        require_file(required_path)?;
+    }
+
+    let version_policy = load_version_policy_document(&version_policy_path)?;
+    let bundle_version = version_policy.bundle_version.clone();
+    let package_version = version_policy.manifest_package.version.clone();
+    let schema_version = version_policy.schema_version.clone();
+    let compatibility_manifest = load_compatibility_manifest_from_dir(&contracts_source_dir)?;
+    let compatibility_matrix: Value = load_json_file(&compatibility_matrix_path)?;
+
+    if compatibility_manifest.package.name != version_policy.manifest_package.name {
+        return Err(ContractsError::Compatibility(format!(
+            "compatibility manifest package name '{}' does not match governance/version-policy.json manifest package name '{}'",
+            compatibility_manifest.package.name, version_policy.manifest_package.name
+        )));
+    }
+
+    if compatibility_manifest.package.version != package_version {
+        return Err(ContractsError::Compatibility(format!(
+            "compatibility manifest package version '{}' does not match governance/version-policy.json manifest package version '{}'",
+            compatibility_manifest.package.version, package_version
+        )));
+    }
+
+    let canonical_schema_manifest = compatibility_manifest
+        .schemas
+        .iter()
+        .find(|entry| entry.name == "canonical-workflow")
+        .ok_or_else(|| {
+            ContractsError::Compatibility(
+                "compatibility manifest is missing the canonical-workflow entry".to_string(),
+            )
+        })?;
+
+    if canonical_schema_manifest.schema_version != schema_version {
+        return Err(ContractsError::Compatibility(format!(
+            "compatibility manifest schema version '{}' does not match governance/version-policy.json schemaVersion '{}'",
+            canonical_schema_manifest.schema_version, schema_version
+        )));
+    }
+
+    if compatibility_matrix
+        .get("matrixVersion")
+        .and_then(Value::as_str)
+        .is_none_or(str::is_empty)
+    {
+        return Err(ContractsError::Compatibility(
+            "compatibility matrix is missing matrixVersion".to_string(),
+        ));
+    }
+
+    if compatibility_matrix
+        .get("entries")
+        .and_then(Value::as_array)
+        .is_none_or(|entries| entries.is_empty())
+    {
+        return Err(ContractsError::Compatibility(
+            "compatibility matrix must include at least one entry".to_string(),
+        ));
+    }
+
+    let mut relative_files = BTreeSet::new();
+    for schema_entry in &compatibility_manifest.schemas {
+        relative_files.insert(PathBuf::from(&schema_entry.file));
+        for fixture in &schema_entry.fixtures {
+            relative_files.insert(PathBuf::from(fixture));
+        }
+    }
+
+    for fixture in SUPPLEMENTAL_FIXTURE_FILES {
+        relative_files.insert(PathBuf::from(fixture));
+    }
+
+    relative_files.insert(PathBuf::from("compatibility-manifest.json"));
+    relative_files.insert(PathBuf::from("compatibility-matrix.json"));
+
+    for relative_path in &relative_files {
+        require_file(&resolve_contracts_source_path(&contracts_source_dir, relative_path))?;
+    }
+
+    let output_path = output_dir
+        .map(Path::to_path_buf)
+        .unwrap_or_else(default_contracts_output_dir);
+
+    if output_path.exists() {
+        fs::remove_dir_all(&output_path).map_err(|source| ContractsError::Io {
+            path: output_path.clone(),
+            source,
+        })?;
+    }
+
+    fs::create_dir_all(&output_path).map_err(|source| ContractsError::Io {
+        path: output_path.clone(),
+        source,
+    })?;
+
+    let mut exported_files = Vec::new();
+    for relative_path in &relative_files {
+        let source_path = resolve_contracts_source_path(&contracts_source_dir, relative_path);
+        let destination_path = output_path.join(relative_path);
+
+        if let Some(parent) = destination_path.parent() {
+            fs::create_dir_all(parent).map_err(|source| ContractsError::Io {
+                path: parent.to_path_buf(),
+                source,
+            })?;
+        }
+
+        fs::copy(&source_path, &destination_path).map_err(|source| ContractsError::Io {
+            path: destination_path.clone(),
+            source,
+        })?;
+        exported_files.push(destination_path);
+    }
+    exported_files.sort();
+
+    let archive_path = if create_archive || archive_output_path.is_some() {
+        let resolved_archive_path = archive_output_path
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| default_contracts_archive_path(&repo_root, &bundle_version));
+        write_contract_archive(&resolved_archive_path, &output_path, &relative_files)?;
+        Some(resolved_archive_path)
+    } else {
+        None
+    };
+
+    Ok(ContractsBundleExport {
+        output_path,
+        archive_path,
+        package_version,
+        schema_version,
+        files: exported_files,
+    })
 }
 
 pub fn load_consumer_support_manifest(
@@ -1131,6 +1347,92 @@ where
         path: path.to_path_buf(),
         source,
     })
+}
+
+fn require_file(path: &Path) -> Result<(), ContractsError> {
+    if path.is_file() {
+        Ok(())
+    } else {
+        Err(ContractsError::Compatibility(format!(
+            "missing required file: {}",
+            path.display()
+        )))
+    }
+}
+
+fn load_version_policy_document(path: &Path) -> Result<VersionPolicyDocument, ContractsError> {
+    load_json_file(path)
+}
+
+fn resolve_contracts_source_path(contracts_root: &Path, relative_path: &Path) -> PathBuf {
+    let direct_path = contracts_root.join(relative_path);
+    if direct_path.is_file() {
+        return direct_path;
+    }
+
+    let schema_path = contracts_root.join("schemas").join(relative_path);
+    if schema_path.is_file() {
+        return schema_path;
+    }
+
+    contracts_root.join("manifests").join(relative_path)
+}
+
+fn default_contracts_archive_path(repo_root: &Path, bundle_version: &str) -> PathBuf {
+    repo_root
+        .join("artifacts")
+        .join("distribution")
+        .join(format!("elegy-contracts-{bundle_version}.zip"))
+}
+
+fn write_contract_archive(
+    archive_path: &Path,
+    output_path: &Path,
+    relative_files: &BTreeSet<PathBuf>,
+) -> Result<(), ContractsError> {
+    if let Some(parent) = archive_path.parent() {
+        fs::create_dir_all(parent).map_err(|source| ContractsError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+
+    let archive_file = fs::File::create(archive_path).map_err(|source| ContractsError::Io {
+        path: archive_path.to_path_buf(),
+        source,
+    })?;
+    let mut archive = zip::ZipWriter::new(archive_file);
+    let options = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Deflated)
+        .unix_permissions(0o644);
+
+    for relative_path in relative_files {
+        let bundle_path = output_path.join(relative_path);
+        let archive_name = relative_path.to_string_lossy().replace('\\', "/");
+        archive
+            .start_file(&archive_name, options)
+            .map_err(|source| ContractsError::Archive {
+                path: archive_path.to_path_buf(),
+                source,
+            })?;
+        let file_bytes = fs::read(&bundle_path).map_err(|source| ContractsError::Io {
+            path: bundle_path,
+            source,
+        })?;
+        archive
+            .write_all(&file_bytes)
+            .map_err(|source| ContractsError::Io {
+                path: archive_path.to_path_buf(),
+                source,
+            })?;
+    }
+
+    archive.finish().map_err(|source| ContractsError::Archive {
+        path: archive_path.to_path_buf(),
+        source,
+    })?;
+
+    Ok(())
 }
 
 fn has_duplicate_values<'a>(values: impl Iterator<Item = &'a str>) -> bool {

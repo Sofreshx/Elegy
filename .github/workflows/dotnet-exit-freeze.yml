@@ -1,0 +1,23 @@
+name: Dotnet Exit Freeze
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate-dotnet-exit-freeze:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate dotnet exit freeze
+        shell: pwsh
+        run: |
+          ./scripts/validate-dotnet-exit-freeze.ps1
