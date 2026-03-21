@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "crates/elegy-agent-events",
     "crates/elegy-contracts",
     "crates/elegy-policy",
     "crates/elegy-mcp",
@@ -25,6 +26,7 @@ documentation = "https://github.com/Sofreshx/Elegy/blob/main/README.md"
 readme = "../README.md"
 
 [workspace.dependencies]
+async-trait = "0.1.89"
 base64 = "0.22.1"
 clap = { version = "4.5.30", features = ["derive"] }
 glob = "0.3.2"
@@ -33,6 +35,7 @@ rmcp = { version = "1.2.0", features = ["server", "transport-io"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 thiserror = "2.0.11"
+time = { version = "0.3.41", features = ["formatting"] }
 tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "time"] }
 toml = "0.8.20"
 url = { version = "2.5.4", features = ["serde"] }

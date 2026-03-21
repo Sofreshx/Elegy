@@ -30,6 +30,30 @@
       ]
     },
     {
+      "name": "agent-request-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-request-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-request-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-response-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-response-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-response-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-event-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "agent-event-envelope.schema.json",
+      "fixtures": [
+        "fixtures/agent-event-envelope.minimal.json"
+      ]
+    },
+    {
       "name": "dynamic-skill-activation",
       "schemaVersion": "1.0.0",
       "file": "dynamic-skill-activation.schema.json",

@@ -1,8 +1,11 @@
 use elegy_core::{
     compose_runtime, compose_runtime_state, default_support_manifest_path,
-    load_compatibility_manifest_from_dir, load_consumer_support_manifest,
-    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
-    resolve_upstream_contracts_dir, validate_descriptor_set, validate_mcp_analysis_result,
+    load_agent_event_envelope_fixture_from_dir, load_agent_request_envelope_fixture_from_dir,
+    load_agent_response_envelope_fixture_from_dir, load_compatibility_manifest_from_dir,
+    load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
+    load_mcp_server_descriptor_fixture_from_dir, resolve_upstream_contracts_dir,
+    validate_agent_event_envelope, validate_agent_request_envelope,
+    validate_agent_response_envelope, validate_descriptor_set, validate_mcp_analysis_result,
     validate_mcp_server_descriptor, validate_support_manifest_against_upstream, Catalog,
     ProjectLocator,
 };
@@ -178,6 +181,38 @@ fn upstream_mcp_contract_fixtures_validate_through_core_facade() {
         analysis_validation.is_valid(),
         "unexpected analysis issues: {:?}",
         analysis_validation.issues
+    );
+}
+
+#[test]
+fn upstream_agent_contract_fixtures_validate_through_core_facade() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let request = load_agent_request_envelope_fixture_from_dir(&contracts_dir)
+        .expect("load upstream agent-request-envelope fixture");
+    let response = load_agent_response_envelope_fixture_from_dir(&contracts_dir)
+        .expect("load upstream agent-response-envelope fixture");
+    let event = load_agent_event_envelope_fixture_from_dir(&contracts_dir)
+        .expect("load upstream agent-event-envelope fixture");
+
+    let request_validation = validate_agent_request_envelope(&request);
+    assert!(
+        request_validation.is_valid(),
+        "unexpected request issues: {:?}",
+        request_validation.issues
+    );
+
+    let response_validation = validate_agent_response_envelope(&response);
+    assert!(
+        response_validation.is_valid(),
+        "unexpected response issues: {:?}",
+        response_validation.issues
+    );
+
+    let event_validation = validate_agent_event_envelope(&event);
+    assert!(
+        event_validation.is_valid(),
+        "unexpected event issues: {:?}",
+        event_validation.issues
     );
 }
 

@@ -3,7 +3,10 @@ namespace Elegy.Formalization.Contracts;
 public static class FormalizationArtifactNames
 {
     public const string AgentCreateRequestSchema = "agent-create-request.schema.json";
+    public const string AgentEventEnvelopeSchema = "agent-event-envelope.schema.json";
     public const string AgentDefinitionSchema = "agent-definition.schema.json";
+    public const string AgentRequestEnvelopeSchema = "agent-request-envelope.schema.json";
+    public const string AgentResponseEnvelopeSchema = "agent-response-envelope.schema.json";
     public const string CanonicalWorkflowSchema = "canonical-workflow.schema.json";
     public const string CanonicalWorkflowGraphSchema = "canonical-workflow-graph.schema.json";
     public const string CompatibilityManifest = "compatibility-manifest.json";
@@ -17,7 +20,10 @@ public static class FormalizationArtifactNames
     public const string SkillDiscoveryIndexSchema = "skill-discovery-index.schema.json";
     public const string SkillForgeRequestSchema = "skill-forge-request.schema.json";
     public const string AgentCreateRequestMinimalFixture = "fixtures/agent-create-request.minimal.json";
+    public const string AgentEventEnvelopeMinimalFixture = "fixtures/agent-event-envelope.minimal.json";
     public const string AgentDefinitionMinimalFixture = "fixtures/agent-definition.minimal.json";
+    public const string AgentRequestEnvelopeMinimalFixture = "fixtures/agent-request-envelope.minimal.json";
+    public const string AgentResponseEnvelopeMinimalFixture = "fixtures/agent-response-envelope.minimal.json";
     public const string CanonicalWorkflowGraphMinimalFixture = "fixtures/canonical-workflow-graph.minimal.json";
     public const string CanonicalWorkflowMinimalFixture = "fixtures/canonical-workflow.minimal.json";
     public const string DynamicSkillActivationMinimalFixture = "fixtures/dynamic-skill-activation.minimal.json";
@@ -35,7 +41,10 @@ public static class FormalizationArtifactNames
     public static IReadOnlyList<string> All { get; } =
     [
         AgentCreateRequestSchema,
+        AgentEventEnvelopeSchema,
         AgentDefinitionSchema,
+        AgentRequestEnvelopeSchema,
+        AgentResponseEnvelopeSchema,
         CanonicalWorkflowGraphSchema,
         CanonicalWorkflowSchema,
         CompatibilityManifest,
@@ -49,7 +58,10 @@ public static class FormalizationArtifactNames
         SkillDiscoveryIndexSchema,
         SkillForgeRequestSchema,
         AgentCreateRequestMinimalFixture,
+        AgentEventEnvelopeMinimalFixture,
         AgentDefinitionMinimalFixture,
+        AgentRequestEnvelopeMinimalFixture,
+        AgentResponseEnvelopeMinimalFixture,
         CanonicalWorkflowGraphMinimalFixture,
         CanonicalWorkflowMinimalFixture,
         DynamicSkillActivationMinimalFixture,

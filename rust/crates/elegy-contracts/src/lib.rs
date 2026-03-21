@@ -58,6 +58,157 @@ pub struct ConsumerSupportManifest {
     pub schemas: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentMessageRole {
+    System,
+    #[default]
+    User,
+    Assistant,
+    Tool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentMessage {
+    #[serde(default)]
+    pub message_id: String,
+    #[serde(default)]
+    pub role: AgentMessageRole,
+    #[serde(default)]
+    pub content: String,
+    pub name: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRequestContext {
+    #[serde(default)]
+    pub correlation_id: String,
+    pub session_id: Option<String>,
+    pub conversation_id: Option<String>,
+    pub requested_skill_id: Option<String>,
+    #[serde(default)]
+    pub capability_hints: Vec<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentRequestEnvelope {
+    #[serde(default)]
+    pub request_id: String,
+    #[serde(default)]
+    pub messages: Vec<AgentMessage>,
+    #[serde(default)]
+    pub context: AgentRequestContext,
+    pub streaming_requested: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentResponseStatus {
+    #[default]
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentUsage {
+    pub input_tokens: Option<i32>,
+    pub output_tokens: Option<i32>,
+    pub total_tokens: Option<i32>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentResponseEnvelope {
+    #[serde(default)]
+    pub request_id: String,
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub status: AgentResponseStatus,
+    #[serde(default)]
+    pub messages: Vec<AgentMessage>,
+    #[serde(default)]
+    pub usage: AgentUsage,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentEventType {
+    #[default]
+    RequestAccepted,
+    RunStarted,
+    MessageDelta,
+    MessageCompleted,
+    ReasoningDelta,
+    ReasoningCompleted,
+    ToolCallStarted,
+    ToolCallCompleted,
+    Warning,
+    Error,
+    RunCompleted,
+    RunFailed,
+    RunCancelled,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum AgentEventSource {
+    Client,
+    #[default]
+    Broker,
+    Model,
+    Tool,
+    System,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentEventPayload {
+    pub message_id: Option<String>,
+    pub role: Option<AgentMessageRole>,
+    pub tool_call_id: Option<String>,
+    pub tool_name: Option<String>,
+    pub content: Option<String>,
+    pub delta_content: Option<String>,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
+    pub usage: Option<AgentUsage>,
+    pub metadata: Option<BTreeMap<String, String>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentEventEnvelope {
+    #[serde(default)]
+    pub event_id: String,
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub stream_id: String,
+    pub sequence: u64,
+    pub parent_event_id: Option<String>,
+    #[serde(default)]
+    pub timestamp: String,
+    pub ephemeral: bool,
+    #[serde(default)]
+    pub event_type: AgentEventType,
+    #[serde(default)]
+    pub source: AgentEventSource,
+    #[serde(default)]
+    pub payload: AgentEventPayload,
+}
+
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillDefinition {
@@ -385,6 +536,17 @@ impl McpValidationResult {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AgentEnvelopeValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl AgentEnvelopeValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
 pub fn default_support_manifest_path() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("..")
@@ -448,6 +610,33 @@ pub fn load_mcp_analysis_result_fixture_from_dir(
     load_json_file(
         &dir.join("fixtures")
             .join("mcp-analysis-result.minimal.json"),
+    )
+}
+
+pub fn load_agent_request_envelope_fixture_from_dir(
+    dir: &Path,
+) -> Result<AgentRequestEnvelope, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-request-envelope.minimal.json"),
+    )
+}
+
+pub fn load_agent_response_envelope_fixture_from_dir(
+    dir: &Path,
+) -> Result<AgentResponseEnvelope, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-response-envelope.minimal.json"),
+    )
+}
+
+pub fn load_agent_event_envelope_fixture_from_dir(
+    dir: &Path,
+) -> Result<AgentEventEnvelope, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-event-envelope.minimal.json"),
     )
 }
 
@@ -645,6 +834,219 @@ pub fn validate_skill_definition(definition: &SkillDefinition) -> SkillValidatio
     SkillValidationResult { issues }
 }
 
+pub fn validate_agent_request_envelope(
+    request: &AgentRequestEnvelope,
+) -> AgentEnvelopeValidationResult {
+    let mut issues = Vec::new();
+
+    if request.request_id.trim().is_empty() {
+        issues.push("Agent request envelope must declare a request ID.".to_string());
+    }
+
+    if request.messages.is_empty() {
+        issues.push("Agent request envelope must include at least one message.".to_string());
+    }
+
+    validate_agent_messages(&request.messages, "Agent request messages", &mut issues);
+
+    if request
+        .context
+        .capability_hints
+        .iter()
+        .any(|hint| hint.trim().is_empty())
+    {
+        issues.push("Agent request capability hints must not be blank.".to_string());
+    }
+
+    if has_blank_metadata_entries(&request.context.metadata) {
+        issues.push("Agent request metadata must not contain blank keys or values.".to_string());
+    }
+
+    AgentEnvelopeValidationResult { issues }
+}
+
+pub fn validate_agent_response_envelope(
+    response: &AgentResponseEnvelope,
+) -> AgentEnvelopeValidationResult {
+    let mut issues = Vec::new();
+
+    if response.request_id.trim().is_empty() {
+        issues.push("Agent response envelope must declare a request ID.".to_string());
+    }
+
+    if response.run_id.trim().is_empty() {
+        issues.push("Agent response envelope must declare a run ID.".to_string());
+    }
+
+    validate_agent_messages(&response.messages, "Agent response messages", &mut issues);
+
+    if matches!(response.status, AgentResponseStatus::Completed) && response.messages.is_empty() {
+        issues.push("Completed agent responses must include at least one message.".to_string());
+    }
+
+    if matches!(
+        response.status,
+        AgentResponseStatus::Failed | AgentResponseStatus::Cancelled
+    ) && response
+        .error_message
+        .as_ref()
+        .is_none_or(|message| message.trim().is_empty())
+        && response
+            .error_code
+            .as_ref()
+            .is_none_or(|code| code.trim().is_empty())
+    {
+        issues.push(
+            "Failed or cancelled agent responses must declare an error code or error message."
+                .to_string(),
+        );
+    }
+
+    if has_negative_usage(&response.usage) {
+        issues.push("Agent usage values must not be negative.".to_string());
+    }
+
+    if usage_total_is_inconsistent(&response.usage) {
+        issues.push(
+            "Agent usage total tokens must be greater than or equal to input and output tokens."
+                .to_string(),
+        );
+    }
+
+    if has_blank_metadata_entries(&response.metadata) {
+        issues.push("Agent response metadata must not contain blank keys or values.".to_string());
+    }
+
+    AgentEnvelopeValidationResult { issues }
+}
+
+pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelopeValidationResult {
+    let mut issues = Vec::new();
+
+    if event.event_id.trim().is_empty() {
+        issues.push("Agent event envelope must declare an event ID.".to_string());
+    }
+
+    if event.run_id.trim().is_empty() {
+        issues.push("Agent event envelope must declare a run ID.".to_string());
+    }
+
+    if event.stream_id.trim().is_empty() {
+        issues.push("Agent event envelope must declare a stream ID.".to_string());
+    }
+
+    if event.sequence == 0 {
+        issues.push("Agent event envelope sequence must be greater than zero.".to_string());
+    }
+
+    if event.timestamp.trim().is_empty() {
+        issues.push("Agent event envelope must declare a timestamp.".to_string());
+    }
+
+    match event.event_type {
+        AgentEventType::MessageDelta | AgentEventType::ReasoningDelta => {
+            if event
+                .payload
+                .delta_content
+                .as_ref()
+                .is_none_or(|delta| delta.trim().is_empty())
+            {
+                issues.push(
+                    "Delta agent events must include non-empty delta content.".to_string(),
+                );
+            }
+        }
+        AgentEventType::MessageCompleted | AgentEventType::ReasoningCompleted => {
+            if event
+                .payload
+                .content
+                .as_ref()
+                .is_none_or(|content| content.trim().is_empty())
+            {
+                issues.push(
+                    "Completed message events must include non-empty content.".to_string(),
+                );
+            }
+        }
+        AgentEventType::ToolCallStarted => {
+            if event
+                .payload
+                .tool_call_id
+                .as_ref()
+                .is_none_or(|tool_call_id| tool_call_id.trim().is_empty())
+                || event
+                    .payload
+                    .tool_name
+                    .as_ref()
+                    .is_none_or(|tool_name| tool_name.trim().is_empty())
+            {
+                issues.push(
+                    "Tool call started events must include a tool call ID and tool name."
+                        .to_string(),
+                );
+            }
+        }
+        AgentEventType::ToolCallCompleted => {
+            if event
+                .payload
+                .tool_call_id
+                .as_ref()
+                .is_none_or(|tool_call_id| tool_call_id.trim().is_empty())
+            {
+                issues.push(
+                    "Tool call completed events must include a tool call ID.".to_string(),
+                );
+            }
+        }
+        AgentEventType::Error | AgentEventType::RunFailed => {
+            if event
+                .payload
+                .error_message
+                .as_ref()
+                .is_none_or(|message| message.trim().is_empty())
+                && event
+                    .payload
+                    .error_code
+                    .as_ref()
+                    .is_none_or(|code| code.trim().is_empty())
+            {
+                issues.push(
+                    "Error agent events must include an error code or error message."
+                        .to_string(),
+                );
+            }
+        }
+        _ => {}
+    }
+
+    if event.payload.usage.as_ref().is_some_and(has_negative_usage) {
+        issues.push("Agent event usage values must not be negative.".to_string());
+    }
+
+    if event
+        .payload
+        .usage
+        .as_ref()
+        .is_some_and(usage_total_is_inconsistent)
+    {
+        issues.push(
+            "Agent event usage total tokens must be greater than or equal to input and output tokens."
+                .to_string(),
+        );
+    }
+
+    if event
+        .payload
+        .metadata
+        .as_ref()
+        .is_some_and(has_blank_metadata_entries)
+    {
+        issues.push("Agent event metadata must not contain blank keys or values.".to_string());
+    }
+
+    AgentEnvelopeValidationResult { issues }
+}
+
 pub fn validate_mcp_server_descriptor(descriptor: &McpServerDescriptor) -> McpValidationResult {
     let mut issues = Vec::new();
 
@@ -744,4 +1146,48 @@ fn has_duplicate_values<'a>(values: impl Iterator<Item = &'a str>) -> bool {
     }
 
     false
+}
+
+fn validate_agent_messages(messages: &[AgentMessage], label: &str, issues: &mut Vec<String>) {
+    if messages.iter().any(|message| message.content.trim().is_empty()) {
+        issues.push(format!("{label} must include non-empty content."));
+    }
+
+    if has_duplicate_values(
+        messages
+            .iter()
+            .filter(|message| !message.message_id.trim().is_empty())
+            .map(|message| message.message_id.as_str()),
+    ) {
+        issues.push(format!("{label} must not reuse message IDs."));
+    }
+
+    if messages
+        .iter()
+        .filter_map(|message| message.name.as_ref())
+        .any(|name| name.trim().is_empty())
+    {
+        issues.push(format!("{label} must not contain blank message names."));
+    }
+}
+
+fn has_blank_metadata_entries(metadata: &BTreeMap<String, String>) -> bool {
+    metadata
+        .iter()
+        .any(|(key, value)| key.trim().is_empty() || value.trim().is_empty())
+}
+
+fn has_negative_usage(usage: &AgentUsage) -> bool {
+    usage.input_tokens.is_some_and(|value| value < 0)
+        || usage.output_tokens.is_some_and(|value| value < 0)
+        || usage.total_tokens.is_some_and(|value| value < 0)
+}
+
+fn usage_total_is_inconsistent(usage: &AgentUsage) -> bool {
+    let Some(total_tokens) = usage.total_tokens else {
+        return false;
+    };
+
+    usage.input_tokens.is_some_and(|value| value > total_tokens)
+        || usage.output_tokens.is_some_and(|value| value > total_tokens)
 }
