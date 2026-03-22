@@ -2,159 +2,147 @@
 
 ## Purpose
 
-This document is the canonical Phase 1 governance baseline for the Elegy umbrella repo.
+This document is the canonical governance baseline for the current Elegy repo.
 
 It defines:
 
-- the substrate package boundary
-- the current higher-level package-family boundary
-- allowed source-package dependency direction
-- the rules for promoting concepts into public package families
-- the shared-contract governance model for schemas, fixtures, and conformance artifacts
+- the governed artifact boundary
+- the Rust executable boundary
+- allowed dependency direction between those layers
+- the rules for promoting concepts into durable repo-owned surfaces
+- the shared-contract governance model for schemas, fixtures, manifests, and policy artifacts
 
-This document is intentionally narrower than the broader ecosystem topology doc. The topology doc explains the high-level repo relationship. This document explains the concrete source-package governance needed before later phases can safely expand the public surface.
+This document is intentionally narrower than the broader ecosystem topology doc. The topology doc explains the high-level repo relationship. This document explains the concrete governance needed for the repo that exists today.
 
-## Package tiers
+## Repository layers
 
-Elegy package families currently sit in four conceptual tiers.
+Elegy now has three practical layers.
 
-### Tier 1: substrate
+### Layer 1: governed artifacts
 
-These packages are the base layer and must stay free of provider-specific SDKs, framework ownership, and runtime-host assumptions.
+These are the durable authority roots and must stay language-agnostic.
 
-| Package | Responsibility | Allowed source dependencies |
-| --- | --- | --- |
-| `Elegy.Formalization.Core` | Core abstractions and domain primitives | none |
-| `Elegy.Formalization.Contracts` | Publishable contract resources and integration boundary artifacts | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Serialization` | Serialization support over core models | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Validation` | Validation utilities and rule evaluation for formalization artifacts | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Governance` | Governance metadata and enforcement helpers | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Projections.Mermaid` | Projection output from core structures | `Elegy.Formalization.Core` |
+| Surface | Responsibility |
+| --- | --- |
+| `contracts/schemas/` | Governed JSON schema authority |
+| `contracts/fixtures/` | Minimal and parity fixtures |
+| `contracts/manifests/` | Compatibility and bundle manifests |
+| `contracts/support/` | Consumer support metadata |
+| `governance/` | Version, inventory, and boundary governance |
+| `policies/` | Formalization and operational policy artifacts |
 
-### Tier 2: definition families
+### Layer 2: Rust executable crates
 
-These packages define reusable capabilities on top of the substrate.
+These crates consume governed artifacts and provide reusable executable behavior.
 
-| Package | Responsibility | Allowed source dependencies |
-| --- | --- | --- |
-| `Elegy.Formalization.Skills` | Skill definitions and lifecycle state | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Skills.Discovery` | Skill discovery and indexing surfaces | `Elegy.Formalization.Core`, `Elegy.Formalization.Skills` |
-| `Elegy.Formalization.Monitoring` | Monitoring-oriented formalization surfaces | `Elegy.Formalization.Core` |
-| `Elegy.Formalization.Agents` | Agent-facing formalization primitives | `Elegy.Formalization.Core` |
+| Surface | Responsibility |
+| --- | --- |
+| `rust/crates/elegy-contracts` | Rust consumption of governed contracts |
+| `rust/crates/elegy-policy` | Policy enforcement helpers |
+| `rust/crates/elegy-mcp` | MCP analysis and related runtime behavior |
+| `rust/crates/elegy-tooling` | Descriptor authoring, analysis, and skill generation |
+| `rust/crates/elegy-descriptor` | Descriptor loading and normalization |
+| `rust/crates/elegy-adapter-*` | Bounded adapter behavior |
+| `rust/crates/elegy-runtime` and `rust/crates/elegy-core` | Reusable runtime composition |
+| `rust/crates/elegy-host-mcp` and `rust/crates/elegy-cli` | Thin operator-facing surfaces |
 
-### Tier 3: derived and transformation families
+### Layer 3: export and validation surfaces
 
-These packages are allowed to compose the substrate plus definition families, but they still must not become runtime-host ownership surfaces.
+These surfaces validate and ship the governed and executable layers without redefining them.
 
-| Package | Responsibility | Allowed source dependencies |
-| --- | --- | --- |
-| `Elegy.Formalization.DynamicSkills` | Dynamic skill activation and runtime-oriented materialization helpers | `Elegy.Formalization.Core`, `Elegy.Formalization.Skills`, `Elegy.Formalization.Monitoring` |
-| `Elegy.Formalization.Mcp` | MCP-facing analysis, descriptor transformation, and MCP-derived projections | `Elegy.Formalization.Skills` |
-| `Elegy.Formalization.AgentFactory` | Agent construction helpers | `Elegy.Formalization.Core`, `Elegy.Formalization.Agents`, `Elegy.Formalization.Governance` |
-
-### Tier 4: tooling and materialization
-
-This is where deterministic generation and materialization concerns belong.
-
-| Package | Responsibility | Allowed source dependencies |
-| --- | --- | --- |
-| `Elegy.Formalization.SkillForge` | Materialization, generated registration metadata, and generation-oriented outputs | `Elegy.Formalization.Core`, `Elegy.Formalization.Skills`, `Elegy.Formalization.DynamicSkills`, `Elegy.Formalization.Governance` |
+| Surface | Responsibility |
+| --- | --- |
+| `scripts/export-contracts.ps1` | Bundle export |
+| `scripts/validate-canonical-outputs.ps1` | Canonical output validation |
+| `scripts/validate-package-boundaries.ps1` | Boundary-governance validation |
+| `.github/workflows/*.yml` | CI enforcement for artifacts, Rust, security, and distribution |
 
 ## Dependency direction rules
 
 The following rules are mandatory until a later architecture decision changes them explicitly:
 
-1. Substrate packages may only reference substrate packages.
-2. Definition families may depend on the substrate, but not on tooling, runtime adapters, or repo-external frameworks.
-3. Derived or transformation families may depend on the substrate and on definition families, but they may not absorb runtime transport or host ownership.
-4. Tooling families may depend on substrate and definition outputs, but lower tiers must never depend upward on tooling.
-5. Human-facing CLI shells and runtime adapters remain outside this source-package dependency policy. They are top-layer consumers, not substrate-shaping inputs.
-6. Cross-family consumer facades or metapackages are not implicit. If the repo later needs a convenience package such as a formalization facade, it must be introduced as a new explicitly-governed package family rather than referenced through synthetic paths in planning docs.
+1. Governed artifacts are the authority boundary and must not depend on Rust implementation details.
+2. Rust crates may consume governed artifacts, but they must not silently redefine schema, fixture, manifest, or policy authority.
+3. Runtime-composition crates may depend on lower Rust crates and governed artifacts, but lower layers must never depend upward on CLI or host shells.
+4. Operator surfaces such as `elegy-cli` and `elegy-host-mcp` must remain thin over explicit runtime and tooling crates.
+5. Export scripts and workflows validate or package the repo surfaces; they are not alternate places to invent contract truth.
+6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
 
-## Mixed-language monorepo rule
+## Post-legacy rule
 
-The Elegy repo now hosts two first-party implementation families:
+Elegy no longer has an active first-party `.NET` source-package family in-repo.
 
-1. `.NET` package families under `src/` and `tests/`
-2. a Rust runtime family under `rust/`
+That means:
 
-The .NET package-boundary policy in this document applies only to the `.NET` source packages under `src/`.
+1. docs must not describe `src/` or `tests/` as active repo centers
+2. any downstream `.NET` consumer is now just that: a consumer of governed outputs, not a co-owned in-repo authority surface
+3. new shared responsibilities should be expressed either as governed artifacts or as Rust executable behavior, not by reintroducing legacy compatibility framing
 
-The Rust runtime family is governed separately through its Cargo workspace, Rust lint configuration, and runtime-focused tests. Rust crates are allowed to consume governed contracts from the authoritative .NET contract families, but they must not silently redefine schema or canonical skill authority.
+## Public-surface graduation rule
 
-## Public package graduation rule
+A concept should become a durable Elegy-owned surface only when all of the following are true:
 
-A concept should become a public package family only when all of the following are true:
+1. the responsibility is stable and not just a temporary helper
+2. the boundary is clearer as a governed artifact or reusable Rust executable feature than as consumer-local behavior
+3. the concept has at least one real validation path
+4. the concept improves ownership more than it increases maintenance cost
 
-1. The concept has a stable responsibility that cannot be explained as a temporary implementation helper.
-2. The concept has a coherent dependency story that does not require upward references into tooling, adapters, or product hosts.
-3. The concept has at least one validation harness or consumer path that exercises it through public types rather than internal implementation shortcuts.
-4. The concept improves package clarity more than it increases coordination cost.
-
-If those conditions are not met, keep the capability inside an existing family until the abstraction proves itself.
-
-This applies to proposed facade or orchestration families too. A document may describe a future consumer-facing facade, but extraction planning must still target the current real package families until that facade passes graduation and exists in `src/`.
+If those conditions are not met, keep the capability as docs, policy, or consumer-local logic until the abstraction proves itself.
 
 ## Core contract change policy
 
-Changes to substrate contracts are considered core contract changes when they alter any of the following:
+Changes are considered core contract changes when they alter any of the following:
 
-- public types or members in substrate packages
-- serialized schema shape or required fields in publishable contract artifacts
-- semantics of compatibility manifests or conformance fixtures
-- dependency-direction policy between source package families
+- schema shape or required fields in publishable contract artifacts
+- fixture meaning or compatibility evidence
+- compatibility manifests, support metadata, or version-policy semantics
+- dependency-direction policy between governed artifacts and Rust executable layers
 
 Core contract changes must update the relevant docs, fixtures, and validation paths in the same change.
 
 ## Shared-contract governance
 
-Shared contracts, fixtures, and conformance artifacts are governed centrally in the umbrella repo.
+Shared contracts, fixtures, manifests, and policy artifacts are governed centrally in this repo.
 
 That means:
 
-1. The authoritative source lives in `Elegy`, not in downstream consuming repos.
-2. Versioning rules are defined here first, then consumed elsewhere.
-3. First-party Rust crates in the same repo and any downstream consumers should consume published artifacts or versioned files, not co-own the truth through copy-paste drift.
-4. Coordinated change procedures are required before a contract family becomes a multi-repo dependency.
-
-The primary governed artifacts in Phase 1 are:
-
-- `governance/version-policy.json` bundle and manifest package version baseline
-- `schemas/schema-version.json` transitional schema-version mirror
-- contract schemas and fixtures in `contracts/`
-- compatibility manifest and compatibility matrix artifacts
+1. the authoritative source lives in `Elegy`, not in downstream consuming repos
+2. versioning rules are defined in `governance/` first, then consumed elsewhere
+3. first-party Rust crates and downstream consumers should consume published artifacts or versioned files, not co-own the truth through copy-paste drift
+4. coordinated change procedures are required before a governed contract family becomes a wider dependency
 
 ## Fixture and conformance corpus rule
 
-Fixtures are not example clutter. They are governed compatibility evidence.
+Fixtures are governed compatibility evidence.
 
 Every publishable schema family should eventually have:
 
 - at least one minimal valid fixture
-- at least one compatibility manifest entry
-- a machine-readable compatibility description where cross-repo consumers depend on the contract
+- compatibility-manifest coverage
+- machine-readable compatibility description where downstream consumers depend on the contract
 
-When a schema or manifest is changed, the fixture corpus must be reviewed in the same change.
+When a schema, fixture, or manifest is changed, the governed corpus must be reviewed in the same change.
 
 ## Enforcement surfaces
 
-Phase 1 enforcement lives in these surfaces:
+Current enforcement lives in these surfaces:
 
-- `scripts/validate-package-boundaries.ps1` validates source-package dependency direction
-- `scripts/export-contracts.ps1` validates and exports governed contract artifacts
-- `.github/workflows/versioning-governance.yml` validates SemVer and schema-governance coupling
-- `.github/workflows/package-boundaries.yml` validates package boundaries and architecture governance tests
-- `tests/Elegy.Formalization.Core.Tests/Architecture/*` pins the package-boundary and governed-contract rules in code
-- `rust/` workspace validation will pin the Rust runtime-family side of the monorepo as that subtree is imported and expanded
+- `scripts/export-contracts.ps1`
+- `scripts/validate-canonical-outputs.ps1`
+- `scripts/validate-package-boundaries.ps1`
+- `.github/workflows/versioning-governance.yml`
+- `.github/workflows/package-boundaries.yml`
+- `.github/workflows/distribution-artifacts.yml`
+- `.github/workflows/rust-ci.yml`
+- Rust workspace tests that exercise CLI and tooling behavior
 
-## Phase 1 completion standard
+## Completion standard
 
-Phase 1 is only complete when the substrate is not just described but enforced.
+The governance baseline is only complete when the repo is not just described but enforced.
 
 The minimum bar is:
 
-1. package tiers are documented
-2. dependency direction is machine-validated
-3. version and schema governance are documented and checked
-4. publishable fixtures and manifests are validated from the repo root
-5. terminology is explicit enough that later phases do not have to redefine the same concepts
+1. governed artifact roots are documented
+2. export and canonical-output validation are runnable from the repo root
+3. Rust executable surfaces are linted and tested from the Rust workspace
+4. contributor docs point to the real validation and export path rather than to removed solution-era flows

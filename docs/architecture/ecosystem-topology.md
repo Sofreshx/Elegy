@@ -2,187 +2,121 @@
 
 ## Purpose
 
-This document defines the high-level organization of the Elegy ecosystem so package boundaries stay clear while the repositories are still evolving.
+This document defines the current high-level organization of the Elegy ecosystem so docs, exports, and implementation ownership stay aligned with the repo that actually exists.
 
 The main goal is to keep Elegy reusable across Holon and non-Holon projects while staying:
 
-- LLM-agnostic
+- contract-first
 - provider-agnostic
-- framework-agnostic
+- framework-agnostic where possible
+- honest about the currently shipped executable surfaces
 
 ## Top-level decision
 
-`Elegy` is the single main monorepo and contract home.
+`Elegy` is now a contracts-and-tooling monorepo.
 
-It owns the shared formalization, contract, governance, skill, and generation-oriented package families that can be consumed by many runtimes, plus the first-party Rust runtime subtree that executes or composes those governed artifacts.
+Its active design centers are:
 
-The Rust runtime family should live inside the main Elegy repo under `rust/`. It should stay narrow rather than becoming the umbrella source of truth for contracts.
+- governed schemas, fixtures, manifests, and policies rooted under `contracts/`, `governance/`, `schemas/`, and `policies/`
+- the first-party Rust workspace under `rust/`, which owns the reusable executable and operator-facing surfaces
 
-The current standalone `Elegy-Skills` and `Elegy-CLI` repositories should not be treated as the primary implementation surfaces right now. Until a later split is justified, the active design center is:
+Legacy `src/`, `tests/`, solution files, and `.NET` package-family narratives are not active repo centers and should not be described as such in current docs.
 
-- the .NET package-family strategy in `Elegy/src`
-- the first-party Rust runtime family in `Elegy/rust`
+Historical `Elegy-Skills`, `Elegy-CLI`, and related sibling repos should be treated as archival or transition references rather than the current implementation home.
+
+## Repo centers
+
+### Governed artifact roots
+
+The durable authority in this repo is language-agnostic and lives in authored assets such as:
+
+- schemas and fixtures under `contracts/`
+- compatibility manifests under `contracts/manifests/`
+- version and release policy under `governance/`
+- formalization policy under `policies/`
+- exported downstream handoff bundles under `artifacts/contracts`
+
+These assets are the source of truth for downstream consumers. They should be preferred over reviving a removed source-package tree.
+
+### Rust executable family
+
+The first-party executable and runtime layer lives under `rust/`.
+
+The key current crates are:
+
+- `elegy-contracts` for governed-contract consumption in Rust
+- `elegy-policy` for bounded policy enforcement
+- `elegy-mcp` for MCP analysis and related runtime behavior over governed descriptors
+- `elegy-tooling` for descriptor authoring, analysis, and skill generation
+- `elegy-core` and `elegy-runtime` for reusable composition surfaces
+- `elegy-host-mcp` for the thin stdio host
+- `elegy-cli` for the human-facing operator surface
+
+### Current shipped operator slice
+
+The current shipped operator path is intentionally narrow.
+
+What the repo proves today:
+
+- the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, and `generate skills`
+- those commands are backed by `rust/crates/elegy-tooling`
+- the CLI also carries validation, inspection, and stdio-host startup entrypoints
+- contract bundles can be exported and consumed independently of the Rust workspace
+
+What the repo does **not** yet prove as a completed product surface:
+
+- built-in MCP-native self-authoring loops
+- skill-driven autonomous authoring built into the runtime as a finished user surface
+- broad claims that all MCP surfaces are implemented just because descriptor analysis and generation exist
+
+Those remain targets until the repo has a documented, validated, contributor-facing implementation for them.
 
 ## Burden-of-proof rule
 
-Package existence is not the same thing as long-term package survival.
+Capability existence is not the same thing as long-term repo-center status.
 
-Under the current architecture reset, a shared Elegy code surface should survive only if it proves one of two things:
+Under the current architecture reset, a shared Elegy surface should survive only if it proves one of two things:
 
-1. it is canonical authority that other runtimes or repos must consume exactly
-2. it is a reusable executable capability that multiple consumers should use without product-specific assumptions
+1. it is governed authority that downstream consumers must consume consistently
+2. it is a reusable Rust executable capability that multiple consumers should use without product-specific assumptions
 
-If a capability can be represented as schemas, fixtures, policy artifacts, compatibility metadata, or docs, prefer those artifacts over a shared library.
+If a capability can be represented as schemas, fixtures, manifests, compatibility metadata, policy files, or docs, prefer those artifacts over shared code.
 
 If a capability depends on host-specific auth, persistence, UI, HTTP endpoints, DI composition, tenant policy, or app orchestration, it belongs in the consuming repo rather than in Elegy.
 
-## Package families in the umbrella repo
-
-### Core formalization and contracts
-
-These packages define the reusable substrate.
-
-The current burden-of-proof reset treats `Core` and `Contracts` as the most durable parts of this layer. Other existing substrate-adjacent packages may still contain useful logic, but they do not automatically clear the bar for long-term package survival.
-
-- `Elegy.Formalization.Core`
-- `Elegy.Formalization.Contracts`
-- `Elegy.Formalization.Serialization`
-- `Elegy.Formalization.Validation`
-- `Elegy.Formalization.Governance`
-- `Elegy.Formalization.Projections.Mermaid`
-
-These packages should remain free of provider-specific SDKs, runtime-host assumptions, and framework-owned abstractions.
-
-Integration-oriented extraction work should target these real package families directly. Planning documents should not refer to a synthetic `src/Elegy.Formalization/...` path, because no such source-package root exists in the repo today.
-
-### Skills family
-
-The skills family currently contains skill definitions, discovery, and dynamic materialization:
-
-- `Elegy.Formalization.Skills`
-- `Elegy.Formalization.Skills.Discovery`
-- `Elegy.Formalization.DynamicSkills`
-
-The intended durable center of gravity is canonical skill definition and validation. Discovery and dynamic materialization behavior must still prove why they belong as shared `.NET` packages rather than as artifacts, Rust runtime tooling, or consumer-local behavior.
-
-### MCP formalization family
-
-`Elegy.Formalization.Mcp` currently owns MCP-facing analysis and formalization concerns such as:
-
-- server and tool descriptors
-- MCP tool analysis
-- skill generation from MCP tools
-- governed MCP contract artifacts that sibling runtimes can consume
-
-This package family should describe governed MCP surfaces and canonical projections, but it should not absorb long-term host, transport, runtime, search, resolve, or tooling ownership that belongs in the in-repo Rust runtime family.
-
-### Rust runtime family
-
-The `rust/` subtree is the first-class home for:
-
-- contract-consumer utilities in Rust
-- runtime composition and policy-bounded execution
-- filesystem and HTTP adapters
-- MCP host and CLI layers
-- retrieval, indexing, and memory-style runtime capabilities when they warrant shared executable code
-- future Rust replacements for behavior-heavy .NET MCP logic once parity is proven
-
-It is not the authority for governed schemas or canonical skill contracts. It consumes and enforces those authorities.
-
-### Tooling and generation family
-
-`Elegy.Formalization.SkillForge` is the current generation/tooling lane, but it is not automatically a durable shared package family.
-
-This is the place for:
-
-- materialization flows
-- generated registration metadata
-- scaffolding or tool-output manifests
-- future generated-tool or CLI-oriented output contracts
-
-This layer should be treated as the generation/tooling family rather than as the definition of the user-facing `elegy` command-line experience.
-
-### Agent-facing families
-
-The current repo also has explicit agent-related package families:
-
-- `Elegy.Formalization.Agents`
-- `Elegy.Formalization.AgentFactory`
-
-Those families are the current landing zones for agent-facing primitives and construction helpers, but their package survival is still subject to the same burden-of-proof rule. Contract survival does not automatically imply standalone package survival.
-
-## Integration-ready extraction targeting
-
-For near-term extraction and migration work, prefer the smallest authority surface that can carry the responsibility:
-
-- canonical workflow/domain model types should target `Core`
-- publishable exchange DTOs and boundary artifacts should target `Contracts`
-- serialization helpers should target `Contracts` or consumer-local code unless a dedicated shared serialization family proves strong multi-consumer value
-- validation resolution and rule evaluation should target the canonical authority family that owns the semantics, or stay consumer-local when they are transport-shaped
-- governance policy/defaulting behavior should target canonical authority artifacts first and shared code second
-- Mermaid output should stay consumer-local unless it proves stronger shared value than a projection helper
-- agent primitives should target governed contract authority first; only keep a standalone package if multiple consumers prove that boundary
-
-If downstream consumers later need a single convenience surface, introduce a new facade package family or metapackage explicitly. Until then, adapters should compose the existing families rather than pretending a consolidated root already exists.
-
-## Relationship between MCP, skills, and tooling
+## Dependency shape across the repo
 
 The dependency direction should remain one-way:
 
-1. Core/contracts/governance at the bottom
-2. MCP formalization and skills as peer families above the substrate
-3. Tooling/generation above shared contracts and skill/MCP descriptors
-4. Human-facing CLI shells on top of explicit public facades or direct package-family composition
-5. Rust runtime-family crates consuming the governed contract surfaces without redefining them
+1. governed artifacts and policies at the bottom
+2. Rust contract consumers and policy crates above those authored assets
+3. runtime-composition and adapter crates above the contract and policy layer
+4. operator surfaces such as `elegy-cli` and `elegy-host-mcp` on top
+5. downstream apps consuming exported bundles, explicit Rust crates, or CLI outputs
 
 That means:
 
-- skills may import MCP analysis output, but core MCP runtime/transport concerns must not depend on skills
-- tooling may depend on MCP and skill descriptors, but core skills and MCP contracts must not depend on tooling
-- no package in the substrate should depend on model providers, agent frameworks, or application runtime glue
+- contracts and policies define the durable boundary
+- Rust crates consume governed artifacts rather than redefining them
+- operator shells remain thin over explicit runtime and tooling crates
+- docs must not imply a removed source-package center just because downstream consumers may still be `.NET`
 
-## CLI naming rule
+## Consumer guidance
 
-Do not use `CLI` as the name of every command-related concern.
+For near-term integration and migration work, prefer the smallest real Elegy surface that carries the responsibility:
 
-Two separate things exist:
-
-- a human-facing `elegy` CLI or shell surface
-- a tooling/generation layer that may emit runnable tools, manifests, or stubs
-
-Those are related, but they are not the same subsystem.
-
-For planning and package organization, prefer terms like `tooling`, `toolgen`, or `forge` for the generation layer. Reserve `elegy` CLI naming for the human-facing entrypoint.
-
-## Agnostic boundary rules
-
-To preserve reuse across Holon and other projects:
-
-- skill definitions must not require a specific LLM vendor or model SDK
-- MCP descriptors must not assume Holon DesktopHost, GitHub Copilot, or any single application host
-- generation outputs must be based on explicit contracts and manifests rather than hidden framework behavior
-- framework-specific integrations should live in adapters or runtime-family crates, not in core package families
-
-## Phase 1 companion docs
-
-The current substrate baseline is further defined in:
-
-- [Substrate governance](substrate-governance.md)
-- [Terminology](terminology.md)
-
-## Phase 2 companion docs
-
-The current skill-core authority decision is further defined in:
-
-- [Skill Core V1](skill-core-v1.md)
+- use `contracts/` and exported bundles for stable schema, fixture, and compatibility handoff
+- use Rust crates under `rust/` only for proven reusable executable behavior
+- keep host-specific endpoints, orchestration, and prompt assembly in the consuming repo
+- do not assume sibling checkout layouts, solution-level builds, or removed package-family roots
 
 ## Split policy for future repos
 
-If a package family later proves it needs its own release cadence, contributor base, or implementation language, it can split back out into a dedicated repo.
+If a surface later proves it needs its own release cadence, contributor base, or implementation language, it can split into a dedicated repo.
 
 That split should happen only after:
 
-- the package boundary is already stable
+- the boundary is already stable
 - at least two real consumers exist
 - the split improves ownership more than it increases coordination cost
 
@@ -190,8 +124,8 @@ That split should happen only after:
 
 For now, the most coherent working model is:
 
-- `Elegy` is the single main repo
-- `src/` remains authoritative for the smallest durable formalization, schema, and contract families, with `Core`, `Contracts`, and canonical `Skills` as the clearest surviving center
-- `rust/` is the first-party Rust runtime family for self-contained shared executable capabilities where Rust is the better implementation fit
-- weak shared `.NET` runtime packages should be collapsed, reduced to artifacts, or pushed back to consumers unless they re-prove their shared value
-- `Elegy-Skills` and `Elegy-CLI` should be treated as inactive placeholders unless and until the package boundaries are proven enough to justify separate repos
+- `Elegy` is the single active repo
+- governed authority lives in root artifact and policy directories, not in a removed `.NET` source tree
+- `rust/` is the first-party home for reusable executable surfaces, especially CLI, MCP analysis, descriptor tooling, policy-bounded runtime composition, and host layers
+- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors
+- built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

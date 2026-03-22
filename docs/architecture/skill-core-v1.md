@@ -2,49 +2,50 @@
 
 ## Purpose
 
-This document records the Skill Core V1 authority decision for Phase 2 and the downstream convergence that followed it.
+This document retains its earlier title for continuity, but its content reflects the current post-legacy repo shape.
 
-The goal was to make the skills package the authoritative skill contract and then force discovery, forge, MCP, and dynamic-skill flows to adapt to that contract instead of continuing to evolve around older thin shapes.
+The goal is to keep skill authority in neutral governed artifacts while keeping reusable executable behavior in the Rust workspace.
 
 ## Authority decision
 
-The canonical skill model lives in `Elegy.Formalization.Skills`.
+The canonical skill model lives in the governed skill artifact family exported from `contracts/` and versioned through `governance/`.
 
 That means:
 
-- `SkillDefinition` is the authoritative skill contract
-- discovery index entries are projections of the authoritative contract
+- the stable skill shape and compatibility expectations belong to governed schemas, fixtures, manifests, and support metadata
+- discovery index entries are projections of the authoritative governed contract
 - `SKILL.md` materialization is an output format, not the source of truth
-- downstream generators and bridges should consume or emit the canonical skill contract rather than silently inventing parallel shapes
+- Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
 
-## Phase 2 implementation scope
+## Current executable ownership
 
-Phase 2 established and then propagated explicit contract areas for:
+The Rust workspace owns the reusable executable path around those governed skill artifacts.
 
-- identity
-- metadata
-- input shape
-- output shape
-- execution expectations
-- governance metadata
-- discovery hints
-- origin and materialization posture
+- `rust/crates/elegy-tooling` owns reusable authoring, analysis, and skill-generation behavior over governed descriptors and skill projections
+- `rust/crates/elegy-cli` exposes the current contributor-facing commands: `author mcp`, `analyze mcp`, and `generate skills`
+- `rust/crates/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
+- consuming applications keep host-specific registration, auth, persistence, and orchestration local
 
-It also adds semantic validation so the skills package can define the difference between a merely present object and a minimally valid skill contract.
+## Current self-authoring scope
 
-## Converged downstream surfaces
+What the repo proves today:
 
-The downstream consumers that previously drifted from the canonical contract are now aligned.
+- skill generation from analyzed MCP descriptor inputs through the Rust CLI and tooling path
+- deterministic export of governed skill artifacts for downstream consumers
+- a clean split between neutral artifact authority and Rust executable ownership
 
-- `Elegy.Formalization.Skills.Discovery` treats discovery index entries as projections of the canonical contract.
-- governed `skill-definition` and `skill-discovery-index` artifacts now match the authoritative .NET model.
-- `Elegy.Formalization.DynamicSkills` creates and validates canonical skill definitions with explicit dynamic origin semantics.
-- `Elegy.Formalization.SkillForge` consumes canonical skill inputs, preserves governance and I/O metadata, and materializes `SKILL.md` as a projection.
-- `Elegy.Formalization.Mcp` maps MCP analysis results into canonical skills as a strict adapter rather than introducing a parallel skill shape.
-- first-party Rust runtime crates inside the main Elegy repo must consume the same canonical skill contract and may replace behavior-heavy MCP logic only if they preserve the same projection semantics and conformance expectations.
+What the repo does not yet prove as a finished product surface:
+
+- a built-in MCP-native self-authoring loop
+- a skill-driven autonomous authoring surface baked into the runtime by default
+- license to describe all future skill-hosting ideas as already implemented
 
 ## Verification posture
 
-Phase 2 completion is anchored by focused downstream tests, governed artifact export, package-boundary validation, and a full solution test pass.
+Current confidence comes from the surviving validation and export flows:
 
-The next phase should build on this contract baseline rather than reopening skill-core authority or downstream shape decisions. In particular, any Rust replacement of MCP analyzer, generator, or discovery behavior must treat this document as the authority source instead of inventing a Rust-local contract model.
+- `scripts/export-contracts.ps1` and `scripts/validate-canonical-outputs.ps1`
+- `scripts/validate-package-boundaries.ps1`
+- Rust CI for formatting, linting, and tests in `.github/workflows/rust-ci.yml`
+
+Future work should build on this split rather than reopening skill authority. New reusable execution logic belongs in Rust, and new durable skill truth belongs in governed artifacts.

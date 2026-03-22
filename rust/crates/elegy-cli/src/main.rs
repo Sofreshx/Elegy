@@ -106,6 +106,8 @@ enum ValidateCommand {
 #[derive(Subcommand, Debug)]
 enum InspectCommand {
     Resources,
+    #[command(name = "session-context", alias = "memory")]
+    SessionContext,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -131,6 +133,20 @@ where
 struct Summary {
     errors: usize,
     warnings: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionContextInspection {
+    capability: &'static str,
+    contract_field: &'static str,
+    schema_file: &'static str,
+    representation: &'static str,
+    supported_scopes: Vec<&'static str>,
+    intended_consumers: Vec<&'static str>,
+    bounded_fields: Vec<&'static str>,
+    raw_transcript_persisted: bool,
+    transcript_bodies_allowed_in_artifact: bool,
 }
 
 #[tokio::main]
@@ -181,8 +197,29 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Inspect {
             command: InspectCommand::Resources,
         } => execute_runtime_command(locator, cli.format, vec!["inspect", "resources"]),
+        Command::Inspect {
+            command: InspectCommand::SessionContext,
+        } => execute_session_context_command(cli.format),
         Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
     }
+}
+
+fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    let inspection = session_context_inspection();
+
+    match format {
+        OutputFormat::Text => print_session_context_text(&inspection),
+        OutputFormat::Json => print_json(&Envelope {
+            schema_version: CLI_SCHEMA_VERSION,
+            command: vec!["inspect".to_string(), "session-context".to_string()],
+            status: "ok",
+            summary: Summary::default(),
+            data: inspection,
+            diagnostics: Vec::new(),
+        })?,
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_author_mcp_command(
@@ -459,6 +496,53 @@ fn print_catalog_text(catalog: &Catalog) {
             format_family(resource.family),
             resource.id
         );
+    }
+}
+
+fn print_session_context_text(inspection: &SessionContextInspection) {
+    println!("summary-only session context artifact");
+    println!("capability: {}", inspection.capability);
+    println!("contract field: {}", inspection.contract_field);
+    println!("schema: {}", inspection.schema_file);
+    println!("representation: {}", inspection.representation);
+    println!(
+        "supported scopes: {}",
+        inspection.supported_scopes.join(", ")
+    );
+    println!(
+        "consumers: {}",
+        inspection.intended_consumers.join(", ")
+    );
+    println!(
+        "bounded fields: {}",
+        inspection.bounded_fields.join(", ")
+    );
+    println!(
+        "raw transcript persisted: {}",
+        inspection.raw_transcript_persisted
+    );
+    println!(
+        "transcript bodies allowed in artifact: {}",
+        inspection.transcript_bodies_allowed_in_artifact
+    );
+}
+
+fn session_context_inspection() -> SessionContextInspection {
+    SessionContextInspection {
+        capability: "summary-only-session-context-envelope",
+        contract_field: "summary-only-session-context-envelope.sessionContext",
+        schema_file: "contracts/schemas/summary-only-session-context-envelope.schema.json",
+        representation: "summary-only",
+        supported_scopes: vec!["run", "session", "workspace"],
+        intended_consumers: vec!["instruction-engine", "workspace-bootstrap", "agent-runtime"],
+        bounded_fields: vec![
+            "summary",
+            "salientFacts",
+            "instructionContext",
+            "rawTranscriptPersisted",
+        ],
+        raw_transcript_persisted: false,
+        transcript_bodies_allowed_in_artifact: false,
     }
 }
 

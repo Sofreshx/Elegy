@@ -8,15 +8,13 @@ The format is based on Keep a Changelog principles, adapted for the current boot
 
 ### Added
 
-- dedicated multi-OS Rust CI in the main `Elegy` monorepo
-- monorepo security workflow covering Rust dependency review, secret scanning, and mixed-language CodeQL analysis
-- root contributor, security, conduct, spec-baseline, and architecture index docs so `Elegy` is the public entrypoint for project governance
-- Rust workspace toolchain and dependency-policy files inside `rust/`
-- portable canonical workflow graph contracts plus deterministic serializer, deserializer, normalization, and portable workflow transformation support in the workflow formalization packages
+- governed contract bundle export and validation flows centered on `scripts/export-contracts.ps1` and `scripts/validate-canonical-outputs.ps1`
+- dedicated multi-OS Rust CI for the surviving workspace under `rust/`
+- repository security workflow covering `cargo-deny`, `cargo-audit`, `gitleaks`, and Rust CodeQL analysis
+- contributor-facing Rust CLI self-authoring slice for `author mcp`, `analyze mcp`, and `generate skills`, backed by `rust/crates/elegy-tooling`
 
 ### Changed
 
-- package-boundary governance checks now focus on `.NET`/contract authority concerns instead of also acting as the only Rust CI surface
-- repository docs now describe `Elegy` as the operational center for contributor and security posture
-- sibling repos are being prepared for closeout verification with documentation that redirects active work to the main monorepo
-- package-family version advanced to `0.2.0` for the next downstream workflow formalization adoption slice
+- repository authority language now centers on `contracts/`, `governance/`, `schemas/`, and `policies/` plus exported artifacts, rather than removed source-package roots
+- architecture and policy docs now describe `rust/` as the active executable surface and avoid claiming a built-in MCP-native or skill-driven self-authoring surface that the repo does not yet ship
+- validation posture now points to surviving scripts and workflows instead of removed legacy build and test flows

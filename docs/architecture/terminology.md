@@ -10,19 +10,19 @@ These definitions exist to prevent later phases from overloading the same words 
 
 ### Substrate
 
-The lowest reusable package layer in the umbrella repo.
+The lowest reusable authority layer in the repo.
 
-It includes core, contracts, serialization, validation, governance, and projection support. The substrate is where shared primitives and publishable artifacts are defined without provider, framework, or host ownership.
+It includes governed schemas, fixtures, manifests, policy artifacts, support metadata, and the rules that shape their exports and validation. The substrate is where shared publishable artifacts are defined without provider, framework, or host ownership.
 
 ### Contract
 
 A stable public agreement that another package, repo, or tool can depend on.
 
-Contracts can be represented as public .NET types, JSON schemas, compatibility manifests, or other governed artifacts. A contract is stronger than a local implementation detail.
+Contracts are represented here as governed schemas, fixtures, manifests, support metadata, or other authored artifacts. A contract is stronger than a local implementation detail.
 
 ### Monorepo
 
-The single main Elegy repository that contains both the authoritative .NET formalization families and the first-party Rust runtime family.
+The single main Elegy repository that contains both the neutral governed artifact roots and the first-party Rust runtime family.
 
 Monorepo does not mean that every language surface has the same authority. It means they are versioned and governed together.
 
@@ -54,7 +54,7 @@ Capability is the broad concept. It should not be used as a synonym for a single
 
 A formalized capability definition with identity, metadata, and execution-oriented semantics.
 
-In Elegy, a skill is not inherently tied to a specific LLM vendor, prompt engine, runtime host, or MCP transport.
+In Elegy, a skill is a governed capability contract. It is not inherently tied to a specific LLM vendor, prompt engine, runtime host, or MCP transport.
 
 ### Dynamic skill
 
@@ -114,7 +114,7 @@ In the current topology, the Rust subtree under `rust/` is the primary runtime f
 
 The package family or artifact set that is allowed to define canonical truth for a concept.
 
-In Elegy, governed schemas, fixtures, compatibility manifests, and canonical skill contracts remain authority surfaces in the .NET package families even when Rust implements the operational behavior that consumes them.
+In Elegy, authority surfaces are the governed artifact roots under `contracts/`, `governance/`, `schemas/`, and `policies/`. Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth.
 
 ### Governance
 
@@ -126,7 +126,7 @@ Governance is broader than security policy. It includes compatibility, conforman
 
 The generation and materialization layer responsible for deterministic derived outputs.
 
-Forge is not the same thing as the human-facing CLI. It is the subsystem that emits or materializes governed artifacts.
+Forge is not the same thing as the human-facing CLI. It is the subsystem that emits or materializes governed artifacts or derived projections from them.
 
 ### CLI
 

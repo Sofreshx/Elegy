@@ -11,4 +11,4 @@ Use it for:
 
 Do not treat `artifacts/contracts` as the authored source of truth. That directory is generated output for consumers and CI.
 
-During the .NET purge, assets may still exist under `src/` for compatibility, but new ownership should move here first.
+No authored contract asset should live under a legacy implementation tree. If a governed schema, fixture, or manifest is kept, it belongs here or under `governance/`.

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elegy/contracts/formalization/1.0.0/agent-response-envelope.schema.json",
   "title": "Agent Response Envelope",
-  "description": "Canonical final response envelope for provider-neutral agent execution flows.",
+  "description": "Canonical final response envelope for provider-neutral agent execution flows, with optional summary-only session context metadata.",
   "type": "object",
   "additionalProperties": false,
   "required": ["requestId", "runId", "status", "messages", "usage"],
@@ -35,6 +35,53 @@
     },
     "errorCode": { "type": ["string", "null"] },
     "errorMessage": { "type": ["string", "null"] },
+    "sessionContext": {
+      "type": "object",
+      "description": "Optional summary-only context metadata that can be reused by workspace or instruction-engine flows without defining the durable transcript policy surface.",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "representation",
+        "summary",
+        "rawTranscriptPersisted"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["run", "session", "workspace"]
+        },
+        "representation": {
+          "type": "string",
+          "enum": ["summary-only"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "salientFacts": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "instructionContext": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "rawTranscriptPersisted": {
+          "const": false
+        }
+      }
+    },
     "metadata": {
       "type": "object",
       "additionalProperties": { "type": "string" }

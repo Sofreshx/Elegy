@@ -35,6 +35,10 @@
       "generated": "artifacts/contracts/agent-response-envelope.schema.json"
     },
     {
+      "source": "contracts/schemas/summary-only-session-context-envelope.schema.json",
+      "generated": "artifacts/contracts/summary-only-session-context-envelope.schema.json"
+    },
+    {
       "source": "contracts/schemas/canonical-workflow-graph.schema.json",
       "generated": "artifacts/contracts/canonical-workflow-graph.schema.json"
     },
@@ -93,6 +97,10 @@
     {
       "source": "contracts/fixtures/agent-response-envelope.minimal.json",
       "generated": "artifacts/contracts/fixtures/agent-response-envelope.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/summary-only-session-context-envelope.minimal.json",
+      "generated": "artifacts/contracts/fixtures/summary-only-session-context-envelope.minimal.json"
     },
     {
       "source": "contracts/fixtures/canonical-workflow-graph.minimal.json",

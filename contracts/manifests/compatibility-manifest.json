@@ -2,7 +2,7 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "0.2.0"
+    "version": "1.1.0"
   },
   "schemas": [
     {
@@ -43,6 +43,14 @@
       "file": "agent-response-envelope.schema.json",
       "fixtures": [
         "fixtures/agent-response-envelope.minimal.json"
+      ]
+    },
+    {
+      "name": "summary-only-session-context-envelope",
+      "schemaVersion": "1.0.0",
+      "file": "summary-only-session-context-envelope.schema.json",
+      "fixtures": [
+        "fixtures/summary-only-session-context-envelope.minimal.json"
       ]
     },
     {

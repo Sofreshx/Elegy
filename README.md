@@ -8,12 +8,12 @@ The design target is cross-project reuse with focused packages that stay:
 - provider-agnostic
 - framework-agnostic
 
-The neutral authority root under `contracts/` now owns governed schemas, fixtures, manifests, and support metadata for the purge path. Rust is the preferred implementation surface for self-contained, reusable, executable agentic/runtime capabilities where protocol, transport, host, and IO concerns dominate. The remaining `.NET` tree is transitional and is being retired rather than expanded.
+The neutral authority roots under `contracts/` and `governance/` own governed schemas, fixtures, manifests, support metadata, and policy for the repository. Rust is the preferred implementation surface for self-contained, reusable, executable agentic/runtime capabilities where protocol, transport, host, and IO concerns dominate.
 
 ## Ecosystem position
 
 - `Elegy` is the single main repository.
-- governed contracts, schemas, fixtures, manifests, and support metadata are moving to the neutral authority root under `contracts/`.
+- governed contracts, schemas, fixtures, manifests, and support metadata live under `contracts/`, with policy and version governance under `governance/`.
 - the first-party Rust runtime family lives under `rust/` and is the preferred implementation surface for shared executable capabilities such as CLI, host, policy execution, retrieval, memory, and behavior-heavy MCP runtime logic.
 - standalone `Elegy-Skills` and `Elegy-CLI` repos should not be treated as the primary implementation surfaces.
 
@@ -24,35 +24,25 @@ See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topolo
 ### Substrate
 
 - `contracts/` - Authored neutral authority root for schemas, fixtures, manifests, and support metadata.
-
-- `src/Elegy.Formalization.Core` - Core abstractions and domain model primitives.
-- `src/Elegy.Formalization.Contracts` - Shared contracts for integration boundaries.
-- `src/Elegy.Formalization.Serialization` - Serialization support over core formalization models.
-- `src/Elegy.Formalization.Validation` - Validation utilities and rules for formalization artifacts.
-- `src/Elegy.Formalization.Governance` - Governance policies and enforcement helpers.
-- `src/Elegy.Formalization.Projections.Mermaid` - Mermaid projection output from core formalization structures.
-
-### Skills and generation
-
-- `src/Elegy.Formalization.Skills` - Core skill definitions and lifecycle metadata.
-- `src/Elegy.Formalization.Skills.Discovery` - Discovery-oriented skill surfaces.
-- `src/Elegy.Formalization.DynamicSkills` - Dynamic materialization and runtime-oriented skill helpers.
-- `src/Elegy.Formalization.SkillForge` - Skill and tooling generation/materialization flows.
-
-### MCP and adjacent runtime-facing analysis
-
-- `src/Elegy.Formalization.Mcp` - MCP descriptors, governed analysis artifacts, and canonical MCP-to-skill projection rules.
+- `governance/` - Version policy, canonical output inventory, and boundary policy for the neutral authority surface.
+- `schemas/` - Shared schema support material that survives independently of any removed implementation tree.
+- `policies/` - Policy assets and formalization inputs that govern repository behavior.
 
 ### Rust Runtime Family
 
-- `rust/` - in-repo Rust workspace for runtime composition, MCP host concerns, contract-consumer utilities, and future Rust replacements for behavior-heavy .NET MCP logic.
+- `rust/` - in-repo Rust workspace for runtime composition, MCP host concerns, contract-consumer utilities, and shared executable behavior.
 
-### Additional families
+### Current self-authoring surface
 
-- `src/Elegy.Formalization.Agents` - Agent-facing formalization primitives.
-- `src/Elegy.Formalization.AgentFactory` - Agent creation/build helpers.
-- `src/Elegy.Formalization.Monitoring` - Monitoring-oriented formalization surfaces.
-- `tests/*` - Unit test projects aligned to source packages.
+The shipped self-authoring surface today is the Rust CLI flow for `author mcp`, `analyze mcp`, and `generate skills`, backed by `rust/crates/elegy-tooling`.
+
+Built-in MCP-native or skill-driven self-authoring remains the next milestone rather than a shipped repo claim.
+
+### Operational support
+
+- `scripts/` - export, validation, and release support scripts for the governed bundle.
+- `artifacts/` - generated outputs and distribution artifacts.
+- `docs/` - architecture, migration, distribution, and governance documentation.
 
 ## Burden-of-Proof Reset
 
@@ -62,23 +52,20 @@ Elegy now follows a stricter shared-code rule:
 - prefer schemas, fixtures, policy artifacts, and docs over libraries when consumers mainly need to read, validate, or conform
 - keep host-specific runtime behavior, auth, persistence, UI orchestration, HTTP endpoints, and composition-root logic in consuming repos
 
-Under that rule, the current durable `.NET` authority center is intentionally small:
+Under that rule, the current durable authority center is intentionally small:
 
-- `src/Elegy.Formalization.Core`
-- `src/Elegy.Formalization.Contracts`
-- `src/Elegy.Formalization.Skills`
-
-Other existing `.NET` package families may still contain useful pieces, but they are under burden-of-proof review and may be collapsed, reduced to artifacts, moved toward Rust runtime ownership, or pushed back to consumers.
+- `contracts/`
+- `governance/`
+- `rust/`
 
 ## Organization rules
 
-- shared substrate packages must not depend on provider-specific SDKs, app frameworks, or host-specific runtime glue
-- MCP formalization in `src/` remains the schema and canonical projection authority, but behavior-heavy host, transport, filesystem, HTTP, execution, and retrieval logic should move to the in-repo Rust runtime family when Rust is the stronger implementation fit
-- the exported contract bundle is the machine-readable handshake between authoritative .NET contract families and first-party Rust runtime crates, plus any external consumers
-- generation/tooling concerns belong in `SkillForge`-style packages rather than being conflated with the human-facing CLI concept
-- if a package family later needs its own repository, split only after the package boundary is proven and at least two real consumers exist
-- new shared executable features should default to Rust unless they are inseparable from canonical `.NET` authority semantics
-- downstream `.NET` consumers should integrate through packages, exported artifacts, or thin adapters rather than using Elegy as a catch-all `.NET` runtime host
+- shared substrate assets must not depend on provider-specific SDKs, app frameworks, or host-specific runtime glue
+- governed schemas, fixtures, manifests, and support metadata belong under `contracts/`, with policy and version governance under `governance/`
+- behavior-heavy host, transport, filesystem, HTTP, execution, retrieval, and projection logic should live in the in-repo Rust runtime family when shared implementation is justified
+- the exported contract bundle is the machine-readable handshake between the neutral authority roots and first-party Rust runtime crates, plus any external consumers
+- new shared executable features should default to Rust unless they can be expressed as neutral artifacts instead of code
+- downstream consumers should integrate through exported artifacts or thin adapters rather than using Elegy as a catch-all runtime host
 
 ## Consolidation posture
 
@@ -86,8 +73,8 @@ The current reset direction is:
 
 - keep neutral artifacts authoritative for governed contracts, schemas, fixtures, compatibility manifests, and support metadata during the purge
 - keep the Rust runtime family in `rust/` as the shared executable surface for CLI, host, runtime composition, policy execution, retrieval, memory, and behavior-heavy MCP logic
-- shrink or delete shared `.NET` packages unless they prove authority value that cannot be expressed as neutral contracts or artifacts
-- keep product-hosted `.NET` runtime logic in downstream consumers such as Holon or SAASTools unless the capability is demonstrably reusable and host-agnostic
+- keep product-hosted runtime logic in downstream consumers unless the capability is demonstrably reusable and host-agnostic
+- treat the removed legacy package tree as retired, not as a compatibility surface to preserve
 
 ## Documentation and operational posture
 
@@ -104,7 +91,7 @@ Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Ski
 
 ## Distribution and consumption
 
-Elegy should be consumed through versioned exported artifacts rather than local sibling-repository references or .NET package restore.
+Elegy should be consumed through versioned exported artifacts rather than local sibling-repository references or repo-internal package restore assumptions.
 
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.

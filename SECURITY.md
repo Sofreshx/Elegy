@@ -2,16 +2,17 @@
 
 ## Supported state
 
-`Elegy` is the main monorepo for the project's shared formalization packages, governed contract artifacts, and first-party Rust runtime family.
+`Elegy` is the main monorepo for governed contract artifacts and the first-party Rust executable family that consumes them.
 
-The repository is still in a **bootstrap and consolidation stage**.
+The repository is still in a **bootstrap and consolidation stage** after the legacy cleanup.
 
 At this stage:
 
-- the `.NET` packages under `src/` remain the authority for governed contracts, schemas, fixtures, and canonical skill/MCP formalization
-- the Rust workspace under `rust/` is the active home for behavior-heavy runtime, host, transport, and adapter logic
-- interfaces may still tighten as the former sibling runtime repos are verified and closed out
-- security-related docs describe the current implementation boundary and reporting process, not a claim of comprehensive platform hardening
+- `contracts/`, `governance/`, `schemas/`, and `policies/` are the authority roots for governed schemas, fixtures, manifests, support metadata, versioning, and policy
+- exported bundles under `artifacts/contracts` are the supported machine-readable handoff surface for downstream consumers
+- the Rust workspace under `rust/` is the active home for CLI, tooling, host, runtime, and adapter behavior that consumes governed artifacts
+- the current contributor-facing self-authoring slice is the Rust CLI path for `author mcp`, `analyze mcp`, and `generate skills`, backed by `rust/crates/elegy-tooling`
+- this policy describes the repository boundary and reporting process; it does not claim a finished hardening story or a built-in MCP-native or skill-driven self-authoring product surface
 
 ## Reporting a vulnerability
 
@@ -44,12 +45,11 @@ During bootstrap, response times are best-effort. Maintainers will try to:
 
 The current implemented posture includes repository and runtime safeguards such as:
 
-- package-boundary and architecture validation for the formalization families
-- deterministic exported contract artifacts for downstream consumers
-- Rust workspace lint/test validation in CI
-- dependency-policy review through `cargo-deny` and advisory review through `cargo-audit`
-- secret scanning and CodeQL analysis at the monorepo level
-- conservative runtime policy in the Rust runtime family, including bounded filesystem roots, allowlisted outbound HTTP targets, timeout and size limits, and rejection of credential-bearing HTTP URLs
+- canonical output and boundary validation through `scripts/export-contracts.ps1`, `scripts/validate-canonical-outputs.ps1`, and `scripts/validate-package-boundaries.ps1`
+- distribution bundle export and archive validation in `.github/workflows/distribution-artifacts.yml`
+- Rust workspace formatting, linting, and test validation in `.github/workflows/rust-ci.yml`
+- dependency review through `cargo-deny` and advisory review through `cargo-audit` in `.github/workflows/security.yml`
+- repository secret scanning through `gitleaks` and Rust-oriented static analysis through CodeQL in `.github/workflows/security.yml`
 
 ## Important limitation
 
