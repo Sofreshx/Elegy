@@ -7,6 +7,10 @@
   ],
   "mirroredOutputs": [
     {
+      "source": "contracts/support/elegy-rust-support.json",
+      "generated": "rust/contracts/elegy-rust-support.json"
+    },
+    {
       "source": "contracts/manifests/compatibility-manifest.json",
       "generated": "artifacts/contracts/compatibility-manifest.json"
     },
@@ -33,6 +37,14 @@
     {
       "source": "contracts/schemas/agent-response-envelope.schema.json",
       "generated": "artifacts/contracts/agent-response-envelope.schema.json"
+    },
+    {
+      "source": "contracts/schemas/governed-memory-record.schema.json",
+      "generated": "artifacts/contracts/governed-memory-record.schema.json"
+    },
+    {
+      "source": "contracts/schemas/governed-memory-record-projection.schema.json",
+      "generated": "artifacts/contracts/governed-memory-record-projection.schema.json"
     },
     {
       "source": "contracts/schemas/summary-only-session-context-envelope.schema.json",
@@ -99,6 +111,14 @@
       "generated": "artifacts/contracts/fixtures/agent-response-envelope.minimal.json"
     },
     {
+      "source": "contracts/fixtures/governed-memory-record.minimal.json",
+      "generated": "artifacts/contracts/fixtures/governed-memory-record.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/governed-memory-record-projection.minimal.json",
+      "generated": "artifacts/contracts/fixtures/governed-memory-record-projection.minimal.json"
+    },
+    {
       "source": "contracts/fixtures/summary-only-session-context-envelope.minimal.json",
       "generated": "artifacts/contracts/fixtures/summary-only-session-context-envelope.minimal.json"
     },
@@ -147,8 +167,16 @@
       "generated": "artifacts/contracts/fixtures/skill-definition.minimal.json"
     },
     {
+      "source": "contracts/fixtures/skill-definition.elegy-memory.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-memory.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-memory.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-memory.json"
     },
     {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",

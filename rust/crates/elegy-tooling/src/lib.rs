@@ -1,7 +1,6 @@
 use elegy_contracts::{
     validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition,
-    McpAnalysisResult, McpServerDescriptor, McpToolDefinition, McpTransportKind,
-    SkillDefinition,
+    McpAnalysisResult, McpServerDescriptor, McpToolDefinition, McpTransportKind, SkillDefinition,
 };
 use elegy_mcp::{generated_skill_id, McpSkillGenerator, McpToolAnalyzer};
 use serde::Serialize;
@@ -109,12 +108,10 @@ pub fn generate_skills_from_descriptor_file(
     validate_generated_skills(&generation.generated_skills)?;
 
     let written_files = match output_dir {
-        Some(output_dir) => {
-            write_skill_files(output_dir, &generation.generated_skills, overwrite)?
-                .into_iter()
-                .map(|path| display_path(&path))
-                .collect()
-        }
+        Some(output_dir) => write_skill_files(output_dir, &generation.generated_skills, overwrite)?
+            .into_iter()
+            .map(|path| display_path(&path))
+            .collect(),
         None => Vec::new(),
     };
 
@@ -389,7 +386,11 @@ mod tests {
         let persisted = fs::read_to_string(&output_path).expect("read descriptor file");
         let parsed = serde_json::from_str(&persisted).expect("parse descriptor file");
         let validation = validate_mcp_server_descriptor(&parsed);
-        assert!(validation.is_valid(), "unexpected issues: {:?}", validation.issues);
+        assert!(
+            validation.is_valid(),
+            "unexpected issues: {:?}",
+            validation.issues
+        );
         assert!(
             parsed.tools.iter().all(|tool| tool.input_schema.is_none()),
             "authored MCP descriptors should not fabricate tool schemas"
@@ -428,13 +429,19 @@ mod tests {
         assert_eq!(analysis.server_name, "weather-server");
         assert_eq!(analysis.analyses.len(), 2);
 
-        let generated = generate_skills_from_descriptor_file(&descriptor_path, Some(&output_dir), false)
-            .expect("skill generation should succeed");
+        let generated =
+            generate_skills_from_descriptor_file(&descriptor_path, Some(&output_dir), false)
+                .expect("skill generation should succeed");
         assert_eq!(generated.generated_skills.len(), 1);
-        assert_eq!(generated.generated_skills[0].effective_id(), "mcp-weather-server-get-weather");
+        assert_eq!(
+            generated.generated_skills[0].effective_id(),
+            "mcp-weather-server-get-weather"
+        );
         assert_eq!(generated.skipped_tools.len(), 1);
         assert_eq!(generated.written_files.len(), 1);
-        assert!(output_dir.join("mcp-weather-server-get-weather.json").is_file());
+        assert!(output_dir
+            .join("mcp-weather-server-get-weather.json")
+            .is_file());
     }
 
     #[test]
@@ -494,21 +501,21 @@ mod tests {
         assert!(matches!(error, ToolingError::OutputExists { .. }));
     }
 
-        #[test]
-        fn generation_preflights_existing_outputs_before_writing_any_files() {
-                let temp_dir = unique_temp_dir("elegy-tooling-preflight");
-                let descriptor_path = temp_dir.join("weather-mcp.json");
-                let output_dir = temp_dir.join("generated-skills");
-                fs::create_dir_all(&output_dir).expect("create output directory");
-                fs::write(
-                        output_dir.join("mcp-weather-server-list-alerts.json"),
-                        "{}\n",
-                )
-                .expect("seed colliding output file");
+    #[test]
+    fn generation_preflights_existing_outputs_before_writing_any_files() {
+        let temp_dir = unique_temp_dir("elegy-tooling-preflight");
+        let descriptor_path = temp_dir.join("weather-mcp.json");
+        let output_dir = temp_dir.join("generated-skills");
+        fs::create_dir_all(&output_dir).expect("create output directory");
+        fs::write(
+            output_dir.join("mcp-weather-server-list-alerts.json"),
+            "{}\n",
+        )
+        .expect("seed colliding output file");
 
-                fs::write(
-                        &descriptor_path,
-                        r#"{
+        fs::write(
+            &descriptor_path,
+            r#"{
     "serverName": "weather-server",
     "transport": "stdio",
     "tools": [
@@ -525,27 +532,30 @@ mod tests {
     ]
 }
 "#,
-                )
-                .expect("write descriptor fixture");
+        )
+        .expect("write descriptor fixture");
 
-                let error = generate_skills_from_descriptor_file(&descriptor_path, Some(&output_dir), false)
-                        .expect_err("colliding output should fail before any write occurs");
+        let error =
+            generate_skills_from_descriptor_file(&descriptor_path, Some(&output_dir), false)
+                .expect_err("colliding output should fail before any write occurs");
 
-                assert!(matches!(error, ToolingError::OutputExists { .. }));
-                assert!(
-                        !output_dir.join("mcp-weather-server-get-weather.json").exists(),
-                        "preflight should block all writes when a collision is detected"
-                );
-        }
+        assert!(matches!(error, ToolingError::OutputExists { .. }));
+        assert!(
+            !output_dir
+                .join("mcp-weather-server-get-weather.json")
+                .exists(),
+            "preflight should block all writes when a collision is detected"
+        );
+    }
 
-            #[test]
-            fn analyze_rejects_generator_id_collisions_for_valid_schema_tools() {
-                let temp_dir = unique_temp_dir("elegy-tooling-collision");
-                let descriptor_path = temp_dir.join("weather-mcp.json");
+    #[test]
+    fn analyze_rejects_generator_id_collisions_for_valid_schema_tools() {
+        let temp_dir = unique_temp_dir("elegy-tooling-collision");
+        let descriptor_path = temp_dir.join("weather-mcp.json");
 
-                fs::write(
-                    &descriptor_path,
-                    r#"{
+        fs::write(
+            &descriptor_path,
+            r#"{
           "serverName": "weather-server",
           "transport": "stdio",
           "tools": [
@@ -562,17 +572,19 @@ mod tests {
           ]
         }
         "#,
-                )
-                .expect("write descriptor fixture");
+        )
+        .expect("write descriptor fixture");
 
-                let error = analyze_mcp_descriptor_file(&descriptor_path)
-                    .expect_err("colliding generated skill IDs should be rejected during analysis");
+        let error = analyze_mcp_descriptor_file(&descriptor_path)
+            .expect_err("colliding generated skill IDs should be rejected during analysis");
 
-                match error {
-                    ToolingError::InvalidMcpDescriptor { issues, .. } => {
-                        assert!(issues.iter().any(|issue| issue.contains("generated skill ID")));
-                    }
-                    other => panic!("unexpected error: {other}"),
-                }
+        match error {
+            ToolingError::InvalidMcpDescriptor { issues, .. } => {
+                assert!(issues
+                    .iter()
+                    .any(|issue| issue.contains("generated skill ID")));
             }
+            other => panic!("unexpected error: {other}"),
+        }
+    }
 }

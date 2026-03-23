@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-03-23T00:00:00Z",
+  "entries": [
+    {
+      "skillId": "elegy-memory",
+      "name": "Elegy Memory",
+      "description": "Derived projection of the governed Elegy-memory skill definition for loading the rendered non-authoritative local skill markdown.",
+      "lifecycleState": "active",
+      "triggersOn": [
+        "memory",
+        "session context",
+        "local memory",
+        "supersede memory artifact",
+        "tombstone memory artifact"
+      ],
+      "keywords": [
+        "memory",
+        "session context",
+        "summary-only",
+        "local store",
+        "non-authoritative"
+      ],
+      "capabilityHints": [
+        "inspect-session-context",
+        "validate-session-context",
+        "local-memory-store"
+      ],
+      "manifest": {
+        "id": "elegy-memory",
+        "loadMode": "onDemand",
+        "vaultRef": ".github/skills/elegy-memory/SKILL.md",
+        "sourceKind": "manual",
+        "materializationKind": "declared"
+      }
+    }
+  ]
+}

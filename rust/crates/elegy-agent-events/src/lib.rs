@@ -1,9 +1,8 @@
 use async_trait::async_trait;
 use elegy_contracts::{
     validate_agent_event_envelope, validate_agent_request_envelope,
-    validate_agent_response_envelope, AgentEventEnvelope, AgentEventPayload,
-    AgentEventSource, AgentEventType, AgentRequestEnvelope, AgentResponseEnvelope,
-    AgentResponseStatus,
+    validate_agent_response_envelope, AgentEventEnvelope, AgentEventPayload, AgentEventSource,
+    AgentEventType, AgentRequestEnvelope, AgentResponseEnvelope, AgentResponseStatus,
 };
 use std::collections::{BTreeMap, VecDeque};
 use std::sync::{Arc, Mutex};
@@ -117,7 +116,10 @@ impl AgentRunHandle {
         };
 
         let payload = AgentEventPayload {
-            content: response.messages.last().map(|message| message.content.clone()),
+            content: response
+                .messages
+                .last()
+                .map(|message| message.content.clone()),
             error_code: response.error_code.clone(),
             error_message: response.error_message.clone(),
             usage: Some(response.usage.clone()),
@@ -313,7 +315,10 @@ impl AgentEventBroker {
         Ok(AgentEventSubscription { replay, receiver })
     }
 
-    pub fn events_for_run(&self, run_id: &str) -> Result<Vec<AgentEventEnvelope>, AgentBrokerError> {
+    pub fn events_for_run(
+        &self,
+        run_id: &str,
+    ) -> Result<Vec<AgentEventEnvelope>, AgentBrokerError> {
         let state = self
             .inner
             .state
@@ -511,9 +516,7 @@ mod tests {
                 true,
                 None,
             )
-            .map_err(|error| {
-                AgentAdapterError::new("broker_publish_failed", error.to_string())
-            })?;
+            .map_err(|error| AgentAdapterError::new("broker_publish_failed", error.to_string()))?;
 
             run.publish(
                 AgentEventType::MessageCompleted,
@@ -527,9 +530,7 @@ mod tests {
                 false,
                 None,
             )
-            .map_err(|error| {
-                AgentAdapterError::new("broker_publish_failed", error.to_string())
-            })?;
+            .map_err(|error| AgentAdapterError::new("broker_publish_failed", error.to_string()))?;
 
             Ok(AgentResponseEnvelope {
                 request_id: request.request_id,
@@ -563,7 +564,9 @@ mod tests {
     #[tokio::test]
     async fn replay_only_contains_persisted_events() {
         let broker = AgentEventBroker::default();
-        let run = broker.start_request(request_fixture()).expect("start request");
+        let run = broker
+            .start_request(request_fixture())
+            .expect("start request");
 
         run.publish(
             AgentEventType::MessageDelta,
@@ -647,10 +650,7 @@ mod tests {
             .await
             .expect_err("adapter failure should surface");
 
-        assert!(matches!(
-            error,
-            AgentBrokerError::AdapterFailed(_, _)
-        ));
+        assert!(matches!(error, AgentBrokerError::AdapterFailed(_, _)));
 
         let response = broker
             .response_for_run("request-1")

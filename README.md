@@ -85,6 +85,7 @@ The current reset direction is:
 - [Code of conduct](CODE_OF_CONDUCT.md)
 - [Changelog](CHANGELOG.md)
 - [Architecture docs](docs/architecture/README.md)
+- [Elegy-memory V1](docs/architecture/elegy-memory-v1.md)
 - [MCP spec baseline](docs/spec-baseline.md)
 
 Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Skills` should be treated as archival or closeout references rather than the primary source of truth.
@@ -96,6 +97,7 @@ Elegy should be consumed through versioned exported artifacts rather than local 
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 - the existing `elegy` CLI is published as explicit release archives for `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
+- the bounded local memory operator now lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary; `rust/crates/elegy-cli` keeps only a temporary compatibility bridge for legacy memory commands, and this slice does not add a separate memory release asset claim.
 - downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path>` to fetch the contracts bundle plus the matching host CLI archive without sibling checkouts or package feeds.
 - downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
@@ -155,8 +157,12 @@ This produces deterministic files under `artifacts/contracts` for downstream con
 - `agent-event-envelope.schema.json`
 - `fixtures/canonical-workflow.minimal.json`
 - `fixtures/canonical-workflow-graph.minimal.json`
+- `fixtures/skill-definition.elegy-memory.json`
+- `fixtures/skill-discovery-index.elegy-memory.json`
 - `compatibility-manifest.json`
 - `compatibility-matrix.json`
+
+The repo also materializes `.github/skills/elegy-memory/SKILL.md` for contributor routing over the `elegy-memory` package-owned local memory surface. That markdown file is non-authoritative. The authority chain remains `contracts/fixtures/skill-definition.elegy-memory.json` -> `contracts/fixtures/skill-discovery-index.elegy-memory.json` -> rendered skill output.
 
 ### Compatibility matrix for consumers
 

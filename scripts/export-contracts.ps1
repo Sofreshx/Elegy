@@ -8,6 +8,12 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$versionPolicyRelativePath = 'governance/version-policy.json'
+$versionPolicyPath = Join-Path $repoRoot $versionPolicyRelativePath
+
+if (-not (Test-Path $versionPolicyPath)) {
+    throw "Missing version policy: $versionPolicyPath"
+}
 
 $cargoArgs = @(
     'run',

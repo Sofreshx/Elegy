@@ -119,10 +119,11 @@ fn analyze_and_generate_commands_use_same_descriptor_input() {
         "stderr: {}",
         String::from_utf8_lossy(&generation.stderr)
     );
-    assert!(output_dir.join("mcp-weather-server-get-weather.json").is_file());
+    assert!(output_dir
+        .join("mcp-weather-server-get-weather.json")
+        .is_file());
 
-    let generation_stdout =
-        String::from_utf8(generation.stdout).expect("stdout should be utf-8");
+    let generation_stdout = String::from_utf8(generation.stdout).expect("stdout should be utf-8");
     assert!(generation_stdout.contains("mcp-weather-server-get-weather"));
     assert!(generation_stdout.contains("list-alerts"));
 }
@@ -264,4 +265,335 @@ fn validate_session_context_command_rejects_invalid_artifact() {
     assert!(stdout.contains("\"status\": \"invalid\""));
     assert!(stdout.contains("CLI-MEMORY-002"));
     assert!(stdout.contains("rawTranscriptPersisted must be false"));
+}
+
+#[test]
+fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
+    let temp_dir = unique_temp_dir("elegy-cli-local-memory");
+    let root = temp_dir.join("local-store");
+    let input_a = temp_dir.join("record-a.json");
+    let input_b = temp_dir.join("record-b.json");
+    let input_c = temp_dir.join("record-c.json");
+
+    fs::write(
+        &input_a,
+        r#"{
+    "artifactKind": "summary-only-session-context-envelope",
+    "requestId": "request-a",
+    "runId": "run-a",
+    "capturedAtUtc": "2026-03-22T00:00:00Z",
+    "sessionContext": {
+        "scope": "workspace",
+        "representation": "summary-only",
+        "summary": "First deterministic local summary.",
+        "rawTranscriptPersisted": false
+  }
+}
+"#,
+    )
+    .expect("write record-a fixture");
+    fs::write(
+        &input_b,
+        r#"{
+    "artifactKind": "summary-only-session-context-envelope",
+    "requestId": "request-b",
+    "runId": "run-b",
+    "capturedAtUtc": "2026-03-22T01:00:00Z",
+    "sessionContext": {
+        "scope": "workspace",
+        "representation": "summary-only",
+        "summary": "Second deterministic local summary.",
+        "rawTranscriptPersisted": false
+  }
+}
+"#,
+    )
+    .expect("write record-b fixture");
+    fs::write(
+        &input_c,
+        r#"{
+    "artifactKind": "summary-only-session-context-envelope",
+    "requestId": "request-c",
+    "runId": "run-c",
+    "capturedAtUtc": "2026-03-22T02:00:00Z",
+    "sessionContext": {
+        "scope": "workspace",
+        "representation": "summary-only",
+        "summary": "Third deterministic local summary.",
+        "rawTranscriptPersisted": false
+  }
+}
+"#,
+    )
+    .expect("write record-c fixture");
+
+    let init = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "init",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy local init");
+    assert!(
+        init.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&init.stderr)
+    );
+
+    let import_a = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "import",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--input",
+            input_a.to_str().expect("utf-8 input path"),
+            "--record-id",
+            "record-a",
+            "--imported-at-utc",
+            "2026-03-23T00:00:00Z",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy local import record-a");
+    assert!(
+        import_a.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&import_a.stderr)
+    );
+    let import_a_repeat = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "import",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--input",
+            input_a.to_str().expect("utf-8 input path"),
+            "--record-id",
+            "record-a",
+            "--imported-at-utc",
+            "2026-03-23T00:00:00Z",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("repeat import record-a");
+    assert_eq!(import_a.stdout, import_a_repeat.stdout);
+
+    for (record_id, imported_at_utc, input_path) in [
+        ("record-b", "2026-03-23T01:00:00Z", &input_b),
+        ("record-c", "2026-03-23T02:00:00Z", &input_c),
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+            .args([
+                "local",
+                "import",
+                "--root",
+                root.to_str().expect("utf-8 root path"),
+                "--input",
+                input_path.to_str().expect("utf-8 input path"),
+                "--record-id",
+                record_id,
+                "--imported-at-utc",
+                imported_at_utc,
+                "--format",
+                "json",
+            ])
+            .output()
+            .expect("run local import");
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+    }
+
+    let supersede = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "supersede",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-a",
+            "--superseded-by-record-id",
+            "record-b",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local supersede");
+    assert!(
+        supersede.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&supersede.stderr)
+    );
+
+    let tombstone = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "tombstone",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-c",
+            "--tombstoned-at-utc",
+            "2026-03-24T00:00:00Z",
+            "--reason",
+            "Local tombstone for deterministic test coverage.",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local tombstone");
+    assert!(
+        tombstone.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&tombstone.stderr)
+    );
+
+    let default_list = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "list",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local list default");
+    assert!(
+        default_list.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&default_list.stderr)
+    );
+    let default_stdout = String::from_utf8(default_list.stdout).expect("stdout should be utf-8");
+    assert!(default_stdout.contains("\"recordId\": \"record-b\""));
+    assert!(!default_stdout.contains("\"recordId\": \"record-a\""));
+    assert!(!default_stdout.contains("\"recordId\": \"record-c\""));
+    assert!(default_stdout.contains("local non-authoritative artifact management only"));
+
+    let show_hidden = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "show",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-a",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local show hidden record");
+    assert!(!show_hidden.status.success());
+    let show_hidden_stdout = String::from_utf8(show_hidden.stdout).expect("stdout should be utf-8");
+    assert!(show_hidden_stdout.contains("CLI-LOCAL-006"));
+
+    let list_all_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "list",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--include-superseded",
+            "--include-tombstoned",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local list all one");
+    let list_all_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "list",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--include-superseded",
+            "--include-tombstoned",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local list all two");
+    assert_eq!(list_all_one.stdout, list_all_two.stdout);
+    let list_all_stdout = String::from_utf8(list_all_one.stdout).expect("stdout should be utf-8");
+    let index_a = list_all_stdout
+        .find("\"recordId\": \"record-a\"")
+        .expect("record-a in list");
+    let index_b = list_all_stdout
+        .find("\"recordId\": \"record-b\"")
+        .expect("record-b in list");
+    let index_c = list_all_stdout
+        .find("\"recordId\": \"record-c\"")
+        .expect("record-c in list");
+    assert!(index_a < index_b && index_b < index_c);
+
+    let show_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "show",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-b",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local show one");
+    let show_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "show",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-b",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local show two");
+    assert_eq!(show_one.stdout, show_two.stdout);
+
+    let export_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "export",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-b",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local export one");
+    let export_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "local",
+            "export",
+            "--root",
+            root.to_str().expect("utf-8 root path"),
+            "--record-id",
+            "record-b",
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run local export two");
+    assert_eq!(export_one.stdout, export_two.stdout);
+
+    let export_path = root
+        .join("exports")
+        .join("record-b.summary-only-session-context-envelope.json");
+    let exported_contents = fs::read_to_string(export_path).expect("read exported artifact");
+    assert!(exported_contents.contains("summary-only-session-context-envelope"));
 }

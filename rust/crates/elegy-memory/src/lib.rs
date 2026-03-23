@@ -1,20 +1,52 @@
+pub mod cli;
+mod local_store;
+
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
-use time::{format_description::well_known::Rfc3339, OffsetDateTime};
+use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
+
+pub use local_store::{
+    LocalMemoryCatalog, LocalMemoryCatalogEntry, LocalMemoryExportResult, LocalMemoryPaths,
+    LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoreInitResult,
+    LocalMemoryStoredRecord, LOCAL_MEMORY_ARTIFACTS_DIR, LOCAL_MEMORY_AUTHORITY_POSTURE,
+    LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_EXPORTS_DIR,
+    LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
+    LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
+};
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =
     "summary-only-session-context-envelope";
+pub const GOVERNED_MEMORY_RECORD_ARTIFACT_KIND: &str = "governed-memory-record";
+pub const GOVERNED_MEMORY_RECORD_PROJECTION_ARTIFACT_KIND: &str =
+    "governed-memory-record-projection";
 pub const SUMMARY_ONLY_REPRESENTATION: &str = "summary-only";
+pub const MEMORY_PROJECTION_RULES_VERSION: &str = "1.0.0";
 pub const MAX_SUMMARY_LENGTH: usize = 4_000;
 pub const MAX_SALIENT_FACTS: usize = 16;
 pub const MAX_INSTRUCTION_CONTEXT_ITEMS: usize = 8;
 pub const MAX_CONTEXT_ITEM_LENGTH: usize = 280;
+pub const MAX_MEMORY_RECORD_ID_LENGTH: usize = 128;
+pub const MAX_MEMORY_SORT_KEY_LENGTH: usize = 280;
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum MemoryArtifactKind {
     #[default]
     #[serde(rename = "summary-only-session-context-envelope")]
     SummaryOnlySessionContextEnvelope,
+    #[serde(rename = "governed-memory-record")]
+    GovernedMemoryRecord,
+    #[serde(rename = "governed-memory-record-projection")]
+    GovernedMemoryRecordProjection,
+}
+
+impl MemoryArtifactKind {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SummaryOnlySessionContextEnvelope => SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+            Self::GovernedMemoryRecord => GOVERNED_MEMORY_RECORD_ARTIFACT_KIND,
+            Self::GovernedMemoryRecordProjection => GOVERNED_MEMORY_RECORD_PROJECTION_ARTIFACT_KIND,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -25,11 +57,57 @@ pub enum SessionContextScope {
     Workspace,
 }
 
+impl SessionContextScope {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Run => "run",
+            Self::Session => "session",
+            Self::Workspace => "workspace",
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 pub enum SessionContextRepresentation {
     #[default]
     #[serde(rename = "summary-only")]
     SummaryOnly,
+}
+
+impl SessionContextRepresentation {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SummaryOnly => SUMMARY_ONLY_REPRESENTATION,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum LocalMemoryLifecycleState {
+    #[default]
+    Active,
+    Superseded,
+    Tombstoned,
+}
+
+impl LocalMemoryLifecycleState {
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Active => "active",
+            Self::Superseded => "superseded",
+            Self::Tombstoned => "tombstoned",
+        }
+    }
+
+    pub const fn can_transition_to(self, next: Self) -> bool {
+        matches!(
+            (self, next),
+            (Self::Active, Self::Superseded)
+                | (Self::Active, Self::Tombstoned)
+                | (Self::Superseded, Self::Tombstoned)
+        )
+    }
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
@@ -67,6 +145,11 @@ impl SummaryOnlySessionContext {
     }
 
     pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_constant_string(
+            "sessionContext.representation",
+            self.representation.as_str(),
+            SUMMARY_ONLY_REPRESENTATION,
+        )?;
         validate_bounded_string("sessionContext.summary", &self.summary, MAX_SUMMARY_LENGTH)?;
         validate_bounded_items(
             "sessionContext.salientFacts",
@@ -150,6 +233,11 @@ impl SummaryOnlySessionContextEnvelope {
     }
 
     pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_constant_string(
+            "artifactKind",
+            self.artifact_kind.as_str(),
+            SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+        )?;
         validate_optional_non_empty("requestId", &self.request_id)?;
         validate_optional_non_empty("runId", &self.run_id)?;
         validate_optional_rfc3339("capturedAtUtc", &self.captured_at_utc)?;
@@ -188,6 +276,632 @@ impl<'de> Deserialize<'de> for SummaryOnlySessionContextEnvelope {
     }
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryRecordProvenance {
+    pub source_artifact_kind: MemoryArtifactKind,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub request_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub run_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub captured_at_utc: Option<String>,
+    pub imported_at_utc: String,
+    pub projection_rules_version: String,
+}
+
+impl MemoryRecordProvenance {
+    fn validated(self) -> Result<Self, MemoryValidationError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_constant_string(
+            "provenance.sourceArtifactKind",
+            self.source_artifact_kind.as_str(),
+            SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+        )?;
+        validate_optional_non_empty("provenance.requestId", &self.request_id)?;
+        validate_optional_non_empty("provenance.runId", &self.run_id)?;
+        validate_optional_rfc3339("provenance.capturedAtUtc", &self.captured_at_utc)?;
+        validate_rfc3339("provenance.importedAtUtc", &self.imported_at_utc)?;
+        validate_constant_string(
+            "provenance.projectionRulesVersion",
+            &self.projection_rules_version,
+            MEMORY_PROJECTION_RULES_VERSION,
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MemoryRecordProvenanceWire {
+    source_artifact_kind: MemoryArtifactKind,
+    #[serde(default)]
+    request_id: Option<String>,
+    #[serde(default)]
+    run_id: Option<String>,
+    #[serde(default)]
+    captured_at_utc: Option<String>,
+    imported_at_utc: String,
+    projection_rules_version: String,
+}
+
+impl<'de> Deserialize<'de> for MemoryRecordProvenance {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = MemoryRecordProvenanceWire::deserialize(deserializer)?;
+        Self {
+            source_artifact_kind: wire.source_artifact_kind,
+            request_id: wire.request_id,
+            run_id: wire.run_id,
+            captured_at_utc: wire.captured_at_utc,
+            imported_at_utc: wire.imported_at_utc,
+            projection_rules_version: wire.projection_rules_version,
+        }
+        .validated()
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryTombstoneMetadata {
+    pub tombstoned_at_utc: String,
+    pub reason: String,
+}
+
+impl MemoryTombstoneMetadata {
+    fn validated(self) -> Result<Self, MemoryValidationError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_rfc3339(
+            "localLifecycle.tombstone.tombstonedAtUtc",
+            &self.tombstoned_at_utc,
+        )?;
+        validate_bounded_string(
+            "localLifecycle.tombstone.reason",
+            &self.reason,
+            MAX_CONTEXT_ITEM_LENGTH,
+        )?;
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MemoryTombstoneMetadataWire {
+    tombstoned_at_utc: String,
+    reason: String,
+}
+
+impl<'de> Deserialize<'de> for MemoryTombstoneMetadata {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = MemoryTombstoneMetadataWire::deserialize(deserializer)?;
+        Self {
+            tombstoned_at_utc: wire.tombstoned_at_utc,
+            reason: wire.reason,
+        }
+        .validated()
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Default, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LocalMemoryLifecycle {
+    pub state: LocalMemoryLifecycleState,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub superseded_by_record_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tombstone: Option<MemoryTombstoneMetadata>,
+}
+
+impl LocalMemoryLifecycle {
+    pub fn active() -> Self {
+        Self::default()
+    }
+
+    fn validated(self) -> Result<Self, MemoryValidationError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_optional_bounded_string(
+            "localLifecycle.supersededByRecordId",
+            &self.superseded_by_record_id,
+            MAX_MEMORY_RECORD_ID_LENGTH,
+        )?;
+
+        match self.state {
+            LocalMemoryLifecycleState::Active => {
+                if self.superseded_by_record_id.is_some() {
+                    return Err(MemoryValidationError::UnexpectedLifecycleMetadata {
+                        field: "localLifecycle.supersededByRecordId",
+                        state: self.state.as_str(),
+                    });
+                }
+
+                if self.tombstone.is_some() {
+                    return Err(MemoryValidationError::UnexpectedLifecycleMetadata {
+                        field: "localLifecycle.tombstone",
+                        state: self.state.as_str(),
+                    });
+                }
+            }
+            LocalMemoryLifecycleState::Superseded => {
+                if self.superseded_by_record_id.is_none() {
+                    return Err(MemoryValidationError::MissingLifecycleMetadata {
+                        field: "localLifecycle.supersededByRecordId",
+                        state: self.state.as_str(),
+                    });
+                }
+
+                if self.tombstone.is_some() {
+                    return Err(MemoryValidationError::UnexpectedLifecycleMetadata {
+                        field: "localLifecycle.tombstone",
+                        state: self.state.as_str(),
+                    });
+                }
+            }
+            LocalMemoryLifecycleState::Tombstoned => {
+                let tombstone = self.tombstone.as_ref().ok_or(
+                    MemoryValidationError::MissingLifecycleMetadata {
+                        field: "localLifecycle.tombstone",
+                        state: self.state.as_str(),
+                    },
+                )?;
+                tombstone.validate()?;
+            }
+        }
+
+        Ok(())
+    }
+
+    pub fn transition_to_superseded(
+        &self,
+        superseded_by_record_id: impl Into<String>,
+    ) -> Result<Self, MemoryValidationError> {
+        let next_state = LocalMemoryLifecycleState::Superseded;
+        if !self.state.can_transition_to(next_state) {
+            return Err(MemoryValidationError::InvalidLifecycleTransition {
+                from: self.state.as_str(),
+                to: next_state.as_str(),
+            });
+        }
+
+        Self {
+            state: next_state,
+            superseded_by_record_id: Some(superseded_by_record_id.into()),
+            tombstone: None,
+        }
+        .validated()
+    }
+
+    pub fn transition_to_tombstoned(
+        &self,
+        tombstone: MemoryTombstoneMetadata,
+    ) -> Result<Self, MemoryValidationError> {
+        let next_state = LocalMemoryLifecycleState::Tombstoned;
+        if !self.state.can_transition_to(next_state) {
+            return Err(MemoryValidationError::InvalidLifecycleTransition {
+                from: self.state.as_str(),
+                to: next_state.as_str(),
+            });
+        }
+
+        Self {
+            state: next_state,
+            superseded_by_record_id: self.superseded_by_record_id.clone(),
+            tombstone: Some(tombstone),
+        }
+        .validated()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct LocalMemoryLifecycleWire {
+    state: LocalMemoryLifecycleState,
+    #[serde(default)]
+    superseded_by_record_id: Option<String>,
+    #[serde(default)]
+    tombstone: Option<MemoryTombstoneMetadata>,
+}
+
+impl<'de> Deserialize<'de> for LocalMemoryLifecycle {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = LocalMemoryLifecycleWire::deserialize(deserializer)?;
+        Self {
+            state: wire.state,
+            superseded_by_record_id: wire.superseded_by_record_id,
+            tombstone: wire.tombstone,
+        }
+        .validated()
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryRecordSortKeys {
+    pub scope_captured_at_record_id: String,
+    pub lifecycle_state_record_id: String,
+    pub superseded_by_record_id_or_self: String,
+}
+
+impl MemoryRecordSortKeys {
+    fn from_components(
+        record_id: &str,
+        scope: SessionContextScope,
+        provenance: &MemoryRecordProvenance,
+        local_lifecycle: &LocalMemoryLifecycle,
+    ) -> Result<Self, MemoryValidationError> {
+        let scope_value = scope.as_str();
+        let captured_at = canonical_sort_key_timestamp(
+            provenance.captured_at_utc.as_deref(),
+            provenance.imported_at_utc.as_str(),
+        )?;
+        let superseded_by = local_lifecycle
+            .superseded_by_record_id
+            .as_deref()
+            .unwrap_or(record_id);
+
+        Ok(Self {
+            scope_captured_at_record_id: format!("{scope_value}|{captured_at}|{record_id}"),
+            lifecycle_state_record_id: format!(
+                "{}|{scope_value}|{record_id}",
+                local_lifecycle.state.as_str()
+            ),
+            superseded_by_record_id_or_self: format!("{scope_value}|{superseded_by}|{record_id}"),
+        })
+    }
+
+    fn validate_matches(
+        &self,
+        record_id: &str,
+        scope: SessionContextScope,
+        provenance: &MemoryRecordProvenance,
+        local_lifecycle: &LocalMemoryLifecycle,
+    ) -> Result<(), MemoryValidationError> {
+        let expected = Self::from_components(record_id, scope, provenance, local_lifecycle)?;
+
+        validate_sort_key(
+            "deterministicSortKeys.scopeCapturedAtRecordId",
+            &self.scope_captured_at_record_id,
+            &expected.scope_captured_at_record_id,
+        )?;
+        validate_sort_key(
+            "deterministicSortKeys.lifecycleStateRecordId",
+            &self.lifecycle_state_record_id,
+            &expected.lifecycle_state_record_id,
+        )?;
+        validate_sort_key(
+            "deterministicSortKeys.supersededByRecordIdOrSelf",
+            &self.superseded_by_record_id_or_self,
+            &expected.superseded_by_record_id_or_self,
+        )?;
+
+        Ok(())
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct MemoryRecordSortKeysWire {
+    scope_captured_at_record_id: String,
+    lifecycle_state_record_id: String,
+    superseded_by_record_id_or_self: String,
+}
+
+impl<'de> Deserialize<'de> for MemoryRecordSortKeys {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = MemoryRecordSortKeysWire::deserialize(deserializer)?;
+        Ok(Self {
+            scope_captured_at_record_id: wire.scope_captured_at_record_id,
+            lifecycle_state_record_id: wire.lifecycle_state_record_id,
+            superseded_by_record_id_or_self: wire.superseded_by_record_id_or_self,
+        })
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GovernedMemoryRecordImportOptions {
+    pub record_id: String,
+    pub imported_at_utc: String,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedMemoryRecord {
+    pub artifact_kind: MemoryArtifactKind,
+    pub record_id: String,
+    pub session_context: SummaryOnlySessionContext,
+    pub provenance: MemoryRecordProvenance,
+    pub local_lifecycle: LocalMemoryLifecycle,
+    pub deterministic_sort_keys: MemoryRecordSortKeys,
+}
+
+impl GovernedMemoryRecord {
+    fn validated(self) -> Result<Self, MemoryValidationError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn import_summary_only_envelope(
+        envelope: &SummaryOnlySessionContextEnvelope,
+        options: GovernedMemoryRecordImportOptions,
+    ) -> Result<Self, MemoryValidationError> {
+        envelope.validate()?;
+        validate_bounded_string("recordId", &options.record_id, MAX_MEMORY_RECORD_ID_LENGTH)?;
+        validate_rfc3339("provenance.importedAtUtc", &options.imported_at_utc)?;
+        let imported_at_utc =
+            canonicalize_rfc3339_utc("provenance.importedAtUtc", &options.imported_at_utc)?;
+
+        let provenance = MemoryRecordProvenance {
+            source_artifact_kind: MemoryArtifactKind::SummaryOnlySessionContextEnvelope,
+            request_id: envelope.request_id.clone(),
+            run_id: envelope.run_id.clone(),
+            captured_at_utc: envelope.captured_at_utc.clone(),
+            imported_at_utc,
+            projection_rules_version: MEMORY_PROJECTION_RULES_VERSION.to_string(),
+        }
+        .validated()?;
+        let local_lifecycle = LocalMemoryLifecycle::active();
+        let deterministic_sort_keys = MemoryRecordSortKeys::from_components(
+            &options.record_id,
+            envelope.session_context.scope,
+            &provenance,
+            &local_lifecycle,
+        )?;
+
+        Self {
+            artifact_kind: MemoryArtifactKind::GovernedMemoryRecord,
+            record_id: options.record_id,
+            session_context: envelope.session_context.clone(),
+            provenance,
+            local_lifecycle,
+            deterministic_sort_keys,
+        }
+        .validated()
+    }
+
+    pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_constant_string(
+            "artifactKind",
+            self.artifact_kind.as_str(),
+            GOVERNED_MEMORY_RECORD_ARTIFACT_KIND,
+        )?;
+        validate_bounded_string("recordId", &self.record_id, MAX_MEMORY_RECORD_ID_LENGTH)?;
+        self.session_context.validate()?;
+        self.provenance.validate()?;
+        self.local_lifecycle.validate()?;
+        self.deterministic_sort_keys.validate_matches(
+            &self.record_id,
+            self.session_context.scope,
+            &self.provenance,
+            &self.local_lifecycle,
+        )
+    }
+
+    pub fn export_summary_only_envelope(
+        &self,
+    ) -> Result<SummaryOnlySessionContextEnvelope, MemoryValidationError> {
+        self.validate()?;
+
+        SummaryOnlySessionContextEnvelope {
+            artifact_kind: MemoryArtifactKind::SummaryOnlySessionContextEnvelope,
+            request_id: self.provenance.request_id.clone(),
+            run_id: self.provenance.run_id.clone(),
+            captured_at_utc: self.provenance.captured_at_utc.clone(),
+            session_context: self.session_context.clone(),
+        }
+        .validated()
+    }
+
+    pub fn project_summary_only_envelope(
+        &self,
+    ) -> Result<GovernedMemoryRecordProjection, MemoryValidationError> {
+        self.validate()?;
+
+        GovernedMemoryRecordProjection {
+            artifact_kind: MemoryArtifactKind::GovernedMemoryRecordProjection,
+            rules_version: MEMORY_PROJECTION_RULES_VERSION.to_string(),
+            source_record_id: self.record_id.clone(),
+            source_artifact_kind: MemoryArtifactKind::GovernedMemoryRecord,
+            target_artifact_kind: MemoryArtifactKind::SummaryOnlySessionContextEnvelope,
+            source_lifecycle_state: self.local_lifecycle.state,
+            deterministic_sort_key: self
+                .deterministic_sort_keys
+                .scope_captured_at_record_id
+                .clone(),
+            projected_envelope: self.export_summary_only_envelope()?,
+        }
+        .validated()
+    }
+
+    pub fn supersede(
+        &self,
+        superseded_by_record_id: impl Into<String>,
+    ) -> Result<Self, MemoryValidationError> {
+        self.with_local_lifecycle(
+            self.local_lifecycle
+                .transition_to_superseded(superseded_by_record_id)?,
+        )
+    }
+
+    pub fn tombstone(
+        &self,
+        tombstoned_at_utc: impl Into<String>,
+        reason: impl Into<String>,
+    ) -> Result<Self, MemoryValidationError> {
+        let tombstone = MemoryTombstoneMetadata {
+            tombstoned_at_utc: tombstoned_at_utc.into(),
+            reason: reason.into(),
+        }
+        .validated()?;
+
+        self.with_local_lifecycle(self.local_lifecycle.transition_to_tombstoned(tombstone)?)
+    }
+
+    fn with_local_lifecycle(
+        &self,
+        local_lifecycle: LocalMemoryLifecycle,
+    ) -> Result<Self, MemoryValidationError> {
+        let deterministic_sort_keys = MemoryRecordSortKeys::from_components(
+            &self.record_id,
+            self.session_context.scope,
+            &self.provenance,
+            &local_lifecycle,
+        )?;
+
+        Self {
+            artifact_kind: self.artifact_kind,
+            record_id: self.record_id.clone(),
+            session_context: self.session_context.clone(),
+            provenance: self.provenance.clone(),
+            local_lifecycle,
+            deterministic_sort_keys,
+        }
+        .validated()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GovernedMemoryRecordWire {
+    artifact_kind: MemoryArtifactKind,
+    record_id: String,
+    session_context: SummaryOnlySessionContext,
+    provenance: MemoryRecordProvenance,
+    local_lifecycle: LocalMemoryLifecycle,
+    deterministic_sort_keys: MemoryRecordSortKeys,
+}
+
+impl<'de> Deserialize<'de> for GovernedMemoryRecord {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = GovernedMemoryRecordWire::deserialize(deserializer)?;
+        Self {
+            artifact_kind: wire.artifact_kind,
+            record_id: wire.record_id,
+            session_context: wire.session_context,
+            provenance: wire.provenance,
+            local_lifecycle: wire.local_lifecycle,
+            deterministic_sort_keys: wire.deterministic_sort_keys,
+        }
+        .validated()
+        .map_err(serde::de::Error::custom)
+    }
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct GovernedMemoryRecordProjection {
+    pub artifact_kind: MemoryArtifactKind,
+    pub rules_version: String,
+    pub source_record_id: String,
+    pub source_artifact_kind: MemoryArtifactKind,
+    pub target_artifact_kind: MemoryArtifactKind,
+    pub source_lifecycle_state: LocalMemoryLifecycleState,
+    pub deterministic_sort_key: String,
+    pub projected_envelope: SummaryOnlySessionContextEnvelope,
+}
+
+impl GovernedMemoryRecordProjection {
+    fn validated(self) -> Result<Self, MemoryValidationError> {
+        self.validate()?;
+        Ok(self)
+    }
+
+    pub fn validate(&self) -> Result<(), MemoryValidationError> {
+        validate_constant_string(
+            "artifactKind",
+            self.artifact_kind.as_str(),
+            GOVERNED_MEMORY_RECORD_PROJECTION_ARTIFACT_KIND,
+        )?;
+        validate_constant_string(
+            "rulesVersion",
+            &self.rules_version,
+            MEMORY_PROJECTION_RULES_VERSION,
+        )?;
+        validate_bounded_string(
+            "sourceRecordId",
+            &self.source_record_id,
+            MAX_MEMORY_RECORD_ID_LENGTH,
+        )?;
+        validate_constant_string(
+            "sourceArtifactKind",
+            self.source_artifact_kind.as_str(),
+            GOVERNED_MEMORY_RECORD_ARTIFACT_KIND,
+        )?;
+        validate_constant_string(
+            "targetArtifactKind",
+            self.target_artifact_kind.as_str(),
+            SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+        )?;
+        validate_bounded_string(
+            "deterministicSortKey",
+            &self.deterministic_sort_key,
+            MAX_MEMORY_SORT_KEY_LENGTH,
+        )?;
+        self.projected_envelope.validate()
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct GovernedMemoryRecordProjectionWire {
+    artifact_kind: MemoryArtifactKind,
+    rules_version: String,
+    source_record_id: String,
+    source_artifact_kind: MemoryArtifactKind,
+    target_artifact_kind: MemoryArtifactKind,
+    source_lifecycle_state: LocalMemoryLifecycleState,
+    deterministic_sort_key: String,
+    projected_envelope: SummaryOnlySessionContextEnvelope,
+}
+
+impl<'de> Deserialize<'de> for GovernedMemoryRecordProjection {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let wire = GovernedMemoryRecordProjectionWire::deserialize(deserializer)?;
+        Self {
+            artifact_kind: wire.artifact_kind,
+            rules_version: wire.rules_version,
+            source_record_id: wire.source_record_id,
+            source_artifact_kind: wire.source_artifact_kind,
+            target_artifact_kind: wire.target_artifact_kind,
+            source_lifecycle_state: wire.source_lifecycle_state,
+            deterministic_sort_key: wire.deterministic_sort_key,
+            projected_envelope: wire.projected_envelope,
+        }
+        .validated()
+        .map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum MemoryValidationError {
     #[error("{field} must not be empty")]
@@ -215,10 +929,44 @@ pub enum MemoryValidationError {
     },
     #[error("{field} must be a valid RFC 3339 date-time")]
     InvalidDateTime { field: &'static str },
+    #[error("{field} must be `{expected}`")]
+    ConstantMismatch {
+        field: &'static str,
+        expected: &'static str,
+    },
     #[error(
         "sessionContext.rawTranscriptPersisted must be false for portable summary-only artifacts"
     )]
     RawTranscriptPersistedMustBeFalse,
+    #[error("{field} metadata is required when localLifecycle.state is `{state}`")]
+    MissingLifecycleMetadata {
+        field: &'static str,
+        state: &'static str,
+    },
+    #[error("{field} metadata is not allowed when localLifecycle.state is `{state}`")]
+    UnexpectedLifecycleMetadata {
+        field: &'static str,
+        state: &'static str,
+    },
+    #[error("local lifecycle transition `{from}` -> `{to}` is not allowed")]
+    InvalidLifecycleTransition {
+        from: &'static str,
+        to: &'static str,
+    },
+    #[error("{field} must match deterministic projection formula")]
+    DeterministicSortKeyMismatch { field: &'static str },
+}
+
+fn validate_constant_string(
+    field: &'static str,
+    value: &str,
+    expected: &'static str,
+) -> Result<(), MemoryValidationError> {
+    if value != expected {
+        return Err(MemoryValidationError::ConstantMismatch { field, expected });
+    }
+
+    Ok(())
 }
 
 fn validate_optional_non_empty(
@@ -232,13 +980,58 @@ fn validate_optional_non_empty(
     Ok(())
 }
 
+fn validate_optional_bounded_string(
+    field: &'static str,
+    value: &Option<String>,
+    max: usize,
+) -> Result<(), MemoryValidationError> {
+    if let Some(value) = value {
+        validate_bounded_string(field, value, max)?;
+    }
+
+    Ok(())
+}
+
+fn parse_rfc3339(
+    field: &'static str,
+    value: &str,
+) -> Result<OffsetDateTime, MemoryValidationError> {
+    OffsetDateTime::parse(value, &Rfc3339)
+        .map_err(|_| MemoryValidationError::InvalidDateTime { field })
+}
+
+fn validate_rfc3339(field: &'static str, value: &str) -> Result<(), MemoryValidationError> {
+    parse_rfc3339(field, value)?;
+
+    Ok(())
+}
+
+fn canonical_sort_key_timestamp(
+    captured_at_utc: Option<&str>,
+    imported_at_utc: &str,
+) -> Result<String, MemoryValidationError> {
+    match captured_at_utc {
+        Some(value) => canonicalize_rfc3339_utc("provenance.capturedAtUtc", value),
+        None => canonicalize_rfc3339_utc("provenance.importedAtUtc", imported_at_utc),
+    }
+}
+
+fn canonicalize_rfc3339_utc(
+    field: &'static str,
+    value: &str,
+) -> Result<String, MemoryValidationError> {
+    parse_rfc3339(field, value)?
+        .to_offset(UtcOffset::UTC)
+        .format(&Rfc3339)
+        .map_err(|_| MemoryValidationError::InvalidDateTime { field })
+}
+
 fn validate_optional_rfc3339(
     field: &'static str,
     value: &Option<String>,
 ) -> Result<(), MemoryValidationError> {
     if let Some(value) = value {
-        OffsetDateTime::parse(value, &Rfc3339)
-            .map_err(|_| MemoryValidationError::InvalidDateTime { field })?;
+        validate_rfc3339(field, value)?;
     }
 
     Ok(())
@@ -294,267 +1087,15 @@ fn validate_bounded_items(
     Ok(())
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn fixture_shape_deserializes_and_validates() {
-        let envelope: SummaryOnlySessionContextEnvelope = match serde_json::from_str(FIXTURE_JSON) {
-            Ok(value) => value,
-            Err(error) => panic!("fixture should deserialize: {error}"),
-        };
-
-        assert_eq!(
-            envelope.artifact_kind,
-            MemoryArtifactKind::SummaryOnlySessionContextEnvelope
-        );
-        assert_eq!(
-            envelope.session_context.scope,
-            SessionContextScope::Workspace
-        );
-        assert!(envelope.validate().is_ok());
+fn validate_sort_key(
+    field: &'static str,
+    actual: &str,
+    expected: &str,
+) -> Result<(), MemoryValidationError> {
+    validate_bounded_string(field, actual, MAX_MEMORY_SORT_KEY_LENGTH)?;
+    if actual != expected {
+        return Err(MemoryValidationError::DeterministicSortKeyMismatch { field });
     }
 
-    #[test]
-    fn constructor_serializes_canonical_strings() {
-        let context = match SummaryOnlySessionContext::new(
-            SessionContextScope::Session,
-            "Bounded summary for handoff.",
-        ) {
-            Ok(value) => value,
-            Err(error) => panic!("context should be valid: {error}"),
-        };
-
-        let envelope = match SummaryOnlySessionContextEnvelope::new(context) {
-            Ok(value) => value,
-            Err(error) => panic!("envelope should be valid: {error}"),
-        };
-
-        let value = match serde_json::to_value(&envelope) {
-            Ok(value) => value,
-            Err(error) => panic!("envelope should serialize: {error}"),
-        };
-
-        assert_eq!(
-            value
-                .get("artifactKind")
-                .and_then(serde_json::Value::as_str),
-            Some(SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND)
-        );
-        assert_eq!(
-            value
-                .get("sessionContext")
-                .and_then(|entry| entry.get("representation"))
-                .and_then(serde_json::Value::as_str),
-            Some(SUMMARY_ONLY_REPRESENTATION)
-        );
-        assert!(value.get("requestId").is_none());
-    }
-
-    #[test]
-    fn validation_rejects_durable_transcript_flags_and_oversized_lists() {
-        let invalid_context = SummaryOnlySessionContext {
-            scope: SessionContextScope::Run,
-            representation: SessionContextRepresentation::SummaryOnly,
-            summary: "short summary".to_string(),
-            salient_facts: vec!["fact".to_string(); MAX_SALIENT_FACTS + 1],
-            instruction_context: Vec::new(),
-            raw_transcript_persisted: true,
-        };
-
-        assert_eq!(
-            invalid_context.validate(),
-            Err(MemoryValidationError::TooManyItems {
-                field: "sessionContext.salientFacts",
-                max: MAX_SALIENT_FACTS,
-                actual: MAX_SALIENT_FACTS + 1,
-            })
-        );
-
-        let transcript_flag_context = SummaryOnlySessionContext {
-            scope: SessionContextScope::Run,
-            representation: SessionContextRepresentation::SummaryOnly,
-            summary: "short summary".to_string(),
-            salient_facts: Vec::new(),
-            instruction_context: Vec::new(),
-            raw_transcript_persisted: true,
-        };
-
-        assert_eq!(
-            transcript_flag_context.validate(),
-            Err(MemoryValidationError::RawTranscriptPersistedMustBeFalse)
-        );
-    }
-
-    #[test]
-    fn deserialization_rejects_unknown_transcript_fields() {
-        let top_level_error = serde_json::from_str::<SummaryOnlySessionContextEnvelope>(
-            r#"{
-    "artifactKind": "summary-only-session-context-envelope",
-    "capturedAtUtc": "2026-03-22T00:00:00Z",
-    "rawTranscript": "forbidden",
-    "sessionContext": {
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Portable summary only.",
-        "rawTranscriptPersisted": false
-    }
-}"#,
-        )
-        .expect_err("top-level transcript property should be rejected");
-
-        assert!(
-            top_level_error.to_string().contains("unknown field `rawTranscript`"),
-            "unexpected error: {top_level_error}"
-        );
-
-        let nested_error = serde_json::from_str::<SummaryOnlySessionContextEnvelope>(
-            r#"{
-    "artifactKind": "summary-only-session-context-envelope",
-    "capturedAtUtc": "2026-03-22T00:00:00Z",
-    "sessionContext": {
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Portable summary only.",
-        "rawTranscriptPersisted": false,
-        "transcript": "forbidden"
-    }
-}"#,
-        )
-        .expect_err("nested transcript property should be rejected");
-
-        assert!(
-            nested_error.to_string().contains("unknown field `transcript`"),
-            "unexpected error: {nested_error}"
-        );
-    }
-
-    #[test]
-    fn validation_rejects_invalid_captured_at_utc() {
-        let envelope = SummaryOnlySessionContextEnvelope {
-            artifact_kind: MemoryArtifactKind::SummaryOnlySessionContextEnvelope,
-            request_id: None,
-            run_id: None,
-            captured_at_utc: Some("not-a-date-time".to_string()),
-            session_context: SummaryOnlySessionContext {
-                scope: SessionContextScope::Session,
-                representation: SessionContextRepresentation::SummaryOnly,
-                summary: "Portable summary only.".to_string(),
-                salient_facts: Vec::new(),
-                instruction_context: Vec::new(),
-                raw_transcript_persisted: false,
-            },
-        };
-
-        assert_eq!(
-            envelope.validate(),
-            Err(MemoryValidationError::InvalidDateTime {
-                field: "capturedAtUtc",
-            })
-        );
-    }
-
-    #[test]
-    fn deserialization_rejects_schema_invalid_payloads() {
-        let overlong_summary = "x".repeat(MAX_SUMMARY_LENGTH + 1);
-        let too_many_salient_facts = (0..=MAX_SALIENT_FACTS)
-            .map(|index| format!("fact-{index}"))
-            .collect::<Vec<_>>();
-
-        let cases = vec![
-            (
-                "capturedAtUtc format",
-                r#"{
-    "artifactKind": "summary-only-session-context-envelope",
-    "capturedAtUtc": "not-a-date-time",
-    "sessionContext": {
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Portable summary only.",
-        "rawTranscriptPersisted": false
-    }
-}"#
-                .to_string(),
-                "capturedAtUtc must be a valid RFC 3339 date-time",
-            ),
-            (
-                "rawTranscriptPersisted const false",
-                r#"{
-    "artifactKind": "summary-only-session-context-envelope",
-    "sessionContext": {
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Portable summary only.",
-        "rawTranscriptPersisted": true
-    }
-}"#
-                .to_string(),
-                "sessionContext.rawTranscriptPersisted must be false",
-            ),
-            (
-                "summary string bounds",
-                format!(
-                    r#"{{
-    "artifactKind": "summary-only-session-context-envelope",
-    "sessionContext": {{
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "{overlong_summary}",
-        "rawTranscriptPersisted": false
-    }}
-}}"#,
-                ),
-                "sessionContext.summary exceeds max length",
-            ),
-            (
-                "salientFacts array bounds",
-                format!(
-                    r#"{{
-    "artifactKind": "summary-only-session-context-envelope",
-    "sessionContext": {{
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Portable summary only.",
-        "salientFacts": {},
-        "rawTranscriptPersisted": false
-    }}
-}}"#,
-                    serde_json::to_string(&too_many_salient_facts)
-                        .expect("salientFacts fixture should serialize")
-                ),
-                "sessionContext.salientFacts exceeds max items",
-            ),
-        ];
-
-        for (name, json, expected_message) in cases {
-            let error = serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&json)
-                .unwrap_err();
-
-            assert!(
-                error.to_string().contains(expected_message),
-                "{name} should fail during deserialization with `{expected_message}`, got `{error}`"
-            );
-        }
-    }
-
-    const FIXTURE_JSON: &str = r#"{
-    "artifactKind": "summary-only-session-context-envelope",
-    "requestId": "request-1",
-    "runId": "run-1",
-    "capturedAtUtc": "2026-03-22T00:00:00Z",
-    "sessionContext": {
-        "scope": "workspace",
-        "representation": "summary-only",
-        "summary": "Workspace context persists only bounded summaries for instruction assembly and follow-on agent runs.",
-        "salientFacts": [
-            "Persist summary and context artifacts only.",
-            "Raw execution logs remain transient and are not stored durably."
-    ],
-        "instructionContext": [
-            "Use this summary context when assembling workspace-level instructions."
-    ],
-        "rawTranscriptPersisted": false
-  }
-}"#;
+    Ok(())
 }

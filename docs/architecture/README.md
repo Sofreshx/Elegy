@@ -10,6 +10,7 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Rust consolidation](rust-consolidation.md) - current cleanup baseline for governed roots, exports, and Rust executable ownership
 - [Substrate governance](substrate-governance.md) - active artifact/runtime boundary and validation rules
 - [Skill Core V1](skill-core-v1.md) - current skill authority split between governed artifacts and Rust executable behavior
+- [Elegy-memory V1](elegy-memory-v1.md) - shipped local memory surface under `elegy-memory`, authority chain, and retention/removal semantics
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Terminology](terminology.md) - neutral vocabulary for artifact authority, projections, and runtime ownership
 

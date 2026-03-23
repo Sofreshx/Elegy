@@ -1,15 +1,35 @@
 {
   "matrixVersion": "1.0.0",
   "generatedAtUtc": "2026-03-22T00:00:00Z",
+  "plannedFamilies": [
+    {
+      "name": "elegy-memory-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.2.0 <2.0.0",
+      "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
+      "existingArtifactsUnchanged": [
+        "summary-only-session-context-envelope"
+      ],
+      "authorityReservations": [
+        "SAASTools currentness",
+        "SAASTools approval",
+        "SAASTools freshness policy",
+        "SAASTools retrieval ranking",
+        "SAASTools runtime validation",
+        "SAASTools promotion authority"
+      ]
+    }
+  ],
   "entries": [
     {
       "holonVersionRange": ">=0.1.0 <0.2.0",
       "instructionEngineVersionRange": ">=0.1.0 <0.2.0",
-      "elegyPackageVersionRange": ">=1.1.0 <2.0.0",
+      "elegyPackageVersionRange": ">=1.2.0 <2.0.0",
       "elegySchemaVersionRange": ">=1.0.0 <2.0.0",
       "policySchemaVersionRange": null,
       "supportLevel": "supported",
-      "notes": "Publishes bundle 1.1.0 as an additive update: agent-response-envelope stays on the 1.x line with optional sessionContext metadata, and the dedicated summary-only-session-context-envelope durable artifact carries the bounded no-transcript guarantee."
+      "notes": "Publishes bundle 1.2.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, and Elegy-memory V1 adds bounded local non-authoritative import, list, show, export, supersede, and tombstone semantics while SAASTools retains currentness, approval, freshness policy, retrieval ranking, runtime validation, and promotion authority."
     }
   ]
 }

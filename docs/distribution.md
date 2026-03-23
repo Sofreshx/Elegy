@@ -2,7 +2,9 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The reusable executable surface is the existing `elegy` CLI built from `rust/crates/elegy-cli`.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The published general host CLI surface remains the existing `elegy` CLI built from `rust/crates/elegy-cli`.
+
+The bounded local memory operator itself now lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. The shared `elegy` CLI keeps only a temporary compatibility bridge for legacy memory commands, and this document does not add a separate memory release-asset claim.
 
 ## Asset model
 
@@ -42,6 +44,13 @@ Current governed workflow artifacts in that bundle include both the portable wor
 - `canonical-workflow-graph.schema.json`
 - `fixtures/canonical-workflow.minimal.json`
 - `fixtures/canonical-workflow-graph.minimal.json`
+
+Current governed memory-skill artifacts in that bundle include:
+
+- `fixtures/skill-definition.elegy-memory.json`
+- `fixtures/skill-discovery-index.elegy-memory.json`
+
+The repo also materializes `.github/skills/elegy-memory/SKILL.md` for contributor routing over the `elegy-memory` surface. That markdown file is a repo-local non-authoritative render and is not part of the governed contracts bundle.
 
 ## CLI archive
 

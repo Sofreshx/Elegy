@@ -1,0 +1,171 @@
+{
+  "id": "elegy-memory",
+  "name": "elegy-memory",
+  "description": "Governed skill definition for the shipped Elegy-memory V1 surface: summary-only session-context inspection and validation plus local non-authoritative artifact import, list, show, export, supersede, and tombstone flows.",
+  "identity": {
+    "definitionId": "elegy-memory",
+    "displayName": "Elegy Memory",
+    "namespace": "elegy",
+    "version": "1.0.0",
+    "aliases": [
+      "memory",
+      "session-context",
+      "local-memory"
+    ]
+  },
+  "metadata": {
+    "summary": "Bounded local non-authoritative artifact management over governed summary-only session-context envelopes.",
+    "category": "memory",
+    "tags": [
+      "memory",
+      "session-context",
+      "summary-only",
+      "local-store",
+      "non-authoritative"
+    ],
+    "owners": [
+      "elegy"
+    ],
+    "documentationUri": "docs/architecture/elegy-memory-v1.md"
+  },
+  "triggers": [
+    {
+      "pattern": "memory",
+      "description": "When work involves Elegy's bounded summary-only memory surface."
+    },
+    {
+      "pattern": "session context",
+      "description": "When inspecting or validating governed summary-only session-context envelopes."
+    },
+    {
+      "pattern": "local memory",
+      "description": "When managing the local non-authoritative artifact store."
+    },
+    {
+      "pattern": "supersede memory artifact",
+      "description": "When recording local lineage that one artifact copy supersedes another."
+    },
+    {
+      "pattern": "tombstone memory artifact",
+      "description": "When recording local withdrawal of an artifact copy without changing host runtime authority."
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "summary-only-envelope-import-only",
+      "description": "Local import accepts governed summary-only-session-context-envelope artifacts only.",
+      "required": true
+    },
+    {
+      "constraintId": "local-non-authoritative-surface",
+      "description": "This surface must not claim currentness, approval, freshness, retrieval ranking, runtime validation, or promotion authority.",
+      "required": true
+    },
+    {
+      "constraintId": "single-writer-local-store",
+      "description": "Local store mutations are single-writer; concurrent writers are rejected.",
+      "required": true
+    }
+  ],
+  "input": {
+    "parameters": [
+      {
+        "name": "command",
+        "type": "string",
+        "description": "One of inspect-session-context, validate-session-context, init, import, list, show, export, supersede, or tombstone.",
+        "required": true
+      },
+      {
+        "name": "root",
+        "type": "path",
+        "description": "Optional local artifact root. Defaults to .elegy-local-memory.",
+        "required": false
+      },
+      {
+        "name": "input",
+        "type": "path",
+        "description": "Path to a governed summary-only-session-context-envelope artifact for validation or local import.",
+        "required": false
+      },
+      {
+        "name": "recordId",
+        "type": "string",
+        "description": "Record identifier for show, export, supersede, or tombstone flows.",
+        "required": false
+      },
+      {
+        "name": "outputPath",
+        "type": "path",
+        "description": "Optional explicit export destination for exported summary-only envelopes.",
+        "required": false
+      },
+      {
+        "name": "importedAtUtc",
+        "type": "string",
+        "description": "UTC timestamp recorded during local import.",
+        "required": false
+      },
+      {
+        "name": "tombstonedAtUtc",
+        "type": "string",
+        "description": "UTC timestamp recorded for a local tombstone action.",
+        "required": false
+      },
+      {
+        "name": "reason",
+        "type": "string",
+        "description": "Required reason text for a local tombstone action.",
+        "required": false
+      }
+    ],
+    "schemaRef": null
+  },
+  "output": {
+    "resultType": null,
+    "schemaRef": null,
+    "returnsCollection": false,
+    "description": "Command-scoped inspection, validation, record, list, or export reports for the local non-authoritative memory surface."
+  },
+  "execution": {
+    "mode": "requestResponse",
+    "isDeterministic": false,
+    "hasSideEffects": true,
+    "timeoutSeconds": null
+  },
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [
+      "docs/migration/reusable-memory-boundary.md",
+      "docs/architecture/skill-core-v1.md"
+    ],
+    "allowedContexts": [
+      "contributor-routing",
+      "local-cli",
+      "artifact-inspection"
+    ]
+  },
+  "discovery": {
+    "keywords": [
+      "memory",
+      "session context",
+      "summary-only",
+      "local memory",
+      "supersede",
+      "tombstone"
+    ],
+    "capabilityHints": [
+      "summary-only-envelope-validation",
+      "local-artifact-management",
+      "lineage-annotation"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition.elegy-memory.json",
+    "sourceVersion": "1.0.0"
+  },
+  "lifecycleState": "active"
+}

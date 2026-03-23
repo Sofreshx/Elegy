@@ -17,6 +17,8 @@ That means:
 - `SKILL.md` materialization is an output format, not the source of truth
 - Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
 
+The shipped `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a rendered non-authoritative output only.
+
 ## Current executable ownership
 
 The Rust workspace owns the reusable executable path around those governed skill artifacts.

@@ -2,107 +2,96 @@
 
 ## Purpose
 
-This document gives the phase-1 reusable memory/context effort an explicit home in `Elegy`.
+This document defines the WU-001 boundary that now underpins the shipped `elegy-memory` V1 family.
 
-It defines the bounded split between neutral reusable memory authority that can later sit behind a CLI or other host-agnostic surface and the host-owned runtime behavior that remains in `SAASTools`.
+`Elegy` is limited to local, non-authoritative artifact-management semantics for governed reusable memory artifacts. `SAASTools` remains the runtime and policy authority.
 
-This is a planning and governance boundary, not a claim that a full reusable memory runtime already exists in `Elegy`.
+The existing `summary-only-session-context-envelope` remains unchanged. The shipped memory surface and its governed skill authority chain are documented in `../architecture/elegy-memory-v1.md`. This migration note keeps the extraction boundary and release posture separate from that implementation-facing entrypoint.
 
 ## Placement rule
 
-1. If the surface is a portable schema, fixture, manifest, compatibility artifact, or neutral provenance/freshness vocabulary that multiple hosts must consume consistently, it may belong in `Elegy`.
-2. If the surface depends on Holon or `SAASTools` retrieval policy, persistence, approvals, frontmatter parsing, promotion workflow, or product/runtime integration, it stays in `SAASTools`.
-3. Contract extraction comes before runtime extraction. Do not move a retrieval engine or broad mutation flow into `Elegy` before the governed artifact family is explicit and validated.
+1. Portable schemas, fixtures, manifests, compatibility metadata, and support metadata for reusable memory artifacts may live in `Elegy`.
+2. Local artifact-management semantics in `Elegy` are limited to import, list, show, export, supersede, and tombstone operations over governed artifacts.
+3. Those semantics are non-authoritative. They may describe local lineage or local artifact state, but they do not establish currentness, approval, freshness policy, retrieval ranking, runtime validity, or promotion.
+4. Retrieval pipelines, persistence stores, approval gates, frontmatter parsing, freshness policy, retrieval ranking, runtime validation, promotion, and production currentness remain in `SAASTools`.
+5. Contract and governance extraction comes before runtime extraction. Do not widen this phase into runtime/store ownership, broad mutation flows, or skill-authority changes.
 
-## Phase 1 home in Elegy
+## Shipped Elegy-memory V1 family
 
-For phase 1, `Elegy` is the bounded home for reusable memory/context work in these forms:
+The shipped `elegy-memory` V1 family is intentionally narrow:
 
-- governed schema families for portable memory/context records, summaries, or promotion descriptors
-- fixtures and manifests that prove portability and compatibility
-- neutral provenance, freshness, supersession, and invalidation vocabulary when those semantics must cross runtime boundaries
-- a later thin CLI-capable neutral substrate only after the contract family is explicit and the executable need is proven
+- portable contract and support metadata for reusable memory artifacts
+- local non-authoritative import semantics
+- local non-authoritative list and show semantics
+- local non-authoritative export semantics
+- local non-authoritative supersede and tombstone semantics
+
+This planned family does not add or imply:
+
+- current-artifact selection
+- approval inference or approval policy
+- freshness policy or freshness enforcement
+- retrieval ranking or host context shaping
+- runtime validation authority
+- promotion authority or production promotion workflow
+- persistence-store ownership or broad mutation workflows
 
 ## What belongs in Elegy vs stays in SAASTools
 
 | Concern | Placement | Notes |
 | --- | --- | --- |
-| Portable memory/context envelopes | `Elegy` | Governed artifacts under `contracts/` if multiple hosts must consume the same shape. |
-| Provenance, freshness, supersession, and invalidation metadata that travel across boundaries | `Elegy` | Keep the vocabulary neutral; host enforcement still stays local. |
+| Portable reusable-memory artifacts, fixtures, manifests, and support metadata | `Elegy` | Governed artifacts may live under `contracts/` and `governance/`. |
+| Local import, list, show, export, supersede, and tombstone semantics | `Elegy` | These semantics are local and non-authoritative only. |
 | Compatibility manifests and fixture corpus | `Elegy` | This is governed evidence, not app logic. |
-| Host retrieval pipeline, ranking, and context shaping | `SAASTools` | Retrieval remains host-owned and product-shaped. |
-| Persistence stores, promotion decisions, and mutation workflows | `SAASTools` | These remain product/runtime responsibilities. |
-| Approvals, frontmatter parsing, and policy gates | `SAASTools` | These are host and product behaviors, not neutral contract authority. |
-| Desktop app integration, session continuity, and user-facing runtime surfaces | `SAASTools` | Keep UI and runtime orchestration local. |
-| Broad workspace or user memory CLI mutation | `SAASTools` for now | Not part of the phase-1 `Elegy` scope. |
+| Currentness, approval, freshness policy, and retrieval ranking | `SAASTools` | These remain host-owned policy decisions. |
+| Runtime validation and promotion authority | `SAASTools` | `Elegy` does not become operational authority. |
+| Persistence stores, mutation workflows, and product runtime integration | `SAASTools` | These remain product/runtime responsibilities. |
+| Skill authority and `SKILL.md` governance | `Elegy` governed artifacts | Governed definition remains authoritative, discovery remains derived, and rendered `.github/skills/elegy-memory/SKILL.md` stays non-authoritative. |
 
-## First contract-family direction
+## Local non-authoritative artifact-management semantics
 
-The first bounded contract family should target portable promoted-memory artifacts rather than a full memory engine.
+Within this boundary, the planned meanings are:
 
-Start with a small artifact family such as:
+- `import`: ingest a governed artifact copy into a local `Elegy` surface without making it current, approved, fresh, or promotable
+- `list`: enumerate locally present governed artifacts and their declared lineage metadata
+- `show`: inspect a specific governed artifact and its declared lineage metadata
+- `export`: emit a portable copy of a governed artifact and its local lineage metadata
+- `supersede`: record local lineage that one local artifact copy supersedes another, without deciding runtime currentness
+- `tombstone`: record local withdrawal of a local artifact copy, without invalidating runtime use in `SAASTools`
 
-- a portable memory or context item envelope
-- provenance, freshness, supersession, and invalidation metadata blocks
-- a promotion or scope descriptor that classifies an item for work-unit, workspace, or user-level use
-- validation-state and approval metadata that can travel with promoted artifacts without moving validation authority out of `SAASTools`
+These are artifact-management semantics only. They are not host runtime decisions.
 
-Keep turn-local retrieval state, transcript indexing, storage layout, approvals, and mutation flows out of this first family.
+## Reserved to SAASTools
 
-The initial Rust landing zone for typed portable summary/context artifacts is `rust/crates/elegy-memory`, which should stay limited to neutral models and bounded validation helpers for governed reusable artifacts.
+`SAASTools` explicitly retains authority for:
 
-The first executable landing zone is the existing `rust/crates/elegy-cli` surface, but only as a thin read-only validation and inspection layer over those governed artifacts.
+- currentness
+- approval
+- freshness policy and freshness enforcement
+- retrieval ranking and runtime context shaping
+- runtime validation
+- promotion and production promotion
+- invalidation for runtime use
 
-## First bounded CLI slice
+No `Elegy` artifact, mirror, or local adapter may override those decisions.
 
-The first bounded CLI slice is now explicitly limited to read-only summary-only session-context inspection and validation.
+## Release posture
 
-- primary command: `elegy validate session-context --input <path>`
-- companion contract view: `elegy inspect session-context`
-- accepted input: JSON for the governed `summary-only-session-context-envelope` only
-- validation mechanism: `elegy-memory` validated types and bounded field checks
-- output modes: bounded text and JSON reports
+The next memory-family change, when introduced, should be an additive minor release on the existing 1.x line because it adds bounded local artifact-management vocabulary without changing the existing `summary-only-session-context-envelope` or moving runtime authority out of `SAASTools`.
 
-This slice does not add or imply:
-
-- mutation, promotion, persistence, or invalidation behavior
-- resume orchestration, host retrieval, or current-artifact selection
-- approval inference, freshness decisions, or host policy enforcement
-- transcript-bearing payload support
-
-## Frozen phase-1 authority notes
-
-- `SAASTools` remains the planning and runtime authority for creation, validation, promotion, supersession decisions, freshness enforcement, and invalidation actions.
-- `elegy validate session-context` is a neutral artifact-shape validator, not a host validation authority. A passing result does not make an artifact current, approved, promotable, or non-stale.
-- `Elegy` provides neutral vocabulary and contract shapes for durable artifacts above turn scope, but it does not become the source of truth for host retrieval or policy.
-- The phase-1 work-unit summary is treated as a distinct durable artifact, not merely a projected session summary, because resume and supersession chains need a stable portable shape.
-- User-scope promotion requires explicit per-item approval in phase 1; `Elegy` may define the approval-bearing artifact shape, but it does not grant or infer approval.
-- File-backed or mirrored adapters may serialize governed artifacts, but those adapters remain non-authoritative and cannot override host-owned validation or invalidation.
-
-## Validation checkpoints and adapter posture
-
-The phase-1 sequence is:
-
-1. `SAASTools` authors or exports candidate governed summary-only artifacts.
-2. `Elegy` validates only the neutral bounded artifact shape.
-3. `SAASTools` re-validates before runtime use, promotion, or invalidation decisions.
-4. Optional adapters may mirror or transport the artifact, but they do not become the source of truth.
-
-Adapter posture is intentionally conservative:
-
-- file-backed, mirrored, and bridge adapters are non-authoritative
-- read-only inspect/import/export flows are acceptable
-- mutation-capable adapter flows are out of scope for phase 1
-- no adapter may infer approval, currentness, freshness, supersession, or invalidation on behalf of `SAASTools`
+A major bump is reserved for a real breaking change to an already published contract or support promise.
 
 ## Non-claims
 
-- This does not claim that `Elegy` already owns Holon retrieval or persistence.
-- This does not authorize broad CLI mutation of workspace or user memory.
-- This does not assume embeddings, vector storage, or RAG as required substrate.
-- This does not move current-state truth out of `SAASTools/docs/system/**`.
+- This does not claim that `Elegy` owns retrieval, ranking, validation, promotion, or persistence.
+- This does not authorize broad workspace or user-memory mutation.
+- This does not change the existing summary-only session-context envelope.
+- This does not make rendered `SKILL.md` output authoritative.
+- This does not add runtime/store/CLI implementation beyond boundary and governance updates.
 
 ## Related
 
+- [Elegy-memory V1](../architecture/elegy-memory-v1.md)
 - [Extraction Matrix](extraction-matrix.md)
+- [Research note: memory retention and removal guidance](../research/elegy-memory-retention-removal.md)
 - [Elegy Substrate Governance](../architecture/substrate-governance.md)

@@ -734,7 +734,10 @@ pub fn export_contract_bundle(
     relative_files.insert(PathBuf::from("compatibility-matrix.json"));
 
     for relative_path in &relative_files {
-        require_file(&resolve_contracts_source_path(&contracts_source_dir, relative_path))?;
+        require_file(&resolve_contracts_source_path(
+            &contracts_source_dir,
+            relative_path,
+        ))?;
     }
 
     let output_path = output_dir
@@ -1169,9 +1172,7 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                 .as_ref()
                 .is_none_or(|delta| delta.trim().is_empty())
             {
-                issues.push(
-                    "Delta agent events must include non-empty delta content.".to_string(),
-                );
+                issues.push("Delta agent events must include non-empty delta content.".to_string());
             }
         }
         AgentEventType::MessageCompleted | AgentEventType::ReasoningCompleted => {
@@ -1181,9 +1182,7 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                 .as_ref()
                 .is_none_or(|content| content.trim().is_empty())
             {
-                issues.push(
-                    "Completed message events must include non-empty content.".to_string(),
-                );
+                issues.push("Completed message events must include non-empty content.".to_string());
             }
         }
         AgentEventType::ToolCallStarted => {
@@ -1211,9 +1210,7 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                 .as_ref()
                 .is_none_or(|tool_call_id| tool_call_id.trim().is_empty())
             {
-                issues.push(
-                    "Tool call completed events must include a tool call ID.".to_string(),
-                );
+                issues.push("Tool call completed events must include a tool call ID.".to_string());
             }
         }
         AgentEventType::Error | AgentEventType::RunFailed => {
@@ -1229,8 +1226,7 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                     .is_none_or(|code| code.trim().is_empty())
             {
                 issues.push(
-                    "Error agent events must include an error code or error message."
-                        .to_string(),
+                    "Error agent events must include an error code or error message.".to_string(),
                 );
             }
         }
@@ -1453,7 +1449,10 @@ fn has_duplicate_values<'a>(values: impl Iterator<Item = &'a str>) -> bool {
 }
 
 fn validate_agent_messages(messages: &[AgentMessage], label: &str, issues: &mut Vec<String>) {
-    if messages.iter().any(|message| message.content.trim().is_empty()) {
+    if messages
+        .iter()
+        .any(|message| message.content.trim().is_empty())
+    {
         issues.push(format!("{label} must include non-empty content."));
     }
 
@@ -1493,5 +1492,7 @@ fn usage_total_is_inconsistent(usage: &AgentUsage) -> bool {
     };
 
     usage.input_tokens.is_some_and(|value| value > total_tokens)
-        || usage.output_tokens.is_some_and(|value| value > total_tokens)
+        || usage
+            .output_tokens
+            .is_some_and(|value| value > total_tokens)
 }

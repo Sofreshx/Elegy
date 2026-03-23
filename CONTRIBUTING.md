@@ -25,6 +25,7 @@ Review:
 
 - [README.md](README.md)
 - [docs/architecture/README.md](docs/architecture/README.md)
+- [docs/architecture/elegy-memory-v1.md](docs/architecture/elegy-memory-v1.md) when changing governed memory or rendered skill surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
 - [docs/spec-baseline.md](docs/spec-baseline.md)
 - [SECURITY.md](SECURITY.md)
 
