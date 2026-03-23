@@ -95,6 +95,8 @@ Elegy should be consumed through versioned exported artifacts rather than local 
 
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
+- the existing `elegy` CLI is published as explicit release archives for `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
+- downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path>` to fetch the contracts bundle plus the matching host CLI archive without sibling checkouts or package feeds.
 - downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Release and versioning

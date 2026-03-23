@@ -5,17 +5,31 @@
     "governance/canonical-output-inventory.json",
     "governance/version-policy.json",
     "scripts/export-contracts.ps1",
+    "scripts/package-cli.ps1",
+    "scripts/install-distribution.ps1",
     "scripts/bump-version.ps1",
     "scripts/validate-canonical-outputs.ps1",
     "scripts/validate-package-boundaries.ps1"
   ],
   "rules": [
     {
-      "name": "neutral-authority-docs-and-export",
+      "name": "neutral-authority-docs",
       "files": [
         "README.md",
         "docs/distribution.md",
-        "docs/architecture/substrate-governance.md",
+        "docs/architecture/substrate-governance.md"
+      ],
+      "forbiddenPatterns": [
+        "src/Elegy\\.Formalization\\.Contracts/Resources",
+        "Directory\\.Build\\.props"
+      ],
+      "requiredPatterns": [
+        "contracts"
+      ]
+    },
+    {
+      "name": "export-script-is-version-policy-driven",
+      "files": [
         "scripts/export-contracts.ps1"
       ],
       "forbiddenPatterns": [
@@ -55,7 +69,7 @@
       ]
     },
     {
-      "name": "bundle-distribution-only",
+      "name": "distribution-release-surfaces-are-neutral",
       "files": [
         ".github/workflows/distribution-artifacts.yml",
         ".github/workflows/publish-distribution.yml"
@@ -71,7 +85,41 @@
       "requiredPatterns": [
         "validate-canonical-outputs\\.ps1",
         "export-contracts\\.ps1 -CreateArchive",
-        "elegy-contracts-\\*\\.zip"
+        "package-cli\\.ps1",
+        "elegy-contracts-\\*\\.zip",
+        "elegy-cli-\\*\\.zip"
+      ]
+    },
+    {
+      "name": "distribution-scripts-stay-generic",
+      "files": [
+        "scripts/package-cli.ps1",
+        "scripts/install-distribution.ps1"
+      ],
+      "forbiddenPatterns": [
+        "holon",
+        "SAASTools",
+        "nuget",
+        "\\.nupkg"
+      ],
+      "requiredPatterns": [
+        "elegy-cli"
+      ]
+    },
+    {
+      "name": "distribution-installer-handles-both-surfaces",
+      "files": [
+        "scripts/install-distribution.ps1"
+      ],
+      "forbiddenPatterns": [
+        "holon",
+        "SAASTools",
+        "nuget",
+        "\\.nupkg"
+      ],
+      "requiredPatterns": [
+        "elegy-contracts",
+        "elegy-cli"
       ]
     },
     {

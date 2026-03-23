@@ -5,6 +5,10 @@ use elegy_core::{
     CLI_SCHEMA_VERSION,
 };
 use elegy_host_mcp::{serve_stdio, HostError};
+use elegy_memory::{
+    SessionContextScope, SummaryOnlySessionContextEnvelope, SUMMARY_ONLY_REPRESENTATION,
+    SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+};
 use elegy_tooling::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path,
     generate_skills_from_descriptor_file, AuthorMcpDescriptorRequest, AuthorMcpToolRequest,
@@ -12,8 +16,19 @@ use elegy_tooling::{
 };
 use serde::Serialize;
 use serde_json::json;
+use std::fs;
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+
+const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
+const SESSION_CONTEXT_NEUTRAL_VALIDATION_SCOPE: &str =
+    "artifact-shape validation over the governed summary-only envelope only";
+const SESSION_CONTEXT_AUTHORITY_POSTURE: &str =
+    "non-authoritative CLI surface; host-owned authority remains in SAASTools";
+const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
+    "mirror-or-inspect-only; adapters cannot promote, invalidate, or override host-owned truth";
+const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy")]
@@ -101,6 +116,11 @@ enum GenerateCommand {
 enum ValidateCommand {
     Config,
     Runtime,
+    #[command(name = "session-context", alias = "memory")]
+    SessionContext {
+        #[arg(long)]
+        input: PathBuf,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -149,6 +169,33 @@ struct SessionContextInspection {
     transcript_bodies_allowed_in_artifact: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SessionContextValidationReport {
+    input_path: String,
+    artifact_kind: &'static str,
+    representation: &'static str,
+    scope: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    request_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    run_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    captured_at_utc: Option<String>,
+    summary_length: usize,
+    summary_preview: String,
+    salient_facts_count: usize,
+    instruction_context_count: usize,
+    raw_transcript_persisted: bool,
+    read_only: bool,
+    neutral_validation_scope: &'static str,
+    authority_posture: &'static str,
+    host_validation_owner: &'static str,
+    host_promotion_owner: &'static str,
+    host_invalidation_owner: &'static str,
+    adapter_posture: &'static str,
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     match run().await {
@@ -194,6 +241,9 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Validate {
             command: ValidateCommand::Runtime,
         } => execute_runtime_command(locator, cli.format, vec!["validate", "runtime"]),
+        Command::Validate {
+            command: ValidateCommand::SessionContext { input },
+        } => execute_validate_session_context_command(input, cli.format),
         Command::Inspect {
             command: InspectCommand::Resources,
         } => execute_runtime_command(locator, cli.format, vec!["inspect", "resources"]),
@@ -215,6 +265,74 @@ fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, ser
             status: "ok",
             summary: Summary::default(),
             data: inspection,
+            diagnostics: Vec::new(),
+        })?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_validate_session_context_command(
+    input: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let input_path = input.display().to_string();
+    let file_contents = match fs::read_to_string(&input) {
+        Ok(value) => value,
+        Err(error) => {
+            let diagnostic = Diagnostic::error(
+                "CLI-MEMORY-001",
+                format!("failed to read session-context artifact {}: {error}", input.display()),
+            )
+            .with_path(input_path.clone())
+            .with_hint("supply a readable JSON file containing a governed summary-only artifact");
+
+            return emit_diagnostics(
+                format,
+                vec!["validate", "session-context"],
+                vec![diagnostic],
+                json!({ "inputPath": input_path }),
+                "invalid",
+                ExitCode::from(1),
+            );
+        }
+    };
+
+    let artifact = match serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&file_contents) {
+        Ok(value) => value,
+        Err(error) => {
+            let diagnostic = Diagnostic::error(
+                "CLI-MEMORY-002",
+                format!(
+                    "failed to parse or validate summary-only session-context artifact {}: {error}",
+                    input.display()
+                ),
+            )
+            .with_path(input_path.clone())
+            .with_hint(
+                "only governed summary-only envelopes are supported; mutation, promotion, persistence, and transcript-bearing payloads are out of scope",
+            );
+
+            return emit_diagnostics(
+                format,
+                vec!["validate", "session-context"],
+                vec![diagnostic],
+                json!({ "inputPath": input_path }),
+                "invalid",
+                ExitCode::from(1),
+            );
+        }
+    };
+
+    let report = build_session_context_validation_report(&input, &artifact);
+    match format {
+        OutputFormat::Text => print_validated_session_context_text(&report),
+        OutputFormat::Json => print_json(&Envelope {
+            schema_version: CLI_SCHEMA_VERSION,
+            command: vec!["validate".to_string(), "session-context".to_string()],
+            status: "ok",
+            summary: Summary::default(),
+            data: report,
             diagnostics: Vec::new(),
         })?,
     }
@@ -527,6 +645,44 @@ fn print_session_context_text(inspection: &SessionContextInspection) {
     );
 }
 
+fn print_validated_session_context_text(report: &SessionContextValidationReport) {
+    println!("summary-only session context artifact is valid");
+    println!("input: {}", report.input_path);
+    println!("artifact kind: {}", report.artifact_kind);
+    println!("representation: {}", report.representation);
+    println!("scope: {}", report.scope);
+    if let Some(request_id) = &report.request_id {
+        println!("request id: {request_id}");
+    }
+    if let Some(run_id) = &report.run_id {
+        println!("run id: {run_id}");
+    }
+    if let Some(captured_at_utc) = &report.captured_at_utc {
+        println!("captured at utc: {captured_at_utc}");
+    }
+    println!("summary length: {}", report.summary_length);
+    println!("summary preview: {}", report.summary_preview);
+    println!("salient facts: {}", report.salient_facts_count);
+    println!(
+        "instruction context items: {}",
+        report.instruction_context_count
+    );
+    println!(
+        "raw transcript persisted: {}",
+        report.raw_transcript_persisted
+    );
+    println!("read only: {}", report.read_only);
+    println!(
+        "neutral validation scope: {}",
+        report.neutral_validation_scope
+    );
+    println!("authority posture: {}", report.authority_posture);
+    println!("host validation owner: {}", report.host_validation_owner);
+    println!("host promotion owner: {}", report.host_promotion_owner);
+    println!("host invalidation owner: {}", report.host_invalidation_owner);
+    println!("adapter posture: {}", report.adapter_posture);
+}
+
 fn session_context_inspection() -> SessionContextInspection {
     SessionContextInspection {
         capability: "summary-only-session-context-envelope",
@@ -544,6 +700,51 @@ fn session_context_inspection() -> SessionContextInspection {
         raw_transcript_persisted: false,
         transcript_bodies_allowed_in_artifact: false,
     }
+}
+
+fn build_session_context_validation_report(
+    input: &Path,
+    artifact: &SummaryOnlySessionContextEnvelope,
+) -> SessionContextValidationReport {
+    SessionContextValidationReport {
+        input_path: input.display().to_string(),
+        artifact_kind: SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+        representation: SUMMARY_ONLY_REPRESENTATION,
+        scope: format_scope(artifact.session_context.scope),
+        request_id: artifact.request_id.clone(),
+        run_id: artifact.run_id.clone(),
+        captured_at_utc: artifact.captured_at_utc.clone(),
+        summary_length: artifact.session_context.summary.chars().count(),
+        summary_preview: truncate_for_preview(&artifact.session_context.summary),
+        salient_facts_count: artifact.session_context.salient_facts.len(),
+        instruction_context_count: artifact.session_context.instruction_context.len(),
+        raw_transcript_persisted: artifact.session_context.raw_transcript_persisted,
+        read_only: true,
+        neutral_validation_scope: SESSION_CONTEXT_NEUTRAL_VALIDATION_SCOPE,
+        authority_posture: SESSION_CONTEXT_AUTHORITY_POSTURE,
+        host_validation_owner: SESSION_CONTEXT_HOST_OWNER,
+        host_promotion_owner: SESSION_CONTEXT_HOST_OWNER,
+        host_invalidation_owner: SESSION_CONTEXT_HOST_OWNER,
+        adapter_posture: SESSION_CONTEXT_ADAPTER_POSTURE,
+    }
+}
+
+fn format_scope(scope: SessionContextScope) -> &'static str {
+    match scope {
+        SessionContextScope::Run => "run",
+        SessionContextScope::Session => "session",
+        SessionContextScope::Workspace => "workspace",
+    }
+}
+
+fn truncate_for_preview(value: &str) -> String {
+    let char_count = value.chars().count();
+    if char_count <= SESSION_CONTEXT_PREVIEW_LIMIT {
+        return value.to_string();
+    }
+
+    let preview: String = value.chars().take(SESSION_CONTEXT_PREVIEW_LIMIT).collect();
+    format!("{preview}...")
 }
 
 fn print_authored_mcp_text(result: &AuthoredMcpDescriptor) {

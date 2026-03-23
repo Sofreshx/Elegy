@@ -15,7 +15,7 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  export:
+  export-contracts:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,8 +39,47 @@ jobs:
       - name: Upload distribution artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: elegy-distribution-${{ github.sha }}
+          name: elegy-contracts-${{ github.sha }}
           if-no-files-found: error
           path: |
             artifacts/contracts/**
             artifacts/distribution/elegy-contracts-*.zip
+
+  package-cli:
+    name: package cli (${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.88.0
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: rust -> rust/target
+
+      - name: Package CLI archive
+        shell: pwsh
+        run: |
+          ./scripts/package-cli.ps1 -Target '${{ matrix.target }}'
+
+      - name: Upload CLI distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-cli-${{ matrix.target }}-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/distribution/elegy-cli-*.zip

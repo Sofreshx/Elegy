@@ -353,6 +353,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "elegy-memory"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "time",
+]
+
+[[package]]
 name = "elegy-policy"
 version = "0.1.0"
 dependencies = [

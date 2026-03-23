@@ -2,6 +2,8 @@
 
 Scope: workflow formalization artifacts already changed or planned in SAASTools, including workflow models and sharing, WS3 governance scripts, and agent-orchestration-adjacent shapes.
 
+Companion note: the phase-1 reusable memory/context split is tracked in [reusable-memory-boundary.md](reusable-memory-boundary.md). Apply the same governed-artifacts-first rule there: portable envelopes, metadata, fixtures, and manifests may graduate into `Elegy`, while retrieval, persistence, approvals, frontmatter parsing, and product integration stay consumer-local in `SAASTools`.
+
 Decision rule: do not move code into Elegy unless it clearly proves why shared ownership is needed at all. Every candidate should be classified into one of these lanes:
 
 - `governed artifacts` — canonical schemas, fixtures, manifests, policies, or machine-readable exports that downstream consumers must consume consistently
