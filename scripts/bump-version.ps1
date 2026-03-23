@@ -20,6 +20,9 @@ $versionPolicyPath = Join-Path $repoRoot 'governance\version-policy.json'
 $schemaPath = Join-Path $repoRoot 'schemas\schema-version.json'
 $semVerRegex = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
 
+# Compatibility note: the Package* parameter names remain for CLI stability, but the
+# current authority model is file-native bundle/schema version governance.
+
 function Assert-SemVer {
     param(
         [string]$Value,
@@ -73,10 +76,10 @@ if (-not $versionPolicy.bundleVersion) {
     throw "governance/version-policy.json must include bundleVersion."
 }
 $currentPackageVersion = [string]$versionPolicy.bundleVersion
-Assert-SemVer -Value $currentPackageVersion -Name 'Current package version'
+Assert-SemVer -Value $currentPackageVersion -Name 'Current bundle version'
 
 if (-not $versionPolicy.manifestPackage.version) {
-    throw "governance/version-policy.json must include manifestPackage.version."
+    throw "governance/version-policy.json must include manifestPackage.version for legacy compatibility metadata."
 }
 
 $schemaJson = Get-Content -Raw -Path $schemaPath | ConvertFrom-Json
@@ -105,11 +108,11 @@ elseif ($SchemaBump) {
 
 if ((Get-Major -Version $nextSchemaVersion) -gt (Get-Major -Version $currentSchemaVersion) -and
     (Get-Major -Version $nextPackageVersion) -le (Get-Major -Version $currentPackageVersion)) {
-    throw "Schema major bump detected ($currentSchemaVersion -> $nextSchemaVersion). Package major must also increase ($currentPackageVersion -> $nextPackageVersion is invalid)."
+    throw "Schema major bump detected ($currentSchemaVersion -> $nextSchemaVersion). Bundle major must also increase ($currentPackageVersion -> $nextPackageVersion is invalid)."
 }
 
-Write-Host "Current package version: $currentPackageVersion"
-Write-Host "Next package version:    $nextPackageVersion"
+Write-Host "Current bundle version:  $currentPackageVersion"
+Write-Host "Next bundle version:     $nextPackageVersion"
 Write-Host "Current schema version:  $currentSchemaVersion"
 Write-Host "Next schema version:     $nextSchemaVersion"
 
@@ -126,4 +129,4 @@ $versionPolicy | ConvertTo-Json -Depth 10 | Set-Content -Path $versionPolicyPath
 $schemaJson.schemaVersion = $nextSchemaVersion
 $schemaJson | ConvertTo-Json -Depth 10 | Set-Content -Path $schemaPath
 
-Write-Host 'Updated version files successfully.'
+Write-Host 'Updated version-policy and schema-version files successfully.'

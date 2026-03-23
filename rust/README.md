@@ -9,8 +9,10 @@ Its job is to implement behavior-heavy runtime concerns that are better served b
 Imported or added so far:
 
 - `elegy-contracts`
+- `elegy-memory`
 - `elegy-policy`
 - `elegy-mcp`
+- `elegy-skills`
 - `elegy-tooling`
 - `elegy-descriptor`
 - `elegy-adapter-fs`
@@ -34,6 +36,7 @@ These crates currently provide:
 - family-neutral runtime composition and a caller-facing core facade over descriptor, policy, adapters, and MCP consumers
 - a thin stdio MCP host that serves runtime-composed resources from the imported core/runtime layers
 - a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, MCP-to-skill generation, and stdio host startup
+- dedicated thin CLIs for bounded local memory, dedicated MCP descriptor authoring/analysis, and dedicated MCP-to-skill generation
 
 ## Current posture
 
@@ -43,6 +46,7 @@ The bootstrap runtime stack is now imported in-repo from contracts through opera
 - runtime and core remain the reusable composition surfaces
 - `elegy-host-mcp` stays thin over `elegy-core`
 - `elegy-cli` stays thin over `elegy-core` plus the stdio host entrypoint
+- `elegy-memory`, `elegy-mcp`, and `elegy-skills` stay thin over their owned library/tooling surfaces
 
 The next work in this subtree should focus on hardening and operating these imported surfaces in-repo rather than rebuilding them in parallel elsewhere.
 

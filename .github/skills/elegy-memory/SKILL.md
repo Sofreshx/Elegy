@@ -1,21 +1,21 @@
 ---
 name: elegy-memory
-description: "Rendered local skill for Elegy's shipped memory V1 surface. Use for summary-only session-context inspection or validation and local non-authoritative artifact import, list, show, export, supersede, and tombstone flows."
+description: "Repo-local non-authoritative contributor-routing file for Elegy's implemented in-repo memory V1 surface. Use for summary-only session-context inspection or validation and local non-authoritative artifact import, list, show, export, supersede, and tombstone flows."
 ---
 
 # Elegy Memory
 
-This file is a rendered, non-authoritative output.
+This file is a repo-local, non-authoritative contributor-routing output.
 
 The authority chain is one-way:
 
 1. `contracts/fixtures/skill-definition.elegy-memory.json` is the governed source of truth.
 2. `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed discovery projection derived from that definition.
-3. `.github/skills/elegy-memory/SKILL.md` is a contributor-facing render only.
+3. `.github/skills/elegy-memory/SKILL.md` is a repo-local contributor-routing file only.
 
 ## When to use
 
-- Prefer the dedicated `elegy-memory` binary for the shipped bounded memory surface.
+- Prefer the dedicated `elegy-memory` binary for the implemented in-repo bounded memory surface.
 - Inspect the governed summary-only session-context contract with `elegy-memory inspect`.
 - Validate a summary-only session-context artifact with `elegy-memory validate --input <path>`.
 - Initialize or inspect the local memory store with `elegy-memory init`, `elegy-memory list`, and `elegy-memory show`.
@@ -29,7 +29,7 @@ The authority chain is one-way:
 - Do not infer runtime invalidation from local supersede or tombstone actions.
 - Do not use this skill to describe raw transcript storage or broad host-owned persistence behavior.
 
-## Shipped commands
+## Current commands
 
 ```text
 elegy-memory inspect
@@ -53,7 +53,7 @@ elegy-memory tombstone --record-id <record-id> --tombstoned-at-utc <utc> --reaso
 - Durable local state is derived by scanning artifact files; `state/catalog.json` is not persisted local state.
 - Default active-only views hide superseded and tombstoned records unless `--include-superseded` or `--include-tombstoned` is passed.
 - Local writes are single-writer; concurrent writers are rejected.
-- Listing and reporting follow deterministic ordering from the shipped local store surface.
+- Listing and reporting follow deterministic ordering from the current local store surface.
 
 ## Retention and removal semantics
 

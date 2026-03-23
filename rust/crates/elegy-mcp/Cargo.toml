@@ -7,12 +7,18 @@ license.workspace = true
 authors.workspace = true
 repository.workspace = true
 
+[[bin]]
+name = "elegy-mcp"
+path = "src/main.rs"
+
 [dependencies]
+clap.workspace = true
 elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
+serde.workspace = true
 serde_json.workspace = true
+thiserror.workspace = true
 
 [dev-dependencies]
-serde.workspace = true
 
 [lints]
 workspace = true

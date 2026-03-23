@@ -16,6 +16,7 @@ The repository now converges on this shape:
 - `contracts/`, `governance/`, `schemas/`, and `policies/` remain the authored authority roots
 - `artifacts/contracts` remains the generated downstream handoff surface
 - `rust/` is the in-repo Cargo workspace for reusable executable behavior
+- `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` may exist as contributor-navigation overlays only; they do not reopen the removed source-package story
 - root docs and root scripts define the contributor and validation path
 
 This is no longer a story about keeping a removed legacy package tree authoritative. The current question is simpler: which responsibilities belong in governed artifacts, which belong in Rust executable crates, and which should stay consumer-local.
@@ -38,6 +39,7 @@ The Rust workspace is the first-party home for:
 
 - governed-contract consumption in executable form
 - MCP descriptor authoring, analysis, and skill generation tooling
+- the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries
 - runtime composition and bounded adapter behavior
 - the thin stdio MCP host
 - the human-facing `elegy` CLI
@@ -48,7 +50,7 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `analyze mcp`
 - `generate skills`
 
-Those commands are backed by `rust/crates/elegy-tooling` and exercised by CLI and tooling tests in the Rust workspace.
+Those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
 
 ## What is still a target
 
@@ -59,6 +61,7 @@ These remain forward-looking targets rather than completed surfaces:
 - built-in MCP-native self-authoring as a settled product surface
 - skill-driven self-authoring loops presented as already integrated operator behavior
 - broad autonomous agent workflows layered directly into the runtime by default
+- claims that REST/OpenAPI ingestion, hosted MCP runtime execution, or autonomous registration are already shipped because the thin dedicated CLIs now exist
 
 `elegy-host-mcp` exists, and the CLI includes runtime validation, inspection, and run entrypoints, but those facts do not by themselves justify a claim that the broader self-authoring experience is already delivered.
 

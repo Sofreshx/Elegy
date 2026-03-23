@@ -1,12 +1,12 @@
 {
   "matrixVersion": "1.0.0",
-  "generatedAtUtc": "2026-03-22T00:00:00Z",
+  "generatedAtUtc": "2026-03-23T00:00:00Z",
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.2.0 <2.0.0",
+      "targetPackageVersionRange": ">=1.3.0 <2.0.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "existingArtifactsUnchanged": [
         "summary-only-session-context-envelope"
@@ -19,17 +19,49 @@
         "SAASTools runtime validation",
         "SAASTools promotion authority"
       ]
+    },
+    {
+      "name": "elegy-mcp-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.3.0 <2.0.0",
+      "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
+      "existingArtifactsUnchanged": [
+        "mcp-server-descriptor",
+        "mcp-analysis-result"
+      ],
+      "authorityReservations": [
+        "contracts MCP descriptor authority",
+        "contracts MCP analysis-result authority",
+        "downstream hosted runtime orchestration"
+      ]
+    },
+    {
+      "name": "elegy-skills-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.3.0 <2.0.0",
+      "scope": "Dedicated MCP-to-skill generation commands only.",
+      "existingArtifactsUnchanged": [
+        "skill-definition",
+        "skill-discovery-index"
+      ],
+      "authorityReservations": [
+        "contracts skill-definition authority",
+        "contracts skill-discovery-index authority",
+        "downstream runtime registration and orchestration"
+      ]
     }
   ],
   "entries": [
     {
       "holonVersionRange": ">=0.1.0 <0.2.0",
       "instructionEngineVersionRange": ">=0.1.0 <0.2.0",
-      "elegyPackageVersionRange": ">=1.2.0 <2.0.0",
+      "elegyPackageVersionRange": ">=1.3.0 <2.0.0",
       "elegySchemaVersionRange": ">=1.0.0 <2.0.0",
       "policySchemaVersionRange": null,
       "supportLevel": "supported",
-      "notes": "Publishes bundle 1.2.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, and Elegy-memory V1 adds bounded local non-authoritative import, list, show, export, supersede, and tombstone semantics while SAASTools retains currentness, approval, freshness policy, retrieval ranking, runtime validation, and promotion authority."
+      "notes": "Publishes bundle 1.3.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, Elegy-memory V1 remains bounded and non-authoritative, and the shipped elegy-mcp plus elegy-skills surfaces add thin dedicated CLI wrappers over existing descriptor authoring, descriptor analysis, and MCP-to-skill generation flows without claiming unsupported REST/OpenAPI execution or autonomous runtime registration."
     }
   ]
 }

@@ -5,6 +5,7 @@ members = [
     "crates/elegy-memory",
     "crates/elegy-policy",
     "crates/elegy-mcp",
+    "crates/elegy-skills",
     "crates/elegy-tooling",
     "crates/elegy-descriptor",
     "crates/elegy-adapter-fs",

@@ -1,0 +1,136 @@
+{
+  "id": "elegy-skills",
+  "name": "elegy-skills",
+  "description": "Governed skill definition for Elegy's current dedicated skills surface: thin MCP-to-skill generation over governed descriptor inputs.",
+  "identity": {
+    "definitionId": "elegy-skills",
+    "displayName": "Elegy Skills",
+    "namespace": "elegy",
+    "version": "1.0.0",
+    "aliases": [
+      "skills",
+      "skill-generation",
+      "mcp-to-skill"
+    ]
+  },
+  "metadata": {
+    "summary": "Dedicated MCP-to-skill generation from governed descriptors without claiming autonomous authoring or host registration that does not exist yet.",
+    "category": "skills",
+    "tags": [
+      "skills",
+      "generation",
+      "mcp",
+      "descriptor",
+      "governed"
+    ],
+    "owners": [
+      "elegy"
+    ],
+    "documentationUri": "docs/architecture/skill-core-v1.md"
+  },
+  "triggers": [
+    {
+      "pattern": "skills",
+      "description": "When work involves the current dedicated MCP-to-skill generation surface."
+    },
+    {
+      "pattern": "generate skills",
+      "description": "When governed skill artifacts need to be generated from an MCP descriptor."
+    },
+    {
+      "pattern": "mcp to skill",
+      "description": "When a bounded MCP slice should be projected into governed skill definitions."
+    },
+    {
+      "pattern": "skill generation",
+      "description": "When the dedicated skill-generation CLI surface should be used instead of broader automation claims."
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "descriptor-input-only",
+      "description": "This surface generates skill artifacts from governed MCP descriptor inputs only.",
+      "required": true
+    },
+    {
+      "constraintId": "no-autonomous-authoring-claim",
+      "description": "Do not claim autonomous authoring, host registration, or runtime-side skill execution through this CLI unless those paths are explicitly implemented elsewhere.",
+      "required": true
+    }
+  ],
+  "input": {
+    "parameters": [
+      {
+        "name": "command",
+        "type": "string",
+        "description": "The current command is generate.",
+        "required": true
+      },
+      {
+        "name": "descriptor",
+        "type": "path",
+        "description": "Path to a governed MCP descriptor used as the generation source.",
+        "required": true
+      },
+      {
+        "name": "outputDir",
+        "type": "path",
+        "description": "Optional output directory for generated governed skill-definition artifacts.",
+        "required": false
+      },
+      {
+        "name": "force",
+        "type": "boolean",
+        "description": "Allow overwriting generated skill files when an output directory is provided.",
+        "required": false
+      }
+    ],
+    "schemaRef": null
+  },
+  "output": {
+    "resultType": null,
+    "schemaRef": null,
+    "returnsCollection": false,
+    "description": "Command-scoped skill-generation reports including generated skill definitions, skipped tools, and written output files."
+  },
+  "execution": {
+    "mode": "requestResponse",
+    "isDeterministic": false,
+    "hasSideEffects": true,
+    "timeoutSeconds": null
+  },
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [
+      "docs/architecture/skill-core-v1.md",
+      "docs/architecture/mcp-skill-tooling-placement.md"
+    ],
+    "allowedContexts": [
+      "contributor-routing",
+      "local-cli",
+      "skill-generation"
+    ]
+  },
+  "discovery": {
+    "keywords": [
+      "skills",
+      "generate",
+      "mcp",
+      "descriptor",
+      "governed"
+    ],
+    "capabilityHints": [
+      "mcp-to-skill-generation",
+      "governed-skill-output"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition.elegy-skills.json",
+    "sourceVersion": "1.0.0"
+  },
+  "lifecycleState": "active"
+}

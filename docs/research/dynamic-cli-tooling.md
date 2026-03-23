@@ -71,18 +71,18 @@ Bad candidates:
 
 ## Where it belongs in Elegy
 
-Dynamic CLI tooling should not become a `.NET` authority package in Elegy.
+Dynamic CLI tooling should not become a revived language-specific authority layer in Elegy.
 
 Recommended placement:
 
 - governed manifest or descriptor contracts only if cross-runtime interoperability actually requires them
-- executable generation, inspection, and invocation in Rust tooling or the Rust CLI
+- executable generation, inspection, and invocation in Rust tooling or dedicated Rust CLIs when a bounded surface exists; keep `elegy` as the general/compatibility CLI
 - product-specific approval UX, transport wrapping, or local policy overlays in the consuming repo
 
 This matches the broader burden-of-proof reset:
 
-- `.NET` in Elegy remains the authority for contracts and canonical semantics
-- Rust in Elegy owns self-contained shared executable capabilities
+- governed artifacts under `contracts/`, `governance/`, `schemas/`, and `policies/` remain the authority for contracts and canonical semantics
+- Rust in Elegy owns self-contained shared executable capabilities, with dedicated in-repo CLIs preferred for bounded paths
 - app-local runtime integration stays local to the consumer
 
 ## Suggested phased path

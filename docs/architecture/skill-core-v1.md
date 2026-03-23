@@ -17,7 +17,9 @@ That means:
 - `SKILL.md` materialization is an output format, not the source of truth
 - Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
 
-The shipped `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a rendered non-authoritative output only.
+The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a repo-local non-authoritative contributor-routing output only.
+
+The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skills` do not change that authority split. They are pointer shells only, not skill authority surfaces, implementation centers, or release surfaces.
 
 ## Current executable ownership
 
@@ -25,6 +27,7 @@ The Rust workspace owns the reusable executable path around those governed skill
 
 - `rust/crates/elegy-tooling` owns reusable authoring, analysis, and skill-generation behavior over governed descriptors and skill projections
 - `rust/crates/elegy-cli` exposes the current contributor-facing commands: `author mcp`, `analyze mcp`, and `generate skills`
+- `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` expose the current dedicated MCP and skill-generation flows as thin CLI surfaces
 - `rust/crates/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
 - consuming applications keep host-specific registration, auth, persistence, and orchestration local
 
@@ -33,14 +36,17 @@ The Rust workspace owns the reusable executable path around those governed skill
 What the repo proves today:
 
 - skill generation from analyzed MCP descriptor inputs through the Rust CLI and tooling path
+- dedicated `elegy-mcp` and `elegy-skills` binaries for the current MCP descriptor and skill-generation commands
 - deterministic export of governed skill artifacts for downstream consumers
 - a clean split between neutral artifact authority and Rust executable ownership
+- the current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`
 
 What the repo does not yet prove as a finished product surface:
 
 - a built-in MCP-native self-authoring loop
 - a skill-driven autonomous authoring surface baked into the runtime by default
 - license to describe all future skill-hosting ideas as already implemented
+- license to describe autonomous registration or runtime-owned skill hosting as already implemented
 
 ## Verification posture
 

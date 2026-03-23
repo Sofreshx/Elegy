@@ -1,5 +1,7 @@
 [CmdletBinding()]
 param(
+    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-skills')]
+    [string]$Surface = 'elegy-cli',
     [string]$Target = '',
     [string]$OutputDirectory = '',
     [switch]$SkipBuild
@@ -10,16 +12,61 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $rustRoot = Join-Path $repoRoot 'rust'
 
-function Get-CliPackageVersion {
+function Get-DistributionSurfaceMetadata {
     param(
-        [string]$WorkspaceRoot
+        [string]$SurfaceName
+    )
+
+    switch ($SurfaceName) {
+        'elegy-cli' {
+            return @{
+                Surface = 'elegy-cli'
+                Package = 'elegy-cli'
+                Binary = 'elegy'
+                AssetPrefix = 'elegy-cli'
+            }
+        }
+        'elegy-memory' {
+            return @{
+                Surface = 'elegy-memory'
+                Package = 'elegy-memory'
+                Binary = 'elegy-memory'
+                AssetPrefix = 'elegy-memory'
+            }
+        }
+        'elegy-mcp' {
+            return @{
+                Surface = 'elegy-mcp'
+                Package = 'elegy-mcp'
+                Binary = 'elegy-mcp'
+                AssetPrefix = 'elegy-mcp'
+            }
+        }
+        'elegy-skills' {
+            return @{
+                Surface = 'elegy-skills'
+                Package = 'elegy-skills'
+                Binary = 'elegy-skills'
+                AssetPrefix = 'elegy-skills'
+            }
+        }
+        default {
+            throw "Unsupported distribution surface: $SurfaceName"
+        }
+    }
+}
+
+function Get-PackageVersion {
+    param(
+        [string]$WorkspaceRoot,
+        [string]$PackageName
     )
 
     Push-Location $WorkspaceRoot
     try {
         $metadataJson = & cargo metadata --format-version 1 --no-deps
         if ($LASTEXITCODE -ne 0) {
-            throw 'cargo metadata failed while resolving the elegy CLI package version.'
+            throw "cargo metadata failed while resolving the package version for $PackageName."
         }
     }
     finally {
@@ -27,10 +74,10 @@ function Get-CliPackageVersion {
     }
 
     $metadata = $metadataJson | ConvertFrom-Json
-    $package = $metadata.packages | Where-Object { $_.name -eq 'elegy-cli' } | Select-Object -First 1
+    $package = $metadata.packages | Where-Object { $_.name -eq $PackageName } | Select-Object -First 1
 
     if ($null -eq $package -or [string]::IsNullOrWhiteSpace($package.version)) {
-        throw 'Unable to resolve the elegy CLI package version from cargo metadata.'
+        throw "Unable to resolve the package version for $PackageName from cargo metadata."
     }
 
     return $package.version
@@ -60,21 +107,24 @@ function Get-HostTargetTriple {
     return ($hostLine -replace '^host:\s+', '').Trim()
 }
 
-function Get-BinaryName {
+function Get-BinaryFileName {
     param(
+        [string]$BinaryName,
         [string]$TargetTriple
     )
 
     if ($TargetTriple -match 'windows') {
-        return 'elegy.exe'
+        return "$BinaryName.exe"
     }
 
-    return 'elegy'
+    return $BinaryName
 }
 
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts\distribution'
 }
+
+$surfaceMetadata = Get-DistributionSurfaceMetadata -SurfaceName $Surface
 
 $resolvedTarget = if ([string]::IsNullOrWhiteSpace($Target)) {
     Get-HostTargetTriple -WorkspaceRoot $rustRoot
@@ -83,20 +133,20 @@ else {
     $Target.Trim()
 }
 
-$cliVersion = Get-CliPackageVersion -WorkspaceRoot $rustRoot
-$binaryName = Get-BinaryName -TargetTriple $resolvedTarget
+$packageVersion = Get-PackageVersion -WorkspaceRoot $rustRoot -PackageName $surfaceMetadata.Package
+$binaryFileName = Get-BinaryFileName -BinaryName $surfaceMetadata.Binary -TargetTriple $resolvedTarget
 
 Push-Location $rustRoot
 try {
     if (-not $SkipBuild) {
-        $buildArgs = @('build', '--locked', '-p', 'elegy-cli', '--bin', 'elegy', '--release')
+        $buildArgs = @('build', '--locked', '-p', $surfaceMetadata.Package, '--bin', $surfaceMetadata.Binary, '--release')
         if (-not [string]::IsNullOrWhiteSpace($Target)) {
             $buildArgs += @('--target', $resolvedTarget)
         }
 
         & cargo @buildArgs
         if ($LASTEXITCODE -ne 0) {
-            throw 'cargo build failed while packaging the elegy CLI archive.'
+            throw "cargo build failed while packaging the $($surfaceMetadata.Surface) archive."
         }
     }
 }
@@ -105,19 +155,19 @@ finally {
 }
 
 $binaryPath = if ([string]::IsNullOrWhiteSpace($Target)) {
-    Join-Path $rustRoot "target\release\$binaryName"
+    Join-Path $rustRoot "target\release\$binaryFileName"
 }
 else {
-    Join-Path $rustRoot "target\$resolvedTarget\release\$binaryName"
+    Join-Path $rustRoot "target\$resolvedTarget\release\$binaryFileName"
 }
 
 if (-not (Test-Path $binaryPath)) {
-    throw "Built elegy CLI binary was not found at $binaryPath"
+    throw "Built $($surfaceMetadata.Surface) binary was not found at $binaryPath"
 }
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
 
-$assetBaseName = "elegy-cli-$cliVersion-$resolvedTarget"
+$assetBaseName = "$($surfaceMetadata.AssetPrefix)-$packageVersion-$resolvedTarget"
 $stagingDirectory = Join-Path $OutputDirectory $assetBaseName
 $archivePath = Join-Path $OutputDirectory "$assetBaseName.zip"
 
@@ -130,11 +180,13 @@ if (Test-Path $archivePath) {
 }
 
 New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
-Copy-Item -Path $binaryPath -Destination (Join-Path $stagingDirectory $binaryName) -Force
+Copy-Item -Path $binaryPath -Destination (Join-Path $stagingDirectory $binaryFileName) -Force
 Compress-Archive -Path (Join-Path $stagingDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
 Remove-Item -Path $stagingDirectory -Recurse -Force
 
 Write-Host "Packaged CLI archive: $archivePath"
-Write-Host " - CLI version: $cliVersion"
+Write-Host " - surface: $($surfaceMetadata.Surface)"
+Write-Host " - package: $($surfaceMetadata.Package)"
+Write-Host " - package version: $packageVersion"
 Write-Host " - target: $resolvedTarget"
 Write-Host " - binary: $binaryPath"

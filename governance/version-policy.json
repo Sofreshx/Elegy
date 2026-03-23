@@ -1,16 +1,16 @@
 {
-  "bundleVersion": "1.2.0",
+  "bundleVersion": "1.3.0",
   "schemaVersion": "1.0.0",
   "manifestPackage": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetBundleVersion": "1.2.0",
+      "targetBundleVersion": "1.3.0",
       "targetSchemaLine": "1.x",
       "releaseStory": "Add a bounded local non-authoritative artifact-management family for import, list, show, export, supersede, and tombstone semantics without changing the existing summary-only-session-context-envelope or moving runtime authority out of SAASTools.",
       "authorityReservations": [
@@ -20,6 +20,32 @@
         "SAASTools owns retrieval ranking",
         "SAASTools owns runtime validation",
         "SAASTools owns promotion authority"
+      ]
+    },
+    {
+      "name": "elegy-mcp-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetBundleVersion": "1.3.0",
+      "targetSchemaLine": "1.x",
+      "releaseStory": "Publish a dedicated MCP descriptor authoring and analysis CLI surface plus governed MCP skill fixtures without claiming unsupported REST or OpenAPI execution paths.",
+      "authorityReservations": [
+        "contracts owns MCP descriptor and analysis artifact authority",
+        "governance owns release and compatibility metadata",
+        "downstream consumers own hosted runtime orchestration"
+      ]
+    },
+    {
+      "name": "elegy-skills-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetBundleVersion": "1.3.0",
+      "targetSchemaLine": "1.x",
+      "releaseStory": "Publish a dedicated MCP-to-skill generation CLI surface plus governed skill-generation fixtures while keeping autonomous authoring and host registration out of scope.",
+      "authorityReservations": [
+        "contracts owns governed skill artifact authority",
+        "governance owns release and compatibility metadata",
+        "downstream consumers own runtime registration and orchestration"
       ]
     }
   ],

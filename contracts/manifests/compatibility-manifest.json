@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.2.0"
+    "version": "1.3.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.2.0",
+      "targetPackageVersion": "1.3.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "existingArtifactsUnchanged": [
         "summary-only-session-context-envelope"
@@ -21,6 +21,38 @@
         "SAASTools retrieval ranking",
         "SAASTools runtime validation",
         "SAASTools promotion authority"
+      ]
+    },
+    {
+      "name": "elegy-mcp-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.3.0",
+      "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
+      "existingArtifactsUnchanged": [
+        "mcp-server-descriptor",
+        "mcp-analysis-result"
+      ],
+      "authorityReservations": [
+        "contracts MCP descriptor authority",
+        "contracts MCP analysis-result authority",
+        "downstream hosted runtime orchestration"
+      ]
+    },
+    {
+      "name": "elegy-skills-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.3.0",
+      "scope": "Dedicated MCP-to-skill generation commands only.",
+      "existingArtifactsUnchanged": [
+        "skill-definition",
+        "skill-discovery-index"
+      ],
+      "authorityReservations": [
+        "contracts skill-definition authority",
+        "contracts skill-discovery-index authority",
+        "downstream runtime registration and orchestration"
       ]
     }
   ],
@@ -119,7 +151,9 @@
       "file": "skill-definition.schema.json",
       "fixtures": [
         "fixtures/skill-definition.minimal.json",
-        "fixtures/skill-definition.elegy-memory.json"
+        "fixtures/skill-definition.elegy-memory.json",
+        "fixtures/skill-definition.elegy-mcp.json",
+        "fixtures/skill-definition.elegy-skills.json"
       ]
     },
     {
@@ -144,7 +178,9 @@
       "file": "skill-discovery-index.schema.json",
       "fixtures": [
         "fixtures/skill-discovery-index.minimal.json",
-        "fixtures/skill-discovery-index.elegy-memory.json"
+        "fixtures/skill-discovery-index.elegy-memory.json",
+        "fixtures/skill-discovery-index.elegy-mcp.json",
+        "fixtures/skill-discovery-index.elegy-skills.json"
       ]
     },
     {

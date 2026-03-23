@@ -171,12 +171,28 @@
       "generated": "artifacts/contracts/fixtures/skill-definition.elegy-memory.json"
     },
     {
+      "source": "contracts/fixtures/skill-definition.elegy-mcp.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-mcp.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-skills.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.minimal.json"
     },
     {
       "source": "contracts/fixtures/skill-discovery-index.elegy-memory.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-memory.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-mcp.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-mcp.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-skills.json"
     },
     {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",

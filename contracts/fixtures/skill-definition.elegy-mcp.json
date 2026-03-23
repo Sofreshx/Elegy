@@ -1,0 +1,154 @@
+{
+  "id": "elegy-mcp",
+  "name": "elegy-mcp",
+  "description": "Governed skill definition for Elegy's current dedicated MCP surface: thin descriptor authoring and analysis flows over governed MCP artifacts.",
+  "identity": {
+    "definitionId": "elegy-mcp",
+    "displayName": "Elegy MCP",
+    "namespace": "elegy",
+    "version": "1.0.0",
+    "aliases": [
+      "mcp",
+      "mcp-descriptor",
+      "mcp-analysis"
+    ]
+  },
+  "metadata": {
+    "summary": "Current dedicated descriptor authoring and analysis over governed MCP shapes without claiming unsupported REST or OpenAPI execution paths.",
+    "category": "mcp",
+    "tags": [
+      "mcp",
+      "descriptor",
+      "authoring",
+      "analysis",
+      "governed"
+    ],
+    "owners": [
+      "elegy"
+    ],
+    "documentationUri": "docs/architecture/mcp-skill-tooling-placement.md"
+  },
+  "triggers": [
+    {
+      "pattern": "mcp",
+      "description": "When work involves Elegy's current dedicated MCP descriptor authoring or analysis surface."
+    },
+    {
+      "pattern": "author mcp descriptor",
+      "description": "When a governed MCP descriptor needs to be authored from explicit tool inputs."
+    },
+    {
+      "pattern": "analyze mcp descriptor",
+      "description": "When a governed MCP descriptor needs to be analyzed for tool schema viability."
+    },
+    {
+      "pattern": "mcp descriptor",
+      "description": "When descriptor-scoped MCP work should use the dedicated CLI surface instead of broader runtime claims."
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "descriptor-scoped-only",
+      "description": "This surface is limited to descriptor authoring and analysis over governed MCP shapes.",
+      "required": true
+    },
+    {
+      "constraintId": "no-openapi-or-rest-execution-claim",
+      "description": "Do not claim OpenAPI ingestion, REST execution, or hosted MCP runtime behavior through this CLI unless those paths are explicitly implemented elsewhere.",
+      "required": true
+    }
+  ],
+  "input": {
+    "parameters": [
+      {
+        "name": "command",
+        "type": "string",
+        "description": "One of author or analyze.",
+        "required": true
+      },
+      {
+        "name": "serverName",
+        "type": "string",
+        "description": "Server name for descriptor authoring.",
+        "required": false
+      },
+      {
+        "name": "output",
+        "type": "path",
+        "description": "Output path for a newly authored MCP descriptor.",
+        "required": false
+      },
+      {
+        "name": "transport",
+        "type": "string",
+        "description": "Optional transport for authoring. Supported values: stdio or http.",
+        "required": false
+      },
+      {
+        "name": "tool",
+        "type": "string[]",
+        "description": "Repeated tool spec in NAME or NAME=DESCRIPTION form when authoring.",
+        "required": false
+      },
+      {
+        "name": "descriptor",
+        "type": "path",
+        "description": "Path to a governed MCP descriptor for analysis.",
+        "required": false
+      },
+      {
+        "name": "force",
+        "type": "boolean",
+        "description": "Allow overwriting an existing authored descriptor file.",
+        "required": false
+      }
+    ],
+    "schemaRef": null
+  },
+  "output": {
+    "resultType": null,
+    "schemaRef": null,
+    "returnsCollection": false,
+    "description": "Command-scoped descriptor authoring or analysis reports for the dedicated MCP surface."
+  },
+  "execution": {
+    "mode": "requestResponse",
+    "isDeterministic": false,
+    "hasSideEffects": true,
+    "timeoutSeconds": null
+  },
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [
+      "docs/architecture/mcp-skill-tooling-placement.md",
+      "docs/architecture/rust-consolidation.md"
+    ],
+    "allowedContexts": [
+      "contributor-routing",
+      "local-cli",
+      "descriptor-authoring"
+    ]
+  },
+  "discovery": {
+    "keywords": [
+      "mcp",
+      "descriptor",
+      "author",
+      "analyze",
+      "governed"
+    ],
+    "capabilityHints": [
+      "descriptor-authoring",
+      "descriptor-analysis"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition.elegy-mcp.json",
+    "sourceVersion": "1.0.0"
+  },
+  "lifecycleState": "active"
+}

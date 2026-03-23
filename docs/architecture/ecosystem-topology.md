@@ -20,6 +20,8 @@ Its active design centers are:
 - governed schemas, fixtures, manifests, and policies rooted under `contracts/`, `governance/`, `schemas/`, and `policies/`
 - the first-party Rust workspace under `rust/`, which owns the reusable executable and operator-facing surfaces
 
+Contributor-navigation overlays may exist under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills`, but they are not repo centers, authority layers, implementation centers, or release surfaces.
+
 Legacy `src/`, `tests/`, solution files, and `.NET` package-family narratives are not active repo centers and should not be described as such in current docs.
 
 Historical `Elegy-Skills`, `Elegy-CLI`, and related sibling repos should be treated as archival or transition references rather than the current implementation home.
@@ -56,10 +58,15 @@ The key current crates are:
 
 The current shipped operator path is intentionally narrow.
 
+The current shipped operator surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`.
+
 What the repo proves today:
 
 - the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, and `generate skills`
-- those commands are backed by `rust/crates/elegy-tooling`
+- the in-repo `elegy-memory` surface is shipped as a bounded local operator surface
+- the in-repo `elegy-mcp` surface is shipped as a thin dedicated wrapper over descriptor authoring and descriptor analysis
+- the in-repo `elegy-skills` surface is shipped as a thin dedicated wrapper over MCP-to-skill generation
+- those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`
 - the CLI also carries validation, inspection, and stdio-host startup entrypoints
 - contract bundles can be exported and consumed independently of the Rust workspace
 
@@ -67,7 +74,7 @@ What the repo does **not** yet prove as a completed product surface:
 
 - built-in MCP-native self-authoring loops
 - skill-driven autonomous authoring built into the runtime as a finished user surface
-- broad claims that all MCP surfaces are implemented just because descriptor analysis and generation exist
+- broad claims that REST/OpenAPI ingestion, operation-catalog projection, or hosted MCP execution are implemented just because descriptor analysis and generation exist
 
 Those remain targets until the repo has a documented, validated, contributor-facing implementation for them.
 
@@ -127,5 +134,6 @@ For now, the most coherent working model is:
 - `Elegy` is the single active repo
 - governed authority lives in root artifact and policy directories, not in a removed `.NET` source tree
 - `rust/` is the first-party home for reusable executable surfaces, especially CLI, MCP analysis, descriptor tooling, policy-bounded runtime composition, and host layers
-- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors
+- `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are contributor-navigation overlays only, not revived package-family centers
+- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through both the umbrella `elegy` surface and the dedicated `elegy-mcp` / `elegy-skills` binaries
 - built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

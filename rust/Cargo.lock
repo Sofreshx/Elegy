@@ -391,9 +391,11 @@ dependencies = [
 name = "elegy-mcp"
 version = "0.1.0"
 dependencies = [
+ "clap",
  "elegy-contracts",
  "serde",
  "serde_json",
+ "thiserror",
 ]
 
 [[package]]
@@ -426,6 +428,16 @@ dependencies = [
  "elegy-descriptor",
  "elegy-mcp",
  "elegy-policy",
+ "serde",
+ "serde_json",
+]
+
+[[package]]
+name = "elegy-skills"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "elegy-tooling",
  "serde",
  "serde_json",
 ]

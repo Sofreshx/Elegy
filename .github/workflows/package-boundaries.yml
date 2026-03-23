@@ -1,4 +1,4 @@
-name: Package Boundaries
+name: Repo Boundaries (package-boundaries compatibility name)
 
 on:
   pull_request:
@@ -26,7 +26,7 @@ jobs:
         with:
           toolchain: 1.88.0
 
-      - name: Validate source package boundaries
+      - name: Validate repo boundary policy
         shell: pwsh
         run: |
           ./scripts/validate-package-boundaries.ps1

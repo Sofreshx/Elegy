@@ -2,6 +2,8 @@
 
 This directory contains the current architectural guidance for the repo that exists today: neutral governed artifact roots under `contracts/`, `governance/`, `schemas/`, and `policies/`, plus the first-party Rust workspace under `rust/`.
 
+Contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are pointer shells only. They do not replace these docs, the governed roots, or `rust/` as canonical centers.
+
 Some page titles were retained from earlier cleanup phases for continuity. Unless a page marks itself as historical, treat it as current guidance for the post-legacy repo shape.
 
 ## Current references

@@ -1,9 +1,87 @@
 use elegy_contracts::{
-    McpAnalysisResult, McpServerDescriptor, McpToolAnalysis, McpToolDefinition, SkillDefinition,
+    McpAnalysisResult, McpServerDescriptor, McpToolAnalysis, McpToolDefinition,
+    McpTransportKind, SkillDefinition,
     SkillDiscoveryMetadata, SkillGovernanceMetadata, SkillIdentity, SkillInputContract,
     SkillLifecycleState, SkillMaterializationKind, SkillMetadata, SkillOrigin, SkillSourceKind,
-    SkillTrigger,
+    SkillTrigger, validate_mcp_analysis_result, validate_mcp_server_descriptor,
 };
+use serde::Serialize;
+use serde_json::Value;
+use std::collections::BTreeSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+use thiserror::Error;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AuthorMcpDescriptorRequest {
+    pub server_name: String,
+    pub transport: McpTransportKind,
+    pub tools: Vec<AuthorMcpToolRequest>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct AuthorMcpToolRequest {
+    pub name: String,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, PartialEq)]
+pub struct AuthoredMcpDescriptor {
+    pub output_path: String,
+    pub descriptor: McpServerDescriptor,
+}
+
+#[derive(Debug, Error)]
+pub enum McpSurfaceError {
+    #[error("failed to {operation} {path}: {source}")]
+    Io {
+        operation: &'static str,
+        path: PathBuf,
+        #[source]
+        source: std::io::Error,
+    },
+    #[error("failed to parse JSON in {path}: {source}")]
+    Json {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
+    #[error("invalid MCP descriptor in {path}")]
+    InvalidMcpDescriptor { path: PathBuf, issues: Vec<String> },
+    #[error("invalid MCP analysis result for {path}")]
+    InvalidMcpAnalysis { path: PathBuf, issues: Vec<String> },
+    #[error("output file already exists: {path}")]
+    OutputExists { path: PathBuf },
+}
+
+pub fn author_mcp_descriptor_to_path(
+    request: AuthorMcpDescriptorRequest,
+    output_path: &Path,
+    overwrite: bool,
+) -> Result<AuthoredMcpDescriptor, McpSurfaceError> {
+    let descriptor = build_mcp_descriptor(request)?;
+    write_json_file(output_path, &descriptor, overwrite)?;
+
+    Ok(AuthoredMcpDescriptor {
+        output_path: display_path(output_path),
+        descriptor,
+    })
+}
+
+pub fn analyze_mcp_descriptor_file(path: &Path) -> Result<McpAnalysisResult, McpSurfaceError> {
+    let descriptor = load_mcp_descriptor_file(path)?;
+    let analysis = analyze_descriptor(&descriptor);
+    let validation = validate_mcp_analysis_result(&analysis);
+
+    if !validation.is_valid() {
+        return Err(McpSurfaceError::InvalidMcpAnalysis {
+            path: path.to_path_buf(),
+            issues: validation.issues,
+        });
+    }
+
+    Ok(analysis)
+}
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct McpSkillGenerationResult {
@@ -114,6 +192,143 @@ impl McpSkillGenerator {
 pub fn generated_skill_id(server_name: &str, tool_name: &str) -> String {
     let slug = build_slug(server_name, tool_name);
     format!("mcp-{slug}")
+}
+
+fn build_mcp_descriptor(
+    request: AuthorMcpDescriptorRequest,
+) -> Result<McpServerDescriptor, McpSurfaceError> {
+    let descriptor = McpServerDescriptor {
+        server_name: request.server_name,
+        transport: request.transport,
+        tools: request
+            .tools
+            .into_iter()
+            .map(|tool| McpToolDefinition {
+                name: tool.name,
+                description: tool.description,
+                input_schema: None,
+            })
+            .collect(),
+    };
+
+    let issues = descriptor_validation_issues(&descriptor);
+    if !issues.is_empty() {
+        return Err(McpSurfaceError::InvalidMcpDescriptor {
+            path: PathBuf::from("<in-memory>"),
+            issues,
+        });
+    }
+
+    Ok(descriptor)
+}
+
+fn load_mcp_descriptor_file(path: &Path) -> Result<McpServerDescriptor, McpSurfaceError> {
+    let content = fs::read_to_string(path).map_err(|source| McpSurfaceError::Io {
+        operation: "read",
+        path: path.to_path_buf(),
+        source,
+    })?;
+
+    let descriptor = serde_json::from_str::<McpServerDescriptor>(&content).map_err(|source| {
+        McpSurfaceError::Json {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
+
+    let issues = descriptor_validation_issues(&descriptor);
+    if !issues.is_empty() {
+        return Err(McpSurfaceError::InvalidMcpDescriptor {
+            path: path.to_path_buf(),
+            issues,
+        });
+    }
+
+    Ok(descriptor)
+}
+
+fn descriptor_validation_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
+    let mut issues = validate_mcp_server_descriptor(descriptor).issues;
+    issues.extend(generator_collision_issues(descriptor));
+    issues
+}
+
+fn analyze_descriptor(descriptor: &McpServerDescriptor) -> McpAnalysisResult {
+    let mut analysis = McpToolAnalyzer.analyze(descriptor);
+    for tool_analysis in &mut analysis.analyses {
+        tool_analysis.has_valid_schema = tool_analysis
+            .tool
+            .input_schema
+            .as_ref()
+            .is_some_and(is_supported_input_schema);
+    }
+
+    analysis
+}
+
+fn is_supported_input_schema(value: &Value) -> bool {
+    matches!(value, Value::Object(_))
+}
+
+fn generator_collision_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
+    let mut distinct_ids = BTreeSet::new();
+    let mut issues = Vec::new();
+
+    for tool in &descriptor.tools {
+        let Some(schema) = tool.input_schema.as_ref() else {
+            continue;
+        };
+
+        if !is_supported_input_schema(schema) {
+            continue;
+        }
+
+        let skill_id = generated_skill_id(&descriptor.server_name, &tool.name);
+        let normalized_skill_id = skill_id.to_ascii_lowercase();
+        if !distinct_ids.insert(normalized_skill_id) {
+            issues.push(format!(
+                "MCP descriptor tools must not collapse to the same generated skill ID; {skill_id} is duplicated."
+            ));
+        }
+    }
+
+    issues
+}
+
+fn write_json_file<T: Serialize>(
+    output_path: &Path,
+    value: &T,
+    overwrite: bool,
+) -> Result<(), McpSurfaceError> {
+    if output_path.exists() && !overwrite {
+        return Err(McpSurfaceError::OutputExists {
+            path: output_path.to_path_buf(),
+        });
+    }
+
+    if let Some(parent) = output_path.parent() {
+        fs::create_dir_all(parent).map_err(|source| McpSurfaceError::Io {
+            operation: "create directory",
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+
+    let mut content = serde_json::to_string_pretty(value).map_err(|source| McpSurfaceError::Json {
+        path: output_path.to_path_buf(),
+        source,
+    })?;
+    content.push('\n');
+
+    fs::write(output_path, content).map_err(|source| McpSurfaceError::Io {
+        operation: "write",
+        path: output_path.to_path_buf(),
+        source,
+    })
+}
+
+fn display_path(path: &Path) -> String {
+    path.display().to_string()
 }
 
 pub struct McpToolSearchService;

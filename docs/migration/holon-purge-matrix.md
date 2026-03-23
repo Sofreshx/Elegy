@@ -1,5 +1,7 @@
 # Holon Purge Matrix
 
+Historical-only migration note: this matrix tracks the overlap and delete sequencing that existed during the zero-dotnet purge. References to `.NET`, `Directory.Build.props`, and package-family surfaces here describe migration-era overlap, not the current repo authority model.
+
 Scope: staged removal of Holon-oriented responsibility and all compiled C# or .NET from the steady-state Elegy repo.
 
 Steady-state target:
@@ -7,6 +9,8 @@ Steady-state target:
 - Rust crates, CLI or similar tool binaries, docs, tests, workflows, and governed file artifacts remain.
 - Compiled C# projects, dotnet-based CI requirements, and NuGet as a primary distribution lane do not remain.
 - Temporary overlap is allowed only when the surface is deprecated, non-expanding, owned, validated, and tied to a sunset gate.
+
+Docs-only contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` do not reopen the old compiled package-family story. They are pointer shells only, not compiled packages, authority layers, implementation centers, or release surfaces.
 
 Disposition meanings:
 
@@ -59,13 +63,13 @@ All current `.NET` test projects are delete-bound surfaces. None survive in the 
 | Surface | Current role | Disposition | Planned steady-state owner | Deletion gate |
 | --- | --- | --- | --- | --- |
 | `scripts/export-contracts.ps1` | Compatibility shim that delegates contract export to the Rust CLI bundler. | `Temporary deprecated overlap` | Rust-owned bundling path. | Delete after local callers and docs no longer need the shim. |
-| `scripts/validate-package-boundaries.ps1` | Enforces the current `.NET` package DAG. | `Intentional removal` | No steady-state owner unless a Rust-native equivalent is later justified. | Delete after no `.NET` source packages remain. |
-| `scripts/bump-version.ps1` | Updates `Directory.Build.props` and `schemas/schema-version.json`. | `Temporary deprecated overlap` | Rust-native or file-native version tooling. | Delete after version authority no longer depends on `Directory.Build.props`. |
+| `scripts/validate-package-boundaries.ps1` | Enforces the current repo-boundary policy through the legacy `package-boundaries` compatibility lane. | `Intentional removal` | No steady-state owner unless a Rust-native equivalent is later justified. | Delete after the compatibility path is no longer needed. |
+| `scripts/bump-version.ps1` | Updates `governance/version-policy.json` and `schemas/schema-version.json`; `Package*` parameter names remain only for CLI compatibility. | `Temporary deprecated overlap` | Rust-native or file-native version tooling. | Keep the compatibility interface only as long as downstream callers still depend on it. |
 | `.github/workflows/rust-ci.yml` | Primary Rust validation lane, now reading the checked-in contract bundle without a PowerShell export step. | `Rust-owned replacement` | Keep workflow as a dotnet-free Rust validation lane. | Keep the lane dotnet-free and prevent regressions that reintroduce export-time dependencies. |
-| `.github/workflows/distribution-artifacts.yml` | Builds `.nupkg` assets and now invokes the Rust bundler for contract artifacts. | `Temporary deprecated overlap` | Rust-first release or artifact workflow. | Delete or rewrite after CLI binaries, crates, and artifact bundles cover the same release need. |
-| `.github/workflows/publish-distribution.yml` | Publishes NuGet packages and now invokes the Rust bundler before attaching the contracts archive to releases. | `Temporary deprecated overlap` | Rust-first release workflow plus artifact publication. | Delete only after published-surface deprecation or cutover gates are satisfied. |
-| `.github/workflows/package-boundaries.yml` | Runs `.NET` package-boundary validation and architecture tests, with contract export now delegated to Rust. | `Temporary deprecated overlap` | Rust-native or file-native governance validation if still needed. | Delete after `.NET` package-boundary policy is no longer part of repo truth. |
-| `.github/workflows/versioning-governance.yml` | Validates `Directory.Build.props` and `schemas/schema-version.json`. | `Temporary deprecated overlap` | File-native version and schema governance lane. | Delete or rewrite after version authority leaves `.NET`. |
+| `.github/workflows/distribution-artifacts.yml` | Builds repo-local Rust CLI archives and the contracts bundle as CI artifacts; package-feed overlap is tracked separately as a historical consumer-migration concern, not a current producer lane here. | `Rust-owned replacement` | Rust-first artifact workflow. | Keep unless artifact packaging is consolidated elsewhere; do not reframe this workflow as a current `.nupkg` producer. |
+| `.github/workflows/publish-distribution.yml` | Publishes release-attached Rust CLI archives and the contracts bundle; package-feed overlap is tracked separately as a historical consumer-migration concern, not a current producer lane here. | `Rust-owned replacement` | Rust-first release workflow plus artifact publication. | Keep unless release-asset publication is consolidated elsewhere; do not reframe this workflow as a current NuGet publisher. |
+| `.github/workflows/package-boundaries.yml` | Runs repo-boundary validation through the legacy `package-boundaries` compatibility name, with contract export delegated to Rust. | `Temporary deprecated overlap` | Rust-native or file-native governance validation if still needed. | Delete or rename only after the compatibility entrypoint is no longer needed. |
+| `.github/workflows/versioning-governance.yml` | Validates file-native version governance in `governance/version-policy.json` and `schemas/schema-version.json`; any `Directory.Build.props` language is historical compatibility tracking only. | `Temporary deprecated overlap` | File-native version and schema governance lane. | Delete or rename only after compatibility naming is no longer needed. |
 | `.github/workflows/security.yml` | Mixed Rust and `.NET` security analysis, including C# CodeQL. | `Temporary deprecated overlap` | Rust-focused security lane. | Delete or rewrite the C# build path after no compiled `.NET` remains. |
 | `.github/workflows/ws3-formalization-governance.yml` | Shared governance workflow driven by PowerShell assets. | `Temporary deprecated overlap` | Keep or replace as tooling after the concept table resolves governance ownership. | Re-evaluate only after governance semantics and scripting strategy are settled. |
 
@@ -73,7 +77,7 @@ All current `.NET` test projects are delete-bound surfaces. None survive in the 
 
 | Published surface | Current producer | Current consumer class | Disposition | Deletion or retention rule |
 | --- | --- | --- | --- | --- |
-| GitHub Packages `.nupkg` output | `distribution-artifacts.yml` and `publish-distribution.yml` | Known SAASTools package-feed expectation plus unknown external consumers | `Temporary deprecated overlap` | Cannot delete until the surface is either proved closed-world, deprecated with a notice window, or replaced by a validated consumer-class cutover. |
+| Historical GitHub Packages `.nupkg` surface | No current in-repo producer; tracked only as historical or external-overlap migration evidence. | Known SAASTools package-feed expectation plus unknown external consumers | `Historical or external-overlap tracking` | Do not treat this as a current Elegy production lane. Keep tracking until the surface is either proved closed-world, deprecated with a notice window, or retired through a validated consumer-class cutover. |
 | `artifacts/distribution/elegy-contracts-*.zip` | `cargo run --manifest-path ./rust/Cargo.toml -p elegy-cli -- contracts export --create-archive` | Artifact-bundle consumers and release downloads | `Static artifact authority` | Keep the surface, while continuing to decouple the wider release lane from `.NET`. |
 | `artifacts/contracts/**` | `cargo run --manifest-path ./rust/Cargo.toml -p elegy-cli -- contracts export` | Repo-local Rust crates, tests, examples, and external contract consumers | `Static artifact authority` | Keep the surface on the Rust or file-native preparation path. |
 | Reusable WS3 governance workflow asset | `.github/workflows/ws3-formalization-governance.yml` | Caller repos using `workflow_call` | `Temporary deprecated overlap` | Cannot delete until callers are known or the workflow is formally deprecated. |

@@ -14,7 +14,7 @@ Thanks for your interest in contributing.
 Please keep these rules in mind:
 
 1. **Be honest about current status.** Do not document commands, examples, or capabilities that do not exist yet.
-2. **Respect the accepted direction.** `contracts/` and `governance/` are the active authority roots, and the in-repo Rust workspace is the preferred home for behavior-heavy MCP runtime logic.
+2. **Respect the accepted direction.** `contracts/`, `governance/`, and `rust/` remain the canonical owned surfaces. The contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are pointer shells only.
 3. **Keep v1 intentionally narrow.** The current protocol/runtime target is Rust-first, runtime composition, resources-first MCP behavior, and conservative policy defaults.
 4. **Prefer safe defaults.** Validation, policy, and security posture are core project behavior, not extras.
 5. **Do not widen scope casually.** Changes that affect protocol scope, trust boundaries, packaging topology, or repo-split direction should start with an issue or design discussion.
@@ -25,10 +25,11 @@ Review:
 
 - [README.md](README.md)
 - [docs/architecture/README.md](docs/architecture/README.md)
-- [docs/architecture/elegy-memory-v1.md](docs/architecture/elegy-memory-v1.md) when changing governed memory or rendered skill surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
+- [docs/architecture/elegy-memory-v1.md](docs/architecture/elegy-memory-v1.md) when changing governed memory or repo-local non-authoritative skill-routing surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
 - [docs/spec-baseline.md](docs/spec-baseline.md)
 - [SECURITY.md](SECURITY.md)
 
+If you touch `src/Elegy-memory`, `src/Elegy-mcp`, or `src/Elegy-skills`, keep those paths documentation-only and route substantive authority or implementation changes back to `contracts/`, `governance/`, `rust/`, and the canonical docs. Treat `.github/skills/` only as repo-local non-authoritative contributor-routing output.
 For larger changes, open an issue or draft PR early so maintainers can confirm the work still matches the accepted consolidation direction.
 
 ## What to work on now

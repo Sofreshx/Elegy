@@ -75,7 +75,7 @@ if ($EmitJson) {
 }
 
 if ($missingFiles.Count -gt 0) {
-    throw ('Missing package-boundary required files: ' + ($missingFiles -join ', '))
+    throw ('Missing repo-boundary required files (package-boundaries compatibility policy): ' + ($missingFiles -join ', '))
 }
 
 if ($ruleViolations.Count -gt 0) {
@@ -86,7 +86,7 @@ if ($ruleViolations.Count -gt 0) {
     throw ($message -join [Environment]::NewLine)
 }
 
-Write-Host 'Package-boundary validation passed.'
+Write-Host 'Repo-boundary validation passed.'
 Write-Host " - required files: $($policy.requiredFiles.Count)"
 Write-Host " - policy rules: $($policy.rules.Count)"
 foreach ($rule in $policy.rules) {

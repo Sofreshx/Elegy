@@ -74,7 +74,7 @@ Elegy no longer has an active first-party `.NET` source-package family in-repo.
 
 That means:
 
-1. docs must not describe `src/` or `tests/` as active repo centers
+1. docs must not describe `src/` or `tests/` as active repo centers; the docs-only overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are the only exception, and they remain pointer shells only
 2. any downstream `.NET` consumer is now just that: a consumer of governed outputs, not a co-owned in-repo authority surface
 3. new shared responsibilities should be expressed either as governed artifacts or as Rust executable behavior, not by reintroducing legacy compatibility framing
 

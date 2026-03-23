@@ -1,13 +1,16 @@
-name: WS3 Formalization Governance
+name: WS3 Governance (formalization compatibility name)
+
+# Historical compatibility naming is retained in this workflow path, artifact names,
+# and formalization-named JSON inputs because reusable callers may still depend on them.
 
 on:
   workflow_call:
     outputs:
       resolved-mode:
-        description: Resolved WS3 enforcement mode.
+        description: Resolved WS3 governance enforcement mode.
         value: ${{ jobs.ws3-governance.outputs.resolved-mode }}
       gate-decision:
-        description: Final WS3 gate decision.
+        description: Final WS3 governance gate decision.
         value: ${{ jobs.ws3-governance.outputs.gate-decision }}
   workflow_dispatch:
   pull_request:
@@ -116,7 +119,7 @@ jobs:
             -ViolationsPath (Join-Path $artifactsRoot 'smoke-violations.json') `
             -OutputPath (Join-Path $artifactsRoot 'smoke-gate-decision.json')
 
-      - name: Evaluate formalization gates
+      - name: Evaluate WS3 governance gates (formalization compatibility input)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'
@@ -130,6 +133,7 @@ jobs:
           $artifactsRoot = Join-Path $callerRoot 'artifacts/ws3'
           $violationsPath = Join-Path $artifactsRoot 'formalization-violations.json'
           if (-not (Test-Path -LiteralPath $violationsPath)) {
+            Write-Host 'Creating empty formalization-violations.json compatibility input.'
             Set-Content -Path $violationsPath -Value '{"violations":[]}' -Encoding utf8
           }
 
@@ -164,7 +168,7 @@ jobs:
           if (Test-Path -LiteralPath $violationsPath) {
             $violationsDocument = Get-Content -LiteralPath $violationsPath -Raw | ConvertFrom-Json
             $violations = if ($null -ne $violationsDocument.violations) { @($violationsDocument.violations) } elseif ($violationsDocument -is [System.Array]) { @($violationsDocument) } else { @($violationsDocument) }
-            Write-Host "WS3 violations path: $violationsPath"
+            Write-Host "WS3 violations compatibility path: $violationsPath"
             Write-Host "WS3 violation count: $($violations.Count)"
           } else {
             Write-Host 'WS3 violations artifact is missing.'
@@ -226,7 +230,7 @@ jobs:
             "gate-decision=unknown" >> $env:GITHUB_OUTPUT
           }
 
-      - name: Upload WS3 governance artifacts
+      - name: Upload WS3 governance artifacts (compatibility artifact name retained)
         if: always()
         uses: actions/upload-artifact@v4
         with:

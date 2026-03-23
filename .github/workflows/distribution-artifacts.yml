@@ -51,7 +51,7 @@ jobs:
             artifacts/distribution/elegy-contracts-*.zip
 
   package-cli:
-    name: package cli (${{ matrix.target }})
+    name: package cli (${{ matrix.surface }}, ${{ matrix.target }})
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -59,10 +59,40 @@ jobs:
         include:
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            surface: elegy-cli
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-memory
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-mcp
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-skills
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
+            surface: elegy-cli
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-memory
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-mcp
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-skills
           - runner: macos-14
             target: aarch64-apple-darwin
+            surface: elegy-cli
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-memory
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-mcp
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-skills
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -79,12 +109,12 @@ jobs:
       - name: Package CLI archive
         shell: pwsh
         run: |
-          ./scripts/package-cli.ps1 -Target '${{ matrix.target }}'
+          ./scripts/package-cli.ps1 -Surface '${{ matrix.surface }}' -Target '${{ matrix.target }}'
 
       - name: Upload CLI distribution artifact
         uses: actions/upload-artifact@v4
         with:
-          name: elegy-cli-${{ matrix.target }}-${{ github.sha }}
+          name: ${{ matrix.surface }}-${{ matrix.target }}-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/distribution/elegy-cli-*.zip
+            artifacts/distribution/${{ matrix.surface }}-*.zip

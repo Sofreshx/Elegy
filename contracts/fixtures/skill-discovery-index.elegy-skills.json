@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-03-23T00:00:00Z",
+  "entries": [
+    {
+      "skillId": "elegy-skills",
+      "name": "Elegy Skills",
+      "description": "Derived projection of the governed Elegy skills definition for loading the repo-local non-authoritative contributor-routing skill-generation markdown.",
+      "lifecycleState": "active",
+      "triggersOn": [
+        "skills",
+        "generate skills",
+        "mcp to skill",
+        "skill generation"
+      ],
+      "keywords": [
+        "skills",
+        "generate",
+        "mcp",
+        "descriptor",
+        "governed"
+      ],
+      "capabilityHints": [
+        "mcp-to-skill-generation",
+        "governed-skill-output"
+      ],
+      "manifest": {
+        "id": "elegy-skills",
+        "loadMode": "onDemand",
+        "vaultRef": ".github/skills/elegy-skills/SKILL.md",
+        "sourceKind": "manual",
+        "materializationKind": "declared"
+      }
+    }
+  ]
+}

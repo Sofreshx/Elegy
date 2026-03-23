@@ -6,6 +6,8 @@
 
 `rust/crates/elegy-memory` owns the dedicated `elegy-memory` binary for that surface. `rust/crates/elegy-cli` keeps only a temporary compatibility bridge for legacy memory commands.
 
+Alongside the existing `elegy` CLI surface, this in-repo `elegy-memory` surface is one of the current shipped operator surfaces. The contributor-navigation overlay under `src/Elegy-memory` is a pointer shell only, not a repo center, authority layer, implementation center, or separate release surface.
+
 It covers two things only:
 
 - governed reusable-memory artifacts rooted in `contracts/` and versioned through `governance/`

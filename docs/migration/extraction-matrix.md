@@ -11,7 +11,7 @@ Decision rule: do not move code into Elegy unless it clearly proves why shared o
 - `consumer-local` — host-specific runtime behavior that should stay in SAASTools or another app repo
 - `docs/workflows` — shared docs, scripts, or CI definitions that do not need a runtime library
 
-Topology note: the current Elegy repo is centered on governed root artifacts plus the Rust workspace. Extraction targets in this matrix therefore map to `contracts/`, `governance/`, `policies/`, root scripts and workflows, or `rust/` crates. They do **not** map to a removed `src/` or `.NET` package-family tree.
+Topology note: the current Elegy repo is centered on governed root artifacts plus the Rust workspace. Extraction targets in this matrix therefore map to `contracts/`, `governance/`, `policies/`, root scripts and workflows, or `rust/` crates. They do **not** map to a removed `src/` or `.NET` package-family tree. The contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are pointer shells only and are not extraction targets or implementation centers.
 
 | Source file | Disposition | Shared-code proof | Execution lane | Target in Elegy (or reason kept) | Rationale | API or handoff mapping | Validation impact notes |
 | --- | --- | --- | --- | --- | --- | --- | --- |

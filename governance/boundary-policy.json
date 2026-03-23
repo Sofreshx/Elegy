@@ -87,7 +87,28 @@
         "export-contracts\\.ps1 -CreateArchive",
         "package-cli\\.ps1",
         "elegy-contracts-\\*\\.zip",
-        "elegy-cli-\\*\\.zip"
+        "surface: elegy-cli",
+        "surface: elegy-memory",
+        "surface: elegy-mcp",
+        "surface: elegy-skills",
+        "matrix\\.surface"
+      ]
+    },
+    {
+      "name": "publish-distribution-attaches-shipped-cli-assets",
+      "files": [
+        ".github/workflows/publish-distribution.yml"
+      ],
+      "forbiddenPatterns": [
+        "setup-dotnet",
+        "dotnet\\s",
+        "\\.csproj",
+        "\\.nupkg",
+        "\\.snupkg",
+        "nuget"
+      ],
+      "requiredPatterns": [
+        "elegy-\\*\\.zip"
       ]
     },
     {
@@ -103,11 +124,14 @@
         "\\.nupkg"
       ],
       "requiredPatterns": [
-        "elegy-cli"
+        "elegy-cli",
+        "elegy-memory",
+        "elegy-mcp",
+        "elegy-skills"
       ]
     },
     {
-      "name": "distribution-installer-handles-both-surfaces",
+      "name": "distribution-installer-handles-contracts-and-cli-surfaces",
       "files": [
         "scripts/install-distribution.ps1"
       ],
@@ -119,7 +143,10 @@
       ],
       "requiredPatterns": [
         "elegy-contracts",
-        "elegy-cli"
+        "elegy-cli",
+        "elegy-memory",
+        "elegy-mcp",
+        "elegy-skills"
       ]
     },
     {
