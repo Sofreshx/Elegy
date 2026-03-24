@@ -147,12 +147,37 @@ jobs:
             artifacts/distribution/elegy-mcp-wrapper-*.zip
             artifacts/distribution/elegy-skills-wrapper-*.zip
 
+  package-installer:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package installer archive
+        shell: pwsh
+        run: |
+          ./scripts/package-installer.ps1
+
+      - name: Validate installer archive
+        shell: pwsh
+        run: |
+          ./scripts/validate-canonical-outputs.ps1 -RequireInstallerArchives
+
+      - name: Upload installer distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-installer-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/distribution/elegy-installer-*.zip
+
   publish:
     runs-on: ubuntu-latest
     needs:
       - export-contracts
       - package-cli
       - package-wrapper-surfaces
+      - package-installer
     steps:
       - name: Download distribution artifacts
         uses: actions/download-artifact@v4

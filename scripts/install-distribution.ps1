@@ -286,6 +286,21 @@ function Get-ExecutableFileName {
     return $BinaryName
 }
 
+function Restore-UnixExecutablePermission {
+    param(
+        [string]$ExecutablePath
+    )
+
+    if ($IsWindows) {
+        return
+    }
+
+    & chmod +x $ExecutablePath
+    if ($LASTEXITCODE -ne 0) {
+        throw "Failed to restore executable permissions for $ExecutablePath"
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Destination)) {
     $Destination = Join-Path (Get-Location) '.elegy'
 }
@@ -371,9 +386,18 @@ foreach ($surface in $resolvedCliSurfaces) {
         throw "Installed CLI executable was not found at $executablePath"
     }
 
+    Restore-UnixExecutablePermission -ExecutablePath $executablePath
+
     if ($surface -eq 'elegy-cli') {
         Initialize-DestinationDirectory -Path $legacyCliPath -AllowReplace:$true
         Copy-Item -Path (Join-Path $surfacePath '*') -Destination $legacyCliPath -Recurse -Force
+
+        $legacyExecutablePath = Join-Path $legacyCliPath $executableName
+        if (-not (Test-Path $legacyExecutablePath)) {
+            throw "Installed compatibility CLI executable was not found at $legacyExecutablePath"
+        }
+
+        Restore-UnixExecutablePermission -ExecutablePath $legacyExecutablePath
     }
 
     $installedCliReports.Add([pscustomobject]@{

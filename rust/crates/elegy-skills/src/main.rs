@@ -45,14 +45,13 @@ fn main() -> ExitCode {
 
 fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
+    let Command::Generate {
+        descriptor,
+        output_dir,
+        force,
+    } = cli.command;
 
-    match cli.command {
-        Command::Generate {
-            descriptor,
-            output_dir,
-            force,
-        } => execute_generate_command(descriptor, output_dir, force, cli.format),
-    }
+    execute_generate_command(descriptor, output_dir, force, cli.format)
 }
 
 fn execute_generate_command(
@@ -105,7 +104,7 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
         println!("- {} ({})", skill.effective_id(), skill.effective_name());
     }
     for path in &result.written_files {
-        println!("written: {}", path);
+        println!("written: {path}");
     }
 }
 

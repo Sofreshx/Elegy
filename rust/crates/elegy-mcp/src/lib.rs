@@ -1,9 +1,9 @@
 use elegy_contracts::{
-    McpAnalysisResult, McpServerDescriptor, McpToolAnalysis, McpToolDefinition,
-    McpTransportKind, SkillDefinition,
+    validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
+    McpServerDescriptor, McpToolAnalysis, McpToolDefinition, McpTransportKind, SkillDefinition,
     SkillDiscoveryMetadata, SkillGovernanceMetadata, SkillIdentity, SkillInputContract,
     SkillLifecycleState, SkillMaterializationKind, SkillMetadata, SkillOrigin, SkillSourceKind,
-    SkillTrigger, validate_mcp_analysis_result, validate_mcp_server_descriptor,
+    SkillTrigger,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -314,10 +314,11 @@ fn write_json_file<T: Serialize>(
         })?;
     }
 
-    let mut content = serde_json::to_string_pretty(value).map_err(|source| McpSurfaceError::Json {
-        path: output_path.to_path_buf(),
-        source,
-    })?;
+    let mut content =
+        serde_json::to_string_pretty(value).map_err(|source| McpSurfaceError::Json {
+            path: output_path.to_path_buf(),
+            source,
+        })?;
     content.push('\n');
 
     fs::write(output_path, content).map_err(|source| McpSurfaceError::Io {

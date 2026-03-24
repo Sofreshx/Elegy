@@ -110,13 +110,17 @@ Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Ski
 
 ## Distribution and consumption
 
-Elegy should be consumed through versioned exported artifacts rather than local sibling-repository references or repo-internal package restore assumptions.
+Elegy should be consumed through versioned GitHub release assets rather than local sibling-repository references, repo-internal package restore assumptions, or new package-feed distribution lanes.
 
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 - the `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries are the CLI surfaces covered by the explicit release/archive workflows for `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
 - `rust/crates/elegy-memory`, `rust/crates/elegy-mcp`, and `rust/crates/elegy-skills` own the dedicated binaries for their bounded surfaces; `rust/crates/elegy-cli` keeps the general/compatibility surface.
+- tagged GitHub releases are the primary downstream lane; the standalone installer asset is only a convenience bootstrap around the same release assets.
 - downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>` to fetch the contracts bundle plus matching CLI archives and wrapper archives without sibling checkouts or package feeds.
+- wrapper archives already embed `scripts/install-distribution.ps1`, so dedicated-wrapper consumers do not need the standalone installer asset unless they want the generic bootstrap path.
+- Holon and other downstream repos should pin an Elegy release tag and install into a repo-local tools directory such as `./tools/elegy`.
+- historical GitHub Packages and NuGet publication surfaces are frozen/deprecated; keep them retired and only remove remaining metadata after consumer cutover evidence exists.
 - downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Release and versioning

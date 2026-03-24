@@ -207,10 +207,16 @@
     "artifacts/distribution/elegy-mcp-wrapper-*.zip",
     "artifacts/distribution/elegy-skills-wrapper-*.zip"
   ],
+  "installerArchivePatterns": [
+    "artifacts/distribution/elegy-installer-*.zip"
+  ],
   "wrapperArchiveRequiredEntries": [
     "install.ps1",
     "wrapper-entrypoint.json",
     "scripts/install-distribution.ps1"
+  ],
+  "installerArchiveRequiredEntries": [
+    "install-distribution.ps1"
   ],
   "wrapperArchiveSurfaceSpecificEntries": {
     "artifacts/distribution/elegy-memory-wrapper-*.zip": [

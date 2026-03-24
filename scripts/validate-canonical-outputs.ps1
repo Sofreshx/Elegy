@@ -3,6 +3,7 @@ param(
     [switch]$RequireGeneratedOutputs,
     [switch]$RequireArchive,
     [switch]$RequireWrapperArchives,
+    [switch]$RequireInstallerArchives,
     [switch]$EmitJson
 )
 
@@ -24,6 +25,8 @@ $contentMismatches = [System.Collections.Generic.List[string]]::new()
 $missingArchives = [System.Collections.Generic.List[string]]::new()
 $missingWrapperArchives = [System.Collections.Generic.List[string]]::new()
 $invalidWrapperArchives = [System.Collections.Generic.List[string]]::new()
+$missingInstallerArchives = [System.Collections.Generic.List[string]]::new()
+$invalidInstallerArchives = [System.Collections.Generic.List[string]]::new()
 
 function Test-ArchiveRequiredEntries {
     param(
@@ -127,6 +130,28 @@ if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
     }
 }
 
+if ($RequireInstallerArchives -and $null -ne $inventory.installerArchivePatterns) {
+    $requiredInstallerEntries = [System.Collections.Generic.List[string]]::new()
+    foreach ($entry in @($inventory.installerArchiveRequiredEntries)) {
+        $requiredInstallerEntries.Add([string]$entry) | Out-Null
+    }
+
+    foreach ($pattern in $inventory.installerArchivePatterns) {
+        $archiveFiles = Get-ChildItem -Path (Join-Path $repoRoot $pattern) -ErrorAction SilentlyContinue
+        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
+            $missingInstallerArchives.Add($pattern) | Out-Null
+            continue
+        }
+
+        foreach ($archive in $archiveFiles) {
+            $missingEntries = Test-ArchiveRequiredEntries -ArchivePath $archive.FullName -RequiredEntries @($requiredInstallerEntries)
+            if ($missingEntries.Count -gt 0) {
+                $invalidInstallerArchives.Add("$($archive.Name) missing required entries: $($missingEntries -join ', ')") | Out-Null
+            }
+        }
+    }
+}
+
 $result = [pscustomobject]@{
     inventoryVersion = $inventory.inventoryVersion
     missingAuthority = $missingAuthority
@@ -136,6 +161,8 @@ $result = [pscustomobject]@{
     missingArchives = $missingArchives
     missingWrapperArchives = $missingWrapperArchives
     invalidWrapperArchives = $invalidWrapperArchives
+    missingInstallerArchives = $missingInstallerArchives
+    invalidInstallerArchives = $invalidInstallerArchives
 }
 
 if ($EmitJson) {
@@ -170,6 +197,14 @@ if ($invalidWrapperArchives.Count -gt 0) {
     throw ('Wrapper archives are missing required payload entries: ' + ($invalidWrapperArchives -join '; '))
 }
 
+if ($missingInstallerArchives.Count -gt 0) {
+    throw ('Missing installer archives from canonical output inventory: ' + ($missingInstallerArchives -join ', '))
+}
+
+if ($invalidInstallerArchives.Count -gt 0) {
+    throw ('Installer archives are missing required payload entries: ' + ($invalidInstallerArchives -join '; '))
+}
+
 Write-Host 'Canonical output validation passed.'
 Write-Host " - authority-only files: $($inventory.authorityOnly.Count)"
 Write-Host " - mirrored outputs: $($inventory.mirroredOutputs.Count)"
@@ -182,4 +217,8 @@ if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
     if ($null -ne $inventory.wrapperArchiveSurfaceSpecificEntries) {
         Write-Host " - wrapper archive surface-specific entry sets: $($inventory.wrapperArchiveSurfaceSpecificEntries.PSObject.Properties.Count)"
     }
+}
+if ($RequireInstallerArchives -and $null -ne $inventory.installerArchivePatterns) {
+    Write-Host " - installer archive patterns: $($inventory.installerArchivePatterns.Count)"
+    Write-Host " - installer archive required entries: $($inventory.installerArchiveRequiredEntries.Count)"
 }

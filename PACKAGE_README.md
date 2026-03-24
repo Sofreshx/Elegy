@@ -2,7 +2,7 @@
 
 Elegy no longer treats package-feed publication as the supported downstream surface.
 
-Use GitHub release assets instead of package restore or sibling-repository project references.
+Use GitHub release assets instead of package restore, sibling-repository project references, or new package-feed publication lanes.
 
 - Repository: https://github.com/Sofreshx/Elegy
 - Contracts bundle guidance: see `docs/distribution.md`
@@ -10,7 +10,10 @@ Use GitHub release assets instead of package restore or sibling-repository proje
 - CLI release targets: `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`
 - CLI archive surfaces: `elegy-cli`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`
 - Wrapper archive surfaces: `elegy-memory-wrapper`, `elegy-mcp-wrapper`, and `elegy-skills-wrapper`
+- Standalone installer bootstrap asset: `elegy-installer-<bundleVersion>.zip`
 - Generic install helper: `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
 - Local artifact install helper: `pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
 
-Historical package feeds are no longer the supported downstream surface, and remaining migration and consumer overlap is tracked in `docs/migration/holon-purge-consumers.md`. Downstream consumers should integrate through the exported contract bundle and the release/archive CLI surfaces.
+GitHub Releases are the primary downstream lane. The standalone installer asset is a convenience bootstrap, and the wrapper archives already embed the same installer helper.
+
+Holon and other downstream consumers should pin an Elegy release tag and install into a repo-local tools directory. Historical GitHub Packages and NuGet surfaces are frozen/deprecated, and any remaining cleanup should wait until consumer cutover evidence exists. Downstream consumers should integrate through the exported contract bundle and the release/archive CLI surfaces.
