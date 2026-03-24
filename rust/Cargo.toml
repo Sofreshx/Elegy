@@ -1,6 +1,7 @@
 [workspace]
 members = [
     "crates/elegy-agent-events",
+    "crates/elegy-mermaid",
     "crates/elegy-contracts",
     "crates/elegy-memory",
     "crates/elegy-policy",

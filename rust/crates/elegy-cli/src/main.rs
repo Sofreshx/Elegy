@@ -6,6 +6,7 @@ use elegy_core::{
     CLI_SCHEMA_VERSION,
 };
 use elegy_host_mcp::{serve_stdio, HostError};
+use elegy_mermaid::{render_from_json_str, MermaidRenderError};
 use elegy_memory::{
     cli as memory_cli, GovernedMemoryRecord, LocalMemoryCatalogEntry, LocalMemoryExportResult,
     LocalMemoryLifecycleState, LocalMemoryPaths, LocalMemoryQueryOptions, LocalMemoryStore,
@@ -22,6 +23,7 @@ use elegy_tooling::{
 use serde::Serialize;
 use serde_json::json;
 use std::fs;
+use std::io::{self, Read};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
@@ -81,6 +83,10 @@ enum Command {
     Local {
         #[command(subcommand)]
         command: LocalCommand,
+    },
+    Mermaid {
+        #[command(subcommand)]
+        command: MermaidCommand,
     },
     Run {
         #[arg(long)]
@@ -224,6 +230,14 @@ enum ContractsCommand {
     },
 }
 
+#[derive(Subcommand, Debug)]
+enum MermaidCommand {
+    Render {
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+}
+
 #[derive(Args, Clone, Debug)]
 struct LocalRootArgs {
     #[arg(long)]
@@ -354,6 +368,25 @@ struct LocalExportReport {
     exported_envelope: SummaryOnlySessionContextEnvelope,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MermaidRenderReport {
+    mermaid: String,
+    input_source: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_path: Option<String>,
+}
+
+enum MermaidInputSource {
+    File(PathBuf),
+    Stdin,
+}
+
+enum MermaidInputLoadError {
+    File { path: PathBuf, source: io::Error },
+    Stdin { source: io::Error },
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
     match run().await {
@@ -476,6 +509,9 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             reason,
             cli.format,
         ),
+        Command::Mermaid {
+            command: MermaidCommand::Render { input },
+        } => execute_mermaid_render_command(input, cli.format),
         Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
         Command::Contracts {
             command:
@@ -694,6 +730,53 @@ fn execute_generate_skills_command(
     }
 }
 
+fn execute_mermaid_render_command(
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["mermaid", "render"];
+
+    let (canonical_json, input_source) = match load_mermaid_input(input) {
+        Ok(result) => result,
+        Err(error) => {
+            return emit_diagnostics(
+                format,
+                command,
+                mermaid_input_load_diagnostics(error),
+                json!({}),
+                "error",
+                ExitCode::from(1),
+            )
+        }
+    };
+
+    match render_from_json_str(&canonical_json) {
+        Ok(mermaid) => {
+            match format {
+                OutputFormat::Text => println!("{mermaid}"),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["mermaid".to_string(), "render".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: build_mermaid_render_report(mermaid, &input_source),
+                    diagnostics: Vec::new(),
+                })?,
+            }
+
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_diagnostics(
+            format,
+            command,
+            mermaid_render_diagnostics(error, &input_source),
+            json!({}),
+            "invalid",
+            ExitCode::from(1),
+        ),
+    }
+}
+
 fn execute_config_command(
     locator: ProjectLocator,
     format: OutputFormat,
@@ -809,6 +892,117 @@ fn execute_contracts_export_command(
             Ok(ExitCode::SUCCESS)
         }
         Err(error) => emit_contracts_error(error, format, vec!["contracts", "export"]),
+    }
+}
+
+fn load_mermaid_input(
+    input: Option<PathBuf>,
+) -> Result<(String, MermaidInputSource), MermaidInputLoadError> {
+    match input {
+        Some(path) => fs::read_to_string(&path)
+            .map(|contents| (contents, MermaidInputSource::File(path.clone())))
+            .map_err(|source| MermaidInputLoadError::File { path, source }),
+        None => {
+            let mut contents = String::new();
+            io::stdin()
+                .read_to_string(&mut contents)
+                .map_err(|source| MermaidInputLoadError::Stdin { source })?;
+            Ok((contents, MermaidInputSource::Stdin))
+        }
+    }
+}
+
+fn build_mermaid_render_report(
+    mermaid: String,
+    input_source: &MermaidInputSource,
+) -> MermaidRenderReport {
+    MermaidRenderReport {
+        mermaid,
+        input_source: input_source.kind(),
+        input_path: input_source.input_path(),
+    }
+}
+
+fn mermaid_input_load_diagnostics(error: MermaidInputLoadError) -> Vec<Diagnostic> {
+    match error {
+        MermaidInputLoadError::File { path, source } => vec![Diagnostic::error(
+            "CLI-MERMAID-001",
+            format!("failed to read Mermaid render input {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        MermaidInputLoadError::Stdin { source } => vec![Diagnostic::error(
+            "CLI-MERMAID-001",
+            format!("failed to read Mermaid render input from stdin: {source}"),
+        )
+        .with_path("<stdin>".to_string())],
+    }
+}
+
+fn mermaid_render_diagnostics(
+    error: MermaidRenderError,
+    input_source: &MermaidInputSource,
+) -> Vec<Diagnostic> {
+    let input_location = input_source.display();
+
+    match error {
+        MermaidRenderError::Json { source } => vec![Diagnostic::error(
+            "CLI-MERMAID-002",
+            format!(
+                "failed to parse Mermaid render input JSON {}: {source}",
+                input_location
+            ),
+        )
+        .with_path(input_location)],
+        MermaidRenderError::UnsupportedCanonicalDocument => vec![Diagnostic::error(
+            "CLI-MERMAID-003",
+            format!(
+                "unsupported Mermaid render input {}; expected canonical workflow or canonical workflow graph JSON",
+                input_location
+            ),
+        )
+        .with_path(input_source.display())
+        .with_hint(
+            "supply governed canonical-workflow or canonical-workflow-graph JSON to `elegy mermaid render`",
+        )],
+        error @ (MermaidRenderError::InvalidCanonicalWorkflowGraphReference { .. }
+        | MermaidRenderError::DuplicateCanonicalWorkflowGraphId { .. }) => {
+            vec![Diagnostic::error(
+                "CLI-MERMAID-004",
+                format!(
+                    "canonical workflow graph input is invalid {}: {error}",
+                    input_location
+                ),
+            )
+            .with_path(input_source.display())
+            .with_hint("ensure the input matches the governed canonical workflow graph contract")]
+        }
+        MermaidRenderError::CanonicalWorkflowGraph { source } => vec![Diagnostic::error(
+            "CLI-MERMAID-004",
+            format!(
+                "canonical workflow graph input is invalid {}: {source}",
+                input_location
+            ),
+        )
+        .with_path(input_source.display())
+        .with_hint("ensure the input matches the governed canonical workflow graph contract")],
+        error @ (MermaidRenderError::InvalidCanonicalWorkflowReference { .. }
+        | MermaidRenderError::DuplicateCanonicalWorkflowId { .. }) => vec![
+            Diagnostic::error(
+                "CLI-MERMAID-005",
+                format!(
+                    "canonical workflow input is invalid {}: {error}",
+                    input_location
+                ),
+            )
+            .with_path(input_source.display())
+            .with_hint("ensure the input matches the governed canonical workflow contract"),
+        ],
+        MermaidRenderError::CanonicalWorkflow { source } => vec![Diagnostic::error(
+            "CLI-MERMAID-005",
+            format!("canonical workflow input is invalid {}: {source}", input_location),
+        )
+        .with_path(input_source.display())
+        .with_hint("ensure the input matches the governed canonical workflow contract")],
     }
 }
 
@@ -1532,6 +1726,26 @@ fn sanitize_record_id_for_cli_path(record_id: &str) -> String {
 fn print_json<T: Serialize>(value: &T) -> Result<(), serde_json::Error> {
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
+}
+
+impl MermaidInputSource {
+    fn kind(&self) -> &'static str {
+        match self {
+            Self::File(_) => "file",
+            Self::Stdin => "stdin",
+        }
+    }
+
+    fn input_path(&self) -> Option<String> {
+        match self {
+            Self::File(path) => Some(path.display().to_string()),
+            Self::Stdin => None,
+        }
+    }
+
+    fn display(&self) -> String {
+        self.input_path().unwrap_or_else(|| "<stdin>".to_string())
+    }
 }
 
 impl From<CliTransport> for McpTransportKind {

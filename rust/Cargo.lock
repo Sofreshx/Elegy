@@ -335,6 +335,7 @@ dependencies = [
  "elegy-core",
  "elegy-host-mcp",
  "elegy-memory",
+ "elegy-mermaid",
  "elegy-tooling",
  "serde",
  "serde_json",
@@ -407,6 +408,15 @@ dependencies = [
  "serde_json",
  "thiserror",
  "time",
+]
+
+[[package]]
+name = "elegy-mermaid"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]

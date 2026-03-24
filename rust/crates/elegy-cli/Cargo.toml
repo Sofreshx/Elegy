@@ -16,6 +16,7 @@ clap.workspace = true
 elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 elegy-core = { version = "0.1.0", path = "../elegy-core" }
 elegy-host-mcp = { version = "0.1.0", path = "../elegy-host-mcp" }
+elegy-mermaid = { version = "0.1.0", path = "../elegy-mermaid" }
 elegy-memory = { version = "0.1.0", path = "../elegy-memory" }
 elegy-tooling = { version = "0.1.0", path = "../elegy-tooling" }
 serde.workspace = true
