@@ -228,6 +228,32 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU8 — Simple Consolidator
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(pending WU8 commit; record hash after commit)_ |
+| Timestamp | 2026-03-24T06:57:57.6971886-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/consolidator.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/similarity.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test --lib` result | ✅ Pass — `cargo test -p elegy-memory --lib --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (27 passed, 0 failed) |
+| `cargo test` result | ✅ Pass — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (48 passed, 0 failed) |
+| Tests written | 7 focused unit tests across `rust/crates/elegy-memory/src/consolidator.rs` and `rust/crates/elegy-memory/src/similarity.rs` covering active-only consolidation eligibility, higher-importance survivor selection, missing-embedding/below-threshold skips, dormant exclusion, custom-threshold handling, matching-dimension cosine similarity, and zero-norm vector handling. |
+| Deviations from plan | No behavioral change was needed after the first failing custom-threshold test; the only follow-up was a narrow test-fixture correction so the comparison vectors actually fell below the configured threshold. WU8 also extracted the previously inline cosine similarity helper from `sqlite_store.rs` into shared `similarity.rs` so both retrieval and consolidation use the same implementation. |
+| Blockers encountered | None in the authoritative validation pass set. The only transient issue was the initial threshold-test fixture mismatch, which was corrected without changing consolidator behavior. |
+| Decisions made | Introduced `SimpleConsolidator` as the MVP `MemoryConsolidator`, using `ScopeConfig::merge_similarity_threshold` (default `0.92`) as its merge cutoff; limited eligibility to `Active` memories with non-empty embeddings; sorted candidates by descending `importance_score` with original-order tie breaking so the strongest memory survives; merged later candidates only when cosine similarity is strictly greater than the threshold; and extracted shared cosine similarity logic into `similarity.rs`, reusing it from both the consolidator and `sqlite_store` vector-search paths. |
+| Confidence self-assessment | 5 |
+
+**Canary — Verify WU8:**
+> _Without re-reading, describe the consolidator's merge logic and threshold. Then open `consolidator.rs` and verify._
+>
+> Recall attempt: `SimpleConsolidator` only considers active candidates that have non-empty embeddings, sorts eligible candidates by descending `importance_score`, keeps the highest-importance remaining memory as the survivor, compares later eligible candidates using cosine similarity, and emits a `Merged` action for candidates whose similarity is above the configured `merge_similarity_threshold`, which defaults to `0.92`. Dormant candidates, candidates without embeddings, and below-threshold pairs are left alone.
+>
+> Verification result: `rust/crates/elegy-memory/src/consolidator.rs` confirms that flow. `SimpleConsolidator::new` reads `scope_config.merge_similarity_threshold`, `normalize_threshold` falls back to `ScopeConfig::default().merge_similarity_threshold` for non-finite inputs, `is_eligible` requires `MemoryState::Active` plus a non-empty embedding, candidate ordering is by descending `importance_score` with original index tie-break, and the merge condition is `if similarity > self.similarity_threshold` using the shared `similarity::cosine_similarity` helper. Verification also confirms the landed default threshold remains `0.92`. No recall errors.
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

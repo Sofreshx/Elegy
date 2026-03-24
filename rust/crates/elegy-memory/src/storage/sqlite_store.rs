@@ -13,6 +13,7 @@ use uuid::Uuid;
 use super::schema::init_database;
 use crate::{
     decay,
+    similarity::cosine_similarity,
     traits::MemoryStore,
     types::{
         ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
@@ -1834,36 +1835,6 @@ fn load_vector_similarity_scores(
     }
 
     Ok(similarity_scores)
-}
-
-fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, StoreError> {
-    if left.len() != right.len() {
-        return Err(StoreError::Validation(format!(
-            "cosine similarity requires equal vector dimensions, got {} and {}",
-            left.len(),
-            right.len()
-        )));
-    }
-    if left.is_empty() {
-        return Err(StoreError::Validation(
-            "cosine similarity requires non-empty vectors".to_string(),
-        ));
-    }
-
-    let mut dot_product = 0.0_f32;
-    let mut left_norm = 0.0_f32;
-    let mut right_norm = 0.0_f32;
-    for (left_component, right_component) in left.iter().zip(right.iter()) {
-        dot_product += left_component * right_component;
-        left_norm += left_component * left_component;
-        right_norm += right_component * right_component;
-    }
-
-    if left_norm <= f32::EPSILON || right_norm <= f32::EPSILON {
-        return Ok(0.0);
-    }
-
-    Ok((dot_product / (left_norm.sqrt() * right_norm.sqrt())).clamp(0.0, 1.0))
 }
 
 fn combine_similarity_signals(

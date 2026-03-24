@@ -1,8 +1,10 @@
 pub mod cli;
+pub mod consolidator;
 pub mod decay;
 pub mod error;
 pub mod gate;
 mod local_store;
+mod similarity;
 pub mod storage;
 pub mod traits;
 pub mod types;
@@ -11,6 +13,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
+pub use consolidator::SimpleConsolidator;
 pub use decay::{retention, retention_with_lambda};
 pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
 pub use gate::DefaultSalienceGate;
