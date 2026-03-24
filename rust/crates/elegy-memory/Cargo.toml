@@ -23,5 +23,6 @@ thiserror.workspace = true
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 [lints]
 workspace = true

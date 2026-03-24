@@ -66,7 +66,7 @@
 | Field | Value |
 |---|---|
 | Status | ✅ Done |
-| Commit hash | _(recorded in git history by the WU3 commit created from this finalized snapshot)_ |
+| Commit hash | `1131f25258af2bfb6e733de744d428bff10fd235` |
 | Timestamp | 2026-03-24T04:29:29.4578624-07:00 |
 | Files created/modified | `rust/Cargo.lock`, `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/error.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/mod.rs`, `rust/crates/elegy-memory/src/storage/schema.rs`, `SESSION_TRACKING.md` |
 | `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
@@ -88,17 +88,17 @@
 
 | Field | Value |
 |---|---|
-| Status | ⬜ Not started / 🔨 In progress / ✅ Done / ❌ Blocked |
-| Commit hash | |
-| Timestamp | |
-| Files created/modified | |
-| `cargo check` result | |
-| `cargo test` result | |
-| Tests written | _(count and brief description)_ |
-| Deviations from plan | |
-| Blockers encountered | |
-| Decisions made | |
-| Confidence self-assessment | |
+| Status | ✅ Done |
+| Commit hash | _(recorded in git history by the WU4 finalization commit created from this finalized snapshot)_ |
+| Timestamp | 2026-03-24T04:47:28.6060083-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/mod.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — initial WU4 implementation and focused malformed-FTS fix both pass `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test` result | ✅ Pass after post-fix rerun via dedicated unit-test runner — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (28 passed, 0 failed) |
+| Tests written | 5 focused async unit tests in `rust/crates/elegy-memory/src/storage/sqlite_store.rs`: store/get access tracking, content update + versioning, lifecycle + hard delete cascade, metadata/list filtering, and health report + contradiction handling |
+| Deviations from plan | WU4 intentionally leaves `search`, `find_similar`, `purge_user`, and `purge_all` as explicit `StoreError::Validation` stubs so CRUD/lifecycle work can land without prematurely implementing WU5 hybrid search or later purge flows; automatic `memory_links` `supersedes` rows on update remain deferred because the current trait/schema surface versions content in-place without a second memory ID to link cleanly. |
+| Blockers encountered | Dedicated unit-test validation initially exposed 5 `sqlite_store` failures with `Sqlite("database disk image is malformed")`; the root cause was WU4 treating the external-content `memories_fts` table like a normal table (`DELETE FROM` + reinsert) instead of using the FTS5 delete pseudo-command with the previous indexed payload. The issue is now resolved and the focused rerun passed. |
+| Decisions made | Scoped each `SqliteMemoryStore` instance to a single authoritative `MemoryScope`, backed the `Send + Sync` trait requirement with `Arc<Mutex<rusqlite::Connection>>`, kept manual FTS synchronization for WU4 CRUD readiness, fixed the malformed-FTS regression by deleting prior external-content rows through the FTS5 delete pseudo-command before reinserting refreshed terms, added embedding write/staleness support for CRUD readiness, and recorded contradictions with a simple provenance-based reliability downgrade for the less trusted memory. |
+| Confidence self-assessment | 4 |
 
 **Canary — Verify WU3:**
 > _Without opening schema.rs, list all 7 tables created. Then verify._

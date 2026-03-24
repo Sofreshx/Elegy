@@ -18,7 +18,7 @@ pub use local_store::{
     LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
     LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
 };
-pub use storage::{init_database, CURRENT_SCHEMA_VERSION};
+pub use storage::{init_database, SqliteMemoryStore, CURRENT_SCHEMA_VERSION};
 pub use traits::{
     ConsolidationAction, EmbeddingProvider, GateDecision, MemoryConsolidator, MemoryFilter,
     MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate, SalienceGate,
