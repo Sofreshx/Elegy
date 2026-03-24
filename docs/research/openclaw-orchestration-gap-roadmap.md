@@ -12,6 +12,12 @@ This note is research-oriented guidance, not a canonical ownership change. It co
 - A shared Elegy seam needs evidence that at least two consumers benefit from the same governed contract, artifact, or bounded runtime helper.
 - Supporting references such as copilot-sdk and GenericInfrastructure matter only where they reinforce the boundary or operating-model discussion.
 
+## Provenance and evidence
+
+- Local workspace and local checkout inputs used directly for this note: `Elegy/README.md`, `Elegy/docs/architecture/elegy-memory-v1.md`, `SAASTools/docs/research/oss/openclaw.md`, `SAASTools/docs/research/openclaw/03-runtime-topology-and-orchestration-model.md`, `SAASTools/docs/research/openclaw/07-security-boundaries-and-trust-policies.md`, `SAASTools/docs/research/openclaw/09-saas-tools-adoption-roadmap.md`, `SAASTools/docs/system/architecture/execution-isolation.md`, `SAASTools/docs/system/architecture/desktop-threat-model.md`, and a local OpenClaw checkout including `README.md`, `docs/start/wizard.md`, `docs/gateway/configuration.md`, `docs/gateway/security/index.md`, `docs/concepts/model-failover.md`, `docs/tools/skills.md`, `src/wizard/onboarding.ts`, `src/wizard/onboarding.gateway-config.ts`, `src/security/audit.ts`, `src/config/config.ts`, plus runtime routing files under `src/gateway` and `src/routing`.
+- Web inputs used as upstream pattern evidence: `docs.openclaw.ai/start/wizard`, `docs.openclaw.ai/gateway/configuration`, `docs.openclaw.ai/gateway/security`, `docs.openclaw.ai/concepts/model-failover`, `docs.openclaw.ai/tools/skills`, plus GitHub repo pages for OpenHands, Open Interpreter, Open WebUI, and LibreChat as comparative references.
+- The web review reinforced rather than materially changed the local conclusion: keep runtime control-plane ownership, provider execution, and operator enforcement local to the host, while borrowing stronger onboarding, policy visibility, and operational posture patterns.
+
 ## Short comparison baseline
 
 - Elegy proves today: governed contracts, schemas, fixtures, manifests, policy assets, and bounded CLI or runtime tooling. It does not prove app-host UX, operator onboarding, runtime registration, secret brokerage, or live control-plane ownership.
@@ -37,6 +43,13 @@ This note is research-oriented guidance, not a canonical ownership change. It co
 - Recommended direction: Use a safe secret-drop flow where the UI stores a secret reference or brokered capability token, the host injects it only at execution time, and the model sees only an indirect handle. Make provider profile validation explicit and make failover sticky and auditable per session.
 - Ownership guidance: Likely Elegy candidate = secret-reference descriptor or brokered-capability-token descriptor, with redaction and injection metadata, but only if at least two consumers need it. SAASTools/app-local = secret storage, auth exchange, provider selection, failover policy, and injection runtime. Not shared = raw secret handling, token brokers, and provider-specific setup UX.
 
+### LLM integration, provider abstraction, and prompt ownership
+
+- What OpenClaw or peers do: They treat provider and model choice as runtime policy, not just UI preference, with explicit profiles, validation, failover behavior, and visible differences between model routing, prompt assembly, and tool execution.
+- Gap in our repos: SAASTools has the ingredients for provider auth state, `secretRef`, retrieval-driven capability shaping, and session continuity, but it does not yet expose one coherent operator model for provider abstraction, model selection, failover, prompt ownership, and enforcement hooks. Elegy should not become the live provider client or prompt-builder host.
+- Recommended direction: Keep provider adapters, model routing, sticky failover, prompt assembly, and execution-time secret injection in the host runtime. The model should never see raw provider credentials; it should see only host-selected context, tools, and indirect handles. Enforcement hooks should live in host-owned config validation, provider-profile selection, pre-prompt assembly, pre-tool dispatch, and audit emission rather than in portable prompt text alone.
+- Ownership guidance: Likely Elegy candidate = bounded provider-profile descriptors, model capability metadata, redaction and injection metadata, and policy or audit envelopes only if multiple consumers need the same governed shape. SAASTools/app-local = provider SDK wiring, model selection and failover, prompt assembly, secret resolution, retries, and turn-time enforcement. Not shared = raw keys, provider-specific client logic, or host-local prompt composers.
+
 ### Policy enforcement and auditability
 
 - What OpenClaw or peers do: OpenClaw exposes explicit security audit checks, hardened baselines, clear check IDs, and policy-driven trust surfaces instead of relying on prompt wording. Open WebUI and LibreChat also reinforce the value of visible admin policy state.
@@ -50,6 +63,13 @@ This note is research-oriented guidance, not a canonical ownership change. It co
 - Gap in our repos: SAASTools proves orchestration in practice, but the operator-facing control plane is still spread across shells, DesktopHost, APIs, config, and inspector surfaces. Elegy must not become an app host or a control-plane product shell.
 - Recommended direction: Consolidate control-plane concepts in SAASTools around explicit startup phases, readiness contracts, capability registry metadata, and truthful degraded-state reporting. Keep the product shell and runtime composition local. Use Elegy only for bounded, governed metadata when a real cross-consumer seam exists.
 - Ownership guidance: Likely Elegy candidate = capability metadata or control-plane report envelopes only. SAASTools/app-local = control-plane runtime, lifecycle orchestration, reload handling, and operator surfaces. Not shared = composition-root orchestration, DI wiring, HTTP endpoints, and app-host behavior.
+
+### Execution practices and operational enforcement
+
+- What OpenClaw or peers do: They make validation posture, startup phases, readiness, degraded operation, audit loops, and reload behavior explicit operator concerns rather than hidden implementation details.
+- Gap in our repos: SAASTools has health checks, inspector surfaces, and policy-aware runtime pieces, but not one clear execution-practices contract that distinguishes startup validation from readiness, degraded from failed, periodic audit from one-time config lint, and hot-reloadable settings from restart-only boundaries. Elegy can define policy artifacts, but it should not become the ops loop.
+- Recommended direction: Treat execution practices as host runtime policy. Fail closed on invalid config, policy, and capability registration. Tie readiness to real dispatch, session, and provider prerequisites instead of process-up signals. Emit stable degraded-state reason codes, run explicit audit loops, and document which changes can hot reload versus which require restart. Keep policy definition portable; keep operational enforcement local, observable, and testable.
+- Ownership guidance: Likely Elegy candidate = validation result envelopes, audit finding schemas, and bounded metadata about reload eligibility only if reused. SAASTools/app-local = startup gates, readiness checks, degraded-state reporting, audit cadence, reload or restart behavior, and remediation UX. Not shared = process supervision, health probe implementation, deployment exceptions, or incident workflows.
 
 ### Execution safety, approvals, and sandbox posture
 
@@ -132,7 +152,9 @@ This note is research-oriented guidance, not a canonical ownership change. It co
 
 - In SAASTools, add a coherent onboarding and self-configuration flow that chooses harness, auth mode, secret posture, and safety defaults in one path.
 - In SAASTools, add a safe secret-drop flow where the stored artifact is a `secretRef` or brokered handle and the model only sees an indirect reference.
+- In SAASTools, formalize host-owned provider abstraction, model selection, prompt-assembly ownership, and session-sticky failover with enforcement hooks before prompt assembly and tool dispatch.
 - In SAASTools, introduce explicit policy check IDs, a minimal audit report surface, and truthful degraded-state reporting.
+- In SAASTools, add fail-closed startup validation, readiness gates, degraded reason codes, and explicit hot-reload versus restart-only boundaries.
 - In SAASTools, make approval posture, sandbox profile, and capability allowlist state visible in diagnostics and inspector surfaces.
 - In Elegy, draft only the smallest candidate schemas: policy decision envelope, audit finding/report envelope, and secret-reference descriptor, and stop unless a second consumer appears.
 
