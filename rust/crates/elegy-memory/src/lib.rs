@@ -1,6 +1,7 @@
 pub mod cli;
 pub mod error;
 mod local_store;
+pub mod storage;
 pub mod traits;
 pub mod types;
 
@@ -8,6 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
+pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
 pub use local_store::{
     LocalMemoryCatalog, LocalMemoryCatalogEntry, LocalMemoryExportResult, LocalMemoryPaths,
     LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoreInitResult,
@@ -16,9 +18,7 @@ pub use local_store::{
     LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
     LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
 };
-pub use error::{
-    ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError,
-};
+pub use storage::{init_database, CURRENT_SCHEMA_VERSION};
 pub use traits::{
     ConsolidationAction, EmbeddingProvider, GateDecision, MemoryConsolidator, MemoryFilter,
     MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate, SalienceGate,

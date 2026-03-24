@@ -43,8 +43,8 @@
 | Field | Value |
 |---|---|
 | Status | ✅ Done |
-| Commit hash | This commit (`feat(elegy-memory): WU2 — trait definitions`) |
-| Timestamp | 2026-03-24T04:19:51.7577759-07:00 |
+| Commit hash | `7a120430a4b6ccf2ad4c074c54f4c3597118c1b0` |
+| Timestamp | 2026-03-24T04:20:20-07:00 |
 | Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/error.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/traits.rs`, `SESSION_TRACKING.md` |
 | `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
 | `cargo test` result | N/A for WU2 |
@@ -65,16 +65,16 @@
 
 | Field | Value |
 |---|---|
-| Status | ⬜ Not started / 🔨 In progress / ✅ Done / ❌ Blocked |
-| Commit hash | |
-| Timestamp | |
-| Files created/modified | |
-| `cargo check` result | |
-| `cargo test` result | |
-| Deviations from plan | |
-| Blockers encountered | |
-| Decisions made | |
-| Confidence self-assessment | |
+| Status | ✅ Done |
+| Commit hash | _(recorded in git history by the WU3 commit created from this finalized snapshot)_ |
+| Timestamp | 2026-03-24T04:29:29.4578624-07:00 |
+| Files created/modified | `rust/Cargo.lock`, `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/error.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/mod.rs`, `rust/crates/elegy-memory/src/storage/schema.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test` result | ✅ Pass via dedicated unit-test runner — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Deviations from plan | Did not add a `sqlite-vec` Rust crate in WU3; instead `init_database()` first attempts the documented `vec0` virtual table and falls back to a rowid-compatible `vec_memories` table when the module is unavailable, with an explicit TODO to replace the fallback once runtime extension loading/integration is finalized. |
+| Blockers encountered | None. |
+| Decisions made | Added a new `storage` module wired through `lib.rs`, introduced `init_database(&Path) -> Result<rusqlite::Connection, StoreError>`, reused the existing trait-first `StoreError` surface with a minimal `From<rusqlite::Error>` adapter, enabled SQLite via `rusqlite` with bundled SQLite, and initialized `scope_config` with `schema_version` plus MVP-safe default tuning keys. |
+| Confidence self-assessment | 4 |
 
 **Canary — Verify WU2:**
 > _Without opening traits.rs, list all 5 traits you defined and the return type of MemoryStore::search. Then verify._

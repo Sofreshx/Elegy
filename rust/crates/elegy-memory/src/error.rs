@@ -68,3 +68,9 @@ pub enum ObservabilityError {
     #[error("observability operation failed: {0}")]
     Operation(String),
 }
+
+impl From<rusqlite::Error> for StoreError {
+    fn from(value: rusqlite::Error) -> Self {
+        Self::Sqlite(value.to_string())
+    }
+}
