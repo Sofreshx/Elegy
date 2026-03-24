@@ -13,10 +13,12 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
+chrono = { version = "0.4.44", features = ["serde"] }
 serde.workspace = true
 serde_json.workspace = true
-time = { workspace = true, features = ["parsing"] }
+time = { workspace = true, features = ["parsing", "serde"] }
 thiserror.workspace = true
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
 [lints]

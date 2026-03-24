@@ -1,5 +1,6 @@
 pub mod cli;
 mod local_store;
+pub mod types;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
@@ -12,6 +13,12 @@ pub use local_store::{
     LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_EXPORTS_DIR,
     LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
     LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
+};
+pub use types::{
+    ContradictionEntry, ContradictionRecord, ExportFormat, Memory, MemoryCandidate,
+    MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope, MemorySearchQuery,
+    MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport,
+    ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
 };
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =
