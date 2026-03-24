@@ -22,14 +22,14 @@
 
 | Field | Value |
 |---|---|
-| Status | ❌ Blocked pending upstream Git author configuration; implementation corrected |
-| Commit hash | Not created yet — commit failed because local Git `user.name` / `user.email` are not configured |
-| Timestamp | 2026-03-24T03:15:30.7864131-07:00 |
+| Status | ✅ Done |
+| Commit hash | `c288d328f3f0fcbe74c251c7ecf4bdc559015b3e` |
+| Timestamp | 2026-03-24T04:19:51.7577759-07:00 |
 | Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/types.rs`, `SESSION_TRACKING.md` |
 | `cargo check` result | ✅ Pass after WU1 fixup — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
 | `cargo test` result | N/A for WU1 |
 | Deviations from plan | Added prompt-compatibility aliases (`ContradictionRecord`, `MemorySearchQuery`, `MemorySearchResult`) plus lightweight `ScopeConfig` and `MemoryVersion` alongside the authoritative types so the prompt extras are covered without displacing the architecture-defined contracts; WU1 fixup aligned the new core timestamp fields to `chrono::DateTime<Utc>` and the primary memory identifier alias to `uuid::Uuid` while leaving existing `lib.rs` `time`-based artifact code intact. |
-| Blockers encountered | Commit creation is blocked because local Git `user.name` and `user.email` are unset. Exact decision needed: the author name and email to configure for this repository before creating the required WU1 commit. |
+| Blockers encountered | Initial commit creation failed until repo-local Git author identity was configured; blocker is now resolved and the corrected WU1 commit exists. |
 | Decisions made | Kept new types in a dedicated `types.rs` module and re-exported them from `lib.rs` to preserve the existing public API surface; corrected WU1 types to use `chrono::DateTime<Utc>` for prompt-facing timestamps and `uuid::Uuid` for `MemoryId`, while retaining the pre-existing `time` dependency and `lib.rs` validation/parsing code used by existing artifact flows. |
 | Confidence self-assessment | 5 |
 
@@ -42,16 +42,16 @@
 
 | Field | Value |
 |---|---|
-| Status | ⬜ Not started / 🔨 In progress / ✅ Done / ❌ Blocked |
-| Commit hash | |
-| Timestamp | |
-| Files created/modified | |
-| `cargo check` result | |
+| Status | ✅ Done |
+| Commit hash | This commit (`feat(elegy-memory): WU2 — trait definitions`) |
+| Timestamp | 2026-03-24T04:19:51.7577759-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/error.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/traits.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
 | `cargo test` result | N/A for WU2 |
-| Deviations from plan | |
-| Blockers encountered | |
-| Decisions made | |
-| Confidence self-assessment | |
+| Deviations from plan | Kept the documented trait surface intact, but represented backend-specific `StoreError::Sqlite` as a string payload for now so WU2 can remain trait-first without prematurely introducing the concrete SQLite backend dependency wiring before the storage implementation work units. |
+| Blockers encountered | None after WU1 Git identity setup was resolved upstream. |
+| Decisions made | Added the documented trait families (`MemoryStore`, `EmbeddingProvider`, `SalienceGate`, `MemoryConsolidator`, `MemoryObservability`) plus minimal supporting API types required by the signatures to compile (`MetadataUpdate`, `MemoryFilter`, `OptionalFieldUpdate`, `GateDecision`, `ConsolidationAction`, and the corresponding error enums); wired everything into `lib.rs` via public re-exports and added `async-trait` using the workspace dependency convention. |
+| Confidence self-assessment | 5 |
 
 **Canary — Verify WU1:**
 > _Without opening types.rs, list the 5 MemoryType variants and the 5 ProvenanceLevel variants with their reliability scores. Then open the file and note any errors in your recall._
