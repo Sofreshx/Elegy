@@ -201,6 +201,33 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU7 — MVP Memory Store CLI Surface
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(pending WU7 commit; record hash after commit)_ |
+| Timestamp | 2026-03-24T06:42:01.0737571-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/cli.rs`, `rust/crates/elegy-memory/src/main.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/tests/cli.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo build` result | ✅ Pass — `cargo build -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test` result | ✅ Pass — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (41 passed, 0 failed) |
+| CLI help smoke result | ✅ Pass — help smoke verified for `root`, `add`, `search`, `list`, `inspect`, `purge`, `health`, `export`, `reembed`, and `contradictions` |
+| Tests written | 2 focused CLI binary tests in `rust/crates/elegy-memory/tests/cli.rs` covering JSON `add`→`list` flow and keyword-search retrieval through the landed MVP command surface. |
+| Deviations from plan | WU7 replaces the older local-memory artifact CLI entrypoint with the MVP memory-store CLI surface, so the landed binary/help output now centers on store operations (`add`, `search`, `list`, `inspect`, `purge`, `health`, `export`, `reembed`, `contradictions`) instead of the prior artifact workflow. The only follow-up fix folded into the landed snapshot was a narrow debug-only `SqliteMemoryStore` `Debug` implementation so CLI `StoreContext` can derive `Debug` cleanly without widening runtime behavior. |
+| Blockers encountered | None in the authoritative validation pass set; `cargo check`, `cargo build`, the full `cargo test` run, and the root/subcommand help smoke all passed once the MVP CLI surface and the debug-only store formatting fix were in place. |
+| Decisions made | Introduced a dedicated `src/cli.rs` MVP CLI module and pointed `src/main.rs` at it; kept the root command named `elegy-memory` with both text and JSON output modes; aligned the exposed subcommand surface to the validated MVP store operations only; retained CLI search as the landed keyword-oriented MVP path; and added focused CLI tests plus help-smoke coverage to confirm the binary shape after replacing the old artifact CLI. |
+| Confidence self-assessment | 5 |
+
+**Canary — Verify WU7:**
+> _Without re-reading, list all 9 CLI commands implemented. Then open cli.rs and verify._
+>
+> Recall attempt: `add`, `search`, `list`, `inspect`, `purge`, `health`, `export`, `reembed`, `contradictions`.
+>
+> Verification result: `rust/crates/elegy-memory/src/cli.rs` `Command` enum confirms exactly those 9 implemented subcommands: `Add`, `Search`, `List`, `Inspect`, `Purge`, `Health`, `Export`, `Reembed`, and `Contradictions`. The root `elegy-memory` parser wraps that subcommand set but is not an additional counted store command. Verification also confirms the landed CLI surface matches the MVP memory-store replacement, not the older local-memory artifact CLI. No recall errors.
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

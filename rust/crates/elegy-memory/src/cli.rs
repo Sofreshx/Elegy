@@ -1,42 +1,145 @@
-use crate::{
-    GovernedMemoryRecord, GovernedMemoryRecordImportOptions, LocalMemoryCatalogEntry,
-    LocalMemoryExportResult, LocalMemoryLifecycleState, LocalMemoryPaths, LocalMemoryQueryOptions,
-    LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoredRecord, SessionContextScope,
-    SummaryOnlySessionContextEnvelope, LOCAL_MEMORY_AUTHORITY_POSTURE,
-    LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_SINGLE_WRITER_POSTURE,
-    SUMMARY_ONLY_REPRESENTATION, SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+use std::{
+    collections::BTreeMap,
+    ffi::OsString,
+    fs,
+    io::{self, Write},
+    path::PathBuf,
+    process::ExitCode,
 };
+
+use chrono::Utc;
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use serde::Serialize;
-use serde_json::json;
-use std::ffi::OsString;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::process::ExitCode;
+use thiserror::Error;
+use tokio::runtime::Builder;
+use uuid::Uuid;
 
-const MEMORY_CLI_SCHEMA_VERSION: &str = "0.1.0";
-const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
-const LOCAL_DEFAULT_ROOT_DIR: &str = ".elegy-local-memory";
-const LOCAL_DEFAULT_VISIBILITY_POSTURE: &str =
-    "default active-only queries exclude superseded and tombstoned local records";
-const SESSION_CONTEXT_NEUTRAL_VALIDATION_SCOPE: &str =
-    "artifact-shape validation over the governed summary-only envelope only";
-const SESSION_CONTEXT_AUTHORITY_POSTURE: &str =
-    "non-authoritative CLI surface; host-owned authority remains in SAASTools";
-const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
-    "mirror-or-inspect-only; adapters cannot promote, invalidate, or override host-owned truth";
-const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
+use crate::{
+    DefaultSalienceGate, GateDecision, GateError, Memory, MemoryCandidate, MemoryFilter,
+    MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
+    MemoryVersion, ProvenanceLevel, ResolutionStatus, ScoredMemory, SearchQuery,
+    SalienceGate, SensitivityLevel, SqliteMemoryStore, StoreError,
+};
+
+const DEFAULT_IMPORTANCE: f32 = 0.5;
+const DEFAULT_LIMIT: usize = 20;
+const DEFAULT_REEMBED_LIMIT: usize = 100;
+const PREVIEW_LIMIT: usize = 80;
+
+#[derive(Debug, Error)]
+pub enum CliError {
+    #[error("{0}")]
+    Store(#[from] StoreError),
+    #[error("{0}")]
+    Gate(#[from] GateError),
+    #[error("{0}")]
+    Io(#[from] io::Error),
+    #[error("{0}")]
+    Json(#[from] serde_json::Error),
+    #[error("invalid memory id `{value}`: {source}")]
+    InvalidId {
+        value: String,
+        #[source]
+        source: uuid::Error,
+    },
+    #[error("{0}")]
+    Validation(String),
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy-memory")]
-#[command(
-    about = "CLI for governed session-context inspection and local non-authoritative memory artifact management"
-)]
+#[command(about = "MVP CLI for the Elegy memory store")]
 struct Cli {
-    #[arg(long, value_enum, default_value_t = OutputFormat::Text, global = true)]
+    #[arg(long, value_enum, global = true, default_value_t = OutputFormat::Text)]
     format: OutputFormat,
     #[command(subcommand)]
     command: Command,
+}
+
+#[derive(Subcommand, Debug)]
+enum Command {
+    /// Add a memory to the store.
+    Add {
+        #[command(flatten)]
+        store: StoreArgs,
+        content: String,
+        #[arg(long = "type", value_enum, default_value_t = CliMemoryType::Observation)]
+        memory_type: CliMemoryType,
+        #[arg(long, default_value_t = DEFAULT_IMPORTANCE)]
+        importance: f32,
+        #[arg(long, value_enum, default_value_t = CliProvenance::UserStated)]
+        provenance: CliProvenance,
+    },
+    /// Search with keyword-only FTS5 matching in the CLI MVP.
+    Search {
+        #[command(flatten)]
+        store: StoreArgs,
+        query: String,
+        #[arg(long, default_value_t = DEFAULT_LIMIT)]
+        limit: usize,
+        #[arg(long)]
+        include_dormant: bool,
+    },
+    /// List memories using simple filters.
+    List {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long = "type", value_enum)]
+        memory_type: Option<CliMemoryType>,
+        #[arg(long, value_enum)]
+        state: Option<CliMemoryState>,
+        #[arg(long, default_value_t = DEFAULT_LIMIT)]
+        limit: usize,
+    },
+    /// Inspect a single memory and show its version history.
+    Inspect {
+        #[command(flatten)]
+        store: StoreArgs,
+        id: String,
+    },
+    /// Purge the configured database after confirmation.
+    Purge {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long)]
+        yes: bool,
+    },
+    /// Show a health summary for the current scope.
+    Health {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Export memories as JSON to stdout or a file.
+    Export {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Re-embed stale memories when a provider is configured.
+    Reembed {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long)]
+        provider: Option<String>,
+        #[arg(long, default_value_t = DEFAULT_REEMBED_LIMIT)]
+        limit: usize,
+    },
+    /// List unresolved contradiction records.
+    Contradictions {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+}
+
+#[derive(Args, Clone, Debug)]
+struct StoreArgs {
+    /// SQLite database path. Defaults to ~/.elegy/memory.db
+    #[arg(long)]
+    db: Option<PathBuf>,
+    /// Memory scope to operate on. Workspace is used by default in this MVP CLI.
+    #[arg(long, value_enum, default_value_t = CliScope::Workspace)]
+    scope: CliScope,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -45,260 +148,185 @@ pub enum OutputFormat {
     Json,
 }
 
-#[derive(Subcommand, Debug)]
-enum Command {
-    Inspect,
-    Validate {
-        #[arg(long)]
-        input: PathBuf,
-    },
-    Init {
-        #[command(flatten)]
-        root: LocalRootArgs,
-    },
-    Import {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[arg(long)]
-        input: PathBuf,
-        #[arg(long)]
-        record_id: String,
-        #[arg(long)]
-        imported_at_utc: String,
-    },
-    List {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[command(flatten)]
-        visibility: LocalVisibilityArgs,
-    },
-    Show {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[arg(long)]
-        record_id: String,
-        #[command(flatten)]
-        visibility: LocalVisibilityArgs,
-    },
-    Export {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[arg(long)]
-        record_id: String,
-        #[arg(long)]
-        output_path: Option<PathBuf>,
-        #[command(flatten)]
-        visibility: LocalVisibilityArgs,
-    },
-    Supersede {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[arg(long)]
-        record_id: String,
-        #[arg(long)]
-        superseded_by_record_id: String,
-    },
-    Tombstone {
-        #[command(flatten)]
-        root: LocalRootArgs,
-        #[arg(long)]
-        record_id: String,
-        #[arg(long)]
-        tombstoned_at_utc: String,
-        #[arg(long)]
-        reason: String,
-    },
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliScope {
+    Session,
+    Workspace,
+    User,
+    Agent,
 }
 
-#[derive(Args, Clone, Debug)]
-struct LocalRootArgs {
-    #[arg(long)]
-    root: Option<PathBuf>,
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliMemoryType {
+    Fact,
+    Preference,
+    Decision,
+    Procedure,
+    Observation,
 }
 
-#[derive(Args, Clone, Debug, Default)]
-struct LocalVisibilityArgs {
-    #[arg(long)]
-    include_superseded: bool,
-    #[arg(long)]
-    include_tombstoned: bool,
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliMemoryState {
+    Active,
+    Dormant,
+    Deleted,
 }
 
-impl LocalVisibilityArgs {
-    fn query_options(&self) -> LocalMemoryQueryOptions {
-        LocalMemoryQueryOptions {
-            include_superseded: self.include_superseded,
-            include_tombstoned: self.include_tombstoned,
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliProvenance {
+    UserStated,
+    AgentObserved,
+    Consolidated,
+    Imported,
+    AgentInferred,
+}
+
+impl From<CliScope> for MemoryScope {
+    fn from(value: CliScope) -> Self {
+        match value {
+            CliScope::Session => Self::Session,
+            CliScope::Workspace => Self::Workspace,
+            CliScope::User => Self::User,
+            CliScope::Agent => Self::Agent,
         }
     }
 }
 
+impl From<CliMemoryType> for MemoryType {
+    fn from(value: CliMemoryType) -> Self {
+        match value {
+            CliMemoryType::Fact => Self::Fact,
+            CliMemoryType::Preference => Self::Preference,
+            CliMemoryType::Decision => Self::Decision,
+            CliMemoryType::Procedure => Self::Procedure,
+            CliMemoryType::Observation => Self::Observation,
+        }
+    }
+}
+
+impl From<CliMemoryState> for MemoryState {
+    fn from(value: CliMemoryState) -> Self {
+        match value {
+            CliMemoryState::Active => Self::Active,
+            CliMemoryState::Dormant => Self::Dormant,
+            CliMemoryState::Deleted => Self::Deleted,
+        }
+    }
+}
+
+impl From<CliProvenance> for ProvenanceLevel {
+    fn from(value: CliProvenance) -> Self {
+        match value {
+            CliProvenance::UserStated => Self::UserStated,
+            CliProvenance::AgentObserved => Self::AgentObserved,
+            CliProvenance::Consolidated => Self::Consolidated,
+            CliProvenance::Imported => Self::Imported,
+            CliProvenance::AgentInferred => Self::AgentInferred,
+        }
+    }
+}
+
+#[derive(Debug)]
+struct StoreContext {
+    db_path: PathBuf,
+    scope: MemoryScope,
+    store: SqliteMemoryStore,
+}
+
 #[derive(Serialize)]
-struct Envelope<T>
+struct JsonEnvelope<T>
 where
     T: Serialize,
 {
-    schema_version: &'static str,
-    command: Vec<String>,
-    status: &'static str,
-    summary: Summary,
+    command: &'static str,
     data: T,
-    diagnostics: Vec<Diagnostic>,
-}
-
-#[derive(Default, Serialize)]
-struct Summary {
-    errors: usize,
-    warnings: usize,
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, Serialize)]
-#[serde(rename_all = "lowercase")]
-enum DiagnosticSeverity {
-    Error,
-    Warning,
-}
-
-#[derive(Clone, Debug, Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct DiagnosticLocation {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    path: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    field: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Diagnostic {
-    severity: DiagnosticSeverity,
-    code: String,
-    message: String,
-    location: DiagnosticLocation,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    hint: Option<String>,
-}
-
-impl Diagnostic {
-    fn error(code: &str, message: impl Into<String>) -> Self {
-        Self {
-            severity: DiagnosticSeverity::Error,
-            code: code.to_string(),
-            message: message.into(),
-            location: DiagnosticLocation::default(),
-            hint: None,
-        }
-    }
-
-    fn with_path(mut self, path: String) -> Self {
-        self.location.path = Some(path);
-        self
-    }
-
-    fn with_field(mut self, field: impl Into<String>) -> Self {
-        self.location.field = Some(field.into());
-        self
-    }
-
-    fn with_hint(mut self, hint: impl Into<String>) -> Self {
-        self.hint = Some(hint.into());
-        self
-    }
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SessionContextInspection {
-    capability: &'static str,
-    contract_field: &'static str,
-    schema_file: &'static str,
-    representation: &'static str,
-    supported_scopes: Vec<&'static str>,
-    intended_consumers: Vec<&'static str>,
-    bounded_fields: Vec<&'static str>,
-    raw_transcript_persisted: bool,
-    transcript_bodies_allowed_in_artifact: bool,
+struct AddResponse {
+    action: &'static str,
+    gate_result: &'static str,
+    memory: Memory,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct SessionContextValidationReport {
-    input_path: String,
-    artifact_kind: &'static str,
-    representation: &'static str,
-    scope: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    request_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    run_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    captured_at_utc: Option<String>,
-    summary_length: usize,
-    summary_preview: String,
-    salient_facts_count: usize,
-    instruction_context_count: usize,
-    raw_transcript_persisted: bool,
-    read_only: bool,
-    neutral_validation_scope: &'static str,
-    authority_posture: &'static str,
-    host_validation_owner: &'static str,
-    host_promotion_owner: &'static str,
-    host_invalidation_owner: &'static str,
-    adapter_posture: &'static str,
+struct SearchResponse {
+    scope: String,
+    query: String,
+    keyword_only: bool,
+    include_dormant: bool,
+    results: Vec<SearchResultRow>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LocalInitReport {
-    root_path: String,
-    artifacts_path: String,
-    state_path: String,
-    write_lock_path: String,
-    exports_path: String,
-    authority_posture: &'static str,
-    single_writer_posture: &'static str,
-    deterministic_ordering: &'static str,
+struct SearchResultRow {
+    id: String,
+    score: f32,
+    similarity: f32,
+    state: String,
+    memory_type: String,
+    preview: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LocalListReport {
-    root_path: String,
-    authority_posture: &'static str,
-    default_visibility: String,
-    deterministic_ordering: &'static str,
-    records: Vec<LocalMemoryCatalogEntry>,
+struct ListResponse {
+    scope: String,
+    count: usize,
+    memories: Vec<ListRow>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LocalRecordReport {
-    root_path: String,
-    artifact_path: String,
-    default_export_path: String,
-    authority_posture: &'static str,
-    default_visibility: String,
-    deterministic_ordering: &'static str,
-    record: GovernedMemoryRecord,
+struct ListRow {
+    id: String,
+    state: String,
+    memory_type: String,
+    provenance: String,
+    importance: f32,
+    updated_at: String,
+    preview: String,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct LocalExportReport {
-    root_path: String,
-    output_path: String,
-    authority_posture: &'static str,
-    default_visibility: String,
-    deterministic_ordering: &'static str,
-    record: GovernedMemoryRecord,
-    exported_envelope: SummaryOnlySessionContextEnvelope,
+struct InspectResponse {
+    memory: Memory,
+    versions: Vec<MemoryVersion>,
 }
 
-pub fn run_from_env() -> Result<ExitCode, serde_json::Error> {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthResponse {
+    report: MemoryHealthReport,
+    type_counts: BTreeMap<String, u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportResponse {
+    exported_at: String,
+    db_path: String,
+    scope: String,
+    memories: Vec<Memory>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PurgeResponse {
+    db_path: String,
+    scope: String,
+    report: crate::PurgeReport,
+}
+
+pub fn run_from_env() -> Result<ExitCode, CliError> {
     run_from(std::env::args_os())
 }
 
-pub fn run_from<I, T>(args: I) -> Result<ExitCode, serde_json::Error>
+pub fn run_from<I, T>(args: I) -> Result<ExitCode, CliError>
 where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
@@ -306,954 +334,764 @@ where
     dispatch(Cli::parse_from(args))
 }
 
-fn dispatch(cli: Cli) -> Result<ExitCode, serde_json::Error> {
+fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
     match cli.command {
-        Command::Inspect => execute_inspect_command(cli.format),
-        Command::Validate { input } => execute_validate_command(input, cli.format),
-        Command::Init { root } => execute_init_command(root.root, cli.format),
-        Command::Import {
-            root,
-            input,
-            record_id,
-            imported_at_utc,
-        } => execute_import_command(root.root, input, record_id, imported_at_utc, cli.format),
-        Command::List { root, visibility } => {
-            execute_list_command(root.root, visibility.query_options(), cli.format)
-        }
-        Command::Show {
-            root,
-            record_id,
-            visibility,
-        } => execute_show_command(root.root, record_id, visibility.query_options(), cli.format),
-        Command::Export {
-            root,
-            record_id,
-            output_path,
-            visibility,
-        } => execute_export_command(
-            root.root,
-            record_id,
-            output_path,
-            visibility.query_options(),
+        Command::Add {
+            store,
+            content,
+            memory_type,
+            importance,
+            provenance,
+        } => execute_add_command(
+            open_store(store)?,
+            content,
+            memory_type.into(),
+            importance,
+            provenance.into(),
             cli.format,
         ),
-        Command::Supersede {
-            root,
-            record_id,
-            superseded_by_record_id,
-        } => execute_supersede_command(root.root, record_id, superseded_by_record_id, cli.format),
-        Command::Tombstone {
-            root,
-            record_id,
-            tombstoned_at_utc,
-            reason,
-        } => execute_tombstone_command(root.root, record_id, tombstoned_at_utc, reason, cli.format),
+        Command::Search {
+            store,
+            query,
+            limit,
+            include_dormant,
+        } => execute_search_command(open_store(store)?, query, limit, include_dormant, cli.format),
+        Command::List {
+            store,
+            memory_type,
+            state,
+            limit,
+        } => execute_list_command(
+            open_store(store)?,
+            memory_type.map(Into::into),
+            state.map(Into::into),
+            limit,
+            cli.format,
+        ),
+        Command::Inspect { store, id } => execute_inspect_command(open_store(store)?, id, cli.format),
+        Command::Purge { store, yes } => execute_purge_command(open_store(store)?, yes, cli.format),
+        Command::Health { store } => execute_health_command(open_store(store)?, cli.format),
+        Command::Export { store, output } => {
+            execute_export_command(open_store(store)?, output, cli.format)
+        }
+        Command::Reembed {
+            store,
+            provider,
+            limit,
+        } => execute_reembed_command(open_store(store)?, provider, limit),
+        Command::Contradictions { store } => {
+            execute_contradictions_command(open_store(store)?, cli.format)
+        }
     }
 }
 
-pub fn execute_inspect_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
-    let inspection = session_context_inspection();
+fn execute_add_command(
+    ctx: StoreContext,
+    content: String,
+    memory_type: MemoryType,
+    importance: f32,
+    provenance: ProvenanceLevel,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    validate_importance(importance)?;
+    let trimmed_content = content.trim().to_string();
+    if trimmed_content.is_empty() {
+        return Err(CliError::Validation(
+            "memory content must not be empty".to_string(),
+        ));
+    }
+
+    let gate = DefaultSalienceGate::new(ctx.store.scope_config()?);
+    let candidate = MemoryCandidate {
+        content: trimmed_content.clone(),
+        summary: None,
+        memory_type,
+        provenance,
+        importance_score: importance,
+        sensitivity: SensitivityLevel::Low,
+        tags: Vec::new(),
+        custom_metadata: Default::default(),
+        embedding: None,
+    };
+
+    let decision = run_async(gate.evaluate(&candidate, &ctx.store))?;
+    let response = match decision {
+        GateDecision::Merge {
+            target_id,
+            enriched_content,
+        } => {
+            run_async(ctx.store.update_content(
+                &target_id,
+                &enriched_content,
+                "cli:add",
+                "merged by salience gate from CLI add",
+            ))?;
+            let memory = run_async(ctx.store.get_raw(&target_id))?
+                .ok_or_else(|| StoreError::NotFound(target_id))?;
+            AddResponse {
+                action: "merged",
+                gate_result: "merge",
+                memory,
+            }
+        }
+        GateDecision::Archive => {
+            let now = Utc::now();
+            let memory = Memory {
+                id: Uuid::new_v4(),
+                content: trimmed_content,
+                summary: None,
+                scope: ctx.scope,
+                memory_type,
+                provenance,
+                importance_score: importance,
+                reliability_score: provenance.base_reliability(),
+                sensitivity: SensitivityLevel::Low,
+                state: MemoryState::Dormant,
+                tags: Vec::new(),
+                status: None,
+                custom_metadata: Default::default(),
+                access_count: 0,
+                corroboration_count: 0,
+                embedding_stale: true,
+                created_at: now,
+                updated_at: now,
+                last_accessed_at: None,
+                tenant_id: None,
+                user_id: None,
+                agent_id: None,
+            };
+            let id = memory.id;
+            run_async(ctx.store.store(memory))?;
+            let stored = run_async(ctx.store.get_raw(&id))?
+                .ok_or_else(|| StoreError::NotFound(id))?;
+            AddResponse {
+                action: "added",
+                gate_result: "archived",
+                memory: stored,
+            }
+        }
+        GateDecision::Accept => {
+            let now = Utc::now();
+            let memory = Memory {
+                id: Uuid::new_v4(),
+                content: trimmed_content,
+                summary: None,
+                scope: ctx.scope,
+                memory_type,
+                provenance,
+                importance_score: importance,
+                reliability_score: provenance.base_reliability(),
+                sensitivity: SensitivityLevel::Low,
+                state: MemoryState::Active,
+                tags: Vec::new(),
+                status: None,
+                custom_metadata: Default::default(),
+                access_count: 0,
+                corroboration_count: 0,
+                embedding_stale: true,
+                created_at: now,
+                updated_at: now,
+                last_accessed_at: None,
+                tenant_id: None,
+                user_id: None,
+                agent_id: None,
+            };
+            let id = memory.id;
+            run_async(ctx.store.store(memory))?;
+            let stored = run_async(ctx.store.get_raw(&id))?
+                .ok_or_else(|| StoreError::NotFound(id))?;
+            AddResponse {
+                action: "added",
+                gate_result: "accepted",
+                memory: stored,
+            }
+        }
+        GateDecision::Reject { reason } => {
+            return Err(CliError::Validation(format!(
+                "unexpected non-MVP reject decision from salience gate: {reason}"
+            )));
+        }
+    };
 
     match format {
-        OutputFormat::Text => print_session_context_text(&inspection),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: MEMORY_CLI_SCHEMA_VERSION,
-            command: vec!["inspect".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: inspection,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Text => print_add_text(&ctx, &response),
+        OutputFormat::Json => print_json("add", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
 }
 
-pub fn execute_validate_command(
-    input: PathBuf,
+fn execute_search_command(
+    ctx: StoreContext,
+    query: String,
+    limit: usize,
+    include_dormant: bool,
     format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let input_path = input.display().to_string();
-    let file_contents = match fs::read_to_string(&input) {
-        Ok(value) => value,
-        Err(error) => {
-            let diagnostic = Diagnostic::error(
-                "CLI-MEMORY-001",
-                format!(
-                    "failed to read session-context artifact {}: {error}",
-                    input.display()
-                ),
-            )
-            .with_path(input_path.clone())
-            .with_hint("supply a readable JSON file containing a governed summary-only artifact");
+) -> Result<ExitCode, CliError> {
+    validate_limit(limit, "limit")?;
+    let trimmed_query = query.trim().to_string();
+    if trimmed_query.is_empty() {
+        return Err(CliError::Validation(
+            "search query must not be empty".to_string(),
+        ));
+    }
 
-            return emit_diagnostics(
-                format,
-                vec!["validate"],
-                vec![diagnostic],
-                json!({ "inputPath": input_path }),
-                "invalid",
-                ExitCode::from(1),
-            );
-        }
+    let mut results = run_async(ctx.store.search(SearchQuery {
+        text: trimmed_query.clone(),
+        embedding: None,
+        scope: ctx.scope,
+        state_filter: Some(MemoryState::Active),
+        type_filter: None,
+        max_results: limit,
+        context_config: None,
+    }))?;
+
+    if include_dormant {
+        results.extend(run_async(ctx.store.search(SearchQuery {
+            text: trimmed_query.clone(),
+            embedding: None,
+            scope: ctx.scope,
+            state_filter: Some(MemoryState::Dormant),
+            type_filter: None,
+            max_results: limit,
+            context_config: None,
+        }))?);
+        sort_scored_memories(&mut results);
+        results.truncate(limit);
+    }
+
+    let response = SearchResponse {
+        scope: display_scope(ctx.scope),
+        query: trimmed_query,
+        keyword_only: true,
+        include_dormant,
+        results: results.into_iter().map(search_result_row).collect(),
     };
 
-    let artifact = match serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&file_contents) {
-        Ok(value) => value,
-        Err(error) => {
-            let diagnostic = Diagnostic::error(
-                "CLI-MEMORY-002",
-                format!(
-                    "failed to parse or validate summary-only session-context artifact {}: {error}",
-                    input.display()
-                ),
-            )
-            .with_path(input_path.clone())
-            .with_hint(
-                "only governed summary-only envelopes are supported; mutation, promotion, persistence, and transcript-bearing payloads are out of scope",
-            );
-
-            return emit_diagnostics(
-                format,
-                vec!["validate"],
-                vec![diagnostic],
-                json!({ "inputPath": input_path }),
-                "invalid",
-                ExitCode::from(1),
-            );
-        }
-    };
-
-    let report = build_session_context_validation_report(&input, &artifact);
     match format {
-        OutputFormat::Text => print_validated_session_context_text(&report),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: MEMORY_CLI_SCHEMA_VERSION,
-            command: vec!["validate".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: report,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Text => print_search_text(&response),
+        OutputFormat::Json => print_json("search", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
 }
 
-pub fn execute_init_command(
-    root: Option<PathBuf>,
+fn execute_list_command(
+    ctx: StoreContext,
+    memory_type: Option<MemoryType>,
+    state: Option<MemoryState>,
+    limit: usize,
     format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
+) -> Result<ExitCode, CliError> {
+    validate_limit(limit, "limit")?;
+    let memories = run_async(ctx.store.list(MemoryFilter {
+        scope: Some(ctx.scope),
+        state,
+        memory_types: memory_type.map(|kind| vec![kind]),
+        provenance_levels: None,
+        tags: None,
+        status: None,
+        tenant_id: None,
+        user_id: None,
+        agent_id: None,
+        limit: Some(limit),
+    }))?;
 
-    match store.init() {
-        Ok(initialized) => {
-            let report = build_local_init_report(&initialized.paths);
-            match format {
-                OutputFormat::Text => print_local_init_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["init".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["init"],
-            json!({ "rootPath": root.display().to_string() }),
-        ),
-    }
-}
-
-pub fn execute_import_command(
-    root: Option<PathBuf>,
-    input: PathBuf,
-    record_id: String,
-    imported_at_utc: String,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-    let input_path = input.display().to_string();
-    let file_contents = match fs::read_to_string(&input) {
-        Ok(value) => value,
-        Err(error) => {
-            let diagnostic = Diagnostic::error(
-                "CLI-LOCAL-001",
-                format!("failed to read local import artifact {}: {error}", input.display()),
-            )
-            .with_path(input_path.clone())
-            .with_hint(
-                "supply a readable summary-only session-context envelope; local import does not establish host authority",
-            );
-
-            return emit_diagnostics(
-                format,
-                vec!["import"],
-                vec![diagnostic],
-                json!({ "inputPath": input_path, "rootPath": root.display().to_string() }),
-                "invalid",
-                ExitCode::from(1),
-            );
-        }
+    let response = ListResponse {
+        scope: display_scope(ctx.scope),
+        count: memories.len(),
+        memories: memories.into_iter().map(list_row).collect(),
     };
 
-    let artifact = match serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&file_contents) {
-        Ok(value) => value,
-        Err(error) => {
-            let diagnostic = Diagnostic::error(
-                "CLI-LOCAL-002",
-                format!(
-                    "failed to parse or validate local import artifact {}: {error}",
-                    input.display()
-                ),
-            )
-            .with_path(input_path.clone())
-            .with_hint(
-                "only governed summary-only envelopes are accepted here; local import remains non-authoritative artifact management only",
-            );
-
-            return emit_diagnostics(
-                format,
-                vec!["import"],
-                vec![diagnostic],
-                json!({ "inputPath": input_path, "rootPath": root.display().to_string() }),
-                "invalid",
-                ExitCode::from(1),
-            );
-        }
-    };
-
-    match store.import_summary_only_envelope(
-        &artifact,
-        GovernedMemoryRecordImportOptions {
-            record_id,
-            imported_at_utc,
-        },
-    ) {
-        Ok(stored) => {
-            let report =
-                build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
-            match format {
-                OutputFormat::Text => {
-                    print_local_record_text("imported local non-authoritative artifact", &report)
-                }
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["import".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["import"],
-            json!({ "inputPath": input_path, "rootPath": root.display().to_string() }),
-        ),
-    }
-}
-
-pub fn execute_list_command(
-    root: Option<PathBuf>,
-    options: LocalMemoryQueryOptions,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-
-    match store.list_records(&options) {
-        Ok(records) => {
-            let report = build_local_list_report(&root, &options, records);
-            match format {
-                OutputFormat::Text => print_local_list_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["list".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["list"],
-            json!({ "rootPath": root.display().to_string() }),
-        ),
-    }
-}
-
-pub fn execute_show_command(
-    root: Option<PathBuf>,
-    record_id: String,
-    options: LocalMemoryQueryOptions,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-
-    match store.show_record(&record_id, &options) {
-        Ok(stored) => {
-            let report = build_local_record_report(&root, &stored, &options);
-            match format {
-                OutputFormat::Text => {
-                    print_local_record_text("local non-authoritative artifact record", &report)
-                }
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["show".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["show"],
-            json!({
-                "rootPath": root.display().to_string(),
-                "recordId": record_id,
-            }),
-        ),
-    }
-}
-
-pub fn execute_export_command(
-    root: Option<PathBuf>,
-    record_id: String,
-    output_path: Option<PathBuf>,
-    options: LocalMemoryQueryOptions,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-
-    match store.export_summary_only_envelope(&record_id, output_path.as_deref(), &options) {
-        Ok(result) => {
-            let report = build_local_export_report(&root, &result, &options);
-            match format {
-                OutputFormat::Text => print_local_export_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["export".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["export"],
-            json!({
-                "rootPath": root.display().to_string(),
-                "recordId": record_id,
-            }),
-        ),
-    }
-}
-
-pub fn execute_supersede_command(
-    root: Option<PathBuf>,
-    record_id: String,
-    superseded_by_record_id: String,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-
-    match store.supersede_record(&record_id, &superseded_by_record_id) {
-        Ok(stored) => {
-            let report = build_local_record_report(
-                &root,
-                &stored,
-                &LocalMemoryQueryOptions {
-                    include_superseded: true,
-                    include_tombstoned: false,
-                },
-            );
-            match format {
-                OutputFormat::Text => {
-                    print_local_record_text("marked local artifact as superseded", &report)
-                }
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["supersede".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["supersede"],
-            json!({
-                "rootPath": root.display().to_string(),
-                "recordId": record_id,
-                "supersededByRecordId": superseded_by_record_id,
-            }),
-        ),
-    }
-}
-
-pub fn execute_tombstone_command(
-    root: Option<PathBuf>,
-    record_id: String,
-    tombstoned_at_utc: String,
-    reason: String,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let root = resolve_local_root(root);
-    let store = LocalMemoryStore::new(&root);
-
-    match store.tombstone_record(&record_id, &tombstoned_at_utc, &reason) {
-        Ok(stored) => {
-            let report = build_local_record_report(
-                &root,
-                &stored,
-                &LocalMemoryQueryOptions {
-                    include_superseded: true,
-                    include_tombstoned: true,
-                },
-            );
-            match format {
-                OutputFormat::Text => print_local_record_text("tombstoned local artifact", &report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: MEMORY_CLI_SCHEMA_VERSION,
-                    command: vec!["tombstone".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
-            }
-
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_local_store_error(
-            error,
-            format,
-            vec!["tombstone"],
-            json!({
-                "rootPath": root.display().to_string(),
-                "recordId": record_id,
-            }),
-        ),
-    }
-}
-
-fn emit_diagnostics<T: Serialize>(
-    format: OutputFormat,
-    command: Vec<&str>,
-    diagnostics: Vec<Diagnostic>,
-    data: T,
-    status: &'static str,
-    exit_code: ExitCode,
-) -> Result<ExitCode, serde_json::Error> {
-    let summary = summarize(&diagnostics);
     match format {
-        OutputFormat::Text => print_diagnostics_text(&diagnostics),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: MEMORY_CLI_SCHEMA_VERSION,
-            command: command.into_iter().map(str::to_string).collect(),
-            status,
-            summary,
-            data,
-            diagnostics,
-        })?,
+        OutputFormat::Text => print_list_text(&response),
+        OutputFormat::Json => print_json("list", &response)?,
     }
-    Ok(exit_code)
+
+    Ok(ExitCode::SUCCESS)
 }
 
-fn summarize(diagnostics: &[Diagnostic]) -> Summary {
-    Summary {
-        errors: diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Error)
-            .count(),
-        warnings: diagnostics
-            .iter()
-            .filter(|diagnostic| diagnostic.severity == DiagnosticSeverity::Warning)
-            .count(),
-    }
-}
-
-fn print_session_context_text(inspection: &SessionContextInspection) {
-    println!("summary-only session context artifact");
-    println!("capability: {}", inspection.capability);
-    println!("contract field: {}", inspection.contract_field);
-    println!("schema: {}", inspection.schema_file);
-    println!("representation: {}", inspection.representation);
-    println!(
-        "supported scopes: {}",
-        inspection.supported_scopes.join(", ")
-    );
-    println!("consumers: {}", inspection.intended_consumers.join(", "));
-    println!("bounded fields: {}", inspection.bounded_fields.join(", "));
-    println!(
-        "raw transcript persisted: {}",
-        inspection.raw_transcript_persisted
-    );
-    println!(
-        "transcript bodies allowed in artifact: {}",
-        inspection.transcript_bodies_allowed_in_artifact
-    );
-}
-
-fn print_validated_session_context_text(report: &SessionContextValidationReport) {
-    println!("summary-only session context artifact is valid");
-    println!("input: {}", report.input_path);
-    println!("artifact kind: {}", report.artifact_kind);
-    println!("representation: {}", report.representation);
-    println!("scope: {}", report.scope);
-    if let Some(request_id) = &report.request_id {
-        println!("request id: {request_id}");
-    }
-    if let Some(run_id) = &report.run_id {
-        println!("run id: {run_id}");
-    }
-    if let Some(captured_at_utc) = &report.captured_at_utc {
-        println!("captured at utc: {captured_at_utc}");
-    }
-    println!("summary length: {}", report.summary_length);
-    println!("summary preview: {}", report.summary_preview);
-    println!("salient facts: {}", report.salient_facts_count);
-    println!(
-        "instruction context items: {}",
-        report.instruction_context_count
-    );
-    println!(
-        "raw transcript persisted: {}",
-        report.raw_transcript_persisted
-    );
-    println!("read only: {}", report.read_only);
-    println!(
-        "neutral validation scope: {}",
-        report.neutral_validation_scope
-    );
-    println!("authority posture: {}", report.authority_posture);
-    println!("host validation owner: {}", report.host_validation_owner);
-    println!("host promotion owner: {}", report.host_promotion_owner);
-    println!(
-        "host invalidation owner: {}",
-        report.host_invalidation_owner
-    );
-    println!("adapter posture: {}", report.adapter_posture);
-}
-
-fn print_local_init_text(report: &LocalInitReport) {
-    println!("initialized local non-authoritative artifact root");
-    println!("root: {}", report.root_path);
-    println!("artifacts: {}", report.artifacts_path);
-    println!("state: {}", report.state_path);
-    println!("write lock: {}", report.write_lock_path);
-    println!("exports: {}", report.exports_path);
-    println!("authority posture: {}", report.authority_posture);
-    println!("single writer posture: {}", report.single_writer_posture);
-    println!("deterministic ordering: {}", report.deterministic_ordering);
-}
-
-fn print_local_list_text(report: &LocalListReport) {
-    println!("local non-authoritative artifact list");
-    println!("root: {}", report.root_path);
-    println!("authority posture: {}", report.authority_posture);
-    println!("default visibility: {}", report.default_visibility);
-    println!("deterministic ordering: {}", report.deterministic_ordering);
-    println!("records: {}", report.records.len());
-    for record in &report.records {
-        println!(
-            "- {} [{}] {} | {}",
-            record.record_id,
-            format_local_lifecycle_state(record.lifecycle_state),
-            format_scope(record.scope),
-            record.scope_captured_at_record_id
-        );
-    }
-}
-
-fn print_local_record_text(header: &str, report: &LocalRecordReport) {
-    println!("{header}");
-    println!("root: {}", report.root_path);
-    println!("record id: {}", report.record.record_id);
-    println!(
-        "lifecycle state: {}",
-        format_local_lifecycle_state(report.record.local_lifecycle.state)
-    );
-    println!(
-        "scope: {}",
-        format_scope(report.record.session_context.scope)
-    );
-    if let Some(captured_at_utc) = &report.record.provenance.captured_at_utc {
-        println!("captured at utc: {captured_at_utc}");
-    }
-    println!(
-        "imported at utc: {}",
-        report.record.provenance.imported_at_utc
-    );
-    println!("artifact: {}", report.artifact_path);
-    println!("default export: {}", report.default_export_path);
-    println!(
-        "summary preview: {}",
-        truncate_for_preview(&report.record.session_context.summary)
-    );
-    if let Some(superseded_by_record_id) = &report.record.local_lifecycle.superseded_by_record_id {
-        println!("superseded by local record: {superseded_by_record_id}");
-    }
-    if let Some(tombstone) = &report.record.local_lifecycle.tombstone {
-        println!("tombstoned at utc: {}", tombstone.tombstoned_at_utc);
-        println!("tombstone reason: {}", tombstone.reason);
-    }
-    println!("authority posture: {}", report.authority_posture);
-    println!("default visibility: {}", report.default_visibility);
-    println!("deterministic ordering: {}", report.deterministic_ordering);
-}
-
-fn print_local_export_text(report: &LocalExportReport) {
-    println!("exported local non-authoritative summary-only artifact");
-    println!("root: {}", report.root_path);
-    println!("record id: {}", report.record.record_id);
-    println!("output: {}", report.output_path);
-    println!(
-        "lifecycle state: {}",
-        format_local_lifecycle_state(report.record.local_lifecycle.state)
-    );
-    println!(
-        "scope: {}",
-        format_scope(report.record.session_context.scope)
-    );
-    println!("authority posture: {}", report.authority_posture);
-    println!("default visibility: {}", report.default_visibility);
-    println!("deterministic ordering: {}", report.deterministic_ordering);
-}
-
-fn print_diagnostics_text(diagnostics: &[Diagnostic]) {
-    for diagnostic in diagnostics {
-        let mut location = String::new();
-        if let Some(path) = &diagnostic.location.path {
-            location.push_str(path);
-        }
-        if let Some(field) = &diagnostic.location.field {
-            if !location.is_empty() {
-                location.push('#');
-            }
-            location.push_str(field);
-        }
-
-        if location.is_empty() {
-            eprintln!(
-                "{}[{}]: {}",
-                severity_label(diagnostic),
-                diagnostic.code,
-                diagnostic.message
-            );
-        } else {
-            eprintln!(
-                "{}[{}] {}: {}",
-                severity_label(diagnostic),
-                diagnostic.code,
-                location,
-                diagnostic.message
-            );
-        }
-
-        if let Some(hint) = &diagnostic.hint {
-            eprintln!("  hint: {hint}");
-        }
-    }
-}
-
-fn severity_label(diagnostic: &Diagnostic) -> &'static str {
-    match diagnostic.severity {
-        DiagnosticSeverity::Error => "error",
-        DiagnosticSeverity::Warning => "warning",
-    }
-}
-
-fn session_context_inspection() -> SessionContextInspection {
-    SessionContextInspection {
-        capability: "summary-only-session-context-envelope",
-        contract_field: "summary-only-session-context-envelope.sessionContext",
-        schema_file: "contracts/schemas/summary-only-session-context-envelope.schema.json",
-        representation: "summary-only",
-        supported_scopes: vec!["run", "session", "workspace"],
-        intended_consumers: vec!["instruction-engine", "workspace-bootstrap", "agent-runtime"],
-        bounded_fields: vec![
-            "summary",
-            "salientFacts",
-            "instructionContext",
-            "rawTranscriptPersisted",
-        ],
-        raw_transcript_persisted: false,
-        transcript_bodies_allowed_in_artifact: false,
-    }
-}
-
-fn build_session_context_validation_report(
-    input: &Path,
-    artifact: &SummaryOnlySessionContextEnvelope,
-) -> SessionContextValidationReport {
-    SessionContextValidationReport {
-        input_path: input.display().to_string(),
-        artifact_kind: SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
-        representation: SUMMARY_ONLY_REPRESENTATION,
-        scope: format_scope(artifact.session_context.scope),
-        request_id: artifact.request_id.clone(),
-        run_id: artifact.run_id.clone(),
-        captured_at_utc: artifact.captured_at_utc.clone(),
-        summary_length: artifact.session_context.summary.chars().count(),
-        summary_preview: truncate_for_preview(&artifact.session_context.summary),
-        salient_facts_count: artifact.session_context.salient_facts.len(),
-        instruction_context_count: artifact.session_context.instruction_context.len(),
-        raw_transcript_persisted: artifact.session_context.raw_transcript_persisted,
-        read_only: true,
-        neutral_validation_scope: SESSION_CONTEXT_NEUTRAL_VALIDATION_SCOPE,
-        authority_posture: SESSION_CONTEXT_AUTHORITY_POSTURE,
-        host_validation_owner: SESSION_CONTEXT_HOST_OWNER,
-        host_promotion_owner: SESSION_CONTEXT_HOST_OWNER,
-        host_invalidation_owner: SESSION_CONTEXT_HOST_OWNER,
-        adapter_posture: SESSION_CONTEXT_ADAPTER_POSTURE,
-    }
-}
-
-fn build_local_init_report(paths: &LocalMemoryPaths) -> LocalInitReport {
-    LocalInitReport {
-        root_path: paths.root.display().to_string(),
-        artifacts_path: paths.artifacts_dir.display().to_string(),
-        state_path: paths.state_dir.display().to_string(),
-        write_lock_path: paths.write_lock_path.display().to_string(),
-        exports_path: paths.exports_dir.display().to_string(),
-        authority_posture: LOCAL_MEMORY_AUTHORITY_POSTURE,
-        single_writer_posture: LOCAL_MEMORY_SINGLE_WRITER_POSTURE,
-        deterministic_ordering: LOCAL_MEMORY_DETERMINISTIC_ORDERING,
-    }
-}
-
-fn build_local_list_report(
-    root: &Path,
-    options: &LocalMemoryQueryOptions,
-    records: Vec<LocalMemoryCatalogEntry>,
-) -> LocalListReport {
-    LocalListReport {
-        root_path: root.display().to_string(),
-        authority_posture: LOCAL_MEMORY_AUTHORITY_POSTURE,
-        default_visibility: format!(
-            "{}; {}",
-            options.default_filter_label(),
-            LOCAL_DEFAULT_VISIBILITY_POSTURE
-        ),
-        deterministic_ordering: LOCAL_MEMORY_DETERMINISTIC_ORDERING,
-        records,
-    }
-}
-
-fn build_local_record_report(
-    root: &Path,
-    stored: &LocalMemoryStoredRecord,
-    options: &LocalMemoryQueryOptions,
-) -> LocalRecordReport {
-    let store = LocalMemoryStore::new(root);
-    LocalRecordReport {
-        root_path: root.display().to_string(),
-        artifact_path: stored.artifact_path.display().to_string(),
-        default_export_path: store
-            .default_export_path(&stored.record.record_id)
-            .display()
-            .to_string(),
-        authority_posture: LOCAL_MEMORY_AUTHORITY_POSTURE,
-        default_visibility: format!(
-            "{}; {}",
-            options.default_filter_label(),
-            LOCAL_DEFAULT_VISIBILITY_POSTURE
-        ),
-        deterministic_ordering: LOCAL_MEMORY_DETERMINISTIC_ORDERING,
-        record: stored.record.clone(),
-    }
-}
-
-fn build_local_export_report(
-    root: &Path,
-    result: &LocalMemoryExportResult,
-    options: &LocalMemoryQueryOptions,
-) -> LocalExportReport {
-    LocalExportReport {
-        root_path: root.display().to_string(),
-        output_path: result.output_path.display().to_string(),
-        authority_posture: LOCAL_MEMORY_AUTHORITY_POSTURE,
-        default_visibility: format!(
-            "{}; {}",
-            options.default_filter_label(),
-            LOCAL_DEFAULT_VISIBILITY_POSTURE
-        ),
-        deterministic_ordering: LOCAL_MEMORY_DETERMINISTIC_ORDERING,
-        record: result.record.clone(),
-        exported_envelope: result.exported_envelope.clone(),
-    }
-}
-
-fn emit_local_store_error<T: Serialize>(
-    error: LocalMemoryStoreError,
+fn execute_inspect_command(
+    ctx: StoreContext,
+    raw_id: String,
     format: OutputFormat,
-    command: Vec<&str>,
-    data: T,
-) -> Result<ExitCode, serde_json::Error> {
-    emit_diagnostics(
-        format,
-        command,
-        local_store_error_diagnostics(error),
-        data,
-        "invalid",
-        ExitCode::from(1),
-    )
+) -> Result<ExitCode, CliError> {
+    let id = parse_memory_id(&raw_id)?;
+    let memory = run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+    let versions = ctx.store.list_versions(&id)?;
+    let response = InspectResponse { memory, versions };
+
+    match format {
+        OutputFormat::Text => print_inspect_text(&response),
+        OutputFormat::Json => print_json("inspect", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
-fn local_store_error_diagnostics(error: LocalMemoryStoreError) -> Vec<Diagnostic> {
-    match error {
-        LocalMemoryStoreError::RootNotInitialized { root } => vec![Diagnostic::error(
-            "CLI-LOCAL-003",
-            format!("local artifact root is not initialized: {}", root.display()),
-        )
-        .with_path(root.display().to_string())
-        .with_hint("run `elegy-memory init --root <path>` before using local artifact commands")],
-        LocalMemoryStoreError::ConcurrentWriterRejected { root } => vec![Diagnostic::error(
-            "CLI-LOCAL-004",
-            format!(
-                "concurrent local writer rejected for {}; state/write.lock already exists",
-                root.display()
-            ),
-        )
-        .with_path(root.display().to_string())
-        .with_hint(
-            "local artifact writes assume a single writer; retry after the current writer exits or remove a stale lock intentionally",
-        )],
-        LocalMemoryStoreError::RecordNotFound { record_id } => vec![Diagnostic::error(
-            "CLI-LOCAL-005",
-            format!("local record was not found: {record_id}"),
-        )
-        .with_field(record_id)],
-        LocalMemoryStoreError::RecordExcludedByLifecycle { record_id, state } => {
-            vec![Diagnostic::error(
-                "CLI-LOCAL-006",
-                format!(
-                    "local record `{record_id}` is `{}` and is hidden by the default active-only filter",
-                    format_local_lifecycle_state(state)
-                ),
-            )
-            .with_field(record_id)
-            .with_hint(
-                "pass --include-superseded or --include-tombstoned when you explicitly want non-active local records",
-            )]
+fn execute_purge_command(
+    ctx: StoreContext,
+    yes: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    if !yes && !confirm_purge(&ctx)? {
+        match format {
+            OutputFormat::Text => println!("Purge cancelled."),
+            OutputFormat::Json => print_json(
+                "purge",
+                &serde_json::json!({
+                    "status": "cancelled",
+                    "dbPath": ctx.db_path.display().to_string(),
+                    "scope": display_scope(ctx.scope),
+                }),
+            )?,
         }
-        LocalMemoryStoreError::RecordIdConflict { record_id } => vec![Diagnostic::error(
-            "CLI-LOCAL-007",
-            format!("local record ID collision detected for {record_id}"),
-        )
-        .with_field(record_id)
-        .with_hint(
-            "reuse the same record ID only for the same governed artifact contents; choose a different local record ID otherwise",
-        )],
-        LocalMemoryStoreError::SelfSupersede { record_id } => vec![Diagnostic::error(
-            "CLI-LOCAL-008",
-            format!("local record `{record_id}` cannot supersede itself"),
-        )
-        .with_field(record_id)],
-        LocalMemoryStoreError::SuccessorRecordNotFound { record_id } => vec![Diagnostic::error(
-            "CLI-LOCAL-009",
-            format!("successor local record was not found: {record_id}"),
-        )
-        .with_field(record_id)
-        .with_hint("import the successor local record before linking another record to it")],
-        LocalMemoryStoreError::Io {
-            operation,
-            path,
-            source,
-        } => vec![Diagnostic::error(
-            "CLI-LOCAL-010",
-            format!("failed to {operation} {}: {source}", path.display()),
-        )
-        .with_path(path.display().to_string())],
-        LocalMemoryStoreError::InvalidArtifactJson { path, source } => vec![Diagnostic::error(
-            "CLI-LOCAL-011",
-            format!("invalid local governed-memory artifact JSON {}: {source}", path.display()),
-        )
-        .with_path(path.display().to_string())],
-        LocalMemoryStoreError::InvalidJsonSerialization { path, source } => vec![Diagnostic::error(
-            "CLI-LOCAL-012",
-            format!("failed to serialize local JSON {}: {source}", path.display()),
-        )
-        .with_path(path.display().to_string())],
-        LocalMemoryStoreError::MemoryValidation(error) => vec![Diagnostic::error(
-            "CLI-LOCAL-013",
-            error.to_string(),
-        )
-        .with_hint(
-            "local artifact management accepts only governed memory shapes and bounded local lifecycle metadata",
-        )],
+        return Ok(ExitCode::from(1));
+    }
+
+    let response = PurgeResponse {
+        db_path: ctx.db_path.display().to_string(),
+        scope: display_scope(ctx.scope),
+        report: run_async(ctx.store.purge_all())?,
+    };
+
+    match format {
+        OutputFormat::Text => print_purge_text(&response),
+        OutputFormat::Json => print_json("purge", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
+    let report = run_async(ctx.store.health_report())?;
+    let memories = run_async(ctx.store.list(MemoryFilter {
+        scope: Some(ctx.scope),
+        state: None,
+        memory_types: None,
+        provenance_levels: None,
+        tags: None,
+        status: None,
+        tenant_id: None,
+        user_id: None,
+        agent_id: None,
+        limit: None,
+    }))?;
+    let mut type_counts = BTreeMap::new();
+    for memory in memories {
+        *type_counts
+            .entry(display_memory_type(memory.memory_type))
+            .or_insert(0) += 1;
+    }
+    let response = HealthResponse { report, type_counts };
+
+    match format {
+        OutputFormat::Text => print_health_text(&response),
+        OutputFormat::Json => print_json("health", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_export_command(
+    ctx: StoreContext,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let response = ExportResponse {
+        exported_at: Utc::now().to_rfc3339(),
+        db_path: ctx.db_path.display().to_string(),
+        scope: display_scope(ctx.scope),
+        memories: run_async(ctx.store.list(MemoryFilter {
+            scope: Some(ctx.scope),
+            state: None,
+            memory_types: None,
+            provenance_levels: None,
+            tags: None,
+            status: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+            limit: None,
+        }))?,
+    };
+    let payload = serde_json::to_string_pretty(&response)?;
+
+    if let Some(path) = output {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, payload)?;
+        match format {
+            OutputFormat::Text => {
+                println!("Exported {} memories to {}", response.memories.len(), path.display());
+            }
+            OutputFormat::Json => print_json(
+                "export",
+                &serde_json::json!({
+                    "outputPath": path.display().to_string(),
+                    "memoryCount": response.memories.len(),
+                    "scope": response.scope,
+                }),
+            )?,
+        }
+    } else {
+        println!("{payload}");
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_reembed_command(
+    ctx: StoreContext,
+    provider: Option<String>,
+    limit: usize,
+) -> Result<ExitCode, CliError> {
+    validate_limit(limit, "limit")?;
+    let stale = run_async(ctx.store.get_stale_embeddings(limit))?;
+    let provider = provider.unwrap_or_else(|| "none".to_string());
+    Err(CliError::Validation(format!(
+        "reembed is not wired in the MVP CLI yet; provider `{provider}` is unavailable and {} stale memories are queued",
+        stale.len()
+    )))
+}
+
+fn execute_contradictions_command(
+    ctx: StoreContext,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let contradictions =
+        run_async(ctx.store.list_contradictions(Some(ResolutionStatus::Unresolved)))?;
+    match format {
+        OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
+        OutputFormat::Json => print_json("contradictions", &contradictions)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
+    let db_path = normalize_path(args.db.unwrap_or_else(default_db_path));
+    if let Some(parent) = db_path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+    let scope: MemoryScope = args.scope.into();
+    let store = SqliteMemoryStore::new(&db_path, scope)?;
+    Ok(StoreContext {
+        db_path,
+        scope,
+        store,
+    })
+}
+
+fn default_db_path() -> PathBuf {
+    home_dir().join(".elegy").join("memory.db")
+}
+
+fn normalize_path(path: PathBuf) -> PathBuf {
+    let raw = path.to_string_lossy();
+    if raw == "~" {
+        return default_db_path();
+    }
+    if let Some(stripped) = raw
+        .strip_prefix("~/")
+        .or_else(|| raw.strip_prefix("~\\"))
+    {
+        return home_dir().join(stripped);
+    }
+    path
+}
+
+fn home_dir() -> PathBuf {
+    std::env::var_os("HOME")
+        .or_else(|| std::env::var_os("USERPROFILE"))
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from("."))
+}
+
+fn run_async<F, T, E>(future: F) -> Result<T, CliError>
+where
+    F: std::future::Future<Output = Result<T, E>>,
+    CliError: From<E>,
+{
+    let runtime = Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(CliError::Io)?;
+    runtime.block_on(future).map_err(CliError::from)
+}
+
+fn validate_importance(importance: f32) -> Result<(), CliError> {
+    if importance.is_finite() && (0.0..=1.0).contains(&importance) {
+        return Ok(());
+    }
+    Err(CliError::Validation(
+        "--importance must be a finite value in the inclusive range 0.0..=1.0".to_string(),
+    ))
+}
+
+fn validate_limit(limit: usize, flag: &str) -> Result<(), CliError> {
+    if limit == 0 {
+        return Err(CliError::Validation(format!(
+            "--{flag} must be greater than zero"
+        )));
+    }
+    Ok(())
+}
+
+fn parse_memory_id(raw: &str) -> Result<MemoryId, CliError> {
+    Uuid::parse_str(raw).map_err(|source| CliError::InvalidId {
+        value: raw.to_string(),
+        source,
+    })
+}
+
+fn confirm_purge(ctx: &StoreContext) -> Result<bool, CliError> {
+    let mut stdout = io::stdout();
+    write!(
+        stdout,
+        "This will purge all data in {} (scope: {}). Type `purge` to confirm: ",
+        ctx.db_path.display(),
+        display_scope(ctx.scope)
+    )?;
+    stdout.flush()?;
+
+    let mut confirmation = String::new();
+    io::stdin().read_line(&mut confirmation)?;
+    Ok(confirmation.trim() == "purge")
+}
+
+fn sort_scored_memories(results: &mut [ScoredMemory]) {
+    results.sort_by(|left, right| {
+        right
+            .score
+            .total_cmp(&left.score)
+            .then_with(|| right.similarity.total_cmp(&left.similarity))
+            .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
+            .then_with(|| right.memory.id.cmp(&left.memory.id))
+    });
+}
+
+fn search_result_row(result: ScoredMemory) -> SearchResultRow {
+    SearchResultRow {
+        id: result.memory.id.to_string(),
+        score: result.score,
+        similarity: result.similarity,
+        state: display_state(result.memory.state),
+        memory_type: display_memory_type(result.memory.memory_type),
+        preview: preview(&result.memory.content),
     }
 }
 
-fn resolve_local_root(root: Option<PathBuf>) -> PathBuf {
-    root.unwrap_or_else(|| PathBuf::from(LOCAL_DEFAULT_ROOT_DIR))
+fn list_row(memory: Memory) -> ListRow {
+    ListRow {
+        id: memory.id.to_string(),
+        state: display_state(memory.state),
+        memory_type: display_memory_type(memory.memory_type),
+        provenance: display_provenance(memory.provenance),
+        importance: memory.importance_score,
+        updated_at: memory.updated_at.to_rfc3339(),
+        preview: preview(&memory.content),
+    }
 }
 
-fn format_scope(scope: SessionContextScope) -> &'static str {
+fn preview(content: &str) -> String {
+    let mut preview = String::new();
+    let mut chars = content.chars().peekable();
+    while preview.chars().count() < PREVIEW_LIMIT {
+        let Some(character) = chars.next() else {
+            break;
+        };
+        preview.push(character);
+    }
+    if chars.peek().is_some() {
+        preview.push('…');
+    }
+    preview.replace('\n', " ")
+}
+
+fn display_scope(scope: MemoryScope) -> String {
     match scope {
-        SessionContextScope::Run => "run",
-        SessionContextScope::Session => "session",
-        SessionContextScope::Workspace => "workspace",
+        MemoryScope::Session => "session",
+        MemoryScope::Workspace => "workspace",
+        MemoryScope::User => "user",
+        MemoryScope::Agent => "agent",
     }
+    .to_string()
 }
 
-fn format_local_lifecycle_state(state: LocalMemoryLifecycleState) -> &'static str {
+fn display_memory_type(memory_type: MemoryType) -> String {
+    match memory_type {
+        MemoryType::Fact => "fact",
+        MemoryType::Preference => "preference",
+        MemoryType::Decision => "decision",
+        MemoryType::Procedure => "procedure",
+        MemoryType::Observation => "observation",
+    }
+    .to_string()
+}
+
+fn display_state(state: MemoryState) -> String {
     match state {
-        LocalMemoryLifecycleState::Active => "active",
-        LocalMemoryLifecycleState::Superseded => "superseded",
-        LocalMemoryLifecycleState::Tombstoned => "tombstoned",
+        MemoryState::Active => "active",
+        MemoryState::Dormant => "dormant",
+        MemoryState::Deleted => "deleted",
+    }
+    .to_string()
+}
+
+fn display_provenance(provenance: ProvenanceLevel) -> String {
+    match provenance {
+        ProvenanceLevel::UserStated => "user-stated",
+        ProvenanceLevel::AgentObserved => "agent-observed",
+        ProvenanceLevel::Consolidated => "consolidated",
+        ProvenanceLevel::Imported => "imported",
+        ProvenanceLevel::AgentInferred => "agent-inferred",
+    }
+    .to_string()
+}
+
+fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
+    println!(
+        "{} memory {} in {}",
+        response.action,
+        response.memory.id,
+        ctx.db_path.display()
+    );
+    println!("scope: {}", display_scope(response.memory.scope));
+    println!("state: {}", display_state(response.memory.state));
+    println!("type: {}", display_memory_type(response.memory.memory_type));
+    println!("importance: {:.2}", response.memory.importance_score);
+    println!("provenance: {}", display_provenance(response.memory.provenance));
+    println!("gate: {}", response.gate_result);
+    println!("content: {}", response.memory.content);
+}
+
+fn print_search_text(response: &SearchResponse) {
+    println!("search scope: {}", response.scope);
+    println!("query: {}", response.query);
+    println!("mode: keyword-only FTS5 (no query embedding in CLI MVP)");
+    println!("include dormant: {}", response.include_dormant);
+    if response.results.is_empty() {
+        println!("no results");
+        return;
+    }
+    for result in &response.results {
+        println!(
+            "- {} [{} | {}] score={:.3} similarity={:.3}",
+            result.id, result.state, result.memory_type, result.score, result.similarity
+        );
+        println!("  {}", result.preview);
     }
 }
 
-fn truncate_for_preview(value: &str) -> String {
-    let char_count = value.chars().count();
-    if char_count <= SESSION_CONTEXT_PREVIEW_LIMIT {
-        return value.to_string();
+fn print_list_text(response: &ListResponse) {
+    println!("scope: {}", response.scope);
+    println!("count: {}", response.count);
+    if response.memories.is_empty() {
+        println!("no memories");
+        return;
     }
-
-    let preview: String = value.chars().take(SESSION_CONTEXT_PREVIEW_LIMIT).collect();
-    format!("{preview}...")
+    for memory in &response.memories {
+        println!(
+            "- {} [{} | {} | {}] importance={:.2} updated={}",
+            memory.id,
+            memory.state,
+            memory.memory_type,
+            memory.provenance,
+            memory.importance,
+            memory.updated_at
+        );
+        println!("  {}", memory.preview);
+    }
 }
 
-fn print_json<T: Serialize>(value: &T) -> Result<(), serde_json::Error> {
-    println!("{}", serde_json::to_string_pretty(value)?);
+fn print_inspect_text(response: &InspectResponse) {
+    let memory = &response.memory;
+    println!("id: {}", memory.id);
+    println!("scope: {}", display_scope(memory.scope));
+    println!("state: {}", display_state(memory.state));
+    println!("type: {}", display_memory_type(memory.memory_type));
+    println!("provenance: {}", display_provenance(memory.provenance));
+    println!("importance: {:.2}", memory.importance_score);
+    println!("reliability: {:.2}", memory.reliability_score);
+    println!("embedding stale: {}", memory.embedding_stale);
+    println!("created: {}", memory.created_at.to_rfc3339());
+    println!("updated: {}", memory.updated_at.to_rfc3339());
+    println!("content:\n{}", memory.content);
+    println!("version history: {}", response.versions.len());
+    for version in &response.versions {
+        println!(
+            "- v{} at {} by {}",
+            version.version_number,
+            version.changed_at.to_rfc3339(),
+            version.changed_by
+        );
+        if !version.change_reason.is_empty() {
+            println!("  reason: {}", version.change_reason);
+        }
+        println!("  content: {}", preview(&version.content));
+    }
+}
+
+fn print_purge_text(response: &PurgeResponse) {
+    println!("purged database: {}", response.db_path);
+    println!("scope: {}", response.scope);
+    println!("memories deleted: {}", response.report.memories_deleted);
+    println!("versions deleted: {}", response.report.versions_deleted);
+    println!("links deleted: {}", response.report.links_deleted);
+    println!(
+        "contradictions deleted: {}",
+        response.report.contradictions_deleted
+    );
+    println!("embeddings deleted: {}", response.report.embeddings_deleted);
+}
+
+fn print_health_text(response: &HealthResponse) {
+    let report = &response.report;
+    println!("scope: {}", display_scope(report.scope));
+    println!("active: {}", report.active_count);
+    println!("dormant: {}", report.dormant_count);
+    println!("stale embeddings: {}", report.stale_embeddings_count);
+    println!(
+        "unresolved contradictions: {}",
+        report.unresolved_contradictions
+    );
+    println!("storage bytes: {}", report.total_storage_bytes);
+    println!("budget usage ratio: {:.3}", report.budget_usage_ratio);
+    println!("type counts:");
+    for (memory_type, count) in &response.type_counts {
+        println!("- {}: {}", memory_type, count);
+    }
+}
+
+fn print_contradictions_text(ctx: &StoreContext, contradictions: &[crate::ContradictionEntry]) {
+    println!("db: {}", ctx.db_path.display());
+    println!("scope: {}", display_scope(ctx.scope));
+    println!("unresolved contradictions: {}", contradictions.len());
+    if contradictions.is_empty() {
+        println!("no unresolved contradictions");
+        return;
+    }
+    for contradiction in contradictions {
+        println!(
+            "- {}: {} <-> {} at {}",
+            contradiction.id,
+            contradiction.memory_a_id,
+            contradiction.memory_b_id,
+            contradiction.detected_at.to_rfc3339()
+        );
+        println!("  {}", contradiction.description);
+    }
+}
+
+fn print_json<T>(command: &'static str, data: &T) -> Result<(), CliError>
+where
+    T: Serialize,
+{
+    println!(
+        "{}",
+        serde_json::to_string_pretty(&JsonEnvelope { command, data })?
+    );
     Ok(())
 }

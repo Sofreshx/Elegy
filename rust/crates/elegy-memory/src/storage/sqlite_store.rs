@@ -16,8 +16,8 @@ use crate::{
     traits::MemoryStore,
     types::{
         ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
-        MemoryState, MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus, ScopeConfig,
-        ScoredMemory, SearchQuery, SensitivityLevel,
+        MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport, ResolutionStatus,
+        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
     },
     MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
 };
@@ -63,6 +63,14 @@ pub struct SqliteMemoryStore {
     scope: MemoryScope,
 }
 
+impl std::fmt::Debug for SqliteMemoryStore {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SqliteMemoryStore")
+            .field("scope", &self.scope)
+            .finish_non_exhaustive()
+    }
+}
+
 impl SqliteMemoryStore {
     /// Open or create a SQLite-backed store at `path` for a single logical scope.
     pub fn new(path: impl AsRef<Path>, scope: MemoryScope) -> Result<Self, StoreError> {
@@ -88,6 +96,35 @@ impl SqliteMemoryStore {
             .lock()
             .map_err(|_| StoreError::Sqlite("sqlite connection lock poisoned".to_string()))?;
         operation(&mut connection)
+    }
+
+    /// Load the effective scope configuration used by this store.
+    pub fn scope_config(&self) -> Result<ScopeConfig, StoreError> {
+        self.with_connection(|connection| load_scope_config(connection))
+    }
+
+    /// Load version-history rows for a single memory without mutating access tracking.
+    pub fn list_versions(&self, id: &MemoryId) -> Result<Vec<MemoryVersion>, StoreError> {
+        self.with_connection(|connection| {
+            if require_memory(connection, id)?.is_none() {
+                return Err(StoreError::NotFound(*id));
+            }
+
+            let mut statement = connection.prepare(
+                r#"
+                SELECT id, memory_id, version_number, content, changed_by, change_reason, changed_at
+                FROM memory_versions
+                WHERE memory_id = ?1
+                ORDER BY version_number DESC, changed_at DESC, id DESC
+                "#,
+            )?;
+            let rows = statement.query_map([id.to_string()], map_memory_version_row)?;
+            let mut versions = Vec::new();
+            for row in rows {
+                versions.push(row?);
+            }
+            Ok(versions)
+        })
     }
 }
 
@@ -693,10 +730,34 @@ impl MemoryStore for SqliteMemoryStore {
     }
 
     async fn purge_all(&self) -> Result<PurgeReport, StoreError> {
-        Err(StoreError::Validation(
-            "purge_all is reserved for a later work unit and is intentionally left as an explicit stub in WU4"
-                .to_string(),
-        ))
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+            let memories_deleted = count_table_rows(&transaction, "memories")?;
+            let versions_deleted = count_table_rows(&transaction, "memory_versions")?;
+            let links_deleted = count_table_rows(&transaction, "memory_links")?;
+            let contradictions_deleted = count_table_rows(&transaction, "contradictions")?;
+            let embeddings_deleted = count_table_rows(&transaction, "memory_embeddings")?;
+
+            transaction.execute("DELETE FROM contradictions", [])?;
+            transaction.execute("DELETE FROM memory_links", [])?;
+            transaction.execute("DELETE FROM memory_versions", [])?;
+            transaction.execute("DELETE FROM memory_embeddings", [])?;
+            transaction.execute("DELETE FROM vec_memories", [])?;
+            transaction.execute("DELETE FROM memories", [])?;
+            transaction.execute("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", [])?;
+            transaction.commit()?;
+
+            Ok(PurgeReport {
+                memories_deleted: i64_to_u64(memories_deleted, "memories_deleted")?,
+                versions_deleted: i64_to_u64(versions_deleted, "versions_deleted")?,
+                links_deleted: i64_to_u64(links_deleted, "links_deleted")?,
+                contradictions_deleted: i64_to_u64(
+                    contradictions_deleted,
+                    "contradictions_deleted",
+                )?,
+                embeddings_deleted: i64_to_u64(embeddings_deleted, "embeddings_deleted")?,
+            })
+        })
     }
 
     async fn health_report(&self) -> Result<MemoryHealthReport, StoreError> {
@@ -1123,6 +1184,21 @@ fn map_contradiction_row(row: &Row<'_>) -> rusqlite::Result<ContradictionEntry> 
     })
 }
 
+fn map_memory_version_row(row: &Row<'_>) -> rusqlite::Result<MemoryVersion> {
+    let raw_memory_id: String = row.get(1)?;
+    let raw_changed_at: String = row.get(6)?;
+
+    Ok(MemoryVersion {
+        id: row.get(0)?,
+        memory_id: parse_uuid_for_sqlite(&raw_memory_id)?,
+        version_number: i64_to_u32_for_sqlite(row.get(2)?, "version_number")?,
+        content: row.get(3)?,
+        changed_by: row.get(4)?,
+        change_reason: row.get::<_, Option<String>>(5)?.unwrap_or_default(),
+        changed_at: parse_datetime_for_sqlite(&raw_changed_at)?,
+    })
+}
+
 fn parse_json<T>(raw: &str) -> Result<T, StoreError>
 where
     T: DeserializeOwned,
@@ -1145,6 +1221,13 @@ where
     T: DeserializeOwned,
 {
     parse_json(raw).map_err(sqlite_conversion_error)
+}
+
+fn count_table_rows(connection: &Connection, table: &str) -> Result<i64, StoreError> {
+    let sql = format!("SELECT COUNT(*) FROM {table}");
+    connection
+        .query_row(&sql, [], |row| row.get::<_, i64>(0))
+        .map_err(StoreError::from)
 }
 
 fn parse_uuid(raw: &str) -> Result<MemoryId, StoreError> {
