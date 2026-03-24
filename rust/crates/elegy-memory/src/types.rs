@@ -25,11 +25,20 @@ pub const DEFAULT_RESPONSE_RESERVE: u32 = 4_096;
 /// Default importance threshold below which the salience gate archives memories.
 pub const DEFAULT_SALIENCE_THRESHOLD: f32 = 0.2;
 
+/// Default lower bound of the novelty doubt zone used by the salience gate.
+pub const DEFAULT_NOVELTY_DOUBT_THRESHOLD: f32 = 0.85;
+
 /// Default semantic similarity threshold used for conservative merge decisions.
 pub const DEFAULT_MERGE_SIMILARITY_THRESHOLD: f32 = 0.92;
 
 /// Default semantic similarity threshold used for exact-duplicate rejection.
 pub const DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD: f32 = 0.99;
+
+/// Default fixed lambda used for MVP recency decay.
+pub const DEFAULT_DECAY_LAMBDA_BASE: f32 = 0.10;
+
+/// Default importance threshold below which inferred memories are archived.
+pub const DEFAULT_AGENT_INFERRED_IMPORTANCE_THRESHOLD: f32 = 0.5;
 
 /// Stable identifier for a memory record.
 ///
@@ -219,6 +228,17 @@ pub struct MemoryCandidate {
     pub embedding: Option<Vec<f32>>,
 }
 
+/// Stored memory supplied to a consolidator with an optional embedding payload.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConsolidationCandidate {
+    /// Retrieved memory record to consider during consolidation.
+    pub memory: Memory,
+    /// Optional embedding used by implementations that perform semantic deduplication.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub embedding: Option<Vec<f32>>,
+}
+
 /// Memory returned from search with its final rank score and similarity signal.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -379,6 +399,8 @@ pub enum ExportFormat {
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopeConfig {
+    /// Fixed lambda used for MVP recency decay.
+    pub decay_lambda_base: f32,
     /// Weight applied to vector similarity during retrieval.
     pub similarity_weight: f32,
     /// Weight applied to recency during retrieval.
@@ -393,15 +415,20 @@ pub struct ScopeConfig {
     pub response_reserve: u32,
     /// Importance threshold below which new memories should be archived.
     pub salience_threshold: f32,
+    /// Lower bound of the novelty doubt zone. Similarities below this are accepted as new.
+    pub novelty_doubt_threshold: f32,
     /// Similarity threshold at or above which a new memory may be merged.
     pub merge_similarity_threshold: f32,
     /// Similarity threshold at or above which a new memory may be rejected as duplicate.
     pub duplicate_similarity_threshold: f32,
+    /// Importance threshold below which `AgentInferred` memories should be archived.
+    pub agent_inferred_importance_threshold: f32,
 }
 
 impl Default for ScopeConfig {
     fn default() -> Self {
         Self {
+            decay_lambda_base: DEFAULT_DECAY_LAMBDA_BASE,
             similarity_weight: DEFAULT_SIMILARITY_WEIGHT,
             recency_weight: DEFAULT_RECENCY_WEIGHT,
             access_weight: DEFAULT_ACCESS_WEIGHT,
@@ -409,8 +436,10 @@ impl Default for ScopeConfig {
             memory_context_ratio: DEFAULT_MEMORY_CONTEXT_RATIO,
             response_reserve: DEFAULT_RESPONSE_RESERVE,
             salience_threshold: DEFAULT_SALIENCE_THRESHOLD,
+            novelty_doubt_threshold: DEFAULT_NOVELTY_DOUBT_THRESHOLD,
             merge_similarity_threshold: DEFAULT_MERGE_SIMILARITY_THRESHOLD,
             duplicate_similarity_threshold: DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD,
+            agent_inferred_importance_threshold: DEFAULT_AGENT_INFERRED_IMPORTANCE_THRESHOLD,
         }
     }
 }

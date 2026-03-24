@@ -3,13 +3,11 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{
-    ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError,
-};
+use crate::error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
 use crate::types::{
-    ContradictionEntry, ExportFormat, Memory, MemoryCandidate, MemoryHealthReport, MemoryId,
-    MemoryScope, MemoryState, MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus,
-    ScoredMemory, SearchQuery,
+    ConsolidationCandidate, ContradictionEntry, ExportFormat, Memory, MemoryCandidate,
+    MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryType, ProvenanceLevel,
+    PurgeReport, ResolutionStatus, ScoredMemory, SearchQuery,
 };
 
 /// Patch operation for an optional metadata field.
@@ -244,9 +242,10 @@ pub trait EmbeddingProvider: Send + Sync {
 }
 
 /// Write-time decision gate that protects the store from low-value or duplicate memories.
+#[async_trait]
 pub trait SalienceGate: Send + Sync {
     /// Evaluate a candidate memory and decide whether it should be accepted, archived, merged, or rejected.
-    fn evaluate(
+    async fn evaluate(
         &self,
         candidate: &MemoryCandidate,
         store: &dyn MemoryStore,
@@ -259,7 +258,7 @@ pub trait MemoryConsolidator: Send + Sync {
     /// Consolidate a batch of memories and return the actions taken or proposed.
     async fn consolidate(
         &self,
-        memories: &[Memory],
+        memories: &[ConsolidationCandidate],
     ) -> Result<Vec<ConsolidationAction>, ConsolidationError>;
 }
 

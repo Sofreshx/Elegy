@@ -9,12 +9,13 @@ const EMBEDDING_DIMENSIONS: usize = 768;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const SQLITE_VEC_MODULE_NAME: &str = "vec0";
 
-const DEFAULT_SCOPE_CONFIG: [(&str, &str); 14] = [
+const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
     ("budget_active_max", "500"),
     ("storage_cap_mb", "100"),
     ("decay_lambda_base", "0.10"),
     ("dedup_threshold", "0.92"),
     ("salience_threshold", "0.20"),
+    ("novelty_doubt_threshold", "0.85"),
     ("embedding_dimensions", "768"),
     ("similarity_weight", "0.4"),
     ("recency_weight", "0.25"),
@@ -24,6 +25,7 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 14] = [
     ("response_reserve", "4096"),
     ("merge_similarity_threshold", "0.92"),
     ("duplicate_similarity_threshold", "0.99"),
+    ("agent_inferred_importance_threshold", "0.50"),
 ];
 
 /// Open or create a SQLite-backed memory store database and ensure the MVP schema exists.

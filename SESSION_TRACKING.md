@@ -162,6 +162,44 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+## Session 2 Info
+
+| Field | Value |
+|---|---|
+| Session | 2 — WU6 Finalization |
+| Model | GPT-5.4 (xhigh) |
+| Started at | 2026-03-24T06:14:28.1338438-07:00 |
+| Repo state at start | `9f1a296` |
+| Architecture docs read | No additional architecture docs during the finalization-only boundary; relied on the landed WU6 implementation and direct `gate.rs` verification for the required canary. |
+
+---
+
+## Session 2 Work Unit Log
+
+### WU6 — Fixed Recency Decay and Salience Gate
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(this WU6 finalization commit; actual hash reported after commit creation)_ |
+| Timestamp | 2026-03-24T06:14:28.1338438-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/decay.rs`, `rust/crates/elegy-memory/src/gate.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/types.rs`, `rust/crates/elegy-memory/src/storage/schema.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/src/traits.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test` result | ✅ Pass — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (41 passed, 0 failed) |
+| Deviations from plan | Kept the commit scoped to the landed WU6 memory files plus tracking only; the self-referential commit hash cannot be embedded inside the same commit without rewriting it, so this tracking row keeps the standard placeholder and the actual commit hash is reported in the finalization output. |
+| Blockers encountered | None. |
+| Decisions made | Added shared `decay.rs` retention helpers and reused them from `sqlite_store` so retrieval scoring evaluates recency against one captured timestamp per search; introduced `DefaultSalienceGate` as an async store-backed gate that checks novelty before salience, merges only above the merge threshold, archives low-salience candidates, and applies a stricter archive threshold for `AgentInferred` candidates; extended `ScopeConfig`/schema defaults for `decay_lambda_base`, `novelty_doubt_threshold`, and `agent_inferred_importance_threshold`; updated the trait surface so `SalienceGate::evaluate` is async and `MemoryConsolidator` consumes `ConsolidationCandidate`. |
+| Confidence self-assessment | 5 |
+
+**Canary — Verify WU6:**
+> _Without re-reading, list the 3 salience gate steps and their thresholds. Then open gate.rs and verify._
+>
+> Recall attempt: 1) if an embedding is present, run a novelty lookup in the doubt zone with a lower bound of `0.85` and merge only when similarity is above `0.92`; 2) archive any candidate whose `importance_score` is below the general salience threshold of `0.20`; 3) archive `AgentInferred` candidates whose `importance_score` is below `0.50`; otherwise accept.
+>
+> Verification result: `rust/crates/elegy-memory/src/gate.rs` confirms that evaluation order and thresholds. The implementation calls `find_similar(..., novelty_floor, 1)` where `novelty_floor = min(novelty_doubt_threshold, merge_similarity_threshold)`, which resolves to `0.85` with the default config; it merges only when similarity is `>` `0.92`, archives below `0.20` salience, and archives `AgentInferred` candidates below `0.50`. No recall errors.
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

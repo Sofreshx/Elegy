@@ -12,11 +12,12 @@ use uuid::Uuid;
 
 use super::schema::init_database;
 use crate::{
+    decay,
     traits::MemoryStore,
     types::{
-        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId,
-        MemoryScope, MemoryState, MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus,
-        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
+        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
+        MemoryState, MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus, ScopeConfig,
+        ScoredMemory, SearchQuery, SensitivityLevel,
     },
     MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
 };
@@ -50,7 +51,6 @@ const DEFAULT_EMBEDDING_DIMENSIONS: usize = 768;
 const DEFAULT_WORKSPACE_BUDGET: f32 = 500.0;
 const DEFAULT_USER_BUDGET: f32 = 1_000.0;
 const DEFAULT_AGENT_BUDGET: f32 = 200.0;
-const DEFAULT_DECAY_LAMBDA_BASE: f32 = 0.10;
 const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
 const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
 const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
@@ -451,7 +451,7 @@ impl MemoryStore for SqliteMemoryStore {
                 .map(|memory| (memory.id, memory))
                 .collect();
 
-            let decay_lambda = load_decay_lambda(connection)?;
+            let scoring_now = Utc::now();
             let mut results = Vec::with_capacity(candidate_memories_by_id.len());
             for id in candidate_ids {
                 let Some(memory) = candidate_memories_by_id.get(&id).cloned() else {
@@ -461,7 +461,8 @@ impl MemoryStore for SqliteMemoryStore {
                 let keyword_similarity = keyword_scores.remove(&id);
                 let vector_similarity = vector_scores.remove(&id);
                 let similarity = combine_similarity_signals(vector_similarity, keyword_similarity);
-                let score = compute_retrieval_score(&memory, similarity, &scope_config, decay_lambda);
+                let score =
+                    compute_retrieval_score(&memory, similarity, &scope_config, scoring_now);
                 results.push(ScoredMemory {
                     memory,
                     score,
@@ -478,8 +479,11 @@ impl MemoryStore for SqliteMemoryStore {
                     .then_with(|| right.memory.id.cmp(&left.memory.id))
             });
             results.truncate(query.max_results);
-            let mut results =
-                trim_results_to_context_budget(results, query.context_config.as_ref(), &scope_config);
+            let mut results = trim_results_to_context_budget(
+                results,
+                query.context_config.as_ref(),
+                &scope_config,
+            );
             touch_scored_memories(connection, &mut results)?;
             Ok(results)
         })
@@ -512,20 +516,16 @@ impl MemoryStore for SqliteMemoryStore {
                 return Ok(Vec::new());
             }
 
-            let memories_by_id: HashMap<MemoryId, Memory> = load_search_memories(
-                connection,
-                self.scope,
-                MemoryState::Active,
-                None,
-            )?
-            .into_iter()
-            .filter_map(|memory| {
-                similarity_scores
-                    .get(&memory.id)
-                    .copied()
-                    .map(|_| (memory.id, memory))
-            })
-            .collect();
+            let memories_by_id: HashMap<MemoryId, Memory> =
+                load_search_memories(connection, self.scope, MemoryState::Active, None)?
+                    .into_iter()
+                    .filter_map(|memory| {
+                        similarity_scores
+                            .get(&memory.id)
+                            .copied()
+                            .map(|_| (memory.id, memory))
+                    })
+                    .collect();
 
             let mut results = similarity_scores
                 .into_iter()
@@ -1012,7 +1012,11 @@ fn sync_fts_entry(
     Ok(())
 }
 
-fn delete_fts_entry(connection: &Connection, row_id: i64, memory: &Memory) -> Result<(), StoreError> {
+fn delete_fts_entry(
+    connection: &Connection,
+    row_id: i64,
+    memory: &Memory,
+) -> Result<(), StoreError> {
     connection.execute(
         "INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags) VALUES ('delete', ?1, ?2, ?3, ?4)",
         params![
@@ -1413,6 +1417,11 @@ fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError>
             "memory_context_ratio",
             defaults.memory_context_ratio,
         )?,
+        decay_lambda_base: load_f32_config(
+            connection,
+            "decay_lambda_base",
+            defaults.decay_lambda_base,
+        )?,
         response_reserve: load_u32_config(
             connection,
             "response_reserve",
@@ -1422,6 +1431,11 @@ fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError>
             connection,
             "salience_threshold",
             defaults.salience_threshold,
+        )?,
+        novelty_doubt_threshold: load_f32_config(
+            connection,
+            "novelty_doubt_threshold",
+            defaults.novelty_doubt_threshold,
         )?,
         merge_similarity_threshold: load_f32_config(
             connection,
@@ -1433,11 +1447,12 @@ fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError>
             "duplicate_similarity_threshold",
             defaults.duplicate_similarity_threshold,
         )?,
+        agent_inferred_importance_threshold: load_f32_config(
+            connection,
+            "agent_inferred_importance_threshold",
+            defaults.agent_inferred_importance_threshold,
+        )?,
     })
-}
-
-fn load_decay_lambda(connection: &Connection) -> Result<f32, StoreError> {
-    load_f32_config(connection, "decay_lambda_base", DEFAULT_DECAY_LAMBDA_BASE)
 }
 
 fn load_f32_config(connection: &Connection, key: &str, default: f32) -> Result<f32, StoreError> {
@@ -1502,7 +1517,10 @@ fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>
     Ok(embedding)
 }
 
-fn validate_query_embedding(embedding: &[f32], expected_dimensions: usize) -> Result<(), StoreError> {
+fn validate_query_embedding(
+    embedding: &[f32],
+    expected_dimensions: usize,
+) -> Result<(), StoreError> {
     if embedding.is_empty() {
         return Err(StoreError::Validation(
             "embedding vector must not be empty".to_string(),
@@ -1525,8 +1543,7 @@ fn validate_similarity_threshold(threshold: f32) -> Result<(), StoreError> {
     }
 
     Err(StoreError::Validation(
-        "similarity threshold must be a finite value in the inclusive range 0.0..=1.0"
-            .to_string(),
+        "similarity threshold must be a finite value in the inclusive range 0.0..=1.0".to_string(),
     ))
 }
 
@@ -1536,9 +1553,8 @@ fn load_search_memories(
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
 ) -> Result<Vec<Memory>, StoreError> {
-    let mut sql = format!(
-        "SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE scope = ?1 AND state = ?2"
-    );
+    let mut sql =
+        format!("SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE scope = ?1 AND state = ?2");
     let mut params: Vec<rusqlite::types::Value> = vec![
         rusqlite::types::Value::from(scope_to_db(scope).to_string()),
         rusqlite::types::Value::from(state_to_db(state).to_string()),
@@ -1767,7 +1783,10 @@ fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, StoreError> {
     Ok((dot_product / (left_norm.sqrt() * right_norm.sqrt())).clamp(0.0, 1.0))
 }
 
-fn combine_similarity_signals(vector_similarity: Option<f32>, keyword_similarity: Option<f32>) -> f32 {
+fn combine_similarity_signals(
+    vector_similarity: Option<f32>,
+    keyword_similarity: Option<f32>,
+) -> f32 {
     match (vector_similarity, keyword_similarity) {
         (Some(vector_similarity), Some(keyword_similarity)) => {
             (VECTOR_SIMILARITY_BLEND_WEIGHT * vector_similarity)
@@ -1783,10 +1802,9 @@ fn compute_retrieval_score(
     memory: &Memory,
     similarity: f32,
     scope_config: &ScopeConfig,
-    decay_lambda: f32,
+    now: DateTime<Utc>,
 ) -> f32 {
-    let reference_time = memory.last_accessed_at.unwrap_or(memory.updated_at);
-    let recency = compute_recency_score(reference_time, decay_lambda);
+    let recency = decay::retention(memory, now, scope_config) as f32;
     let access = ((memory.access_count as f32) + 1.0).ln();
     let priority = memory.importance_score * memory.reliability_score;
 
@@ -1794,12 +1812,6 @@ fn compute_retrieval_score(
         + (scope_config.recency_weight * recency)
         + (scope_config.access_weight * access)
         + (scope_config.priority_weight * priority)
-}
-
-fn compute_recency_score(reference_time: DateTime<Utc>, decay_lambda: f32) -> f32 {
-    let days_since_reference =
-        ((Utc::now() - reference_time).num_seconds().max(0) as f32) / 86_400.0;
-    (-decay_lambda.max(0.0) * days_since_reference).exp()
 }
 
 fn trim_results_to_context_budget(
@@ -1834,7 +1846,8 @@ fn trim_results_to_context_budget(
     let mut used_tokens = 0_u32;
     for result in results {
         let estimated_tokens = estimate_memory_tokens(&result.memory);
-        if retained.is_empty() || used_tokens.saturating_add(estimated_tokens) <= max_memory_tokens {
+        if retained.is_empty() || used_tokens.saturating_add(estimated_tokens) <= max_memory_tokens
+        {
             used_tokens = used_tokens.saturating_add(estimated_tokens);
             retained.push(result);
         } else {
@@ -1871,10 +1884,11 @@ fn touch_scored_memories(
     let now = Utc::now();
     let transaction = connection.transaction()?;
     for result in results {
-        result.memory.access_count =
-            result.memory.access_count.checked_add(1).ok_or_else(|| {
-                StoreError::Validation("access_count overflow".to_string())
-            })?;
+        result.memory.access_count = result
+            .memory
+            .access_count
+            .checked_add(1)
+            .ok_or_else(|| StoreError::Validation("access_count overflow".to_string()))?;
         result.memory.last_accessed_at = Some(now);
 
         transaction.execute(
@@ -2387,7 +2401,8 @@ mod tests {
         keyword_only.reliability_score = 0.2;
         let keyword_only_id = keyword_only.id;
 
-        let mut semantic_priority = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let mut semantic_priority =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
         semantic_priority.content = "deployment runbook for launch window".to_string();
         semantic_priority.importance_score = 1.0;
         semantic_priority.reliability_score = 1.0;
@@ -2430,7 +2445,10 @@ mod tests {
                 )?;
                 connection.execute(
                     "UPDATE memories SET access_count = 0, last_accessed_at = ?2 WHERE id = ?1",
-                    [keyword_only_id.to_string(), super::format_timestamp(Utc::now())],
+                    [
+                        keyword_only_id.to_string(),
+                        super::format_timestamp(Utc::now()),
+                    ],
                 )?;
                 Ok(())
             })
@@ -2458,10 +2476,84 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn search_uses_scope_configured_fixed_decay_for_recency_ordering() {
+        let fixture = test_fixture();
+
+        let mut recent = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        recent.content = "apollo recency note".to_string();
+        let recent_id = recent.id;
+
+        let mut stale = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        stale.content = "apollo recency note".to_string();
+        let stale_id = stale.id;
+
+        fixture
+            .store
+            .store(recent)
+            .await
+            .expect("store recent memory");
+        fixture
+            .store
+            .store(stale)
+            .await
+            .expect("store stale memory");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = Utc::now();
+                let stale_time = now - chrono::Duration::days(10);
+
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.0' WHERE key IN ('similarity_weight', 'access_weight', 'priority_weight')",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '1.0' WHERE key = 'recency_weight'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.5' WHERE key = 'decay_lambda_base'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET last_accessed_at = ?2, updated_at = ?2, access_count = 0 WHERE id = ?1",
+                    [recent_id.to_string(), super::format_timestamp(now)],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET last_accessed_at = ?2, updated_at = ?2, access_count = 0 WHERE id = ?1",
+                    [stale_id.to_string(), super::format_timestamp(stale_time)],
+                )?;
+                Ok(())
+            })
+            .expect("seed recency ordering fixture");
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: "apollo recency".to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run recency-focused search");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].memory.id, recent_id);
+        assert_eq!(results[1].memory.id, stale_id);
+        assert!(results[0].score > results[1].score);
+    }
+
+    #[tokio::test]
     async fn search_respects_type_and_state_filters() {
         let fixture = test_fixture();
 
-        let mut active_decision = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let mut active_decision =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
         active_decision.content = "migration decision for apollo workspace".to_string();
         active_decision.memory_type = MemoryType::Decision;
         let active_decision_id = active_decision.id;
@@ -2470,7 +2562,8 @@ mod tests {
         active_fact.content = "apollo workspace fact sheet".to_string();
         active_fact.memory_type = MemoryType::Fact;
 
-        let mut dormant_decision = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let mut dormant_decision =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
         dormant_decision.content = "old apollo decision archive".to_string();
         dormant_decision.memory_type = MemoryType::Decision;
         dormant_decision.state = MemoryState::Dormant;

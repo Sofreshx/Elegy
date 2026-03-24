@@ -1,5 +1,7 @@
 pub mod cli;
+pub mod decay;
 pub mod error;
+pub mod gate;
 mod local_store;
 pub mod storage;
 pub mod traits;
@@ -9,7 +11,9 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
+pub use decay::{retention, retention_with_lambda};
 pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
+pub use gate::DefaultSalienceGate;
 pub use local_store::{
     LocalMemoryCatalog, LocalMemoryCatalogEntry, LocalMemoryExportResult, LocalMemoryPaths,
     LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoreInitResult,
@@ -24,10 +28,10 @@ pub use traits::{
     MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate, SalienceGate,
 };
 pub use types::{
-    ContradictionEntry, ContradictionRecord, ExportFormat, Memory, MemoryCandidate,
-    MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope, MemorySearchQuery,
-    MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport,
-    ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
+    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, ExportFormat, Memory,
+    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
+    MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel,
+    PurgeReport, ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
 };
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =
