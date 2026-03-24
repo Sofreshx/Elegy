@@ -1,10 +1,10 @@
-# Elegy-mcp docs overlay
+# Elegy-mcp docs helper lane
 
-This folder is a pointer shell only.
+This folder is the docs helper lane for the `src/Elegy-mcp` wrapper surface.
 
-Do not treat it as a canonical docs center, repo center, authority layer, implementation center, or release surface.
+It does not become a canonical docs center, authority layer, implementation center, or release surface.
 
-Use these locations instead:
+Use it to route contributors from the wrapper entrypoint to the owned documentation locations:
 
 - `docs/architecture/mcp-skill-tooling-placement.md` for placement and target narrative.
 - `docs/architecture/ecosystem-topology.md` and `docs/architecture/rust-consolidation.md` for repo-center guidance.

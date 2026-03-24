@@ -121,11 +121,38 @@ jobs:
           path: |
             artifacts/distribution/${{ matrix.surface }}-*.zip
 
+  package-wrapper-surfaces:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Package wrapper archives
+        shell: pwsh
+        run: |
+          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-skills
+
+      - name: Validate wrapper archives
+        shell: pwsh
+        run: |
+          ./scripts/validate-canonical-outputs.ps1 -RequireWrapperArchives
+
+      - name: Upload wrapper distribution artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-wrapper-surfaces-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/distribution/elegy-memory-wrapper-*.zip
+            artifacts/distribution/elegy-mcp-wrapper-*.zip
+            artifacts/distribution/elegy-skills-wrapper-*.zip
+
   publish:
     runs-on: ubuntu-latest
     needs:
       - export-contracts
       - package-cli
+      - package-wrapper-surfaces
     steps:
       - name: Download distribution artifacts
         uses: actions/download-artifact@v4

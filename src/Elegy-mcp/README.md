@@ -1,16 +1,24 @@
-# Elegy-mcp contributor overlay
+# Elegy-mcp wrapper surface
 
-This directory is a contributor-navigation overlay for the current dedicated in-repo `elegy-mcp` surface.
+This directory is a thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-mcp` surface.
 
-It is not a repo center, authority layer, implementation center, or release surface.
+It is a real contributor-facing surface for wrapper metadata and guided handoff, but it is not the authority source, implementation center, or release orchestration surface.
 
-The overlay itself is not the release surface. Published release archives and install flows are produced from the Rust workspace and repo-root distribution scripts.
+The wrapper contract for this root lives in `wrapper-entrypoint.json`.
 
-Canonical ownership remains outside this overlay:
+Delegation stays one-way:
 
 - `contracts/` and `governance/` remain canonical for governed MCP descriptors, analysis-result artifacts, compatibility metadata, and policy.
-- `rust/` remains the implementation center for reusable MCP behavior, including `rust/crates/elegy-mcp` and related tooling/runtime crates.
-- `.github/skills/elegy-mcp/SKILL.md` remains a repo-local non-authoritative contributor-routing output only, not the authority source.
+- `rust/crates/elegy-mcp` remains the implementation center for descriptor authoring and analysis behavior.
+- `.github/skills/elegy-mcp/SKILL.md` remains the repo-local non-authoritative contributor-routing output for this surface.
 - `docs/architecture/mcp-skill-tooling-placement.md`, `docs/architecture/ecosystem-topology.md`, and `docs/spec-baseline.md` remain the canonical documentation entrypoints.
 
-The current executable scope is the dedicated `elegy-mcp` CLI for descriptor authoring and descriptor analysis. The longer-range target narrative remains REST/OpenAPI definition ingestion, governed operation-catalog projection, and dynamic MCP generation from API specs through governed artifacts plus Rust tooling.
+This wrapper surface organizes its helper lanes like this:
+
+- `docs/` maps this surface to its canonical documentation entrypoints.
+- `agents/` captures wrapper-level agent handoff guidance for descriptor authoring and analysis.
+- `skills/` explains how this surface delegates repo-local skill routing output and ships a surface-local bridge in `skills/elegy-mcp/SKILL.md`.
+
+Published release archives and install flows remain produced from the Rust workspace and repo-root distribution scripts, including the platform-neutral `elegy-mcp-wrapper-<bundleVersion>.zip` wrapper archive.
+
+This root now also carries `install.ps1` as a thin installer entrypoint for the `elegy-mcp` CLI surface.

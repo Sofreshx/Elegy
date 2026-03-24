@@ -2,6 +2,7 @@
 param(
     [switch]$RequireGeneratedOutputs,
     [switch]$RequireArchive,
+    [switch]$RequireWrapperArchives,
     [switch]$EmitJson
 )
 
@@ -21,6 +22,38 @@ $missingSources = [System.Collections.Generic.List[string]]::new()
 $missingGenerated = [System.Collections.Generic.List[string]]::new()
 $contentMismatches = [System.Collections.Generic.List[string]]::new()
 $missingArchives = [System.Collections.Generic.List[string]]::new()
+$missingWrapperArchives = [System.Collections.Generic.List[string]]::new()
+$invalidWrapperArchives = [System.Collections.Generic.List[string]]::new()
+
+function Test-ArchiveRequiredEntries {
+    param(
+        [string]$ArchivePath,
+        [string[]]$RequiredEntries
+    )
+
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    try {
+        $entryLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $archive.Entries) {
+            $normalizedEntry = $entry.FullName.Replace('\\', '/').TrimStart([char[]]@('/', '.'))
+            if (-not [string]::IsNullOrWhiteSpace($normalizedEntry)) {
+                $entryLookup.Add($normalizedEntry) | Out-Null
+            }
+        }
+
+        $missingEntries = [System.Collections.Generic.List[string]]::new()
+        foreach ($requiredEntry in $RequiredEntries) {
+            if (-not $entryLookup.Contains($requiredEntry)) {
+                $missingEntries.Add($requiredEntry) | Out-Null
+            }
+        }
+
+        return @($missingEntries)
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
 
 foreach ($relativePath in $inventory.authorityOnly) {
     $fullPath = Join-Path $repoRoot $relativePath
@@ -56,9 +89,40 @@ foreach ($entry in $inventory.mirroredOutputs) {
 
 if ($RequireArchive) {
     foreach ($pattern in $inventory.archivePatterns) {
-        $matches = Get-ChildItem -Path (Join-Path $repoRoot $pattern) -ErrorAction SilentlyContinue
-        if ($null -eq $matches -or $matches.Count -eq 0) {
+        $archiveFiles = Get-ChildItem -Path (Join-Path $repoRoot $pattern) -ErrorAction SilentlyContinue
+        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
             $missingArchives.Add($pattern) | Out-Null
+        }
+    }
+}
+
+if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
+    foreach ($pattern in $inventory.wrapperArchivePatterns) {
+        $requiredWrapperEntries = [System.Collections.Generic.List[string]]::new()
+        foreach ($entry in @($inventory.wrapperArchiveRequiredEntries)) {
+            $requiredWrapperEntries.Add([string]$entry) | Out-Null
+        }
+
+        $surfaceSpecificEntries = $null
+        if ($null -ne $inventory.wrapperArchiveSurfaceSpecificEntries) {
+            $surfaceSpecificEntries = $inventory.wrapperArchiveSurfaceSpecificEntries.$pattern
+        }
+
+        foreach ($entry in @($surfaceSpecificEntries)) {
+            $requiredWrapperEntries.Add([string]$entry) | Out-Null
+        }
+
+        $archiveFiles = Get-ChildItem -Path (Join-Path $repoRoot $pattern) -ErrorAction SilentlyContinue
+        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
+            $missingWrapperArchives.Add($pattern) | Out-Null
+            continue
+        }
+
+        foreach ($archive in $archiveFiles) {
+            $missingEntries = Test-ArchiveRequiredEntries -ArchivePath $archive.FullName -RequiredEntries @($requiredWrapperEntries)
+            if ($missingEntries.Count -gt 0) {
+                $invalidWrapperArchives.Add("$($archive.Name) missing required entries: $($missingEntries -join ', ')") | Out-Null
+            }
         }
     }
 }
@@ -70,6 +134,8 @@ $result = [pscustomobject]@{
     missingGenerated = $missingGenerated
     contentMismatches = $contentMismatches
     missingArchives = $missingArchives
+    missingWrapperArchives = $missingWrapperArchives
+    invalidWrapperArchives = $invalidWrapperArchives
 }
 
 if ($EmitJson) {
@@ -96,9 +162,24 @@ if ($missingArchives.Count -gt 0) {
     throw ('Missing generated archives from canonical output inventory: ' + ($missingArchives -join ', '))
 }
 
+if ($missingWrapperArchives.Count -gt 0) {
+    throw ('Missing wrapper archives from canonical output inventory: ' + ($missingWrapperArchives -join ', '))
+}
+
+if ($invalidWrapperArchives.Count -gt 0) {
+    throw ('Wrapper archives are missing required payload entries: ' + ($invalidWrapperArchives -join '; '))
+}
+
 Write-Host 'Canonical output validation passed.'
 Write-Host " - authority-only files: $($inventory.authorityOnly.Count)"
 Write-Host " - mirrored outputs: $($inventory.mirroredOutputs.Count)"
 if ($RequireArchive) {
     Write-Host " - archive patterns: $($inventory.archivePatterns.Count)"
+}
+if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
+    Write-Host " - wrapper archive patterns: $($inventory.wrapperArchivePatterns.Count)"
+    Write-Host " - wrapper archive required entries: $($inventory.wrapperArchiveRequiredEntries.Count)"
+    if ($null -ne $inventory.wrapperArchiveSurfaceSpecificEntries) {
+        Write-Host " - wrapper archive surface-specific entry sets: $($inventory.wrapperArchiveSurfaceSpecificEntries.PSObject.Properties.Count)"
+    }
 }

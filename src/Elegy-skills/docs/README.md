@@ -1,10 +1,10 @@
-# Elegy-skills docs overlay
+# Elegy-skills docs helper lane
 
-This folder is a pointer shell only.
+This folder is the docs helper lane for the `src/Elegy-skills` wrapper surface.
 
-Do not treat it as a canonical docs center, repo center, authority layer, implementation center, or release surface.
+It does not become a canonical docs center, authority layer, implementation center, or release surface.
 
-Use these locations instead:
+Use it to route contributors from the wrapper entrypoint to the owned documentation locations:
 
 - `docs/architecture/skill-core-v1.md` for current skill authority guidance.
 - `docs/architecture/mcp-skill-tooling-placement.md` for MCP-to-skill generation placement.

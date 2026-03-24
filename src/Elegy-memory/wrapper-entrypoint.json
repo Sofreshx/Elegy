@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "surface": "elegy-memory",
+  "surfaceRole": "thin-integration-wrapper",
+  "delegatesTo": {
+    "cliCrate": "rust/crates/elegy-memory",
+    "repoLocalSkillOutput": ".github/skills/elegy-memory/SKILL.md"
+  },
+  "integrationAssets": {
+    "installer": "install.ps1",
+    "surfaceLocalSkillBridge": "skills/elegy-memory/SKILL.md"
+  },
+  "authority": {
+    "contracts": "contracts/",
+    "governance": "governance/",
+    "implementation": "rust/crates/elegy-memory"
+  },
+  "helperLanes": {
+    "docs": "docs/",
+    "agents": "agents/",
+    "skills": "skills/"
+  },
+  "canonicalDocs": [
+    "docs/architecture/elegy-memory-v1.md",
+    "docs/migration/reusable-memory-boundary.md"
+  ],
+  "distribution": {
+    "wrapperAssetPrefix": "elegy-memory-wrapper",
+    "wrapperArchivePattern": "elegy-memory-wrapper-<bundleVersion>.zip",
+    "installLayout": {
+      "contracts": "contracts/",
+      "cli": "bin/elegy-memory/",
+      "wrapper": "wrappers/elegy-memory/"
+    }
+  }
+}

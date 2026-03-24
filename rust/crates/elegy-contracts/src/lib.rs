@@ -645,6 +645,7 @@ pub fn export_contract_bundle(
     let repo_root = resolve_repo_root();
     let contracts_source_dir = resolve_contracts_source_dir();
     let version_policy_path = repo_root.join("governance").join("version-policy.json");
+    let support_manifest_path = default_support_manifest_path();
     let compatibility_manifest_path = contracts_source_dir
         .join("manifests")
         .join("compatibility-manifest.json");
@@ -653,6 +654,7 @@ pub fn export_contract_bundle(
         .join("compatibility-matrix.json");
 
     for required_path in [
+        &support_manifest_path,
         &compatibility_manifest_path,
         &compatibility_matrix_path,
         &version_policy_path,
@@ -775,6 +777,24 @@ pub fn export_contract_bundle(
         exported_files.push(destination_path);
     }
     exported_files.sort();
+
+    let rust_support_mirror_path = repo_root
+        .join("rust")
+        .join("contracts")
+        .join("elegy-rust-support.json");
+    if let Some(parent) = rust_support_mirror_path.parent() {
+        fs::create_dir_all(parent).map_err(|source| ContractsError::Io {
+            path: parent.to_path_buf(),
+            source,
+        })?;
+    }
+
+    fs::copy(&support_manifest_path, &rust_support_mirror_path).map_err(|source| {
+        ContractsError::Io {
+            path: rust_support_mirror_path.clone(),
+            source,
+        }
+    })?;
 
     let archive_path = if create_archive || archive_output_path.is_some() {
         let resolved_archive_path = archive_output_path

@@ -2,19 +2,22 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace, and tagged release workflows are configured to publish archives for those surfaces.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace, and tagged release workflows are configured to publish archives for those surfaces plus the three dedicated wrapper archives.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and MCP-to-skill generation. The shared `elegy` CLI remains the general and compatibility surface.
 
 ## Asset model
 
-Tagged releases are configured to publish five neutral surfaces:
+Tagged releases are configured to publish eight neutral assets across the contracts, CLI, and dedicated wrapper lanes:
 
 - governed contracts bundle: `elegy-contracts-<bundleVersion>.zip`
 - umbrella CLI archive: `elegy-cli-<cliVersion>-<target>.zip`
 - local memory CLI archive: `elegy-memory-<cliVersion>-<target>.zip`
 - MCP CLI archive: `elegy-mcp-<cliVersion>-<target>.zip`
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
+- local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
+- MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
+- skills wrapper archive: `elegy-skills-wrapper-<bundleVersion>.zip`
 
 The contracts bundle remains the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
 
@@ -78,6 +81,22 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
+## Wrapper archive
+
+Build the platform-neutral wrapper archives with:
+
+```powershell
+pwsh ./scripts/package-wrapper-surface.ps1
+```
+
+Outputs:
+
+- `artifacts/distribution/elegy-memory-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-mcp-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-skills-wrapper-<bundleVersion>.zip`
+
+Each wrapper archive contains the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
+
 ## Holon-oriented quick start
 
 For Holon or any other downstream host that wants the simplest supported consumption path:
@@ -86,13 +105,20 @@ For Holon or any other downstream host that wants the simplest supported consump
 2. Run the generic installer helper from a checked-out copy or a vendored copy of `scripts/install-distribution.ps1`.
 3. Consume the extracted `contracts` directory as the governed artifact surface and invoke the extracted binaries directly from `bin/<surface>/`.
 
-Example:
+Example using release assets:
 
 ```powershell
-pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-skills -Force
+pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
 ```
 
-The installer resolves the release tag, downloads the contracts bundle and the matching host CLI archives for the selected surfaces, extracts them under `bin/<surface>/`, and prints the resulting paths. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
+Example using local artifacts only:
+
+```powershell
+pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-local -CliSurfaces elegy-memory -WrapperSurfaces elegy-memory -Force
+pwsh ./src/Elegy-memory/install.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-memory-wrapper -Force
+```
+
+The installer resolves either a release tag or a local artifacts directory, downloads or copies the contracts bundle and the matching host CLI archives for the selected surfaces, extracts the CLI assets under `bin/<surface>/`, extracts wrapper assets under `wrappers/<surface>/`, and prints the resulting paths. When `-LocalArtifactsRoot` is used, the root must contain exactly one matching archive for each required asset; the installer now fails on ambiguous roots instead of guessing between stale files. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
 
 ## Downstream guidance
 
@@ -106,6 +132,7 @@ The installer resolves the release tag, downloads the contracts bundle and the m
 1. Update bundle and manifest package metadata/version in `governance/version-policy.json` when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
-4. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive`.
-5. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
-6. Publish the generated assets through the GitHub Actions workflows when ready.
+4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
+5. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives`.
+6. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
+7. Publish the generated assets through the GitHub Actions workflows when ready.

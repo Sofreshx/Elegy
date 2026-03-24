@@ -201,5 +201,26 @@
   ],
   "archivePatterns": [
     "artifacts/distribution/elegy-contracts-*.zip"
-  ]
+  ],
+  "wrapperArchivePatterns": [
+    "artifacts/distribution/elegy-memory-wrapper-*.zip",
+    "artifacts/distribution/elegy-mcp-wrapper-*.zip",
+    "artifacts/distribution/elegy-skills-wrapper-*.zip"
+  ],
+  "wrapperArchiveRequiredEntries": [
+    "install.ps1",
+    "wrapper-entrypoint.json",
+    "scripts/install-distribution.ps1"
+  ],
+  "wrapperArchiveSurfaceSpecificEntries": {
+    "artifacts/distribution/elegy-memory-wrapper-*.zip": [
+      "skills/elegy-memory/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-mcp-wrapper-*.zip": [
+      "skills/elegy-mcp/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-skills-wrapper-*.zip": [
+      "skills/elegy-skills/SKILL.md"
+    ]
+  }
 }

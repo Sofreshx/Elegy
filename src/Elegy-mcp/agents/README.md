@@ -1,10 +1,10 @@
-# Elegy-mcp agents overlay
+# Elegy-mcp agents helper lane
 
-This folder is a contributor pointer shell only.
+This folder is the agents helper lane for the `src/Elegy-mcp` wrapper surface.
 
-It is not an agent center, host implementation center, or release surface.
+It does not become an agent center, host implementation center, or release surface.
 
-Use these locations instead:
+Use it to keep wrapper-level handoff guidance aligned with the owned locations:
 
 - `rust/` for reusable MCP runtime and tooling implementation.
 - `docs/architecture/mcp-skill-tooling-placement.md` for placement rules.

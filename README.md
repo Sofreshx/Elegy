@@ -32,13 +32,13 @@ See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topolo
 
 - `rust/` - in-repo Rust workspace for runtime composition, MCP host concerns, contract-consumer utilities, and shared executable behavior.
 
-### Contributor overlays
+### Wrapper entrypoints
 
-- `src/Elegy-memory/` - contributor-navigation overlay for the shipped in-repo `elegy-memory` surface; not a repo center, authority layer, implementation center, or release surface.
-- `src/Elegy-mcp/` - contributor-navigation overlay for the current dedicated in-repo `elegy-mcp` surface; not a repo center, authority layer, implementation center, or release surface.
-- `src/Elegy-skills/` - contributor-navigation overlay for the current dedicated in-repo `elegy-skills` surface; not a repo center, authority layer, implementation center, or release surface.
+- `src/Elegy-memory/` - thin wrapper and integration entrypoint for the shipped in-repo `elegy-memory` surface; not a repo center, authority layer, implementation center, or release surface.
+- `src/Elegy-mcp/` - thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-mcp` surface; not a repo center, authority layer, implementation center, or release surface.
+- `src/Elegy-skills/` - thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-skills` surface; not a repo center, authority layer, implementation center, or release surface.
 
-These pointer shells exist only to route contributors back to `contracts/`, `governance/`, `rust/`, `.github/skills/`, and the canonical docs.
+Each wrapper root carries a `wrapper-entrypoint.json` asset plus helper-lane guidance under `docs/`, `agents/`, and `skills/`. The dedicated wrapper roots now also carry `install.ps1` plus a surface-local `skills/<surface>/SKILL.md` bridge so the wrapper archive lane stays actionable. Authority remains in `contracts/`, `governance/`, `rust/`, `.github/skills/`, and the canonical docs.
 
 ### Current operator surfaces
 
@@ -104,7 +104,7 @@ The current reset direction is:
 - [Elegy-memory V1](docs/architecture/elegy-memory-v1.md)
 - [MCP spec baseline](docs/spec-baseline.md)
 
-Contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are pointer shells only. They do not replace `contracts/`, `governance/`, or `rust/` as the canonical owned surfaces, and `.github/skills/` remains only a repo-local non-authoritative contributor-routing surface.
+The wrapper entrypoints under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are thin integration surfaces only. They do not replace `contracts/`, `governance/`, or `rust/` as the canonical owned surfaces, and `.github/skills/` remains only a repo-local non-authoritative contributor-routing surface.
 
 Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Skills` should be treated as archival or closeout references rather than the primary source of truth.
 
@@ -116,7 +116,7 @@ Elegy should be consumed through versioned exported artifacts rather than local 
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 - the `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries are the CLI surfaces covered by the explicit release/archive workflows for `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
 - `rust/crates/elegy-memory`, `rust/crates/elegy-mcp`, and `rust/crates/elegy-skills` own the dedicated binaries for their bounded surfaces; `rust/crates/elegy-cli` keeps the general/compatibility surface.
-- downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]>` to fetch the contracts bundle plus matching CLI archives without sibling checkouts or package feeds.
+- downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>` to fetch the contracts bundle plus matching CLI archives and wrapper archives without sibling checkouts or package feeds.
 - downstream consumer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Release and versioning

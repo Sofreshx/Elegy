@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "surface": "elegy-mcp",
+  "surfaceRole": "thin-integration-wrapper",
+  "delegatesTo": {
+    "cliCrate": "rust/crates/elegy-mcp",
+    "repoLocalSkillOutput": ".github/skills/elegy-mcp/SKILL.md"
+  },
+  "integrationAssets": {
+    "installer": "install.ps1",
+    "surfaceLocalSkillBridge": "skills/elegy-mcp/SKILL.md"
+  },
+  "authority": {
+    "contracts": "contracts/",
+    "governance": "governance/",
+    "implementation": "rust/crates/elegy-mcp"
+  },
+  "helperLanes": {
+    "docs": "docs/",
+    "agents": "agents/",
+    "skills": "skills/"
+  },
+  "canonicalDocs": [
+    "docs/architecture/mcp-skill-tooling-placement.md",
+    "docs/architecture/ecosystem-topology.md",
+    "docs/spec-baseline.md"
+  ],
+  "distribution": {
+    "wrapperAssetPrefix": "elegy-mcp-wrapper",
+    "wrapperArchivePattern": "elegy-mcp-wrapper-<bundleVersion>.zip",
+    "installLayout": {
+      "contracts": "contracts/",
+      "cli": "bin/elegy-mcp/",
+      "wrapper": "wrappers/elegy-mcp/"
+    }
+  }
+}

@@ -1,18 +1,22 @@
-# Elegy-memory contributor overlay
+# Elegy-memory wrapper surface
 
-This directory is a contributor-navigation overlay for the implemented in-repo `elegy-memory` surface.
+This directory is a thin wrapper and integration entrypoint for the implemented in-repo `elegy-memory` surface.
 
-It is not a repo center, authority layer, implementation center, or release surface.
+It is a real contributor-facing surface for wrapper metadata and guided handoff, but it is not the authority source, implementation center, or release orchestration surface.
 
-Canonical ownership remains outside this overlay:
+The wrapper contract for this root lives in `wrapper-entrypoint.json`.
+
+Delegation stays one-way:
 
 - `contracts/` and `governance/` remain canonical for governed memory-family artifacts, discovery projections, and release/version policy.
 - `rust/crates/elegy-memory` remains the implementation center for the in-repo `elegy-memory` operator surface.
-- `.github/skills/elegy-memory/SKILL.md` remains a repo-local non-authoritative contributor-routing output only, not the authority source.
+- `.github/skills/elegy-memory/SKILL.md` remains the repo-local non-authoritative contributor-routing output for this surface.
 - `docs/architecture/elegy-memory-v1.md` and `docs/migration/reusable-memory-boundary.md` remain the canonical documentation entrypoints.
 
-Current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`. This overlay exists only to route contributors back to those owned locations.
+This wrapper surface organizes its helper lanes like this:
 
-- `docs/` points to the canonical docs.
-- `agents/` is a pointer shell, not an agent implementation center.
-- `skills/` is a pointer shell, not a skill authority surface.
+- `docs/` maps this surface to its canonical documentation entrypoints.
+- `agents/` captures wrapper-level agent handoff guidance for the bounded memory surface.
+- `skills/` explains how this surface delegates repo-local skill routing output and ships a surface-local bridge in `skills/elegy-memory/SKILL.md`.
+
+This root now also carries `install.ps1` as a thin installer entrypoint for the `elegy-memory` CLI surface plus the platform-neutral `elegy-memory-wrapper-<bundleVersion>.zip` wrapper archive.

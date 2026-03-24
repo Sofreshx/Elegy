@@ -1,10 +1,10 @@
-# Elegy-memory docs overlay
+# Elegy-memory docs helper lane
 
-This folder is a pointer shell only.
+This folder is the docs helper lane for the `src/Elegy-memory` wrapper surface.
 
-Do not treat it as a canonical docs center, repo center, authority layer, implementation center, or release surface.
+It does not become a canonical docs center, authority layer, implementation center, or release surface.
 
-Use these locations instead:
+Use it to route contributors from the wrapper entrypoint to the owned documentation locations:
 
 - `docs/architecture/elegy-memory-v1.md` for the shipped in-repo `elegy-memory` surface.
 - `docs/migration/reusable-memory-boundary.md` for the governed reusable-memory boundary.

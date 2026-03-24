@@ -6,6 +6,7 @@
     "governance/version-policy.json",
     "scripts/export-contracts.ps1",
     "scripts/package-cli.ps1",
+    "scripts/package-wrapper-surface.ps1",
     "scripts/install-distribution.ps1",
     "scripts/bump-version.ps1",
     "scripts/validate-canonical-outputs.ps1",
@@ -86,7 +87,11 @@
         "validate-canonical-outputs\\.ps1",
         "export-contracts\\.ps1 -CreateArchive",
         "package-cli\\.ps1",
+        "package-wrapper-surface\\.ps1",
         "elegy-contracts-\\*\\.zip",
+        "elegy-memory-wrapper",
+        "elegy-mcp-wrapper",
+        "elegy-skills-wrapper",
         "surface: elegy-cli",
         "surface: elegy-memory",
         "surface: elegy-mcp",
@@ -131,6 +136,23 @@
       ]
     },
     {
+      "name": "wrapper-packaging-script-stays-generic",
+      "files": [
+        "scripts/package-wrapper-surface.ps1"
+      ],
+      "forbiddenPatterns": [
+        "holon",
+        "SAASTools",
+        "nuget",
+        "\\.nupkg"
+      ],
+      "requiredPatterns": [
+        "elegy-memory-wrapper",
+        "elegy-mcp-wrapper",
+        "elegy-skills-wrapper"
+      ]
+    },
+    {
       "name": "distribution-installer-handles-contracts-and-cli-surfaces",
       "files": [
         "scripts/install-distribution.ps1"
@@ -146,7 +168,12 @@
         "elegy-cli",
         "elegy-memory",
         "elegy-mcp",
-        "elegy-skills"
+        "elegy-skills",
+        "LocalArtifactsRoot",
+        "WrapperSurfaces",
+        "elegy-memory-wrapper",
+        "elegy-mcp-wrapper",
+        "elegy-skills-wrapper"
       ]
     },
     {

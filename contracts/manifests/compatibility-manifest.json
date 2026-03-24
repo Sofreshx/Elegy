@@ -11,6 +11,15 @@
       "targetReleaseType": "minor",
       "targetPackageVersion": "1.3.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
+      "wrapperSurface": {
+        "root": "src/Elegy-memory",
+        "entrypoint": "src/Elegy-memory/wrapper-entrypoint.json",
+        "installer": "src/Elegy-memory/install.ps1",
+        "skillBridge": "src/Elegy-memory/skills/elegy-memory/SKILL.md",
+        "releaseAssetPrefix": "elegy-memory-wrapper",
+        "archivePattern": "elegy-memory-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-memory/, and the wrapper surface under wrappers/elegy-memory/."
+      },
       "existingArtifactsUnchanged": [
         "summary-only-session-context-envelope"
       ],
@@ -29,6 +38,15 @@
       "targetReleaseType": "minor",
       "targetPackageVersion": "1.3.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
+      "wrapperSurface": {
+        "root": "src/Elegy-mcp",
+        "entrypoint": "src/Elegy-mcp/wrapper-entrypoint.json",
+        "installer": "src/Elegy-mcp/install.ps1",
+        "skillBridge": "src/Elegy-mcp/skills/elegy-mcp/SKILL.md",
+        "releaseAssetPrefix": "elegy-mcp-wrapper",
+        "archivePattern": "elegy-mcp-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-mcp/, and the wrapper surface under wrappers/elegy-mcp/."
+      },
       "existingArtifactsUnchanged": [
         "mcp-server-descriptor",
         "mcp-analysis-result"
@@ -45,6 +63,15 @@
       "targetReleaseType": "minor",
       "targetPackageVersion": "1.3.0",
       "scope": "Dedicated MCP-to-skill generation commands only.",
+      "wrapperSurface": {
+        "root": "src/Elegy-skills",
+        "entrypoint": "src/Elegy-skills/wrapper-entrypoint.json",
+        "installer": "src/Elegy-skills/install.ps1",
+        "skillBridge": "src/Elegy-skills/skills/elegy-skills/SKILL.md",
+        "releaseAssetPrefix": "elegy-skills-wrapper",
+        "archivePattern": "elegy-skills-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-skills/, and the wrapper surface under wrappers/elegy-skills/."
+      },
       "existingArtifactsUnchanged": [
         "skill-definition",
         "skill-discovery-index"
