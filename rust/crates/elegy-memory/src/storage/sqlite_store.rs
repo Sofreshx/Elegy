@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -13,9 +14,9 @@ use super::schema::init_database;
 use crate::{
     traits::MemoryStore,
     types::{
-        ContradictionEntry, Memory, MemoryHealthReport, MemoryId, MemoryScope, MemoryState,
-        MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus, ScoredMemory, SearchQuery,
-        SensitivityLevel,
+        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId,
+        MemoryScope, MemoryState, MemoryType, ProvenanceLevel, PurgeReport, ResolutionStatus,
+        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
     },
     MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
 };
@@ -49,6 +50,11 @@ const DEFAULT_EMBEDDING_DIMENSIONS: usize = 768;
 const DEFAULT_WORKSPACE_BUDGET: f32 = 500.0;
 const DEFAULT_USER_BUDGET: f32 = 1_000.0;
 const DEFAULT_AGENT_BUDGET: f32 = 200.0;
+const DEFAULT_DECAY_LAMBDA_BASE: f32 = 0.10;
+const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
+const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
+const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
+const BASE_MEMORY_TOKEN_OVERHEAD: u32 = 16;
 
 /// SQLite-backed [`MemoryStore`] implementation for the MVP memory schema.
 #[derive(Clone)]
@@ -370,23 +376,178 @@ impl MemoryStore for SqliteMemoryStore {
         })
     }
 
-    async fn search(&self, _query: SearchQuery) -> Result<Vec<ScoredMemory>, StoreError> {
-        Err(StoreError::Validation(
-            "hybrid search is scheduled for WU5; WU4 intentionally leaves search unimplemented"
-                .to_string(),
-        ))
+    async fn search(&self, query: SearchQuery) -> Result<Vec<ScoredMemory>, StoreError> {
+        let trimmed_text = query.text.trim().to_string();
+        if query.max_results == 0 {
+            return Ok(Vec::new());
+        }
+        if query.scope != self.scope {
+            return Ok(Vec::new());
+        }
+        if trimmed_text.is_empty() && query.embedding.is_none() {
+            return Err(StoreError::Validation(
+                "search requires non-empty text or a query embedding".to_string(),
+            ));
+        }
+
+        let requested_state = query.state_filter.unwrap_or(MemoryState::Active);
+        if requested_state == MemoryState::Deleted {
+            return Ok(Vec::new());
+        }
+
+        self.with_connection(|connection| {
+            let scope_config = load_scope_config(connection)?;
+            let query_embedding = match query.embedding.as_deref() {
+                Some(embedding) => {
+                    let expected_dimensions = load_embedding_dimensions(connection)?;
+                    validate_query_embedding(embedding, expected_dimensions)?;
+                    Some(embedding)
+                }
+                None => None,
+            };
+
+            let mut keyword_scores = if trimmed_text.is_empty() {
+                HashMap::new()
+            } else {
+                load_keyword_scores(
+                    connection,
+                    self.scope,
+                    requested_state,
+                    query.type_filter.as_deref(),
+                    &trimmed_text,
+                )?
+            };
+
+            let mut vector_scores = match query_embedding {
+                Some(embedding) => load_vector_similarity_scores(
+                    connection,
+                    self.scope,
+                    requested_state,
+                    query.type_filter.as_deref(),
+                    embedding,
+                    0.0,
+                )?,
+                None => HashMap::new(),
+            };
+
+            let candidate_ids: HashSet<MemoryId> = keyword_scores
+                .keys()
+                .copied()
+                .chain(vector_scores.keys().copied())
+                .collect();
+            if candidate_ids.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let candidate_memories = load_search_memories(
+                connection,
+                self.scope,
+                requested_state,
+                query.type_filter.as_deref(),
+            )?;
+            let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
+                .into_iter()
+                .filter(|memory| candidate_ids.contains(&memory.id))
+                .map(|memory| (memory.id, memory))
+                .collect();
+
+            let decay_lambda = load_decay_lambda(connection)?;
+            let mut results = Vec::with_capacity(candidate_memories_by_id.len());
+            for id in candidate_ids {
+                let Some(memory) = candidate_memories_by_id.get(&id).cloned() else {
+                    continue;
+                };
+
+                let keyword_similarity = keyword_scores.remove(&id);
+                let vector_similarity = vector_scores.remove(&id);
+                let similarity = combine_similarity_signals(vector_similarity, keyword_similarity);
+                let score = compute_retrieval_score(&memory, similarity, &scope_config, decay_lambda);
+                results.push(ScoredMemory {
+                    memory,
+                    score,
+                    similarity,
+                });
+            }
+
+            results.sort_by(|left, right| {
+                right
+                    .score
+                    .total_cmp(&left.score)
+                    .then_with(|| right.similarity.total_cmp(&left.similarity))
+                    .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
+                    .then_with(|| right.memory.id.cmp(&left.memory.id))
+            });
+            results.truncate(query.max_results);
+            let mut results =
+                trim_results_to_context_budget(results, query.context_config.as_ref(), &scope_config);
+            touch_scored_memories(connection, &mut results)?;
+            Ok(results)
+        })
     }
 
     async fn find_similar(
         &self,
-        _embedding: &[f32],
-        _threshold: f32,
-        _limit: usize,
+        embedding: &[f32],
+        threshold: f32,
+        limit: usize,
     ) -> Result<Vec<ScoredMemory>, StoreError> {
-        Err(StoreError::Validation(
-            "vector similarity search is scheduled for WU5; WU4 intentionally leaves find_similar unimplemented"
-                .to_string(),
-        ))
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+        validate_similarity_threshold(threshold)?;
+
+        self.with_connection(|connection| {
+            let expected_dimensions = load_embedding_dimensions(connection)?;
+            validate_query_embedding(embedding, expected_dimensions)?;
+
+            let similarity_scores = load_vector_similarity_scores(
+                connection,
+                self.scope,
+                MemoryState::Active,
+                None,
+                embedding,
+                threshold,
+            )?;
+            if similarity_scores.is_empty() {
+                return Ok(Vec::new());
+            }
+
+            let memories_by_id: HashMap<MemoryId, Memory> = load_search_memories(
+                connection,
+                self.scope,
+                MemoryState::Active,
+                None,
+            )?
+            .into_iter()
+            .filter_map(|memory| {
+                similarity_scores
+                    .get(&memory.id)
+                    .copied()
+                    .map(|_| (memory.id, memory))
+            })
+            .collect();
+
+            let mut results = similarity_scores
+                .into_iter()
+                .filter_map(|(id, similarity)| {
+                    memories_by_id.get(&id).cloned().map(|memory| ScoredMemory {
+                        memory,
+                        score: similarity,
+                        similarity,
+                    })
+                })
+                .collect::<Vec<_>>();
+
+            results.sort_by(|left, right| {
+                right
+                    .similarity
+                    .total_cmp(&left.similarity)
+                    .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
+                    .then_with(|| right.memory.id.cmp(&left.memory.id))
+            });
+            results.truncate(limit);
+            Ok(results)
+        })
     }
 
     async fn store_embedding(&self, id: &MemoryId, embedding: &[f32]) -> Result<(), StoreError> {
@@ -1236,12 +1397,503 @@ fn load_embedding_dimensions(connection: &Connection) -> Result<usize, StoreErro
     }
 }
 
+fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError> {
+    let defaults = ScopeConfig::default();
+    Ok(ScopeConfig {
+        similarity_weight: load_f32_config(
+            connection,
+            "similarity_weight",
+            defaults.similarity_weight,
+        )?,
+        recency_weight: load_f32_config(connection, "recency_weight", defaults.recency_weight)?,
+        access_weight: load_f32_config(connection, "access_weight", defaults.access_weight)?,
+        priority_weight: load_f32_config(connection, "priority_weight", defaults.priority_weight)?,
+        memory_context_ratio: load_f32_config(
+            connection,
+            "memory_context_ratio",
+            defaults.memory_context_ratio,
+        )?,
+        response_reserve: load_u32_config(
+            connection,
+            "response_reserve",
+            defaults.response_reserve,
+        )?,
+        salience_threshold: load_f32_config(
+            connection,
+            "salience_threshold",
+            defaults.salience_threshold,
+        )?,
+        merge_similarity_threshold: load_f32_config(
+            connection,
+            "merge_similarity_threshold",
+            defaults.merge_similarity_threshold,
+        )?,
+        duplicate_similarity_threshold: load_f32_config(
+            connection,
+            "duplicate_similarity_threshold",
+            defaults.duplicate_similarity_threshold,
+        )?,
+    })
+}
+
+fn load_decay_lambda(connection: &Connection) -> Result<f32, StoreError> {
+    load_f32_config(connection, "decay_lambda_base", DEFAULT_DECAY_LAMBDA_BASE)
+}
+
+fn load_f32_config(connection: &Connection, key: &str, default: f32) -> Result<f32, StoreError> {
+    let raw_value = load_config_value(connection, key)?;
+    match raw_value {
+        Some(raw_value) => raw_value.parse::<f32>().map_err(|error| {
+            StoreError::Serialization(format!("invalid {key} config `{raw_value}`: {error}"))
+        }),
+        None => Ok(default),
+    }
+}
+
+fn load_u32_config(connection: &Connection, key: &str, default: u32) -> Result<u32, StoreError> {
+    let raw_value = load_config_value(connection, key)?;
+    match raw_value {
+        Some(raw_value) => raw_value.parse::<u32>().map_err(|error| {
+            StoreError::Serialization(format!("invalid {key} config `{raw_value}`: {error}"))
+        }),
+        None => Ok(default),
+    }
+}
+
+fn load_config_value(connection: &Connection, key: &str) -> Result<Option<String>, StoreError> {
+    connection
+        .query_row(
+            "SELECT value FROM scope_config WHERE key = ?1",
+            [key],
+            |row| row.get::<_, String>(0),
+        )
+        .optional()
+        .map_err(StoreError::from)
+}
+
 fn encode_embedding(embedding: &[f32]) -> Vec<u8> {
     let mut bytes = Vec::with_capacity(embedding.len() * std::mem::size_of::<f32>());
     for component in embedding {
         bytes.extend_from_slice(&component.to_le_bytes());
     }
     bytes
+}
+
+fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>, StoreError> {
+    if bytes.len() % std::mem::size_of::<f32>() != 0 {
+        return Err(StoreError::Serialization(format!(
+            "embedding blob length {} is not aligned to f32 components",
+            bytes.len()
+        )));
+    }
+
+    let actual_dimensions = bytes.len() / std::mem::size_of::<f32>();
+    if actual_dimensions != expected_dimensions {
+        return Err(StoreError::Serialization(format!(
+            "stored embedding dimension mismatch: expected {expected_dimensions}, got {actual_dimensions}"
+        )));
+    }
+
+    let mut embedding = Vec::with_capacity(actual_dimensions);
+    for chunk in bytes.chunks_exact(std::mem::size_of::<f32>()) {
+        embedding.push(f32::from_le_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]));
+    }
+
+    Ok(embedding)
+}
+
+fn validate_query_embedding(embedding: &[f32], expected_dimensions: usize) -> Result<(), StoreError> {
+    if embedding.is_empty() {
+        return Err(StoreError::Validation(
+            "embedding vector must not be empty".to_string(),
+        ));
+    }
+
+    if embedding.len() != expected_dimensions {
+        return Err(StoreError::Validation(format!(
+            "embedding dimension mismatch: expected {expected_dimensions}, got {}",
+            embedding.len()
+        )));
+    }
+
+    Ok(())
+}
+
+fn validate_similarity_threshold(threshold: f32) -> Result<(), StoreError> {
+    if threshold.is_finite() && (0.0..=1.0).contains(&threshold) {
+        return Ok(());
+    }
+
+    Err(StoreError::Validation(
+        "similarity threshold must be a finite value in the inclusive range 0.0..=1.0"
+            .to_string(),
+    ))
+}
+
+fn load_search_memories(
+    connection: &Connection,
+    scope: MemoryScope,
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+) -> Result<Vec<Memory>, StoreError> {
+    let mut sql = format!(
+        "SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE scope = ?1 AND state = ?2"
+    );
+    let mut params: Vec<rusqlite::types::Value> = vec![
+        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
+        rusqlite::types::Value::from(state_to_db(state).to_string()),
+    ];
+
+    if let Some(type_filter) = type_filter {
+        if type_filter.is_empty() {
+            return Ok(Vec::new());
+        }
+
+        sql.push_str(" AND memory_type IN (");
+        for (index, memory_type) in type_filter.iter().enumerate() {
+            if index > 0 {
+                sql.push_str(", ");
+            }
+            sql.push('?');
+            sql.push_str(&(params.len() + 1).to_string());
+            params.push(rusqlite::types::Value::from(
+                memory_type_to_db(*memory_type).to_string(),
+            ));
+        }
+        sql.push(')');
+    }
+
+    sql.push_str(" ORDER BY updated_at DESC, rowid DESC");
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(params), map_memory_row)?;
+    let mut memories = Vec::new();
+    for row in rows {
+        memories.push(row?);
+    }
+    Ok(memories)
+}
+
+fn load_keyword_scores(
+    connection: &Connection,
+    scope: MemoryScope,
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    text: &str,
+) -> Result<HashMap<MemoryId, f32>, StoreError> {
+    let Some(fts_query) = build_fts_query(text) else {
+        return Ok(HashMap::new());
+    };
+
+    let mut sql = String::from(
+        r#"
+        SELECT m.id, bm25(memories_fts) AS bm25_score
+        FROM memories_fts
+        JOIN memories m ON m.rowid = memories_fts.rowid
+        WHERE memories_fts MATCH ?1
+          AND m.scope = ?2
+          AND m.state = ?3
+        "#,
+    );
+    let mut params: Vec<rusqlite::types::Value> = vec![
+        rusqlite::types::Value::from(fts_query),
+        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
+        rusqlite::types::Value::from(state_to_db(state).to_string()),
+    ];
+
+    if let Some(type_filter) = type_filter {
+        if type_filter.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        sql.push_str(" AND m.memory_type IN (");
+        for (index, memory_type) in type_filter.iter().enumerate() {
+            if index > 0 {
+                sql.push_str(", ");
+            }
+            sql.push('?');
+            sql.push_str(&(params.len() + 1).to_string());
+            params.push(rusqlite::types::Value::from(
+                memory_type_to_db(*memory_type).to_string(),
+            ));
+        }
+        sql.push(')');
+    }
+
+    sql.push_str(" ORDER BY bm25_score ASC, m.updated_at DESC");
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(params), |row| {
+        let raw_id: String = row.get(0)?;
+        Ok((parse_uuid_for_sqlite(&raw_id)?, row.get::<_, f64>(1)?))
+    })?;
+
+    let mut raw_matches = Vec::new();
+    for row in rows {
+        raw_matches.push(row?);
+    }
+    if raw_matches.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let best_score = raw_matches
+        .iter()
+        .map(|(_, score)| *score)
+        .fold(f64::INFINITY, f64::min);
+    let worst_score = raw_matches
+        .iter()
+        .map(|(_, score)| *score)
+        .fold(f64::NEG_INFINITY, f64::max);
+
+    let mut normalized_scores = HashMap::with_capacity(raw_matches.len());
+    for (id, raw_score) in raw_matches {
+        let normalized = if (worst_score - best_score).abs() < f64::EPSILON {
+            1.0
+        } else {
+            ((worst_score - raw_score) / (worst_score - best_score)).clamp(0.0, 1.0)
+        } as f32;
+        normalized_scores.insert(id, normalized);
+    }
+
+    Ok(normalized_scores)
+}
+
+fn build_fts_query(text: &str) -> Option<String> {
+    let terms = text
+        .split(|character: char| !character.is_alphanumeric() && character != '_')
+        .map(str::trim)
+        .filter(|term| !term.is_empty())
+        .map(|term| format!("\"{}\"", term.replace('"', "\"\"")))
+        .collect::<Vec<_>>();
+
+    if terms.is_empty() {
+        None
+    } else {
+        Some(terms.join(" AND "))
+    }
+}
+
+fn load_vector_similarity_scores(
+    connection: &Connection,
+    scope: MemoryScope,
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    query_embedding: &[f32],
+    threshold: f32,
+) -> Result<HashMap<MemoryId, f32>, StoreError> {
+    let expected_dimensions = load_embedding_dimensions(connection)?;
+    validate_query_embedding(query_embedding, expected_dimensions)?;
+
+    let mut sql = String::from(
+        r#"
+        SELECT m.id, v.embedding
+        FROM memories m
+        JOIN memory_embeddings me ON me.memory_id = m.id
+        JOIN vec_memories v ON v.rowid = me.vec_rowid
+        WHERE m.scope = ?1
+          AND m.state = ?2
+        "#,
+    );
+    let mut params: Vec<rusqlite::types::Value> = vec![
+        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
+        rusqlite::types::Value::from(state_to_db(state).to_string()),
+    ];
+
+    if let Some(type_filter) = type_filter {
+        if type_filter.is_empty() {
+            return Ok(HashMap::new());
+        }
+
+        sql.push_str(" AND m.memory_type IN (");
+        for (index, memory_type) in type_filter.iter().enumerate() {
+            if index > 0 {
+                sql.push_str(", ");
+            }
+            sql.push('?');
+            sql.push_str(&(params.len() + 1).to_string());
+            params.push(rusqlite::types::Value::from(
+                memory_type_to_db(*memory_type).to_string(),
+            ));
+        }
+        sql.push(')');
+    }
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(params), |row| {
+        let raw_id: String = row.get(0)?;
+        Ok((parse_uuid_for_sqlite(&raw_id)?, row.get::<_, Vec<u8>>(1)?))
+    })?;
+
+    let mut similarity_scores = HashMap::new();
+    for row in rows {
+        let (id, encoded_embedding) = row?;
+        let stored_embedding = decode_embedding(&encoded_embedding, expected_dimensions)?;
+        let similarity = cosine_similarity(query_embedding, &stored_embedding)?;
+        if similarity >= threshold && similarity > 0.0 {
+            similarity_scores.insert(id, similarity);
+        }
+    }
+
+    Ok(similarity_scores)
+}
+
+fn cosine_similarity(left: &[f32], right: &[f32]) -> Result<f32, StoreError> {
+    if left.len() != right.len() {
+        return Err(StoreError::Validation(format!(
+            "cosine similarity requires equal vector dimensions, got {} and {}",
+            left.len(),
+            right.len()
+        )));
+    }
+    if left.is_empty() {
+        return Err(StoreError::Validation(
+            "cosine similarity requires non-empty vectors".to_string(),
+        ));
+    }
+
+    let mut dot_product = 0.0_f32;
+    let mut left_norm = 0.0_f32;
+    let mut right_norm = 0.0_f32;
+    for (left_component, right_component) in left.iter().zip(right.iter()) {
+        dot_product += left_component * right_component;
+        left_norm += left_component * left_component;
+        right_norm += right_component * right_component;
+    }
+
+    if left_norm <= f32::EPSILON || right_norm <= f32::EPSILON {
+        return Ok(0.0);
+    }
+
+    Ok((dot_product / (left_norm.sqrt() * right_norm.sqrt())).clamp(0.0, 1.0))
+}
+
+fn combine_similarity_signals(vector_similarity: Option<f32>, keyword_similarity: Option<f32>) -> f32 {
+    match (vector_similarity, keyword_similarity) {
+        (Some(vector_similarity), Some(keyword_similarity)) => {
+            (VECTOR_SIMILARITY_BLEND_WEIGHT * vector_similarity)
+                + (KEYWORD_SIMILARITY_BLEND_WEIGHT * keyword_similarity)
+        }
+        (Some(vector_similarity), None) => vector_similarity,
+        (None, Some(keyword_similarity)) => keyword_similarity,
+        (None, None) => 0.0,
+    }
+}
+
+fn compute_retrieval_score(
+    memory: &Memory,
+    similarity: f32,
+    scope_config: &ScopeConfig,
+    decay_lambda: f32,
+) -> f32 {
+    let reference_time = memory.last_accessed_at.unwrap_or(memory.updated_at);
+    let recency = compute_recency_score(reference_time, decay_lambda);
+    let access = ((memory.access_count as f32) + 1.0).ln();
+    let priority = memory.importance_score * memory.reliability_score;
+
+    (scope_config.similarity_weight * similarity)
+        + (scope_config.recency_weight * recency)
+        + (scope_config.access_weight * access)
+        + (scope_config.priority_weight * priority)
+}
+
+fn compute_recency_score(reference_time: DateTime<Utc>, decay_lambda: f32) -> f32 {
+    let days_since_reference =
+        ((Utc::now() - reference_time).num_seconds().max(0) as f32) / 86_400.0;
+    (-decay_lambda.max(0.0) * days_since_reference).exp()
+}
+
+fn trim_results_to_context_budget(
+    results: Vec<ScoredMemory>,
+    context_config: Option<&MemoryContextConfig>,
+    scope_config: &ScopeConfig,
+) -> Vec<ScoredMemory> {
+    let Some(context_config) = context_config else {
+        return results;
+    };
+
+    let memory_context_ratio = if context_config.memory_context_ratio.is_finite() {
+        context_config.memory_context_ratio.clamp(0.0, 1.0)
+    } else {
+        scope_config.memory_context_ratio
+    };
+    let response_reserve = context_config
+        .response_reserve
+        .unwrap_or(scope_config.response_reserve);
+    let available_for_memory = context_config.model_max_tokens.saturating_sub(
+        context_config
+            .effective_already_used_tokens()
+            .saturating_add(response_reserve),
+    );
+    let max_memory_tokens = ((available_for_memory as f32) * memory_context_ratio).floor() as u32;
+
+    if max_memory_tokens == 0 {
+        return Vec::new();
+    }
+
+    let mut retained = Vec::new();
+    let mut used_tokens = 0_u32;
+    for result in results {
+        let estimated_tokens = estimate_memory_tokens(&result.memory);
+        if retained.is_empty() || used_tokens.saturating_add(estimated_tokens) <= max_memory_tokens {
+            used_tokens = used_tokens.saturating_add(estimated_tokens);
+            retained.push(result);
+        } else {
+            break;
+        }
+    }
+
+    retained
+}
+
+fn estimate_memory_tokens(memory: &Memory) -> u32 {
+    let tags_length = if memory.tags.is_empty() {
+        0
+    } else {
+        memory.tags.iter().map(String::len).sum::<usize>() + memory.tags.len().saturating_sub(1)
+    };
+    let raw_characters = memory.content.len()
+        + memory.summary.as_ref().map_or(0, String::len)
+        + memory.status.as_ref().map_or(0, String::len)
+        + tags_length;
+
+    let content_tokens = raw_characters.div_ceil(ESTIMATED_CHARS_PER_TOKEN) as u32;
+    content_tokens.saturating_add(BASE_MEMORY_TOKEN_OVERHEAD)
+}
+
+fn touch_scored_memories(
+    connection: &mut Connection,
+    results: &mut [ScoredMemory],
+) -> Result<(), StoreError> {
+    if results.is_empty() {
+        return Ok(());
+    }
+
+    let now = Utc::now();
+    let transaction = connection.transaction()?;
+    for result in results {
+        result.memory.access_count =
+            result.memory.access_count.checked_add(1).ok_or_else(|| {
+                StoreError::Validation("access_count overflow".to_string())
+            })?;
+        result.memory.last_accessed_at = Some(now);
+
+        transaction.execute(
+            r#"
+            UPDATE memories
+            SET access_count = ?2,
+                last_accessed_at = ?3
+            WHERE id = ?1
+            "#,
+            params![
+                result.memory.id.to_string(),
+                i64::from(result.memory.access_count),
+                format_timestamp(now),
+            ],
+        )?;
+    }
+    transaction.commit()?;
+
+    Ok(())
 }
 
 fn count_memories_by_state(
@@ -1320,7 +1972,7 @@ mod tests {
     use super::SqliteMemoryStore;
     use crate::{
         Memory, MemoryFilter, MemoryScope, MemoryState, MemoryStore, MemoryType, MetadataUpdate,
-        OptionalFieldUpdate, ProvenanceLevel, ResolutionStatus, SensitivityLevel,
+        OptionalFieldUpdate, ProvenanceLevel, ResolutionStatus, SearchQuery, SensitivityLevel,
     };
 
     #[tokio::test]
@@ -1606,6 +2258,271 @@ mod tests {
             .expect("get downgraded memory")
             .expect("memory exists");
         assert!((downgraded.reliability_score - 0.4).abs() < f32::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn search_uses_keyword_fts_and_updates_access_tracking() {
+        let fixture = test_fixture();
+
+        let mut active_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        active_match.content = "Apollo launch checklist and mission notes".to_string();
+        active_match.tags = vec!["apollo".to_string(), "launch".to_string()];
+        let active_match_id = active_match.id;
+
+        let mut dormant_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        dormant_match.content = "Apollo archive notes".to_string();
+        dormant_match.state = MemoryState::Dormant;
+
+        let mut active_miss = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        active_miss.content = "Garden irrigation instructions".to_string();
+
+        fixture
+            .store
+            .store(active_match)
+            .await
+            .expect("store active keyword match");
+        fixture
+            .store
+            .store(dormant_match)
+            .await
+            .expect("store dormant keyword match");
+        fixture
+            .store
+            .store(active_miss)
+            .await
+            .expect("store active non-match");
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: "apollo launch".to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run keyword search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].memory.id, active_match_id);
+        assert!(results[0].similarity > 0.0);
+        assert_eq!(results[0].memory.access_count, 1);
+        assert!(results[0].memory.last_accessed_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn find_similar_returns_active_embedding_matches_without_touching_access() {
+        let fixture = test_fixture();
+
+        let active_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let active_match_id = active_match.id;
+        let mut dormant_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        dormant_match.state = MemoryState::Dormant;
+        let dormant_match_id = dormant_match.id;
+        let active_far = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let active_far_id = active_far.id;
+
+        fixture
+            .store
+            .store(active_match)
+            .await
+            .expect("store active vector match");
+        fixture
+            .store
+            .store(dormant_match)
+            .await
+            .expect("store dormant vector match");
+        fixture
+            .store
+            .store(active_far)
+            .await
+            .expect("store active far vector");
+
+        fixture
+            .store
+            .store_embedding(&active_match_id, &[1.0; 768])
+            .await
+            .expect("store active embedding");
+        fixture
+            .store
+            .store_embedding(&dormant_match_id, &[1.0; 768])
+            .await
+            .expect("store dormant embedding");
+        fixture
+            .store
+            .store_embedding(&active_far_id, &[0.0; 768])
+            .await
+            .expect("store far embedding");
+
+        let results = fixture
+            .store
+            .find_similar(&[1.0; 768], 0.95, 5)
+            .await
+            .expect("find similar");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].memory.id, active_match_id);
+        assert!((results[0].similarity - 1.0).abs() < f32::EPSILON);
+
+        let persisted = fixture
+            .store
+            .get_raw(&active_match_id)
+            .await
+            .expect("reload active match")
+            .expect("active match exists");
+        assert_eq!(persisted.access_count, 0);
+        assert!(persisted.last_accessed_at.is_none());
+    }
+
+    #[tokio::test]
+    async fn search_combines_semantic_and_priority_signals_for_ordering() {
+        let fixture = test_fixture();
+
+        let mut keyword_only = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        keyword_only.content = "release checklist for apollo deployment".to_string();
+        keyword_only.importance_score = 0.2;
+        keyword_only.reliability_score = 0.2;
+        let keyword_only_id = keyword_only.id;
+
+        let mut semantic_priority = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        semantic_priority.content = "deployment runbook for launch window".to_string();
+        semantic_priority.importance_score = 1.0;
+        semantic_priority.reliability_score = 1.0;
+        semantic_priority.access_count = 5;
+        let semantic_priority_id = semantic_priority.id;
+
+        fixture
+            .store
+            .store(keyword_only)
+            .await
+            .expect("store keyword-only memory");
+        fixture
+            .store
+            .store(semantic_priority)
+            .await
+            .expect("store semantic-priority memory");
+
+        let mut weak_embedding = vec![1.0_f32; 384];
+        weak_embedding.extend(vec![-1.0_f32; 384]);
+        fixture
+            .store
+            .store_embedding(&keyword_only_id, &weak_embedding)
+            .await
+            .expect("store weak semantic embedding");
+        fixture
+            .store
+            .store_embedding(&semantic_priority_id, &[1.0; 768])
+            .await
+            .expect("store strong semantic embedding");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE memories SET access_count = 5, last_accessed_at = ?2 WHERE id = ?1",
+                    [
+                        semantic_priority_id.to_string(),
+                        super::format_timestamp(Utc::now()),
+                    ],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET access_count = 0, last_accessed_at = ?2 WHERE id = ?1",
+                    [keyword_only_id.to_string(), super::format_timestamp(Utc::now())],
+                )?;
+                Ok(())
+            })
+            .expect("seed deterministic access counts");
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: "apollo deployment".to_string(),
+                embedding: Some(vec![1.0; 768]),
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run hybrid search");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].memory.id, semantic_priority_id);
+        assert_eq!(results[1].memory.id, keyword_only_id);
+        assert!(results[0].score > results[1].score);
+        assert!(results[0].similarity >= results[1].similarity);
+    }
+
+    #[tokio::test]
+    async fn search_respects_type_and_state_filters() {
+        let fixture = test_fixture();
+
+        let mut active_decision = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        active_decision.content = "migration decision for apollo workspace".to_string();
+        active_decision.memory_type = MemoryType::Decision;
+        let active_decision_id = active_decision.id;
+
+        let mut active_fact = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        active_fact.content = "apollo workspace fact sheet".to_string();
+        active_fact.memory_type = MemoryType::Fact;
+
+        let mut dormant_decision = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        dormant_decision.content = "old apollo decision archive".to_string();
+        dormant_decision.memory_type = MemoryType::Decision;
+        dormant_decision.state = MemoryState::Dormant;
+        let dormant_decision_id = dormant_decision.id;
+
+        fixture
+            .store
+            .store(active_decision)
+            .await
+            .expect("store active decision");
+        fixture
+            .store
+            .store(active_fact)
+            .await
+            .expect("store active fact");
+        fixture
+            .store
+            .store(dormant_decision)
+            .await
+            .expect("store dormant decision");
+
+        let active_results = fixture
+            .store
+            .search(SearchQuery {
+                text: "apollo decision".to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: Some(vec![MemoryType::Decision]),
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run active decision search");
+        assert_eq!(active_results.len(), 1);
+        assert_eq!(active_results[0].memory.id, active_decision_id);
+
+        let dormant_results = fixture
+            .store
+            .search(SearchQuery {
+                text: "apollo decision".to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: Some(MemoryState::Dormant),
+                type_filter: Some(vec![MemoryType::Decision]),
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run dormant decision search");
+        assert_eq!(dormant_results.len(), 1);
+        assert_eq!(dormant_results[0].memory.id, dormant_decision_id);
     }
 
     struct TestFixture {

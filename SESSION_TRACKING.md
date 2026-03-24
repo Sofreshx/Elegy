@@ -89,7 +89,7 @@
 | Field | Value |
 |---|---|
 | Status | ✅ Done |
-| Commit hash | _(recorded in git history by the WU4 finalization commit created from this finalized snapshot)_ |
+| Commit hash | `b19788a8ba28d49abef26f43dd114dfdb227ece0` |
 | Timestamp | 2026-03-24T04:47:28.6060083-07:00 |
 | Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/mod.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
 | `cargo check` result | ✅ Pass — initial WU4 implementation and focused malformed-FTS fix both pass `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
@@ -112,17 +112,17 @@
 
 | Field | Value |
 |---|---|
-| Status | ⬜ Not started / 🔨 In progress / ✅ Done / ❌ Blocked |
-| Commit hash | |
-| Timestamp | |
-| Files created/modified | |
-| `cargo check` result | |
-| `cargo test` result | |
-| Tests written | _(count and brief description)_ |
-| Deviations from plan | |
-| Blockers encountered | |
-| Decisions made | |
-| Confidence self-assessment | |
+| Status | ✅ Done |
+| Commit hash | _(this WU5 finalization commit; report the resulting hash from git history)_ |
+| Timestamp | 2026-03-24T06:11:00-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
+| `cargo check` result | ✅ Pass — `cargo check -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| `cargo test` result | ✅ Pass via dedicated unit-test runner — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (32 passed, 0 failed) |
+| Tests written | 4 focused async unit tests added in `rust/crates/elegy-memory/src/storage/sqlite_store.rs` covering keyword FTS retrieval + access updates, active-only embedding similarity, hybrid ordering across semantic/priority signals, and state/type filtering. |
+| Deviations from plan | Used the documented/manual cosine fallback over dynamic sqlite-vec KNN for retrieval so the implementation remains correct in both the sqlite-vec-present and rowid-table fallback environments established by WU3/WU4; hybrid similarity blends vector and BM25-derived keyword relevance before applying the architecture scoring weights. |
+| Blockers encountered | None; `cargo check` passed on the first validation run after the WU5 search implementation landed, and the dedicated unit-test runner passed without follow-up fixes. |
+| Decisions made | Search defaults to `Active` memories, honors explicit dormant filtering, excludes deleted memories from retrieval, updates access tracking for returned `search` results only, loads scoring weights/decay/context defaults from `scope_config`, and trims prompt-oriented search results against the optional context budget using a lightweight token-estimation heuristic. |
+| Confidence self-assessment | 4 |
 
 **Canary — Verify WU4:**
 > _Without opening sqlite_store.rs, describe the auto-versioning behavior on update. Then verify._
