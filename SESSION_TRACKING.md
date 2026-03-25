@@ -321,6 +321,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU2 — Sqlite Store Optional Provider Wiring (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Finalizing commit recorded on `feature/embedding-provider` during WU2 closeout. |
+| Timestamp | 2026-03-24T22:34:08.8100283-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/Cargo.lock`, `SESSION_TRACKING.md` |
+| Validation | ✅ Verified pass — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` => `59 passed, 0 failed` |
+| Tests run by this runner | Finalization used the already-verified full `cargo test -p elegy-memory` signal supplied with the WU2 handoff; no additional test execution was performed during closeout. |
+| Blockers encountered | None in implementation or finalization. I did not find an obvious repository-local `wu2` todo/status tracker to update confidently, so no separate status artifact was modified. |
+| Deviations from plan | **Intentional policy deviation documented here:** when a provider-backed `store()` attempt cannot obtain a usable embedding (provider error or provider output rejected by store-side validation such as dimension mismatch), the memory insert still succeeds and remains `embedding_stale = true` rather than surfacing a fatal error back through the store API. Likewise, provider-backed `search()` now opportunistically derives a query embedding only when no explicit embedding is supplied, and if that provider call fails it degrades to the existing keyword-only path instead of failing the search. |
+| Decisions made | Added optional provider ownership directly to `SqliteMemoryStore`; preserved existing `SqliteMemoryStore::new(path, scope)` for current callers; introduced provider-aware constructors (`new_with_embedding_provider`, `new_with_optional_embedding_provider`); reused the existing `store_embedding()` and hybrid search scoring path instead of rewriting retrieval logic; added deterministic stub-provider unit tests that prove automatic embedding persistence on store, automatic query-embedding search when no explicit query vector is supplied, and graceful fallback behavior when provider calls fail; and kept `rust/Cargo.lock` in the final commit so the tracked lockfile matches the current workspace dependency graph (including `elegy-memory`'s `reqwest` dependency and the already-declared `elegy-cli` workspace links). |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

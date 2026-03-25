@@ -14,13 +14,13 @@ use super::schema::init_database;
 use crate::{
     decay,
     similarity::cosine_similarity,
-    traits::MemoryStore,
+    traits::{EmbeddingProvider, MemoryStore},
     types::{
         ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
         MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport, ResolutionStatus,
         ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
     },
-    MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
+    EmbeddingError, MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
 };
 
 const MEMORY_SELECT_COLUMNS: &str = r#"
@@ -62,6 +62,7 @@ const BASE_MEMORY_TOKEN_OVERHEAD: u32 = 16;
 pub struct SqliteMemoryStore {
     connection: Arc<Mutex<Connection>>,
     scope: MemoryScope,
+    embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
 }
 
 impl std::fmt::Debug for SqliteMemoryStore {
@@ -75,10 +76,29 @@ impl std::fmt::Debug for SqliteMemoryStore {
 impl SqliteMemoryStore {
     /// Open or create a SQLite-backed store at `path` for a single logical scope.
     pub fn new(path: impl AsRef<Path>, scope: MemoryScope) -> Result<Self, StoreError> {
+        Self::new_with_optional_embedding_provider(path, scope, None)
+    }
+
+    /// Open or create a SQLite-backed store with an embedding provider for automatic embedding flows.
+    pub fn new_with_embedding_provider(
+        path: impl AsRef<Path>,
+        scope: MemoryScope,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+    ) -> Result<Self, StoreError> {
+        Self::new_with_optional_embedding_provider(path, scope, Some(embedding_provider))
+    }
+
+    /// Open or create a SQLite-backed store with an optional embedding provider.
+    pub fn new_with_optional_embedding_provider(
+        path: impl AsRef<Path>,
+        scope: MemoryScope,
+        embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+    ) -> Result<Self, StoreError> {
         let connection = init_database(path.as_ref())?;
         Ok(Self {
             connection: Arc::new(Mutex::new(connection)),
             scope,
+            embedding_provider,
         })
     }
 
@@ -86,6 +106,19 @@ impl SqliteMemoryStore {
     #[must_use]
     pub const fn scope(&self) -> MemoryScope {
         self.scope
+    }
+
+    async fn generate_embedding(&self, text: &str) -> Result<Option<Vec<f32>>, EmbeddingError> {
+        let trimmed_text = text.trim();
+        if trimmed_text.is_empty() {
+            return Ok(None);
+        }
+
+        let Some(embedding_provider) = self.embedding_provider.as_ref() else {
+            return Ok(None);
+        };
+
+        embedding_provider.embed(trimmed_text).await.map(Some)
     }
 
     fn with_connection<T>(
@@ -132,9 +165,16 @@ impl SqliteMemoryStore {
 #[async_trait]
 impl MemoryStore for SqliteMemoryStore {
     async fn store(&self, memory: Memory) -> Result<MemoryId, StoreError> {
+        let should_attempt_embedding =
+            self.embedding_provider.is_some() && !memory.content.trim().is_empty();
+        let mut memory = memory;
+        if should_attempt_embedding {
+            memory.embedding_stale = true;
+        }
+
         validate_memory_for_store(&memory, self.scope)?;
 
-        self.with_connection(|connection| {
+        let id = self.with_connection(|connection| {
             let transaction = connection.transaction()?;
             transaction.execute(
                 r#"
@@ -175,7 +215,21 @@ impl MemoryStore for SqliteMemoryStore {
             transaction.commit()?;
 
             Ok(memory.id)
-        })
+        })?;
+
+        if !should_attempt_embedding {
+            return Ok(id);
+        }
+
+        let embedding: Vec<f32> = match self.generate_embedding(&memory.content).await {
+            Ok(Some(embedding)) => embedding,
+            Ok(None) | Err(_) => return Ok(id),
+        };
+
+        match self.store_embedding(&id, &embedding).await {
+            Ok(()) | Err(StoreError::Validation(_)) => Ok(id),
+            Err(error) => Err(error),
+        }
     }
 
     async fn update_content(
@@ -433,6 +487,15 @@ impl MemoryStore for SqliteMemoryStore {
             return Ok(Vec::new());
         }
 
+        let derived_query_embedding = if query.embedding.is_none() {
+            match self.generate_embedding(&trimmed_text).await {
+                Ok(embedding) => embedding,
+                Err(_) => None,
+            }
+        } else {
+            None
+        };
+
         self.with_connection(|connection| {
             let scope_config = load_scope_config(connection)?;
             let query_embedding = match query.embedding.as_deref() {
@@ -441,7 +504,17 @@ impl MemoryStore for SqliteMemoryStore {
                     validate_query_embedding(embedding, expected_dimensions)?;
                     Some(embedding)
                 }
-                None => None,
+                None => match derived_query_embedding.as_deref() {
+                    Some(embedding) => {
+                        let expected_dimensions = load_embedding_dimensions(connection)?;
+                        match validate_query_embedding(embedding, expected_dimensions) {
+                            Ok(()) => Some(embedding),
+                            Err(StoreError::Validation(_)) => None,
+                            Err(error) => return Err(error),
+                        }
+                    }
+                    None => None,
+                },
             };
 
             let mut keyword_scores = if trimmed_text.is_empty() {
@@ -745,7 +818,10 @@ impl MemoryStore for SqliteMemoryStore {
             transaction.execute("DELETE FROM memory_embeddings", [])?;
             transaction.execute("DELETE FROM vec_memories", [])?;
             transaction.execute("DELETE FROM memories", [])?;
-            transaction.execute("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", [])?;
+            transaction.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                [],
+            )?;
             transaction.commit()?;
 
             Ok(PurgeReport {
@@ -2031,17 +2107,85 @@ fn lower_reliability(
 
 #[cfg(test)]
 mod tests {
-    use std::{collections::HashMap, env, fs, path::PathBuf};
+    use std::{
+        collections::HashMap,
+        env, fs,
+        path::PathBuf,
+        sync::{Arc, Mutex},
+    };
 
+    use async_trait::async_trait;
     use chrono::Utc;
     use tokio;
     use uuid::Uuid;
 
     use super::SqliteMemoryStore;
     use crate::{
-        Memory, MemoryFilter, MemoryScope, MemoryState, MemoryStore, MemoryType, MetadataUpdate,
-        OptionalFieldUpdate, ProvenanceLevel, ResolutionStatus, SearchQuery, SensitivityLevel,
+        EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
+        MemoryStore, MemoryType, MetadataUpdate, OptionalFieldUpdate, ProvenanceLevel,
+        ResolutionStatus, SearchQuery, SensitivityLevel,
     };
+
+    #[derive(Debug, Clone)]
+    enum StubEmbeddingResponse {
+        Embedding(Vec<f32>),
+        Failure(String),
+    }
+
+    #[derive(Debug)]
+    struct StubEmbeddingProvider {
+        responses: HashMap<String, StubEmbeddingResponse>,
+        calls: Mutex<Vec<String>>,
+    }
+
+    impl StubEmbeddingProvider {
+        fn new<I, S>(responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
+            S: Into<String>,
+        {
+            Self {
+                responses: responses
+                    .into_iter()
+                    .map(|(text, response)| (text.into(), response))
+                    .collect(),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("stub provider calls lock").clone()
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StubEmbeddingProvider {
+        async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            let trimmed = text.trim().to_string();
+            self.calls
+                .lock()
+                .expect("stub provider calls lock")
+                .push(trimmed.clone());
+
+            match self.responses.get(&trimmed) {
+                Some(StubEmbeddingResponse::Embedding(embedding)) => Ok(embedding.clone()),
+                Some(StubEmbeddingResponse::Failure(message)) => {
+                    Err(EmbeddingError::Provider(message.clone()))
+                }
+                None => Err(EmbeddingError::Provider(format!(
+                    "missing stub embedding for `{trimmed}`"
+                ))),
+            }
+        }
+
+        fn dimensions(&self) -> usize {
+            768
+        }
+
+        fn model_id(&self) -> &str {
+            "stub-embedding-provider"
+        }
+    }
 
     #[tokio::test]
     async fn store_and_get_round_trip_updates_access_tracking() {
@@ -2672,6 +2816,191 @@ mod tests {
         assert_eq!(dormant_results[0].memory.id, dormant_decision_id);
     }
 
+    #[tokio::test]
+    async fn store_with_embedding_provider_persists_embedding_automatically() {
+        let memory_content = "provider-backed storage memory";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            memory_content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.content = memory_content.to_string();
+        let id = memory.id;
+
+        fixture
+            .store
+            .store(memory)
+            .await
+            .expect("store memory with automatic embedding");
+
+        let persisted = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("reload stored memory")
+            .expect("memory exists");
+        assert!(!persisted.embedding_stale);
+
+        let (embedding_rows, vector_rows) = fixture
+            .store
+            .with_connection(|connection| {
+                let embedding_rows = connection.query_row(
+                    "SELECT COUNT(*) FROM memory_embeddings WHERE memory_id = ?1",
+                    [id.to_string()],
+                    |row| row.get::<_, i64>(0),
+                )?;
+                let vector_rows =
+                    connection.query_row("SELECT COUNT(*) FROM vec_memories", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?;
+                Ok((embedding_rows, vector_rows))
+            })
+            .expect("load automatic embedding counts");
+
+        assert_eq!(embedding_rows, 1);
+        assert_eq!(vector_rows, 1);
+        assert_eq!(provider.calls(), vec![memory_content.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn search_with_provider_auto_generates_query_embedding_when_missing() {
+        let semantic_query = "semantic probe";
+        let semantic_match_content = "release readiness checklist";
+        let non_match_content = "garden watering schedule";
+        let mut weak_embedding = vec![1.0_f32; 384];
+        weak_embedding.extend(vec![-1.0_f32; 384]);
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                semantic_match_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                non_match_content,
+                StubEmbeddingResponse::Embedding(weak_embedding),
+            ),
+            (
+                semantic_query,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+        ]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut semantic_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        semantic_match.content = semantic_match_content.to_string();
+        let semantic_match_id = semantic_match.id;
+
+        let mut non_match = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        non_match.content = non_match_content.to_string();
+
+        fixture
+            .store
+            .store(semantic_match)
+            .await
+            .expect("store semantic match");
+        fixture
+            .store
+            .store(non_match)
+            .await
+            .expect("store semantic non-match");
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: semantic_query.to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run provider-backed semantic search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].memory.id, semantic_match_id);
+        assert!(results[0].similarity > 0.0);
+        assert_eq!(
+            provider.calls(),
+            vec![
+                semantic_match_content.to_string(),
+                non_match_content.to_string(),
+                semantic_query.to_string()
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn provider_failures_keep_memory_stored_and_preserve_keyword_search_fallback() {
+        let fallback_content = "apollo keyword fallback";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            fallback_content,
+            StubEmbeddingResponse::Failure("store embedding failed".to_string()),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.content = fallback_content.to_string();
+        let id = memory.id;
+
+        fixture
+            .store
+            .store(memory)
+            .await
+            .expect("store memory despite provider failure");
+
+        let persisted = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("reload stored fallback memory")
+            .expect("memory exists");
+        assert!(persisted.embedding_stale);
+
+        let (embedding_rows, vector_rows) = fixture
+            .store
+            .with_connection(|connection| {
+                let embedding_rows = connection.query_row(
+                    "SELECT COUNT(*) FROM memory_embeddings WHERE memory_id = ?1",
+                    [id.to_string()],
+                    |row| row.get::<_, i64>(0),
+                )?;
+                let vector_rows =
+                    connection.query_row("SELECT COUNT(*) FROM vec_memories", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?;
+                Ok((embedding_rows, vector_rows))
+            })
+            .expect("load failed automatic embedding counts");
+
+        assert_eq!(embedding_rows, 0);
+        assert_eq!(vector_rows, 0);
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: fallback_content.to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+            })
+            .await
+            .expect("run keyword fallback search");
+
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].memory.id, id);
+        assert!(results[0].similarity > 0.0);
+        assert_eq!(
+            provider.calls(),
+            vec![fallback_content.to_string(), fallback_content.to_string()]
+        );
+    }
+
     struct TestFixture {
         store: SqliteMemoryStore,
         path: PathBuf,
@@ -2687,6 +3016,14 @@ mod tests {
         let path = env::temp_dir().join(format!("elegy-memory-store-{}.sqlite3", Uuid::new_v4()));
         let store =
             SqliteMemoryStore::new(&path, MemoryScope::Workspace).expect("create sqlite store");
+        TestFixture { store, path }
+    }
+
+    fn test_fixture_with_provider(provider: Arc<dyn EmbeddingProvider>) -> TestFixture {
+        let path = env::temp_dir().join(format!("elegy-memory-store-{}.sqlite3", Uuid::new_v4()));
+        let store =
+            SqliteMemoryStore::new_with_embedding_provider(&path, MemoryScope::Workspace, provider)
+                .expect("create sqlite store with embedding provider");
         TestFixture { store, path }
     }
 
