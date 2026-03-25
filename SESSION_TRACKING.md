@@ -337,6 +337,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU3 — Salience Gate Optional Provider Fallback (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-24T22:48:11.1843082-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/gate.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo fmt --all && cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; focused unit coverage was added but direct unit/integration/E2E execution was intentionally deferred. |
+| Blockers encountered | None in implementation. I did not find a repository-local `wu3-impl` todo/status tracker beyond this session log, so no additional tracker artifact was updated. |
+| Deviations from plan | Kept CLI add wiring unchanged for this run so the public behavior change is limited to the salience gate API and its unit coverage; provider-aware gate construction is available but not yet plumbed into CLI add. |
+| Decisions made | Preserved `DefaultSalienceGate::new(scope_config)` for existing callers; added compatibility-preserving provider-aware constructors that accept an optional `Arc<dyn EmbeddingProvider>`; changed novelty lookup to reuse an explicit candidate embedding when present or derive one from trimmed content when a provider is configured; and intentionally degrade provider embed failures to “skip novelty lookup” so salience/provenance archive logic continues unchanged. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**
