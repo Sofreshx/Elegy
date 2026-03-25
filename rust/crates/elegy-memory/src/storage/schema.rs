@@ -103,7 +103,8 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
 
         CREATE TABLE IF NOT EXISTS memory_embeddings (
             memory_id TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
-            vec_rowid INTEGER NOT NULL UNIQUE
+            vec_rowid INTEGER NOT NULL UNIQUE,
+            content_sha256 TEXT
         );
 
         CREATE VIRTUAL TABLE IF NOT EXISTS memories_fts USING fts5(
@@ -167,6 +168,7 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
     )?;
 
     ensure_vec_memories_object(connection)?;
+    ensure_memory_embeddings_columns(connection)?;
 
     Ok(())
 }
@@ -194,6 +196,26 @@ fn ensure_vec_memories_object(connection: &Connection) -> Result<(), StoreError>
         }
         Err(error) => Err(StoreError::from(error)),
     }
+}
+
+fn ensure_memory_embeddings_columns(connection: &Connection) -> Result<(), StoreError> {
+    if !table_column_exists(connection, "memory_embeddings", "content_sha256")? {
+        connection.execute(
+            "ALTER TABLE memory_embeddings ADD COLUMN content_sha256 TEXT",
+            [],
+        )?;
+    }
+
+    connection.execute(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_memory_embeddings_content_sha256
+            ON memory_embeddings(content_sha256)
+            WHERE content_sha256 IS NOT NULL
+        "#,
+        [],
+    )?;
+
+    Ok(())
 }
 
 fn initialize_scope_config(connection: &Connection) -> Result<(), StoreError> {
@@ -250,6 +272,24 @@ fn schema_object_exists(connection: &Connection, name: &str) -> Result<bool, Sto
     Ok(exists.is_some())
 }
 
+fn table_column_exists(
+    connection: &Connection,
+    table_name: &str,
+    column_name: &str,
+) -> Result<bool, StoreError> {
+    let pragma = format!("PRAGMA table_info({table_name})");
+    let mut statement = connection.prepare(&pragma)?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+
+    for row in rows {
+        if row? == column_name {
+            return Ok(true);
+        }
+    }
+
+    Ok(false)
+}
+
 fn is_missing_module_error(error: &rusqlite::Error, module_name: &str) -> bool {
     error.to_string().contains("no such module") && error.to_string().contains(module_name)
 }
@@ -260,7 +300,9 @@ mod tests {
 
     use uuid::Uuid;
 
-    use super::{init_database, CURRENT_SCHEMA_VERSION};
+    use rusqlite::Connection;
+
+    use super::{init_database, table_column_exists, CURRENT_SCHEMA_VERSION};
 
     #[test]
     fn init_database_creates_expected_schema_objects_idempotently() {
@@ -319,6 +361,51 @@ mod tests {
             );
         }
         drop(second_connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::NotFound,
+                "failed to remove temporary database {}: {error}",
+                database_path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn init_database_adds_embedding_content_hash_column_for_existing_databases() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-schema-{}.sqlite3", Uuid::new_v4()));
+
+        let legacy_connection = must(
+            Connection::open(&database_path),
+            "create legacy temporary schema database",
+        );
+        must(
+            legacy_connection.execute_batch(
+                r#"
+                CREATE TABLE memory_embeddings (
+                    memory_id TEXT PRIMARY KEY,
+                    vec_rowid INTEGER NOT NULL UNIQUE
+                );
+                "#,
+            ),
+            "create legacy memory_embeddings table",
+        );
+        drop(legacy_connection);
+
+        let upgraded_connection = must(
+            init_database(&database_path),
+            "upgrade legacy temporary schema database",
+        );
+        assert!(
+            must(
+                table_column_exists(&upgraded_connection, "memory_embeddings", "content_sha256"),
+                "load upgraded memory_embeddings columns",
+            ),
+            "expected init_database to add content_sha256 to memory_embeddings",
+        );
+        drop(upgraded_connection);
 
         if let Err(error) = fs::remove_file(&database_path) {
             assert_eq!(

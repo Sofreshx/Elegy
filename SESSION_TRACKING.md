@@ -401,6 +401,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU7 — Embedding Cache / Skip If Unchanged (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | `073dd9257928a5ec345b15650ebbd3cde0889234` |
+| Timestamp | 2026-03-25T05:10:38.0211778-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/storage/schema.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo test --package elegy-memory` from `C:\Users\Romain\Projects\Elegy\rust` completed green: lib/unit `48 passed`, CLI integration `4 passed`, governed-memory integration `15 passed`, integration `9 passed`, local-store integration `4 passed`, plus `2` zero-test harnesses (`src/main.rs` and doc-tests) for `80 passed, 0 failed, 0 ignored, 0 measured, 0 filtered out`. |
+| Tests run by this runner | Executed the requested authoritative validation lane after the WU7 cache and schema changes landed. Added focused store/schema coverage proving duplicate-content stores only invoke the embedding provider once, stale embeddings are not reused after content changes, and legacy databases are upgraded to include the new hash column. |
+| Blockers encountered | None in the final change set. `rust/Cargo.lock` changed locally when adding the direct `sha2` dependency, but it remains intentionally unstaged per the closeout constraints. |
+| Deviations from plan | Kept the cache lookup scoped to the current `SqliteMemoryStore` scope and reused persisted vector blobs by copying them into a new `vec_memories` row, rather than widening public APIs or introducing cross-scope/provider cache sharing. |
+| Decisions made | Added `content_sha256` storage on `memory_embeddings` with a backward-compatible schema migration/index path; compute SHA-256 hashes for persisted embeddings; on `store()`, check for a non-stale existing embedding with the same hash before calling the provider and clone that vector into the new memory when available; and keep stale embeddings out of cache hits by requiring `memories.embedding_stale = 0` on lookup. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

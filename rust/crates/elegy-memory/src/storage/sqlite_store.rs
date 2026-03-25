@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type, Connection, OptionalExtension, Row};
 use serde::{de::DeserializeOwned, Serialize};
+use sha2::{Digest, Sha256};
 use uuid::Uuid;
 
 use super::schema::init_database;
@@ -121,6 +122,33 @@ impl SqliteMemoryStore {
         embedding_provider.embed(trimmed_text).await.map(Some)
     }
 
+    async fn reuse_cached_embedding(
+        &self,
+        id: &MemoryId,
+        content_sha256: &str,
+    ) -> Result<bool, StoreError> {
+        let Some(encoded_embedding) = self.with_connection(|connection| {
+            load_cached_embedding_blob(connection, self.scope, content_sha256)
+        })?
+        else {
+            return Ok(false);
+        };
+
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+            if require_memory(&transaction, id)?.is_none() {
+                return Err(StoreError::NotFound(*id));
+            }
+
+            let expected_dimensions = load_embedding_dimensions(&transaction)?;
+            decode_embedding(&encoded_embedding, expected_dimensions)?;
+            upsert_encoded_embedding(&transaction, id, &encoded_embedding, content_sha256)?;
+            transaction.commit()?;
+
+            Ok(true)
+        })
+    }
+
     fn with_connection<T>(
         &self,
         operation: impl FnOnce(&mut Connection) -> Result<T, StoreError>,
@@ -167,6 +195,7 @@ impl MemoryStore for SqliteMemoryStore {
     async fn store(&self, memory: Memory) -> Result<MemoryId, StoreError> {
         let should_attempt_embedding =
             self.embedding_provider.is_some() && !memory.content.trim().is_empty();
+        let content_sha256 = should_attempt_embedding.then(|| content_sha256(&memory.content));
         let mut memory = memory;
         if should_attempt_embedding {
             memory.embedding_stale = true;
@@ -219,6 +248,12 @@ impl MemoryStore for SqliteMemoryStore {
 
         if !should_attempt_embedding {
             return Ok(id);
+        }
+
+        if let Some(content_sha256) = content_sha256.as_deref() {
+            if self.reuse_cached_embedding(&id, content_sha256).await? {
+                return Ok(id);
+            }
         }
 
         let embedding: Vec<f32> = match self.generate_embedding(&memory.content).await {
@@ -676,9 +711,7 @@ impl MemoryStore for SqliteMemoryStore {
 
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-            if require_memory(&transaction, id)?.is_none() {
-                return Err(StoreError::NotFound(*id));
-            }
+            let memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
 
             let expected_dimensions = load_embedding_dimensions(&transaction)?;
             if embedding.len() != expected_dimensions {
@@ -688,39 +721,9 @@ impl MemoryStore for SqliteMemoryStore {
                 )));
             }
 
+            let content_sha256 = content_sha256(&memory.content);
             let encoded_embedding = encode_embedding(embedding);
-            let existing_vec_rowid: Option<i64> = transaction
-                .query_row(
-                    "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
-                    [id.to_string()],
-                    |row| row.get(0),
-                )
-                .optional()?;
-
-            match existing_vec_rowid {
-                Some(vec_rowid) => {
-                    transaction.execute(
-                        "UPDATE vec_memories SET embedding = ?1 WHERE rowid = ?2",
-                        params![encoded_embedding, vec_rowid],
-                    )?;
-                }
-                None => {
-                    transaction.execute(
-                        "INSERT INTO vec_memories(embedding) VALUES (?1)",
-                        params![encoded_embedding],
-                    )?;
-                    let vec_rowid = transaction.last_insert_rowid();
-                    transaction.execute(
-                        "INSERT INTO memory_embeddings(memory_id, vec_rowid) VALUES (?1, ?2)",
-                        params![id.to_string(), vec_rowid],
-                    )?;
-                }
-            }
-
-            transaction.execute(
-                "UPDATE memories SET embedding_stale = 0 WHERE id = ?1",
-                [id.to_string()],
-            )?;
+            upsert_encoded_embedding(&transaction, id, &encoded_embedding, &content_sha256)?;
             transaction.commit()?;
 
             Ok(())
@@ -1582,6 +1585,31 @@ fn load_embedding_dimensions(connection: &Connection) -> Result<usize, StoreErro
     }
 }
 
+fn load_cached_embedding_blob(
+    connection: &Connection,
+    scope: MemoryScope,
+    content_sha256: &str,
+) -> Result<Option<Vec<u8>>, StoreError> {
+    connection
+        .query_row(
+            r#"
+            SELECT v.embedding
+            FROM memory_embeddings me
+            JOIN memories m ON m.id = me.memory_id
+            JOIN vec_memories v ON v.rowid = me.vec_rowid
+            WHERE me.content_sha256 = ?1
+              AND m.scope = ?2
+              AND m.embedding_stale = 0
+            ORDER BY m.updated_at DESC, m.created_at DESC
+            LIMIT 1
+            "#,
+            params![content_sha256, scope_to_db(scope)],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(StoreError::from)
+}
+
 fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError> {
     let defaults = ScopeConfig::default();
     Ok(ScopeConfig {
@@ -1673,6 +1701,65 @@ fn encode_embedding(embedding: &[f32]) -> Vec<u8> {
         bytes.extend_from_slice(&component.to_le_bytes());
     }
     bytes
+}
+
+fn content_sha256(content: &str) -> String {
+    let digest = Sha256::digest(content.as_bytes());
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+
+    for byte in digest {
+        encoded.push(HEX[usize::from(byte >> 4)] as char);
+        encoded.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+
+    encoded
+}
+
+fn upsert_encoded_embedding(
+    connection: &Connection,
+    id: &MemoryId,
+    encoded_embedding: &[u8],
+    content_sha256: &str,
+) -> Result<(), StoreError> {
+    let existing_vec_rowid: Option<i64> = connection
+        .query_row(
+            "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
+            [id.to_string()],
+            |row| row.get(0),
+        )
+        .optional()?;
+
+    match existing_vec_rowid {
+        Some(vec_rowid) => {
+            connection.execute(
+                "UPDATE vec_memories SET embedding = ?1 WHERE rowid = ?2",
+                params![encoded_embedding, vec_rowid],
+            )?;
+            connection.execute(
+                "UPDATE memory_embeddings SET content_sha256 = ?1 WHERE memory_id = ?2",
+                params![content_sha256, id.to_string()],
+            )?;
+        }
+        None => {
+            connection.execute(
+                "INSERT INTO vec_memories(embedding) VALUES (?1)",
+                params![encoded_embedding],
+            )?;
+            let vec_rowid = connection.last_insert_rowid();
+            connection.execute(
+                "INSERT INTO memory_embeddings(memory_id, vec_rowid, content_sha256) VALUES (?1, ?2, ?3)",
+                params![id.to_string(), vec_rowid, content_sha256],
+            )?;
+        }
+    }
+
+    connection.execute(
+        "UPDATE memories SET embedding_stale = 0 WHERE id = ?1",
+        [id.to_string()],
+    )?;
+
+    Ok(())
 }
 
 fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>, StoreError> {
@@ -2137,6 +2224,7 @@ mod tests {
 
     use async_trait::async_trait;
     use chrono::Utc;
+    use rusqlite::params;
     use tokio;
     use uuid::Uuid;
 
@@ -2176,6 +2264,10 @@ mod tests {
 
         fn calls(&self) -> Vec<String> {
             self.calls.lock().expect("stub provider calls lock").clone()
+        }
+
+        fn call_count(&self) -> usize {
+            self.calls.lock().expect("stub provider calls lock").len()
         }
     }
 
@@ -2883,6 +2975,122 @@ mod tests {
         assert_eq!(embedding_rows, 1);
         assert_eq!(vector_rows, 1);
         assert_eq!(provider.calls(), vec![memory_content.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn store_with_duplicate_content_reuses_cached_embedding_without_reembedding() {
+        let memory_content = "provider-backed cached storage memory";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            memory_content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut first = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        first.content = memory_content.to_string();
+        let first_id = first.id;
+
+        fixture
+            .store
+            .store(first)
+            .await
+            .expect("store first cached memory");
+
+        let mut second = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        second.content = memory_content.to_string();
+        let second_id = second.id;
+
+        fixture
+            .store
+            .store(second)
+            .await
+            .expect("store second cached memory");
+
+        let (embedding_rows, vector_rows, cached_hashes) = fixture
+            .store
+            .with_connection(|connection| {
+                let embedding_rows =
+                    connection.query_row("SELECT COUNT(*) FROM memory_embeddings", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?;
+                let vector_rows =
+                    connection.query_row("SELECT COUNT(*) FROM vec_memories", [], |row| {
+                        row.get::<_, i64>(0)
+                    })?;
+                let mut statement = connection.prepare(
+                    "SELECT content_sha256 FROM memory_embeddings WHERE memory_id IN (?1, ?2) ORDER BY memory_id",
+                )?;
+                let hashes = statement
+                    .query_map(params![first_id.to_string(), second_id.to_string()], |row| {
+                        row.get::<_, Option<String>>(0)
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok((embedding_rows, vector_rows, hashes))
+            })
+            .expect("load duplicate cached embedding state");
+
+        assert_eq!(provider.call_count(), 1);
+        assert_eq!(provider.calls(), vec![memory_content.to_string()]);
+        assert_eq!(embedding_rows, 2);
+        assert_eq!(vector_rows, 2);
+        assert_eq!(cached_hashes.len(), 2);
+        assert_eq!(cached_hashes[0], cached_hashes[1]);
+        assert!(cached_hashes[0].is_some());
+        assert!(
+            !fixture
+                .store
+                .get_raw(&second_id)
+                .await
+                .expect("reload cached memory")
+                .expect("cached memory exists")
+                .embedding_stale
+        );
+    }
+
+    #[tokio::test]
+    async fn store_ignores_stale_cached_embeddings_for_changed_content() {
+        let original_content = "cached content before update";
+        let updated_content = "changed content after update";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                original_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                updated_content,
+                StubEmbeddingResponse::Embedding(vec![0.5; 768]),
+            ),
+        ]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut first = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        first.content = original_content.to_string();
+        let first_id = first.id;
+
+        fixture
+            .store
+            .store(first)
+            .await
+            .expect("store original memory");
+        fixture
+            .store
+            .update_content(&first_id, updated_content, "editor", "content changed")
+            .await
+            .expect("update original memory content");
+
+        let mut second = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        second.content = original_content.to_string();
+
+        fixture
+            .store
+            .store(second)
+            .await
+            .expect("store second memory with original content");
+
+        assert_eq!(
+            provider.calls(),
+            vec![original_content.to_string(), original_content.to_string(),]
+        );
     }
 
     #[tokio::test]
