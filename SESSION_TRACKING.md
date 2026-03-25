@@ -279,6 +279,48 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+## Session 3 Info
+
+| Field | Value |
+|---|---|
+| Session | 3 — Embedding Provider Adaptation |
+| Model | GPT-5.4 (xhigh) |
+| Started at | 2026-03-24T22:24:02.4381411-07:00 |
+| Repo state at start | `7472adf` |
+| Branch | `feature/embedding-provider` |
+| Architecture docs read | No additional architecture docs in this session; relied on direct repo inventory plus the verified handoff corrections supplied with the work group. |
+
+---
+
+## Session 3 Work Unit Log
+
+### WU1 — Ollama Embedding Provider (adapted from stale handoff)
+
+**Pre-WU1 reality check / prompt correction log:**
+
+- Verified current baseline for this run is **27/27 passing tests**, not `53/53`; the incoming handoff overstated baseline test reality.
+- Verified the prompt handoff was **partially stale** because the embedding stack was not greenfield:
+  - **Already present:** `EmbeddingProvider` trait in `rust/crates/elegy-memory/src/traits.rs`; embedding persistence and stale-embedding enumeration in `src/storage/sqlite_store.rs`; hybrid search when `SearchQuery.embedding` is supplied; salience-gate novelty logic that uses `candidate.embedding`; CLI command surface already includes `reembed`.
+  - **Partially present / still incomplete:** CLI `search` still sends `embedding: None` and explicitly reports keyword-only mode; CLI `reembed` is still a stub that reports queued stale memories but does not invoke a provider.
+  - **Missing for adapted WU1:** a concrete provider implementation module/export for Ollama, provider-specific dependency wiring, and focused provider unit tests.
+- Prompt-WU status as verified at session start:
+  - **Already done from earlier work:** trait contract, SQLite embedding storage, stale-embedding queueing, hybrid semantic+keyword store search, salience-gate embedding use.
+  - **Partial:** CLI search/query-embedding wiring and CLI re-embedding flow.
+  - **Still pending after this adapted WU1:** provider-backed CLI re-embedding execution and any further CLI/provider integration work beyond the concrete provider itself.
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(reported after commit in orchestration output to avoid self-invalidating the hash in-file)_ |
+| Timestamp | 2026-03-24T22:24:02.4381411-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/embedding/mod.rs`, `rust/crates/elegy-memory/src/embedding/ollama.rs`, `rust/crates/elegy-memory/src/lib.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; requested scope remains focused provider unit tests compiled via `cargo check --tests` only. |
+| Blockers encountered | None in implementation. Branch creation succeeded. The repo still contains unrelated local dirt in `rust/Cargo.lock` and untracked `prompt.md`, both intentionally left unstaged because this adapted WU1 did not require them. |
+| Decisions made | Added a dedicated `embedding` module with a concrete `OllamaEmbeddingProvider` that calls Ollama `/api/embeddings`, validates non-empty configuration/input, normalizes the configured base URL, enforces the MVP `768`-dimension assumption for `nomic-embed-text`, re-exports the provider through `lib.rs`, and limits test coverage to constructor/default/identity behavior without live HTTP calls or CLI wiring beyond adapted WU1 scope. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**
