@@ -38,11 +38,18 @@ See [docs/architecture/ecosystem-topology.md](docs/architecture/ecosystem-topolo
 - `src/Elegy-mcp/` - thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-mcp` surface; not a repo center, authority layer, implementation center, or release surface.
 - `src/Elegy-skills/` - thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-skills` surface; not a repo center, authority layer, implementation center, or release surface.
 
-Each wrapper root carries a `wrapper-entrypoint.json` asset plus helper-lane guidance under `docs/`, `agents/`, and `skills/`. The dedicated wrapper roots now also carry `install.ps1` plus a surface-local `skills/<surface>/SKILL.md` bridge so the wrapper archive lane stays actionable. Authority remains in `contracts/`, `governance/`, `rust/`, `.github/skills/`, and the canonical docs.
+Each wrapper root carries a `wrapper-entrypoint.json` asset plus helper-lane guidance under `docs/`, `agents/`, and `skills/`. Those lanes are for external-agent integration guidance and contributor routing only; they do not create an in-repo agent runtime or orchestration lane. The dedicated wrapper roots now also carry `install.ps1` plus a surface-local `skills/<surface>/SKILL.md` bridge so the wrapper archive lane stays actionable. Authority remains in `contracts/`, `governance/`, `rust/`, `.github/skills/`, and the canonical docs.
 
-### Current operator surfaces
+### Current direct system surfaces
 
-The current operator CLI surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`.
+The current CLI surfaces are:
+
+- `elegy-memory` for the dedicated bounded memory surface
+- `elegy-mcp` for the dedicated MCP descriptor authoring and analysis surface
+- `elegy-skills` for the dedicated MCP-to-skill generation surface
+- `elegy` as the umbrella general/compatibility surface
+
+When an external agent outside Elegy needs one of these dedicated systems, it should load the associated skill material and invoke the matching `elegy-*` CLI directly. Elegy itself is not the place where agents are orchestrated or called internally.
 
 ### Mermaid tooling
 
@@ -58,9 +65,9 @@ Release workflows and distribution support now exist for archives of the umbrell
 
 ### Current self-authoring surface
 
-The current implemented self-authoring surface today is the Rust tooling flow for MCP descriptor authoring, MCP descriptor analysis, and MCP-to-skill generation, backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`.
+The current implemented authoring slice is the Rust flow for MCP descriptor authoring, MCP descriptor analysis, and MCP-to-skill generation.
 
-Those flows are exposed through the dedicated `elegy-mcp` and `elegy-skills` binaries, while `elegy` remains the compatibility/general surface.
+Those flows are exposed through the dedicated `elegy-mcp` and `elegy-skills` binaries, while `elegy` remains the compatibility/general surface. Shared crates such as `rust/crates/elegy-tooling` support descriptor and skill workflows as lower-level helper and compatibility infrastructure; they are not the preferred direct system surface for external consumers of `elegy-skills`.
 
 Built-in MCP-native or skill-driven self-authoring remains the next milestone rather than a completed repo claim.
 
@@ -114,7 +121,7 @@ The current reset direction is:
 - [Elegy-memory V1](docs/architecture/elegy-memory-v1.md)
 - [MCP spec baseline](docs/spec-baseline.md)
 
-The wrapper entrypoints under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are thin integration surfaces only. They do not replace `contracts/`, `governance/`, or `rust/` as the canonical owned surfaces, and `.github/skills/` remains only a repo-local non-authoritative contributor-routing surface.
+The wrapper entrypoints under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are thin integration surfaces only. They do not replace `contracts/`, `governance/`, or `rust/` as the canonical owned surfaces, and `.github/skills/` remains only a repo-local non-authoritative contributor-routing surface. External agents should use those routing surfaces to find the dedicated CLI handoff, not to infer that Elegy runs an internal agent orchestration layer.
 
 Historical sibling repositories such as `Elegy-MCP`, `Elegy-CLI`, and `Elegy-Skills` should be treated as archival or closeout references rather than the primary source of truth.
 
@@ -125,7 +132,8 @@ Elegy should be consumed through versioned GitHub release assets rather than loc
 - the neutral governed bundle is exported from `contracts/` and versioned by `governance/version-policy.json`.
 - contract schemas, fixtures, and compatibility metadata can be exported as a versioned bundle with `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
 - the `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries are the CLI surfaces covered by the explicit release/archive workflows for `x86_64-pc-windows-msvc`, `x86_64-unknown-linux-gnu`, and `aarch64-apple-darwin`.
-- `rust/crates/elegy-memory`, `rust/crates/elegy-mcp`, and `rust/crates/elegy-skills` own the dedicated binaries for their bounded surfaces; `rust/crates/elegy-cli` keeps the general/compatibility surface.
+- `rust/crates/elegy-memory`, `rust/crates/elegy-mcp`, and `rust/crates/elegy-skills` own the dedicated binaries for their bounded direct surfaces; `rust/crates/elegy-cli` keeps the umbrella general/compatibility surface.
+- `rust/crates/elegy-tooling` remains shared lower-level helper and compatibility infrastructure for descriptor and skill workflows rather than a dedicated end-user system surface.
 - tagged GitHub releases are the primary downstream lane; the standalone installer asset is only a convenience bootstrap around the same release assets.
 - downstream consumers can use `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>` to fetch the contracts bundle plus matching CLI archives and wrapper archives without sibling checkouts or package feeds.
 - wrapper archives already embed `scripts/install-distribution.ps1`, so dedicated-wrapper consumers do not need the standalone installer asset unless they want the generic bootstrap path.
@@ -200,7 +208,7 @@ This produces deterministic files under `artifacts/contracts` for downstream con
 - `compatibility-manifest.json`
 - `compatibility-matrix.json`
 
-The repo also materializes `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` for contributor routing over the current dedicated surfaces plus the umbrella Mermaid tooling surface. Those markdown files are non-authoritative. The authority chain remains governed skill definition fixture -> governed skill discovery projection -> repo-local non-authoritative contributor-routing output.
+The repo also materializes `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` for contributor routing over the current dedicated surfaces plus the umbrella Mermaid tooling surface. External agents outside Elegy can load those routing files to discover the correct dedicated CLI handoff, but those markdown files remain non-authoritative. The authority chain remains governed skill definition fixture -> governed skill discovery projection -> repo-local non-authoritative contributor-routing output.
 
 ### Compatibility matrix for consumers
 
