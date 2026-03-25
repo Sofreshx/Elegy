@@ -369,6 +369,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU5 — Provider-backed Integration Coverage (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-25T01:41:27.3234028-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/tests/integration.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; added deterministic integration coverage but deferred direct test execution to the requested validation lane. |
+| Blockers encountered | None during implementation. I did not find a repository-local `wu5-impl` tracker artifact beyond this session log, so no separate done/blocked file was updated. |
+| Deviations from plan | Kept scope inside integration coverage only and did not touch production code, because the requested provider-backed scenarios could be exercised through existing public APIs plus an in-test deterministic stub provider. The re-embed integration coverage validates the same stale-ID/embed/store flow using `MemoryStore` APIs rather than reaching into private CLI helpers. |
+| Decisions made | Extended the existing `rust/crates/elegy-memory/tests/integration.rs` suite instead of creating another integration target; added a local deterministic `StubEmbeddingProvider` so no live Ollama/network calls are required; covered provider-backed store search when `SearchQuery.embedding` is omitted and the store auto-derives a query vector; added an explicit no-provider text-only search regression proving keyword retrieval still works; added a stale-ID re-embedding integration that re-embeds only the oldest stale memory under a limit and clears its `embedding_stale` flag; and added provider-backed salience-gate coverage for near-duplicate detection when `candidate.embedding` is absent and the gate must ask the provider for the novelty vector. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**
