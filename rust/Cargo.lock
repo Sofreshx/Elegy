@@ -353,6 +353,7 @@ dependencies = [
  "elegy-contracts",
  "elegy-core",
  "elegy-host-mcp",
+ "elegy-mcp",
  "elegy-memory",
  "elegy-mermaid",
  "elegy-tooling",
