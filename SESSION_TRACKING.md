@@ -254,6 +254,31 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU9 — Integration Tests
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(pending WU9 commit; final hash reported after commit because recording it in-file would require changing the commit again)_ |
+| Timestamp | 2026-03-24T17:12:18.1011405-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/tests/integration.rs`, `rust/crates/elegy-memory/Cargo.toml`, `rust/Cargo.lock`, `SESSION_TRACKING.md` |
+| Focused integration test result | ✅ Pass — authoritative prior validation: `cargo test -p elegy-memory --test integration --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (5 passed, 0 failed) |
+| Full suite result | ✅ Pass — authoritative prior validation: `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` (53 passed, 0 failed) |
+| Tests written | 5 focused integration tests in `rust/crates/elegy-memory/tests/integration.rs` covering full lifecycle retrieval/versioning/dormant exclusion, salience-gate merge behavior with preserved version history, salience-gate safety decision bounds plus doubt-zone accept behavior, combined search-score ordering, and retention decay consistency by age/type. |
+| Deviations from plan | No functional deviation from the intended WU9 scope. The only supporting manifest change kept with WU9 is the new `tempfile` dev-dependency (and corresponding `rust/Cargo.lock` update) because the integration suite uses `tempfile::TempDir` to provision isolated SQLite databases. |
+| Blockers encountered | None. Validation evidence was already authoritative, so WU9 finalization only required verifying the manifest relevance, updating session tracking, and committing the scoped deliverable without picking up unrelated repository dirt. |
+| Decisions made | Kept `rust/crates/elegy-memory/Cargo.toml` in scope because `tests/integration.rs` imports and uses `tempfile::TempDir`; staged the matching `rust/Cargo.lock` resolution update for reproducibility; and explicitly left `rust/crates/elegy-memory/docs/` untracked and unstaged because it is unrelated dirt outside WU9. |
+| Confidence self-assessment | 5 |
+
+**Canary — Verify WU9:**
+> _Without re-reading, list all 5 integration test scenarios. Then open integration.rs and verify._
+>
+> Recall attempt: 1) full lifecycle coverage for store/get/update/version-history plus keyword search and dormant exclusion; 2) salience-gate integration merging a near-duplicate into the original memory while preserving version history; 3) gate safety proving outcomes stay within accept/merge/archive and that the doubt zone resolves to accept; 4) search ranking ordering by the combined scoring signals; 5) decay integration confirming older memories decay more and same-age fact/preference memories use the same fixed lambda.
+>
+> Verification result: `rust/crates/elegy-memory/tests/integration.rs` confirms exactly those 5 scenarios via `full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion`, `gate_integration_merges_near_duplicates_and_preserves_version_history`, `gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone`, `search_orders_results_by_combined_scoring_signals`, and `decay_integration_uses_age_and_fixed_lambda_consistently`. Verification also confirms the suite depends on `tempfile::TempDir` for isolated test stores, so the dev-dependency change is required. No recall errors.
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**
