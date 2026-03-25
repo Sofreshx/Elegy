@@ -353,6 +353,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU4 — CLI Provider Wiring and Re-embedding (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-24T23:25:58.2825823-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/cli.rs`, `rust/crates/elegy-memory/tests/cli.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; added focused CLI/unit coverage but deferred direct unit/integration/E2E execution for the validation lane. |
+| Blockers encountered | None in implementation. I did not find a repository-local `wu4-impl` tracker artifact to update beyond this session log, so no separate status file was modified. Post-validation follow-up: three internal CLI unit tests initially panicked with `Cannot start a runtime from within a runtime` because `#[tokio::test]` wrappers were invoking sync CLI helpers that call `run_async(...)`. The narrow fix converts those affected tests to plain `#[test]` and keeps async setup/assertion calls behind explicit `run_async(...)` boundaries; a later review also flagged `reembed_stale_memories()` for repeated runtime entry inside its per-memory loop, so that helper was tightened to execute the full stale-ID fetch/load/embed/store flow inside one async block behind a single `run_async(...)` boundary. Compile re-validation passed and direct test re-validation remains pending. |
+| Deviations from plan | Kept provider configuration narrowly scoped to shared CLI store args (`--embedding-provider` with `--provider` alias plus Ollama URL/model overrides) instead of introducing a broader provider registry or config file. Provider-backed search now stops advertising keyword-only mode whenever a provider-configured store context is active, even though store-side search still intentionally falls back to keyword-only retrieval if a provider query-embedding call fails. |
+| Decisions made | Wired `open_store()` to optionally construct `SqliteMemoryStore::new_with_embedding_provider(...)` using `OllamaEmbeddingProvider` and default local Ollama settings; plumbed the same optional provider into CLI add's `DefaultSalienceGate`; implemented successful `reembed` execution by enumerating stale IDs, loading each memory, embedding content through the configured provider, and persisting vectors through the existing `store_embedding()` path; tightened the sync CLI helper after review so the entire re-embed flow now runs inside a single async block / runtime entry instead of repeatedly calling `run_async(...)` inside the loop; returned clear CLI validation errors for missing provider configuration or per-memory embedding/store failures; added internal CLI unit tests for provider-aware store opening, provider-backed search mode reporting, re-embedding success/limit handling, and failure paths; and added a CLI binary test confirming `reembed` now fails fast with a helpful message when no provider is configured. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

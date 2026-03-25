@@ -5,6 +5,7 @@ use std::{
     io::{self, Write},
     path::PathBuf,
     process::ExitCode,
+    sync::Arc,
 };
 
 use chrono::Utc;
@@ -15,10 +16,11 @@ use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
-    DefaultSalienceGate, GateDecision, GateError, Memory, MemoryCandidate, MemoryFilter,
-    MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
-    MemoryVersion, ProvenanceLevel, ResolutionStatus, ScoredMemory, SearchQuery,
-    SalienceGate, SensitivityLevel, SqliteMemoryStore, StoreError,
+    DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision, GateError, Memory,
+    MemoryCandidate, MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState,
+    MemoryStore, MemoryType, MemoryVersion, OllamaEmbeddingProvider, ProvenanceLevel,
+    ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery, SensitivityLevel, SqliteMemoryStore,
+    StoreError, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -32,6 +34,8 @@ pub enum CliError {
     Store(#[from] StoreError),
     #[error("{0}")]
     Gate(#[from] GateError),
+    #[error("{0}")]
+    Embedding(#[from] EmbeddingError),
     #[error("{0}")]
     Io(#[from] io::Error),
     #[error("{0}")]
@@ -70,7 +74,7 @@ enum Command {
         #[arg(long, value_enum, default_value_t = CliProvenance::UserStated)]
         provenance: CliProvenance,
     },
-    /// Search with keyword-only FTS5 matching in the CLI MVP.
+    /// Search memories with keyword matching plus provider-backed embeddings when configured.
     Search {
         #[command(flatten)]
         store: StoreArgs,
@@ -120,8 +124,6 @@ enum Command {
     Reembed {
         #[command(flatten)]
         store: StoreArgs,
-        #[arg(long)]
-        provider: Option<String>,
         #[arg(long, default_value_t = DEFAULT_REEMBED_LIMIT)]
         limit: usize,
     },
@@ -140,6 +142,17 @@ struct StoreArgs {
     /// Memory scope to operate on. Workspace is used by default in this MVP CLI.
     #[arg(long, value_enum, default_value_t = CliScope::Workspace)]
     scope: CliScope,
+    /// Embedding provider to enable for provider-backed store search and re-embedding.
+    #[arg(long = "embedding-provider", alias = "provider", value_enum)]
+    embedding_provider: Option<CliEmbeddingProvider>,
+    /// Ollama base URL when `--embedding-provider ollama` is enabled. Defaults to
+    /// http://localhost:11434.
+    #[arg(long)]
+    ollama_url: Option<String>,
+    /// Ollama model when `--embedding-provider ollama` is enabled. Defaults to
+    /// nomic-embed-text.
+    #[arg(long)]
+    ollama_model: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -179,6 +192,11 @@ enum CliProvenance {
     Consolidated,
     Imported,
     AgentInferred,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliEmbeddingProvider {
+    Ollama,
 }
 
 impl From<CliScope> for MemoryScope {
@@ -226,11 +244,36 @@ impl From<CliProvenance> for ProvenanceLevel {
     }
 }
 
-#[derive(Debug)]
 struct StoreContext {
     db_path: PathBuf,
     scope: MemoryScope,
     store: SqliteMemoryStore,
+    embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+    embedding_provider_label: Option<String>,
+}
+
+impl StoreContext {
+    fn has_embedding_provider(&self) -> bool {
+        self.embedding_provider.is_some()
+    }
+
+    fn embedding_provider_label(&self) -> &str {
+        self.embedding_provider_label
+            .as_deref()
+            .unwrap_or("none")
+    }
+}
+
+impl std::fmt::Debug for StoreContext {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("StoreContext")
+            .field("db_path", &self.db_path)
+            .field("scope", &self.scope)
+            .field("store", &self.store)
+            .field("has_embedding_provider", &self.embedding_provider.is_some())
+            .field("embedding_provider_label", &self.embedding_provider_label)
+            .finish()
+    }
 }
 
 #[derive(Serialize)]
@@ -322,6 +365,18 @@ struct PurgeResponse {
     report: crate::PurgeReport,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ReembedResponse {
+    db_path: String,
+    scope: String,
+    provider: String,
+    requested_limit: usize,
+    stale_found: usize,
+    reembedded_count: usize,
+    reembedded_ids: Vec<String>,
+}
+
 pub fn run_from_env() -> Result<ExitCode, CliError> {
     run_from(std::env::args_os())
 }
@@ -355,7 +410,13 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             query,
             limit,
             include_dormant,
-        } => execute_search_command(open_store(store)?, query, limit, include_dormant, cli.format),
+        } => execute_search_command(
+            open_store(store)?,
+            query,
+            limit,
+            include_dormant,
+            cli.format,
+        ),
         Command::List {
             store,
             memory_type,
@@ -368,7 +429,9 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             limit,
             cli.format,
         ),
-        Command::Inspect { store, id } => execute_inspect_command(open_store(store)?, id, cli.format),
+        Command::Inspect { store, id } => {
+            execute_inspect_command(open_store(store)?, id, cli.format)
+        }
         Command::Purge { store, yes } => execute_purge_command(open_store(store)?, yes, cli.format),
         Command::Health { store } => execute_health_command(open_store(store)?, cli.format),
         Command::Export { store, output } => {
@@ -376,9 +439,8 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         }
         Command::Reembed {
             store,
-            provider,
             limit,
-        } => execute_reembed_command(open_store(store)?, provider, limit),
+        } => execute_reembed_command(open_store(store)?, limit, cli.format),
         Command::Contradictions { store } => {
             execute_contradictions_command(open_store(store)?, cli.format)
         }
@@ -401,7 +463,10 @@ fn execute_add_command(
         ));
     }
 
-    let gate = DefaultSalienceGate::new(ctx.store.scope_config()?);
+    let gate = DefaultSalienceGate::new_with_optional_embedding_provider(
+        ctx.store.scope_config()?,
+        ctx.embedding_provider.clone(),
+    );
     let candidate = MemoryCandidate {
         content: trimmed_content.clone(),
         summary: None,
@@ -462,8 +527,8 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored = run_async(ctx.store.get_raw(&id))?
-                .ok_or_else(|| StoreError::NotFound(id))?;
+            let stored =
+                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "archived",
@@ -498,8 +563,8 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored = run_async(ctx.store.get_raw(&id))?
-                .ok_or_else(|| StoreError::NotFound(id))?;
+            let stored =
+                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "accepted",
@@ -528,45 +593,7 @@ fn execute_search_command(
     include_dormant: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    validate_limit(limit, "limit")?;
-    let trimmed_query = query.trim().to_string();
-    if trimmed_query.is_empty() {
-        return Err(CliError::Validation(
-            "search query must not be empty".to_string(),
-        ));
-    }
-
-    let mut results = run_async(ctx.store.search(SearchQuery {
-        text: trimmed_query.clone(),
-        embedding: None,
-        scope: ctx.scope,
-        state_filter: Some(MemoryState::Active),
-        type_filter: None,
-        max_results: limit,
-        context_config: None,
-    }))?;
-
-    if include_dormant {
-        results.extend(run_async(ctx.store.search(SearchQuery {
-            text: trimmed_query.clone(),
-            embedding: None,
-            scope: ctx.scope,
-            state_filter: Some(MemoryState::Dormant),
-            type_filter: None,
-            max_results: limit,
-            context_config: None,
-        }))?);
-        sort_scored_memories(&mut results);
-        results.truncate(limit);
-    }
-
-    let response = SearchResponse {
-        scope: display_scope(ctx.scope),
-        query: trimmed_query,
-        keyword_only: true,
-        include_dormant,
-        results: results.into_iter().map(search_result_row).collect(),
-    };
+    let response = build_search_response(&ctx, query, limit, include_dormant)?;
 
     match format {
         OutputFormat::Text => print_search_text(&response),
@@ -683,7 +710,10 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
             .entry(display_memory_type(memory.memory_type))
             .or_insert(0) += 1;
     }
-    let response = HealthResponse { report, type_counts };
+    let response = HealthResponse {
+        report,
+        type_counts,
+    };
 
     match format {
         OutputFormat::Text => print_health_text(&response),
@@ -724,7 +754,11 @@ fn execute_export_command(
         fs::write(&path, payload)?;
         match format {
             OutputFormat::Text => {
-                println!("Exported {} memories to {}", response.memories.len(), path.display());
+                println!(
+                    "Exported {} memories to {}",
+                    response.memories.len(),
+                    path.display()
+                );
             }
             OutputFormat::Json => print_json(
                 "export",
@@ -744,24 +778,27 @@ fn execute_export_command(
 
 fn execute_reembed_command(
     ctx: StoreContext,
-    provider: Option<String>,
     limit: usize,
+    format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    validate_limit(limit, "limit")?;
-    let stale = run_async(ctx.store.get_stale_embeddings(limit))?;
-    let provider = provider.unwrap_or_else(|| "none".to_string());
-    Err(CliError::Validation(format!(
-        "reembed is not wired in the MVP CLI yet; provider `{provider}` is unavailable and {} stale memories are queued",
-        stale.len()
-    )))
+    let response = reembed_stale_memories(&ctx, limit)?;
+
+    match format {
+        OutputFormat::Text => print_reembed_text(&response),
+        OutputFormat::Json => print_json("reembed", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_contradictions_command(
     ctx: StoreContext,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let contradictions =
-        run_async(ctx.store.list_contradictions(Some(ResolutionStatus::Unresolved)))?;
+    let contradictions = run_async(
+        ctx.store
+            .list_contradictions(Some(ResolutionStatus::Unresolved)),
+    )?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
         OutputFormat::Json => print_json("contradictions", &contradictions)?,
@@ -771,17 +808,55 @@ fn execute_contradictions_command(
 }
 
 fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
-    let db_path = normalize_path(args.db.unwrap_or_else(default_db_path));
+    let db_path = normalize_path(args.db.clone().unwrap_or_else(default_db_path));
     if let Some(parent) = db_path.parent() {
         fs::create_dir_all(parent)?;
     }
     let scope: MemoryScope = args.scope.into();
-    let store = SqliteMemoryStore::new(&db_path, scope)?;
+    let (embedding_provider, embedding_provider_label) = resolve_embedding_provider(&args)?;
+    let store = match embedding_provider.clone() {
+        Some(provider) => SqliteMemoryStore::new_with_embedding_provider(&db_path, scope, provider)?,
+        None => SqliteMemoryStore::new(&db_path, scope)?,
+    };
     Ok(StoreContext {
         db_path,
         scope,
         store,
+        embedding_provider,
+        embedding_provider_label,
     })
+}
+
+fn resolve_embedding_provider(
+    args: &StoreArgs,
+) -> Result<(Option<Arc<dyn EmbeddingProvider>>, Option<String>), CliError> {
+    match args.embedding_provider {
+        Some(CliEmbeddingProvider::Ollama) => {
+            let base_url = args
+                .ollama_url
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OLLAMA_BASE_URL.to_string());
+            let model = args
+                .ollama_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OLLAMA_MODEL.to_string());
+            let provider =
+                Arc::new(OllamaEmbeddingProvider::new(base_url.clone(), model.clone())?)
+                    as Arc<dyn EmbeddingProvider>;
+            Ok((
+                Some(provider),
+                Some(format!("ollama ({model} @ {base_url})")),
+            ))
+        }
+        None => {
+            if args.ollama_url.is_some() || args.ollama_model.is_some() {
+                return Err(CliError::Validation(
+                    "Ollama configuration requires --embedding-provider ollama".to_string(),
+                ));
+            }
+            Ok((None, None))
+        }
+    }
 }
 
 fn default_db_path() -> PathBuf {
@@ -793,10 +868,7 @@ fn normalize_path(path: PathBuf) -> PathBuf {
     if raw == "~" {
         return default_db_path();
     }
-    if let Some(stripped) = raw
-        .strip_prefix("~/")
-        .or_else(|| raw.strip_prefix("~\\"))
-    {
+    if let Some(stripped) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\")) {
         return home_dir().join(stripped);
     }
     path
@@ -837,6 +909,102 @@ fn validate_limit(limit: usize, flag: &str) -> Result<(), CliError> {
         )));
     }
     Ok(())
+}
+
+fn build_search_response(
+    ctx: &StoreContext,
+    query: String,
+    limit: usize,
+    include_dormant: bool,
+) -> Result<SearchResponse, CliError> {
+    validate_limit(limit, "limit")?;
+    let trimmed_query = query.trim().to_string();
+    if trimmed_query.is_empty() {
+        return Err(CliError::Validation(
+            "search query must not be empty".to_string(),
+        ));
+    }
+
+    let mut results = run_async(ctx.store.search(SearchQuery {
+        text: trimmed_query.clone(),
+        embedding: None,
+        scope: ctx.scope,
+        state_filter: Some(MemoryState::Active),
+        type_filter: None,
+        max_results: limit,
+        context_config: None,
+    }))?;
+
+    if include_dormant {
+        results.extend(run_async(ctx.store.search(SearchQuery {
+            text: trimmed_query.clone(),
+            embedding: None,
+            scope: ctx.scope,
+            state_filter: Some(MemoryState::Dormant),
+            type_filter: None,
+            max_results: limit,
+            context_config: None,
+        }))?);
+        sort_scored_memories(&mut results);
+        results.truncate(limit);
+    }
+
+    Ok(SearchResponse {
+        scope: display_scope(ctx.scope),
+        query: trimmed_query,
+        keyword_only: !ctx.has_embedding_provider(),
+        include_dormant,
+        results: results.into_iter().map(search_result_row).collect(),
+    })
+}
+
+fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedResponse, CliError> {
+    validate_limit(limit, "limit")?;
+    let provider = ctx.embedding_provider.as_ref().ok_or_else(|| {
+        CliError::Validation(
+            "reembed requires an embedding provider; rerun with --embedding-provider ollama"
+                .to_string(),
+        )
+    })?;
+
+    run_async::<_, ReembedResponse, CliError>(async {
+        let stale_ids = ctx.store.get_stale_embeddings(limit).await?;
+        let mut reembedded_ids = Vec::with_capacity(stale_ids.len());
+        for id in &stale_ids {
+            let memory = ctx
+                .store
+                .get_raw(id)
+                .await
+                .map_err(|error| {
+                    CliError::Validation(format!("failed to load memory {id}: {error}"))
+                })?
+                .ok_or_else(|| {
+                    CliError::Validation(format!("failed to load memory {id}: not found"))
+                })?;
+            let embedding = provider.embed(&memory.content).await.map_err(|error| {
+                CliError::Validation(format!(
+                    "failed to generate embedding for memory {id}: {error}"
+                ))
+            })?;
+            ctx.store
+                .store_embedding(id, &embedding)
+                .await
+                .map_err(|error| {
+                    CliError::Validation(format!("failed to store embedding for memory {id}: {error}"))
+                })?;
+            reembedded_ids.push(id.to_string());
+        }
+
+        Ok(ReembedResponse {
+            db_path: ctx.db_path.display().to_string(),
+            scope: display_scope(ctx.scope),
+            provider: ctx.embedding_provider_label().to_string(),
+            requested_limit: limit,
+            stale_found: stale_ids.len(),
+            reembedded_count: reembedded_ids.len(),
+            reembedded_ids,
+        })
+    })
 }
 
 fn parse_memory_id(raw: &str) -> Result<MemoryId, CliError> {
@@ -962,7 +1130,10 @@ fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
     println!("state: {}", display_state(response.memory.state));
     println!("type: {}", display_memory_type(response.memory.memory_type));
     println!("importance: {:.2}", response.memory.importance_score);
-    println!("provenance: {}", display_provenance(response.memory.provenance));
+    println!(
+        "provenance: {}",
+        display_provenance(response.memory.provenance)
+    );
     println!("gate: {}", response.gate_result);
     println!("content: {}", response.memory.content);
 }
@@ -970,7 +1141,11 @@ fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
 fn print_search_text(response: &SearchResponse) {
     println!("search scope: {}", response.scope);
     println!("query: {}", response.query);
-    println!("mode: keyword-only FTS5 (no query embedding in CLI MVP)");
+    if response.keyword_only {
+        println!("mode: keyword-only FTS5");
+    } else {
+        println!("mode: hybrid keyword + provider-backed embedding search");
+    }
     println!("include dormant: {}", response.include_dormant);
     if response.results.is_empty() {
         println!("no results");
@@ -982,6 +1157,22 @@ fn print_search_text(response: &SearchResponse) {
             result.id, result.state, result.memory_type, result.score, result.similarity
         );
         println!("  {}", result.preview);
+    }
+}
+
+fn print_reembed_text(response: &ReembedResponse) {
+    println!("db: {}", response.db_path);
+    println!("scope: {}", response.scope);
+    println!("provider: {}", response.provider);
+    println!("requested limit: {}", response.requested_limit);
+    println!("stale found: {}", response.stale_found);
+    println!("re-embedded: {}", response.reembedded_count);
+    if response.reembedded_ids.is_empty() {
+        println!("no stale memories required re-embedding");
+        return;
+    }
+    for id in &response.reembedded_ids {
+        println!("- {id}");
     }
 }
 
@@ -1094,4 +1285,296 @@ where
         serde_json::to_string_pretty(&JsonEnvelope { command, data })?
     );
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{
+        collections::HashMap,
+        env,
+        fs,
+        path::PathBuf,
+        sync::{Arc, Mutex},
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use async_trait::async_trait;
+    use chrono::{Duration, Utc};
+
+    use super::{
+        build_search_response, open_store, reembed_stale_memories, run_async,
+        CliEmbeddingProvider, CliScope, StoreArgs, StoreContext,
+    };
+    use crate::{
+        EmbeddingError, EmbeddingProvider, Memory, MemoryScope, MemoryState, MemoryStore,
+        MemoryType, ProvenanceLevel, SqliteMemoryStore, SensitivityLevel,
+        DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL,
+    };
+
+    #[derive(Debug, Clone)]
+    enum StubEmbeddingResponse {
+        Embedding(Vec<f32>),
+        Failure(String),
+    }
+
+    #[derive(Debug)]
+    struct StubEmbeddingProvider {
+        responses: HashMap<String, StubEmbeddingResponse>,
+        calls: Mutex<Vec<String>>,
+    }
+
+    impl StubEmbeddingProvider {
+        fn new<I, S>(responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
+            S: Into<String>,
+        {
+            Self {
+                responses: responses
+                    .into_iter()
+                    .map(|(text, response)| (text.into(), response))
+                    .collect(),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("stub provider calls lock").clone()
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StubEmbeddingProvider {
+        async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            let trimmed = text.trim().to_string();
+            self.calls
+                .lock()
+                .expect("stub provider calls lock")
+                .push(trimmed.clone());
+            match self.responses.get(&trimmed) {
+                Some(StubEmbeddingResponse::Embedding(embedding)) => Ok(embedding.clone()),
+                Some(StubEmbeddingResponse::Failure(message)) => {
+                    Err(EmbeddingError::Provider(message.clone()))
+                }
+                None => Err(EmbeddingError::Provider(format!(
+                    "missing stub embedding for `{trimmed}`"
+                ))),
+            }
+        }
+
+        fn dimensions(&self) -> usize {
+            768
+        }
+
+        fn model_id(&self) -> &str {
+            "stub-embedding-provider"
+        }
+    }
+
+    #[test]
+    fn open_store_constructs_ollama_provider_with_defaults() {
+        let db_path = unique_temp_path("elegy-memory-cli-open-store");
+        let ctx = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: Some(CliEmbeddingProvider::Ollama),
+            ollama_url: None,
+            ollama_model: None,
+        })
+        .expect("open provider-backed store");
+
+        assert!(ctx.has_embedding_provider());
+        let label = ctx.embedding_provider_label();
+        assert!(label.contains(DEFAULT_OLLAMA_BASE_URL));
+        assert!(label.contains(DEFAULT_OLLAMA_MODEL));
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn provider_backed_search_response_is_not_marked_keyword_only() {
+        let db_path = unique_temp_path("elegy-memory-cli-search-provider");
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                "semantic launch checklist",
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            ("semantic probe", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
+        ]));
+        let store = SqliteMemoryStore::new_with_embedding_provider(
+            &db_path,
+            MemoryScope::Workspace,
+            provider.clone(),
+        )
+        .expect("create provider-backed store");
+
+        let memory = sample_memory("semantic launch checklist");
+        let memory_id = memory.id;
+        run_async(store.store(memory)).expect("store semantic memory");
+
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            store,
+            embedding_provider: Some(provider.clone()),
+            embedding_provider_label: Some("stub".to_string()),
+        };
+        let response = build_search_response(&ctx, "semantic probe".to_string(), 5, false)
+            .expect("build provider-backed search response");
+
+        assert!(!response.keyword_only);
+        assert_eq!(response.results.len(), 1);
+        assert_eq!(response.results[0].id, memory_id.to_string());
+        assert_eq!(
+            provider.calls(),
+            vec![
+                "semantic launch checklist".to_string(),
+                "semantic probe".to_string(),
+            ]
+        );
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
+        let db_path = unique_temp_path("elegy-memory-cli-reembed");
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            ("older stale memory", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
+            ("newer stale memory", StubEmbeddingResponse::Embedding(vec![0.5; 768])),
+        ]));
+        let store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
+
+        let older = sample_memory("older stale memory");
+        let older_id = older.id;
+        run_async(store.store(older)).expect("store older stale memory");
+
+        let mut newer = sample_memory("newer stale memory");
+        newer.updated_at = Utc::now() + Duration::milliseconds(1);
+        let newer_id = newer.id;
+        run_async(store.store(newer)).expect("store newer stale memory");
+
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            store,
+            embedding_provider: Some(provider.clone()),
+            embedding_provider_label: Some("stub".to_string()),
+        };
+        let response = reembed_stale_memories(&ctx, 1).expect("re-embed stale memories");
+
+        assert_eq!(response.stale_found, 1);
+        assert_eq!(response.reembedded_count, 1);
+        assert_eq!(response.reembedded_ids, vec![older_id.to_string()]);
+
+        let older_memory = ctx
+            .store
+            .get_raw(&older_id);
+        let older_memory = run_async(older_memory)
+            .expect("load older memory")
+            .expect("older memory exists");
+        let newer_memory = ctx
+            .store
+            .get_raw(&newer_id);
+        let newer_memory = run_async(newer_memory)
+            .expect("load newer memory")
+            .expect("newer memory exists");
+        assert!(!older_memory.embedding_stale);
+        assert!(newer_memory.embedding_stale);
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn reembed_requires_provider_configuration() {
+        let db_path = unique_temp_path("elegy-memory-cli-reembed-no-provider");
+        let store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
+        run_async(store.store(sample_memory("stale memory"))).expect("store stale memory");
+
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            store,
+            embedding_provider: None,
+            embedding_provider_label: None,
+        };
+        let error = reembed_stale_memories(&ctx, 5).expect_err("provider should be required");
+
+        assert!(error
+            .to_string()
+            .contains("--embedding-provider ollama"));
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn reembed_surfaces_provider_failures_with_memory_id() {
+        let db_path = unique_temp_path("elegy-memory-cli-reembed-failure");
+        let store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
+        let memory = sample_memory("failing stale memory");
+        let memory_id = memory.id;
+        run_async(store.store(memory)).expect("store failing memory");
+
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            "failing stale memory",
+            StubEmbeddingResponse::Failure("stub embed failure".to_string()),
+        )]));
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            store,
+            embedding_provider: Some(provider),
+            embedding_provider_label: Some("stub".to_string()),
+        };
+        let error = reembed_stale_memories(&ctx, 5).expect_err("provider failure should surface");
+
+        let message = error.to_string();
+        assert!(message.contains(&memory_id.to_string()));
+        assert!(message.contains("stub embed failure"));
+
+        cleanup_temp_path(&db_path);
+    }
+
+    fn sample_memory(content: &str) -> Memory {
+        let now = Utc::now();
+        Memory {
+            id: uuid::Uuid::new_v4(),
+            content: content.to_string(),
+            summary: None,
+            scope: MemoryScope::Workspace,
+            memory_type: MemoryType::Observation,
+            provenance: ProvenanceLevel::UserStated,
+            importance_score: 0.8,
+            reliability_score: ProvenanceLevel::UserStated.base_reliability(),
+            sensitivity: SensitivityLevel::Low,
+            state: MemoryState::Active,
+            tags: Vec::new(),
+            status: None,
+            custom_metadata: HashMap::new(),
+            access_count: 0,
+            corroboration_count: 0,
+            embedding_stale: true,
+            created_at: now,
+            updated_at: now,
+            last_accessed_at: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+        }
+    }
+
+    fn unique_temp_path(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("current time should be after unix epoch")
+            .as_nanos();
+        env::temp_dir().join(format!("{prefix}-{unique}.sqlite3"))
+    }
+
+    fn cleanup_temp_path(path: &PathBuf) {
+        let _ = fs::remove_file(path);
+    }
 }

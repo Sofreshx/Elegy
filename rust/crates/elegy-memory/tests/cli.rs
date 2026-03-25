@@ -132,11 +132,53 @@ fn search_returns_keyword_matches_from_cli() {
 
     assert_eq!(search_json["data"]["keywordOnly"].as_bool(), Some(true));
     assert!(
-        results
-            .iter()
-            .any(|result| result["preview"]
-                .as_str()
-                .is_some_and(|preview| preview.contains("Apollo"))),
+        results.iter().any(|result| result["preview"]
+            .as_str()
+            .is_some_and(|preview| preview.contains("Apollo"))),
         "expected at least one Apollo keyword match, got {search_json}"
+    );
+}
+
+#[test]
+fn reembed_requires_a_configured_provider_from_cli() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-reembed-provider-required");
+    let db_path = temp_dir.join("memory.sqlite3");
+
+    let add = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "add",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "Memory that will remain stale without a provider",
+        ])
+        .output()
+        .expect("run elegy-memory add");
+    assert!(
+        add.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let reembed = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "reembed",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--limit",
+            "5",
+        ])
+        .output()
+        .expect("run elegy-memory reembed");
+
+    assert!(
+        !reembed.status.success(),
+        "stdout: {}",
+        String::from_utf8_lossy(&reembed.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&reembed.stderr)
+            .contains("reembed requires an embedding provider"),
+        "expected provider-required error, stderr: {}",
+        String::from_utf8_lossy(&reembed.stderr)
     );
 }
