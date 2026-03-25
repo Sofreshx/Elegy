@@ -12,12 +12,19 @@ name = "elegy-memory"
 path = "src/main.rs"
 
 [dependencies]
+async-trait.workspace = true
 clap.workspace = true
+chrono = { version = "0.4.44", features = ["serde"] }
+rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde.workspace = true
 serde_json.workspace = true
-time = { workspace = true, features = ["parsing"] }
+time = { workspace = true, features = ["parsing", "serde"] }
 thiserror.workspace = true
+tokio = { workspace = true, features = ["rt-multi-thread"] }
+uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
+tempfile = "3.16.0"
+tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
 [lints]
 workspace = true

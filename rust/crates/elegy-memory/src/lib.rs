@@ -1,10 +1,22 @@
 pub mod cli;
+pub mod consolidator;
+pub mod decay;
+pub mod error;
+pub mod gate;
 mod local_store;
+mod similarity;
+pub mod storage;
+pub mod traits;
+pub mod types;
 
 use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
+pub use consolidator::SimpleConsolidator;
+pub use decay::{retention, retention_with_lambda};
+pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
+pub use gate::DefaultSalienceGate;
 pub use local_store::{
     LocalMemoryCatalog, LocalMemoryCatalogEntry, LocalMemoryExportResult, LocalMemoryPaths,
     LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoreInitResult,
@@ -12,6 +24,17 @@ pub use local_store::{
     LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_EXPORTS_DIR,
     LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
     LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
+};
+pub use storage::{init_database, SqliteMemoryStore, CURRENT_SCHEMA_VERSION};
+pub use traits::{
+    ConsolidationAction, EmbeddingProvider, GateDecision, MemoryConsolidator, MemoryFilter,
+    MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate, SalienceGate,
+};
+pub use types::{
+    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, ExportFormat, Memory,
+    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
+    MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel,
+    PurgeReport, ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
 };
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =
