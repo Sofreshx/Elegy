@@ -10,10 +10,12 @@ Mermaid tooling stays on that umbrella surface. `elegy mermaid render`, `elegy m
 
 ## Asset model
 
-Tagged releases are configured to publish nine neutral assets across the contracts, installer, CLI, and dedicated wrapper lanes:
+Tagged releases are configured to publish eleven neutral assets across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
 
 - governed contracts bundle: `elegy-contracts-<bundleVersion>.zip`
 - standalone installer bootstrap: `elegy-installer-<bundleVersion>.zip`
+- release manifest: `elegy-release-manifest-<bundleVersion>.json`
+- release checksums: `elegy-release-checksums-<bundleVersion>.json`
 - umbrella CLI archive: `elegy-cli-<cliVersion>-<target>.zip`
 - local memory CLI archive: `elegy-memory-<cliVersion>-<target>.zip`
 - MCP CLI archive: `elegy-mcp-<cliVersion>-<target>.zip`
@@ -36,6 +38,23 @@ The installer only resolves those exact release targets and fails clearly on uns
 
 Bundle version and CLI version are intentionally independent. Consumers should resolve both assets from the same release tag rather than assuming `bundleVersion == cliVersion`.
 
+## Release metadata
+
+Each published distribution set now includes two metadata documents in `artifacts/distribution`:
+
+- `elegy-release-manifest-<bundleVersion>.json`
+- `elegy-release-checksums-<bundleVersion>.json`
+
+The manifest is the installer authority for distribution contents. It records the repository, tag marker, bundle version, generated timestamp, published targets, and every published asset with file name, asset kind, surface, target, version, size, SHA-256, and required archive entries.
+
+The checksums document carries the release or local-artifacts tag marker plus the SHA-256 digest for every published asset and for the manifest itself. The installer resolves those two JSON assets first and fails closed if they are missing, duplicated, inconsistent, or do not match the downloaded payloads.
+
+Local artifact installs use the same metadata lane. After building or copying local release assets into a staging directory, generate the metadata pair before invoking the installer:
+
+```powershell
+pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
+```
+
 ## Standalone installer archive
 
 Build the standalone installer bootstrap asset with:
@@ -49,6 +68,8 @@ Output:
 - versioned archive: `artifacts/distribution/elegy-installer-<bundleVersion>.zip`
 
 The standalone installer archive contains `install-distribution.ps1` at the archive root so downstream repos can download a single GitHub release asset, extract it into a repo-local tools/bootstrap directory, and then fetch the contracts bundle plus the selected CLI and wrapper archives through the supported installer path.
+
+The generic installer now requires the manifest and checksums JSON assets alongside the zip assets. It verifies exact asset presence, file size, SHA-256, and required archive entries before extraction, then writes `install-receipt.json` into the destination root with the request, source, host target, installed assets, and verification evidence.
 
 ## Contracts bundle
 
@@ -146,11 +167,12 @@ pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -
 Example using local artifacts only:
 
 ```powershell
+pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
 pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-local -CliSurfaces elegy-memory -WrapperSurfaces elegy-memory -Force
 pwsh ./src/Elegy-memory/install.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-memory-wrapper -Force
 ```
 
-The installer resolves either a release tag or a local artifacts directory, downloads or copies the contracts bundle and the matching host CLI archives for the selected surfaces, extracts the CLI assets under `bin/<surface>/`, extracts wrapper assets under `wrappers/<surface>/`, and prints the resulting paths. When `-LocalArtifactsRoot` is used, the root must contain exactly one matching archive for each required asset; the installer now fails on ambiguous roots instead of guessing between stale files. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
+The installer resolves either a release tag or a local artifacts directory, downloads or copies the manifest and checksums first, validates that every requested asset exists in the manifest, then verifies exact file size, SHA-256, and required archive entries before extracting the contracts bundle under `contracts/`, CLI assets under `bin/<surface>/`, and wrapper assets under `wrappers/<surface>/`. When `-LocalArtifactsRoot` is used, the root must contain exactly one manifest and checksum file plus the exact assets referenced by that manifest; the installer now fails on ambiguous or stale metadata instead of guessing between stale files. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
 
 ## Downstream guidance
 
@@ -172,6 +194,7 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
 4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
 5. Run `pwsh ./scripts/package-installer.ps1`.
-6. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives -RequireInstallerArchives`.
-7. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
-8. Publish the generated assets through the GitHub Actions workflows when ready.
+6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.
+7. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata`.
+8. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
+9. Publish the generated assets through the GitHub Actions workflows when ready.

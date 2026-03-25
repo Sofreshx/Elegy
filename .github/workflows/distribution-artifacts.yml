@@ -168,3 +168,40 @@ jobs:
           if-no-files-found: error
           path: |
             artifacts/distribution/elegy-installer-*.zip
+
+  compose-release-metadata:
+    runs-on: ubuntu-latest
+    needs:
+      - export-contracts
+      - package-cli
+      - package-wrapper-surfaces
+      - package-installer
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download distribution artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: elegy-*-${{ github.sha }}
+          merge-multiple: true
+          path: artifacts/distribution
+
+      - name: Write release metadata
+        shell: pwsh
+        run: |
+          ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
+
+      - name: Validate composed distribution artifacts
+        shell: pwsh
+        run: |
+          ./scripts/validate-canonical-outputs.ps1 -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata -DistributionDirectory ./artifacts/distribution
+
+      - name: Upload release metadata artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-release-metadata-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/distribution/elegy-release-manifest-*.json
+            artifacts/distribution/elegy-release-checksums-*.json

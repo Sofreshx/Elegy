@@ -218,6 +218,10 @@
   "installerArchivePatterns": [
     "artifacts/distribution/elegy-installer-*.zip"
   ],
+  "releaseMetadataPatterns": {
+    "manifest": "artifacts/distribution/elegy-release-manifest-*.json",
+    "checksums": "artifacts/distribution/elegy-release-checksums-*.json"
+  },
   "wrapperArchiveRequiredEntries": [
     "install.ps1",
     "wrapper-entrypoint.json",
