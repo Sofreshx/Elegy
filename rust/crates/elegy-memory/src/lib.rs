@@ -17,8 +17,8 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 pub use consolidator::SimpleConsolidator;
 pub use decay::{retention, retention_with_lambda};
 pub use embedding::{
-    OllamaEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_DIMENSIONS,
-    DEFAULT_OLLAMA_MODEL,
+    OllamaEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_CONNECT_TIMEOUT,
+    DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_REQUEST_TIMEOUT,
 };
 pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
 pub use gate::DefaultSalienceGate;

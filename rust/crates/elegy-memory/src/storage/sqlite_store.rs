@@ -223,7 +223,13 @@ impl MemoryStore for SqliteMemoryStore {
 
         let embedding: Vec<f32> = match self.generate_embedding(&memory.content).await {
             Ok(Some(embedding)) => embedding,
-            Ok(None) | Err(_) => return Ok(id),
+            Ok(None) => return Ok(id),
+            Err(error) => {
+                if let Some(warning) = embedding_degradation_warning(&error) {
+                    eprintln!("warning: {warning}");
+                }
+                return Ok(id);
+            }
         };
 
         match self.store_embedding(&id, &embedding).await {
@@ -1000,6 +1006,21 @@ impl MemoryStore for SqliteMemoryStore {
             Ok(())
         })
     }
+}
+
+fn embedding_degradation_warning(error: &EmbeddingError) -> Option<String> {
+    let EmbeddingError::Provider(message) = error else {
+        return None;
+    };
+    let reachable_prefix = "ollama not reachable at ";
+    let url = message
+        .strip_prefix(reachable_prefix)
+        .and_then(|remainder| remainder.split_once(": ").map(|(url, _)| url.trim()))?;
+
+    Some(format!(
+        "Ollama not reachable at {}, storing without embeddings. Run reembed later.",
+        url
+    ))
 }
 
 async fn transition_state(
@@ -2933,11 +2954,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn provider_failures_keep_memory_stored_and_preserve_keyword_search_fallback() {
+    async fn ollama_offline_store_keeps_memory_and_preserves_keyword_search_fallback() {
         let fallback_content = "apollo keyword fallback";
         let provider = Arc::new(StubEmbeddingProvider::new([(
             fallback_content,
-            StubEmbeddingResponse::Failure("store embedding failed".to_string()),
+            StubEmbeddingResponse::Failure(
+                "ollama not reachable at http://127.0.0.1:11434: connection failed".to_string(),
+            ),
         )]));
         let fixture = test_fixture_with_provider(provider.clone());
 
@@ -2999,6 +3022,25 @@ mod tests {
             provider.calls(),
             vec![fallback_content.to_string(), fallback_content.to_string()]
         );
+    }
+
+    #[test]
+    fn ollama_offline_errors_map_to_user_facing_degradation_warning() {
+        let warning = super::embedding_degradation_warning(&EmbeddingError::Provider(
+            "ollama not reachable at http://127.0.0.1:11434: request timed out after 30s"
+                .to_string(),
+        ))
+        .expect("offline provider errors should produce a degradation warning");
+
+        assert_eq!(
+            warning,
+            "Ollama not reachable at http://127.0.0.1:11434, storing without embeddings. Run reembed later."
+        );
+
+        let non_offline_warning = super::embedding_degradation_warning(&EmbeddingError::Provider(
+            "ollama embeddings request returned 500 Internal Server Error: boom".to_string(),
+        ));
+        assert!(non_offline_warning.is_none());
     }
 
     struct TestFixture {
