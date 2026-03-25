@@ -12,18 +12,20 @@ use elegy_mermaid::{
     MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
     MermaidWorkflowProjection,
 };
+use elegy_mcp::{
+    analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
+    AuthorMcpToolRequest, AuthoredMcpDescriptor, McpSurfaceError,
+};
 use elegy_memory::{
-    cli as memory_cli, GovernedMemoryRecord, LocalMemoryCatalogEntry, LocalMemoryExportResult,
-    LocalMemoryLifecycleState, LocalMemoryPaths, LocalMemoryQueryOptions, LocalMemoryStore,
-    LocalMemoryStoreError, LocalMemoryStoredRecord, SessionContextScope,
-    SummaryOnlySessionContextEnvelope, LOCAL_MEMORY_AUTHORITY_POSTURE,
+    GovernedMemoryRecord, GovernedMemoryRecordImportOptions, LocalMemoryCatalogEntry,
+    LocalMemoryExportResult, LocalMemoryLifecycleState, LocalMemoryPaths,
+    LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoredRecord,
+    SessionContextScope, SummaryOnlySessionContextEnvelope, LOCAL_MEMORY_AUTHORITY_POSTURE,
     LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_SINGLE_WRITER_POSTURE,
     SUMMARY_ONLY_REPRESENTATION, SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
 };
-use elegy_tooling::{
-    analyze_mcp_descriptor_file, author_mcp_descriptor_to_path,
-    generate_skills_from_descriptor_file, AuthorMcpDescriptorRequest, AuthorMcpToolRequest,
-    AuthoredMcpDescriptor, GeneratedSkillArtifacts, ToolingError,
+use elegy_skills::{
+    generate_skills_from_descriptor_file, GeneratedSkillArtifacts, SkillsSurfaceError,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -572,21 +574,83 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
 }
 
 fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_inspect_command(map_memory_output_format(format))
+    let inspection = session_context_inspection();
+    match format {
+        OutputFormat::Text => print_session_context_text(&inspection),
+        OutputFormat::Json => print_json(&Envelope {
+            schema_version: CLI_SCHEMA_VERSION,
+            command: vec!["inspect".to_string(), "session-context".to_string()],
+            status: "ok",
+            summary: Summary::default(),
+            data: inspection,
+            diagnostics: Vec::new(),
+        })?,
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_validate_session_context_command(
     input: PathBuf,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_validate_command(input, map_memory_output_format(format))
+    let artifact = match read_summary_only_session_context_envelope(&input) {
+        Ok(artifact) => artifact,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["validate", "session-context"],
+                diagnostics,
+                json!({ "inputPath": input.display().to_string() }),
+                "invalid",
+                ExitCode::from(1),
+            )
+        }
+    };
+
+    let report = build_session_context_validation_report(&input, &artifact);
+    match format {
+        OutputFormat::Text => print_validated_session_context_text(&report),
+        OutputFormat::Json => print_json(&Envelope {
+            schema_version: CLI_SCHEMA_VERSION,
+            command: vec!["validate".to_string(), "session-context".to_string()],
+            status: "ok",
+            summary: Summary::default(),
+            data: report,
+            diagnostics: Vec::new(),
+        })?,
+    }
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_local_init_command(
     root: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_init_command(root, map_memory_output_format(format))
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.init() {
+        Ok(result) => {
+            let report = build_local_init_report(&result.paths);
+            match format {
+                OutputFormat::Text => print_local_init_text(&report),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "init".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "init"],
+            json!({ "root": root.display().to_string() }),
+        ),
+    }
 }
 
 fn execute_local_import_command(
@@ -596,13 +660,59 @@ fn execute_local_import_command(
     imported_at_utc: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_import_command(
-        root,
-        input,
-        record_id,
-        imported_at_utc,
-        map_memory_output_format(format),
-    )
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    let envelope = match read_summary_only_session_context_envelope(&input) {
+        Ok(artifact) => artifact,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["local", "import"],
+                diagnostics,
+                json!({
+                    "root": root.display().to_string(),
+                    "inputPath": input.display().to_string(),
+                }),
+                "invalid",
+                ExitCode::from(1),
+            )
+        }
+    };
+
+    match store.import_summary_only_envelope(
+        &envelope,
+        GovernedMemoryRecordImportOptions {
+            record_id,
+            imported_at_utc,
+        },
+    ) {
+        Ok(stored) => {
+            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            match format {
+                OutputFormat::Text => {
+                    print_local_record_text("imported local non-authoritative summary-only artifact", &report)
+                }
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "import".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "import"],
+            json!({
+                "root": root.display().to_string(),
+                "inputPath": input.display().to_string(),
+            }),
+        ),
+    }
 }
 
 fn execute_local_list_command(
@@ -610,7 +720,31 @@ fn execute_local_list_command(
     options: LocalMemoryQueryOptions,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_list_command(root, options, map_memory_output_format(format))
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.list_records(&options) {
+        Ok(records) => {
+            let report = build_local_list_report(&root, &options, records);
+            match format {
+                OutputFormat::Text => print_local_list_text(&report),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "list".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "list"],
+            json!({ "root": root.display().to_string() }),
+        ),
+    }
 }
 
 fn execute_local_show_command(
@@ -619,7 +753,36 @@ fn execute_local_show_command(
     options: LocalMemoryQueryOptions,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_show_command(root, record_id, options, map_memory_output_format(format))
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.show_record(&record_id, &options) {
+        Ok(stored) => {
+            let report = build_local_record_report(&root, &stored, &options);
+            match format {
+                OutputFormat::Text => {
+                    print_local_record_text("local non-authoritative summary-only artifact", &report)
+                }
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "show".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "show"],
+            json!({
+                "root": root.display().to_string(),
+                "recordId": record_id,
+            }),
+        ),
+    }
 }
 
 fn execute_local_export_command(
@@ -629,13 +792,34 @@ fn execute_local_export_command(
     options: LocalMemoryQueryOptions,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_export_command(
-        root,
-        record_id,
-        output_path,
-        options,
-        map_memory_output_format(format),
-    )
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.export_summary_only_envelope(&record_id, output_path.as_deref(), &options) {
+        Ok(result) => {
+            let report = build_local_export_report(&root, &result, &options);
+            match format {
+                OutputFormat::Text => print_local_export_text(&report),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "export".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "export"],
+            json!({
+                "root": root.display().to_string(),
+                "recordId": record_id,
+            }),
+        ),
+    }
 }
 
 fn execute_local_supersede_command(
@@ -644,12 +828,37 @@ fn execute_local_supersede_command(
     superseded_by_record_id: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_supersede_command(
-        root,
-        record_id,
-        superseded_by_record_id,
-        map_memory_output_format(format),
-    )
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.supersede_record(&record_id, &superseded_by_record_id) {
+        Ok(stored) => {
+            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            match format {
+                OutputFormat::Text => {
+                    print_local_record_text("superseded local non-authoritative summary-only artifact", &report)
+                }
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "supersede".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "supersede"],
+            json!({
+                "root": root.display().to_string(),
+                "recordId": record_id,
+                "supersededByRecordId": superseded_by_record_id,
+            }),
+        ),
+    }
 }
 
 fn execute_local_tombstone_command(
@@ -659,20 +868,69 @@ fn execute_local_tombstone_command(
     reason: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    memory_cli::execute_tombstone_command(
-        root,
-        record_id,
-        tombstoned_at_utc,
-        reason,
-        map_memory_output_format(format),
-    )
+    let root = resolve_local_root(root);
+    let store = LocalMemoryStore::new(root.clone());
+    match store.tombstone_record(&record_id, &tombstoned_at_utc, &reason) {
+        Ok(stored) => {
+            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            match format {
+                OutputFormat::Text => {
+                    print_local_record_text("tombstoned local non-authoritative summary-only artifact", &report)
+                }
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["local".to_string(), "tombstone".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: report,
+                    diagnostics: Vec::new(),
+                })?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_local_store_error(
+            error,
+            format,
+            vec!["local", "tombstone"],
+            json!({
+                "root": root.display().to_string(),
+                "recordId": record_id,
+            }),
+        ),
+    }
 }
 
-fn map_memory_output_format(format: OutputFormat) -> memory_cli::OutputFormat {
-    match format {
-        OutputFormat::Text => memory_cli::OutputFormat::Text,
-        OutputFormat::Json => memory_cli::OutputFormat::Json,
-    }
+fn read_summary_only_session_context_envelope(
+    input: &Path,
+) -> Result<SummaryOnlySessionContextEnvelope, Vec<Diagnostic>> {
+    let contents = fs::read_to_string(input).map_err(|source| {
+        vec![
+            Diagnostic::error(
+                "CLI-LOCAL-001",
+                format!(
+                    "failed to read summary-only session context artifact {}: {source}",
+                    input.display()
+                ),
+            )
+            .with_path(input.display().to_string()),
+        ]
+    })?;
+
+    serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&contents).map_err(|source| {
+        vec![
+            Diagnostic::error(
+                "CLI-LOCAL-002",
+                format!(
+                    "invalid summary-only session context artifact JSON {}: {source}",
+                    input.display()
+                ),
+            )
+            .with_path(input.display().to_string())
+            .with_hint(
+                "ensure the input matches the governed summary-only session context envelope contract",
+            ),
+        ]
+    })
 }
 
 fn execute_author_mcp_command(
@@ -720,7 +978,7 @@ fn execute_author_mcp_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_tooling_error(error, format, vec!["author", "mcp"], json!({})),
+        Err(error) => emit_mcp_error(error, format, vec!["author", "mcp"], json!({})),
     }
 }
 
@@ -743,7 +1001,7 @@ fn execute_analyze_mcp_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_tooling_error(error, format, vec!["analyze", "mcp"], json!({})),
+        Err(error) => emit_mcp_error(error, format, vec!["analyze", "mcp"], json!({})),
     }
 }
 
@@ -768,7 +1026,7 @@ fn execute_generate_skills_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_tooling_error(error, format, vec!["generate", "skills"], json!({})),
+        Err(error) => emit_skills_error(error, format, vec!["generate", "skills"], json!({})),
     }
 }
 
@@ -1301,8 +1559,8 @@ fn emit_contracts_error(
     )
 }
 
-fn emit_tooling_error<T: Serialize>(
-    error: ToolingError,
+fn emit_mcp_error<T: Serialize>(
+    error: McpSurfaceError,
     format: OutputFormat,
     command: Vec<&str>,
     data: T,
@@ -1310,7 +1568,23 @@ fn emit_tooling_error<T: Serialize>(
     emit_diagnostics(
         format,
         command,
-        tooling_error_diagnostics(error),
+        mcp_error_diagnostics(error),
+        data,
+        "invalid",
+        ExitCode::from(1),
+    )
+}
+
+fn emit_skills_error<T: Serialize>(
+    error: SkillsSurfaceError,
+    format: OutputFormat,
+    command: Vec<&str>,
+    data: T,
+) -> Result<ExitCode, serde_json::Error> {
+    emit_diagnostics(
+        format,
+        command,
+        skills_error_diagnostics(error),
         data,
         "invalid",
         ExitCode::from(1),
@@ -1871,9 +2145,9 @@ fn parse_tool_specs(values: &[String]) -> Result<Vec<AuthorMcpToolRequest>, Stri
         .collect()
 }
 
-fn tooling_error_diagnostics(error: ToolingError) -> Vec<Diagnostic> {
+fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
     match error {
-        ToolingError::Io {
+        McpSurfaceError::Io {
             operation,
             path,
             source,
@@ -1882,12 +2156,12 @@ fn tooling_error_diagnostics(error: ToolingError) -> Vec<Diagnostic> {
             format!("failed to {operation} {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        ToolingError::Json { path, source } => vec![Diagnostic::error(
+        McpSurfaceError::Json { path, source } => vec![Diagnostic::error(
             "CLI-TOOLING-002",
             format!("failed to parse JSON in {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        ToolingError::InvalidMcpDescriptor { path, issues } => issues
+        McpSurfaceError::InvalidMcpDescriptor { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-001", issue)
@@ -1897,7 +2171,7 @@ fn tooling_error_diagnostics(error: ToolingError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        ToolingError::InvalidMcpAnalysis { path, issues } => issues
+        McpSurfaceError::InvalidMcpAnalysis { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-002", issue)
@@ -1907,7 +2181,33 @@ fn tooling_error_diagnostics(error: ToolingError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        ToolingError::InvalidSkillDefinition { skill_id, issues } => issues
+        McpSurfaceError::OutputExists { path } => vec![Diagnostic::error(
+            "CLI-OUTPUT-001",
+            format!("output already exists: {}", path.display()),
+        )
+        .with_path(path.display().to_string())
+        .with_hint("pass --force to overwrite generated output")],
+    }
+}
+
+fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
+    match error {
+        SkillsSurfaceError::Mcp(error) => mcp_error_diagnostics(error),
+        SkillsSurfaceError::Io {
+            operation,
+            path,
+            source,
+        } => vec![Diagnostic::error(
+            "CLI-TOOLING-001",
+            format!("failed to {operation} {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        SkillsSurfaceError::Json { path, source } => vec![Diagnostic::error(
+            "CLI-TOOLING-002",
+            format!("failed to parse JSON in {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        SkillsSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-SKILL-001", issue)
@@ -1915,11 +2215,11 @@ fn tooling_error_diagnostics(error: ToolingError) -> Vec<Diagnostic> {
                     .with_hint("generated skill definitions must remain valid governed artifacts")
             })
             .collect(),
-        ToolingError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
+        SkillsSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
         )],
-        ToolingError::OutputExists { path } => vec![Diagnostic::error(
+        SkillsSurfaceError::OutputExists { path } => vec![Diagnostic::error(
             "CLI-OUTPUT-001",
             format!("output already exists: {}", path.display()),
         )
