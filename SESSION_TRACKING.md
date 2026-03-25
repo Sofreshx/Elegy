@@ -385,6 +385,22 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+### WU6 — Graceful Degradation When Ollama Is Offline (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | `18b12f28226861b88c442e084ed83e355cf38600` |
+| Timestamp | 2026-03-25T00:00:00-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/embedding/mod.rs`, `rust/crates/elegy-memory/src/embedding/ollama.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/tests/cli.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo test --package elegy-memory` from `C:\Users\Romain\Projects\Elegy\rust` completed green: unit/lib `45 passed`, CLI integration `4 passed`, governed-memory integration `15 passed`, integration `9 passed`, local-store integration `4 passed`, plus `2` zero-test harnesses (`src/main.rs` and doc-tests) for `77 passed, 0 failed, 0 ignored, 0 measured, 0 filtered out`. |
+| Tests run by this runner | Executed the requested validation lane and recorded exact counts from the successful run. A small WU6-scoped assertion hardening in `rust/crates/elegy-memory/src/embedding/ollama.rs` was needed because the simulated offline localhost case can surface as either connection refusal or timeout on this machine; after that adjustment, the package passed cleanly end-to-end. |
+| Blockers encountered | None. Validation is green. |
+| Deviations from plan | Timeout configuration was added as provider-level defaults plus an explicit timeout-aware constructor rather than new CLI flags, because WU6 only required the config to exist with sensible defaults and the public create/search call signatures had to remain stable. |
+| Decisions made | Added default Ollama connect/request timeouts (5s/30s) and a timeout-aware provider constructor; mapped reqwest connection-refused and timeout failures to clear non-panicking provider errors that include the configured base URL; taught `SqliteMemoryStore::store()` to recognize offline-Ollama failures, log a user-facing warning to stderr, and preserve the existing no-vector fallback by storing the memory with `embedding_stale = true`; and added provider unit tests plus CLI binary coverage that simulate connection refusal/timeouts without requiring a live Ollama instance. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**
