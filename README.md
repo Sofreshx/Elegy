@@ -44,6 +44,16 @@ Each wrapper root carries a `wrapper-entrypoint.json` asset plus helper-lane gui
 
 The current operator CLI surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`.
 
+### Mermaid tooling
+
+The umbrella `elegy` CLI exposes Mermaid tooling as a derived projection surface:
+
+- `elegy mermaid render` projects governed `canonical-workflow` or `canonical-workflow-graph` JSON into Mermaid `flowchart TD`
+- `elegy mermaid reverse` projects Mermaid `flowchart TD` output compatible with the current renderer into a bounded workflow-graph-semantics report
+- `elegy mermaid narrate` emits a concise derived narrative from either canonical workflow JSON or Mermaid input
+
+Mermaid remains explicitly non-authoritative. Reverse output is not full canonical workflow reconstruction. See [docs/architecture/mermaid-tooling.md](docs/architecture/mermaid-tooling.md) for the current scope boundaries.
+
 Release workflows and distribution support now exist for archives of the umbrella `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries.
 
 ### Current self-authoring surface
@@ -182,13 +192,15 @@ This produces deterministic files under `artifacts/contracts` for downstream con
 - `fixtures/skill-definition.elegy-memory.json`
 - `fixtures/skill-definition.elegy-mcp.json`
 - `fixtures/skill-definition.elegy-skills.json`
+- `fixtures/skill-definition.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-memory.json`
 - `fixtures/skill-discovery-index.elegy-mcp.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
+- `fixtures/skill-discovery-index.elegy-mermaid.json`
 - `compatibility-manifest.json`
 - `compatibility-matrix.json`
 
-The repo also materializes `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, and `.github/skills/elegy-skills/SKILL.md` for contributor routing over those current dedicated surfaces. Those markdown files are non-authoritative. The authority chain remains governed skill definition fixture -> governed skill discovery projection -> repo-local non-authoritative contributor-routing output.
+The repo also materializes `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` for contributor routing over the current dedicated surfaces plus the umbrella Mermaid tooling surface. Those markdown files are non-authoritative. The authority chain remains governed skill definition fixture -> governed skill discovery projection -> repo-local non-authoritative contributor-routing output.
 
 ### Compatibility matrix for consumers
 

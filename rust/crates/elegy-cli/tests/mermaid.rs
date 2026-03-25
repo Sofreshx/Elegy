@@ -8,6 +8,14 @@ const CANONICAL_WORKFLOW_FIXTURE: &str =
     include_str!("../../../../contracts/fixtures/canonical-workflow.minimal.json");
 const CANONICAL_WORKFLOW_GRAPH_FIXTURE: &str =
     include_str!("../../../../contracts/fixtures/canonical-workflow-graph.minimal.json");
+const RENDERED_WORKFLOW_MERMAID: &str = concat!(
+    "flowchart TD\n",
+    "    step_step_fulfill[\"Fulfill Order\"]\n",
+    "    step_step_review[\"Review Order\"]\n",
+    "    trigger_trigger_order_created((\"Order Created\"))\n",
+    "    trigger_trigger_order_created --> step_step_review\n",
+    "    step_step_review -->|approved| step_step_fulfill"
+);
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let unique = SystemTime::now()
@@ -306,4 +314,101 @@ fn mermaid_render_command_rejects_duplicate_workflow_step_ids() {
     assert!(stdout.contains("CLI-MERMAID-005"));
     assert!(stdout.contains("steps.id"));
     assert!(stdout.contains("step.review"));
+}
+
+#[test]
+fn mermaid_reverse_command_projects_mermaid_from_file() {
+    let temp_dir = unique_temp_dir("elegy-cli-mermaid-reverse");
+    let input_path = temp_dir.join("workflow.mmd");
+    fs::write(&input_path, RENDERED_WORKFLOW_MERMAID).expect("write Mermaid fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "mermaid",
+            "reverse",
+            "--input",
+            input_path.to_str().expect("utf-8 Mermaid input path"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy mermaid reverse with Mermaid file input");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"ok\""));
+    assert!(stdout.contains("\"projectionKind\": \"workflow-graph-semantics\""));
+    assert!(stdout.contains("\"sourceKind\": \"mermaidFlowchartTd\""));
+    assert!(stdout.contains("\"entryNodeIds\": ["));
+    assert!(stdout.contains("step_step_review"));
+    assert!(stdout.contains("\"input_source\": \"file\""));
+}
+
+#[test]
+fn mermaid_narrate_command_accepts_mermaid_from_stdin() {
+    let mut child = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args(["mermaid", "narrate", "--format", "json"])
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn elegy mermaid narrate for stdin input");
+
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin pipe should be available")
+        .write_all(RENDERED_WORKFLOW_MERMAID.as_bytes())
+        .expect("write Mermaid fixture to stdin");
+
+    let output = child
+        .wait_with_output()
+        .expect("wait for elegy mermaid narrate stdin run");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"ok\""));
+    assert!(stdout.contains("\"sourceKind\": \"mermaidFlowchartTd\""));
+    assert!(stdout.contains("derived Mermaid projection only; canonical workflow authority remains outside Mermaid"));
+    assert!(stdout.contains("Order Created activates Review Order."));
+}
+
+#[test]
+fn mermaid_reverse_command_rejects_unsupported_mermaid_direction() {
+    let temp_dir = unique_temp_dir("elegy-cli-mermaid-reverse-invalid");
+    let input_path = temp_dir.join("workflow-invalid.mmd");
+    fs::write(&input_path, "flowchart LR\n    step_a[\"A\"]")
+        .expect("write invalid Mermaid fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "mermaid",
+            "reverse",
+            "--input",
+            input_path.to_str().expect("utf-8 invalid Mermaid input path"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy mermaid reverse with invalid Mermaid input");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("CLI-MERMAID-006"));
+    assert!(stdout.contains("flowchart LR"));
 }

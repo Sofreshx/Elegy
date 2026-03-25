@@ -1,6 +1,6 @@
 # Research: OpenClaw orchestration gap roadmap
 
-Updated: 2026-03-24
+Updated: 2026-03-25
 
 This note is research-oriented and non-canonical. It is a target-direction memo for future work, not a source of current-state truth.
 
@@ -15,13 +15,15 @@ OpenClaw is inspiration only. It is not truth, not canon, and not a migration te
 
 ## Session status
 
-Status in this session: direction clarified, ownership preserved, first slice identified.
+Status in this session: direction clarified, ownership preserved, shipped baseline acknowledged, next seam narrowed.
 
 ### What was decided in this session
 
 - Holon or SAASTools should continue to own orchestration and control-plane behavior.
-- The next major seam should be a replaceable provider or session-manager abstraction above the existing backplane.
-- That seam should support Copilot SDK now and raw API providers later.
+- The delegated typed-output first slice is already shipped in DesktopHost for one bounded delegated child hop.
+- A narrow local delegated pre-start run policy seam has started in code and stops execution for missing persisted success criteria, unresolvable subagent type, and unregistered delegated output schema.
+- The most meaningful immediate next step is to surface those stop conditions and lifecycle outcomes explicitly instead of reopening the already-shipped typed-output slice.
+- A replaceable provider or session-manager abstraction above the existing backplane remains an important later gap. It should support Copilot SDK now and raw API providers later, but it is no longer the immediate next seam in this sequencing.
 - Copilot-compatible delegated depth should stay at one bounded child or subagent hop by default.
 - Greater depth can be added later for raw API providers, but only behind explicit host policy, budgets, and stop conditions.
 - Relevant Elegy CLI capabilities can be integrated where useful, especially `elegy-mcp`, `elegy-skills`, and `elegy-memory`.
@@ -29,47 +31,55 @@ Status in this session: direction clarified, ownership preserved, first slice id
 
 ### What remains carryover
 
-- define the minimum typed result envelope for orchestrator and delegated outputs
-- define typed policy and stop-condition contracts
+- extend typed result envelopes beyond the shipped delegated baseline
+- surface the current local delegated pre-start stop conditions through explicit lifecycle and execution-tree truth
+- define broader typed policy and stop-condition contracts
 - define the minimum orchestration event family and execution-tree truth surface
-- map the current Copilot SDK backplane into the new provider or session-manager seam without breaking host ownership
+- map the current Copilot SDK backplane into a later provider or session-manager seam without breaking host ownership
 - identify which first uses of `elegy-mcp`, `elegy-skills`, and `elegy-memory` are genuinely reusable instead of just convenient to extract
 
-## First practical slice
+## Shipped baseline and immediate follow-on
 
-The recommended first phase is a Holon or SAASTools substrate upgrade, not an OpenClaw feature chase.
+The first practical slice is no longer hypothetical. DesktopHost already ships the bounded delegated typed-output baseline, and the next immediate follow-on is to make the new stop conditions visible as orchestration truth rather than leaving them mostly local to runtime code.
 
 - DesktopHost-owned execution-tree substrate with one bounded delegated child hop by default.
-- Typed aggregation or result envelope for parent and delegated execution.
-- Hard budgets and typed stop conditions enforced by the host.
-- Provider or session-manager seam that supports Copilot SDK now and raw API providers later.
+- Typed delegated output baseline with host-owned named schemas, persisted accepted delegation intent, and host-side JSON validation.
+- Structured delegated pre-start run policy that blocks missing persisted success criteria, unresolvable subagent type, and unregistered output schema.
+- Immediate follow-on: explicit stop-condition and lifecycle surfacing for that started policy seam.
+- Later important seam: provider or session-manager abstraction that supports Copilot SDK now and raw API providers later.
 - Elegy integrated only as bounded host-managed CLI capabilities or reusable contracts where that boundary is justified.
 
-This first slice matters because the current system already has meaningful host-owned orchestration, but its contract plane is still weaker than its control plane. The goal is to make execution truth, stopping rules, and result reuse more formal before pursuing broader delegation depth or more product breadth.
+This sequencing matters because the current system already has meaningful host-owned orchestration, but its contract plane is still weaker than its control plane. The next useful move is to make the new stopping rules visible and inspectable before widening delegation depth, broadening provider seams, or chasing more product breadth.
 
 ## Priority gaps to foreground in Holon or SAASTools
 
 These are the important gaps to drive first. They matter more than broad OpenClaw feature comparison.
 
-### 1. Typed result contracts
+### 1. Explicit stop-condition and lifecycle surfacing for the started delegated policy seam
 
-The host needs typed result envelopes for orchestrator outputs, delegated outputs, aggregation, validation, rejection, and repair. This is the highest-value gap because the runtime already knows how it wants to route work, but it is still weaker at proving what it received.
+DesktopHost now has local delegated pre-start stop codes for missing persisted success criteria, unresolvable subagent type, and unregistered output schema. The immediate gap is that those stops are still mostly local runtime outcomes instead of clear execution-tree or lifecycle truth.
 
-### 2. Typed policy and stop-condition contracts
+This is the most meaningful next step because the seam has started in code and now needs explicit state instead of only failure text.
 
-Approval posture, budget exhaustion, invalid structured output, capability denial, escalation, and degradation should be described as explicit contracts instead of staying mostly implicit in runtime code and prompts.
+### 2. Broader typed policy and stop-condition contracts
 
-### 3. Stronger self-description and capability disclosure
+The local delegated seam is only a start. Approval posture, budget exhaustion, invalid structured output, capability denial, escalation, and degradation should still be described as explicit contracts instead of staying mostly implicit in runtime code and prompts.
+
+### 3. Broader typed result contracts beyond the shipped delegated baseline
+
+The delegated one-hop typed-output slice is now shipped. The remaining result gap is extending typed envelopes for orchestrator outputs, aggregation, validation, rejection, and repair beyond that bounded delegated path.
+
+### 4. Stronger self-description and capability disclosure
 
 The runtime should be able to say, in a host-truthful way, which capabilities are available, why they are available, what constraints apply, and what execution posture is active for this turn.
 
-### 4. Orchestration event formalization and execution-tree truth surfaces
+### 5. Orchestration event formalization and execution-tree truth surfaces
 
 The system needs a typed event family and execution-tree truth model that can explain routing, delegation, tool use, stop reasons, validation failures, and final aggregation without relying mainly on prose summaries or UI-only inspection.
 
-### 5. Provider or session-manager abstraction above the current backplane
+### 6. Provider or session-manager abstraction above the current backplane
 
-The backplane contract is already useful, but the next step is a higher seam that can manage provider sessions consistently, preserve host policy and execution ownership, and make Copilot SDK versus raw API support a replaceable implementation choice rather than a structural fork.
+The backplane contract is already useful, and a higher seam is still important later. It can manage provider sessions consistently, preserve host policy and execution ownership, and make Copilot SDK versus raw API support a replaceable implementation choice rather than a structural fork, but it is no longer the immediate next seam in the sequencing above.
 
 ## Where OpenClaw is useful
 
@@ -108,12 +118,14 @@ Keep these local to Holon or SAASTools unless and until reuse is proven:
 
 ## Practical next move
 
-If future work starts from this note, start with the first practical slice inside Holon or SAASTools and treat any Elegy extraction as secondary proof work.
+If future work starts from this note, start from the shipped delegated baseline and the started local policy seam inside Holon or SAASTools, then treat any Elegy extraction as secondary proof work.
 
 The default bias should be simple:
 
 - keep orchestration local
-- formalize results, policies, and execution truth first
-- support Copilot SDK immediately through a replaceable provider seam
+- keep the shipped delegated typed-output baseline strict
+- surface explicit stop conditions and lifecycle truth next
+- broaden results, policies, and execution truth before widening provider seams
+- keep the provider or session-manager seam as a later important gap
 - leave raw API provider expansion as a planned follow-on
 - extract only the parts that are clearly reusable as CLI, skill, contract, or bounded runtime capability

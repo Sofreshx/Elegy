@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-03-25T00:00:00Z",
+  "entries": [
+    {
+      "skillId": "elegy-mermaid",
+      "name": "Elegy Mermaid",
+      "description": "Derived projection of the governed Elegy Mermaid skill definition for loading the repo-local non-authoritative contributor-routing Mermaid tooling markdown.",
+      "lifecycleState": "active",
+      "triggersOn": [
+        "mermaid",
+        "mermaid reverse",
+        "mermaid narrate",
+        "workflow mermaid"
+      ],
+      "keywords": [
+        "mermaid",
+        "workflow",
+        "render",
+        "reverse",
+        "narrate"
+      ],
+      "capabilityHints": [
+        "workflow-mermaid-render",
+        "workflow-mermaid-reverse-projection",
+        "workflow-mermaid-narration"
+      ],
+      "manifest": {
+        "id": "elegy-mermaid",
+        "loadMode": "onDemand",
+        "vaultRef": ".github/skills/elegy-mermaid/SKILL.md",
+        "sourceKind": "manual",
+        "materializationKind": "declared"
+      }
+    }
+  ]
+}

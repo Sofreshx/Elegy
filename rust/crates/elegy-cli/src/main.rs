@@ -6,7 +6,12 @@ use elegy_core::{
     CLI_SCHEMA_VERSION,
 };
 use elegy_host_mcp::{serve_stdio, HostError};
-use elegy_mermaid::{render_from_json_str, MermaidRenderError};
+use elegy_mermaid::{
+    narrate_from_json_str, narrate_from_mermaid_str, render_from_json_str,
+    reverse_from_mermaid_str, MermaidNarrative, MermaidProjectionEdgeRelation,
+    MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
+    MermaidWorkflowProjection,
+};
 use elegy_memory::{
     cli as memory_cli, GovernedMemoryRecord, LocalMemoryCatalogEntry, LocalMemoryExportResult,
     LocalMemoryLifecycleState, LocalMemoryPaths, LocalMemoryQueryOptions, LocalMemoryStore,
@@ -236,6 +241,14 @@ enum MermaidCommand {
         #[arg(long)]
         input: Option<PathBuf>,
     },
+    Reverse {
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+    Narrate {
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
 }
 
 #[derive(Args, Clone, Debug)]
@@ -377,6 +390,23 @@ struct MermaidRenderReport {
     input_path: Option<String>,
 }
 
+#[derive(Serialize)]
+struct MermaidReverseReport {
+    projection: MermaidWorkflowProjection,
+    input_source: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_path: Option<String>,
+}
+
+#[derive(Serialize)]
+struct MermaidNarrateReport {
+    narrative: MermaidNarrative,
+    projection: MermaidWorkflowProjection,
+    input_source: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input_path: Option<String>,
+}
+
 enum MermaidInputSource {
     File(PathBuf),
     Stdin,
@@ -385,6 +415,12 @@ enum MermaidInputSource {
 enum MermaidInputLoadError {
     File { path: PathBuf, source: io::Error },
     Stdin { source: io::Error },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum MermaidNarrateInputKind {
+    CanonicalJson,
+    MermaidFlowchart,
 }
 
 #[tokio::main]
@@ -512,6 +548,12 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Mermaid {
             command: MermaidCommand::Render { input },
         } => execute_mermaid_render_command(input, cli.format),
+        Command::Mermaid {
+            command: MermaidCommand::Reverse { input },
+        } => execute_mermaid_reverse_command(input, cli.format),
+        Command::Mermaid {
+            command: MermaidCommand::Narrate { input },
+        } => execute_mermaid_narrate_command(input, cli.format),
         Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
         Command::Contracts {
             command:
@@ -777,6 +819,117 @@ fn execute_mermaid_render_command(
     }
 }
 
+fn execute_mermaid_reverse_command(
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["mermaid", "reverse"];
+
+    let (mermaid, input_source) = match load_mermaid_input(input) {
+        Ok(result) => result,
+        Err(error) => {
+            return emit_diagnostics(
+                format,
+                command,
+                mermaid_input_load_diagnostics(error),
+                json!({}),
+                "error",
+                ExitCode::from(1),
+            )
+        }
+    };
+
+    match reverse_from_mermaid_str(&mermaid) {
+        Ok(projection) => {
+            match format {
+                OutputFormat::Text => print_mermaid_projection_text(&projection),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["mermaid".to_string(), "reverse".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: build_mermaid_reverse_report(projection, &input_source),
+                    diagnostics: Vec::new(),
+                })?,
+            }
+
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_diagnostics(
+            format,
+            command,
+            mermaid_reverse_diagnostics(error, &input_source),
+            json!({}),
+            "invalid",
+            ExitCode::from(1),
+        ),
+    }
+}
+
+fn execute_mermaid_narrate_command(
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["mermaid", "narrate"];
+
+    let (contents, input_source) = match load_mermaid_input(input) {
+        Ok(result) => result,
+        Err(error) => {
+            return emit_diagnostics(
+                format,
+                command,
+                mermaid_input_load_diagnostics(error),
+                json!({}),
+                "error",
+                ExitCode::from(1),
+            )
+        }
+    };
+
+    let input_kind = detect_mermaid_narrate_input_kind(&contents);
+    let result = match input_kind {
+        MermaidNarrateInputKind::CanonicalJson => narrate_from_json_str(&contents),
+        MermaidNarrateInputKind::MermaidFlowchart => narrate_from_mermaid_str(&contents),
+    };
+
+    match result {
+        Ok((narrative, projection)) => {
+            match format {
+                OutputFormat::Text => print_mermaid_narrative_text(&narrative),
+                OutputFormat::Json => print_json(&Envelope {
+                    schema_version: CLI_SCHEMA_VERSION,
+                    command: vec!["mermaid".to_string(), "narrate".to_string()],
+                    status: "ok",
+                    summary: Summary::default(),
+                    data: build_mermaid_narrate_report(narrative, projection, &input_source),
+                    diagnostics: Vec::new(),
+                })?,
+            }
+
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            let diagnostics = match input_kind {
+                MermaidNarrateInputKind::CanonicalJson => {
+                    mermaid_narrate_canonical_diagnostics(error, &input_source)
+                }
+                MermaidNarrateInputKind::MermaidFlowchart => {
+                    mermaid_narrate_mermaid_diagnostics(error, &input_source)
+                }
+            };
+
+            emit_diagnostics(
+                format,
+                command,
+                diagnostics,
+                json!({}),
+                "invalid",
+                ExitCode::from(1),
+            )
+        }
+    }
+}
+
 fn execute_config_command(
     locator: ProjectLocator,
     format: OutputFormat,
@@ -923,6 +1076,30 @@ fn build_mermaid_render_report(
     }
 }
 
+fn build_mermaid_reverse_report(
+    projection: MermaidWorkflowProjection,
+    input_source: &MermaidInputSource,
+) -> MermaidReverseReport {
+    MermaidReverseReport {
+        projection,
+        input_source: input_source.kind(),
+        input_path: input_source.input_path(),
+    }
+}
+
+fn build_mermaid_narrate_report(
+    narrative: MermaidNarrative,
+    projection: MermaidWorkflowProjection,
+    input_source: &MermaidInputSource,
+) -> MermaidNarrateReport {
+    MermaidNarrateReport {
+        narrative,
+        projection,
+        input_source: input_source.kind(),
+        input_path: input_source.input_path(),
+    }
+}
+
 fn mermaid_input_load_diagnostics(error: MermaidInputLoadError) -> Vec<Diagnostic> {
     match error {
         MermaidInputLoadError::File { path, source } => vec![Diagnostic::error(
@@ -939,70 +1116,157 @@ fn mermaid_input_load_diagnostics(error: MermaidInputLoadError) -> Vec<Diagnosti
 }
 
 fn mermaid_render_diagnostics(
-    error: MermaidRenderError,
+    error: MermaidToolError,
     input_source: &MermaidInputSource,
+) -> Vec<Diagnostic> {
+    mermaid_canonical_diagnostics(
+        "render",
+        error,
+        input_source,
+        "supply governed canonical-workflow or canonical-workflow-graph JSON to `elegy mermaid render`",
+    )
+}
+
+fn mermaid_narrate_canonical_diagnostics(
+    error: MermaidToolError,
+    input_source: &MermaidInputSource,
+) -> Vec<Diagnostic> {
+    mermaid_canonical_diagnostics(
+        "narrate",
+        error,
+        input_source,
+        "supply governed canonical-workflow or canonical-workflow-graph JSON, or Mermaid `flowchart TD` content, to `elegy mermaid narrate`",
+    )
+}
+
+fn mermaid_canonical_diagnostics(
+    command_name: &str,
+    error: MermaidToolError,
+    input_source: &MermaidInputSource,
+    unsupported_hint: &'static str,
 ) -> Vec<Diagnostic> {
     let input_location = input_source.display();
 
     match error {
-        MermaidRenderError::Json { source } => vec![Diagnostic::error(
+        MermaidToolError::Json { source } => vec![Diagnostic::error(
             "CLI-MERMAID-002",
             format!(
-                "failed to parse Mermaid render input JSON {}: {source}",
-                input_location
+                "failed to parse Mermaid {command_name} input JSON {}: {source}",
+                input_location,
             ),
         )
         .with_path(input_location)],
-        MermaidRenderError::UnsupportedCanonicalDocument => vec![Diagnostic::error(
+        MermaidToolError::UnsupportedCanonicalDocument => vec![Diagnostic::error(
             "CLI-MERMAID-003",
             format!(
-                "unsupported Mermaid render input {}; expected canonical workflow or canonical workflow graph JSON",
-                input_location
+                "unsupported Mermaid {command_name} input {}; expected canonical workflow or canonical workflow graph JSON",
+                input_location,
             ),
         )
         .with_path(input_source.display())
-        .with_hint(
-            "supply governed canonical-workflow or canonical-workflow-graph JSON to `elegy mermaid render`",
-        )],
-        error @ (MermaidRenderError::InvalidCanonicalWorkflowGraphReference { .. }
-        | MermaidRenderError::DuplicateCanonicalWorkflowGraphId { .. }) => {
+        .with_hint(unsupported_hint)],
+        error @ (MermaidToolError::InvalidCanonicalWorkflowGraphReference { .. }
+        | MermaidToolError::DuplicateCanonicalWorkflowGraphId { .. }) => {
             vec![Diagnostic::error(
                 "CLI-MERMAID-004",
                 format!(
-                    "canonical workflow graph input is invalid {}: {error}",
-                    input_location
+                    "canonical workflow graph input is invalid for Mermaid {command_name} {}: {error}",
+                    input_location,
                 ),
             )
             .with_path(input_source.display())
             .with_hint("ensure the input matches the governed canonical workflow graph contract")]
         }
-        MermaidRenderError::CanonicalWorkflowGraph { source } => vec![Diagnostic::error(
+        MermaidToolError::CanonicalWorkflowGraph { source } => vec![Diagnostic::error(
             "CLI-MERMAID-004",
             format!(
-                "canonical workflow graph input is invalid {}: {source}",
-                input_location
+                "canonical workflow graph input is invalid for Mermaid {command_name} {}: {source}",
+                input_location,
             ),
         )
         .with_path(input_source.display())
         .with_hint("ensure the input matches the governed canonical workflow graph contract")],
-        error @ (MermaidRenderError::InvalidCanonicalWorkflowReference { .. }
-        | MermaidRenderError::DuplicateCanonicalWorkflowId { .. }) => vec![
+        error @ (MermaidToolError::InvalidCanonicalWorkflowReference { .. }
+        | MermaidToolError::DuplicateCanonicalWorkflowId { .. }) => vec![
             Diagnostic::error(
                 "CLI-MERMAID-005",
                 format!(
-                    "canonical workflow input is invalid {}: {error}",
-                    input_location
+                    "canonical workflow input is invalid for Mermaid {command_name} {}: {error}",
+                    input_location,
                 ),
             )
             .with_path(input_source.display())
             .with_hint("ensure the input matches the governed canonical workflow contract"),
         ],
-        MermaidRenderError::CanonicalWorkflow { source } => vec![Diagnostic::error(
+        MermaidToolError::CanonicalWorkflow { source } => vec![Diagnostic::error(
             "CLI-MERMAID-005",
-            format!("canonical workflow input is invalid {}: {source}", input_location),
+            format!(
+                "canonical workflow input is invalid for Mermaid {command_name} {}: {source}",
+                input_location,
+            ),
         )
         .with_path(input_source.display())
         .with_hint("ensure the input matches the governed canonical workflow contract")],
+        other => vec![Diagnostic::error(
+            "CLI-MERMAID-005",
+            format!(
+                "Mermaid {command_name} input is invalid {}: {other}",
+                input_location
+            ),
+        )
+        .with_path(input_source.display())],
+    }
+}
+
+fn mermaid_reverse_diagnostics(
+    error: MermaidToolError,
+    input_source: &MermaidInputSource,
+) -> Vec<Diagnostic> {
+    mermaid_subset_diagnostics(
+        "reverse",
+        error,
+        input_source,
+        "supply Mermaid `flowchart TD` content compatible with `elegy mermaid render`; reverse output is a bounded workflow-graph projection, not canonical reconstruction",
+    )
+}
+
+fn mermaid_narrate_mermaid_diagnostics(
+    error: MermaidToolError,
+    input_source: &MermaidInputSource,
+) -> Vec<Diagnostic> {
+    mermaid_subset_diagnostics(
+        "narrate",
+        error,
+        input_source,
+        "supply Mermaid `flowchart TD` content compatible with `elegy mermaid render`, or governed canonical workflow JSON, to `elegy mermaid narrate`",
+    )
+}
+
+fn mermaid_subset_diagnostics(
+    command_name: &str,
+    error: MermaidToolError,
+    input_source: &MermaidInputSource,
+    hint: &'static str,
+) -> Vec<Diagnostic> {
+    let input_location = input_source.display();
+
+    vec![Diagnostic::error(
+        "CLI-MERMAID-006",
+        format!(
+            "Mermaid {command_name} input is invalid {}: {error}",
+            input_location
+        ),
+    )
+    .with_path(input_source.display())
+    .with_hint(hint)]
+}
+
+fn detect_mermaid_narrate_input_kind(input: &str) -> MermaidNarrateInputKind {
+    let trimmed = input.trim_start();
+    if trimmed.starts_with('{') || trimmed.starts_with('[') {
+        MermaidNarrateInputKind::CanonicalJson
+    } else {
+        MermaidNarrateInputKind::MermaidFlowchart
     }
 }
 
@@ -1465,6 +1729,42 @@ fn print_contracts_export_text(result: &ContractsBundleExport) {
     }
 }
 
+fn print_mermaid_projection_text(projection: &MermaidWorkflowProjection) {
+    println!("derived Mermaid workflow projection");
+    println!("source: {}", format_mermaid_source_kind(projection.source_kind));
+    println!("direction: {}", projection.direction);
+    println!("entry nodes: {}", projection.entry_node_ids.len());
+    println!("nodes: {}", projection.nodes.len());
+    println!("edges: {}", projection.edges.len());
+    for node in &projection.nodes {
+        println!(
+            "- {} [{}] {}",
+            node.node_id,
+            format_mermaid_node_role(node.node_role),
+            node.label
+        );
+    }
+    for edge in &projection.edges {
+        let edge_label = edge
+            .label
+            .as_deref()
+            .filter(|label| !label.trim().is_empty())
+            .map(|label| format!(" ({label})"))
+            .unwrap_or_default();
+        println!(
+            "- {}: {} -> {}{}",
+            format_mermaid_relation(edge.relation),
+            edge.from_node_id,
+            edge.to_node_id,
+            edge_label
+        );
+    }
+}
+
+fn print_mermaid_narrative_text(narrative: &MermaidNarrative) {
+    println!("{}", narrative.text);
+}
+
 fn print_diagnostics_text(diagnostics: &[Diagnostic]) {
     for diagnostic in diagnostics {
         let mut location = String::new();
@@ -1521,6 +1821,28 @@ fn format_transport(transport: McpTransportKind) -> &'static str {
     match transport {
         McpTransportKind::Stdio => "stdio",
         McpTransportKind::Http => "http",
+    }
+}
+
+fn format_mermaid_source_kind(kind: MermaidProjectionSourceKind) -> &'static str {
+    match kind {
+        MermaidProjectionSourceKind::CanonicalWorkflow => "canonical-workflow",
+        MermaidProjectionSourceKind::CanonicalWorkflowGraph => "canonical-workflow-graph",
+        MermaidProjectionSourceKind::MermaidFlowchartTd => "mermaid-flowchart-td",
+    }
+}
+
+fn format_mermaid_node_role(role: MermaidProjectionNodeRole) -> &'static str {
+    match role {
+        MermaidProjectionNodeRole::Activity => "activity",
+        MermaidProjectionNodeRole::Trigger => "trigger",
+    }
+}
+
+fn format_mermaid_relation(relation: MermaidProjectionEdgeRelation) -> &'static str {
+    match relation {
+        MermaidProjectionEdgeRelation::Activates => "activates",
+        MermaidProjectionEdgeRelation::TransitionsTo => "transitions_to",
     }
 }
 

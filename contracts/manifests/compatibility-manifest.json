@@ -180,7 +180,8 @@
         "fixtures/skill-definition.minimal.json",
         "fixtures/skill-definition.elegy-memory.json",
         "fixtures/skill-definition.elegy-mcp.json",
-        "fixtures/skill-definition.elegy-skills.json"
+        "fixtures/skill-definition.elegy-skills.json",
+        "fixtures/skill-definition.elegy-mermaid.json"
       ]
     },
     {
@@ -207,7 +208,8 @@
         "fixtures/skill-discovery-index.minimal.json",
         "fixtures/skill-discovery-index.elegy-memory.json",
         "fixtures/skill-discovery-index.elegy-mcp.json",
-        "fixtures/skill-discovery-index.elegy-skills.json"
+        "fixtures/skill-discovery-index.elegy-skills.json",
+        "fixtures/skill-discovery-index.elegy-mermaid.json"
       ]
     },
     {

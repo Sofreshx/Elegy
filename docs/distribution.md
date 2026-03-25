@@ -6,6 +6,8 @@ The active authority root is `contracts/`, with bundle and schema policy under `
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and MCP-to-skill generation. The shared `elegy` CLI remains the general and compatibility surface.
 
+Mermaid tooling stays on that umbrella surface. `elegy mermaid render`, `elegy mermaid reverse`, and `elegy mermaid narrate` do not introduce a dedicated Mermaid binary, wrapper archive, or separate distribution lane.
+
 ## Asset model
 
 Tagged releases are configured to publish nine neutral assets across the contracts, installer, CLI, and dedicated wrapper lanes:
@@ -76,8 +78,10 @@ Current governed dedicated-surface skill artifacts in that bundle include:
 - `fixtures/skill-discovery-index.elegy-mcp.json`
 - `fixtures/skill-definition.elegy-skills.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
+- `fixtures/skill-definition.elegy-mermaid.json`
+- `fixtures/skill-discovery-index.elegy-mermaid.json`
 
-The repo carries `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, and `.github/skills/elegy-skills/SKILL.md` as repo-local non-authoritative contributor-routing files for those surfaces. Those markdown files are not part of the governed contracts bundle.
+The repo carries `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` as repo-local non-authoritative contributor-routing files for those surfaces. Those markdown files are not part of the governed contracts bundle.
 
 ## CLI archive
 
@@ -97,6 +101,8 @@ Output:
 Release workflows publish the explicit target set above by calling `pwsh ./scripts/package-cli.ps1 -Surface <surface> -Target <target>` for each current CLI surface and supported target.
 
 Each archive contains only its corresponding executable. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
+
+For Mermaid tooling, use the umbrella `elegy` archive. The Mermaid commands remain general-surface commands under the existing `elegy` executable rather than a dedicated release target.
 
 ## Wrapper archive
 
