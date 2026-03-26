@@ -43,13 +43,20 @@ jobs:
         run: |
           ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive
 
-      - name: Upload distribution artifacts
+      - name: Upload exported contracts artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-contracts-artifacts-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/contracts/**
+
+      - name: Upload contracts distribution archive
         uses: actions/upload-artifact@v4
         with:
           name: elegy-contracts-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/contracts/**
             artifacts/distribution/elegy-contracts-*.zip
 
   package-cli:
@@ -179,31 +186,40 @@ jobs:
       - package-wrapper-surfaces
       - package-installer
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Download distribution artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: elegy-*-${{ github.sha }}
           merge-multiple: true
-          path: artifacts/release
+          path: artifacts/distribution
 
-      - name: Resolve release tag
-        if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
+      - name: Resolve distribution tag
         id: release_meta
         shell: bash
         run: |
           set -euo pipefail
 
-          tag_name="${GITHUB_REF_NAME:-}"
+          tag_name="local-artifacts"
           if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
             tag_name="${{ github.event.release.tag_name }}"
-          fi
-
-          if [[ -z "${tag_name}" ]]; then
-            echo "Unable to determine a release tag for published distribution assets." >&2
-            exit 1
+          elif [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            tag_name="${GITHUB_REF_NAME}"
           fi
 
           echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Write release metadata
+        shell: pwsh
+        run: |
+          ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag '${{ steps.release_meta.outputs.tag_name }}'
+
+      - name: Validate published distribution assets
+        shell: pwsh
+        run: |
+          ./scripts/validate-canonical-outputs.ps1 -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata -DistributionDirectory ./artifacts/distribution
 
       - name: Attach published distribution assets to GitHub release
         if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') }}
@@ -214,7 +230,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          mapfile -t release_files < <(find artifacts/release -type f -name 'elegy-*.zip' | sort)
+          mapfile -t release_files < <(find artifacts/distribution -type f \( -name 'elegy-*.zip' -o -name 'elegy-release-*.json' \) | sort)
 
           if [[ "${#release_files[@]}" -eq 0 ]]; then
             echo "No published distribution assets were found to attach to release ${RELEASE_TAG}." >&2
@@ -233,4 +249,4 @@ jobs:
           name: elegy-published-distribution-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/release/**
+            artifacts/distribution/**

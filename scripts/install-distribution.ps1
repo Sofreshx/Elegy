@@ -192,53 +192,134 @@ function Get-HostPublishedTarget {
     throw "Unable to determine a supported host operating system for Elegy CLI assets. Published targets: $supportedTargets"
 }
 
-function Find-ReleaseAsset {
+function Resolve-ReleaseAssetByPattern {
     param(
         [object[]]$Assets,
         [string[]]$Patterns,
         [string]$Description
     )
 
+    $candidateAssets = [System.Collections.Generic.List[object]]::new()
     foreach ($pattern in $Patterns) {
-        $asset = $Assets | Where-Object { $_.name -like $pattern } | Sort-Object name | Select-Object -First 1
-        if ($null -ne $asset) {
-            return $asset
+        foreach ($asset in @($Assets | Where-Object { $_.name -like $pattern })) {
+            $candidateAssets.Add($asset) | Out-Null
         }
     }
 
-    throw "Unable to locate a $Description asset matching patterns: $($Patterns -join ', ')"
+    $resolvedAssets = @(
+        $candidateAssets |
+            Group-Object name |
+            ForEach-Object { $_.Group[0] } |
+            Sort-Object name
+    )
+
+    if ($resolvedAssets.Count -eq 1) {
+        return [pscustomobject]@{
+            FileName = [string]$resolvedAssets[0].name
+            SourcePath = ''
+            SourceUri = [string]$resolvedAssets[0].browser_download_url
+            PublishedSize = [int64]$resolvedAssets[0].size
+        }
+    }
+
+    if ($resolvedAssets.Count -gt 1) {
+        $matchNames = $resolvedAssets | ForEach-Object { $_.name }
+        throw "Ambiguous release $Description assets. Patterns: $($Patterns -join ', '). Matches: $($matchNames -join ', ')."
+    }
+
+    throw "Unable to locate a release $Description asset matching patterns: $($Patterns -join ', ')"
 }
 
-function Find-LocalArchive {
+function Resolve-ReleaseAssetByName {
+    param(
+        [object[]]$Assets,
+        [string]$FileName,
+        [string]$Description
+    )
+
+    $candidateAssets = @(
+        $Assets |
+            Where-Object { $_.name -eq $FileName } |
+            Sort-Object name
+    )
+
+    if ($candidateAssets.Count -eq 1) {
+        return [pscustomobject]@{
+            FileName = [string]$candidateAssets[0].name
+            SourcePath = ''
+            SourceUri = [string]$candidateAssets[0].browser_download_url
+            PublishedSize = [int64]$candidateAssets[0].size
+        }
+    }
+
+    if ($candidateAssets.Count -gt 1) {
+        throw "Ambiguous release $Description assets named $FileName."
+    }
+
+    throw "Unable to locate a release $Description asset named $FileName"
+}
+
+function Resolve-LocalAssetByPattern {
     param(
         [string]$ArtifactsRoot,
         [string[]]$Patterns,
         [string]$Description
     )
 
-    $matches = @(
-        foreach ($pattern in $Patterns) {
-            Get-ChildItem -Path $ArtifactsRoot -Filter $pattern -File -ErrorAction SilentlyContinue
+    $candidateAssets = [System.Collections.Generic.List[object]]::new()
+    foreach ($pattern in $Patterns) {
+        foreach ($asset in @(Get-ChildItem -Path $ArtifactsRoot -Filter $pattern -File -ErrorAction SilentlyContinue)) {
+            $candidateAssets.Add($asset) | Out-Null
         }
-    )
+    }
 
-    $uniqueMatches = @(
-        $matches |
+    $resolvedAssets = @(
+        $candidateAssets |
             Group-Object FullName |
             ForEach-Object { $_.Group[0] } |
             Sort-Object Name
     )
 
-    if ($uniqueMatches.Count -eq 1) {
-        return $uniqueMatches[0]
+    if ($resolvedAssets.Count -eq 1) {
+        return [pscustomobject]@{
+            FileName = [string]$resolvedAssets[0].Name
+            SourcePath = [string]$resolvedAssets[0].FullName
+            SourceUri = ''
+            PublishedSize = [int64]$resolvedAssets[0].Length
+        }
     }
 
-    if ($uniqueMatches.Count -gt 1) {
-        $matchNames = $uniqueMatches | ForEach-Object { $_.Name }
-        throw "Ambiguous local $Description archives in $ArtifactsRoot matching patterns: $($Patterns -join ', '). Matches: $($matchNames -join ', '). Provide a local artifacts root with exactly one matching archive per required asset."
+    if ($resolvedAssets.Count -gt 1) {
+        $matchNames = $resolvedAssets | ForEach-Object { $_.Name }
+        throw "Ambiguous local $Description assets in $ArtifactsRoot matching patterns: $($Patterns -join ', '). Matches: $($matchNames -join ', ')."
     }
 
-    throw "Unable to locate a local $Description archive in $ArtifactsRoot matching patterns: $($Patterns -join ', ')"
+    throw "Unable to locate a local $Description asset in $ArtifactsRoot matching patterns: $($Patterns -join ', ')"
+}
+
+function Resolve-LocalAssetByName {
+    param(
+        [string]$ArtifactsRoot,
+        [string]$FileName,
+        [string]$Description
+    )
+
+    $sourcePath = Join-Path $ArtifactsRoot $FileName
+    if (-not (Test-Path $sourcePath)) {
+        throw "Unable to locate a local $Description asset named $FileName in $ArtifactsRoot"
+    }
+
+    $fileInfo = Get-Item -Path $sourcePath
+    if ($fileInfo.PSIsContainer) {
+        throw "Expected a file for local $Description asset $FileName but found a directory at $sourcePath"
+    }
+
+    return [pscustomobject]@{
+        FileName = [string]$fileInfo.Name
+        SourcePath = [string]$fileInfo.FullName
+        SourceUri = ''
+        PublishedSize = [int64]$fileInfo.Length
+    }
 }
 
 function Initialize-DestinationDirectory {
@@ -258,7 +339,7 @@ function Initialize-DestinationDirectory {
     New-Item -ItemType Directory -Path $Path -Force | Out-Null
 }
 
-function Stage-ArchiveFromSource {
+function Copy-FileFromSource {
     param(
         [string]$DestinationPath,
         [string]$SourcePath,
@@ -301,6 +382,185 @@ function Restore-UnixExecutablePermission {
     }
 }
 
+function Read-JsonFile {
+    param(
+        [string]$Path
+    )
+
+    return Get-Content -Raw -Path $Path | ConvertFrom-Json
+}
+
+function ConvertTo-StringArray {
+    param(
+        [object]$Value
+    )
+
+    $result = [System.Collections.Generic.List[string]]::new()
+    foreach ($item in @($Value)) {
+        $stringValue = [string]$item
+        if (-not [string]::IsNullOrWhiteSpace($stringValue)) {
+            $result.Add($stringValue) | Out-Null
+        }
+    }
+
+    return @($result)
+}
+
+function Get-FileSha256 {
+    param(
+        [string]$Path
+    )
+
+    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+
+function Get-NormalizedArchiveEntries {
+    param(
+        [string]$ArchivePath
+    )
+
+    $archive = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+    try {
+        $entryLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+        foreach ($entry in $archive.Entries) {
+            $normalizedEntry = $entry.FullName.Replace('\\', '/').TrimStart([char[]]@('/', '.'))
+            if (-not [string]::IsNullOrWhiteSpace($normalizedEntry)) {
+                $entryLookup.Add($normalizedEntry) | Out-Null
+            }
+        }
+
+        return $entryLookup
+    }
+    finally {
+        $archive.Dispose()
+    }
+}
+
+function Assert-ArchiveRequiredEntries {
+    param(
+        [string]$ArchivePath,
+        [string[]]$RequiredEntries
+    )
+
+    $entryLookup = Get-NormalizedArchiveEntries -ArchivePath $ArchivePath
+    $missingEntries = [System.Collections.Generic.List[string]]::new()
+    foreach ($requiredEntry in @($RequiredEntries)) {
+        if (-not $entryLookup.Contains($requiredEntry)) {
+            $missingEntries.Add($requiredEntry) | Out-Null
+        }
+    }
+
+    if ($missingEntries.Count -gt 0) {
+        throw "Archive $ArchivePath is missing required entries: $($missingEntries -join ', ')"
+    }
+}
+
+function New-ChecksumLookup {
+    param(
+        [object]$ChecksumsDocument
+    )
+
+    $lookup = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($entry in @($ChecksumsDocument.entries)) {
+        $fileName = [string]$entry.fileName
+        if ([string]::IsNullOrWhiteSpace($fileName)) {
+            throw 'Checksums metadata included an empty fileName entry.'
+        }
+
+        if ($lookup.ContainsKey($fileName)) {
+            throw "Checksums metadata included a duplicate fileName entry for $fileName"
+        }
+
+        $lookup[$fileName] = ([string]$entry.sha256).ToLowerInvariant()
+    }
+
+    return $lookup
+}
+
+function Test-OptionalFieldMatch {
+    param(
+        [object]$ActualValue,
+        [string]$ExpectedValue
+    )
+
+    $actualString = [string]$ActualValue
+    if ([string]::IsNullOrWhiteSpace($ExpectedValue)) {
+        return [string]::IsNullOrWhiteSpace($actualString)
+    }
+
+    return [string]::Equals($actualString, $ExpectedValue, [System.StringComparison]::OrdinalIgnoreCase)
+}
+
+function Get-ManifestAsset {
+    param(
+        [object]$ManifestDocument,
+        [string]$AssetKind,
+        [string]$Surface,
+        [string]$Target,
+        [string]$Description
+    )
+
+    $selectedAssets = @(
+        $ManifestDocument.assets |
+            Where-Object {
+                [string]::Equals([string]$_.assetKind, $AssetKind, [System.StringComparison]::OrdinalIgnoreCase) -and
+                (Test-OptionalFieldMatch -ActualValue $_.surface -ExpectedValue $Surface) -and
+                (Test-OptionalFieldMatch -ActualValue $_.target -ExpectedValue $Target)
+            }
+    )
+
+    if ($selectedAssets.Count -eq 1) {
+        return $selectedAssets[0]
+    }
+
+    if ($selectedAssets.Count -gt 1) {
+        throw "Manifest metadata resolved multiple $Description entries."
+    }
+
+    throw "Manifest metadata did not include a $Description entry."
+}
+
+function Assert-StagedFileMatchesMetadata {
+    param(
+        [string]$FilePath,
+        [object]$ManifestAsset,
+        [System.Collections.Generic.Dictionary[string, string]]$ChecksumLookup,
+        [int64]$PublishedSize
+    )
+
+    $fileName = [string]$ManifestAsset.fileName
+    $expectedSize = [int64]$ManifestAsset.sizeBytes
+    $expectedManifestHash = ([string]$ManifestAsset.sha256).ToLowerInvariant()
+
+    if (-not $ChecksumLookup.ContainsKey($fileName)) {
+        throw "Checksums metadata did not include an entry for $fileName"
+    }
+
+    if ($ChecksumLookup[$fileName] -ne $expectedManifestHash) {
+        throw "Manifest and checksums metadata disagreed on the SHA-256 hash for $fileName"
+    }
+
+    if ($PublishedSize -gt 0 -and $PublishedSize -ne $expectedSize) {
+        throw "Published size for $fileName was $PublishedSize bytes, but the manifest expected $expectedSize bytes"
+    }
+
+    $fileInfo = Get-Item -Path $FilePath
+    if ($fileInfo.Length -ne $expectedSize) {
+        throw "Staged file $fileName was $($fileInfo.Length) bytes, but the manifest expected $expectedSize bytes"
+    }
+
+    $actualHash = Get-FileSha256 -Path $FilePath
+    if ($actualHash -ne $expectedManifestHash) {
+        throw "SHA-256 mismatch for $fileName. Expected $expectedManifestHash but found $actualHash"
+    }
+
+    return [pscustomobject]@{
+        fileName = $fileName
+        sizeBytes = $expectedSize
+        sha256 = $actualHash
+    }
+}
+
 if ([string]::IsNullOrWhiteSpace($Destination)) {
     $Destination = Join-Path (Get-Location) '.elegy'
 }
@@ -315,7 +575,7 @@ $resolvedLocalArtifactsRoot = ''
 
 if ([string]::IsNullOrWhiteSpace($LocalArtifactsRoot)) {
     $release = Get-ReleaseMetadata -RepositoryName $Repository -ReleaseTag $Tag
-    $resolvedTag = $release.tag_name
+    $resolvedTag = [string]$release.tag_name
 
     if ([string]::IsNullOrWhiteSpace($resolvedTag)) {
         throw 'Resolved GitHub release metadata did not include a tag name.'
@@ -327,13 +587,6 @@ else {
 }
 
 $resolvedTarget = Get-HostPublishedTarget
-$contractsAsset = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-    Find-ReleaseAsset -Assets $release.assets -Patterns @('elegy-contracts-*.zip') -Description 'contracts bundle'
-}
-else {
-    Find-LocalArchive -ArtifactsRoot $resolvedLocalArtifactsRoot -Patterns @('elegy-contracts-*.zip') -Description 'contracts bundle'
-}
-
 $downloadRoot = Join-Path $Destination 'downloads'
 $contractsPath = Join-Path $Destination 'contracts'
 $binRoot = Join-Path $Destination 'bin'
@@ -348,36 +601,140 @@ if ($resolvedWrapperSurfaces.Count -gt 0) {
     Initialize-DestinationDirectory -Path $wrapperRoot -AllowReplace:$true
 }
 
-$contractsArchivePath = Join-Path $downloadRoot $contractsAsset.name
-
-if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-    Stage-ArchiveFromSource -DestinationPath $contractsArchivePath -SourceUri $contractsAsset.browser_download_url
+$manifestSource = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+    Resolve-ReleaseAssetByPattern -Assets $release.assets -Patterns @('elegy-release-manifest-*.json') -Description 'release manifest'
 }
 else {
-    Stage-ArchiveFromSource -DestinationPath $contractsArchivePath -SourcePath $contractsAsset.FullName
+    Resolve-LocalAssetByPattern -ArtifactsRoot $resolvedLocalArtifactsRoot -Patterns @('elegy-release-manifest-*.json') -Description 'release manifest'
 }
 
+$checksumsSource = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+    Resolve-ReleaseAssetByPattern -Assets $release.assets -Patterns @('elegy-release-checksums-*.json') -Description 'release checksums'
+}
+else {
+    Resolve-LocalAssetByPattern -ArtifactsRoot $resolvedLocalArtifactsRoot -Patterns @('elegy-release-checksums-*.json') -Description 'release checksums'
+}
+
+$manifestPath = Join-Path $downloadRoot $manifestSource.FileName
+$checksumsPath = Join-Path $downloadRoot $checksumsSource.FileName
+Copy-FileFromSource -DestinationPath $manifestPath -SourcePath $manifestSource.SourcePath -SourceUri $manifestSource.SourceUri
+Copy-FileFromSource -DestinationPath $checksumsPath -SourcePath $checksumsSource.SourcePath -SourceUri $checksumsSource.SourceUri
+
+$manifestDocument = Read-JsonFile -Path $manifestPath
+$checksumsDocument = Read-JsonFile -Path $checksumsPath
+
+if ([string]$manifestDocument.documentType -ne 'elegy-release-manifest') {
+    throw 'Release manifest metadata had an unexpected documentType.'
+}
+
+if ([string]$checksumsDocument.documentType -ne 'elegy-release-checksums') {
+    throw 'Release checksums metadata had an unexpected documentType.'
+}
+
+if ([string]::IsNullOrWhiteSpace([string]$manifestDocument.schemaVersion)) {
+    throw 'Release manifest metadata did not include schemaVersion.'
+}
+
+if ([string]::IsNullOrWhiteSpace([string]$checksumsDocument.schemaVersion)) {
+    throw 'Release checksums metadata did not include schemaVersion.'
+}
+
+if ([string]::IsNullOrWhiteSpace([string]$manifestDocument.bundleVersion)) {
+    throw 'Release manifest metadata did not include bundleVersion.'
+}
+
+if (-not [string]::Equals([string]$manifestDocument.tag, [string]$checksumsDocument.tag, [System.StringComparison]::Ordinal)) {
+    throw 'Release manifest and checksums metadata did not agree on the resolved tag marker.'
+}
+
+if (-not [string]::Equals([string]$checksumsDocument.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
+    throw "Unsupported checksums algorithm: $($checksumsDocument.algorithm)"
+}
+
+if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+    if (-not [string]::Equals([string]$manifestDocument.repository, $Repository, [System.StringComparison]::OrdinalIgnoreCase)) {
+        throw "Release manifest metadata targeted repository $($manifestDocument.repository), but installer expected $Repository"
+    }
+
+    if (-not [string]::Equals([string]$manifestDocument.tag, $resolvedTag, [System.StringComparison]::Ordinal)) {
+        throw "Release manifest metadata targeted tag $($manifestDocument.tag), but installer resolved tag $resolvedTag"
+    }
+}
+elseif (-not [string]::Equals([string]$manifestDocument.tag, 'local-artifacts', [System.StringComparison]::Ordinal)) {
+    throw "Local artifact installs require manifest tag marker 'local-artifacts', but found $($manifestDocument.tag)"
+}
+
+$checksumLookup = New-ChecksumLookup -ChecksumsDocument $checksumsDocument
+$manifestFileName = Split-Path -Leaf $manifestPath
+if (-not $checksumLookup.ContainsKey($manifestFileName)) {
+    throw "Checksums metadata did not include the manifest file $manifestFileName"
+}
+
+$manifestSha256 = Get-FileSha256 -Path $manifestPath
+if ($checksumLookup[$manifestFileName] -ne $manifestSha256) {
+    throw "Release manifest SHA-256 did not match the published checksums entry for $manifestFileName"
+}
+
+$publishedTargets = ConvertTo-StringArray -Value $manifestDocument.publishedTargets
+if ($resolvedCliSurfaces.Count -gt 0 -and -not ($publishedTargets -contains $resolvedTarget)) {
+    throw "Release metadata did not publish the current host target $resolvedTarget"
+}
+
+$verifiedFiles = [System.Collections.Generic.List[object]]::new()
+$verifiedFiles.Add([pscustomobject]@{
+    fileName = $manifestFileName
+    sizeBytes = [int64](Get-Item -Path $manifestPath).Length
+    sha256 = $manifestSha256
+}) | Out-Null
+
+$installedAssets = [System.Collections.Generic.List[object]]::new()
+
+$contractsManifestAsset = Get-ManifestAsset -ManifestDocument $manifestDocument -AssetKind 'contracts-bundle' -Surface '' -Target '' -Description 'contracts bundle'
+$contractsSource = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+    Resolve-ReleaseAssetByName -Assets $release.assets -FileName ([string]$contractsManifestAsset.fileName) -Description 'contracts bundle'
+}
+else {
+    Resolve-LocalAssetByName -ArtifactsRoot $resolvedLocalArtifactsRoot -FileName ([string]$contractsManifestAsset.fileName) -Description 'contracts bundle'
+}
+
+$contractsArchivePath = Join-Path $downloadRoot $contractsSource.FileName
+Copy-FileFromSource -DestinationPath $contractsArchivePath -SourcePath $contractsSource.SourcePath -SourceUri $contractsSource.SourceUri
+$verifiedContractsFile = Assert-StagedFileMatchesMetadata -FilePath $contractsArchivePath -ManifestAsset $contractsManifestAsset -ChecksumLookup $checksumLookup -PublishedSize $contractsSource.PublishedSize
+$verifiedFiles.Add($verifiedContractsFile) | Out-Null
+Assert-ArchiveRequiredEntries -ArchivePath $contractsArchivePath -RequiredEntries (ConvertTo-StringArray -Value $contractsManifestAsset.requiredEntries)
 Expand-Archive -Path $contractsArchivePath -DestinationPath $contractsPath -Force
+
+$installedAssets.Add([pscustomobject]@{
+    assetKind = [string]$contractsManifestAsset.assetKind
+    surface = $null
+    target = $null
+    fileName = [string]$contractsManifestAsset.fileName
+    installPath = $contractsPath
+    requiredEntries = ConvertTo-StringArray -Value $contractsManifestAsset.requiredEntries
+    sizeBytes = [int64]$contractsManifestAsset.sizeBytes
+    sha256 = [string]$contractsManifestAsset.sha256
+}) | Out-Null
 
 $installedCliReports = [System.Collections.Generic.List[object]]::new()
 foreach ($surface in $resolvedCliSurfaces) {
     $metadata = $surfaceMetadata[$surface]
-    $cliAsset = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-        Find-ReleaseAsset -Assets $release.assets -Patterns @("$($metadata.AssetPrefix)-*-$resolvedTarget.zip") -Description "$surface CLI archive"
+    $cliManifestAsset = Get-ManifestAsset -ManifestDocument $manifestDocument -AssetKind 'cli' -Surface $surface -Target $resolvedTarget -Description "$surface CLI archive for $resolvedTarget"
+    $cliSource = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+        Resolve-ReleaseAssetByName -Assets $release.assets -FileName ([string]$cliManifestAsset.fileName) -Description "$surface CLI archive"
     }
     else {
-        Find-LocalArchive -ArtifactsRoot $resolvedLocalArtifactsRoot -Patterns @("$($metadata.AssetPrefix)-*-$resolvedTarget.zip") -Description "$surface CLI archive"
+        Resolve-LocalAssetByName -ArtifactsRoot $resolvedLocalArtifactsRoot -FileName ([string]$cliManifestAsset.fileName) -Description "$surface CLI archive"
     }
-    $cliArchivePath = Join-Path $downloadRoot $cliAsset.name
-    $surfacePath = Join-Path $binRoot $surface
 
+    $cliArchivePath = Join-Path $downloadRoot $cliSource.FileName
+    $surfacePath = Join-Path $binRoot $surface
     Initialize-DestinationDirectory -Path $surfacePath -AllowReplace:$true
-    if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-        Stage-ArchiveFromSource -DestinationPath $cliArchivePath -SourceUri $cliAsset.browser_download_url
-    }
-    else {
-        Stage-ArchiveFromSource -DestinationPath $cliArchivePath -SourcePath $cliAsset.FullName
-    }
+    Copy-FileFromSource -DestinationPath $cliArchivePath -SourcePath $cliSource.SourcePath -SourceUri $cliSource.SourceUri
+
+    $verifiedCliFile = Assert-StagedFileMatchesMetadata -FilePath $cliArchivePath -ManifestAsset $cliManifestAsset -ChecksumLookup $checksumLookup -PublishedSize $cliSource.PublishedSize
+    $verifiedFiles.Add($verifiedCliFile) | Out-Null
+    Assert-ArchiveRequiredEntries -ArchivePath $cliArchivePath -RequiredEntries (ConvertTo-StringArray -Value $cliManifestAsset.requiredEntries)
+
     Expand-Archive -Path $cliArchivePath -DestinationPath $surfacePath -Force
 
     $executableName = Get-ExecutableFileName -BinaryName $metadata.Binary -TargetTriple $resolvedTarget
@@ -402,31 +759,44 @@ foreach ($surface in $resolvedCliSurfaces) {
 
     $installedCliReports.Add([pscustomobject]@{
         Surface = $surface
-        Asset = $cliAsset.name
+        Asset = [string]$cliManifestAsset.fileName
         InstallPath = $surfacePath
         ExecutablePath = $executablePath
+    }) | Out-Null
+
+    $installedAssets.Add([pscustomobject]@{
+        assetKind = [string]$cliManifestAsset.assetKind
+        surface = $surface
+        target = $resolvedTarget
+        fileName = [string]$cliManifestAsset.fileName
+        installPath = $surfacePath
+        executablePath = $executablePath
+        requiredEntries = ConvertTo-StringArray -Value $cliManifestAsset.requiredEntries
+        sizeBytes = [int64]$cliManifestAsset.sizeBytes
+        sha256 = [string]$cliManifestAsset.sha256
     }) | Out-Null
 }
 
 $installedWrapperReports = [System.Collections.Generic.List[object]]::new()
 foreach ($surface in $resolvedWrapperSurfaces) {
     $metadata = $wrapperMetadata[$surface]
-    $wrapperAsset = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-        Find-ReleaseAsset -Assets $release.assets -Patterns @("$($metadata.AssetPrefix)-*.zip") -Description "$surface wrapper archive"
+    $wrapperManifestAsset = Get-ManifestAsset -ManifestDocument $manifestDocument -AssetKind 'wrapper' -Surface $surface -Target '' -Description "$surface wrapper archive"
+    $wrapperSource = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
+        Resolve-ReleaseAssetByName -Assets $release.assets -FileName ([string]$wrapperManifestAsset.fileName) -Description "$surface wrapper archive"
     }
     else {
-        Find-LocalArchive -ArtifactsRoot $resolvedLocalArtifactsRoot -Patterns @("$($metadata.AssetPrefix)-*.zip") -Description "$surface wrapper archive"
+        Resolve-LocalAssetByName -ArtifactsRoot $resolvedLocalArtifactsRoot -FileName ([string]$wrapperManifestAsset.fileName) -Description "$surface wrapper archive"
     }
-    $wrapperArchivePath = Join-Path $downloadRoot $wrapperAsset.name
-    $surfacePath = Join-Path $wrapperRoot $surface
 
+    $wrapperArchivePath = Join-Path $downloadRoot $wrapperSource.FileName
+    $surfacePath = Join-Path $wrapperRoot $surface
     Initialize-DestinationDirectory -Path $surfacePath -AllowReplace:$true
-    if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
-        Stage-ArchiveFromSource -DestinationPath $wrapperArchivePath -SourceUri $wrapperAsset.browser_download_url
-    }
-    else {
-        Stage-ArchiveFromSource -DestinationPath $wrapperArchivePath -SourcePath $wrapperAsset.FullName
-    }
+    Copy-FileFromSource -DestinationPath $wrapperArchivePath -SourcePath $wrapperSource.SourcePath -SourceUri $wrapperSource.SourceUri
+
+    $verifiedWrapperFile = Assert-StagedFileMatchesMetadata -FilePath $wrapperArchivePath -ManifestAsset $wrapperManifestAsset -ChecksumLookup $checksumLookup -PublishedSize $wrapperSource.PublishedSize
+    $verifiedFiles.Add($verifiedWrapperFile) | Out-Null
+    Assert-ArchiveRequiredEntries -ArchivePath $wrapperArchivePath -RequiredEntries (ConvertTo-StringArray -Value $wrapperManifestAsset.requiredEntries)
+
     Expand-Archive -Path $wrapperArchivePath -DestinationPath $surfacePath -Force
 
     $installerPath = Join-Path $surfacePath $metadata.Installer
@@ -441,12 +811,57 @@ foreach ($surface in $resolvedWrapperSurfaces) {
 
     $installedWrapperReports.Add([pscustomobject]@{
         Surface = $surface
-        Asset = $wrapperAsset.name
+        Asset = [string]$wrapperManifestAsset.fileName
         InstallPath = $surfacePath
         InstallerPath = $installerPath
         SkillBridgePath = $skillBridgePath
     }) | Out-Null
+
+    $installedAssets.Add([pscustomobject]@{
+        assetKind = [string]$wrapperManifestAsset.assetKind
+        surface = $surface
+        target = $null
+        fileName = [string]$wrapperManifestAsset.fileName
+        installPath = $surfacePath
+        installerPath = $installerPath
+        skillBridgePath = $skillBridgePath
+        requiredEntries = ConvertTo-StringArray -Value $wrapperManifestAsset.requiredEntries
+        sizeBytes = [int64]$wrapperManifestAsset.sizeBytes
+        sha256 = [string]$wrapperManifestAsset.sha256
+    }) | Out-Null
 }
+
+$destinationRoot = (Resolve-Path -Path $Destination).Path
+$receiptPath = Join-Path $destinationRoot 'install-receipt.json'
+$installReceipt = [ordered]@{
+    schemaVersion = '1.0.0'
+    documentType = 'elegy-install-receipt'
+    installedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+    request = [ordered]@{
+        destination = $destinationRoot
+        cliSurfaces = @($resolvedCliSurfaces)
+        wrapperSurfaces = @($resolvedWrapperSurfaces)
+        force = [bool]$Force.IsPresent
+    }
+    source = [ordered]@{
+        mode = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) { 'github-release' } else { 'local-artifacts' }
+        repository = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) { $Repository } else { $null }
+        tag = [string]$manifestDocument.tag
+        localArtifactsRoot = if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) { $null } else { $resolvedLocalArtifactsRoot }
+        manifest = $manifestSource.FileName
+        checksums = $checksumsSource.FileName
+    }
+    hostTarget = $resolvedTarget
+    verification = [ordered]@{
+        algorithm = 'sha256'
+        manifestBundleVersion = [string]$manifestDocument.bundleVersion
+        verifiedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
+        files = @($verifiedFiles)
+    }
+    installedAssets = @($installedAssets)
+}
+
+$installReceipt | ConvertTo-Json -Depth 8 | Set-Content -Path $receiptPath -Encoding utf8
 
 Write-Host 'Installed Elegy distribution assets.'
 if ([string]::IsNullOrWhiteSpace($resolvedLocalArtifactsRoot)) {
@@ -456,7 +871,7 @@ else {
     Write-Host " - local artifacts root: $resolvedLocalArtifactsRoot"
 }
 Write-Host " - release tag: $resolvedTag"
-Write-Host " - contracts asset: $($contractsAsset.name)"
+Write-Host " - contracts asset: $($contractsManifestAsset.fileName)"
 Write-Host " - contracts path: $contractsPath"
 foreach ($report in $installedCliReports) {
     Write-Host " - CLI surface: $($report.Surface)"
@@ -474,3 +889,4 @@ foreach ($report in $installedWrapperReports) {
 if ($resolvedCliSurfaces -contains 'elegy-cli') {
     Write-Host " - compatibility cli path: $legacyCliPath"
 }
+Write-Host " - install receipt: $receiptPath"

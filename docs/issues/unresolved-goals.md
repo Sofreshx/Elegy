@@ -1,10 +1,8 @@
----
 created: 2026-03-24
-updated: 2026-03-24
+updated: 2026-03-25
 category: governance
 status: active
 doc_kind: reference
----
 
 # Unresolved Goals
 
@@ -18,7 +16,7 @@ Track non-active carryover goals that remain after a workflow closes.
 
 Goal Statement: Make the prepared wrapper and CLI surfaces live on GitHub through remote push/tag/release execution and verify hosted distribution workflows end to end.
 
-Status: partial / deferred by approved local-only scope.
+Status: partial.
 
 Resume When: remote publishing is authorized, then execute the release flow and verify downloadable wrapper archives from GitHub.
 
@@ -28,7 +26,7 @@ Owner: workflow-orchestrator
 
 First Seen: 2026-03-24
 
-Last Reviewed: 2026-03-24
+Last Reviewed: 2026-03-25
 
 ## References
 

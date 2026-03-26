@@ -61,7 +61,7 @@ The umbrella `elegy` CLI exposes Mermaid tooling as a derived projection surface
 
 Mermaid remains explicitly non-authoritative. Reverse output is not full canonical workflow reconstruction. See [docs/architecture/mermaid-tooling.md](docs/architecture/mermaid-tooling.md) for the current scope boundaries.
 
-Release workflows and distribution support now exist for archives of the umbrella `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries.
+Release workflows and distribution support now exist for archives of the umbrella `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries, along with release manifest and checksum metadata that the generic installer verifies before extraction.
 
 ### Current self-authoring surface
 
@@ -76,6 +76,8 @@ Built-in MCP-native or skill-driven self-authoring remains the next milestone ra
 - `scripts/` - export, validation, and release support scripts for the governed bundle.
 - `artifacts/` - generated outputs and distribution artifacts.
 - `docs/` - architecture, migration, distribution, and governance documentation.
+
+The generic distribution installer consumes the release manifest and checksums JSON assets first, verifies exact archive hashes and required entries, and writes an `install-receipt.json` into the destination root.
 
 ## Burden-of-Proof Reset
 

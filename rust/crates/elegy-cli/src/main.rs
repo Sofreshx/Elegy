@@ -24,8 +24,9 @@ use elegy_memory::{
     LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_SINGLE_WRITER_POSTURE,
     SUMMARY_ONLY_REPRESENTATION, SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
 };
-use elegy_skills::{
-    generate_skills_from_descriptor_file, GeneratedSkillArtifacts, SkillsSurfaceError,
+use elegy_tooling::{
+    generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
+    ToolingError as SkillsSurfaceError,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -2192,7 +2193,6 @@ fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
 
 fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
     match error {
-        SkillsSurfaceError::Mcp(error) => mcp_error_diagnostics(error),
         SkillsSurfaceError::Io {
             operation,
             path,
@@ -2207,6 +2207,26 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
             format!("failed to parse JSON in {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
+        SkillsSurfaceError::InvalidMcpDescriptor { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-MCP-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint(
+                        "author or supply a descriptor that matches the governed MCP contract",
+                    )
+            })
+            .collect(),
+        SkillsSurfaceError::InvalidMcpAnalysis { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-MCP-002", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint(
+                        "ensure the analyzed descriptor produces a governed MCP analysis result",
+                    )
+            })
+            .collect(),
         SkillsSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
             .into_iter()
             .map(|issue| {
