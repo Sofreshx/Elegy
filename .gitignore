@@ -35,3 +35,6 @@ Thumbs.db
 .tmp/llm-input/
 .tmp/llm-output/
 .tmp/llm-work/
+
+# Repo-local prompt scratch file
+/prompt.md
