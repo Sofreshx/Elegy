@@ -279,6 +279,144 @@ _(Agent: based on your experience in this session, what should the next session 
 
 ---
 
+## Session 3 Info
+
+| Field | Value |
+|---|---|
+| Session | 3 — Embedding Provider Adaptation |
+| Model | GPT-5.4 (xhigh) |
+| Started at | 2026-03-24T22:24:02.4381411-07:00 |
+| Repo state at start | `7472adf` |
+| Branch | `feature/embedding-provider` |
+| Architecture docs read | No additional architecture docs in this session; relied on direct repo inventory plus the verified handoff corrections supplied with the work group. |
+
+---
+
+## Session 3 Work Unit Log
+
+### WU1 — Ollama Embedding Provider (adapted from stale handoff)
+
+**Pre-WU1 reality check / prompt correction log:**
+
+- Verified current baseline for this run is **27/27 passing tests**, not `53/53`; the incoming handoff overstated baseline test reality.
+- Verified the prompt handoff was **partially stale** because the embedding stack was not greenfield:
+  - **Already present:** `EmbeddingProvider` trait in `rust/crates/elegy-memory/src/traits.rs`; embedding persistence and stale-embedding enumeration in `src/storage/sqlite_store.rs`; hybrid search when `SearchQuery.embedding` is supplied; salience-gate novelty logic that uses `candidate.embedding`; CLI command surface already includes `reembed`.
+  - **Partially present / still incomplete:** CLI `search` still sends `embedding: None` and explicitly reports keyword-only mode; CLI `reembed` is still a stub that reports queued stale memories but does not invoke a provider.
+  - **Missing for adapted WU1:** a concrete provider implementation module/export for Ollama, provider-specific dependency wiring, and focused provider unit tests.
+- Prompt-WU status as verified at session start:
+  - **Already done from earlier work:** trait contract, SQLite embedding storage, stale-embedding queueing, hybrid semantic+keyword store search, salience-gate embedding use.
+  - **Partial:** CLI search/query-embedding wiring and CLI re-embedding flow.
+  - **Still pending after this adapted WU1:** provider-backed CLI re-embedding execution and any further CLI/provider integration work beyond the concrete provider itself.
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | _(reported after commit in orchestration output to avoid self-invalidating the hash in-file)_ |
+| Timestamp | 2026-03-24T22:24:02.4381411-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/embedding/mod.rs`, `rust/crates/elegy-memory/src/embedding/ollama.rs`, `rust/crates/elegy-memory/src/lib.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; requested scope remains focused provider unit tests compiled via `cargo check --tests` only. |
+| Blockers encountered | None in implementation. Branch creation succeeded. The repo still contains unrelated local dirt in `rust/Cargo.lock` and untracked `prompt.md`, both intentionally left unstaged because this adapted WU1 did not require them. |
+| Decisions made | Added a dedicated `embedding` module with a concrete `OllamaEmbeddingProvider` that calls Ollama `/api/embeddings`, validates non-empty configuration/input, normalizes the configured base URL, enforces the MVP `768`-dimension assumption for `nomic-embed-text`, re-exports the provider through `lib.rs`, and limits test coverage to constructor/default/identity behavior without live HTTP calls or CLI wiring beyond adapted WU1 scope. |
+
+---
+
+### WU2 — Sqlite Store Optional Provider Wiring (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Finalizing commit recorded on `feature/embedding-provider` during WU2 closeout. |
+| Timestamp | 2026-03-24T22:34:08.8100283-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/Cargo.lock`, `SESSION_TRACKING.md` |
+| Validation | ✅ Verified pass — `cargo test -p elegy-memory --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` => `59 passed, 0 failed` |
+| Tests run by this runner | Finalization used the already-verified full `cargo test -p elegy-memory` signal supplied with the WU2 handoff; no additional test execution was performed during closeout. |
+| Blockers encountered | None in implementation or finalization. I did not find an obvious repository-local `wu2` todo/status tracker to update confidently, so no separate status artifact was modified. |
+| Deviations from plan | **Intentional policy deviation documented here:** when a provider-backed `store()` attempt cannot obtain a usable embedding (provider error or provider output rejected by store-side validation such as dimension mismatch), the memory insert still succeeds and remains `embedding_stale = true` rather than surfacing a fatal error back through the store API. Likewise, provider-backed `search()` now opportunistically derives a query embedding only when no explicit embedding is supplied, and if that provider call fails it degrades to the existing keyword-only path instead of failing the search. |
+| Decisions made | Added optional provider ownership directly to `SqliteMemoryStore`; preserved existing `SqliteMemoryStore::new(path, scope)` for current callers; introduced provider-aware constructors (`new_with_embedding_provider`, `new_with_optional_embedding_provider`); reused the existing `store_embedding()` and hybrid search scoring path instead of rewriting retrieval logic; added deterministic stub-provider unit tests that prove automatic embedding persistence on store, automatic query-embedding search when no explicit query vector is supplied, and graceful fallback behavior when provider calls fail; and kept `rust/Cargo.lock` in the final commit so the tracked lockfile matches the current workspace dependency graph (including `elegy-memory`'s `reqwest` dependency and the already-declared `elegy-cli` workspace links). |
+
+---
+
+### WU3 — Salience Gate Optional Provider Fallback (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-24T22:48:11.1843082-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/gate.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo fmt --all && cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; focused unit coverage was added but direct unit/integration/E2E execution was intentionally deferred. |
+| Blockers encountered | None in implementation. I did not find a repository-local `wu3-impl` todo/status tracker beyond this session log, so no additional tracker artifact was updated. |
+| Deviations from plan | Kept CLI add wiring unchanged for this run so the public behavior change is limited to the salience gate API and its unit coverage; provider-aware gate construction is available but not yet plumbed into CLI add. |
+| Decisions made | Preserved `DefaultSalienceGate::new(scope_config)` for existing callers; added compatibility-preserving provider-aware constructors that accept an optional `Arc<dyn EmbeddingProvider>`; changed novelty lookup to reuse an explicit candidate embedding when present or derive one from trimmed content when a provider is configured; and intentionally degrade provider embed failures to “skip novelty lookup” so salience/provenance archive logic continues unchanged. |
+
+---
+
+### WU4 — CLI Provider Wiring and Re-embedding (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-24T23:25:58.2825823-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/cli.rs`, `rust/crates/elegy-memory/tests/cli.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; added focused CLI/unit coverage but deferred direct unit/integration/E2E execution for the validation lane. |
+| Blockers encountered | None in implementation. I did not find a repository-local `wu4-impl` tracker artifact to update beyond this session log, so no separate status file was modified. Post-validation follow-up: three internal CLI unit tests initially panicked with `Cannot start a runtime from within a runtime` because `#[tokio::test]` wrappers were invoking sync CLI helpers that call `run_async(...)`. The narrow fix converts those affected tests to plain `#[test]` and keeps async setup/assertion calls behind explicit `run_async(...)` boundaries; a later review also flagged `reembed_stale_memories()` for repeated runtime entry inside its per-memory loop, so that helper was tightened to execute the full stale-ID fetch/load/embed/store flow inside one async block behind a single `run_async(...)` boundary. Compile re-validation passed and direct test re-validation remains pending. |
+| Deviations from plan | Kept provider configuration narrowly scoped to shared CLI store args (`--embedding-provider` with `--provider` alias plus Ollama URL/model overrides) instead of introducing a broader provider registry or config file. Provider-backed search now stops advertising keyword-only mode whenever a provider-configured store context is active, even though store-side search still intentionally falls back to keyword-only retrieval if a provider query-embedding call fails. |
+| Decisions made | Wired `open_store()` to optionally construct `SqliteMemoryStore::new_with_embedding_provider(...)` using `OllamaEmbeddingProvider` and default local Ollama settings; plumbed the same optional provider into CLI add's `DefaultSalienceGate`; implemented successful `reembed` execution by enumerating stale IDs, loading each memory, embedding content through the configured provider, and persisting vectors through the existing `store_embedding()` path; tightened the sync CLI helper after review so the entire re-embed flow now runs inside a single async block / runtime entry instead of repeatedly calling `run_async(...)` inside the loop; returned clear CLI validation errors for missing provider configuration or per-memory embedding/store failures; added internal CLI unit tests for provider-aware store opening, provider-backed search mode reporting, re-embedding success/limit handling, and failure paths; and added a CLI binary test confirming `reembed` now fails fast with a helpful message when no provider is configured. |
+
+---
+
+### WU5 — Provider-backed Integration Coverage (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | Not committed in this run by request. |
+| Timestamp | 2026-03-25T01:41:27.3234028-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/tests/integration.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo check -p elegy-memory --tests --manifest-path C:\Users\Romain\Projects\Elegy\rust\Cargo.toml` |
+| Tests run by this runner | None by design; added deterministic integration coverage but deferred direct test execution to the requested validation lane. |
+| Blockers encountered | None during implementation. I did not find a repository-local `wu5-impl` tracker artifact beyond this session log, so no separate done/blocked file was updated. |
+| Deviations from plan | Kept scope inside integration coverage only and did not touch production code, because the requested provider-backed scenarios could be exercised through existing public APIs plus an in-test deterministic stub provider. The re-embed integration coverage validates the same stale-ID/embed/store flow using `MemoryStore` APIs rather than reaching into private CLI helpers. |
+| Decisions made | Extended the existing `rust/crates/elegy-memory/tests/integration.rs` suite instead of creating another integration target; added a local deterministic `StubEmbeddingProvider` so no live Ollama/network calls are required; covered provider-backed store search when `SearchQuery.embedding` is omitted and the store auto-derives a query vector; added an explicit no-provider text-only search regression proving keyword retrieval still works; added a stale-ID re-embedding integration that re-embeds only the oldest stale memory under a limit and clears its `embedding_stale` flag; and added provider-backed salience-gate coverage for near-duplicate detection when `candidate.embedding` is absent and the gate must ask the provider for the novelty vector. |
+
+---
+
+### WU6 — Graceful Degradation When Ollama Is Offline (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | `18b12f28226861b88c442e084ed83e355cf38600` |
+| Timestamp | 2026-03-25T00:00:00-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/src/embedding/mod.rs`, `rust/crates/elegy-memory/src/embedding/ollama.rs`, `rust/crates/elegy-memory/src/lib.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/tests/cli.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo test --package elegy-memory` from `C:\Users\Romain\Projects\Elegy\rust` completed green: unit/lib `45 passed`, CLI integration `4 passed`, governed-memory integration `15 passed`, integration `9 passed`, local-store integration `4 passed`, plus `2` zero-test harnesses (`src/main.rs` and doc-tests) for `77 passed, 0 failed, 0 ignored, 0 measured, 0 filtered out`. |
+| Tests run by this runner | Executed the requested validation lane and recorded exact counts from the successful run. A small WU6-scoped assertion hardening in `rust/crates/elegy-memory/src/embedding/ollama.rs` was needed because the simulated offline localhost case can surface as either connection refusal or timeout on this machine; after that adjustment, the package passed cleanly end-to-end. |
+| Blockers encountered | None. Validation is green. |
+| Deviations from plan | Timeout configuration was added as provider-level defaults plus an explicit timeout-aware constructor rather than new CLI flags, because WU6 only required the config to exist with sensible defaults and the public create/search call signatures had to remain stable. |
+| Decisions made | Added default Ollama connect/request timeouts (5s/30s) and a timeout-aware provider constructor; mapped reqwest connection-refused and timeout failures to clear non-panicking provider errors that include the configured base URL; taught `SqliteMemoryStore::store()` to recognize offline-Ollama failures, log a user-facing warning to stderr, and preserve the existing no-vector fallback by storing the memory with `embedding_stale = true`; and added provider unit tests plus CLI binary coverage that simulate connection refusal/timeouts without requiring a live Ollama instance. |
+
+---
+
+### WU7 — Embedding Cache / Skip If Unchanged (adapted for Session 3)
+
+| Field | Value |
+|---|---|
+| Status | ✅ Done |
+| Commit hash | `81d6c4d` |
+| Timestamp | 2026-03-25T05:10:38.0211778-07:00 |
+| Files created/modified | `rust/crates/elegy-memory/Cargo.toml`, `rust/crates/elegy-memory/src/storage/schema.rs`, `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `SESSION_TRACKING.md` |
+| Validation | ✅ Pass — `cargo test --package elegy-memory` from `C:\Users\Romain\Projects\Elegy\rust` completed green: lib/unit `48 passed`, CLI integration `4 passed`, governed-memory integration `15 passed`, integration `9 passed`, local-store integration `4 passed`, plus `2` zero-test harnesses (`src/main.rs` and doc-tests) for `80 passed, 0 failed, 0 ignored, 0 measured, 0 filtered out`. |
+| Tests run by this runner | Executed the requested authoritative validation lane after the WU7 cache and schema changes landed. Added focused store/schema coverage proving duplicate-content stores only invoke the embedding provider once, stale embeddings are not reused after content changes, and legacy databases are upgraded to include the new hash column. |
+| Blockers encountered | None in the final change set. `rust/Cargo.lock` changed locally when adding the direct `sha2` dependency, but it remains intentionally unstaged per the closeout constraints. |
+| Deviations from plan | Kept the cache lookup scoped to the current `SqliteMemoryStore` scope and reused persisted vector blobs by copying them into a new `vec_memories` row, rather than widening public APIs or introducing cross-scope/provider cache sharing. |
+| Decisions made | Added `content_sha256` storage on `memory_embeddings` with a backward-compatible schema migration/index path; compute SHA-256 hashes for persisted embeddings; on `store()`, check for a non-stale existing embedding with the same hash before calling the provider and clone that vector into the new memory when available; and keep stale embeddings out of cache hits by requiring `memories.embedding_stale = 0` on lookup. |
+
+---
+
 ## How to Read This File (for the human reviewer)
 
 **Red flags to look for:**

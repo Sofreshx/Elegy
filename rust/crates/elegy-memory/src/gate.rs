@@ -1,21 +1,54 @@
+use std::{borrow::Cow, sync::Arc};
+
 use async_trait::async_trait;
 
 use crate::{
-    GateDecision, GateError, MemoryCandidate, MemoryStore, ProvenanceLevel, SalienceGate,
-    ScopeConfig,
+    EmbeddingProvider, GateDecision, GateError, MemoryCandidate, MemoryStore, ProvenanceLevel,
+    SalienceGate, ScopeConfig,
 };
 
 /// Default MVP salience gate using scope-configured novelty and salience thresholds.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct DefaultSalienceGate {
     scope_config: ScopeConfig,
+    embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+}
+
+impl std::fmt::Debug for DefaultSalienceGate {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DefaultSalienceGate")
+            .field("scope_config", &self.scope_config)
+            .field("has_embedding_provider", &self.embedding_provider.is_some())
+            .finish()
+    }
 }
 
 impl DefaultSalienceGate {
     /// Create a new salience gate from an already-loaded scope configuration.
     #[must_use]
     pub fn new(scope_config: ScopeConfig) -> Self {
-        Self { scope_config }
+        Self::new_with_optional_embedding_provider(scope_config, None)
+    }
+
+    /// Create a new salience gate with an embedding provider used when candidates omit embeddings.
+    #[must_use]
+    pub fn new_with_embedding_provider(
+        scope_config: ScopeConfig,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+    ) -> Self {
+        Self::new_with_optional_embedding_provider(scope_config, Some(embedding_provider))
+    }
+
+    /// Create a new salience gate with an optional embedding provider.
+    #[must_use]
+    pub fn new_with_optional_embedding_provider(
+        scope_config: ScopeConfig,
+        embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+    ) -> Self {
+        Self {
+            scope_config,
+            embedding_provider,
+        }
     }
 
     fn validate_candidate(&self, candidate: &MemoryCandidate) -> Result<(), GateError> {
@@ -67,6 +100,26 @@ impl DefaultSalienceGate {
 
         format!("{existing_content}\n\n{candidate_content}")
     }
+
+    async fn novelty_embedding<'a>(
+        &'a self,
+        candidate: &'a MemoryCandidate,
+    ) -> Option<Cow<'a, [f32]>> {
+        if let Some(embedding) = candidate.embedding.as_deref() {
+            return Some(Cow::Borrowed(embedding));
+        }
+
+        let trimmed_content = candidate.content.trim();
+        if trimmed_content.is_empty() {
+            return None;
+        }
+
+        let provider = self.embedding_provider.as_ref()?;
+        match provider.embed(trimmed_content).await {
+            Ok(embedding) if !embedding.is_empty() => Some(Cow::Owned(embedding)),
+            Ok(_) | Err(_) => None,
+        }
+    }
 }
 
 #[async_trait]
@@ -78,9 +131,9 @@ impl SalienceGate for DefaultSalienceGate {
     ) -> Result<GateDecision, GateError> {
         self.validate_candidate(candidate)?;
 
-        if let Some(embedding) = candidate.embedding.as_deref() {
+        if let Some(embedding) = self.novelty_embedding(candidate).await {
             let matches = store
-                .find_similar(embedding, self.novelty_floor(), 1)
+                .find_similar(embedding.as_ref(), self.novelty_floor(), 1)
                 .await?;
             if let Some(best_match) = matches.into_iter().next() {
                 if self.should_merge(best_match.similarity) {
@@ -130,10 +183,10 @@ mod tests {
 
     use super::DefaultSalienceGate;
     use crate::{
-        ContradictionEntry, GateDecision, Memory, MemoryCandidate, MemoryFilter,
-        MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
-        MetadataUpdate, ProvenanceLevel, PurgeReport, ResolutionStatus, SalienceGate, ScopeConfig,
-        ScoredMemory, SearchQuery, SensitivityLevel, StoreError,
+        ContradictionEntry, EmbeddingError, EmbeddingProvider, GateDecision, Memory,
+        MemoryCandidate, MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState,
+        MemoryStore, MemoryType, MetadataUpdate, ProvenanceLevel, PurgeReport, ResolutionStatus,
+        SalienceGate, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, StoreError,
     };
 
     #[tokio::test]
@@ -268,6 +321,124 @@ mod tests {
         assert_eq!(store.find_similar_call_count(), 0);
     }
 
+    #[tokio::test]
+    async fn provider_backed_gate_merges_when_candidate_embedding_is_missing() {
+        let target = sample_memory("Launch plan", ProvenanceLevel::UserStated);
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            "Launch plan with contingency checklist",
+            StubEmbeddingResponse::Embedding(vec![0.1, 0.2, 0.3, 0.4]),
+        )]));
+        let gate = DefaultSalienceGate::new_with_embedding_provider(
+            ScopeConfig::default(),
+            provider.clone(),
+        );
+        let store = MockStore::with_similar_results(vec![ScoredMemory {
+            memory: target.clone(),
+            score: 0.95,
+            similarity: 0.95,
+        }]);
+
+        let decision = gate
+            .evaluate(
+                &sample_candidate(
+                    "Launch plan with contingency checklist",
+                    0.9,
+                    ProvenanceLevel::UserStated,
+                    None,
+                ),
+                &store,
+            )
+            .await
+            .expect("evaluate candidate with provider-backed novelty lookup");
+
+        match decision {
+            GateDecision::Merge {
+                target_id,
+                enriched_content,
+            } => {
+                assert_eq!(target_id, target.id);
+                assert_eq!(enriched_content, "Launch plan with contingency checklist");
+            }
+            other => panic!("expected merge decision, got {other:?}"),
+        }
+        assert_eq!(
+            provider.calls(),
+            vec!["Launch plan with contingency checklist".to_string()]
+        );
+        assert_eq!(store.find_similar_call_count(), 1);
+        let calls = store.find_similar_calls();
+        assert_eq!(calls[0].0, 4);
+    }
+
+    #[tokio::test]
+    async fn provider_failure_gracefully_falls_back_to_archive_logic() {
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            "Minor aside",
+            StubEmbeddingResponse::Failure("provider offline".to_string()),
+        )]));
+        let gate = DefaultSalienceGate::new_with_embedding_provider(
+            ScopeConfig::default(),
+            provider.clone(),
+        );
+        let store = MockStore::with_similar_results(vec![ScoredMemory {
+            memory: sample_memory("Should not be consulted", ProvenanceLevel::UserStated),
+            score: 0.99,
+            similarity: 0.99,
+        }]);
+
+        let decision = gate
+            .evaluate(
+                &sample_candidate("Minor aside", 0.1, ProvenanceLevel::UserStated, None),
+                &store,
+            )
+            .await
+            .expect("evaluate candidate when provider embedding fails");
+
+        assert_eq!(decision, GateDecision::Archive);
+        assert_eq!(provider.calls(), vec!["Minor aside".to_string()]);
+        assert_eq!(store.find_similar_call_count(), 0);
+    }
+
+    #[tokio::test]
+    async fn explicit_candidate_embedding_still_takes_precedence_over_provider() {
+        let target = sample_memory("Launch plan", ProvenanceLevel::UserStated);
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            "Launch plan with contingency checklist",
+            StubEmbeddingResponse::Embedding(vec![9.0; 4]),
+        )]));
+        let gate = DefaultSalienceGate::new_with_embedding_provider(
+            ScopeConfig::default(),
+            provider.clone(),
+        );
+        let store = MockStore::with_similar_results(vec![ScoredMemory {
+            memory: target.clone(),
+            score: 0.95,
+            similarity: 0.95,
+        }]);
+
+        let decision = gate
+            .evaluate(
+                &sample_candidate(
+                    "Launch plan with contingency checklist",
+                    0.9,
+                    ProvenanceLevel::UserStated,
+                    Some(vec![1.0; 4]),
+                ),
+                &store,
+            )
+            .await
+            .expect("evaluate candidate with explicit embedding");
+
+        match decision {
+            GateDecision::Merge { target_id, .. } => assert_eq!(target_id, target.id),
+            other => panic!("expected merge decision, got {other:?}"),
+        }
+        assert!(provider.calls().is_empty());
+        assert_eq!(store.find_similar_call_count(), 1);
+        let calls = store.find_similar_calls();
+        assert_eq!(calls[0].0, 4);
+    }
+
     fn sample_candidate(
         content: &str,
         importance_score: f32,
@@ -312,6 +483,67 @@ mod tests {
             tenant_id: None,
             user_id: None,
             agent_id: None,
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    enum StubEmbeddingResponse {
+        Embedding(Vec<f32>),
+        Failure(String),
+    }
+
+    #[derive(Debug)]
+    struct StubEmbeddingProvider {
+        responses: HashMap<String, StubEmbeddingResponse>,
+        calls: Mutex<Vec<String>>,
+    }
+
+    impl StubEmbeddingProvider {
+        fn new<I, S>(responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
+            S: Into<String>,
+        {
+            Self {
+                responses: responses
+                    .into_iter()
+                    .map(|(text, response)| (text.into(), response))
+                    .collect(),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("stub provider calls lock").clone()
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StubEmbeddingProvider {
+        async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            let trimmed = text.trim().to_string();
+            self.calls
+                .lock()
+                .expect("stub provider calls lock")
+                .push(trimmed.clone());
+
+            match self.responses.get(&trimmed) {
+                Some(StubEmbeddingResponse::Embedding(embedding)) => Ok(embedding.clone()),
+                Some(StubEmbeddingResponse::Failure(message)) => {
+                    Err(EmbeddingError::Provider(message.clone()))
+                }
+                None => Err(EmbeddingError::Provider(format!(
+                    "missing stub embedding for `{trimmed}`"
+                ))),
+            }
+        }
+
+        fn dimensions(&self) -> usize {
+            768
+        }
+
+        fn model_id(&self) -> &str {
+            "stub-embedding-provider"
         }
     }
 

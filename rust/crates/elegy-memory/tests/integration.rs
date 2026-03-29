@@ -1,10 +1,14 @@
-use std::collections::HashMap;
+use std::{
+    collections::HashMap,
+    sync::{Arc, Mutex},
+};
 
+use async_trait::async_trait;
 use chrono::{Duration, Utc};
 use elegy_memory::{
-    retention, DefaultSalienceGate, GateDecision, Memory, MemoryCandidate, MemoryScope,
-    MemoryState, MemoryStore, MemoryType, MetadataUpdate, ProvenanceLevel, SalienceGate,
-    ScopeConfig, SearchQuery, SensitivityLevel, SqliteMemoryStore,
+    retention, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision, Memory,
+    MemoryCandidate, MemoryScope, MemoryState, MemoryStore, MemoryType, MetadataUpdate,
+    ProvenanceLevel, SalienceGate, ScopeConfig, SearchQuery, SensitivityLevel, SqliteMemoryStore,
 };
 use tempfile::TempDir;
 use uuid::Uuid;
@@ -261,6 +265,204 @@ async fn gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone(
 }
 
 #[tokio::test]
+async fn provider_backed_search_derives_query_embedding_without_explicit_vector() {
+    let semantic_query = "orbital prep semantic probe";
+    let semantic_match_content = "release readiness checklist";
+    let non_match_content = "garden watering schedule";
+    let provider = Arc::new(StubEmbeddingProvider::new([
+        (semantic_match_content, axis_embedding()),
+        (non_match_content, negative_axis_embedding()),
+        (semantic_query, axis_embedding()),
+    ]));
+    let (_temp_dir, store) = test_store_with_provider("provider-search-derived", provider.clone());
+
+    let semantic_match = sample_memory(
+        semantic_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        Utc::now(),
+    );
+    let semantic_match_id = semantic_match.id;
+    let non_match = sample_memory(
+        non_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::Imported,
+        0.8,
+        Utc::now(),
+    );
+
+    store.store(semantic_match).await.expect("store semantic match");
+    store.store(non_match).await.expect("store non-match");
+
+    let results = store
+        .search(SearchQuery {
+            text: semantic_query.to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+        })
+        .await
+        .expect("run provider-backed semantic search");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, semantic_match_id);
+    assert!(results[0].similarity > 0.0);
+    assert_eq!(
+        provider.calls(),
+        vec![
+            semantic_match_content.to_string(),
+            non_match_content.to_string(),
+            semantic_query.to_string(),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn text_only_search_without_provider_remains_keyword_driven() {
+    let (_temp_dir, store) = test_store("keyword-only-search");
+    let memory = sample_memory(
+        "apollo fallback keyword memory",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+    let id = memory.id;
+
+    store.store(memory).await.expect("store keyword memory");
+
+    let results = store
+        .search(SearchQuery {
+            text: "fallback keyword".to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+        })
+        .await
+        .expect("search without provider");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, id);
+    assert!(results[0].similarity > 0.0);
+}
+
+#[tokio::test]
+async fn reembed_flow_recomputes_oldest_stale_embeddings_with_stub_provider() {
+    let provider = Arc::new(StubEmbeddingProvider::new([
+        ("older stale memory", axis_embedding()),
+        ("newer stale memory", cosine_embedding(0.5)),
+    ]));
+    let (_temp_dir, store) = test_store("reembed-flow");
+    let now = Utc::now();
+
+    let mut older = sample_memory(
+        "older stale memory",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.7,
+        now - Duration::days(1),
+    );
+    older.embedding_stale = true;
+    let older_id = older.id;
+
+    let mut newer = sample_memory(
+        "newer stale memory",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.7,
+        now,
+    );
+    newer.embedding_stale = true;
+    let newer_id = newer.id;
+
+    store.store(older).await.expect("store older stale memory");
+    store.store(newer).await.expect("store newer stale memory");
+
+    let reembedded_ids = reembed_stale_memories(&store, provider.as_ref(), 1)
+        .await
+        .expect("reembed oldest stale memory");
+
+    assert_eq!(reembedded_ids, vec![older_id]);
+    assert_eq!(provider.calls(), vec!["older stale memory".to_string()]);
+
+    let older_reloaded = store
+        .get_raw(&older_id)
+        .await
+        .expect("reload older memory")
+        .expect("older memory exists");
+    let newer_reloaded = store
+        .get_raw(&newer_id)
+        .await
+        .expect("reload newer memory")
+        .expect("newer memory exists");
+    assert!(!older_reloaded.embedding_stale);
+    assert!(newer_reloaded.embedding_stale);
+}
+
+#[tokio::test]
+async fn gate_uses_provider_embedding_when_candidate_embedding_is_missing() {
+    let provider = Arc::new(StubEmbeddingProvider::new([(
+        "Remember the Apollo launch checklist with contingency notes",
+        cosine_embedding(0.95),
+    )]));
+    let (_temp_dir, store) = test_store("gate-provider-fallback");
+    let gate = DefaultSalienceGate::new_with_embedding_provider(
+        store.scope_config().expect("load scope config"),
+        provider.clone(),
+    );
+    let original = sample_memory(
+        "Remember the Apollo launch checklist",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.6,
+        Utc::now(),
+    );
+
+    let original_id = store.store(original).await.expect("store original");
+    store
+        .store_embedding(&original_id, &axis_embedding())
+        .await
+        .expect("store original embedding");
+
+    let decision = gate
+        .evaluate(
+            &sample_candidate(
+                "Remember the Apollo launch checklist with contingency notes",
+                0.9,
+                ProvenanceLevel::UserStated,
+                None,
+            ),
+            &store,
+        )
+        .await
+        .expect("evaluate candidate with provider-backed embedding");
+
+    let GateDecision::Merge {
+        target_id,
+        enriched_content,
+    } = decision
+    else {
+        panic!("expected merge decision");
+    };
+    assert_eq!(target_id, original_id);
+    assert_eq!(
+        enriched_content,
+        "Remember the Apollo launch checklist with contingency notes"
+    );
+    assert_eq!(
+        provider.calls(),
+        vec!["Remember the Apollo launch checklist with contingency notes".to_string()]
+    );
+}
+
+#[tokio::test]
 async fn search_orders_results_by_combined_scoring_signals() {
     let (_temp_dir, store) = test_store("search-scoring");
     let now = Utc::now();
@@ -396,6 +598,21 @@ fn test_store(prefix: &str) -> (TempDir, SqliteMemoryStore) {
     (temp_dir, store)
 }
 
+fn test_store_with_provider(
+    prefix: &str,
+    provider: Arc<dyn EmbeddingProvider>,
+) -> (TempDir, SqliteMemoryStore) {
+    let temp_dir = TempDir::new().expect("create temp directory");
+    let db_path = temp_dir.path().join(format!("{prefix}.sqlite3"));
+    let store = SqliteMemoryStore::new_with_embedding_provider(
+        &db_path,
+        MemoryScope::Workspace,
+        provider,
+    )
+    .expect("create sqlite store with embedding provider");
+    (temp_dir, store)
+}
+
 fn sample_memory(
     content: &str,
     memory_type: MemoryType,
@@ -454,6 +671,12 @@ fn axis_embedding() -> Vec<f32> {
     embedding
 }
 
+fn negative_axis_embedding() -> Vec<f32> {
+    let mut embedding = vec![0.0; 768];
+    embedding[0] = -1.0;
+    embedding
+}
+
 fn cosine_embedding(target_cosine: f32) -> Vec<f32> {
     assert!((0.0..=1.0).contains(&target_cosine));
 
@@ -461,4 +684,84 @@ fn cosine_embedding(target_cosine: f32) -> Vec<f32> {
     embedding[0] = target_cosine;
     embedding[1] = (1.0 - (target_cosine * target_cosine)).sqrt();
     embedding
+}
+
+async fn reembed_stale_memories(
+    store: &SqliteMemoryStore,
+    provider: &dyn EmbeddingProvider,
+    limit: usize,
+) -> Result<Vec<Uuid>, String> {
+    let stale_ids = store
+        .get_stale_embeddings(limit)
+        .await
+        .map_err(|error| format!("load stale ids: {error}"))?;
+    let mut reembedded_ids = Vec::with_capacity(stale_ids.len());
+
+    for id in &stale_ids {
+        let memory = store
+            .get_raw(id)
+            .await
+            .map_err(|error| format!("load memory {id}: {error}"))?
+            .ok_or_else(|| format!("load memory {id}: not found"))?;
+        let embedding = provider
+            .embed(&memory.content)
+            .await
+            .map_err(|error| format!("embed memory {id}: {error}"))?;
+        store
+            .store_embedding(id, &embedding)
+            .await
+            .map_err(|error| format!("store embedding for {id}: {error}"))?;
+        reembedded_ids.push(*id);
+    }
+
+    Ok(reembedded_ids)
+}
+
+#[derive(Debug)]
+struct StubEmbeddingProvider {
+    responses: HashMap<String, Vec<f32>>,
+    calls: Mutex<Vec<String>>,
+}
+
+impl StubEmbeddingProvider {
+    fn new<I, S>(responses: I) -> Self
+    where
+        I: IntoIterator<Item = (S, Vec<f32>)>,
+        S: Into<String>,
+    {
+        Self {
+            responses: responses
+                .into_iter()
+                .map(|(text, embedding)| (text.into(), embedding))
+                .collect(),
+            calls: Mutex::new(Vec::new()),
+        }
+    }
+
+    fn calls(&self) -> Vec<String> {
+        self.calls.lock().expect("stub provider calls lock").clone()
+    }
+}
+
+#[async_trait]
+impl EmbeddingProvider for StubEmbeddingProvider {
+    async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        let trimmed = text.trim().to_string();
+        self.calls
+            .lock()
+            .expect("stub provider calls lock")
+            .push(trimmed.clone());
+
+        self.responses.get(&trimmed).cloned().ok_or_else(|| {
+            EmbeddingError::Provider(format!("missing stub embedding for `{trimmed}`"))
+        })
+    }
+
+    fn dimensions(&self) -> usize {
+        768
+    }
+
+    fn model_id(&self) -> &str {
+        "integration-stub"
+    }
 }

@@ -138,3 +138,93 @@ fn search_returns_keyword_matches_from_cli() {
         "expected at least one Apollo keyword match, got {search_json}"
     );
 }
+
+#[test]
+fn reembed_requires_a_configured_provider_from_cli() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-reembed-provider-required");
+    let db_path = temp_dir.join("memory.sqlite3");
+
+    let add = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "add",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "Memory that will remain stale without a provider",
+        ])
+        .output()
+        .expect("run elegy-memory add");
+    assert!(
+        add.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let reembed = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "reembed",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--limit",
+            "5",
+        ])
+        .output()
+        .expect("run elegy-memory reembed");
+
+    assert!(
+        !reembed.status.success(),
+        "stdout: {}",
+        String::from_utf8_lossy(&reembed.stdout)
+    );
+    assert!(
+        String::from_utf8_lossy(&reembed.stderr)
+            .contains("reembed requires an embedding provider"),
+        "expected provider-required error, stderr: {}",
+        String::from_utf8_lossy(&reembed.stderr)
+    );
+}
+
+#[test]
+fn ollama_offline_add_succeeds_and_warns_about_degraded_storage() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-add-offline-ollama");
+    let db_path = temp_dir.join("memory.sqlite3");
+
+    let closed_port = std::net::TcpListener::bind("127.0.0.1:0")
+        .expect("bind ephemeral port")
+        .local_addr()
+        .expect("read ephemeral listener address")
+        .port();
+    let ollama_url = format!("http://127.0.0.1:{closed_port}");
+
+    let add = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "add",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--embedding-provider",
+            "ollama",
+            "--ollama-url",
+            &ollama_url,
+            "Remember the offline Ollama fallback.",
+        ])
+        .output()
+        .expect("run elegy-memory add");
+
+    assert!(
+        add.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+
+    let add_json: serde_json::Value =
+        serde_json::from_slice(&add.stdout).expect("parse add response as json");
+    assert_eq!(add_json["command"].as_str(), Some("add"));
+    assert!(
+        String::from_utf8_lossy(&add.stderr).contains(&format!(
+            "Ollama not reachable at {ollama_url}, storing without embeddings. Run reembed later."
+        )),
+        "expected offline warning, stderr: {}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+}
