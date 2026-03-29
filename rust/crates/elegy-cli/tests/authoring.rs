@@ -263,7 +263,7 @@ fn validate_session_context_command_rejects_invalid_artifact() {
 
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
     assert!(stdout.contains("\"status\": \"invalid\""));
-    assert!(stdout.contains("CLI-MEMORY-002"));
+    assert!(stdout.contains("CLI-LOCAL-002"));
     assert!(stdout.contains("rawTranscriptPersisted must be false"));
 }
 

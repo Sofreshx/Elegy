@@ -1,7 +1,7 @@
 {
   "id": "elegy-memory",
   "name": "elegy-memory",
-  "description": "Governed skill definition for the shipped Elegy-memory V1 surface: summary-only session-context inspection and validation plus local non-authoritative artifact import, list, show, export, supersede, and tombstone flows.",
+  "description": "Governed skill definition for the shipped Elegy-memory MVP CLI surface: bounded local add, search, list, inspect, purge, health, export, contradiction review, and preview re-embed flows without claiming downstream runtime policy authority.",
   "identity": {
     "definitionId": "elegy-memory",
     "displayName": "Elegy Memory",
@@ -14,13 +14,13 @@
     ]
   },
   "metadata": {
-    "summary": "Bounded local non-authoritative artifact management over governed summary-only session-context envelopes.",
+    "summary": "Bounded local non-authoritative memory operations over the current Elegy-memory MVP CLI surface, including preview re-embed visibility.",
     "category": "memory",
     "tags": [
       "memory",
-      "session-context",
-      "summary-only",
-      "local-store",
+      "local-cli",
+      "mvp",
+      "preview",
       "non-authoritative"
     ],
     "owners": [
@@ -31,29 +31,29 @@
   "triggers": [
     {
       "pattern": "memory",
-      "description": "When work involves Elegy's bounded summary-only memory surface."
-    },
-    {
-      "pattern": "session context",
-      "description": "When inspecting or validating governed summary-only session-context envelopes."
+      "description": "When work involves Elegy's current bounded local memory operator surface."
     },
     {
       "pattern": "local memory",
-      "description": "When managing the local non-authoritative artifact store."
+      "description": "When work should use the dedicated Elegy-memory MVP CLI instead of older artifact-management language."
     },
     {
-      "pattern": "supersede memory artifact",
-      "description": "When recording local lineage that one artifact copy supersedes another."
+      "pattern": "memory search",
+      "description": "When local memories need to be added, searched, listed, or inspected within a scope."
     },
     {
-      "pattern": "tombstone memory artifact",
-      "description": "When recording local withdrawal of an artifact copy without changing host runtime authority."
+      "pattern": "memory export",
+      "description": "When the local memory store needs health reporting, export, or purge handling."
+    },
+    {
+      "pattern": "memory contradictions",
+      "description": "When contradiction review or preview re-embed status should be checked for the local memory store."
     }
   ],
   "constraints": [
     {
-      "constraintId": "summary-only-envelope-import-only",
-      "description": "Local import accepts governed summary-only-session-context-envelope artifacts only.",
+      "constraintId": "bounded-mvp-cli-surface",
+      "description": "This surface is limited to the shipped MVP CLI commands add, search, list, inspect, purge, health, export, contradictions, and preview re-embed handling.",
       "required": true
     },
     {
@@ -62,8 +62,8 @@
       "required": true
     },
     {
-      "constraintId": "single-writer-local-store",
-      "description": "Local store mutations are single-writer; concurrent writers are rejected.",
+      "constraintId": "reembed-preview-only",
+      "description": "The visible re-embed command remains a preview surface and must not be described as a fully wired provider-backed embedding workflow.",
       "required": true
     }
   ],
@@ -72,49 +72,97 @@
       {
         "name": "command",
         "type": "string",
-        "description": "One of inspect-session-context, validate-session-context, init, import, list, show, export, supersede, or tombstone.",
+        "description": "One of add, search, list, inspect, purge, health, export, reembed, or contradictions.",
         "required": true
       },
       {
-        "name": "root",
+        "name": "db",
         "type": "path",
-        "description": "Optional local artifact root. Defaults to .elegy-local-memory.",
+        "description": "Optional SQLite database path. Defaults to ~/.elegy/memory.db.",
         "required": false
       },
       {
-        "name": "input",
+        "name": "scope",
+        "type": "string",
+        "description": "Optional memory scope. Supported values: session, workspace, user, or agent. Defaults to workspace.",
+        "required": false
+      },
+      {
+        "name": "content",
+        "type": "string",
+        "description": "Memory content for the add command.",
+        "required": false
+      },
+      {
+        "name": "query",
+        "type": "string",
+        "description": "Search query for the search command.",
+        "required": false
+      },
+      {
+        "name": "id",
+        "type": "string",
+        "description": "Memory identifier for the inspect command.",
+        "required": false
+      },
+      {
+        "name": "output",
         "type": "path",
-        "description": "Path to a governed summary-only-session-context-envelope artifact for validation or local import.",
+        "description": "Optional explicit export destination for the export command.",
         "required": false
       },
       {
-        "name": "recordId",
+        "name": "provider",
         "type": "string",
-        "description": "Record identifier for show, export, supersede, or tombstone flows.",
+        "description": "Optional provider name for the preview re-embed command.",
         "required": false
       },
       {
-        "name": "outputPath",
-        "type": "path",
-        "description": "Optional explicit export destination for exported summary-only envelopes.",
+        "name": "limit",
+        "type": "number",
+        "description": "Optional limit for search, list, or preview re-embed operations.",
         "required": false
       },
       {
-        "name": "importedAtUtc",
+        "name": "includeDormant",
+        "type": "boolean",
+        "description": "Optional search flag to include dormant records.",
+        "required": false
+      },
+      {
+        "name": "memoryType",
         "type": "string",
-        "description": "UTC timestamp recorded during local import.",
+        "description": "Optional memory type for add or list. Supported values: fact, preference, decision, procedure, or observation.",
         "required": false
       },
       {
-        "name": "tombstonedAtUtc",
+        "name": "state",
         "type": "string",
-        "description": "UTC timestamp recorded for a local tombstone action.",
+        "description": "Optional state filter for list. Supported values: active, dormant, or deleted.",
         "required": false
       },
       {
-        "name": "reason",
+        "name": "importance",
+        "type": "number",
+        "description": "Optional importance value for add. Defaults to 0.5.",
+        "required": false
+      },
+      {
+        "name": "provenance",
         "type": "string",
-        "description": "Required reason text for a local tombstone action.",
+        "description": "Optional provenance for add. Supported values: user-stated, agent-observed, consolidated, imported, or agent-inferred.",
+        "required": false
+      },
+      {
+        "name": "yes",
+        "type": "boolean",
+        "description": "Optional purge flag to skip confirmation.",
+        "required": false
+      },
+      {
+        "name": "format",
+        "type": "string",
+        "description": "Optional global output format. Supported values: text or json.",
         "required": false
       }
     ],
@@ -124,7 +172,7 @@
     "resultType": null,
     "schemaRef": null,
     "returnsCollection": false,
-    "description": "Command-scoped inspection, validation, record, list, or export reports for the local non-authoritative memory surface."
+    "description": "Command-scoped add, search, list, inspect, purge, health, export, contradiction, and preview re-embed reports for the local non-authoritative memory surface."
   },
   "execution": {
     "mode": "requestResponse",
@@ -142,22 +190,25 @@
     "allowedContexts": [
       "contributor-routing",
       "local-cli",
-      "artifact-inspection"
+      "memory-operations"
     ]
   },
   "discovery": {
     "keywords": [
       "memory",
-      "session context",
-      "summary-only",
       "local memory",
-      "supersede",
-      "tombstone"
+      "search",
+      "inspect",
+      "export",
+      "purge",
+      "contradictions",
+      "reembed"
     ],
     "capabilityHints": [
-      "summary-only-envelope-validation",
-      "local-artifact-management",
-      "lineage-annotation"
+      "local-memory-add-search",
+      "local-memory-inspection-health-export",
+      "local-memory-purge-and-contradictions",
+      "local-memory-reembed-preview"
     ],
     "isHidden": false
   },

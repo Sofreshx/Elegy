@@ -16,9 +16,9 @@ use uuid::Uuid;
 
 use crate::{
     DefaultSalienceGate, GateDecision, GateError, Memory, MemoryCandidate, MemoryFilter,
-    MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
-    MemoryVersion, ProvenanceLevel, ResolutionStatus, ScoredMemory, SearchQuery,
-    SalienceGate, SensitivityLevel, SqliteMemoryStore, StoreError,
+    MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType, MemoryVersion,
+    ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery, SensitivityLevel,
+    SqliteMemoryStore, StoreError,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -355,7 +355,13 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             query,
             limit,
             include_dormant,
-        } => execute_search_command(open_store(store)?, query, limit, include_dormant, cli.format),
+        } => execute_search_command(
+            open_store(store)?,
+            query,
+            limit,
+            include_dormant,
+            cli.format,
+        ),
         Command::List {
             store,
             memory_type,
@@ -368,7 +374,9 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             limit,
             cli.format,
         ),
-        Command::Inspect { store, id } => execute_inspect_command(open_store(store)?, id, cli.format),
+        Command::Inspect { store, id } => {
+            execute_inspect_command(open_store(store)?, id, cli.format)
+        }
         Command::Purge { store, yes } => execute_purge_command(open_store(store)?, yes, cli.format),
         Command::Health { store } => execute_health_command(open_store(store)?, cli.format),
         Command::Export { store, output } => {
@@ -426,8 +434,8 @@ fn execute_add_command(
                 "cli:add",
                 "merged by salience gate from CLI add",
             ))?;
-            let memory = run_async(ctx.store.get_raw(&target_id))?
-                .ok_or_else(|| StoreError::NotFound(target_id))?;
+            let memory =
+                run_async(ctx.store.get_raw(&target_id))?.ok_or(StoreError::NotFound(target_id))?;
             AddResponse {
                 action: "merged",
                 gate_result: "merge",
@@ -462,8 +470,7 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored = run_async(ctx.store.get_raw(&id))?
-                .ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "archived",
@@ -498,8 +505,7 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored = run_async(ctx.store.get_raw(&id))?
-                .ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "accepted",
@@ -617,7 +623,7 @@ fn execute_inspect_command(
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     let id = parse_memory_id(&raw_id)?;
-    let memory = run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+    let memory = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
     let versions = ctx.store.list_versions(&id)?;
     let response = InspectResponse { memory, versions };
 
@@ -683,7 +689,10 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
             .entry(display_memory_type(memory.memory_type))
             .or_insert(0) += 1;
     }
-    let response = HealthResponse { report, type_counts };
+    let response = HealthResponse {
+        report,
+        type_counts,
+    };
 
     match format {
         OutputFormat::Text => print_health_text(&response),
@@ -724,7 +733,11 @@ fn execute_export_command(
         fs::write(&path, payload)?;
         match format {
             OutputFormat::Text => {
-                println!("Exported {} memories to {}", response.memories.len(), path.display());
+                println!(
+                    "Exported {} memories to {}",
+                    response.memories.len(),
+                    path.display()
+                );
             }
             OutputFormat::Json => print_json(
                 "export",
@@ -760,8 +773,10 @@ fn execute_contradictions_command(
     ctx: StoreContext,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let contradictions =
-        run_async(ctx.store.list_contradictions(Some(ResolutionStatus::Unresolved)))?;
+    let contradictions = run_async(
+        ctx.store
+            .list_contradictions(Some(ResolutionStatus::Unresolved)),
+    )?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
         OutputFormat::Json => print_json("contradictions", &contradictions)?,
@@ -793,10 +808,7 @@ fn normalize_path(path: PathBuf) -> PathBuf {
     if raw == "~" {
         return default_db_path();
     }
-    if let Some(stripped) = raw
-        .strip_prefix("~/")
-        .or_else(|| raw.strip_prefix("~\\"))
-    {
+    if let Some(stripped) = raw.strip_prefix("~/").or_else(|| raw.strip_prefix("~\\")) {
         return home_dir().join(stripped);
     }
     path
@@ -962,7 +974,10 @@ fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
     println!("state: {}", display_state(response.memory.state));
     println!("type: {}", display_memory_type(response.memory.memory_type));
     println!("importance: {:.2}", response.memory.importance_score);
-    println!("provenance: {}", display_provenance(response.memory.provenance));
+    println!(
+        "provenance: {}",
+        display_provenance(response.memory.provenance)
+    );
     println!("gate: {}", response.gate_result);
     println!("content: {}", response.memory.content);
 }
@@ -1061,7 +1076,7 @@ fn print_health_text(response: &HealthResponse) {
     println!("budget usage ratio: {:.3}", report.budget_usage_ratio);
     println!("type counts:");
     for (memory_type, count) in &response.type_counts {
-        println!("- {}: {}", memory_type, count);
+        println!("- {memory_type}: {count}");
     }
 }
 

@@ -6,23 +6,23 @@ use elegy_core::{
     CLI_SCHEMA_VERSION,
 };
 use elegy_host_mcp::{serve_stdio, HostError};
-use elegy_mermaid::{
-    narrate_from_json_str, narrate_from_mermaid_str, render_from_json_str,
-    reverse_from_mermaid_str, MermaidNarrative, MermaidProjectionEdgeRelation,
-    MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
-    MermaidWorkflowProjection,
-};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
     AuthorMcpToolRequest, AuthoredMcpDescriptor, McpSurfaceError,
 };
 use elegy_memory::{
     GovernedMemoryRecord, GovernedMemoryRecordImportOptions, LocalMemoryCatalogEntry,
-    LocalMemoryExportResult, LocalMemoryLifecycleState, LocalMemoryPaths,
-    LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoredRecord,
-    SessionContextScope, SummaryOnlySessionContextEnvelope, LOCAL_MEMORY_AUTHORITY_POSTURE,
+    LocalMemoryExportResult, LocalMemoryLifecycleState, LocalMemoryPaths, LocalMemoryQueryOptions,
+    LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoredRecord, SessionContextScope,
+    SummaryOnlySessionContextEnvelope, LOCAL_MEMORY_AUTHORITY_POSTURE,
     LOCAL_MEMORY_DETERMINISTIC_ORDERING, LOCAL_MEMORY_SINGLE_WRITER_POSTURE,
     SUMMARY_ONLY_REPRESENTATION, SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND,
+};
+use elegy_mermaid::{
+    narrate_from_json_str, narrate_from_mermaid_str, render_from_json_str,
+    reverse_from_mermaid_str, MermaidNarrative, MermaidProjectionEdgeRelation,
+    MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
+    MermaidWorkflowProjection,
 };
 use elegy_tooling::{
     generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
@@ -688,11 +688,13 @@ fn execute_local_import_command(
         },
     ) {
         Ok(stored) => {
-            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            let report =
+                build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
             match format {
-                OutputFormat::Text => {
-                    print_local_record_text("imported local non-authoritative summary-only artifact", &report)
-                }
+                OutputFormat::Text => print_local_record_text(
+                    "imported local non-authoritative summary-only artifact",
+                    &report,
+                ),
                 OutputFormat::Json => print_json(&Envelope {
                     schema_version: CLI_SCHEMA_VERSION,
                     command: vec!["local".to_string(), "import".to_string()],
@@ -760,9 +762,10 @@ fn execute_local_show_command(
         Ok(stored) => {
             let report = build_local_record_report(&root, &stored, &options);
             match format {
-                OutputFormat::Text => {
-                    print_local_record_text("local non-authoritative summary-only artifact", &report)
-                }
+                OutputFormat::Text => print_local_record_text(
+                    "local non-authoritative summary-only artifact",
+                    &report,
+                ),
                 OutputFormat::Json => print_json(&Envelope {
                     schema_version: CLI_SCHEMA_VERSION,
                     command: vec!["local".to_string(), "show".to_string()],
@@ -833,11 +836,13 @@ fn execute_local_supersede_command(
     let store = LocalMemoryStore::new(root.clone());
     match store.supersede_record(&record_id, &superseded_by_record_id) {
         Ok(stored) => {
-            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            let report =
+                build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
             match format {
-                OutputFormat::Text => {
-                    print_local_record_text("superseded local non-authoritative summary-only artifact", &report)
-                }
+                OutputFormat::Text => print_local_record_text(
+                    "superseded local non-authoritative summary-only artifact",
+                    &report,
+                ),
                 OutputFormat::Json => print_json(&Envelope {
                     schema_version: CLI_SCHEMA_VERSION,
                     command: vec!["local".to_string(), "supersede".to_string()],
@@ -873,11 +878,13 @@ fn execute_local_tombstone_command(
     let store = LocalMemoryStore::new(root.clone());
     match store.tombstone_record(&record_id, &tombstoned_at_utc, &reason) {
         Ok(stored) => {
-            let report = build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
+            let report =
+                build_local_record_report(&root, &stored, &LocalMemoryQueryOptions::default());
             match format {
-                OutputFormat::Text => {
-                    print_local_record_text("tombstoned local non-authoritative summary-only artifact", &report)
-                }
+                OutputFormat::Text => print_local_record_text(
+                    "tombstoned local non-authoritative summary-only artifact",
+                    &report,
+                ),
                 OutputFormat::Json => print_json(&Envelope {
                     schema_version: CLI_SCHEMA_VERSION,
                     command: vec!["local".to_string(), "tombstone".to_string()],
@@ -905,32 +912,28 @@ fn read_summary_only_session_context_envelope(
     input: &Path,
 ) -> Result<SummaryOnlySessionContextEnvelope, Vec<Diagnostic>> {
     let contents = fs::read_to_string(input).map_err(|source| {
-        vec![
-            Diagnostic::error(
-                "CLI-LOCAL-001",
-                format!(
-                    "failed to read summary-only session context artifact {}: {source}",
-                    input.display()
-                ),
-            )
-            .with_path(input.display().to_string()),
-        ]
+        vec![Diagnostic::error(
+            "CLI-LOCAL-001",
+            format!(
+                "failed to read summary-only session context artifact {}: {source}",
+                input.display()
+            ),
+        )
+        .with_path(input.display().to_string())]
     })?;
 
     serde_json::from_str::<SummaryOnlySessionContextEnvelope>(&contents).map_err(|source| {
-        vec![
-            Diagnostic::error(
-                "CLI-LOCAL-002",
-                format!(
-                    "invalid summary-only session context artifact JSON {}: {source}",
-                    input.display()
-                ),
-            )
-            .with_path(input.display().to_string())
-            .with_hint(
-                "ensure the input matches the governed summary-only session context envelope contract",
+        vec![Diagnostic::error(
+            "CLI-LOCAL-002",
+            format!(
+                "invalid summary-only session context artifact JSON {}: {source}",
+                input.display()
             ),
-        ]
+        )
+        .with_path(input.display().to_string())
+        .with_hint(
+            "ensure the input matches the governed summary-only session context envelope contract",
+        )]
     })
 }
 
@@ -1363,7 +1366,10 @@ fn mermaid_input_load_diagnostics(error: MermaidInputLoadError) -> Vec<Diagnosti
     match error {
         MermaidInputLoadError::File { path, source } => vec![Diagnostic::error(
             "CLI-MERMAID-001",
-            format!("failed to read Mermaid render input {}: {source}", path.display()),
+            format!(
+                "failed to read Mermaid render input {}: {source}",
+                path.display()
+            ),
         )
         .with_path(path.display().to_string())],
         MermaidInputLoadError::Stdin { source } => vec![Diagnostic::error(
@@ -1409,17 +1415,13 @@ fn mermaid_canonical_diagnostics(
     match error {
         MermaidToolError::Json { source } => vec![Diagnostic::error(
             "CLI-MERMAID-002",
-            format!(
-                "failed to parse Mermaid {command_name} input JSON {}: {source}",
-                input_location,
-            ),
+            format!("failed to parse Mermaid {command_name} input JSON {input_location}: {source}"),
         )
         .with_path(input_location)],
         MermaidToolError::UnsupportedCanonicalDocument => vec![Diagnostic::error(
             "CLI-MERMAID-003",
             format!(
-                "unsupported Mermaid {command_name} input {}; expected canonical workflow or canonical workflow graph JSON",
-                input_location,
+                "unsupported Mermaid {command_name} input {input_location}; expected canonical workflow or canonical workflow graph JSON"
             ),
         )
         .with_path(input_source.display())
@@ -1429,8 +1431,7 @@ fn mermaid_canonical_diagnostics(
             vec![Diagnostic::error(
                 "CLI-MERMAID-004",
                 format!(
-                    "canonical workflow graph input is invalid for Mermaid {command_name} {}: {error}",
-                    input_location,
+                    "canonical workflow graph input is invalid for Mermaid {command_name} {input_location}: {error}"
                 ),
             )
             .with_path(input_source.display())
@@ -1439,8 +1440,7 @@ fn mermaid_canonical_diagnostics(
         MermaidToolError::CanonicalWorkflowGraph { source } => vec![Diagnostic::error(
             "CLI-MERMAID-004",
             format!(
-                "canonical workflow graph input is invalid for Mermaid {command_name} {}: {source}",
-                input_location,
+                "canonical workflow graph input is invalid for Mermaid {command_name} {input_location}: {source}"
             ),
         )
         .with_path(input_source.display())
@@ -1450,8 +1450,7 @@ fn mermaid_canonical_diagnostics(
             Diagnostic::error(
                 "CLI-MERMAID-005",
                 format!(
-                    "canonical workflow input is invalid for Mermaid {command_name} {}: {error}",
-                    input_location,
+                    "canonical workflow input is invalid for Mermaid {command_name} {input_location}: {error}"
                 ),
             )
             .with_path(input_source.display())
@@ -1460,18 +1459,14 @@ fn mermaid_canonical_diagnostics(
         MermaidToolError::CanonicalWorkflow { source } => vec![Diagnostic::error(
             "CLI-MERMAID-005",
             format!(
-                "canonical workflow input is invalid for Mermaid {command_name} {}: {source}",
-                input_location,
+                "canonical workflow input is invalid for Mermaid {command_name} {input_location}: {source}"
             ),
         )
         .with_path(input_source.display())
         .with_hint("ensure the input matches the governed canonical workflow contract")],
         other => vec![Diagnostic::error(
             "CLI-MERMAID-005",
-            format!(
-                "Mermaid {command_name} input is invalid {}: {other}",
-                input_location
-            ),
+            format!("Mermaid {command_name} input is invalid {input_location}: {other}"),
         )
         .with_path(input_source.display())],
     }
@@ -1511,10 +1506,7 @@ fn mermaid_subset_diagnostics(
 
     vec![Diagnostic::error(
         "CLI-MERMAID-006",
-        format!(
-            "Mermaid {command_name} input is invalid {}: {error}",
-            input_location
-        ),
+        format!("Mermaid {command_name} input is invalid {input_location}: {error}"),
     )
     .with_path(input_source.display())
     .with_hint(hint)]
@@ -1989,7 +1981,7 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
         println!("- {} ({})", skill.effective_id(), skill.effective_name());
     }
     for path in &result.written_files {
-        println!("written: {}", path);
+        println!("written: {path}");
     }
 }
 
@@ -2006,7 +1998,10 @@ fn print_contracts_export_text(result: &ContractsBundleExport) {
 
 fn print_mermaid_projection_text(projection: &MermaidWorkflowProjection) {
     println!("derived Mermaid workflow projection");
-    println!("source: {}", format_mermaid_source_kind(projection.source_kind));
+    println!(
+        "source: {}",
+        format_mermaid_source_kind(projection.source_kind)
+    );
     println!("direction: {}", projection.direction);
     println!("entry nodes: {}", projection.entry_node_ids.len());
     println!("nodes: {}", projection.nodes.len());

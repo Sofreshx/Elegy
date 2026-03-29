@@ -1,30 +1,34 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-03-23T00:00:00Z",
+  "builtAt": "2026-03-28T00:00:00Z",
   "entries": [
     {
       "skillId": "elegy-memory",
       "name": "Elegy Memory",
-      "description": "Derived projection of the governed Elegy-memory skill definition for loading the rendered non-authoritative local skill markdown.",
+      "description": "Derived projection of the governed Elegy-memory skill definition for loading the rendered non-authoritative local skill markdown for the current MVP memory CLI surface.",
       "lifecycleState": "active",
       "triggersOn": [
         "memory",
-        "session context",
         "local memory",
-        "supersede memory artifact",
-        "tombstone memory artifact"
+        "memory search",
+        "memory export",
+        "memory contradictions"
       ],
       "keywords": [
         "memory",
-        "session context",
-        "summary-only",
-        "local store",
-        "non-authoritative"
+        "local memory",
+        "search",
+        "inspect",
+        "export",
+        "purge",
+        "contradictions",
+        "reembed"
       ],
       "capabilityHints": [
-        "inspect-session-context",
-        "validate-session-context",
-        "local-memory-store"
+        "local-memory-add-search",
+        "local-memory-inspection-health-export",
+        "local-memory-purge-and-contradictions",
+        "local-memory-reembed-preview"
       ],
       "manifest": {
         "id": "elegy-memory",

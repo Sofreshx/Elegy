@@ -189,6 +189,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Prepare distribution staging directory
+        shell: pwsh
+        run: |
+          if (Test-Path ./artifacts/distribution) {
+            Remove-Item ./artifacts/distribution -Recurse -Force
+          }
+
+          New-Item -ItemType Directory -Path ./artifacts/distribution | Out-Null
+
       - name: Download distribution artifacts
         uses: actions/download-artifact@v4
         with:

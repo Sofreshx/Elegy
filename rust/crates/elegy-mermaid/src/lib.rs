@@ -32,20 +32,14 @@ pub enum MermaidToolError {
         source: serde_json::Error,
     },
     #[error("canonical workflow field `{field}` declares duplicate id `{id}`")]
-    DuplicateCanonicalWorkflowId {
-        field: &'static str,
-        id: String,
-    },
+    DuplicateCanonicalWorkflowId { field: &'static str, id: String },
     #[error("canonical workflow reference `{field}` targets undeclared step `{step_id}`")]
     InvalidCanonicalWorkflowReference {
         field: &'static str,
         step_id: String,
     },
     #[error("canonical workflow graph field `{field}` declares duplicate id `{id}`")]
-    DuplicateCanonicalWorkflowGraphId {
-        field: &'static str,
-        id: String,
-    },
+    DuplicateCanonicalWorkflowGraphId { field: &'static str, id: String },
     #[error("canonical workflow graph reference `{field}` targets undeclared node `{node_id}`")]
     InvalidCanonicalWorkflowGraphReference {
         field: &'static str,
@@ -149,8 +143,8 @@ pub fn render_from_json_value(value: &Value) -> Result<String, MermaidToolError>
 }
 
 pub fn project_from_json_str(input: &str) -> Result<MermaidWorkflowProjection, MermaidToolError> {
-    let value = serde_json::from_str::<Value>(input)
-        .map_err(|source| MermaidToolError::Json { source })?;
+    let value =
+        serde_json::from_str::<Value>(input).map_err(|source| MermaidToolError::Json { source })?;
     project_from_json_value(&value)
 }
 
@@ -173,11 +167,15 @@ pub fn project_from_json_value(
     }
 }
 
-pub fn reverse_from_mermaid_str(input: &str) -> Result<MermaidWorkflowProjection, MermaidToolError> {
+pub fn reverse_from_mermaid_str(
+    input: &str,
+) -> Result<MermaidWorkflowProjection, MermaidToolError> {
     parse_mermaid_flowchart(input)
 }
 
-pub fn narrate_from_json_str(input: &str) -> Result<(MermaidNarrative, MermaidWorkflowProjection), MermaidToolError> {
+pub fn narrate_from_json_str(
+    input: &str,
+) -> Result<(MermaidNarrative, MermaidWorkflowProjection), MermaidToolError> {
     let projection = project_from_json_str(input)?;
     let narrative = narrate_projection(&projection);
     Ok((narrative, projection))
@@ -261,7 +259,11 @@ pub fn narrate_projection(projection: &MermaidWorkflowProjection) -> MermaidNarr
             .map(|node| sentence_label(&node.label))
             .unwrap_or_else(|| edge.to_node_id.clone());
 
-        match edge.label.as_deref().filter(|label| !label.trim().is_empty()) {
+        match edge
+            .label
+            .as_deref()
+            .filter(|label| !label.trim().is_empty())
+        {
             Some(label) => sentences.push(format!(
                 "{from_label} transitions to {to_label} when {}.",
                 sentence_label(label)
@@ -624,9 +626,7 @@ where
     }
 }
 
-fn deserialize_canonical_workflow_graph_version<'de, D>(
-    deserializer: D,
-) -> Result<u64, D::Error>
+fn deserialize_canonical_workflow_graph_version<'de, D>(deserializer: D) -> Result<u64, D::Error>
 where
     D: Deserializer<'de>,
 {
@@ -751,13 +751,14 @@ fn build_canonical_workflow_projection(
         compare_ordinal(&left.id, &right.id)
             .then(compare_ordinal(&left.from_step_id, &right.from_step_id))
             .then(compare_ordinal(&left.to_step_id, &right.to_step_id))
-            .then(compare_optional_ordinal(left.label.as_deref(), right.label.as_deref()))
+            .then(compare_optional_ordinal(
+                left.label.as_deref(),
+                right.label.as_deref(),
+            ))
     });
 
-    let step_node_ids = assign_prefixed_node_ids(
-        "step",
-        document.steps.iter().map(|step| step.id.as_str()),
-    );
+    let step_node_ids =
+        assign_prefixed_node_ids("step", document.steps.iter().map(|step| step.id.as_str()));
     let trigger_node_ids = assign_prefixed_node_ids(
         "trigger",
         document.triggers.iter().map(|trigger| trigger.id.as_str()),
@@ -843,7 +844,10 @@ fn build_canonical_workflow_graph_projection(
             .then(compare_ordinal(&left.from_port, &right.from_port))
             .then(compare_ordinal(&left.to_port, &right.to_port))
             .then(left.priority.cmp(&right.priority))
-            .then(compare_optional_ordinal(left.label.as_deref(), right.label.as_deref()))
+            .then(compare_optional_ordinal(
+                left.label.as_deref(),
+                right.label.as_deref(),
+            ))
     });
 
     let graph_node_ids =
@@ -932,7 +936,10 @@ fn normalize_projection(projection: &mut MermaidWorkflowProjection) {
             .cmp(&right.relation)
             .then(compare_ordinal(&left.from_node_id, &right.from_node_id))
             .then(compare_ordinal(&left.to_node_id, &right.to_node_id))
-            .then(compare_optional_ordinal(left.label.as_deref(), right.label.as_deref()))
+            .then(compare_optional_ordinal(
+                left.label.as_deref(),
+                right.label.as_deref(),
+            ))
     });
     projection.entry_node_ids.sort();
     projection.entry_node_ids.dedup();
@@ -1103,7 +1110,8 @@ fn parse_mermaid_node_line(
 
     Err(MermaidToolError::InvalidMermaidLine {
         line: line_number,
-        message: "unsupported Mermaid subset line; expected a node declaration or `-->` edge".to_string(),
+        message: "unsupported Mermaid subset line; expected a node declaration or `-->` edge"
+            .to_string(),
     })
 }
 
@@ -1157,7 +1165,10 @@ fn parse_mermaid_edge_line(
             });
         };
         let decoded_label = unescape_edge_label(raw_label);
-        (sanitize_optional_label(Some(&decoded_label)), raw_to_node_id.trim())
+        (
+            sanitize_optional_label(Some(&decoded_label)),
+            raw_to_node_id.trim(),
+        )
     } else {
         (None, remainder)
     };
@@ -1240,7 +1251,10 @@ fn assign_prefixed_node_ids<'a>(
     prefix: &str,
     raw_ids: impl IntoIterator<Item = &'a str>,
 ) -> BTreeMap<String, String> {
-    let ordered_raw_ids = raw_ids.into_iter().map(str::to_string).collect::<BTreeSet<_>>();
+    let ordered_raw_ids = raw_ids
+        .into_iter()
+        .map(str::to_string)
+        .collect::<BTreeSet<_>>();
     let mut node_ids = BTreeMap::new();
     let mut used_node_ids = BTreeSet::new();
 
@@ -1378,15 +1392,13 @@ mod tests {
     use super::{
         narrate_from_json_str, narrate_from_mermaid_str, project_from_json_value,
         render_from_json_str, render_from_json_value, reverse_from_mermaid_str,
-        MermaidProjectionEdgeRelation, MermaidProjectionNodeRole,
-        MermaidProjectionNodeSourceKind, MermaidProjectionSourceKind, MermaidToolError,
-        MERMAID_NARRATIVE_POSTURE,
+        MermaidProjectionEdgeRelation, MermaidProjectionNodeRole, MermaidProjectionNodeSourceKind,
+        MermaidProjectionSourceKind, MermaidToolError, MERMAID_NARRATIVE_POSTURE,
     };
     use serde_json::{json, Value};
 
-    const CANONICAL_WORKFLOW_GRAPH_FIXTURE: &str = include_str!(
-        "../../../../contracts/fixtures/canonical-workflow-graph.minimal.json"
-    );
+    const CANONICAL_WORKFLOW_GRAPH_FIXTURE: &str =
+        include_str!("../../../../contracts/fixtures/canonical-workflow-graph.minimal.json");
     const CANONICAL_WORKFLOW_FIXTURE: &str =
         include_str!("../../../../contracts/fixtures/canonical-workflow.minimal.json");
     const RENDERED_WORKFLOW_FIXTURE: &str = concat!(
@@ -1443,8 +1455,7 @@ mod tests {
             .expect("steps should be an array")
             .reverse();
 
-        let rendered_b = render_from_json_value(&reordered)
-            .expect("second workflow should render");
+        let rendered_b = render_from_json_value(&reordered).expect("second workflow should render");
 
         assert_eq!(rendered_a, rendered_b);
     }
@@ -1520,9 +1531,8 @@ mod tests {
         assert!(rendered.contains("step_n_01_review_phase[\"Review \\\"A\\\" B\"]"));
         assert!(rendered.contains("step_n_01_review_phase_2[\"Ship\"]"));
         assert!(rendered.contains("trigger_n_1_start((\"Kick \\\"off\\\" Now\"))"));
-        assert!(rendered.contains(
-            "step_n_01_review_phase -->|approve &#124; ship| step_n_01_review_phase_2"
-        ));
+        assert!(rendered
+            .contains("step_n_01_review_phase -->|approve &#124; ship| step_n_01_review_phase_2"));
     }
 
     #[test]
@@ -1551,17 +1561,29 @@ mod tests {
         let projection = reverse_from_mermaid_str(RENDERED_WORKFLOW_FIXTURE)
             .expect("rendered workflow fixture should reverse into a projection");
 
-        assert_eq!(projection.source_kind, MermaidProjectionSourceKind::MermaidFlowchartTd);
+        assert_eq!(
+            projection.source_kind,
+            MermaidProjectionSourceKind::MermaidFlowchartTd
+        );
         assert_eq!(projection.nodes.len(), 3);
         assert_eq!(projection.edges.len(), 2);
-        assert_eq!(projection.entry_node_ids, vec!["step_step_review".to_string()]);
+        assert_eq!(
+            projection.entry_node_ids,
+            vec!["step_step_review".to_string()]
+        );
         assert_eq!(projection.nodes[0].node_id, "step_step_fulfill");
-        assert_eq!(projection.nodes[0].node_role, MermaidProjectionNodeRole::Activity);
+        assert_eq!(
+            projection.nodes[0].node_role,
+            MermaidProjectionNodeRole::Activity
+        );
         assert_eq!(
             projection.nodes[0].source_kind,
             Some(MermaidProjectionNodeSourceKind::WorkflowStep)
         );
-        assert_eq!(projection.edges[0].relation, MermaidProjectionEdgeRelation::Activates);
+        assert_eq!(
+            projection.edges[0].relation,
+            MermaidProjectionEdgeRelation::Activates
+        );
         assert_eq!(projection.edges[1].label.as_deref(), Some("approved"));
     }
 
@@ -1574,8 +1596,8 @@ mod tests {
             .expect("workflow fixture with pipe label should render to Mermaid");
         let reversed = reverse_from_mermaid_str(&rendered)
             .expect("rendered Mermaid should reverse into a projection");
-        let (narrative, narrated_projection) = narrate_from_mermaid_str(&rendered)
-            .expect("rendered Mermaid should narrate");
+        let (narrative, narrated_projection) =
+            narrate_from_mermaid_str(&rendered).expect("rendered Mermaid should narrate");
 
         assert!(rendered.contains("approved &#124; escalated"));
         assert_eq!(
@@ -1637,7 +1659,10 @@ mod tests {
             .edges
             .iter()
             .all(|edge| edge.relation != MermaidProjectionEdgeRelation::Activates));
-        assert_eq!(projection.entry_node_ids, vec!["node_step_collect".to_string()]);
+        assert_eq!(
+            projection.entry_node_ids,
+            vec!["node_step_collect".to_string()]
+        );
     }
 
     #[test]
@@ -1691,8 +1716,14 @@ mod tests {
         let (narrative, projection) = narrate_from_json_str(CANONICAL_WORKFLOW_FIXTURE)
             .expect("canonical workflow fixture should narrate");
 
-        assert_eq!(projection.source_kind, MermaidProjectionSourceKind::CanonicalWorkflow);
-        assert_eq!(narrative.source_kind, MermaidProjectionSourceKind::CanonicalWorkflow);
+        assert_eq!(
+            projection.source_kind,
+            MermaidProjectionSourceKind::CanonicalWorkflow
+        );
+        assert_eq!(
+            narrative.source_kind,
+            MermaidProjectionSourceKind::CanonicalWorkflow
+        );
         assert_eq!(narrative.posture, MERMAID_NARRATIVE_POSTURE);
         assert_eq!(
             narrative.text,
@@ -1709,9 +1740,14 @@ mod tests {
         let (narrative, projection) = narrate_from_mermaid_str(RENDERED_WORKFLOW_FIXTURE)
             .expect("Mermaid fixture should narrate");
 
-        assert_eq!(projection.source_kind, MermaidProjectionSourceKind::MermaidFlowchartTd);
+        assert_eq!(
+            projection.source_kind,
+            MermaidProjectionSourceKind::MermaidFlowchartTd
+        );
         assert_eq!(narrative.sentences.len(), 3);
-        assert!(narrative.text.contains("Order Created activates Review Order."));
+        assert!(narrative
+            .text
+            .contains("Order Created activates Review Order."));
     }
 
     #[test]

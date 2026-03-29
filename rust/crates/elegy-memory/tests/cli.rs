@@ -132,11 +132,9 @@ fn search_returns_keyword_matches_from_cli() {
 
     assert_eq!(search_json["data"]["keywordOnly"].as_bool(), Some(true));
     assert!(
-        results
-            .iter()
-            .any(|result| result["preview"]
-                .as_str()
-                .is_some_and(|preview| preview.contains("Apollo"))),
+        results.iter().any(|result| result["preview"]
+            .as_str()
+            .is_some_and(|preview| preview.contains("Apollo"))),
         "expected at least one Apollo keyword match, got {search_json}"
     );
 }

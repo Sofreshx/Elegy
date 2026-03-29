@@ -213,10 +213,12 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("mcp-parity-expected.json")
         .is_file());
 
-    let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
-    let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
-    assert!(archive.by_name("compatibility-manifest.json").is_ok());
-    assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
+    {
+        let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
+        let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
+        assert!(archive.by_name("compatibility-manifest.json").is_ok());
+        assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
+    }
 
     fs::remove_dir_all(&temp_root).expect("remove temp export root");
 }

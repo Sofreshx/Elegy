@@ -103,6 +103,7 @@ pub enum GateDecision {
 }
 
 /// Change planned or executed during a consolidation pass.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub enum ConsolidationAction {

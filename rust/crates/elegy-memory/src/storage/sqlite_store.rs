@@ -199,8 +199,7 @@ impl MemoryStore for SqliteMemoryStore {
 
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-            let mut memory =
-                require_memory(&transaction, id)?.ok_or_else(|| StoreError::NotFound(*id))?;
+            let mut memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
             let previous_memory = memory.clone();
 
             if memory.content == trimmed_content {
@@ -254,8 +253,7 @@ impl MemoryStore for SqliteMemoryStore {
     ) -> Result<(), StoreError> {
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-            let mut memory =
-                require_memory(&transaction, id)?.ok_or_else(|| StoreError::NotFound(*id))?;
+            let mut memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
             let row_id = require_memory_rowid(&transaction, id)?;
             let previous_memory = memory.clone();
             let mut changed = false;
@@ -320,7 +318,7 @@ impl MemoryStore for SqliteMemoryStore {
             memory.access_count = memory
                 .access_count
                 .checked_add(1)
-                .ok_or_else(|| StoreError::Validation("access_count overflow".to_string()))?;
+                .ok_or(StoreError::Validation("access_count overflow".to_string()))?;
             memory.last_accessed_at = Some(Utc::now());
 
             transaction.execute(
@@ -693,8 +691,7 @@ impl MemoryStore for SqliteMemoryStore {
     async fn hard_delete(&self, id: &MemoryId) -> Result<(), StoreError> {
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-            let memory =
-                require_memory(&transaction, id)?.ok_or_else(|| StoreError::NotFound(*id))?;
+            let memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
             let row_id = require_memory_rowid(&transaction, id)?;
             let vec_rowid: Option<i64> = transaction
                 .query_row(
@@ -745,7 +742,10 @@ impl MemoryStore for SqliteMemoryStore {
             transaction.execute("DELETE FROM memory_embeddings", [])?;
             transaction.execute("DELETE FROM vec_memories", [])?;
             transaction.execute("DELETE FROM memories", [])?;
-            transaction.execute("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')", [])?;
+            transaction.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                [],
+            )?;
             transaction.commit()?;
 
             Ok(PurgeReport {
@@ -884,9 +884,9 @@ impl MemoryStore for SqliteMemoryStore {
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
             let memory_a =
-                require_memory(&transaction, a_id)?.ok_or_else(|| StoreError::NotFound(*a_id))?;
+                require_memory(&transaction, a_id)?.ok_or(StoreError::NotFound(*a_id))?;
             let memory_b =
-                require_memory(&transaction, b_id)?.ok_or_else(|| StoreError::NotFound(*b_id))?;
+                require_memory(&transaction, b_id)?.ok_or(StoreError::NotFound(*b_id))?;
             let now = Utc::now();
 
             transaction.execute(
@@ -933,8 +933,7 @@ async fn transition_state(
 ) -> Result<(), StoreError> {
     store.with_connection(|connection| {
         let transaction = connection.transaction()?;
-        let mut memory =
-            require_memory(&transaction, id)?.ok_or_else(|| StoreError::NotFound(*id))?;
+        let mut memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
 
         if memory.state == MemoryState::Deleted {
             return Err(StoreError::Validation(format!(
@@ -1571,7 +1570,7 @@ fn load_config_value(connection: &Connection, key: &str) -> Result<Option<String
 }
 
 fn encode_embedding(embedding: &[f32]) -> Vec<u8> {
-    let mut bytes = Vec::with_capacity(embedding.len() * std::mem::size_of::<f32>());
+    let mut bytes = Vec::with_capacity(std::mem::size_of_val(embedding));
     for component in embedding {
         bytes.extend_from_slice(&component.to_le_bytes());
     }
@@ -1942,7 +1941,7 @@ fn touch_scored_memories(
             .memory
             .access_count
             .checked_add(1)
-            .ok_or_else(|| StoreError::Validation("access_count overflow".to_string()))?;
+            .ok_or(StoreError::Validation("access_count overflow".to_string()))?;
         result.memory.last_accessed_at = Some(now);
 
         transaction.execute(

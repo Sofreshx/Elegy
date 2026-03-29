@@ -2,16 +2,19 @@
 
 ## Purpose
 
-`elegy-memory` V1 is the shipped bounded memory surface in this repo.
+`elegy-memory` is the shipped local memory surface in this repo, but the current implementation should be described as an MVP or preview CLI rather than as the older planned artifact-management flow.
 
 `rust/crates/elegy-memory` owns the dedicated `elegy-memory` binary for that surface. `rust/crates/elegy-cli` keeps only a temporary compatibility bridge for legacy memory commands.
 
 Alongside the existing `elegy` CLI surface, this in-repo `elegy-memory` surface is one of the current shipped operator surfaces. The contributor-navigation overlay under `src/Elegy-memory` is a pointer shell only, not a repo center, authority layer, implementation center, or separate release surface.
 
-It covers two things only:
+It currently covers a bounded local SQLite memory operator surface:
 
-- governed reusable-memory artifacts rooted in `contracts/` and versioned through `governance/`
-- the local non-authoritative CLI and store behavior for inspecting, validating, importing, listing, showing, exporting, superseding, and tombstoning governed summary-only session-context artifacts
+- adding memories through the salience gate
+- keyword search over the current scope
+- filtered listing and single-record inspection
+- health reporting, JSON export, full purge, and contradiction listing
+- preview re-embed handling that is visible in the CLI but not yet wired to a provider
 
 It does not move runtime authority out of `SAASTools`.
 
@@ -25,47 +28,38 @@ The authority chain is explicit and one-way:
 
 Contributors should update the governed definition first, then the governed projection, and only then the rendered markdown output when the materialized skill text needs to change.
 
-## Shipped local surface
+## Shipped CLI surface
 
-The shipped local surface is the `elegy-memory` CLI behavior around summary-only session-context artifacts and the local artifact store.
+The implemented CLI surface in `rust/crates/elegy-memory/src/cli.rs` is:
 
-Inspection and validation:
-
-- `elegy-memory inspect`
-- `elegy-memory validate --input <path>`
-
-Local artifact management:
-
-- `elegy-memory init`
-- `elegy-memory import`
+- `elegy-memory add <content>`
+- `elegy-memory search <query>`
 - `elegy-memory list`
-- `elegy-memory show`
+- `elegy-memory inspect <id>`
+- `elegy-memory purge`
+- `elegy-memory health`
 - `elegy-memory export`
-- `elegy-memory supersede`
-- `elegy-memory tombstone`
+- `elegy-memory reembed`
+- `elegy-memory contradictions`
 
-The shared `elegy` CLI remains only as a temporary compatibility bridge for those legacy memory command paths.
+The shared `elegy` CLI remains only as a temporary compatibility bridge for legacy memory command paths.
 
-Current guarantees of that local surface:
+## Current behavior
 
-- import accepts governed `summary-only-session-context-envelope` artifacts only
-- omitted `--root` defaults to `.elegy-local-memory`
-- the local layout keeps `artifacts/`, `state/`, `state/write.lock`, and `exports/`
-- durable local state is derived by scanning artifact files rather than persisting `state/catalog.json`
-- active-only visibility is the default, so superseded and tombstoned records stay hidden unless explicitly requested
-- local writes are single-writer
-- local list and reporting order is deterministic
+The current MVP CLI behavior is intentionally narrow:
 
-## Retention and removal semantics
+- the default database path is `~/.elegy/memory.db`
+- the default scope is `workspace`
+- `search` is keyword-only in the current CLI MVP
+- `add` runs the salience gate and may accept, merge, or archive a memory as dormant
+- `list` supports type and state filters with a simple limit
+- `inspect` returns the current record plus version history
+- `export` writes the current scope as JSON, either to stdout or to a file
+- `purge` deletes the configured database contents after confirmation unless `--yes` is passed
+- `contradictions` lists unresolved contradiction records for the current scope
+- `reembed` currently reports queued stale records and exits because provider-backed re-embedding is not wired yet
 
-The shipped semantics are intentionally local and bounded:
-
-- `supersede` records local lineage that one artifact copy has been replaced by another local artifact copy
-- `tombstone` records local withdrawal plus a local reason for that withdrawal
-
-Neither action decides runtime currentness, approval, freshness, retrieval ranking, runtime validity, or promotion.
-
-Those remain host-owned in `SAASTools`.
+This surface is usable now for local preview workflows, but the docs should not describe it as a completed artifact import, supersede, or tombstone system.
 
 ## What stays in SAASTools
 
@@ -78,7 +72,7 @@ Those remain host-owned in `SAASTools`.
 - runtime validation
 - promotion and invalidation decisions
 
-`Elegy` may describe local lineage and local artifact state. It does not become the runtime or policy owner for those decisions.
+`Elegy` does not become the runtime or policy owner for those decisions.
 
 ## Related
 

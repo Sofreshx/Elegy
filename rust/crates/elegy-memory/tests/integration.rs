@@ -142,7 +142,12 @@ async fn gate_integration_merges_near_duplicates_and_preserves_version_history()
     assert_eq!(target_id, original_id);
 
     store
-        .update_content(&target_id, &enriched_content, "integration:test", "gate merge")
+        .update_content(
+            &target_id,
+            &enriched_content,
+            "integration:test",
+            "gate merge",
+        )
         .await
         .expect("apply merged content");
     store
@@ -188,7 +193,7 @@ async fn gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone(
         .await
         .expect("store similarity baseline");
 
-    let decisions = vec![
+    let decisions = [
         gate.evaluate(
             &sample_candidate(
                 "Distinct memory with no embedding",
@@ -236,11 +241,9 @@ async fn gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone(
             GateDecision::Accept | GateDecision::Archive | GateDecision::Merge { .. }
         )
     }));
-    assert!(
-        decisions
-            .iter()
-            .all(|decision| !matches!(decision, GateDecision::Reject { .. }))
-    );
+    assert!(decisions
+        .iter()
+        .all(|decision| !matches!(decision, GateDecision::Reject { .. })));
 
     let doubt_zone = gate
         .evaluate(

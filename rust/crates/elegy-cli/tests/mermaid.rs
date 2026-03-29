@@ -146,11 +146,9 @@ fn mermaid_render_command_rejects_unsupported_canonical_json() {
 
 #[test]
 fn mermaid_render_command_rejects_undeclared_workflow_step_reference() {
-        let temp_dir = unique_temp_dir("elegy-cli-mermaid-invalid-reference");
-        let input_path = temp_dir.join("invalid-workflow.json");
-        fs::write(
-                &input_path,
-                r#"{
+    let temp_dir = unique_temp_dir("elegy-cli-mermaid-invalid-reference");
+    let input_path = temp_dir.join("invalid-workflow.json");
+    let workflow = r#"{
     "id": "wf.order-approval",
     "name": "Order Approval",
     "specVersion": "1.0",
@@ -204,30 +202,31 @@ fn mermaid_render_command_rejects_undeclared_workflow_step_reference() {
         ]
     }
 }
-"#,
-        )
-        .expect("write invalid workflow fixture");
+"#;
+    fs::write(&input_path, workflow).expect("write invalid workflow fixture");
 
-        let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
-                .args([
-                        "mermaid",
-                        "render",
-                        "--input",
-                        input_path.to_str().expect("utf-8 invalid workflow input path"),
-                        "--format",
-                        "json",
-                ])
-                .output()
-                .expect("run elegy mermaid render with invalid workflow input");
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "mermaid",
+            "render",
+            "--input",
+            input_path
+                .to_str()
+                .expect("utf-8 invalid workflow input path"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy mermaid render with invalid workflow input");
 
-        assert!(!output.status.success());
-        assert!(output.stderr.is_empty());
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
 
-        let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
-        assert!(stdout.contains("\"status\": \"invalid\""));
-        assert!(stdout.contains("CLI-MERMAID-005"));
-        assert!(stdout.contains("connections.toStepId"));
-        assert!(stdout.contains("step.missing"));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("CLI-MERMAID-005"));
+    assert!(stdout.contains("connections.toStepId"));
+    assert!(stdout.contains("step.missing"));
 }
 
 #[test]
@@ -381,7 +380,9 @@ fn mermaid_narrate_command_accepts_mermaid_from_stdin() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
     assert!(stdout.contains("\"status\": \"ok\""));
     assert!(stdout.contains("\"sourceKind\": \"mermaidFlowchartTd\""));
-    assert!(stdout.contains("derived Mermaid projection only; canonical workflow authority remains outside Mermaid"));
+    assert!(stdout.contains(
+        "derived Mermaid projection only; canonical workflow authority remains outside Mermaid"
+    ));
     assert!(stdout.contains("Order Created activates Review Order."));
 }
 
@@ -397,7 +398,9 @@ fn mermaid_reverse_command_rejects_unsupported_mermaid_direction() {
             "mermaid",
             "reverse",
             "--input",
-            input_path.to_str().expect("utf-8 invalid Mermaid input path"),
+            input_path
+                .to_str()
+                .expect("utf-8 invalid Mermaid input path"),
             "--format",
             "json",
         ])

@@ -52,6 +52,16 @@ pub struct AgentEventBroker {
     inner: Arc<BrokerInner>,
 }
 
+#[derive(Debug)]
+struct PublishRequest {
+    event_type: AgentEventType,
+    source: AgentEventSource,
+    payload: AgentEventPayload,
+    ephemeral: bool,
+    parent_event_id: Option<String>,
+    terminal_response: Option<AgentResponseEnvelope>,
+}
+
 #[derive(Clone, Debug)]
 pub struct AgentRunHandle {
     broker: AgentEventBroker,
@@ -83,12 +93,14 @@ impl AgentRunHandle {
     ) -> Result<AgentEventEnvelope, AgentBrokerError> {
         self.broker.publish_internal(
             self.run_id.as_str(),
-            event_type,
-            source,
-            payload,
-            ephemeral,
-            parent_event_id,
-            None,
+            PublishRequest {
+                event_type,
+                source,
+                payload,
+                ephemeral,
+                parent_event_id,
+                terminal_response: None,
+            },
         )
     }
 
@@ -133,12 +145,14 @@ impl AgentRunHandle {
 
         self.broker.publish_internal(
             self.run_id.as_str(),
-            event_type,
-            AgentEventSource::Broker,
-            payload,
-            false,
-            None,
-            Some(response.clone()),
+            PublishRequest {
+                event_type,
+                source: AgentEventSource::Broker,
+                payload,
+                ephemeral: false,
+                parent_event_id: None,
+                terminal_response: Some(response.clone()),
+            },
         )?;
 
         Ok(response)
@@ -370,12 +384,7 @@ impl AgentEventBroker {
     fn publish_internal(
         &self,
         run_id: &str,
-        event_type: AgentEventType,
-        source: AgentEventSource,
-        payload: AgentEventPayload,
-        ephemeral: bool,
-        parent_event_id: Option<String>,
-        terminal_response: Option<AgentResponseEnvelope>,
+        request: PublishRequest,
     ) -> Result<AgentEventEnvelope, AgentBrokerError> {
         let mut state = self
             .inner
@@ -399,12 +408,12 @@ impl AgentEventBroker {
             run_id: run_id.to_string(),
             stream_id: run.stream_id.clone(),
             sequence,
-            parent_event_id,
+            parent_event_id: request.parent_event_id,
             timestamp: format_timestamp()?,
-            ephemeral,
-            event_type,
-            source,
-            payload,
+            ephemeral: request.ephemeral,
+            event_type: request.event_type,
+            source: request.source,
+            payload: request.payload,
         };
 
         let validation = validate_agent_event_envelope(&event);
@@ -430,7 +439,7 @@ impl AgentEventBroker {
             run.subscribers.remove(&subscriber_id);
         }
 
-        if let Some(response) = terminal_response {
+        if let Some(response) = request.terminal_response {
             run.response = Some(response);
             run.terminal = true;
         }

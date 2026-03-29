@@ -164,7 +164,7 @@
         "\\.nupkg"
       ],
       "requiredPatterns": [
-        "elegy-contracts",
+        "contracts-bundle",
         "elegy-cli",
         "elegy-memory",
         "elegy-mcp",

@@ -1,8 +1,8 @@
 use async_trait::async_trait;
 
 use crate::{
-    similarity::cosine_similarity, ConsolidationAction, ConsolidationCandidate,
-    ConsolidationError, MemoryConsolidator, MemoryState, ScopeConfig,
+    similarity::cosine_similarity, ConsolidationAction, ConsolidationCandidate, ConsolidationError,
+    MemoryConsolidator, MemoryState, ScopeConfig,
 };
 
 /// Simple MVP consolidator that reports high-similarity active-memory dedup actions.
@@ -28,7 +28,10 @@ impl SimpleConsolidator {
 
     fn is_eligible(candidate: &ConsolidationCandidate) -> bool {
         candidate.memory.state == MemoryState::Active
-            && candidate.embedding.as_ref().is_some_and(|embedding| !embedding.is_empty())
+            && candidate
+                .embedding
+                .as_ref()
+                .is_some_and(|embedding| !embedding.is_empty())
     }
 }
 
