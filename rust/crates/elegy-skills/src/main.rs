@@ -102,11 +102,9 @@ fn execute_generate_command(
         Ok(result) => {
             match context.format {
                 OutputFormat::Text => print_generated_skills_text(&result),
-                OutputFormat::Json => print_json(&build_success_envelope(
-                    context,
-                    ["generate"],
-                    result,
-                ))?,
+                OutputFormat::Json => {
+                    print_json(&build_success_envelope(context, ["generate"], result))?
+                }
             }
 
             Ok(ExitCode::SUCCESS)

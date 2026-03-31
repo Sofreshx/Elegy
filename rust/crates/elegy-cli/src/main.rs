@@ -553,12 +553,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     superseded_by_record_id,
                 },
-        } => execute_local_supersede_command(
-            root.root,
-            record_id,
-            superseded_by_record_id,
-            format,
-        ),
+        } => execute_local_supersede_command(root.root, record_id, superseded_by_record_id, format),
         Command::Local {
             command:
                 LocalCommand::Tombstone {
@@ -567,13 +562,9 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     tombstoned_at_utc,
                     reason,
                 },
-        } => execute_local_tombstone_command(
-            root.root,
-            record_id,
-            tombstoned_at_utc,
-            reason,
-            format,
-        ),
+        } => {
+            execute_local_tombstone_command(root.root, record_id, tombstoned_at_utc, reason, format)
+        }
         Command::Mermaid {
             command: MermaidCommand::Render { input },
         } => execute_mermaid_render_command(input, format),
@@ -1213,9 +1204,13 @@ fn execute_config_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_config_text(&inspection),
-                OutputFormat::Json => {
-                    print_json(&build_envelope(command, "ok", summary, inspection, Vec::new()))?
-                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    command,
+                    "ok",
+                    summary,
+                    inspection,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }

@@ -148,11 +148,9 @@ fn execute_author_command(
         Ok(result) => {
             match context.format {
                 OutputFormat::Text => print_authored_mcp_text(&result),
-                OutputFormat::Json => print_json(&build_success_envelope(
-                    context,
-                    ["author"],
-                    result,
-                ))?,
+                OutputFormat::Json => {
+                    print_json(&build_success_envelope(context, ["author"], result))?
+                }
             }
 
             Ok(ExitCode::SUCCESS)
@@ -169,11 +167,9 @@ fn execute_analyze_command(
         Ok(analysis) => {
             match context.format {
                 OutputFormat::Text => print_mcp_analysis_text(&analysis),
-                OutputFormat::Json => print_json(&build_success_envelope(
-                    context,
-                    ["analyze"],
-                    analysis,
-                ))?,
+                OutputFormat::Json => {
+                    print_json(&build_success_envelope(context, ["analyze"], analysis))?
+                }
             }
 
             Ok(ExitCode::SUCCESS)
