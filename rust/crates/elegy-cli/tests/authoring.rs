@@ -53,6 +53,43 @@ fn author_mcp_command_writes_descriptor_file() {
 }
 
 #[test]
+fn author_mcp_command_supports_machine_flags_and_correlation_id() {
+    let temp_dir = unique_temp_dir("elegy-cli-author-machine");
+    let output_path = temp_dir.join("machine-weather-mcp.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-author-1",
+            "author",
+            "mcp",
+            "--server-name",
+            "weather-server",
+            "--tool",
+            "get-weather=Look up a weather report",
+            "--output",
+            output_path.to_str().expect("utf-8 output path"),
+        ])
+        .output()
+        .expect("run elegy author mcp with machine flags");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_path.is_file());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"ok\""));
+    assert!(stdout.contains("\"correlationId\": \"corr-author-1\""));
+    assert!(stdout.contains("\"nonInteractive\": true"));
+    assert!(stdout.contains("\"serverName\": \"weather-server\""));
+}
+
+#[test]
 fn analyze_and_generate_commands_use_same_descriptor_input() {
     let temp_dir = unique_temp_dir("elegy-cli-generate");
     let descriptor_path = temp_dir.join("weather-mcp.json");

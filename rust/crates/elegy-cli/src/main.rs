@@ -35,6 +35,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::OnceLock;
 
 const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
 const LOCAL_DEFAULT_ROOT_DIR: &str = ".elegy-local-memory";
@@ -47,6 +48,10 @@ const SESSION_CONTEXT_AUTHORITY_POSTURE: &str =
 const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
     "mirror-or-inspect-only; adapters cannot promote, invalidate, or override host-owned truth";
 const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
+const EXIT_CODE_INVALID_INPUT: u8 = 1;
+const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
+
+static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy")]
@@ -56,6 +61,12 @@ struct Cli {
     project: Option<PathBuf>,
     #[arg(long, value_enum, default_value_t = OutputFormat::Text, global = true)]
     format: OutputFormat,
+    #[arg(long, global = true)]
+    json: bool,
+    #[arg(long, global = true)]
+    non_interactive: bool,
+    #[arg(long, global = true)]
+    correlation_id: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -64,6 +75,13 @@ struct Cli {
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Clone, Debug)]
+struct CliMachineContext {
+    format: OutputFormat,
+    non_interactive: bool,
+    correlation_id: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -283,6 +301,10 @@ where
     T: Serialize,
 {
     schema_version: &'static str,
+    #[serde(rename = "correlationId")]
+    correlation_id: String,
+    #[serde(rename = "nonInteractive", skip_serializing_if = "is_false")]
+    non_interactive: bool,
     command: Vec<String>,
     status: &'static str,
     summary: Summary,
@@ -432,13 +454,19 @@ async fn main() -> ExitCode {
         Ok(code) => code,
         Err(error) => {
             eprintln!("unexpected CLI failure: {error}");
-            ExitCode::from(2)
+            exit_runtime()
         }
     }
 }
 
 async fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
+    let format = resolve_output_format(cli.json, cli.format);
+    let _ = CLI_MACHINE_CONTEXT.set(CliMachineContext {
+        format,
+        non_interactive: cli.non_interactive,
+        correlation_id: cli.correlation_id,
+    });
     let locator = cli
         .project
         .map_or(ProjectLocator::Auto, ProjectLocator::Path);
@@ -453,10 +481,10 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     tools,
                     force,
                 },
-        } => execute_author_mcp_command(server_name, output, transport, tools, force, cli.format),
+        } => execute_author_mcp_command(server_name, output, transport, tools, force, format),
         Command::Analyze {
             command: AnalyzeCommand::Mcp { descriptor },
-        } => execute_analyze_mcp_command(descriptor, cli.format),
+        } => execute_analyze_mcp_command(descriptor, format),
         Command::Generate {
             command:
                 GenerateCommand::Skills {
@@ -464,25 +492,25 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     output_dir,
                     force,
                 },
-        } => execute_generate_skills_command(descriptor, output_dir, force, cli.format),
+        } => execute_generate_skills_command(descriptor, output_dir, force, format),
         Command::Validate {
             command: ValidateCommand::Config,
-        } => execute_config_command(locator, cli.format, vec!["validate", "config"]),
+        } => execute_config_command(locator, format, vec!["validate", "config"]),
         Command::Validate {
             command: ValidateCommand::Runtime,
-        } => execute_runtime_command(locator, cli.format, vec!["validate", "runtime"]),
+        } => execute_runtime_command(locator, format, vec!["validate", "runtime"]),
         Command::Validate {
             command: ValidateCommand::SessionContext { input },
-        } => execute_validate_session_context_command(input, cli.format),
+        } => execute_validate_session_context_command(input, format),
         Command::Inspect {
             command: InspectCommand::Resources,
-        } => execute_runtime_command(locator, cli.format, vec!["inspect", "resources"]),
+        } => execute_runtime_command(locator, format, vec!["inspect", "resources"]),
         Command::Inspect {
             command: InspectCommand::SessionContext,
-        } => execute_session_context_command(cli.format),
+        } => execute_session_context_command(format),
         Command::Local {
             command: LocalCommand::Init { root },
-        } => execute_local_init_command(root.root, cli.format),
+        } => execute_local_init_command(root.root, format),
         Command::Local {
             command:
                 LocalCommand::Import {
@@ -491,10 +519,10 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     imported_at_utc,
                 },
-        } => execute_local_import_command(root.root, input, record_id, imported_at_utc, cli.format),
+        } => execute_local_import_command(root.root, input, record_id, imported_at_utc, format),
         Command::Local {
             command: LocalCommand::List { root, visibility },
-        } => execute_local_list_command(root.root, visibility.query_options(), cli.format),
+        } => execute_local_list_command(root.root, visibility.query_options(), format),
         Command::Local {
             command:
                 LocalCommand::Show {
@@ -502,9 +530,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     visibility,
                 },
-        } => {
-            execute_local_show_command(root.root, record_id, visibility.query_options(), cli.format)
-        }
+        } => execute_local_show_command(root.root, record_id, visibility.query_options(), format),
         Command::Local {
             command:
                 LocalCommand::Export {
@@ -518,7 +544,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             record_id,
             output_path,
             visibility.query_options(),
-            cli.format,
+            format,
         ),
         Command::Local {
             command:
@@ -531,7 +557,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             root.root,
             record_id,
             superseded_by_record_id,
-            cli.format,
+            format,
         ),
         Command::Local {
             command:
@@ -546,18 +572,18 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             record_id,
             tombstoned_at_utc,
             reason,
-            cli.format,
+            format,
         ),
         Command::Mermaid {
             command: MermaidCommand::Render { input },
-        } => execute_mermaid_render_command(input, cli.format),
+        } => execute_mermaid_render_command(input, format),
         Command::Mermaid {
             command: MermaidCommand::Reverse { input },
-        } => execute_mermaid_reverse_command(input, cli.format),
+        } => execute_mermaid_reverse_command(input, format),
         Command::Mermaid {
             command: MermaidCommand::Narrate { input },
-        } => execute_mermaid_narrate_command(input, cli.format),
-        Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
+        } => execute_mermaid_narrate_command(input, format),
+        Command::Run { dry_run } => execute_run_command(locator, dry_run, format).await,
         Command::Contracts {
             command:
                 ContractsCommand::Export {
@@ -569,7 +595,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             output_path,
             create_archive,
             archive_output_path,
-            cli.format,
+            format,
         ),
     }
 }
@@ -578,14 +604,13 @@ fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, ser
     let inspection = session_context_inspection();
     match format {
         OutputFormat::Text => print_session_context_text(&inspection),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: vec!["inspect".to_string(), "session-context".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: inspection,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Json => print_json(&build_envelope(
+            ["inspect", "session-context"],
+            "ok",
+            Summary::default(),
+            inspection,
+            Vec::new(),
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -603,7 +628,7 @@ fn execute_validate_session_context_command(
                 diagnostics,
                 json!({ "inputPath": input.display().to_string() }),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -611,14 +636,13 @@ fn execute_validate_session_context_command(
     let report = build_session_context_validation_report(&input, &artifact);
     match format {
         OutputFormat::Text => print_validated_session_context_text(&report),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: vec!["validate".to_string(), "session-context".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: report,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Json => print_json(&build_envelope(
+            ["validate", "session-context"],
+            "ok",
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -634,14 +658,13 @@ fn execute_local_init_command(
             let report = build_local_init_report(&result.paths);
             match format {
                 OutputFormat::Text => print_local_init_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "init".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "init"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -675,7 +698,7 @@ fn execute_local_import_command(
                     "inputPath": input.display().to_string(),
                 }),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -695,14 +718,13 @@ fn execute_local_import_command(
                     "imported local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "import".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "import"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -730,14 +752,13 @@ fn execute_local_list_command(
             let report = build_local_list_report(&root, &options, records);
             match format {
                 OutputFormat::Text => print_local_list_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "list".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "list"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -766,14 +787,13 @@ fn execute_local_show_command(
                     "local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "show".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "show"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -803,14 +823,13 @@ fn execute_local_export_command(
             let report = build_local_export_report(&root, &result, &options);
             match format {
                 OutputFormat::Text => print_local_export_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "export".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "export"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -843,14 +862,13 @@ fn execute_local_supersede_command(
                     "superseded local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "supersede".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "supersede"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -885,14 +903,13 @@ fn execute_local_tombstone_command(
                     "tombstoned local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "tombstone".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "tombstone"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -954,7 +971,7 @@ fn execute_author_mcp_command(
                 vec![Diagnostic::error("CLI-AUTHOR-001", message)],
                 json!({}),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -971,14 +988,13 @@ fn execute_author_mcp_command(
         Ok(result) => {
             match format {
                 OutputFormat::Text => print_authored_mcp_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["author".to_string(), "mcp".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["author", "mcp"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -994,14 +1010,13 @@ fn execute_analyze_mcp_command(
         Ok(analysis) => {
             match format {
                 OutputFormat::Text => print_mcp_analysis_text(&analysis),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["analyze".to_string(), "mcp".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: analysis,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["analyze", "mcp"],
+                    "ok",
+                    Summary::default(),
+                    analysis,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1019,14 +1034,13 @@ fn execute_generate_skills_command(
         Ok(result) => {
             match format {
                 OutputFormat::Text => print_generated_skills_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["generate".to_string(), "skills".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generate", "skills"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1049,7 +1063,7 @@ fn execute_mermaid_render_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1058,14 +1072,13 @@ fn execute_mermaid_render_command(
         Ok(mermaid) => {
             match format {
                 OutputFormat::Text => println!("{mermaid}"),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "render".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_render_report(mermaid, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "render"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_render_report(mermaid, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1076,7 +1089,7 @@ fn execute_mermaid_render_command(
             mermaid_render_diagnostics(error, &input_source),
             json!({}),
             "invalid",
-            ExitCode::from(1),
+            exit_invalid(),
         ),
     }
 }
@@ -1096,7 +1109,7 @@ fn execute_mermaid_reverse_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1105,14 +1118,13 @@ fn execute_mermaid_reverse_command(
         Ok(projection) => {
             match format {
                 OutputFormat::Text => print_mermaid_projection_text(&projection),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "reverse".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_reverse_report(projection, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "reverse"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_reverse_report(projection, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1123,7 +1135,7 @@ fn execute_mermaid_reverse_command(
             mermaid_reverse_diagnostics(error, &input_source),
             json!({}),
             "invalid",
-            ExitCode::from(1),
+            exit_invalid(),
         ),
     }
 }
@@ -1143,7 +1155,7 @@ fn execute_mermaid_narrate_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1158,14 +1170,13 @@ fn execute_mermaid_narrate_command(
         Ok((narrative, projection)) => {
             match format {
                 OutputFormat::Text => print_mermaid_narrative_text(&narrative),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "narrate".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_narrate_report(narrative, projection, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "narrate"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_narrate_report(narrative, projection, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1186,7 +1197,7 @@ fn execute_mermaid_narrate_command(
                 diagnostics,
                 json!({}),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     }
@@ -1202,14 +1213,9 @@ fn execute_config_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_config_text(&inspection),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: command.into_iter().map(str::to_string).collect(),
-                    status: "ok",
-                    summary,
-                    data: inspection,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => {
+                    print_json(&build_envelope(command, "ok", summary, inspection, Vec::new()))?
+                }
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1227,14 +1233,9 @@ fn execute_runtime_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_catalog_text(&catalog),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: command.into_iter().map(str::to_string).collect(),
-                    status: "ok",
-                    summary,
-                    data: catalog,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => {
+                    print_json(&build_envelope(command, "ok", summary, catalog, Vec::new()))?
+                }
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1259,7 +1260,7 @@ async fn execute_run_command(
                 vec![diagnostic],
                 json!({}),
                 "error",
-                ExitCode::from(2),
+                exit_runtime(),
             );
         }
 
@@ -1272,7 +1273,7 @@ async fn execute_run_command(
                 vec![Diagnostic::error("CLI-RUN-003", error.to_string())],
                 json!({}),
                 "error",
-                ExitCode::from(2),
+                exit_runtime(),
             ),
         };
     }
@@ -1295,14 +1296,13 @@ fn execute_contracts_export_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_contracts_export_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["contracts".to_string(), "export".to_string()],
-                    status: "ok",
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["contracts", "export"],
+                    "ok",
                     summary,
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1533,7 +1533,7 @@ fn emit_error<T: Serialize>(
         error.diagnostics().to_vec(),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1548,7 +1548,7 @@ fn emit_contracts_error(
         vec![Diagnostic::error("CLI-CONTRACTS-001", error.to_string())],
         json!({}),
         "error",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1564,7 +1564,7 @@ fn emit_mcp_error<T: Serialize>(
         mcp_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1580,7 +1580,7 @@ fn emit_skills_error<T: Serialize>(
         skills_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1595,14 +1595,9 @@ fn emit_diagnostics<T: Serialize>(
     let summary = summarize(&diagnostics);
     match format {
         OutputFormat::Text => print_diagnostics_text(&diagnostics),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: command.into_iter().map(str::to_string).collect(),
-            status,
-            summary,
-            data,
-            diagnostics,
-        })?,
+        OutputFormat::Json => {
+            print_json(&build_envelope(command, status, summary, data, diagnostics))?
+        }
     }
     Ok(exit_code)
 }
@@ -2255,8 +2250,59 @@ fn emit_local_store_error<T: Serialize>(
         local_store_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
+}
+
+fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
+    if json {
+        OutputFormat::Json
+    } else {
+        format
+    }
+}
+
+fn current_machine_context() -> &'static CliMachineContext {
+    CLI_MACHINE_CONTEXT
+        .get()
+        .expect("CLI machine context should be initialized during run")
+}
+
+fn build_envelope<T, S>(
+    command: impl IntoIterator<Item = S>,
+    status: &'static str,
+    summary: Summary,
+    data: T,
+    diagnostics: Vec<Diagnostic>,
+) -> Envelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
+    let context = current_machine_context();
+    let _ = context.format;
+    Envelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: context.correlation_id.clone().unwrap_or_default(),
+        non_interactive: context.non_interactive,
+        command: command.into_iter().map(Into::into).collect(),
+        status,
+        summary,
+        data,
+        diagnostics,
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn exit_invalid() -> ExitCode {
+    ExitCode::from(EXIT_CODE_INVALID_INPUT)
+}
+
+fn exit_runtime() -> ExitCode {
+    ExitCode::from(EXIT_CODE_RUNTIME_FAILURE)
 }
 
 fn local_store_error_diagnostics(error: LocalMemoryStoreError) -> Vec<Diagnostic> {
