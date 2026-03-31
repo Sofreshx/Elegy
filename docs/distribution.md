@@ -8,6 +8,25 @@ The bounded local memory operator lives in `rust/crates/elegy-memory` and expose
 
 Mermaid tooling stays on that umbrella surface. `elegy mermaid render`, `elegy mermaid reverse`, and `elegy mermaid narrate` do not introduce a dedicated Mermaid binary, wrapper archive, or separate distribution lane.
 
+## Stable vs prerelease
+
+Elegy uses two distribution channels:
+
+- Stable semver tags such as `v1.3.2`. These are the packages downstream consumers should pin.
+- Rolling prerelease `main-snapshot`. This is refreshed on every push to `main` and is intended for validation, debugging, and latest-branch integration checks.
+
+Those two channels publish the same asset families. The difference is lifecycle and stability promise, not package coverage.
+
+## What most consumers should download
+
+Most users do not need every asset in the release:
+
+- If you need schemas, fixtures, or compatibility metadata, download the contracts bundle.
+- If you want to run Elegy commands, download only the CLI archives you need.
+- If you want a scripted installation path, use the installer bootstrap.
+- If you want a bounded repo-local integration surface for one dedicated tool family, use a wrapper archive.
+- The manifest and checksums assets are primarily installer/maintainer assets and usually do not need manual handling.
+
 ## Asset model
 
 Tagged releases are configured to publish eleven neutral assets across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
