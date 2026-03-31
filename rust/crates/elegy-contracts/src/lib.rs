@@ -1200,12 +1200,13 @@ pub fn load_invocation_request_fixture_from_dir(
 pub fn load_invocation_response_fixture_from_dir(
     dir: &Path,
 ) -> Result<InvocationResponse, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("invocation-response.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("invocation-response.minimal.json"),
+    )
 }
 
-pub fn load_execution_event_fixture_from_dir(
-    dir: &Path,
-) -> Result<ExecutionEvent, ContractsError> {
+pub fn load_execution_event_fixture_from_dir(dir: &Path) -> Result<ExecutionEvent, ContractsError> {
     load_json_file(&dir.join("fixtures").join("execution-event.minimal.json"))
 }
 
@@ -1327,15 +1328,16 @@ pub fn validate_structured_failure(
         issues.push("Structured failure message must not be blank.".to_string());
     }
 
-    if failure
-        .correlation_id
-        .as_deref()
-        .is_some_and(str::is_empty)
-    {
-        issues.push("Structured failure correlationId must not be blank when provided.".to_string());
+    if failure.correlation_id.as_deref().is_some_and(str::is_empty) {
+        issues
+            .push("Structured failure correlationId must not be blank when provided.".to_string());
     }
 
-    if failure.details.as_ref().is_some_and(|details| !details.is_object()) {
+    if failure
+        .details
+        .as_ref()
+        .is_some_and(|details| !details.is_object())
+    {
         issues.push("Structured failure details must be a JSON object when provided.".to_string());
     }
 
@@ -1384,14 +1386,26 @@ pub fn validate_invocation_request(request: &InvocationRequest) -> InvocationVal
         .timeout_seconds
         .is_some_and(|timeout| timeout <= 0)
     {
-        issues.push("Invocation request timeoutSeconds must be greater than zero when set.".to_string());
+        issues.push(
+            "Invocation request timeoutSeconds must be greater than zero when set.".to_string(),
+        );
     }
 
-    if request.context.caller_ref.as_deref().is_some_and(str::is_empty) {
+    if request
+        .context
+        .caller_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
         issues.push("Invocation request callerRef must not be blank when provided.".to_string());
     }
 
-    if request.context.trace_ref.as_deref().is_some_and(str::is_empty) {
+    if request
+        .context
+        .trace_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
         issues.push("Invocation request traceRef must not be blank when provided.".to_string());
     }
 
@@ -1401,11 +1415,14 @@ pub fn validate_invocation_request(request: &InvocationRequest) -> InvocationVal
         .as_ref()
         .is_some_and(has_blank_metadata_entries)
     {
-        issues.push("Invocation request policyContext must not contain blank keys or values.".to_string());
+        issues.push(
+            "Invocation request policyContext must not contain blank keys or values.".to_string(),
+        );
     }
 
     if has_blank_metadata_entries(&request.context.metadata) {
-        issues.push("Invocation request metadata must not contain blank keys or values.".to_string());
+        issues
+            .push("Invocation request metadata must not contain blank keys or values.".to_string());
     }
 
     InvocationValidationResult { issues }
@@ -1427,7 +1444,9 @@ pub fn validate_invocation_response(response: &InvocationResponse) -> Invocation
     }
 
     if has_blank_metadata_entries(&response.metadata) {
-        issues.push("Invocation response metadata must not contain blank keys or values.".to_string());
+        issues.push(
+            "Invocation response metadata must not contain blank keys or values.".to_string(),
+        );
     }
 
     if matches!(response.status, InvocationStatus::Completed) && response.output.is_none() {
@@ -1435,7 +1454,10 @@ pub fn validate_invocation_response(response: &InvocationResponse) -> Invocation
     }
 
     if !matches!(response.status, InvocationStatus::Completed) && response.failure.is_none() {
-        issues.push("Failed or cancelled invocation responses must include a structured failure.".to_string());
+        issues.push(
+            "Failed or cancelled invocation responses must include a structured failure."
+                .to_string(),
+        );
     }
 
     if let Some(failure) = &response.failure {
@@ -1490,11 +1512,15 @@ pub fn validate_execution_event(event: &ExecutionEvent) -> ExecutionEventValidat
 
     if let Some(progress) = &event.progress {
         if progress.total < progress.current {
-            issues.push("Execution event progress total must be greater than or equal to current.".to_string());
+            issues.push(
+                "Execution event progress total must be greater than or equal to current."
+                    .to_string(),
+            );
         }
 
         if progress.unit.as_deref().is_some_and(str::is_empty) {
-            issues.push("Execution event progress unit must not be blank when provided.".to_string());
+            issues
+                .push("Execution event progress unit must not be blank when provided.".to_string());
         }
     }
 
@@ -1507,7 +1533,9 @@ pub fn validate_execution_event(event: &ExecutionEvent) -> ExecutionEventValidat
         ExecutionEventType::Failed | ExecutionEventType::Cancelled
     ) && event.failure.is_none()
     {
-        issues.push("Failed or cancelled execution events must include a structured failure.".to_string());
+        issues.push(
+            "Failed or cancelled execution events must include a structured failure.".to_string(),
+        );
     }
 
     ExecutionEventValidationResult { issues }

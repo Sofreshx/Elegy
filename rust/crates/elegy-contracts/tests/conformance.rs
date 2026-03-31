@@ -1,21 +1,21 @@
 use elegy_contracts::{
     default_support_manifest_path, export_contract_bundle,
     load_capability_definition_fixture_from_dir, load_compatibility_manifest_from_dir,
-    load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
-    load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
-    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
-    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
-    load_invocation_response_fixture_from_dir, resolve_upstream_contracts_dir,
+    load_consumer_support_manifest, load_execution_event_fixture_from_dir,
+    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
+    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
+    load_skill_definition_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
+    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
     validate_capability_definition, validate_execution_event, validate_invocation_request,
-    validate_invocation_response, validate_mcp_analysis_result,
-    validate_mcp_server_descriptor, validate_skill_definition, validate_structured_failure,
+    validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
+    validate_skill_definition, validate_structured_failure,
     validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
     CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
     ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationRequest,
-    InvocationResponse, InvocationStatus, McpAnalysisResult, McpServerDescriptor,
-    McpToolAnalysis, McpToolDefinition, SkillApprovalRequirement, SkillDefinition,
-    SkillGovernanceMetadata, SkillMaterializationKind, SkillOrigin, SkillSourceKind,
-    StructuredFailure, StructuredFailureCause, StructuredFailureCategory,
+    InvocationResponse, InvocationStatus, McpAnalysisResult, McpServerDescriptor, McpToolAnalysis,
+    McpToolDefinition, SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
+    SkillMaterializationKind, SkillOrigin, SkillSourceKind, StructuredFailure,
+    StructuredFailureCategory, StructuredFailureCause,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -342,15 +342,15 @@ fn structured_failure_validator_rejects_blank_fields_and_non_object_details() {
     assert!(validation.issues.contains(
         &"Structured failure correlationId must not be blank when provided.".to_string()
     ));
-    assert!(validation.issues.contains(
-        &"Structured failure details must be a JSON object when provided.".to_string()
-    ));
+    assert!(validation
+        .issues
+        .contains(&"Structured failure details must be a JSON object when provided.".to_string()));
     assert!(validation
         .issues
         .contains(&"Structured failure cause code must not be blank.".to_string()));
-    assert!(validation.issues.contains(
-        &"Structured failure cause message must not be blank.".to_string()
-    ));
+    assert!(validation
+        .issues
+        .contains(&"Structured failure cause message must not be blank.".to_string()));
 }
 
 #[test]
@@ -461,7 +461,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .is_file());
     assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path.join("invocation-request.schema.json").is_file());
-    assert!(output_path.join("invocation-response.schema.json").is_file());
+    assert!(output_path
+        .join("invocation-response.schema.json")
+        .is_file());
     assert!(output_path.join("execution-event.schema.json").is_file());
     assert!(output_path
         .join("fixtures")

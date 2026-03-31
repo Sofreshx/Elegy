@@ -1,7 +1,7 @@
 use elegy_contracts::{
     validate_execution_event, validate_invocation_request, validate_invocation_response,
-    ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationContext,
-    InvocationRequest, InvocationResponse, InvocationStatus,
+    ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationContext, InvocationRequest,
+    InvocationResponse, InvocationStatus,
 };
 use serde_json::{json, Value};
 use std::collections::BTreeMap;
@@ -183,7 +183,10 @@ fn author_mcp_machine_output_maps_cleanly_to_invocation_contracts() {
         trace_ref: request.context.trace_ref.clone(),
         metadata: BTreeMap::from([
             ("surface".to_string(), "elegy-cli".to_string()),
-            ("mappedFrom".to_string(), "author-mcp-machine-output".to_string()),
+            (
+                "mappedFrom".to_string(),
+                "author-mcp-machine-output".to_string(),
+            ),
         ]),
     };
     let response_validation = validate_invocation_response(&response);
