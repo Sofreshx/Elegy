@@ -4,12 +4,15 @@ use elegy_contracts::{
     load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
     load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
+    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
     resolve_upstream_contracts_dir, validate_capability_definition,
-    validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition,
-    validate_structured_failure, validate_support_manifest_against_upstream,
+    validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
+    validate_mcp_server_descriptor, validate_skill_definition, validate_structured_failure,
+    validate_support_manifest_against_upstream,
     CapabilityApprovalRequirement, CapabilityDefinition, CapabilityGovernance, CapabilitySource,
-    CapabilitySourceKind, McpAnalysisResult, McpServerDescriptor, McpToolAnalysis,
-    McpToolDefinition, SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
+    CapabilitySourceKind, InvocationRequest, InvocationResponse, InvocationStatus,
+    McpAnalysisResult, McpServerDescriptor, McpToolAnalysis, McpToolDefinition,
+    SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
     SkillMaterializationKind, SkillOrigin, SkillSourceKind, StructuredFailure,
     StructuredFailureCause, StructuredFailureCategory,
 };
@@ -44,6 +47,8 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("mcp-analysis-result"));
     assert!(schema_names.contains("capability-definition"));
     assert!(schema_names.contains("structured-failure"));
+    assert!(schema_names.contains("invocation-request"));
+    assert!(schema_names.contains("invocation-response"));
 }
 
 #[test]
@@ -61,6 +66,40 @@ fn upstream_structured_failure_fixture_is_semantically_valid() {
 
     assert_eq!(failure.code, "capability.invalid-input");
     assert_eq!(failure.category, StructuredFailureCategory::InvalidInput);
+}
+
+#[test]
+fn upstream_invocation_request_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let request = load_invocation_request_fixture_from_dir(&contracts_dir)
+        .expect("load upstream invocation-request fixture");
+
+    let validation = validate_invocation_request(&request);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(request.request_id, "invoke-req-1");
+    assert_eq!(request.capability_id, "cap.example.echo");
+}
+
+#[test]
+fn upstream_invocation_response_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let response = load_invocation_response_fixture_from_dir(&contracts_dir)
+        .expect("load upstream invocation-response fixture");
+
+    let validation = validate_invocation_response(&response);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(response.request_id, "invoke-req-1");
+    assert_eq!(response.status, InvocationStatus::Completed);
 }
 
 #[test]
@@ -172,6 +211,55 @@ fn capability_validator_rejects_missing_policy_refs_and_missing_source_refs() {
     assert!(validation.issues.contains(
         &"Imported, generated, or projected capabilities must declare a sourceRef or artifactRef."
             .to_string()
+    ));
+}
+
+#[test]
+fn invocation_validators_reject_missing_fields_and_missing_failure() {
+    let invalid_request = InvocationRequest {
+        request_id: String::new(),
+        capability_id: String::new(),
+        input: serde_json::json!("bad"),
+        ..InvocationRequest::default()
+    };
+
+    let request_validation = validate_invocation_request(&invalid_request);
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request must declare a requestId.".to_string()));
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request must declare a capabilityId.".to_string()));
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request input must be a JSON object.".to_string()));
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request context must declare a correlationId.".to_string()));
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request context must declare an executionId.".to_string()));
+    assert!(request_validation
+        .issues
+        .contains(&"Invocation request context must declare requestedAt.".to_string()));
+
+    let invalid_response = InvocationResponse {
+        request_id: String::new(),
+        execution_id: String::new(),
+        status: InvocationStatus::Failed,
+        failure: None,
+        ..InvocationResponse::default()
+    };
+
+    let response_validation = validate_invocation_response(&invalid_response);
+    assert!(response_validation
+        .issues
+        .contains(&"Invocation response must declare a requestId.".to_string()));
+    assert!(response_validation
+        .issues
+        .contains(&"Invocation response must declare an executionId.".to_string()));
+    assert!(response_validation.issues.contains(
+        &"Failed or cancelled invocation responses must include a structured failure.".to_string()
     ));
 }
 
@@ -317,6 +405,8 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("capability-definition.schema.json")
         .is_file());
     assert!(output_path.join("structured-failure.schema.json").is_file());
+    assert!(output_path.join("invocation-request.schema.json").is_file());
+    assert!(output_path.join("invocation-response.schema.json").is_file());
     assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
@@ -324,6 +414,14 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path
         .join("fixtures")
         .join("structured-failure.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("invocation-request.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("invocation-response.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -336,11 +434,19 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("compatibility-manifest.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
+        assert!(archive.by_name("invocation-request.schema.json").is_ok());
+        assert!(archive.by_name("invocation-response.schema.json").is_ok());
         assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
         assert!(archive
             .by_name("fixtures/structured-failure.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/invocation-request.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/invocation-response.minimal.json")
             .is_ok());
         assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }

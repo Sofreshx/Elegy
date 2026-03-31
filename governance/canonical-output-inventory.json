@@ -99,6 +99,14 @@
       "generated": "artifacts/contracts/structured-failure.schema.json"
     },
     {
+      "source": "contracts/schemas/invocation-request.schema.json",
+      "generated": "artifacts/contracts/invocation-request.schema.json"
+    },
+    {
+      "source": "contracts/schemas/invocation-response.schema.json",
+      "generated": "artifacts/contracts/invocation-response.schema.json"
+    },
+    {
       "source": "contracts/fixtures/agent-create-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/agent-create-request.minimal.json"
     },
@@ -221,6 +229,14 @@
     {
       "source": "contracts/fixtures/structured-failure.minimal.json",
       "generated": "artifacts/contracts/fixtures/structured-failure.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-request.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-response.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-response.minimal.json"
     }
   ],
   "archivePatterns": [

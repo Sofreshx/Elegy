@@ -117,6 +117,22 @@
       ]
     },
     {
+      "name": "invocation-request",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-request.schema.json",
+      "fixtures": [
+        "fixtures/invocation-request.minimal.json"
+      ]
+    },
+    {
+      "name": "invocation-response",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-response.schema.json",
+      "fixtures": [
+        "fixtures/invocation-response.minimal.json"
+      ]
+    },
+    {
       "name": "agent-definition",
       "schemaVersion": "1.0.0",
       "file": "agent-definition.schema.json",

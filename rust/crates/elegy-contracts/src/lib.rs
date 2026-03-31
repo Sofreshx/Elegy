@@ -262,6 +262,54 @@ pub struct StructuredFailureCause {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct InvocationRequest {
+    pub request_id: String,
+    pub capability_id: String,
+    pub input: Value,
+    #[serde(default)]
+    pub context: InvocationContext,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InvocationContext {
+    pub correlation_id: String,
+    pub execution_id: String,
+    pub requested_at: String,
+    pub timeout_seconds: Option<i32>,
+    pub caller_ref: Option<String>,
+    pub policy_context: Option<BTreeMap<String, String>>,
+    pub trace_ref: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InvocationResponse {
+    pub request_id: String,
+    pub execution_id: String,
+    #[serde(default)]
+    pub status: InvocationStatus,
+    pub output: Option<Value>,
+    pub failure: Option<StructuredFailure>,
+    pub completed_at: Option<String>,
+    pub trace_ref: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum InvocationStatus {
+    #[default]
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityDefinition {
     pub id: String,
     pub display_name: String,
@@ -811,6 +859,17 @@ impl StructuredFailureValidationResult {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct InvocationValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl InvocationValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CapabilityValidationResult {
     pub issues: Vec<String>,
 }
@@ -1068,6 +1127,18 @@ pub fn load_structured_failure_fixture_from_dir(
     load_json_file(&dir.join("fixtures").join("structured-failure.minimal.json"))
 }
 
+pub fn load_invocation_request_fixture_from_dir(
+    dir: &Path,
+) -> Result<InvocationRequest, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("invocation-request.minimal.json"))
+}
+
+pub fn load_invocation_response_fixture_from_dir(
+    dir: &Path,
+) -> Result<InvocationResponse, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("invocation-response.minimal.json"))
+}
+
 pub fn load_capability_definition_fixture_from_dir(
     dir: &Path,
 ) -> Result<CapabilityDefinition, ContractsError> {
@@ -1209,6 +1280,99 @@ pub fn validate_structured_failure(
     }
 
     StructuredFailureValidationResult { issues }
+}
+
+pub fn validate_invocation_request(request: &InvocationRequest) -> InvocationValidationResult {
+    let mut issues = Vec::new();
+
+    if request.request_id.trim().is_empty() {
+        issues.push("Invocation request must declare a requestId.".to_string());
+    }
+
+    if request.capability_id.trim().is_empty() {
+        issues.push("Invocation request must declare a capabilityId.".to_string());
+    }
+
+    if !request.input.is_object() {
+        issues.push("Invocation request input must be a JSON object.".to_string());
+    }
+
+    if request.context.correlation_id.trim().is_empty() {
+        issues.push("Invocation request context must declare a correlationId.".to_string());
+    }
+
+    if request.context.execution_id.trim().is_empty() {
+        issues.push("Invocation request context must declare an executionId.".to_string());
+    }
+
+    if request.context.requested_at.trim().is_empty() {
+        issues.push("Invocation request context must declare requestedAt.".to_string());
+    }
+
+    if request
+        .context
+        .timeout_seconds
+        .is_some_and(|timeout| timeout <= 0)
+    {
+        issues.push("Invocation request timeoutSeconds must be greater than zero when set.".to_string());
+    }
+
+    if request.context.caller_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Invocation request callerRef must not be blank when provided.".to_string());
+    }
+
+    if request.context.trace_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Invocation request traceRef must not be blank when provided.".to_string());
+    }
+
+    if request
+        .context
+        .policy_context
+        .as_ref()
+        .is_some_and(has_blank_metadata_entries)
+    {
+        issues.push("Invocation request policyContext must not contain blank keys or values.".to_string());
+    }
+
+    if has_blank_metadata_entries(&request.context.metadata) {
+        issues.push("Invocation request metadata must not contain blank keys or values.".to_string());
+    }
+
+    InvocationValidationResult { issues }
+}
+
+pub fn validate_invocation_response(response: &InvocationResponse) -> InvocationValidationResult {
+    let mut issues = Vec::new();
+
+    if response.request_id.trim().is_empty() {
+        issues.push("Invocation response must declare a requestId.".to_string());
+    }
+
+    if response.execution_id.trim().is_empty() {
+        issues.push("Invocation response must declare an executionId.".to_string());
+    }
+
+    if response.trace_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Invocation response traceRef must not be blank when provided.".to_string());
+    }
+
+    if has_blank_metadata_entries(&response.metadata) {
+        issues.push("Invocation response metadata must not contain blank keys or values.".to_string());
+    }
+
+    if matches!(response.status, InvocationStatus::Completed) && response.output.is_none() {
+        issues.push("Completed invocation responses must include an output payload.".to_string());
+    }
+
+    if !matches!(response.status, InvocationStatus::Completed) && response.failure.is_none() {
+        issues.push("Failed or cancelled invocation responses must include a structured failure.".to_string());
+    }
+
+    if let Some(failure) = &response.failure {
+        issues.extend(validate_structured_failure(failure).issues);
+    }
+
+    InvocationValidationResult { issues }
 }
 
 pub fn validate_capability_definition(
