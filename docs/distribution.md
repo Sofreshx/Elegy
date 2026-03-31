@@ -2,7 +2,7 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace, and tagged release workflows are configured to publish archives for those surfaces plus the three dedicated wrapper archives.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the three dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and MCP-to-skill generation. The shared `elegy` CLI remains the general and compatibility surface.
 
@@ -26,7 +26,7 @@ Tagged releases are configured to publish eleven neutral assets across the contr
 
 The contracts bundle remains the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
 
-GitHub Releases are the primary downstream distribution lane. The standalone installer archive is a convenience bootstrap that carries the generic install helper only; it does not introduce a separate package-feed or runtime distribution path.
+GitHub Releases are the primary downstream distribution lane. The standalone installer archive is a convenience bootstrap that carries the generic install helper only; it does not introduce a separate package-feed or runtime distribution path. Stable downstream consumption should continue to use explicit semver tags such as `v1.3.2`, while the rolling `main-snapshot` prerelease exists only as a continuously refreshed integration build.
 
 Each CLI archive is a thin distribution of its corresponding executable for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary. The current published target set is intentionally narrow:
 
@@ -48,6 +48,8 @@ Each published distribution set now includes two metadata documents in `artifact
 The manifest is the installer authority for distribution contents. It records the repository, tag marker, bundle version, generated timestamp, published targets, and every published asset with file name, asset kind, surface, target, version, size, SHA-256, and required archive entries.
 
 The checksums document carries the release or local-artifacts tag marker plus the SHA-256 digest for every published asset and for the manifest itself. The installer resolves those two JSON assets first and fails closed if they are missing, duplicated, inconsistent, or do not match the downloaded payloads.
+
+On pushes to `main`, the publish workflow writes the same metadata pair with tag marker `main-snapshot` and replaces the rolling `main-snapshot` prerelease so maintainers always have a fresh release-backed artifact set for the current branch head. On semver tags and published GitHub releases, the workflow writes the metadata with the semver release tag.
 
 Local artifact installs use the same metadata lane. After building or copying local release assets into a staging directory, generate the metadata pair before invoking the installer:
 
@@ -178,12 +180,13 @@ The installer resolves either a release tag or a local artifacts directory, down
 
 - Prefer GitHub release assets for downstream consumption; workflow artifacts remain a maintainer/CI convenience rather than the primary handoff lane.
 - Treat the standalone installer asset as a convenience bootstrap, not as a separate distribution model.
-- Pin an explicit Elegy release tag in downstream repositories and install into a repo-local tools directory.
+- Pin an explicit Elegy semver release tag in downstream repositories and install into a repo-local tools directory.
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Treat the extracted `contracts` directory and the selected CLI executables as the supported downstream handoff surfaces.
 - Wrapper archives already carry the generic installer helper and remain valid when a downstream only needs that bounded surface.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
+- Treat the rolling `main-snapshot` prerelease as an integration/debug lane rather than a pinned downstream contract.
 
 Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecated. Remove any remaining metadata only after downstream consumer cutover evidence exists.
 
@@ -197,4 +200,4 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.
 7. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata`.
 8. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
-9. Publish the generated assets through the GitHub Actions workflows when ready.
+9. Publish the generated assets through the GitHub Actions workflows when ready. Pushes to `main` refresh the rolling `main-snapshot` prerelease; semver tags or published release events refresh the matching stable release.
