@@ -223,6 +223,7 @@ Evolve `elegy-memory` from a bounded local operator surface into a clearer reusa
 - distinguish memory kinds and scopes
 - support async consolidation and re-embed lifecycle hooks
 - preserve current boundary where host-owned ranking and policy can stay outside Elegy
+- add explicit room for episodic execution memory, verifier outcomes, and experiment lineage without turning Elegy into a host control plane
 
 ### Deliverables
 
@@ -249,6 +250,9 @@ Evolve `elegy-memory` from a bounded local operator surface into a clearer reusa
   - freshness
   - contradiction hooks
   - async re-embed or consolidation
+  - episodic execution or outcome memory kinds
+  - verifier result capture
+  - promotion-history or experiment-lineage hooks
 
 #### CLI work
 
@@ -265,6 +269,8 @@ The research note identifies two strong trends:
 
 - real RAG systems are retrieval pipelines, not single vector calls
 - memory systems are multi-tier and lifecycle-aware, not one generic table
+
+Recent autonomous-improvement research sharpens the same point. Systems like SOAR and AgentFlow improve because they can learn from weak, partial, or verifier-labeled experience over time. That argues for explicit support for execution outcomes and verifier memory as first-class reusable substrate concepts, while still keeping host-specific ranking and orchestration authority outside Elegy.
 
 This phase converts Elegy’s promising memory primitives into a stronger reusable substrate.
 
@@ -289,6 +295,7 @@ Turn workflow graphs into a durable reusable execution substrate with explicit c
 - define checkpoint and lifecycle event contracts
 - define approval and stop-condition contracts
 - implement executor traits with replay expectations
+- support explicit planner, executor, verifier, and generator role visibility where consumers need that split
 
 ### Deliverables
 
@@ -300,6 +307,7 @@ Turn workflow graphs into a durable reusable execution substrate with explicit c
   - workflow lifecycle event schema
   - policy stop-condition schema
   - approval decision schema
+  - verifier outcome or turn-decision schema
 
 #### Rust crates or modules
 
@@ -308,10 +316,13 @@ Turn workflow graphs into a durable reusable execution substrate with explicit c
   - checkpoint persistence interfaces
   - replay helpers
   - compensation hooks
+  - typed role or step-kind helpers for planner, executor, verifier, and final synthesis patterns
 
 ### Why this phase matters
 
 The research note is explicit that one of the biggest agent-system anti-patterns is letting the LLM be the workflow engine. This phase makes deterministic orchestration and replay a first-class substrate capability without taking business-flow ownership away from hosts.
+
+Recent evidence from AgentFlow strengthens this sequencing: the improvement comes from optimizing planning inside a structured multi-turn system with evolving memory and verifier feedback, not from making orchestration less explicit. Elegy should therefore prioritize typed lifecycle, step-role, and verifier-outcome contracts before any ambition toward broader autonomous loops.
 
 ### Exit signal
 
@@ -376,6 +387,7 @@ Make tracing and validation a required part of every substrate family, not a lat
 - structured execution events
 - fixture-based conformance suites
 - evaluation harnesses for retrieval, routing, workflow, and policy behavior
+- fixed-budget benchmark loops and explicit keep, reject, or escalate outcome recording where applicable
 
 ### Deliverables
 
@@ -394,10 +406,14 @@ Make tracing and validation a required part of every substrate family, not a lat
 - capability routing correctness checks
 - workflow replay checks
 - policy gate enforcement checks
+- verifier outcome consistency checks
+- bounded experiment-result comparisons for repeated runs of the same capability or workflow slice
 
 ### Why this phase matters
 
 The research note treats observability and evaluation as first-class infrastructure. This phase is what prevents contract families from becoming elegant but unprovable abstractions.
+
+Recent autonomous-improvement work reinforces that the loop is only trustworthy when every candidate change is measured against a stable budget and recorded with explicit acceptance or rejection reasons. Elegy does not need to own the optimizer, but it should make that evidence model reusable.
 
 ### Exit signal
 
@@ -516,6 +532,7 @@ The best next slice after this roadmap is:
 2. draft the invocation-envelope contract family
 3. define the shared CLI machine-mode rules
 4. split `elegy-memory` thinking into memory-core versus operator shell
+5. reserve contract space for verifier outcomes and bounded experiment-result records so later workflow and eval work does not invent them ad hoc
 
 That sequence creates the smallest meaningful substrate foundation while staying aligned with current repo boundaries.
 
@@ -526,3 +543,6 @@ That sequence creates the smallest meaningful substrate foundation while staying
 - [Substrate governance](../architecture/substrate-governance.md)
 - [MCP, skill, and tooling placement](../architecture/mcp-skill-tooling-placement.md)
 - [Elegy-memory V1](../architecture/elegy-memory-v1.md)
+- AgentFlow: <https://agentflow.stanford.edu/>
+- SOAR: <https://arxiv.org/abs/2407.20635>
+- Autoresearch: <https://github.com/karpathy/autoresearch>

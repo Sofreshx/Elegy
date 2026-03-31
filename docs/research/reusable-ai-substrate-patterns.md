@@ -48,6 +48,14 @@ That means Elegy should prefer:
 3. thin CLIs and hosts over those crates
 4. consumer-local ownership for app orchestration, tenancy, approval UX, and prompt strategy
 
+Recent external research strengthens this direction further. The strongest current autonomous-improvement systems are not winning by making one giant opaque agent loop. They are winning by combining:
+
+- explicit role separation such as planner, executor, verifier, and generator
+- evolving memory that records intermediate state and failures
+- bounded mutation surfaces instead of unconstrained repo-wide self-editing
+- fixed evaluation budgets and keep-or-discard decisions tied to one metric or verifier outcome
+- asynchronous improvement loops where expensive learning or upkeep happens outside the critical write path
+
 ## A current-state model of the industry direction
 
 Across agent systems, production-grade patterns are increasingly converging on the same shape:
@@ -62,6 +70,14 @@ Across agent systems, production-grade patterns are increasingly converging on t
 - **structured traces and eval harnesses** rather than debugging by prose and screenshots
 
 That direction matches Elegy's current burden-of-proof rule better than a large integrated framework would.
+
+Recent examples reinforce the same shape from a different angle:
+
+- **AgentFlow** shows that tool-using agents improve when planning, execution, verification, and final synthesis are separated and coordinated through evolving memory instead of one monolithic policy.
+- **SOAR** shows that autonomous improvement gets stronger when semantics are decoupled from execution and when systems learn from weak or imperfect autonomous data without blocking the main loop on heavy supervision.
+- **Autoresearch** shows the practical value of sharply bounded editable surfaces, fixed evaluation budgets, and explicit keep-or-reject experiment records.
+
+These examples do not mean Elegy should own autonomous research or host orchestration. They do mean Elegy should prioritize the reusable substrate pieces that such systems repeatedly depend on: execution envelopes, verifier-friendly event models, memory lifecycle contracts, and eval-by-contract.
 
 ## Recommended Elegy direction
 
@@ -322,6 +338,8 @@ Durability and replay are core ideas in systems like Temporal. Agent workflow fr
 - inspectable transitions
 - human-in-the-loop pause points
 
+Recent agentic optimization work strengthens this further. AgentFlow's planner, executor, verifier, and generator split is a strong example of why reusable workflow substrates need typed step roles, evolving memory, and verifier-visible lifecycle events instead of a single prompt loop pretending to be orchestration.
+
 ### Risks and anti-patterns
 
 Avoid:
@@ -338,6 +356,13 @@ Build this in phases:
 2. add typed checkpoint and lifecycle event contracts
 3. add executor traits with replay requirements
 4. add conformance examples for retries, approvals, and compensation
+
+When this family matures, add conformance examples for:
+
+- verifier-driven retries
+- planner-to-executor handoff visibility
+- evolving memory snapshots between turns
+- final keep, reject, or escalate decisions tied to explicit outcome records
 
 ---
 
@@ -480,6 +505,8 @@ Current memory systems increasingly separate:
 
 Research and production systems increasingly treat memory writes as gated operations and memory upkeep as an asynchronous lifecycle problem. That lines up well with Elegy’s existing salience-gate direction.
 
+Recent autonomous-improvement work adds another important pattern: systems improve faster when they retain structured execution memory, verifier outcomes, failure trails, and candidate-change lineage instead of only storing durable semantic facts. This does not mean storing raw transcripts. It means promoting distilled experiment and execution records into explicit memory kinds with their own retention and retrieval rules.
+
 ### Risks and anti-patterns
 
 Avoid:
@@ -500,6 +527,13 @@ Split the future memory substrate into explicit reusable layers:
 - freshness, contradiction, and provenance metadata
 
 Keep the dedicated CLI, but position it as a thin operator shell over that substrate.
+
+Add room for explicit memory kinds such as:
+
+- semantic memory for durable facts and preferences
+- episodic execution memory for actions, outcomes, and traces
+- verifier memory for checks, failures, and acceptance decisions
+- experiment memory for candidate changes, measured deltas, and promotion history
 
 ---
 
@@ -687,6 +721,11 @@ The good pattern is consistent across robust automation-focused CLIs:
 
 This is especially important if Elegy is meant to support both standard AI apps and advanced automation systems.
 
+Recent autonomous-improvement tooling suggests two additional CLI-friendly patterns that fit Elegy well:
+
+- prefer bounded mutation surfaces over broad implicit edit authority
+- prefer fixed-budget, machine-readable evaluation loops with explicit keep-or-discard outcomes
+
 ### Risks and anti-patterns
 
 Avoid:
@@ -706,6 +745,13 @@ Adopt shared CLI rules across all operator binaries:
 - correlation ID emission
 - dry-run where applicable
 - stable error object shape
+
+Where a CLI performs analysis, generation, or transformation work that may later be auto-improved, also prefer:
+
+- explicit input and output artifact references
+- stable evaluation result objects
+- machine-readable promotion or rejection reasons
+- deterministic non-interactive operation for repeated benchmark runs
 
 ---
 
@@ -929,6 +975,7 @@ Focus on the smallest reusable layers with the strongest evidence:
 4. memory substrate split between contracts or traits and operator shell
 5. narrow retrieval pipeline traits
 6. OTel-compatible event and trace guidance
+7. verifier-friendly execution event and outcome records
 
 ### Medium-term
 
@@ -939,6 +986,7 @@ Once the earlier contracts exist and are tested:
 3. retrieval and routing eval harnesses
 4. explicit policy-decision and stop-condition contracts
 5. progressive disclosure primitives for indexes, details, and expansion
+6. explicit experiment-result and verifier-result contracts for bounded improvement loops
 
 ### Later
 
@@ -990,6 +1038,9 @@ This matters because the repo is strongest when it stays a reusable substrate, n
 - Agentic RAG survey: <https://arxiv.org/abs/2501.09136>
 - Claude-Mem progressive disclosure note: <https://docs.claude-mem.ai/progressive-disclosure>
 - Supabase agent-skills progressive disclosure model: <https://deepwiki.com/supabase/agent-skills/2.1-progressive-disclosure-model>
+- AgentFlow project page: <https://agentflow.stanford.edu/>
+- SOAR paper: <https://arxiv.org/abs/2407.20635>
+- Karpathy autoresearch repository: <https://github.com/karpathy/autoresearch>
 
 ## Final recommendation
 
