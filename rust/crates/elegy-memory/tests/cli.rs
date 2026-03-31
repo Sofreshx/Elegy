@@ -176,8 +176,7 @@ fn reembed_requires_a_configured_provider_from_cli() {
         String::from_utf8_lossy(&reembed.stdout)
     );
     assert!(
-        String::from_utf8_lossy(&reembed.stderr)
-            .contains("reembed requires an embedding provider"),
+        String::from_utf8_lossy(&reembed.stderr).contains("reembed requires an embedding provider"),
         "expected provider-required error, stderr: {}",
         String::from_utf8_lossy(&reembed.stderr)
     );
