@@ -101,6 +101,14 @@
       ]
     },
     {
+      "name": "capability-definition",
+      "schemaVersion": "1.0.0",
+      "file": "capability-definition.schema.json",
+      "fixtures": [
+        "fixtures/capability-definition.minimal.json"
+      ]
+    },
+    {
       "name": "agent-definition",
       "schemaVersion": "1.0.0",
       "file": "agent-definition.schema.json",

@@ -1,12 +1,15 @@
 use elegy_contracts::{
-    default_support_manifest_path, export_contract_bundle, load_compatibility_manifest_from_dir,
+    default_support_manifest_path, export_contract_bundle,
+    load_capability_definition_fixture_from_dir, load_compatibility_manifest_from_dir,
     load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
     load_skill_discovery_index_fixture_from_dir, resolve_upstream_contracts_dir,
-    validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition,
-    validate_support_manifest_against_upstream, McpAnalysisResult, McpServerDescriptor,
-    McpToolAnalysis, McpToolDefinition, SkillApprovalRequirement, SkillDefinition,
-    SkillGovernanceMetadata, SkillMaterializationKind, SkillOrigin, SkillSourceKind,
+    validate_capability_definition, validate_mcp_analysis_result, validate_mcp_server_descriptor,
+    validate_skill_definition, validate_support_manifest_against_upstream,
+    CapabilityApprovalRequirement, CapabilityDefinition, CapabilityGovernance, CapabilitySource,
+    CapabilitySourceKind, McpAnalysisResult, McpServerDescriptor, McpToolAnalysis,
+    McpToolDefinition, SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
+    SkillMaterializationKind, SkillOrigin, SkillSourceKind,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -37,6 +40,24 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("mcp-tool-definition"));
     assert!(schema_names.contains("mcp-server-descriptor"));
     assert!(schema_names.contains("mcp-analysis-result"));
+    assert!(schema_names.contains("capability-definition"));
+}
+
+#[test]
+fn upstream_capability_definition_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let definition = load_capability_definition_fixture_from_dir(&contracts_dir)
+        .expect("load upstream capability-definition fixture");
+
+    let validation = validate_capability_definition(&definition);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(definition.id, "cap.example.echo");
+    assert_eq!(definition.display_name, "Example Echo Capability");
 }
 
 #[test]
@@ -101,6 +122,35 @@ fn validator_matches_phase_two_governance_and_origin_rules() {
     let origin_validation = validate_skill_definition(&dynamic_manual);
     assert!(origin_validation.issues.contains(
         &"Dynamic skills must declare either a source reference or a non-manual source kind."
+            .to_string()
+    ));
+}
+
+#[test]
+fn capability_validator_rejects_missing_policy_refs_and_missing_source_refs() {
+    let invalid = CapabilityDefinition {
+        id: "cap.invalid".to_string(),
+        display_name: "Invalid capability".to_string(),
+        version: "1.0.0".to_string(),
+        governance: CapabilityGovernance {
+            approval_requirement: CapabilityApprovalRequirement::Required,
+            ..CapabilityGovernance::default()
+        },
+        source: CapabilitySource {
+            source_kind: CapabilitySourceKind::Generated,
+            source_ref: None,
+            artifact_ref: None,
+        },
+        ..CapabilityDefinition::default()
+    };
+
+    let validation = validate_capability_definition(&invalid);
+    assert!(validation.issues.contains(
+        &"Capabilities that require approval must declare at least one policy reference."
+            .to_string()
+    ));
+    assert!(validation.issues.contains(
+        &"Imported, generated, or projected capabilities must declare a sourceRef or artifactRef."
             .to_string()
     ));
 }
@@ -209,6 +259,13 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path.join("compatibility-matrix.json").is_file());
     assert!(output_path.join("canonical-workflow.schema.json").is_file());
     assert!(output_path
+        .join("capability-definition.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("capability-definition.minimal.json")
+        .is_file());
+    assert!(output_path
         .join("fixtures")
         .join("mcp-parity-expected.json")
         .is_file());
@@ -217,6 +274,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
         let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
         assert!(archive.by_name("compatibility-manifest.json").is_ok());
+        assert!(archive.by_name("capability-definition.schema.json").is_ok());
+        assert!(archive
+            .by_name("fixtures/capability-definition.minimal.json")
+            .is_ok());
         assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }
 

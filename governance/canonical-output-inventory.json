@@ -59,6 +59,10 @@
       "generated": "artifacts/contracts/canonical-workflow.schema.json"
     },
     {
+      "source": "contracts/schemas/capability-definition.schema.json",
+      "generated": "artifacts/contracts/capability-definition.schema.json"
+    },
+    {
       "source": "contracts/schemas/dynamic-skill-activation.schema.json",
       "generated": "artifacts/contracts/dynamic-skill-activation.schema.json"
     },
@@ -129,6 +133,10 @@
     {
       "source": "contracts/fixtures/canonical-workflow.minimal.json",
       "generated": "artifacts/contracts/fixtures/canonical-workflow.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/capability-definition.minimal.json",
+      "generated": "artifacts/contracts/fixtures/capability-definition.minimal.json"
     },
     {
       "source": "contracts/fixtures/dynamic-skill-activation.minimal.json",

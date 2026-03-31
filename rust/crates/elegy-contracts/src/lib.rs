@@ -224,6 +224,189 @@ pub struct AgentEventEnvelope {
     pub payload: AgentEventPayload,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityDefinition {
+    pub id: String,
+    pub display_name: String,
+    pub version: String,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub family: CapabilityFamily,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub input: CapabilitySchemaReference,
+    #[serde(default)]
+    pub output: CapabilitySchemaReference,
+    #[serde(default)]
+    pub execution: CapabilityExecutionContract,
+    #[serde(default)]
+    pub governance: CapabilityGovernance,
+    #[serde(default)]
+    pub source: CapabilitySource,
+    #[serde(default)]
+    pub observability: CapabilityObservability,
+    #[serde(default)]
+    pub lifecycle_state: CapabilityLifecycleState,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityFamily {
+    #[default]
+    Skill,
+    McpTool,
+    WorkflowNode,
+    RetrievalSource,
+    Adapter,
+    Custom,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitySchemaReference {
+    pub schema: Option<Value>,
+    pub schema_ref: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityExecutionContract {
+    #[serde(default)]
+    pub side_effect_class: CapabilitySideEffectClass,
+    #[serde(default)]
+    pub auth_mode: CapabilityAuthMode,
+    #[serde(default)]
+    pub idempotence: CapabilityIdempotenceHint,
+    #[serde(default)]
+    pub cost_hint: CapabilityCostHint,
+    #[serde(default)]
+    pub latency_hint: CapabilityLatencyHint,
+    pub timeout_seconds: Option<i32>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilitySideEffectClass {
+    #[default]
+    None,
+    Read,
+    Write,
+    External,
+    Destructive,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityAuthMode {
+    #[default]
+    None,
+    Delegated,
+    User,
+    Service,
+    Environment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityIdempotenceHint {
+    #[default]
+    Unknown,
+    Conditional,
+    Always,
+    Never,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityCostHint {
+    #[default]
+    Unknown,
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityLatencyHint {
+    #[default]
+    Unknown,
+    Interactive,
+    Background,
+    Batch,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityGovernance {
+    #[serde(default)]
+    pub trust_level: CapabilityTrustLevel,
+    #[serde(default)]
+    pub approval_requirement: CapabilityApprovalRequirement,
+    #[serde(default)]
+    pub policy_refs: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityTrustLevel {
+    Untrusted,
+    Sandboxed,
+    #[default]
+    Trusted,
+    Privileged,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityApprovalRequirement {
+    #[default]
+    None,
+    Advisory,
+    Required,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitySource {
+    #[serde(default)]
+    pub source_kind: CapabilitySourceKind,
+    pub source_ref: Option<String>,
+    pub artifact_ref: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilitySourceKind {
+    #[default]
+    Manual,
+    Imported,
+    Generated,
+    Projected,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityObservability {
+    #[serde(default)]
+    pub labels: Vec<String>,
+    pub correlation_required: bool,
+    pub emits_execution_events: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityLifecycleState {
+    #[default]
+    Draft,
+    Active,
+    Deprecated,
+    Archived,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractsBundleExport {
@@ -580,6 +763,17 @@ impl AgentEnvelopeValidationResult {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CapabilityValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl CapabilityValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
 pub fn default_support_manifest_path() -> PathBuf {
     resolve_contracts_source_dir()
         .join("support")
@@ -821,6 +1015,15 @@ pub fn load_consumer_support_manifest(
     load_json_file(path)
 }
 
+pub fn load_capability_definition_fixture_from_dir(
+    dir: &Path,
+) -> Result<CapabilityDefinition, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("capability-definition.minimal.json"),
+    )
+}
+
 pub fn load_skill_definition_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDefinition, ContractsError> {
@@ -915,6 +1118,104 @@ pub fn validate_support_manifest_against_upstream(
     }
 
     Ok(())
+}
+
+pub fn validate_capability_definition(
+    definition: &CapabilityDefinition,
+) -> CapabilityValidationResult {
+    let mut issues = Vec::new();
+
+    if definition.id.trim().is_empty() {
+        issues.push("Capability definition id must not be blank.".to_string());
+    }
+
+    if definition.display_name.trim().is_empty() {
+        issues.push("Capability definition displayName must not be blank.".to_string());
+    }
+
+    if definition.version.trim().is_empty() {
+        issues.push("Capability definition version must not be blank.".to_string());
+    }
+
+    if definition.tags.iter().any(|tag| tag.trim().is_empty()) {
+        issues.push("Capability definition tags must not be blank.".to_string());
+    }
+
+    if definition.governance.approval_requirement == CapabilityApprovalRequirement::Required
+        && definition.governance.policy_refs.is_empty()
+    {
+        issues.push(
+            "Capabilities that require approval must declare at least one policy reference."
+                .to_string(),
+        );
+    }
+
+    if definition
+        .governance
+        .policy_refs
+        .iter()
+        .any(|policy_ref| policy_ref.trim().is_empty())
+    {
+        issues.push("Capability policy references must not be blank.".to_string());
+    }
+
+    if definition
+        .observability
+        .labels
+        .iter()
+        .any(|label| label.trim().is_empty())
+    {
+        issues.push("Capability observability labels must not be blank.".to_string());
+    }
+
+    if definition
+        .execution
+        .timeout_seconds
+        .is_some_and(|timeout| timeout <= 0)
+    {
+        issues.push("Capability timeoutSeconds must be greater than zero when set.".to_string());
+    }
+
+    if definition
+        .source
+        .source_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Capability sourceRef must not be blank when provided.".to_string());
+    }
+
+    if definition
+        .source
+        .artifact_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Capability artifactRef must not be blank when provided.".to_string());
+    }
+
+    let source_ref_present = definition
+        .source
+        .source_ref
+        .as_deref()
+        .is_some_and(|source_ref| !source_ref.trim().is_empty());
+    let artifact_ref_present = definition
+        .source
+        .artifact_ref
+        .as_deref()
+        .is_some_and(|artifact_ref| !artifact_ref.trim().is_empty());
+
+    if definition.source.source_kind != CapabilitySourceKind::Manual
+        && !source_ref_present
+        && !artifact_ref_present
+    {
+        issues.push(
+            "Imported, generated, or projected capabilities must declare a sourceRef or artifactRef."
+                .to_string(),
+        );
+    }
+
+    CapabilityValidationResult { issues }
 }
 
 pub fn validate_skill_definition(definition: &SkillDefinition) -> SkillValidationResult {

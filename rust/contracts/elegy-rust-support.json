@@ -98,6 +98,7 @@
     "agent-event-envelope": "1.0.0",
     "agent-request-envelope": "1.0.0",
     "agent-response-envelope": "1.0.0",
+    "capability-definition": "1.0.0",
     "governed-memory-record": "1.0.0",
     "governed-memory-record-projection": "1.0.0",
     "summary-only-session-context-envelope": "1.0.0",
