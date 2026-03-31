@@ -133,6 +133,14 @@
       ]
     },
     {
+      "name": "execution-event",
+      "schemaVersion": "1.0.0",
+      "file": "execution-event.schema.json",
+      "fixtures": [
+        "fixtures/execution-event.minimal.json"
+      ]
+    },
+    {
       "name": "agent-definition",
       "schemaVersion": "1.0.0",
       "file": "agent-definition.schema.json",

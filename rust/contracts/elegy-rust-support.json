@@ -99,6 +99,7 @@
     "agent-request-envelope": "1.0.0",
     "agent-response-envelope": "1.0.0",
     "capability-definition": "1.0.0",
+    "execution-event": "1.0.0",
     "governed-memory-record": "1.0.0",
     "governed-memory-record-projection": "1.0.0",
     "invocation-request": "1.0.0",

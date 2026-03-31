@@ -107,6 +107,10 @@
       "generated": "artifacts/contracts/invocation-response.schema.json"
     },
     {
+      "source": "contracts/schemas/execution-event.schema.json",
+      "generated": "artifacts/contracts/execution-event.schema.json"
+    },
+    {
       "source": "contracts/fixtures/agent-create-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/agent-create-request.minimal.json"
     },
@@ -237,6 +241,10 @@
     {
       "source": "contracts/fixtures/invocation-response.minimal.json",
       "generated": "artifacts/contracts/fixtures/invocation-response.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/execution-event.minimal.json",
+      "generated": "artifacts/contracts/fixtures/execution-event.minimal.json"
     }
   ],
   "archivePatterns": [

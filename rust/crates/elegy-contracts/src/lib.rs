@@ -310,6 +310,59 @@ pub enum InvocationStatus {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct ExecutionEvent {
+    pub event_id: String,
+    pub request_id: String,
+    pub execution_id: String,
+    pub sequence: u64,
+    pub timestamp: String,
+    #[serde(default)]
+    pub event_type: ExecutionEventType,
+    #[serde(default)]
+    pub status: ExecutionEventStatus,
+    pub correlation_id: Option<String>,
+    pub trace_ref: Option<String>,
+    pub capability_id: Option<String>,
+    pub message: Option<String>,
+    pub progress: Option<ExecutionProgress>,
+    pub failure: Option<StructuredFailure>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionEventType {
+    #[default]
+    Accepted,
+    Started,
+    Progress,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionEventStatus {
+    #[default]
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionProgress {
+    pub current: u64,
+    pub total: u64,
+    pub unit: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityDefinition {
     pub id: String,
     pub display_name: String,
@@ -870,6 +923,17 @@ impl InvocationValidationResult {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ExecutionEventValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl ExecutionEventValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CapabilityValidationResult {
     pub issues: Vec<String>,
 }
@@ -1139,6 +1203,12 @@ pub fn load_invocation_response_fixture_from_dir(
     load_json_file(&dir.join("fixtures").join("invocation-response.minimal.json"))
 }
 
+pub fn load_execution_event_fixture_from_dir(
+    dir: &Path,
+) -> Result<ExecutionEvent, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("execution-event.minimal.json"))
+}
+
 pub fn load_capability_definition_fixture_from_dir(
     dir: &Path,
 ) -> Result<CapabilityDefinition, ContractsError> {
@@ -1373,6 +1443,74 @@ pub fn validate_invocation_response(response: &InvocationResponse) -> Invocation
     }
 
     InvocationValidationResult { issues }
+}
+
+pub fn validate_execution_event(event: &ExecutionEvent) -> ExecutionEventValidationResult {
+    let mut issues = Vec::new();
+
+    if event.event_id.trim().is_empty() {
+        issues.push("Execution event must declare an eventId.".to_string());
+    }
+
+    if event.request_id.trim().is_empty() {
+        issues.push("Execution event must declare a requestId.".to_string());
+    }
+
+    if event.execution_id.trim().is_empty() {
+        issues.push("Execution event must declare an executionId.".to_string());
+    }
+
+    if event.sequence == 0 {
+        issues.push("Execution event sequence must be greater than zero.".to_string());
+    }
+
+    if event.timestamp.trim().is_empty() {
+        issues.push("Execution event must declare a timestamp.".to_string());
+    }
+
+    if event.correlation_id.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event correlationId must not be blank when provided.".to_string());
+    }
+
+    if event.trace_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event traceRef must not be blank when provided.".to_string());
+    }
+
+    if event.capability_id.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event capabilityId must not be blank when provided.".to_string());
+    }
+
+    if event.message.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event message must not be blank when provided.".to_string());
+    }
+
+    if has_blank_metadata_entries(&event.metadata) {
+        issues.push("Execution event metadata must not contain blank keys or values.".to_string());
+    }
+
+    if let Some(progress) = &event.progress {
+        if progress.total < progress.current {
+            issues.push("Execution event progress total must be greater than or equal to current.".to_string());
+        }
+
+        if progress.unit.as_deref().is_some_and(str::is_empty) {
+            issues.push("Execution event progress unit must not be blank when provided.".to_string());
+        }
+    }
+
+    if let Some(failure) = &event.failure {
+        issues.extend(validate_structured_failure(failure).issues);
+    }
+
+    if matches!(
+        event.event_type,
+        ExecutionEventType::Failed | ExecutionEventType::Cancelled
+    ) && event.failure.is_none()
+    {
+        issues.push("Failed or cancelled execution events must include a structured failure.".to_string());
+    }
+
+    ExecutionEventValidationResult { issues }
 }
 
 pub fn validate_capability_definition(

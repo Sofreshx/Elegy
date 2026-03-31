@@ -4,17 +4,18 @@ use elegy_contracts::{
     load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
     load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
-    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
-    resolve_upstream_contracts_dir, validate_capability_definition,
-    validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
+    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
+    load_invocation_response_fixture_from_dir, resolve_upstream_contracts_dir,
+    validate_capability_definition, validate_execution_event, validate_invocation_request,
+    validate_invocation_response, validate_mcp_analysis_result,
     validate_mcp_server_descriptor, validate_skill_definition, validate_structured_failure,
-    validate_support_manifest_against_upstream,
-    CapabilityApprovalRequirement, CapabilityDefinition, CapabilityGovernance, CapabilitySource,
-    CapabilitySourceKind, InvocationRequest, InvocationResponse, InvocationStatus,
-    McpAnalysisResult, McpServerDescriptor, McpToolAnalysis, McpToolDefinition,
-    SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
-    SkillMaterializationKind, SkillOrigin, SkillSourceKind, StructuredFailure,
-    StructuredFailureCause, StructuredFailureCategory,
+    validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
+    CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
+    ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationRequest,
+    InvocationResponse, InvocationStatus, McpAnalysisResult, McpServerDescriptor,
+    McpToolAnalysis, McpToolDefinition, SkillApprovalRequirement, SkillDefinition,
+    SkillGovernanceMetadata, SkillMaterializationKind, SkillOrigin, SkillSourceKind,
+    StructuredFailure, StructuredFailureCause, StructuredFailureCategory,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -49,6 +50,7 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("structured-failure"));
     assert!(schema_names.contains("invocation-request"));
     assert!(schema_names.contains("invocation-response"));
+    assert!(schema_names.contains("execution-event"));
 }
 
 #[test]
@@ -100,6 +102,24 @@ fn upstream_invocation_response_fixture_is_semantically_valid() {
 
     assert_eq!(response.request_id, "invoke-req-1");
     assert_eq!(response.status, InvocationStatus::Completed);
+}
+
+#[test]
+fn upstream_execution_event_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let event = load_execution_event_fixture_from_dir(&contracts_dir)
+        .expect("load upstream execution-event fixture");
+
+    let validation = validate_execution_event(&event);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(event.event_id, "exec-event-1");
+    assert_eq!(event.event_type, ExecutionEventType::Accepted);
+    assert_eq!(event.status, ExecutionEventStatus::Pending);
 }
 
 #[test]
@@ -264,6 +284,41 @@ fn invocation_validators_reject_missing_fields_and_missing_failure() {
 }
 
 #[test]
+fn execution_event_validator_rejects_missing_fields_and_missing_failure() {
+    let invalid = ExecutionEvent {
+        event_id: String::new(),
+        request_id: String::new(),
+        execution_id: String::new(),
+        sequence: 0,
+        timestamp: String::new(),
+        event_type: ExecutionEventType::Failed,
+        status: ExecutionEventStatus::Failed,
+        failure: None,
+        ..ExecutionEvent::default()
+    };
+
+    let validation = validate_execution_event(&invalid);
+    assert!(validation
+        .issues
+        .contains(&"Execution event must declare an eventId.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"Execution event must declare a requestId.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"Execution event must declare an executionId.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"Execution event sequence must be greater than zero.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"Execution event must declare a timestamp.".to_string()));
+    assert!(validation.issues.contains(
+        &"Failed or cancelled execution events must include a structured failure.".to_string()
+    ));
+}
+
+#[test]
 fn structured_failure_validator_rejects_blank_fields_and_non_object_details() {
     let invalid = StructuredFailure {
         code: String::new(),
@@ -407,6 +462,7 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path.join("invocation-request.schema.json").is_file());
     assert!(output_path.join("invocation-response.schema.json").is_file());
+    assert!(output_path.join("execution-event.schema.json").is_file());
     assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
@@ -425,6 +481,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .is_file());
     assert!(output_path
         .join("fixtures")
+        .join("execution-event.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
         .join("mcp-parity-expected.json")
         .is_file());
 
@@ -436,6 +496,7 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive.by_name("invocation-request.schema.json").is_ok());
         assert!(archive.by_name("invocation-response.schema.json").is_ok());
+        assert!(archive.by_name("execution-event.schema.json").is_ok());
         assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
@@ -447,6 +508,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
             .is_ok());
         assert!(archive
             .by_name("fixtures/invocation-response.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/execution-event.minimal.json")
             .is_ok());
         assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }
