@@ -226,6 +226,42 @@ pub struct AgentEventEnvelope {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
+pub struct StructuredFailure {
+    pub code: String,
+    pub message: String,
+    #[serde(default)]
+    pub category: StructuredFailureCategory,
+    pub retryable: bool,
+    pub correlation_id: Option<String>,
+    pub details: Option<Value>,
+    pub cause: Option<StructuredFailureCause>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StructuredFailureCategory {
+    InvalidInput,
+    Policy,
+    Authentication,
+    Authorization,
+    Timeout,
+    Dependency,
+    Unavailable,
+    Conflict,
+    Internal,
+    #[default]
+    Unknown,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StructuredFailureCause {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
 pub struct CapabilityDefinition {
     pub id: String,
     pub display_name: String,
@@ -764,6 +800,17 @@ impl AgentEnvelopeValidationResult {
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StructuredFailureValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl StructuredFailureValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct CapabilityValidationResult {
     pub issues: Vec<String>,
 }
@@ -1015,6 +1062,12 @@ pub fn load_consumer_support_manifest(
     load_json_file(path)
 }
 
+pub fn load_structured_failure_fixture_from_dir(
+    dir: &Path,
+) -> Result<StructuredFailure, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("structured-failure.minimal.json"))
+}
+
 pub fn load_capability_definition_fixture_from_dir(
     dir: &Path,
 ) -> Result<CapabilityDefinition, ContractsError> {
@@ -1118,6 +1171,44 @@ pub fn validate_support_manifest_against_upstream(
     }
 
     Ok(())
+}
+
+pub fn validate_structured_failure(
+    failure: &StructuredFailure,
+) -> StructuredFailureValidationResult {
+    let mut issues = Vec::new();
+
+    if failure.code.trim().is_empty() {
+        issues.push("Structured failure code must not be blank.".to_string());
+    }
+
+    if failure.message.trim().is_empty() {
+        issues.push("Structured failure message must not be blank.".to_string());
+    }
+
+    if failure
+        .correlation_id
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Structured failure correlationId must not be blank when provided.".to_string());
+    }
+
+    if failure.details.as_ref().is_some_and(|details| !details.is_object()) {
+        issues.push("Structured failure details must be a JSON object when provided.".to_string());
+    }
+
+    if let Some(cause) = &failure.cause {
+        if cause.code.trim().is_empty() {
+            issues.push("Structured failure cause code must not be blank.".to_string());
+        }
+
+        if cause.message.trim().is_empty() {
+            issues.push("Structured failure cause message must not be blank.".to_string());
+        }
+    }
+
+    StructuredFailureValidationResult { issues }
 }
 
 pub fn validate_capability_definition(

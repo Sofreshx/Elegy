@@ -95,6 +95,10 @@
       "generated": "artifacts/contracts/skill-forge-request.schema.json"
     },
     {
+      "source": "contracts/schemas/structured-failure.schema.json",
+      "generated": "artifacts/contracts/structured-failure.schema.json"
+    },
+    {
       "source": "contracts/fixtures/agent-create-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/agent-create-request.minimal.json"
     },
@@ -213,6 +217,10 @@
     {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-forge-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/structured-failure.minimal.json",
+      "generated": "artifacts/contracts/fixtures/structured-failure.minimal.json"
     }
   ],
   "archivePatterns": [

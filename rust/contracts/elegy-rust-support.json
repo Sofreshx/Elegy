@@ -106,6 +106,7 @@
     "skill-discovery-index": "1.0.0",
     "mcp-tool-definition": "1.0.0",
     "mcp-server-descriptor": "1.0.0",
-    "mcp-analysis-result": "1.0.0"
+    "mcp-analysis-result": "1.0.0",
+    "structured-failure": "1.0.0"
   }
 }

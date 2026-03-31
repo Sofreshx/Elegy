@@ -109,6 +109,14 @@
       ]
     },
     {
+      "name": "structured-failure",
+      "schemaVersion": "1.0.0",
+      "file": "structured-failure.schema.json",
+      "fixtures": [
+        "fixtures/structured-failure.minimal.json"
+      ]
+    },
+    {
       "name": "agent-definition",
       "schemaVersion": "1.0.0",
       "file": "agent-definition.schema.json",

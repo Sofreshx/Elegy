@@ -3,13 +3,15 @@ use elegy_contracts::{
     load_capability_definition_fixture_from_dir, load_compatibility_manifest_from_dir,
     load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_fixture_from_dir,
-    load_skill_discovery_index_fixture_from_dir, resolve_upstream_contracts_dir,
-    validate_capability_definition, validate_mcp_analysis_result, validate_mcp_server_descriptor,
-    validate_skill_definition, validate_support_manifest_against_upstream,
+    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
+    resolve_upstream_contracts_dir, validate_capability_definition,
+    validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition,
+    validate_structured_failure, validate_support_manifest_against_upstream,
     CapabilityApprovalRequirement, CapabilityDefinition, CapabilityGovernance, CapabilitySource,
     CapabilitySourceKind, McpAnalysisResult, McpServerDescriptor, McpToolAnalysis,
     McpToolDefinition, SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
-    SkillMaterializationKind, SkillOrigin, SkillSourceKind,
+    SkillMaterializationKind, SkillOrigin, SkillSourceKind, StructuredFailure,
+    StructuredFailureCause, StructuredFailureCategory,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -41,6 +43,24 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("mcp-server-descriptor"));
     assert!(schema_names.contains("mcp-analysis-result"));
     assert!(schema_names.contains("capability-definition"));
+    assert!(schema_names.contains("structured-failure"));
+}
+
+#[test]
+fn upstream_structured_failure_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let failure = load_structured_failure_fixture_from_dir(&contracts_dir)
+        .expect("load upstream structured-failure fixture");
+
+    let validation = validate_structured_failure(&failure);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(failure.code, "capability.invalid-input");
+    assert_eq!(failure.category, StructuredFailureCategory::InvalidInput);
 }
 
 #[test]
@@ -156,6 +176,41 @@ fn capability_validator_rejects_missing_policy_refs_and_missing_source_refs() {
 }
 
 #[test]
+fn structured_failure_validator_rejects_blank_fields_and_non_object_details() {
+    let invalid = StructuredFailure {
+        code: String::new(),
+        message: String::new(),
+        correlation_id: Some(String::new()),
+        details: Some(serde_json::json!(7)),
+        cause: Some(StructuredFailureCause {
+            code: String::new(),
+            message: String::new(),
+        }),
+        ..StructuredFailure::default()
+    };
+
+    let validation = validate_structured_failure(&invalid);
+    assert!(validation
+        .issues
+        .contains(&"Structured failure code must not be blank.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"Structured failure message must not be blank.".to_string()));
+    assert!(validation.issues.contains(
+        &"Structured failure correlationId must not be blank when provided.".to_string()
+    ));
+    assert!(validation.issues.contains(
+        &"Structured failure details must be a JSON object when provided.".to_string()
+    ));
+    assert!(validation
+        .issues
+        .contains(&"Structured failure cause code must not be blank.".to_string()));
+    assert!(validation.issues.contains(
+        &"Structured failure cause message must not be blank.".to_string()
+    ));
+}
+
+#[test]
 fn upstream_mcp_server_descriptor_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
     let descriptor = load_mcp_server_descriptor_fixture_from_dir(&contracts_dir)
@@ -261,9 +316,14 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path
         .join("capability-definition.schema.json")
         .is_file());
+    assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("structured-failure.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -275,8 +335,12 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
         assert!(archive.by_name("compatibility-manifest.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
+        assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/structured-failure.minimal.json")
             .is_ok());
         assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }
