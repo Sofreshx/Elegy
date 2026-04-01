@@ -13,6 +13,14 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
     dir
 }
 
+fn rust_workspace_root() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(|path| path.parent())
+        .expect("rust workspace root")
+        .to_path_buf()
+}
+
 #[test]
 fn author_mcp_command_writes_descriptor_file() {
     let temp_dir = unique_temp_dir("elegy-cli-author");
@@ -126,6 +134,40 @@ fn analyze_and_generate_commands_use_same_descriptor_input() {
     let generation_stdout = String::from_utf8(generation.stdout).expect("stdout should be utf-8");
     assert!(generation_stdout.contains("mcp-weather-server-get-weather"));
     assert!(generation_stdout.contains("list-alerts"));
+}
+
+#[test]
+fn run_dry_run_command_matches_http_example_catalog() {
+    let example = rust_workspace_root().join("examples/http-minimal");
+    let expected: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(example.join("expected-resources.json"))
+            .expect("read expected resources golden"),
+    )
+    .expect("parse expected resources golden");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "--project",
+            example.to_str().expect("utf-8 example path"),
+            "--format",
+            "json",
+            "run",
+            "--dry-run",
+        ])
+        .output()
+        .expect("run elegy dry-run against http example");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout: serde_json::Value = serde_json::from_slice(&output.stdout)
+        .expect("dry-run stdout should be valid json");
+    assert_eq!(stdout["status"], "ok");
+    assert_eq!(stdout["command"], serde_json::json!(["run", "dry-run"]));
+    assert_eq!(stdout["data"], expected);
 }
 
 #[test]

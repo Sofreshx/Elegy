@@ -3,9 +3,7 @@ param(
     [string]$Destination = '',
     [string]$Tag = '',
     [string]$Repository = 'Sofreshx/Elegy',
-    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-skills', 'all')]
     [string[]]$CliSurfaces = @('elegy-cli'),
-    [ValidateSet('elegy-memory', 'elegy-mcp', 'elegy-skills', 'all')]
     [string[]]$WrapperSurfaces = @(),
     [string]$LocalArtifactsRoot = '',
     [switch]$Force
@@ -97,18 +95,39 @@ function Get-WrapperSurfaceMetadata {
     }
 }
 
+function Expand-SurfaceSelectors {
+    param(
+        [string[]]$Selectors
+    )
+
+    $expanded = [System.Collections.Generic.List[string]]::new()
+    foreach ($selector in @($Selectors)) {
+        foreach ($entry in @(([string]$selector) -split ',')) {
+            $trimmedEntry = $entry.Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmedEntry)) {
+                continue
+            }
+
+            $expanded.Add($trimmedEntry) | Out-Null
+        }
+    }
+
+    return @($expanded)
+}
+
 function Resolve-CliSurfaces {
     param(
         [string[]]$RequestedSurfaces
     )
 
+    $expandedSurfaces = Expand-SurfaceSelectors -Selectors $RequestedSurfaces
     $surfaceMetadata = Get-CliSurfaceMetadata
-    if ($RequestedSurfaces -contains 'all') {
+    if ($expandedSurfaces -contains 'all') {
         return @($surfaceMetadata.Keys)
     }
 
     $resolved = [System.Collections.Generic.List[string]]::new()
-    foreach ($surface in $RequestedSurfaces) {
+    foreach ($surface in $expandedSurfaces) {
         if ($resolved.Contains($surface)) {
             continue
         }
@@ -132,13 +151,14 @@ function Resolve-WrapperSurfaces {
         return @()
     }
 
+    $expandedSurfaces = Expand-SurfaceSelectors -Selectors $RequestedSurfaces
     $surfaceMetadata = Get-WrapperSurfaceMetadata
-    if ($RequestedSurfaces -contains 'all') {
+    if ($expandedSurfaces -contains 'all') {
         return @($surfaceMetadata.Keys)
     }
 
     $resolved = [System.Collections.Generic.List[string]]::new()
-    foreach ($surface in $RequestedSurfaces) {
+    foreach ($surface in $expandedSurfaces) {
         if ($resolved.Contains($surface)) {
             continue
         }
