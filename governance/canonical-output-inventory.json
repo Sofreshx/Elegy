@@ -59,6 +59,10 @@
       "generated": "artifacts/contracts/canonical-workflow.schema.json"
     },
     {
+      "source": "contracts/schemas/capability-definition.schema.json",
+      "generated": "artifacts/contracts/capability-definition.schema.json"
+    },
+    {
       "source": "contracts/schemas/dynamic-skill-activation.schema.json",
       "generated": "artifacts/contracts/dynamic-skill-activation.schema.json"
     },
@@ -89,6 +93,22 @@
     {
       "source": "contracts/schemas/skill-forge-request.schema.json",
       "generated": "artifacts/contracts/skill-forge-request.schema.json"
+    },
+    {
+      "source": "contracts/schemas/structured-failure.schema.json",
+      "generated": "artifacts/contracts/structured-failure.schema.json"
+    },
+    {
+      "source": "contracts/schemas/invocation-request.schema.json",
+      "generated": "artifacts/contracts/invocation-request.schema.json"
+    },
+    {
+      "source": "contracts/schemas/invocation-response.schema.json",
+      "generated": "artifacts/contracts/invocation-response.schema.json"
+    },
+    {
+      "source": "contracts/schemas/execution-event.schema.json",
+      "generated": "artifacts/contracts/execution-event.schema.json"
     },
     {
       "source": "contracts/fixtures/agent-create-request.minimal.json",
@@ -129,6 +149,10 @@
     {
       "source": "contracts/fixtures/canonical-workflow.minimal.json",
       "generated": "artifacts/contracts/fixtures/canonical-workflow.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/capability-definition.minimal.json",
+      "generated": "artifacts/contracts/fixtures/capability-definition.minimal.json"
     },
     {
       "source": "contracts/fixtures/dynamic-skill-activation.minimal.json",
@@ -205,6 +229,22 @@
     {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-forge-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/structured-failure.minimal.json",
+      "generated": "artifacts/contracts/fixtures/structured-failure.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-request.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-response.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-response.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/execution-event.minimal.json",
+      "generated": "artifacts/contracts/fixtures/execution-event.minimal.json"
     }
   ],
   "archivePatterns": [

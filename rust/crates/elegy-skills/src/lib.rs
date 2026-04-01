@@ -1,8 +1,7 @@
 // Re-export public APIs from elegy-tooling for use by other crates
 pub use elegy_tooling::{
-    analyze_mcp_descriptor_file, author_mcp_descriptor_to_path,
-    AuthorMcpDescriptorRequest, AuthorMcpToolRequest, AuthoredMcpDescriptor, GeneratedSkillArtifacts,
-    ToolingError,
+    analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
+    AuthorMcpToolRequest, AuthoredMcpDescriptor, GeneratedSkillArtifacts, ToolingError,
 };
 
 use elegy_mcp::McpSurfaceError;

@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.3.1"
+    "version": "1.3.2"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
+      "targetPackageVersion": "1.3.2",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -36,7 +36,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
+      "targetPackageVersion": "1.3.2",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -61,7 +61,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
+      "targetPackageVersion": "1.3.2",
       "scope": "Dedicated MCP-to-skill generation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -98,6 +98,46 @@
       "file": "canonical-workflow-graph.schema.json",
       "fixtures": [
         "fixtures/canonical-workflow-graph.minimal.json"
+      ]
+    },
+    {
+      "name": "capability-definition",
+      "schemaVersion": "1.0.0",
+      "file": "capability-definition.schema.json",
+      "fixtures": [
+        "fixtures/capability-definition.minimal.json"
+      ]
+    },
+    {
+      "name": "structured-failure",
+      "schemaVersion": "1.0.0",
+      "file": "structured-failure.schema.json",
+      "fixtures": [
+        "fixtures/structured-failure.minimal.json"
+      ]
+    },
+    {
+      "name": "invocation-request",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-request.schema.json",
+      "fixtures": [
+        "fixtures/invocation-request.minimal.json"
+      ]
+    },
+    {
+      "name": "invocation-response",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-response.schema.json",
+      "fixtures": [
+        "fixtures/invocation-response.minimal.json"
+      ]
+    },
+    {
+      "name": "execution-event",
+      "schemaVersion": "1.0.0",
+      "file": "execution-event.schema.json",
+      "fixtures": [
+        "fixtures/execution-event.minimal.json"
       ]
     },
     {

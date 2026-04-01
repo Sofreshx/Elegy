@@ -41,13 +41,20 @@ jobs:
         run: |
           ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive
 
-      - name: Upload distribution artifacts
+      - name: Upload exported contracts artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: elegy-contracts-artifacts-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/contracts/**
+
+      - name: Upload contracts distribution archive
         uses: actions/upload-artifact@v4
         with:
           name: elegy-contracts-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/contracts/**
             artifacts/distribution/elegy-contracts-*.zip
 
   package-cli:

@@ -292,7 +292,10 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
         Utc::now(),
     );
 
-    store.store(semantic_match).await.expect("store semantic match");
+    store
+        .store(semantic_match)
+        .await
+        .expect("store semantic match");
     store.store(non_match).await.expect("store non-match");
 
     let results = store
@@ -604,12 +607,9 @@ fn test_store_with_provider(
 ) -> (TempDir, SqliteMemoryStore) {
     let temp_dir = TempDir::new().expect("create temp directory");
     let db_path = temp_dir.path().join(format!("{prefix}.sqlite3"));
-    let store = SqliteMemoryStore::new_with_embedding_provider(
-        &db_path,
-        MemoryScope::Workspace,
-        provider,
-    )
-    .expect("create sqlite store with embedding provider");
+    let store =
+        SqliteMemoryStore::new_with_embedding_provider(&db_path, MemoryScope::Workspace, provider)
+            .expect("create sqlite store with embedding provider");
     (temp_dir, store)
 }
 

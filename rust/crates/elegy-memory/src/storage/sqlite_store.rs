@@ -527,10 +527,9 @@ impl MemoryStore for SqliteMemoryStore {
         }
 
         let derived_query_embedding = if query.embedding.is_none() {
-            match self.generate_embedding(&trimmed_text).await {
-                Ok(embedding) => embedding,
-                Err(_) => None,
-            }
+            self.generate_embedding(&trimmed_text)
+                .await
+                .unwrap_or_default()
         } else {
             None
         };
@@ -1018,8 +1017,7 @@ fn embedding_degradation_warning(error: &EmbeddingError) -> Option<String> {
         .and_then(|remainder| remainder.split_once(": ").map(|(url, _)| url.trim()))?;
 
     Some(format!(
-        "Ollama not reachable at {}, storing without embeddings. Run reembed later.",
-        url
+        "Ollama not reachable at {url}, storing without embeddings. Run reembed later."
     ))
 }
 

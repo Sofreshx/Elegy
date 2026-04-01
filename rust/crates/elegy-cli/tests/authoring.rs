@@ -1,3 +1,10 @@
+use elegy_contracts::{
+    validate_execution_event, validate_invocation_request, validate_invocation_response,
+    ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationContext, InvocationRequest,
+    InvocationResponse, InvocationStatus,
+};
+use serde_json::{json, Value};
+use std::collections::BTreeMap;
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
@@ -58,6 +65,175 @@ fn author_mcp_command_writes_descriptor_file() {
     let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
     assert!(stdout.contains("\"status\": \"ok\""));
     assert!(stdout.contains("\"output_path\""));
+}
+
+#[test]
+fn author_mcp_command_supports_machine_flags_and_correlation_id() {
+    let temp_dir = unique_temp_dir("elegy-cli-author-machine");
+    let output_path = temp_dir.join("machine-weather-mcp.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-author-1",
+            "author",
+            "mcp",
+            "--server-name",
+            "weather-server",
+            "--tool",
+            "get-weather=Look up a weather report",
+            "--output",
+            output_path.to_str().expect("utf-8 output path"),
+        ])
+        .output()
+        .expect("run elegy author mcp with machine flags");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_path.is_file());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"ok\""));
+    assert!(stdout.contains("\"correlationId\": \"corr-author-1\""));
+    assert!(stdout.contains("\"nonInteractive\": true"));
+    assert!(stdout.contains("\"serverName\": \"weather-server\""));
+}
+
+#[test]
+fn author_mcp_machine_output_maps_cleanly_to_invocation_contracts() {
+    let temp_dir = unique_temp_dir("elegy-cli-author-invocation");
+    let output_path = temp_dir.join("invocation-weather-mcp.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-author-map-1",
+            "author",
+            "mcp",
+            "--server-name",
+            "weather-server",
+            "--tool",
+            "get-weather=Look up a weather report",
+            "--output",
+            output_path.to_str().expect("utf-8 output path"),
+        ])
+        .output()
+        .expect("run elegy author mcp for invocation mapping");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_path.is_file());
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid machine json");
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["correlationId"], "corr-author-map-1");
+    assert_eq!(envelope["nonInteractive"], true);
+    assert_eq!(envelope["command"], json!(["author", "mcp"]));
+
+    let request = InvocationRequest {
+        request_id: "invoke-author-mcp-1".to_string(),
+        capability_id: "elegy.author.mcp".to_string(),
+        input: json!({
+            "serverName": "weather-server",
+            "toolSpecs": ["get-weather=Look up a weather report"],
+            "outputPath": output_path.display().to_string()
+        }),
+        context: InvocationContext {
+            correlation_id: envelope["correlationId"]
+                .as_str()
+                .expect("correlation id string")
+                .to_string(),
+            execution_id: "exec-author-mcp-1".to_string(),
+            requested_at: "2026-03-31T18:00:00Z".to_string(),
+            timeout_seconds: Some(30),
+            caller_ref: Some("integration-test:elegy-cli-authoring".to_string()),
+            policy_context: Some(BTreeMap::from([(
+                "mode".to_string(),
+                "non-interactive".to_string(),
+            )])),
+            trace_ref: Some("trace-author-mcp-1".to_string()),
+            metadata: BTreeMap::from([(
+                "surface".to_string(),
+                "elegy-cli-machine-envelope".to_string(),
+            )]),
+        },
+    };
+    let request_validation = validate_invocation_request(&request);
+    assert!(
+        request_validation.is_valid(),
+        "unexpected request issues: {:?}",
+        request_validation.issues
+    );
+
+    let response = InvocationResponse {
+        request_id: request.request_id.clone(),
+        execution_id: request.context.execution_id.clone(),
+        status: InvocationStatus::Completed,
+        output: Some(json!({
+            "command": envelope["command"].clone(),
+            "summary": envelope["summary"].clone(),
+            "descriptor": envelope["data"]["descriptor"].clone(),
+            "outputPath": envelope["data"]["outputPath"].clone()
+        })),
+        failure: None,
+        completed_at: Some("2026-03-31T18:00:01Z".to_string()),
+        trace_ref: request.context.trace_ref.clone(),
+        metadata: BTreeMap::from([
+            ("surface".to_string(), "elegy-cli".to_string()),
+            (
+                "mappedFrom".to_string(),
+                "author-mcp-machine-output".to_string(),
+            ),
+        ]),
+    };
+    let response_validation = validate_invocation_response(&response);
+    assert!(
+        response_validation.is_valid(),
+        "unexpected response issues: {:?}",
+        response_validation.issues
+    );
+
+    let event = ExecutionEvent {
+        event_id: "exec-event-author-mcp-1".to_string(),
+        request_id: request.request_id.clone(),
+        execution_id: request.context.execution_id.clone(),
+        sequence: 1,
+        timestamp: "2026-03-31T18:00:00Z".to_string(),
+        event_type: ExecutionEventType::Completed,
+        status: ExecutionEventStatus::Completed,
+        correlation_id: Some(request.context.correlation_id.clone()),
+        trace_ref: request.context.trace_ref.clone(),
+        capability_id: Some(request.capability_id.clone()),
+        message: Some("author mcp completed successfully".to_string()),
+        progress: None,
+        failure: None,
+        metadata: BTreeMap::from([
+            ("surface".to_string(), "elegy-cli".to_string()),
+            ("command".to_string(), "author mcp".to_string()),
+        ]),
+    };
+    let event_validation = validate_execution_event(&event);
+    assert!(
+        event_validation.is_valid(),
+        "unexpected event issues: {:?}",
+        event_validation.issues
+    );
+
+    assert_eq!(
+        response.output.as_ref().expect("completed output")["descriptor"]["serverName"],
+        "weather-server"
+    );
 }
 
 #[test]

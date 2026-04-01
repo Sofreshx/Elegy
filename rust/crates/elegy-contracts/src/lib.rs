@@ -224,6 +224,326 @@ pub struct AgentEventEnvelope {
     pub payload: AgentEventPayload,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct StructuredFailure {
+    pub code: String,
+    pub message: String,
+    #[serde(default)]
+    pub category: StructuredFailureCategory,
+    pub retryable: bool,
+    pub correlation_id: Option<String>,
+    pub details: Option<Value>,
+    pub cause: Option<StructuredFailureCause>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum StructuredFailureCategory {
+    InvalidInput,
+    Policy,
+    Authentication,
+    Authorization,
+    Timeout,
+    Dependency,
+    Unavailable,
+    Conflict,
+    Internal,
+    #[default]
+    Unknown,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct StructuredFailureCause {
+    pub code: String,
+    pub message: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InvocationRequest {
+    pub request_id: String,
+    pub capability_id: String,
+    pub input: Value,
+    #[serde(default)]
+    pub context: InvocationContext,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InvocationContext {
+    pub correlation_id: String,
+    pub execution_id: String,
+    pub requested_at: String,
+    pub timeout_seconds: Option<i32>,
+    pub caller_ref: Option<String>,
+    pub policy_context: Option<BTreeMap<String, String>>,
+    pub trace_ref: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct InvocationResponse {
+    pub request_id: String,
+    pub execution_id: String,
+    #[serde(default)]
+    pub status: InvocationStatus,
+    pub output: Option<Value>,
+    pub failure: Option<StructuredFailure>,
+    pub completed_at: Option<String>,
+    pub trace_ref: Option<String>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum InvocationStatus {
+    #[default]
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionEvent {
+    pub event_id: String,
+    pub request_id: String,
+    pub execution_id: String,
+    pub sequence: u64,
+    pub timestamp: String,
+    #[serde(default)]
+    pub event_type: ExecutionEventType,
+    #[serde(default)]
+    pub status: ExecutionEventStatus,
+    pub correlation_id: Option<String>,
+    pub trace_ref: Option<String>,
+    pub capability_id: Option<String>,
+    pub message: Option<String>,
+    pub progress: Option<ExecutionProgress>,
+    pub failure: Option<StructuredFailure>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionEventType {
+    #[default]
+    Accepted,
+    Started,
+    Progress,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ExecutionEventStatus {
+    #[default]
+    Pending,
+    Running,
+    Completed,
+    Failed,
+    Cancelled,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ExecutionProgress {
+    pub current: u64,
+    pub total: u64,
+    pub unit: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityDefinition {
+    pub id: String,
+    pub display_name: String,
+    pub version: String,
+    pub description: Option<String>,
+    #[serde(default)]
+    pub family: CapabilityFamily,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub input: CapabilitySchemaReference,
+    #[serde(default)]
+    pub output: CapabilitySchemaReference,
+    #[serde(default)]
+    pub execution: CapabilityExecutionContract,
+    #[serde(default)]
+    pub governance: CapabilityGovernance,
+    #[serde(default)]
+    pub source: CapabilitySource,
+    #[serde(default)]
+    pub observability: CapabilityObservability,
+    #[serde(default)]
+    pub lifecycle_state: CapabilityLifecycleState,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityFamily {
+    #[default]
+    Skill,
+    McpTool,
+    WorkflowNode,
+    RetrievalSource,
+    Adapter,
+    Custom,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitySchemaReference {
+    pub schema: Option<Value>,
+    pub schema_ref: Option<String>,
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityExecutionContract {
+    #[serde(default)]
+    pub side_effect_class: CapabilitySideEffectClass,
+    #[serde(default)]
+    pub auth_mode: CapabilityAuthMode,
+    #[serde(default)]
+    pub idempotence: CapabilityIdempotenceHint,
+    #[serde(default)]
+    pub cost_hint: CapabilityCostHint,
+    #[serde(default)]
+    pub latency_hint: CapabilityLatencyHint,
+    pub timeout_seconds: Option<i32>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilitySideEffectClass {
+    #[default]
+    None,
+    Read,
+    Write,
+    External,
+    Destructive,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityAuthMode {
+    #[default]
+    None,
+    Delegated,
+    User,
+    Service,
+    Environment,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityIdempotenceHint {
+    #[default]
+    Unknown,
+    Conditional,
+    Always,
+    Never,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityCostHint {
+    #[default]
+    Unknown,
+    Low,
+    Medium,
+    High,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityLatencyHint {
+    #[default]
+    Unknown,
+    Interactive,
+    Background,
+    Batch,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityGovernance {
+    #[serde(default)]
+    pub trust_level: CapabilityTrustLevel,
+    #[serde(default)]
+    pub approval_requirement: CapabilityApprovalRequirement,
+    #[serde(default)]
+    pub policy_refs: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityTrustLevel {
+    Untrusted,
+    Sandboxed,
+    #[default]
+    Trusted,
+    Privileged,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityApprovalRequirement {
+    #[default]
+    None,
+    Advisory,
+    Required,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilitySource {
+    #[serde(default)]
+    pub source_kind: CapabilitySourceKind,
+    pub source_ref: Option<String>,
+    pub artifact_ref: Option<String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilitySourceKind {
+    #[default]
+    Manual,
+    Imported,
+    Generated,
+    Projected,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CapabilityObservability {
+    #[serde(default)]
+    pub labels: Vec<String>,
+    pub correlation_required: bool,
+    pub emits_execution_events: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum CapabilityLifecycleState {
+    #[default]
+    Draft,
+    Active,
+    Deprecated,
+    Archived,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct ContractsBundleExport {
@@ -580,6 +900,50 @@ impl AgentEnvelopeValidationResult {
     }
 }
 
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct StructuredFailureValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl StructuredFailureValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct InvocationValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl InvocationValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ExecutionEventValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl ExecutionEventValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct CapabilityValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl CapabilityValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
 pub fn default_support_manifest_path() -> PathBuf {
     resolve_contracts_source_dir()
         .join("support")
@@ -821,6 +1185,40 @@ pub fn load_consumer_support_manifest(
     load_json_file(path)
 }
 
+pub fn load_structured_failure_fixture_from_dir(
+    dir: &Path,
+) -> Result<StructuredFailure, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("structured-failure.minimal.json"))
+}
+
+pub fn load_invocation_request_fixture_from_dir(
+    dir: &Path,
+) -> Result<InvocationRequest, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("invocation-request.minimal.json"))
+}
+
+pub fn load_invocation_response_fixture_from_dir(
+    dir: &Path,
+) -> Result<InvocationResponse, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("invocation-response.minimal.json"),
+    )
+}
+
+pub fn load_execution_event_fixture_from_dir(dir: &Path) -> Result<ExecutionEvent, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("execution-event.minimal.json"))
+}
+
+pub fn load_capability_definition_fixture_from_dir(
+    dir: &Path,
+) -> Result<CapabilityDefinition, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("capability-definition.minimal.json"),
+    )
+}
+
 pub fn load_skill_definition_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDefinition, ContractsError> {
@@ -915,6 +1313,330 @@ pub fn validate_support_manifest_against_upstream(
     }
 
     Ok(())
+}
+
+pub fn validate_structured_failure(
+    failure: &StructuredFailure,
+) -> StructuredFailureValidationResult {
+    let mut issues = Vec::new();
+
+    if failure.code.trim().is_empty() {
+        issues.push("Structured failure code must not be blank.".to_string());
+    }
+
+    if failure.message.trim().is_empty() {
+        issues.push("Structured failure message must not be blank.".to_string());
+    }
+
+    if failure.correlation_id.as_deref().is_some_and(str::is_empty) {
+        issues
+            .push("Structured failure correlationId must not be blank when provided.".to_string());
+    }
+
+    if failure
+        .details
+        .as_ref()
+        .is_some_and(|details| !details.is_object())
+    {
+        issues.push("Structured failure details must be a JSON object when provided.".to_string());
+    }
+
+    if let Some(cause) = &failure.cause {
+        if cause.code.trim().is_empty() {
+            issues.push("Structured failure cause code must not be blank.".to_string());
+        }
+
+        if cause.message.trim().is_empty() {
+            issues.push("Structured failure cause message must not be blank.".to_string());
+        }
+    }
+
+    StructuredFailureValidationResult { issues }
+}
+
+pub fn validate_invocation_request(request: &InvocationRequest) -> InvocationValidationResult {
+    let mut issues = Vec::new();
+
+    if request.request_id.trim().is_empty() {
+        issues.push("Invocation request must declare a requestId.".to_string());
+    }
+
+    if request.capability_id.trim().is_empty() {
+        issues.push("Invocation request must declare a capabilityId.".to_string());
+    }
+
+    if !request.input.is_object() {
+        issues.push("Invocation request input must be a JSON object.".to_string());
+    }
+
+    if request.context.correlation_id.trim().is_empty() {
+        issues.push("Invocation request context must declare a correlationId.".to_string());
+    }
+
+    if request.context.execution_id.trim().is_empty() {
+        issues.push("Invocation request context must declare an executionId.".to_string());
+    }
+
+    if request.context.requested_at.trim().is_empty() {
+        issues.push("Invocation request context must declare requestedAt.".to_string());
+    }
+
+    if request
+        .context
+        .timeout_seconds
+        .is_some_and(|timeout| timeout <= 0)
+    {
+        issues.push(
+            "Invocation request timeoutSeconds must be greater than zero when set.".to_string(),
+        );
+    }
+
+    if request
+        .context
+        .caller_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Invocation request callerRef must not be blank when provided.".to_string());
+    }
+
+    if request
+        .context
+        .trace_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Invocation request traceRef must not be blank when provided.".to_string());
+    }
+
+    if request
+        .context
+        .policy_context
+        .as_ref()
+        .is_some_and(has_blank_metadata_entries)
+    {
+        issues.push(
+            "Invocation request policyContext must not contain blank keys or values.".to_string(),
+        );
+    }
+
+    if has_blank_metadata_entries(&request.context.metadata) {
+        issues
+            .push("Invocation request metadata must not contain blank keys or values.".to_string());
+    }
+
+    InvocationValidationResult { issues }
+}
+
+pub fn validate_invocation_response(response: &InvocationResponse) -> InvocationValidationResult {
+    let mut issues = Vec::new();
+
+    if response.request_id.trim().is_empty() {
+        issues.push("Invocation response must declare a requestId.".to_string());
+    }
+
+    if response.execution_id.trim().is_empty() {
+        issues.push("Invocation response must declare an executionId.".to_string());
+    }
+
+    if response.trace_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Invocation response traceRef must not be blank when provided.".to_string());
+    }
+
+    if has_blank_metadata_entries(&response.metadata) {
+        issues.push(
+            "Invocation response metadata must not contain blank keys or values.".to_string(),
+        );
+    }
+
+    if matches!(response.status, InvocationStatus::Completed) && response.output.is_none() {
+        issues.push("Completed invocation responses must include an output payload.".to_string());
+    }
+
+    if !matches!(response.status, InvocationStatus::Completed) && response.failure.is_none() {
+        issues.push(
+            "Failed or cancelled invocation responses must include a structured failure."
+                .to_string(),
+        );
+    }
+
+    if let Some(failure) = &response.failure {
+        issues.extend(validate_structured_failure(failure).issues);
+    }
+
+    InvocationValidationResult { issues }
+}
+
+pub fn validate_execution_event(event: &ExecutionEvent) -> ExecutionEventValidationResult {
+    let mut issues = Vec::new();
+
+    if event.event_id.trim().is_empty() {
+        issues.push("Execution event must declare an eventId.".to_string());
+    }
+
+    if event.request_id.trim().is_empty() {
+        issues.push("Execution event must declare a requestId.".to_string());
+    }
+
+    if event.execution_id.trim().is_empty() {
+        issues.push("Execution event must declare an executionId.".to_string());
+    }
+
+    if event.sequence == 0 {
+        issues.push("Execution event sequence must be greater than zero.".to_string());
+    }
+
+    if event.timestamp.trim().is_empty() {
+        issues.push("Execution event must declare a timestamp.".to_string());
+    }
+
+    if event.correlation_id.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event correlationId must not be blank when provided.".to_string());
+    }
+
+    if event.trace_ref.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event traceRef must not be blank when provided.".to_string());
+    }
+
+    if event.capability_id.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event capabilityId must not be blank when provided.".to_string());
+    }
+
+    if event.message.as_deref().is_some_and(str::is_empty) {
+        issues.push("Execution event message must not be blank when provided.".to_string());
+    }
+
+    if has_blank_metadata_entries(&event.metadata) {
+        issues.push("Execution event metadata must not contain blank keys or values.".to_string());
+    }
+
+    if let Some(progress) = &event.progress {
+        if progress.total < progress.current {
+            issues.push(
+                "Execution event progress total must be greater than or equal to current."
+                    .to_string(),
+            );
+        }
+
+        if progress.unit.as_deref().is_some_and(str::is_empty) {
+            issues
+                .push("Execution event progress unit must not be blank when provided.".to_string());
+        }
+    }
+
+    if let Some(failure) = &event.failure {
+        issues.extend(validate_structured_failure(failure).issues);
+    }
+
+    if matches!(
+        event.event_type,
+        ExecutionEventType::Failed | ExecutionEventType::Cancelled
+    ) && event.failure.is_none()
+    {
+        issues.push(
+            "Failed or cancelled execution events must include a structured failure.".to_string(),
+        );
+    }
+
+    ExecutionEventValidationResult { issues }
+}
+
+pub fn validate_capability_definition(
+    definition: &CapabilityDefinition,
+) -> CapabilityValidationResult {
+    let mut issues = Vec::new();
+
+    if definition.id.trim().is_empty() {
+        issues.push("Capability definition id must not be blank.".to_string());
+    }
+
+    if definition.display_name.trim().is_empty() {
+        issues.push("Capability definition displayName must not be blank.".to_string());
+    }
+
+    if definition.version.trim().is_empty() {
+        issues.push("Capability definition version must not be blank.".to_string());
+    }
+
+    if definition.tags.iter().any(|tag| tag.trim().is_empty()) {
+        issues.push("Capability definition tags must not be blank.".to_string());
+    }
+
+    if definition.governance.approval_requirement == CapabilityApprovalRequirement::Required
+        && definition.governance.policy_refs.is_empty()
+    {
+        issues.push(
+            "Capabilities that require approval must declare at least one policy reference."
+                .to_string(),
+        );
+    }
+
+    if definition
+        .governance
+        .policy_refs
+        .iter()
+        .any(|policy_ref| policy_ref.trim().is_empty())
+    {
+        issues.push("Capability policy references must not be blank.".to_string());
+    }
+
+    if definition
+        .observability
+        .labels
+        .iter()
+        .any(|label| label.trim().is_empty())
+    {
+        issues.push("Capability observability labels must not be blank.".to_string());
+    }
+
+    if definition
+        .execution
+        .timeout_seconds
+        .is_some_and(|timeout| timeout <= 0)
+    {
+        issues.push("Capability timeoutSeconds must be greater than zero when set.".to_string());
+    }
+
+    if definition
+        .source
+        .source_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Capability sourceRef must not be blank when provided.".to_string());
+    }
+
+    if definition
+        .source
+        .artifact_ref
+        .as_deref()
+        .is_some_and(str::is_empty)
+    {
+        issues.push("Capability artifactRef must not be blank when provided.".to_string());
+    }
+
+    let source_ref_present = definition
+        .source
+        .source_ref
+        .as_deref()
+        .is_some_and(|source_ref| !source_ref.trim().is_empty());
+    let artifact_ref_present = definition
+        .source
+        .artifact_ref
+        .as_deref()
+        .is_some_and(|artifact_ref| !artifact_ref.trim().is_empty());
+
+    if definition.source.source_kind != CapabilitySourceKind::Manual
+        && !source_ref_present
+        && !artifact_ref_present
+    {
+        issues.push(
+            "Imported, generated, or projected capabilities must declare a sourceRef or artifactRef."
+                .to_string(),
+        );
+    }
+
+    CapabilityValidationResult { issues }
 }
 
 pub fn validate_skill_definition(definition: &SkillDefinition) -> SkillValidationResult {

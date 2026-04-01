@@ -361,6 +361,9 @@ mod tests {
 
         let message = error.to_string();
         assert!(message.contains(&format!("ollama not reachable at {base_url}")));
-        assert!(message.contains("timed out"), "expected timeout message, got: {message}");
+        assert!(
+            message.contains("timed out"),
+            "expected timeout message, got: {message}"
+        );
     }
 }

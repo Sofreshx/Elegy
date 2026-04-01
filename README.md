@@ -4,15 +4,53 @@ Elegy is the authoritative home for governed contracts and policy artifacts plus
 
 The durable authority lives in `contracts/`, `governance/`, and `rust/`. The `.github/skills/*` files are contributor-routing outputs only. They help agents find the right CLI handoff, but they are not authoritative release, runtime, or policy surfaces.
 
-## What ships now
+## Release channels
+
+Elegy publishes the same asset families in two channels:
+
+- Stable releases such as `v1.3.2`. These are the tags downstream consumers should pin.
+- Rolling prerelease `main-snapshot`. This is refreshed on every push to `main` and is meant for latest-branch validation, not as a stable contract.
+
+The important difference is the stability promise, not the package shape. `main-snapshot` is not missing extra tools; it carries the same release surface as the stable lane.
+
+## What most users actually need
+
+Most downstream users only need two things:
+
+1. The contracts bundle if they need schemas, fixtures, or compatibility metadata.
+2. One or more CLI archives for the commands they actually plan to run.
+
+Everything else in the release exists to support verified installation, automation, or bounded integrations.
+
+## Asset guide
+
+| Asset family | Example | Who usually needs it | Why it ships |
+| --- | --- | --- | --- |
+| Contracts bundle | `elegy-contracts-<bundleVersion>.zip` | Any downstream that validates or consumes governed artifacts | Canonical schemas, fixtures, compatibility metadata, and parity fixtures. |
+| Umbrella CLI archive | `elegy-cli-<cliVersion>-<target>.zip` | Most CLI users | Ships the `elegy` binary. This is the umbrella entrypoint and the home of Mermaid commands. |
+| Dedicated CLI archives | `elegy-mcp-<cliVersion>-<target>.zip`, `elegy-skills-<cliVersion>-<target>.zip`, `elegy-memory-<cliVersion>-<target>.zip` | Users who want bounded tool-specific binaries | Ships dedicated binaries for MCP authoring/analysis, skill generation, and the preview memory surface. |
+| Installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Downstream repos that want scripted installation | Carries the generic installer helper. Useful for bootstrapping, but not required if you extract archives directly. |
+| Wrapper archives | `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip` | Hosts that want a thin repo-local integration surface | Packages wrapper metadata, a local install entrypoint, and a bundled installer copy for that bounded surface. |
+| Release manifest | `elegy-release-manifest-<bundleVersion>.json` | Installer and maintainers | Declares the authoritative asset set, archive contents, targets, sizes, and hashes the installer should trust. |
+| Release checksums | `elegy-release-checksums-<bundleVersion>.json` | Installer and maintainers | Lets the installer verify downloaded assets fail-closed instead of guessing. |
+
+## User-facing tools
 
 | Surface | Readiness | What it is for |
 | --- | --- | --- |
-| `elegy` | Ready now | Umbrella CLI surface, including Mermaid render, reverse, and narrate commands. Mermaid output is derived and non-authoritative. |
-| `elegy-mcp` | Ready now | Dedicated CLI for MCP descriptor authoring and analysis. |
+| `elegy` | Ready now | Umbrella CLI surface. Use this when you want the general command surface, including Mermaid tooling. |
+| `elegy mermaid render` | Ready now | Render canonical workflow inputs into Mermaid output. |
+| `elegy mermaid reverse` | Ready now | Perform bounded reverse projection from Mermaid into canonical workflow graph semantics. |
+| `elegy mermaid narrate` | Ready now | Produce concise narrative output from Mermaid or canonical workflow graph inputs. |
+| `elegy-mcp` | Ready now | Dedicated CLI for governed MCP descriptor authoring and descriptor analysis. |
 | `elegy-skills` | Ready now | Dedicated CLI for governed MCP-to-skill generation. |
 | `elegy-memory` | MVP / preview | Dedicated local memory CLI backed by the in-repo Rust implementation. Usable now for add, search, list, inspect, health, export, purge, contradictions, and the current preview `reembed` command surface. |
-| `.github/skills/*` | Routing only | Repo-local, non-authoritative contributor-routing files. They are not the release surface and do not define runtime truth. |
+
+## What is intentionally not a separate release package
+
+- There is no dedicated Mermaid binary. Mermaid lives on the umbrella `elegy` CLI by design.
+- `.github/skills/*` are repo-local contributor-routing files, not release/runtime authority.
+- Most Rust crates in the workspace are implementation crates, not directly shipped user-facing packages.
 
 ## How to use Elegy
 
@@ -20,18 +58,34 @@ Downstream consumers should pin a tagged Elegy release and consume release asset
 
 At a high level:
 
-1. Install the governed contracts bundle when you need schemas, fixtures, manifests, or compatibility metadata.
-2. Install only the CLI archives you need: `elegy-cli` (which contains the `elegy` binary), `elegy-mcp`, `elegy-skills`, and/or `elegy-memory`.
-3. Invoke the selected CLI directly from the installed tool location.
+1. Pin a stable semver release unless you are explicitly testing current `main`.
+2. Install the governed contracts bundle when you need schemas, fixtures, manifests, or compatibility metadata.
+3. Install only the CLI archives you need: `elegy-cli` (which contains the `elegy` binary), `elegy-mcp`, `elegy-skills`, and/or `elegy-memory`.
+4. Optionally use the standalone installer bootstrap or wrapper archives when you want a scripted repo-local integration path rather than direct archive extraction.
+5. Invoke the selected CLI directly from the installed tool location.
 
 Detailed distribution, archive, and installer guidance lives in [docs/distribution.md](docs/distribution.md).
 
 ## Surface summary
 
-- `elegy` is the umbrella CLI and the home for Mermaid tooling. There is no separate Mermaid binary.
+- `elegy` is the umbrella CLI and the home for Mermaid tooling. There is no separate Mermaid package missing from the release.
 - `elegy-mcp` and `elegy-skills` are the current ready-to-use dedicated authoring surfaces.
-- `elegy-memory` is the current shipped preview memory surface. It matches the implemented CLI in `rust/crates/elegy-memory` and should be described as an MVP, not as the older planned artifact-management flow.
+- `elegy-memory` is the current shipped preview memory surface. It matches the implemented CLI in `rust/crates/elegy-memory` and should be described as an MVP.
+- The governed contracts bundle is a first-class shipped output even though it is not itself a CLI.
+- The installer, manifest, and checksum assets are useful support assets, but many direct CLI users will never touch them manually.
 - Wrapper roots under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are thin integration surfaces only.
+- Stable downstream consumption should pin semver release tags. The rolling `main-snapshot` prerelease is for latest-integration validation only.
+
+## Workspace crate map
+
+Not every Rust crate in the workspace is a directly shipped user-facing tool. The current workspace is organized into:
+
+- User-facing CLI crates: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-skills`
+- Governed/data crates: `elegy-contracts`, `elegy-policy`, `elegy-descriptor`
+- Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp`, `elegy-agent-events`
+- Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`
+
+That distinction matters for consumers: the release lane is CLI-first, while the rest of the workspace is primarily implementation and runtime support.
 
 ## Read next
 

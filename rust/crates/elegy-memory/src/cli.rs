@@ -258,9 +258,7 @@ impl StoreContext {
     }
 
     fn embedding_provider_label(&self) -> &str {
-        self.embedding_provider_label
-            .as_deref()
-            .unwrap_or("none")
+        self.embedding_provider_label.as_deref().unwrap_or("none")
     }
 }
 
@@ -437,10 +435,9 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         Command::Export { store, output } => {
             execute_export_command(open_store(store)?, output, cli.format)
         }
-        Command::Reembed {
-            store,
-            limit,
-        } => execute_reembed_command(open_store(store)?, limit, cli.format),
+        Command::Reembed { store, limit } => {
+            execute_reembed_command(open_store(store)?, limit, cli.format)
+        }
         Command::Contradictions { store } => {
             execute_contradictions_command(open_store(store)?, cli.format)
         }
@@ -527,8 +524,7 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored =
-                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "archived",
@@ -563,8 +559,7 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored =
-                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
                 gate_result: "accepted",
@@ -815,7 +810,9 @@ fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
     let scope: MemoryScope = args.scope.into();
     let (embedding_provider, embedding_provider_label) = resolve_embedding_provider(&args)?;
     let store = match embedding_provider.clone() {
-        Some(provider) => SqliteMemoryStore::new_with_embedding_provider(&db_path, scope, provider)?,
+        Some(provider) => {
+            SqliteMemoryStore::new_with_embedding_provider(&db_path, scope, provider)?
+        }
         None => SqliteMemoryStore::new(&db_path, scope)?,
     };
     Ok(StoreContext {
@@ -827,9 +824,9 @@ fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
     })
 }
 
-fn resolve_embedding_provider(
-    args: &StoreArgs,
-) -> Result<(Option<Arc<dyn EmbeddingProvider>>, Option<String>), CliError> {
+type ResolvedEmbeddingProvider = (Option<Arc<dyn EmbeddingProvider>>, Option<String>);
+
+fn resolve_embedding_provider(args: &StoreArgs) -> Result<ResolvedEmbeddingProvider, CliError> {
     match args.embedding_provider {
         Some(CliEmbeddingProvider::Ollama) => {
             let base_url = args
@@ -840,9 +837,10 @@ fn resolve_embedding_provider(
                 .ollama_model
                 .clone()
                 .unwrap_or_else(|| DEFAULT_OLLAMA_MODEL.to_string());
-            let provider =
-                Arc::new(OllamaEmbeddingProvider::new(base_url.clone(), model.clone())?)
-                    as Arc<dyn EmbeddingProvider>;
+            let provider = Arc::new(OllamaEmbeddingProvider::new(
+                base_url.clone(),
+                model.clone(),
+            )?) as Arc<dyn EmbeddingProvider>;
             Ok((
                 Some(provider),
                 Some(format!("ollama ({model} @ {base_url})")),
@@ -990,7 +988,9 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
                 .store_embedding(id, &embedding)
                 .await
                 .map_err(|error| {
-                    CliError::Validation(format!("failed to store embedding for memory {id}: {error}"))
+                    CliError::Validation(format!(
+                        "failed to store embedding for memory {id}: {error}"
+                    ))
                 })?;
             reembedded_ids.push(id.to_string());
         }
@@ -1291,8 +1291,7 @@ where
 mod tests {
     use std::{
         collections::HashMap,
-        env,
-        fs,
+        env, fs,
         path::PathBuf,
         sync::{Arc, Mutex},
         time::{SystemTime, UNIX_EPOCH},
@@ -1302,13 +1301,13 @@ mod tests {
     use chrono::{Duration, Utc};
 
     use super::{
-        build_search_response, open_store, reembed_stale_memories, run_async,
-        CliEmbeddingProvider, CliScope, StoreArgs, StoreContext,
+        build_search_response, open_store, reembed_stale_memories, run_async, CliEmbeddingProvider,
+        CliScope, StoreArgs, StoreContext,
     };
     use crate::{
         EmbeddingError, EmbeddingProvider, Memory, MemoryScope, MemoryState, MemoryStore,
-        MemoryType, ProvenanceLevel, SqliteMemoryStore, SensitivityLevel,
-        DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL,
+        MemoryType, ProvenanceLevel, SensitivityLevel, SqliteMemoryStore, DEFAULT_OLLAMA_BASE_URL,
+        DEFAULT_OLLAMA_MODEL,
     };
 
     #[derive(Debug, Clone)]
@@ -1399,7 +1398,10 @@ mod tests {
                 "semantic launch checklist",
                 StubEmbeddingResponse::Embedding(vec![1.0; 768]),
             ),
-            ("semantic probe", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
+            (
+                "semantic probe",
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
         ]));
         let store = SqliteMemoryStore::new_with_embedding_provider(
             &db_path,
@@ -1440,8 +1442,14 @@ mod tests {
     fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
         let db_path = unique_temp_path("elegy-memory-cli-reembed");
         let provider = Arc::new(StubEmbeddingProvider::new([
-            ("older stale memory", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
-            ("newer stale memory", StubEmbeddingResponse::Embedding(vec![0.5; 768])),
+            (
+                "older stale memory",
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                "newer stale memory",
+                StubEmbeddingResponse::Embedding(vec![0.5; 768]),
+            ),
         ]));
         let store =
             SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
@@ -1468,15 +1476,11 @@ mod tests {
         assert_eq!(response.reembedded_count, 1);
         assert_eq!(response.reembedded_ids, vec![older_id.to_string()]);
 
-        let older_memory = ctx
-            .store
-            .get_raw(&older_id);
+        let older_memory = ctx.store.get_raw(&older_id);
         let older_memory = run_async(older_memory)
             .expect("load older memory")
             .expect("older memory exists");
-        let newer_memory = ctx
-            .store
-            .get_raw(&newer_id);
+        let newer_memory = ctx.store.get_raw(&newer_id);
         let newer_memory = run_async(newer_memory)
             .expect("load newer memory")
             .expect("newer memory exists");
@@ -1502,9 +1506,7 @@ mod tests {
         };
         let error = reembed_stale_memories(&ctx, 5).expect_err("provider should be required");
 
-        assert!(error
-            .to_string()
-            .contains("--embedding-provider ollama"));
+        assert!(error.to_string().contains("--embedding-provider ollama"));
 
         cleanup_temp_path(&db_path);
     }

@@ -17,6 +17,6 @@ Use GitHub release assets instead of package restore, sibling-repository project
 
 The installer now resolves the manifest and checksums first, verifies exact asset size and SHA-256 plus required archive entries, and writes `install-receipt.json` into the destination root.
 
-GitHub Releases are the primary downstream lane. The standalone installer asset is a convenience bootstrap, and the wrapper archives already embed the same installer helper.
+GitHub Releases are the primary downstream lane. The standalone installer asset is a convenience bootstrap, and the wrapper archives already embed the same installer helper. Stable semver tags remain the supported downstream contract, while pushes to `main` now refresh a rolling `main-snapshot` prerelease for latest-branch validation.
 
-Holon and other downstream consumers should pin an Elegy release tag and install into a repo-local tools directory. Historical GitHub Packages and NuGet surfaces are frozen/deprecated, and any remaining cleanup should wait until consumer cutover evidence exists. Downstream consumers should integrate through the exported contract bundle and the release/archive CLI surfaces.
+Holon and other downstream consumers should pin an Elegy semver release tag and install into a repo-local tools directory. Historical GitHub Packages and NuGet surfaces are frozen/deprecated, and any remaining cleanup should wait until consumer cutover evidence exists. Downstream consumers should integrate through the exported contract bundle and the release/archive CLI surfaces rather than the rolling `main-snapshot` prerelease.
