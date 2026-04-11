@@ -5,7 +5,9 @@ description: "Repo-local non-authoritative contributor-routing file for Elegy's 
 
 # Elegy Skills
 
-This file is a repo-local, non-authoritative contributor-routing output.
+This file is a repo-local, non-authoritative contributor-routing output for external-agent integration with the dedicated `elegy-skills` surface.
+
+External agents outside Elegy should load this skill as routing guidance, then invoke the dedicated `elegy-skills` CLI directly. Elegy itself does not orchestrate or call agents internally through this file.
 
 The authority chain is one-way:
 
@@ -15,7 +17,7 @@ The authority chain is one-way:
 
 ## When to use
 
-- Prefer the dedicated `elegy-skills` binary for the current implemented in-repo MCP-to-skill generation flow.
+- If you are operating as an external agent outside Elegy, load this skill and invoke the dedicated `elegy-skills` binary directly for MCP-to-skill generation.
 - Generate governed skill-definition artifacts from an MCP descriptor with `elegy-skills generate --descriptor <path>`.
 - Use `--output-dir <path>` when generated skill-definition files should be written to disk.
 - Treat `elegy generate skills` as a general-surface compatibility command, not the preferred dedicated path.
@@ -36,6 +38,10 @@ elegy-skills generate --descriptor <path> [--output-dir <path>] [--force]
 
 ## Surface posture
 
-- This CLI is a thin wrapper over the existing governed skill-generation functions in `rust/crates/elegy-tooling`.
+- This skill routes external agents and contributors to the dedicated `elegy-skills` CLI surface rather than to an internal Elegy orchestration lane.
+- The dedicated CLI surface lives in `rust/crates/elegy-skills`.
+- Shared crates such as `rust/crates/elegy-tooling` provide lower-level helper and compatibility infrastructure where needed; they are not the dedicated `elegy-skills` implementation center.
+- Treat `src/Elegy-skills` as a thin wrapper and packaging surface, not as the implementation center.
 - The dedicated surface is intentionally bounded to generation from governed MCP descriptor inputs.
+- Treat `elegy generate skills` as the umbrella general/compatibility path, not the preferred dedicated path.
 - Governed skill artifacts remain rooted in `contracts/` and versioned through `governance/`.

@@ -2,7 +2,9 @@
 
 This directory is a thin wrapper and integration entrypoint for the current dedicated in-repo `elegy-skills` surface.
 
-It is a real contributor-facing surface for wrapper metadata and guided handoff, but it is not the authority source, implementation center, or release orchestration surface.
+It is a real contributor-facing surface for wrapper metadata and contributor routing for external-agent integration, but it is not the authority source, implementation center, or release orchestration surface.
+
+External agents outside Elegy should use this wrapper only to find the associated skill guidance and the dedicated `elegy-skills` CLI handoff. `src/Elegy-skills` remains a thin wrapper surface, not an implementation center, and this wrapper does not mean Elegy runs an internal agent orchestration lane.
 
 The wrapper contract for this root lives in `wrapper-entrypoint.json`.
 
@@ -16,8 +18,8 @@ Delegation stays one-way:
 This wrapper surface organizes its helper lanes like this:
 
 - `docs/` maps this surface to its canonical documentation entrypoints.
-- `agents/` captures wrapper-level agent handoff guidance for the bounded generation surface.
-- `skills/` explains how this surface delegates repo-local skill routing output and ships a surface-local bridge in `skills/elegy-skills/SKILL.md`.
+- `agents/` captures wrapper-level external-agent integration and contributor-routing guidance for the bounded generation surface; it is not an in-repo runtime lane.
+- `skills/` explains how this surface delegates repo-local skill routing output and ships a surface-local bridge in `skills/elegy-skills/SKILL.md` for external-agent and wrapper-archive handoff.
 
 Published release archives and install flows remain produced from the Rust workspace and repo-root distribution scripts, including the platform-neutral `elegy-skills-wrapper-<bundleVersion>.zip` wrapper archive.
 

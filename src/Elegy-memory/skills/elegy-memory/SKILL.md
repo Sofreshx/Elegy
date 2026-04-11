@@ -1,11 +1,13 @@
 ---
 name: elegy-memory
-description: "Surface-local non-authoritative bridge shipped with the Elegy-memory wrapper surface and wrapper archive for the implemented memory MVP CLI."
+description: "Surface-local non-authoritative bridge shipped with the Elegy-memory wrapper surface and wrapper archive."
 ---
 
 # Elegy-memory Surface Bridge
 
 This file is a surface-local, non-authoritative skill bridge shipped with the `src/Elegy-memory` wrapper surface and the `elegy-memory-wrapper-<bundleVersion>.zip` archive.
+
+External agents outside Elegy can use this associated skill bridge to locate the dedicated `elegy-memory` CLI handoff, then invoke that CLI directly. `src/Elegy-memory` remains a thin wrapper surface, not an implementation center, and this bridge does not imply an in-repo Elegy agent runtime.
 
 Authority stays one-way:
 
@@ -22,24 +24,17 @@ Authority stays one-way:
 ## Current commands
 
 ```text
-elegy-memory add <content> [--db <path>] [--scope <session|workspace|user|agent>] [--type <fact|preference|decision|procedure|observation>] [--importance <0..1>] [--provenance <user-stated|agent-observed|consolidated|imported|agent-inferred>]
-elegy-memory search <query> [--db <path>] [--scope <session|workspace|user|agent>] [--limit <n>] [--include-dormant]
-elegy-memory list [--db <path>] [--scope <session|workspace|user|agent>] [--type <fact|preference|decision|procedure|observation>] [--state <active|dormant|deleted>] [--limit <n>]
-elegy-memory inspect <id> [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory purge [--db <path>] [--scope <session|workspace|user|agent>] [--yes]
-elegy-memory health [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory export [--db <path>] [--scope <session|workspace|user|agent>] [--output <path>]
-elegy-memory reembed [--db <path>] [--scope <session|workspace|user|agent>] [--provider <name>] [--limit <n>]
-elegy-memory contradictions [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory --format json <command> ...
+elegy-memory inspect
+elegy-memory validate --input <path>
+elegy-memory init [--root <path>]
+elegy-memory import --input <path> --record-id <record-id> --imported-at-utc <utc> [--root <path>]
+elegy-memory list [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory show --record-id <record-id> [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory export --record-id <record-id> [--output-path <path>] [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory supersede --record-id <record-id> --superseded-by-record-id <record-id> [--root <path>]
+elegy-memory tombstone --record-id <record-id> --tombstoned-at-utc <utc> --reason <text> [--root <path>]
 ```
 
-## Current behavior
+`--format json` is available when structured output is needed.
 
-- Default database path: `~/.elegy/memory.db`.
-- Default scope: `workspace`.
-- `search` is keyword-only in the current MVP CLI.
-- `purge` prompts unless `--yes` is passed.
-- `reembed` is present as a preview command surface but is not wired to a provider yet.
-
-This wrapper ships the current CLI handoff. It should not be described as the older local artifact import and supersede/tombstone flow.
+Use `elegy-memory` as the preferred dedicated surface. Treat umbrella `elegy` memory commands only as the general/compatibility path when needed.

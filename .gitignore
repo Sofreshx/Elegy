@@ -36,6 +36,14 @@ Thumbs.db
 .tmp/llm-output/
 .tmp/llm-work/
 
-# Repo-local prompt scratch file
+# Repo-local prompt/session scratch files
 /prompt.md
+/FLIGHT_RECORDER.md
+/SESSION_TRACKING.md
 elegy-memory-mvp-test-plan.md
+
+# Local agent session artifacts
+/.copilot/
+/target/agent-artifacts/
+
+.cargo/config.toml

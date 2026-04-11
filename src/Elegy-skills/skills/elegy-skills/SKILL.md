@@ -7,6 +7,8 @@ description: "Surface-local non-authoritative bridge shipped with the Elegy-skil
 
 This file is a surface-local, non-authoritative skill bridge shipped with the `src/Elegy-skills` wrapper surface and the `elegy-skills-wrapper-<bundleVersion>.zip` archive.
 
+External agents outside Elegy can use this associated skill bridge to locate the dedicated `elegy-skills` CLI handoff, then invoke that CLI directly. `src/Elegy-skills` remains a thin wrapper surface, not an implementation center, and this bridge does not imply an in-repo Elegy agent runtime.
+
 Authority stays one-way:
 
 1. `contracts/fixtures/skill-definition.elegy-skills.json` is the governed source of truth.
@@ -26,3 +28,5 @@ elegy-skills generate --descriptor <path> [--output-dir <path>] [--force]
 ```
 
 `--format json` is available when structured output is needed.
+
+Use `elegy-skills` as the preferred dedicated surface. Treat umbrella `elegy generate skills` only as the general/compatibility path when needed.

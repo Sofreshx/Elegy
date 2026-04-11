@@ -13,7 +13,7 @@ The goal is to decide where neutral artifact authority lives, where Rust executa
 
 The contributor-navigation overlays under `src/Elegy-mcp` and `src/Elegy-skills` are pointer shells only. They are not repo centers, authority layers, implementation centers, or release surfaces.
 
-For contributor-facing CLI use in these lanes, prefer the dedicated `elegy-mcp` and `elegy-skills` binaries for their bounded paths. Keep `elegy` as the general/compatibility surface.
+For contributor-facing or external-agent CLI use in these lanes, prefer the dedicated `elegy-mcp` and `elegy-skills` binaries for their bounded paths. Keep `elegy` as the general/compatibility surface. Elegy itself should not be described as internally orchestrating those agents.
 
 ## Placement rule
 
@@ -30,7 +30,7 @@ Use the following order when deciding where a feature belongs:
 |---|---|---|---|---|
 | MCP analysis | Governed descriptor and analysis-result artifacts under `contracts/`, plus documented projection semantics | Rust crates such as `elegy-mcp`, `elegy-runtime`, and the Rust CLI | Host-specific UX or transport wrappers stay local | Analysis execution is Rust-first; neutral artifacts keep the stable shape. |
 | Dynamic MCP creation | Descriptor fragments, manifests, or other stable serialized shapes under governed artifacts when they need to cross runtime boundaries | Rust tooling or CLI when creation is reusable and self-contained | Product-local server wiring, transport, or auth stays local | Dynamic creation should not become a broad shared runtime surface in Elegy. |
-| Skill creation from an MCP slice | Governed skill artifacts such as `skill-definition` and related discovery outputs | Rust generation from analyzed MCP slices, typically through `elegy-tooling`, `elegy-skills`, and the general `elegy` compatibility surface | App-local post-processing or host-specific registration stays local | The slice-to-skill executable path is Rust-first; only the stable artifacts stay authoritative. |
+| Skill creation from an MCP slice | Governed skill artifacts such as `skill-definition` and related discovery outputs | Rust generation from analyzed MCP slices, typically through the dedicated `elegy-skills` surface plus shared helper crates such as `elegy-tooling`, with `elegy` as the general compatibility surface | App-local post-processing or host-specific registration stays local | The slice-to-skill executable path is Rust-first; only the stable artifacts stay authoritative. |
 | Dynamic CLI tools | Optional manifest/descriptor contract only if cross-runtime interoperability requires one | Rust CLI or future Rust tooling crate | App-local invocation policies stay local | Treat as a Rust tooling problem, not a neutral authority artifact. |
 
 ## MCP analysis
@@ -53,7 +53,7 @@ These belong with governed artifacts and canonical contract semantics.
 - runtime loading of MCP descriptor resources
 - CLI or host flows that expose MCP analysis to operators
 
-The current Rust stack already reflects this direction through `elegy-mcp`, `elegy-tooling`, `elegy-runtime`, and `elegy-cli`.
+The current Rust stack already reflects this direction through `elegy-mcp`, `elegy-runtime`, `elegy-cli`, and shared helper crates such as `elegy-tooling`.
 
 `elegy-mcp` is now a shipped thin dedicated CLI surface for descriptor authoring and descriptor analysis, and it is the preferred bounded CLI path for that work. That does not imply that REST/OpenAPI ingestion or hosted runtime execution is already implemented.
 
@@ -88,7 +88,7 @@ Recommended split:
 
 This keeps neutral artifacts as the source of truth for what a valid skill is, while Rust owns the reusable execution path that derives those skills from MCP inputs.
 
-`elegy-skills` is now a shipped thin dedicated CLI surface for MCP-to-skill generation, and it is the preferred bounded CLI path for that work. That does not imply autonomous authoring or runtime-side registration beyond the implemented generation path.
+`elegy-skills` is now a shipped thin dedicated CLI surface for MCP-to-skill generation, and it is the preferred bounded CLI path for that work. Shared crates such as `elegy-tooling` remain lower-level helper and compatibility infrastructure. That does not imply autonomous authoring or runtime-side registration beyond the implemented generation path.
 
 ## Dynamic CLI tools
 

@@ -10,6 +10,8 @@ The goal is to keep skill authority in neutral governed artifacts while keeping 
 
 The canonical skill model lives in the governed skill artifact family exported from `contracts/` and versioned through `governance/`.
 
+External agents outside Elegy should load the associated skill guidance and invoke the matching dedicated `elegy-*` CLI directly when one exists. Elegy itself is not the place where those agents are orchestrated internally.
+
 That means:
 
 - the stable skill shape and compatibility expectations belong to governed schemas, fixtures, manifests, and support metadata
@@ -25,9 +27,9 @@ The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skil
 
 The Rust workspace owns the reusable executable path around those governed skill artifacts.
 
-- `rust/crates/elegy-tooling` owns reusable authoring, analysis, and skill-generation behavior over governed descriptors and skill projections
-- `rust/crates/elegy-cli` exposes the current contributor-facing commands: `author mcp`, `analyze mcp`, and `generate skills`
-- `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` expose the current dedicated MCP and skill-generation flows as thin CLI surfaces
+- `rust/crates/elegy-memory`, `rust/crates/elegy-mcp`, and `rust/crates/elegy-skills` expose the current dedicated direct system surfaces for bounded memory, MCP descriptor work, and skill generation
+- `rust/crates/elegy-cli` exposes the umbrella contributor-facing general/compatibility commands: `author mcp`, `analyze mcp`, and `generate skills`
+- `rust/crates/elegy-tooling` provides shared lower-level helper and compatibility infrastructure over governed descriptors and skill projections
 - `rust/crates/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
 - consuming applications keep host-specific registration, auth, persistence, and orchestration local
 
@@ -36,7 +38,8 @@ The Rust workspace owns the reusable executable path around those governed skill
 What the repo proves today:
 
 - skill generation from analyzed MCP descriptor inputs through the Rust CLI and tooling path
-- dedicated `elegy-mcp` and `elegy-skills` binaries for the current MCP descriptor and skill-generation commands
+- dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries for the current direct bounded-system commands
+- umbrella `elegy` commands as the general/compatibility path over those dedicated surfaces
 - deterministic export of governed skill artifacts for downstream consumers
 - a clean split between neutral artifact authority and Rust executable ownership
 - the current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`

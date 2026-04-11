@@ -1,11 +1,13 @@
 ---
 name: elegy-memory
-description: "Repo-local non-authoritative contributor-routing file for Elegy's implemented in-repo memory MVP CLI surface. Use for local memory add, search, list, inspect, health, export, purge, contradiction review, and preview reembed flows."
+description: "Repo-local non-authoritative contributor-routing file for Elegy's implemented in-repo memory V1 surface. Use for summary-only session-context inspection or validation and local non-authoritative artifact import, list, show, export, supersede, and tombstone flows."
 ---
 
 # Elegy Memory
 
-This file is a repo-local, non-authoritative contributor-routing output.
+This file is a repo-local, non-authoritative contributor-routing output for external-agent integration with the dedicated `elegy-memory` surface.
+
+External agents outside Elegy should load this skill as routing guidance, then invoke the dedicated `elegy-memory` CLI directly. Elegy itself does not orchestrate or call agents internally through this file.
 
 The authority chain is one-way:
 
@@ -15,44 +17,55 @@ The authority chain is one-way:
 
 ## When to use
 
-- Prefer the dedicated `elegy-memory` binary for the implemented in-repo memory MVP surface.
-- Add a memory with `elegy-memory add <content>`.
-- Search the current scope with `elegy-memory search <query>`.
-- Review stored memories with `elegy-memory list`, `elegy-memory inspect <id>`, `elegy-memory health`, and `elegy-memory contradictions`.
-- Export the current scope as JSON with `elegy-memory export`.
-- Clear a disposable or test database with `elegy-memory purge --yes`.
-- Treat `elegy-memory reembed` as a preview command surface only; provider-backed re-embedding is not wired in the MVP CLI yet.
+- If you are operating as an external agent outside Elegy, load this skill and invoke the dedicated `elegy-memory` binary directly for the bounded memory surface.
+- Inspect the governed summary-only session-context contract with `elegy-memory inspect`.
+- Validate a summary-only session-context artifact with `elegy-memory validate --input <path>`.
+- Initialize or inspect the local memory store with `elegy-memory init`, `elegy-memory list`, and `elegy-memory show`.
+- Import or export governed summary-only session-context artifacts with `elegy-memory import` and `elegy-memory export`.
+- Record local lineage or local withdrawal with `elegy-memory supersede` and `elegy-memory tombstone`.
 - Treat `elegy` memory commands as a temporary legacy compatibility bridge, not the preferred path.
 
 ## Do not use
 
 - Do not treat this skill as authority for currentness, approval, freshness, retrieval ranking, runtime validation, or promotion.
-- Do not describe the current CLI as the older `init` / `import` / `show` / `supersede` / `tombstone` artifact-management flow.
-- Do not use this skill to describe raw transcript storage, broad host-owned persistence behavior, or a fully wired embedding pipeline.
+- Do not infer runtime invalidation from local supersede or tombstone actions.
+- Do not use this skill to describe raw transcript storage or broad host-owned persistence behavior.
 
 ## Current commands
 
 ```text
-elegy-memory add <content> [--db <path>] [--scope <session|workspace|user|agent>] [--type <fact|preference|decision|procedure|observation>] [--importance <0..1>] [--provenance <user-stated|agent-observed|consolidated|imported|agent-inferred>]
-elegy-memory search <query> [--db <path>] [--scope <session|workspace|user|agent>] [--limit <n>] [--include-dormant]
-elegy-memory list [--db <path>] [--scope <session|workspace|user|agent>] [--type <fact|preference|decision|procedure|observation>] [--state <active|dormant|deleted>] [--limit <n>]
-elegy-memory inspect <id> [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory purge [--db <path>] [--scope <session|workspace|user|agent>] [--yes]
-elegy-memory health [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory export [--db <path>] [--scope <session|workspace|user|agent>] [--output <path>]
-elegy-memory reembed [--db <path>] [--scope <session|workspace|user|agent>] [--provider <name>] [--limit <n>]
-elegy-memory contradictions [--db <path>] [--scope <session|workspace|user|agent>]
-elegy-memory --format json <command> ...
+elegy-memory inspect
+elegy-memory validate --input <path>
+elegy-memory init [--root <path>]
+elegy-memory import --input <path> --record-id <record-id> --imported-at-utc <utc> [--root <path>]
+elegy-memory list [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory show --record-id <record-id> [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory export --record-id <record-id> [--output-path <path>] [--root <path>] [--include-superseded] [--include-tombstoned]
+elegy-memory supersede --record-id <record-id> --superseded-by-record-id <record-id> [--root <path>]
+elegy-memory tombstone --record-id <record-id> --tombstoned-at-utc <utc> --reason <text> [--root <path>]
 ```
 
-## Current behavior
+`--format json` is available on the CLI when structured output is needed.
 
-- Default database path: `~/.elegy/memory.db` when `--db` is omitted.
-- Default scope: `workspace`.
-- `add` runs the salience gate and may accept, merge, or archive a memory as dormant.
-- `search` is keyword-only in the MVP CLI and can optionally include dormant records.
-- `export` writes JSON to stdout by default or to a file when `--output` is supplied.
-- `purge` prompts for confirmation unless `--yes` is passed.
-- `reembed` currently reports the queued stale-memory count and exits because provider wiring is not implemented yet.
+## Consumption posture
 
-This surface remains bounded and non-authoritative: it is a local memory operator CLI, not the owner of downstream runtime policy.
+- This skill is a routing bridge for external agents and contributors, not an internal agent runtime lane inside Elegy.
+- Prefer `elegy-memory` directly when you need the dedicated memory surface.
+- Treat `src/Elegy-memory` as a thin wrapper and packaging surface, not as the implementation center.
+- Treat `elegy` memory commands as the general/compatibility path only.
+
+## Local store semantics
+
+- Default root: `.elegy-local-memory` when `--root` is omitted.
+- Local import accepts governed `summary-only-session-context-envelope` artifacts only.
+- The local layout keeps `artifacts/`, `state/`, `state/write.lock`, and `exports/`.
+- Durable local state is derived by scanning artifact files; `state/catalog.json` is not persisted local state.
+- Default active-only views hide superseded and tombstoned records unless `--include-superseded` or `--include-tombstoned` is passed.
+- Local writes are single-writer; concurrent writers are rejected.
+- Listing and reporting follow deterministic ordering from the current local store surface.
+
+## Retention and removal semantics
+
+- Use `supersede` when a newer local artifact copy replaces another for local lineage purposes.
+- Use `tombstone` when a local artifact copy should be withdrawn from normal local visibility and carry an explicit removal reason.
+- Both actions remain local and non-authoritative. They do not decide what `SAASTools` treats as current, approved, fresh, valid, or promotable.

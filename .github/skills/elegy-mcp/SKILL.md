@@ -5,7 +5,9 @@ description: "Repo-local non-authoritative contributor-routing file for Elegy's 
 
 # Elegy MCP
 
-This file is a repo-local, non-authoritative contributor-routing output.
+This file is a repo-local, non-authoritative contributor-routing output for external-agent integration with the dedicated `elegy-mcp` surface.
+
+External agents outside Elegy should load this skill as routing guidance, then invoke the dedicated `elegy-mcp` CLI directly. Elegy itself does not orchestrate or call agents internally through this file.
 
 The authority chain is one-way:
 
@@ -15,7 +17,7 @@ The authority chain is one-way:
 
 ## When to use
 
-- Prefer the dedicated `elegy-mcp` binary for the current implemented in-repo MCP descriptor authoring and analysis flows.
+- If you are operating as an external agent outside Elegy, load this skill and invoke the dedicated `elegy-mcp` binary directly for MCP descriptor authoring and analysis.
 - Author a governed MCP descriptor with `elegy-mcp author` when you have explicit server and tool inputs.
 - Analyze a governed MCP descriptor with `elegy-mcp analyze --descriptor <path>`.
 - Treat `elegy author mcp` and `elegy analyze mcp` as general-surface compatibility commands, not the preferred dedicated path.
@@ -37,6 +39,9 @@ elegy-mcp analyze --descriptor <path>
 
 ## Surface posture
 
+- This skill routes external agents and contributors to the dedicated `elegy-mcp` CLI surface rather than to an internal Elegy orchestration lane.
 - This CLI is a thin wrapper over the existing governed descriptor authoring and analysis functions in `rust/crates/elegy-mcp`.
+- Treat `src/Elegy-mcp` as a thin wrapper and packaging surface, not as the implementation center.
 - The dedicated surface is intentionally bounded to descriptor authoring and analysis.
+- Treat `elegy` author/analyze commands as the umbrella general/compatibility path, not the preferred dedicated path.
 - Governed MCP artifacts remain rooted in `contracts/` and versioned through `governance/`.

@@ -38,6 +38,29 @@ These crates currently provide:
 - a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, MCP-to-skill generation, and stdio host startup
 - dedicated thin CLIs for bounded local memory, dedicated MCP descriptor authoring/analysis, and dedicated MCP-to-skill generation
 
+## Direct system surfaces vs shared foundation crates
+
+The preferred direct CLI/system surfaces in this workspace are:
+
+- `elegy-memory` for the bounded memory system
+- `elegy-mcp` for dedicated MCP descriptor authoring and analysis
+- `elegy-skills` for dedicated MCP-to-skill generation
+- `elegy` as the umbrella general/compatibility surface
+
+External agents outside Elegy should load the associated skill guidance and invoke the matching dedicated `elegy-*` CLI directly when one exists. Elegy itself should not be described as internally calling or orchestrating those agents.
+
+The main shared internal foundation crates under those surfaces include:
+
+- `elegy-contracts`
+- `elegy-policy`
+- `elegy-descriptor`
+- `elegy-adapter-fs`
+- `elegy-adapter-http`
+- `elegy-runtime`
+- `elegy-core`
+- `elegy-host-mcp`
+- `elegy-tooling` as shared helper and compatibility infrastructure for descriptor and skill workflows
+
 ## Current posture
 
 The bootstrap runtime stack is now imported in-repo from contracts through operator surfaces:
@@ -46,7 +69,8 @@ The bootstrap runtime stack is now imported in-repo from contracts through opera
 - runtime and core remain the reusable composition surfaces
 - `elegy-host-mcp` stays thin over `elegy-core`
 - `elegy-cli` stays thin over `elegy-core` plus the stdio host entrypoint
-- `elegy-memory`, `elegy-mcp`, and `elegy-skills` stay thin over their owned library/tooling surfaces
+- `elegy-memory`, `elegy-mcp`, and `elegy-skills` stay thin wrapper surfaces over their owned Rust implementation crates
+- `elegy-tooling` remains shared lower-level helper/compat infrastructure, not the preferred direct `elegy-skills` consumption surface
 
 The next work in this subtree should focus on hardening and operating these imported surfaces in-repo rather than rebuilding them in parallel elsewhere.
 
