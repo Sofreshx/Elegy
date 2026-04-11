@@ -6,30 +6,20 @@ elegy-memory uses SQLite with two extensions:
 - **sqlite-vec** — vector similarity search (KNN via virtual tables)
 - **FTS5** — full-text keyword search with BM25 ranking
 
-Each non-session scope gets its own `.db` file. Session scope uses in-memory JSON.
+The current crate uses one SQLite database file per configured CLI/store target. All logical scopes (`session`, `workspace`, `user`, `agent`) coexist inside that shared file, and the `scope` column is the active isolation / visibility key. Session scope is persisted in the same SQLite backend today.
 
 ## File Layout
 
 ```
-{elegy_data_dir}/
-├── workspaces/
-│   └── {workspace_id}.db    # One SQLite per workspace
-├── user.db                  # User-scoped memories
-└── agent.db                 # Agent-scoped procedural memories
+{chosen_db_path}             # One SQLite database file
+└── memories(scope=...)      # session / workspace / user / agent rows share the file
 ```
 
-For multi-tenant deployments, add `{tenant_id}/` prefix:
-```
-{elegy_data_dir}/
-└── {tenant_id}/
-    ├── workspaces/...
-    ├── user.db
-    └── agent.db
-```
+The CLI defaults to `~/.elegy/memory.db`, but `--db <path>` can point at any SQLite file.
 
 ## Schema (per .db file)
 
-All `.db` files share the same schema. The `scope` column is redundant per-file but useful for validation and potential future merges.
+Each configured `.db` file uses the same schema. The `scope` column is not redundant in the current implementation because one file can contain all four scopes and search visibility cascades across them.
 
 ### Table: memories
 
@@ -38,7 +28,7 @@ CREATE TABLE memories (
     id                TEXT PRIMARY KEY,           -- UUID v4
     content           TEXT NOT NULL,              -- The memory text
     summary           TEXT,                       -- Optional shorter form
-    scope             TEXT NOT NULL,              -- 'workspace' | 'user' | 'agent'
+    scope             TEXT NOT NULL,              -- 'session' | 'workspace' | 'user' | 'agent'
     memory_type       TEXT NOT NULL DEFAULT 'fact', -- 'fact' | 'preference' | 'decision' | 'procedure' | 'observation'
     provenance        TEXT NOT NULL DEFAULT 'imported', -- 'user_stated' | 'agent_observed' | 'agent_inferred' | 'consolidated' | 'imported'
     importance_score  REAL NOT NULL DEFAULT 0.5,  -- LLM-assigned, 0.0-1.0
@@ -175,6 +165,32 @@ CREATE TABLE memory_versions (
 CREATE INDEX idx_versions_memory ON memory_versions(memory_id);
 ```
 
+### Table: memory_promotions
+
+```sql
+CREATE TABLE memory_promotions (
+    id                 TEXT PRIMARY KEY,
+    memory_id          TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    from_scope         TEXT NOT NULL,
+    to_scope           TEXT NOT NULL,
+    reason             TEXT NOT NULL,
+    trigger_session_id TEXT,
+    promoted_at        TEXT NOT NULL
+);
+```
+
+### Table: memory_session_accesses
+
+```sql
+CREATE TABLE memory_session_accesses (
+    memory_id         TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    session_id        TEXT NOT NULL,
+    first_accessed_at TEXT NOT NULL,
+    last_accessed_at  TEXT NOT NULL,
+    PRIMARY KEY(memory_id, session_id)
+);
+```
+
 ### Table: contradictions
 
 ```sql
@@ -192,6 +208,9 @@ CREATE TABLE contradictions (
 CREATE INDEX idx_contradictions_status ON contradictions(resolution_status);
 ```
 
+Tier 2 LLM consolidation does **not** add new persistence tables. When the model returns
+`CONTRADICTION: ...`, the implementation records that result in this same contradiction journal.
+
 ### Table: scope_config
 
 ```sql
@@ -200,18 +219,27 @@ CREATE TABLE scope_config (
     value TEXT NOT NULL
 );
 
--- Populated at init:
+-- Populated at init (key examples):
+-- 'schema_version' → current schema version
 -- 'budget_active_max' → '500'
 -- 'storage_cap_mb' → '100'
 -- 'decay_lambda_base' → '0.10'
--- 'dedup_threshold' → '0.92'
+-- 'similarity_weight' → '0.40'
+-- 'recency_weight' → '0.25'
+-- 'access_weight' → '0.15'
+-- 'priority_weight' → '0.20'
+-- 'memory_context_ratio' → '0.10'
+-- 'response_reserve' → '4096'
 -- 'salience_threshold' → '0.20'
--- 'embedding_dimensions' → '768'
+-- 'novelty_doubt_threshold' → '0.80'
+-- 'merge_similarity_threshold' → '0.85'
+-- 'duplicate_similarity_threshold' → '0.99'
+-- 'agent_inferred_importance_threshold' → '0.50'
 ```
 
 ## Migration Strategy
 
-Schema version is tracked in `scope_config` with key `schema_version`. On open, the store checks the version and applies migrations sequentially. Migrations are idempotent SQL scripts in `migrations/` directory.
+Schema version is tracked in `scope_config` with key `schema_version`. The current implementation still uses additive, idempotent `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` initialization at open time rather than an external migration runner.
 
 ## PostgreSQL Schema (v1)
 

@@ -2,230 +2,278 @@
 
 ## What is a Memory?
 
-A memory is a distilled, atomic piece of information extracted from an agent-user interaction. It is NOT a raw transcript. It is a summary, a fact, a decision, a preference, or a procedure — something the agent should remember.
+A memory is a distilled, atomic record extracted from interaction context. It is not a raw transcript. In code, the core `Memory` struct stores:
 
-Every memory has:
-- **Content** — the textual information (e.g., "User prefers Rust over Python")
-- **Summary** — optional shorter form for context injection
-- **Embedding** — vector representation for semantic search (can be stale)
-- **Scope** — where it lives (Session, Workspace, User, Agent)
-- **Type** — what kind of information it is (Fact, Preference, Decision, Procedure, Observation)
-- **Provenance** — where it came from (UserStated, AgentObserved, AgentInferred, Consolidated, Imported)
-- **Importance Score** — LLM-assigned salience (0.0 → 1.0)
-- **Reliability Score** — system-computed trust (0.0 → 1.0)
-- **Sensitivity** — data classification (Low, Medium, High, Critical)
-- **State** — lifecycle state (Active, Dormant, Deleted)
-- **Metadata** — extensible tags, status, custom key-value pairs
-- **Timestamps** — created_at, updated_at, last_accessed_at
-- **Access Count** — how often this memory has been retrieved
+- **Content** and optional **Summary**
+- **Scope** (`Session`, `Workspace`, `User`, `Agent`)
+- **Type** (`Fact`, `Preference`, `Decision`, `Procedure`, `Observation`)
+- **Provenance** (`UserStated`, `AgentObserved`, `Consolidated`, `Imported`, `AgentInferred`)
+- **Importance Score** and **Reliability Score**
+- **Sensitivity** and **State** (`Active`, `Dormant`, `Deleted`)
+- **Tags**, optional **status**, and free-form **custom_metadata**
+- **Access / corroboration counters**
+- **Embedding freshness**
+- **Timestamps** plus optional tenant / user / agent ids
 
 ## Scopes
 
-| Scope | Lifetime | Storage | Purpose |
-|-------|----------|---------|---------|
-| **Session** | Current session only | JSON in memory / temp file | Working context, immediate task state |
-| **Workspace** | As long as workspace exists | SQLite .db per workspace | Project-specific knowledge, decisions, tasks |
-| **User** | Indefinite | Global SQLite .db | Cross-workspace preferences, traits, patterns |
-| **Agent** | Indefinite | Global SQLite .db (separate namespace) | Procedural knowledge — what tools work, what approaches failed |
+| Scope | Current Role | Current Storage Reality |
+|-------|--------------|-------------------------|
+| **Session** | Ephemeral task-local memory | Variant exists in the model and store APIs |
+| **Workspace** | Project knowledge and decisions | Current CLI default |
+| **User** | Cross-workspace user preferences and traits | Variant exists in the model and store APIs |
+| **Agent** | Procedural knowledge about what works | Variant exists in the model and store APIs |
 
-Scopes are physically isolated. Each scope has its own storage. No implicit cross-scope queries.
+All four scopes exist in the type system and SQLite schema. The current implementation still binds each `SqliteMemoryStore` instance to one explicit **write** scope, but **retrieval visibility now cascades upward**:
 
-### Scope Promotion (v1)
+- `session` searches / duplicate checks can see `session + workspace + user + agent`
+- `workspace` can see `workspace + user + agent`
+- `user` can see `user + agent`
+- `agent` can see `agent`
 
-A memory that recurs in 3+ sessions within a workspace is automatically promoted to workspace scope. A pattern that recurs in 3+ workspaces is promoted to user scope. Promotion creates a new memory in the target scope with provenance `Consolidated` and links back to the source memories.
+`list` remains inventory-only for the exact requested scope.
+
+## Scope Promotion
+
+Automatic promotion is now implemented as a lightweight SQLite-backed pass:
+
+- `session -> workspace` after access in **3 distinct session ids**
+- any non-top scope with `corroboration_count >= 2` promotes **one level up**
+- any non-top scope with `importance × retention >= 0.4` after **7+ days** promotes **one level up**
+- manual CLI override can promote directly to any broader scope
+
+Promotions never move downward. Each promotion records:
+
+- a `memory_versions` row with `changed_by = system:promotion` (or the CLI actor)
+- a `memory_promotions` provenance row with `from_scope`, `to_scope`, reason, and timestamp
 
 ## Memory Types
 
-| Type | Description | Decay Behavior |
-|------|-------------|----------------|
-| **Fact** | Objective, verifiable ("the project uses Rust") | No temporal decay. Only invalidated by contradiction. |
-| **Preference** | Subjective user preference ("I prefer short responses") | Slow decay. Decays if not corroborated across sessions. |
-| **Decision** | Choice made at a point in time ("we chose SQLite") | No temporal decay. Can be superseded by newer decisions. |
-| **Procedure** | How to do something ("to deploy, run X then Y") | Very slow decay. Invalidated if environment changes. |
-| **Observation** | Agent's inference ("user seems to prefer pragmatic approaches") | Normal decay. Requires corroboration to strengthen. |
+| Type | Description |
+|------|-------------|
+| **Fact** | Objective or verifiable information |
+| **Preference** | Subjective preference |
+| **Decision** | Intentional choice captured at a point in time |
+| **Procedure** | How-to knowledge |
+| **Observation** | Agent observation or inference candidate |
 
 ## Provenance Hierarchy
 
-Provenance determines the base reliability score. Higher = more trusted.
+`ProvenanceLevel::base_reliability()` seeds the stored reliability score:
 
 ```
-UserStated    → 1.0  (user explicitly said it)
-AgentObserved → 0.8  (agent witnessed it happen)
-Consolidated  → 0.7  (produced by consolidation/sleep-time)
-Imported      → 0.6  (imported from external source)
-AgentInferred → 0.5  (agent deduced it)
+UserStated    → 1.0
+AgentObserved → 0.8
+Consolidated  → 0.7
+Imported      → 0.6
+AgentInferred → 0.5
 ```
 
-## Confidence Score (Bidirectional)
+## Confidence and Priority
 
-Each memory carries two independent scores:
+The model keeps **importance** and **reliability** as separate values.
 
-### Importance Score (LLM-assigned, 0.0 → 1.0)
-The agent evaluates salience at extraction time.
-- Critical architecture decision → 0.9
-- Cosmetic preference → 0.3
-- Passing mention → 0.1
+- **Importance** is assigned at extraction time.
+- **Reliability** is seeded from provenance when the memory is created.
+- Recording a contradiction lowers the less-trusted side by `0.3`.
 
-### Reliability Score (system-computed, 0.0 → 1.0)
-The system computes trustworthiness:
-- **Base:** provenance level (see hierarchy above)
-- **Corroboration bonus:** +0.1 per independent corroboration (same fact from different sessions), cap +0.3
-- **Contradiction penalty:** -0.3 if contradicted by user, -0.1 if contradicted by another unresolved memory
-- **Staleness penalty:** slight decay if never accessed despite relevant retrieval opportunities
+The struct also carries `corroboration_count`, but automatic corroboration bonuses and broader staleness penalties are not implemented yet.
 
-### Priority Score
+Priority used in retrieval is:
+
 ```
 priority = importance × reliability
 ```
-A memory with importance=0.9 but reliability=0.3 (uncorroborated inference) → priority 0.27, filtered from normal retrieval. A memory with importance=0.4 but reliability=1.0 (user-stated) → priority 0.40, accessible.
 
 ## Retrieval Scoring
 
-When searching for relevant memories, the system combines four signals:
+Search uses a hybrid similarity signal plus recency/access/priority scoring:
 
 ```
-score_final = α × similarity + β × recency + γ × log(access_count + 1) + δ × (importance × reliability)
+score_final =
+    α × similarity
+  + β × recency
+  + γ × ln(access_count + 1)
+  + δ × (similarity × importance × reliability)
 ```
 
-Where:
-- `similarity` = cosine similarity between query embedding and memory embedding (from sqlite-vec)
-- `recency` = `e^(-λ × days_since_last_access)` (Ebbinghaus-inspired decay)
-- `access_count` = number of times this memory has been retrieved
-- `importance × reliability` = the confidence score
-- α, β, γ, δ = configurable weights (defaults: 0.4, 0.25, 0.15, 0.2)
+Default weights remain:
+
+- `α = 0.40`
+- `β = 0.25`
+- `γ = 0.15`
+- `δ = 0.20`
+
+Vector and keyword similarity are blended before this score, with vector similarity intentionally dominant in the current store.
 
 ### Context Window Budget
 
-The number of memories injected into an LLM prompt is controlled by the *remaining* context, not the total:
+Prompt injection still uses remaining-context budgeting:
 
-    available_for_memory = model_max_tokens - already_used_tokens - response_reserve
-    max_memory_tokens = available_for_memory × memory_context_ratio
+```
+available_for_memory = model_max_tokens - already_used_tokens - response_reserve
+max_memory_tokens = available_for_memory × memory_context_ratio
+```
 
-Where:
-- `model_max_tokens` is the model's total context window (provided by caller)
-- `already_used_tokens` is the space already consumed by system prompt, conversation history, and other context (provided by caller, optional — defaults to 0)
-- `response_reserve` is space reserved for the model's response (default: 4096 tokens)
-- `memory_context_ratio` defaults to 0.10 (10% of remaining context)
+Defaults:
 
-This is model-agnostic — the caller provides `model_max_tokens` and optionally `already_used_tokens`.
+- `memory_context_ratio = 0.10`
+- `response_reserve = 4096`
 
 ## Decay Model
 
-Inspired by Ebbinghaus forgetting curve, adapted for agent memory:
-
-```
-retention = importance × e^(-λ_adjusted × days_since_last_access) × (1 + 0.2 × access_count)
-```
-
-### Adaptive Decay Rate
-```
-λ_adjusted = λ_base × (average_sessions_per_week / reference_sessions_per_week)
-```
-Where `reference_sessions_per_week = 3.0` (configurable). A daily user (7 sessions/week) has faster decay. A monthly user (~1/week) has slower decay. This prevents punishing infrequent users.
-
-### Type-Modulated Decay
-- Facts and Decisions: λ_base = 0 (no decay)
-- Procedures: λ_base = 0.02 (very slow)
-- Preferences: λ_base = 0.05 (slow)
-- Observations: λ_base = 0.10 (normal)
-
-### High-Importance Decay Protection
-
-Regardless of memory type, any memory with `importance_score > 0.7` has its effective λ_base halved:
-
-    λ_effective = λ_base × (if importance > 0.7 then 0.5 else 1.0)
-
-This prevents the edge case where a highly important Observation (e.g., "user's critical project deadline is March 30") decays too quickly despite its high salience. Facts and Decisions already have λ_base = 0, so this rule only affects Preferences, Procedures, and Observations with high importance.
+The current code uses a fixed scope-configured decay base (`decay_lambda_base`, default `0.10`) for recency scoring and retention calculations. Adaptive decay, type-specific decay tuning, and high-importance protection are still future refinements, not current behavior.
 
 ## Write-Time Salience Gate
 
-Every memory write passes through a 3-step gate:
+`DefaultSalienceGate` is intentionally conservative. It prefers storing a new memory over collapsing distinct information too early.
 
-### Step 1: Novelty Check (Semantic Deduplication)
-Compute cosine similarity with existing active memories. If similarity > 0.92 with an existing memory:
-- Do NOT create a new memory
-- Update the existing memory: increment access_count, update timestamp, enrich content if new info is present
-- Mark embedding as stale if content changed
+### Step 1: Novelty / Similarity
 
-### Step 2: Salience Check
-If the LLM-assigned importance_score < 0.2:
-- Store directly as Dormant (cold storage), not Active
-- This prevents low-value noise from entering the active retrieval pool
+The current default thresholds are:
 
-### Step 3: Provenance Check
-If provenance is `AgentInferred` AND importance < 0.5:
-- Store as Dormant by default
-- Only user-stated or high-confidence inferences pass to Active
+- **Likely-duplicate warning floor:** `0.80`
+- **Merge threshold:** `0.85`
+- **Duplicate threshold constant:** `0.99`
+- **Salience threshold:** `0.20`
+- **Agent-inferred archive threshold:** `0.50`
+
+Current behavior:
+
+- **Similarity < 0.80** → accept as a new memory
+- **0.80 ≤ similarity < 0.85** → accept as a new memory, but surface a `similar_to` warning
+- **similarity ≥ 0.85** → enter the merge branch
+
+The `0.99` duplicate threshold exists in `ScopeConfig`, but the current default gate does not aggressively auto-reject near-duplicates; it stays conservative and routes high-similarity cases through merge-or-contradiction handling first.
+
+### Step 2: Contradiction Check Inside the Merge Branch
+
+Before merging a high-similarity candidate, the gate now prefers an optional LLM verdict when configured:
+
+- prompt result `AGREE` → merge
+- prompt result `CONTRADICT: ...` → contradiction record
+- prompt result `UNRELATED` → accept as a new memory
+- provider failure / timeout / unusable response → visible warning plus fallback to the conservative heuristic path
+
+Without an LLM provider, or after fallback, the gate runs conservative write-time contradiction heuristics:
+
+- **technology / category swaps** for the same subject
+- **numeric-value swaps** for the same subject
+
+If the change looks additive or like a rephrasing, the candidate still merges. If it looks like a real conflict, the gate returns a contradiction decision instead of merging.
+
+### Scope-Aware Duplicate Policy
+
+The salience gate now evaluates near-duplicates across the store's full visible scope set.
+
+- **higher-scope near-duplicate** → reject the write
+- **same-scope near-duplicate** → merge as before
+- **lower-scope near-duplicate** → return a merge decision plus a promotion target for the merged result
+
+### Step 3: Archive Checks
+
+- `importance_score < 0.20` → store as `Dormant`
+- `provenance == AgentInferred` and `importance_score < 0.50` → store as `Dormant`
 
 ### Gate Output
-```
+
+```rust
 enum GateDecision {
-    Accept,             // Store as Active
-    Archive,            // Store as Dormant
-    Merge(MemoryId),    // Merge with existing memory
-    Reject,             // Do not store (e.g., exact duplicate)
+    Accept {
+        similar_to: Option<MemoryId>,
+        similarity: Option<f32>,
+    },
+    Archive,
+    Merge {
+        target_id: MemoryId,
+        enriched_content: String,
+        promote_to: Option<MemoryScope>,
+    },
+    Contradiction {
+        conflicting_id: MemoryId,
+        description: String,
+    },
+    Reject {
+        reason: String,
+    },
 }
 ```
 
-### Gate Safety Rules
+### Merge Semantics
 
-The gate is the most critical component. A bad gate decision is harder to reverse than a bad retrieval decision. Therefore:
+When the gate decides to merge:
 
-1. **The gate NEVER hard-rejects useful information.** `Reject` is ONLY for exact duplicates (cosine > 0.99) or empty/malformed content. When in doubt, the gate MUST choose `Archive` (dormant), never `Reject`.
-2. **Archive is always preferred over Reject.** A dormant memory costs minimal storage but retains the option value of reactivation. A rejected memory is gone forever.
-3. **Merge is reversible.** Every merge creates a version entry in `memory_versions`, preserving the pre-merge content. A bad merge can be rolled back.
-4. **The gate is conservative by default.** If the novelty check is borderline (cosine between 0.85 and 0.92), the gate should `Accept` as a new memory rather than `Merge`. False negatives (storing a near-duplicate) are cheap; false positives (merging distinct information) lose data.
+- at very high similarity (`>= 0.95`), the newer content replaces the old body
+- if the candidate is clearly more detailed, it can also replace the old body
+- otherwise the existing body is kept
 
-These rules ensure that the write-time gate provides quality control without becoming a bottleneck or a source of data loss.
+`update_content()` versions the old text before replacement and marks embeddings stale for re-embedding.
 
 ## Contradiction Journal
 
-When the system detects two memories with contradictory content:
-1. Both memories are flagged
-2. An entry is created in the contradiction journal with: memory_a_id, memory_b_id, detected_at, description, resolution_status
-3. The reliability_score of the less trusted memory (by provenance) is reduced by 0.3
-4. Resolution can be: automatic (newer user-stated wins), or manual (user resolves)
+Contradiction auto-detection is now implemented at write time, and the same journal is also reused by LLM-backed consolidation when the model flags a contradictory pair instead of returning merged text.
 
-Detection happens:
-- At write time (new memory contradicts existing)
-- During consolidation (sleep-time agent reviews and detects)
+Current workflow:
+
+1. The new memory is stored separately
+2. A contradiction record is created with both memory ids and a human-readable description
+3. The less-trusted side may receive a `-0.3` reliability penalty
+4. Operators list unresolved contradictions
+5. They resolve each one with either:
+   - **keep-one**: keep one memory active and make the losing memory `Dormant`
+   - **keep-both**: mark the contradiction resolved without changing either state
+
+There is no automatic contradiction resolution in the current codepath.
 
 ## Memory Versioning
 
-When a memory is updated (content change, consolidation, contradiction resolution):
-- The old content is saved in the `memory_versions` table
-- A new version number is assigned
-- `changed_by` records who/what made the change
-- `change_reason` records why
-- Embeddings of old versions are NOT stored (only text)
-- The current version's embedding is marked stale for re-computation
+`update_content()` writes a `memory_versions` row before replacing content. This is used by normal edits and merge updates. The version row stores:
+
+- previous content
+- version number
+- `changed_by`
+- `change_reason`
+- timestamp
+
+## Consolidation
+
+Tier 2 consolidation now has two runtime modes:
+
+- **SimpleConsolidator** — embedding-only dedup with the configured merge threshold
+- **LlmConsolidator** — same candidate selection, but each qualifying pair is sent to an LLM for a constrained merge decision
+
+CLI behavior:
+
+- `consolidate` without `--llm-provider` uses `SimpleConsolidator`
+- `consolidate --llm-provider ...` uses `LlmConsolidator`
+- `--consolidate-limit` caps qualifying pair processing, not raw row loading
+- `--dry-run` reports planned merges / contradictions without mutating the store
+
+LLM consolidation degrades explicitly:
+
+- `CONTRADICTION: ...` creates a contradiction record and keeps both memories
+- empty / garbled LLM responses fall back to the simple merge strategy
+- provider failures / timeouts fall back to the simple merge strategy with a visible warning
 
 ## Forgetting Budget
 
-Each scope has a configurable budget of active memories:
-- Workspace: 500 (default)
-- User: 1000 (default)
-- Agent: 200 (default)
-- Session: unlimited (ephemeral anyway)
-
-When the budget is exceeded, memories with the lowest `retention` score transition to Dormant. Dormant memories are excluded from default retrieval but can be reactivated if a query has cosine > 0.95 with their embedding.
-
-Hard delete only occurs when the SQLite file exceeds a configurable size cap (default: 100MB per workspace, 500MB for user, 50MB for agent).
+Budget configuration exists and health reporting exposes `budget_usage_ratio`, but automatic budget-driven dormancy and hard-delete policies are not implemented yet.
 
 ## Memory States
 
+Current state transitions are simpler than the long-term model:
+
 ```
-Active → Dormant (budget exceeded or low retention)
-Dormant → Active (high-similarity query reactivation or manual promotion)
-Active → Deleted (hard purge at storage cap, or user purge request)
-Dormant → Deleted (hard purge at storage cap)
+Active  → Dormant  (write-time archive, manual make_dormant, keep-one contradiction resolution)
+Dormant → Active   (manual reactivate)
+Active  → Deleted  (hard_delete / purge)
+Dormant → Deleted  (hard_delete / purge)
 ```
 
-## User Correction Feedback Loop (v1)
+## Future Work Still Outside Current Code
 
-When an agent uses a memory and the user corrects it:
-1. `reliability_score` of the used memory decreases
-2. A new memory is created with the corrected info (provenance: UserStated, reliability: 1.0)
-3. Contradiction journal entry is created
-4. If the corrected memory was AgentInferred, the agent's inference accuracy for that topic is tracked (meta-learning)
+- corroboration bonuses
+- adaptive/type-specific decay
+- automatic budget enforcement
+- user-correction feedback loops
 

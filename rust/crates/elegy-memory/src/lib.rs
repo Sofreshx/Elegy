@@ -4,7 +4,9 @@ pub mod decay;
 pub mod embedding;
 pub mod error;
 pub mod gate;
+pub mod llm;
 mod local_store;
+pub mod promotion;
 mod similarity;
 pub mod storage;
 pub mod traits;
@@ -14,14 +16,25 @@ use serde::{Deserialize, Deserializer, Serialize};
 use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
-pub use consolidator::SimpleConsolidator;
+pub use consolidator::{LlmConsolidator, SimpleConsolidator};
 pub use decay::{retention, retention_with_lambda};
 pub use embedding::{
-    OllamaEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_CONNECT_TIMEOUT,
-    DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_REQUEST_TIMEOUT,
+    OllamaEmbeddingProvider, OpenAiEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL,
+    DEFAULT_OLLAMA_CONNECT_TIMEOUT, DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OLLAMA_REQUEST_TIMEOUT, DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_CONNECT_TIMEOUT,
+    DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_MODEL, DEFAULT_OPENAI_REQUEST_TIMEOUT,
 };
-pub use error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
+pub use error::{
+    ConsolidationError, EmbeddingError, GateError, LlmError, ObservabilityError, StoreError,
+};
 pub use gate::DefaultSalienceGate;
+pub use llm::{
+    OllamaLlmProvider, OpenAiLlmProvider, DEFAULT_OLLAMA_LLM_BASE_URL,
+    DEFAULT_OLLAMA_LLM_CONNECT_TIMEOUT, DEFAULT_OLLAMA_LLM_MODEL,
+    DEFAULT_OLLAMA_LLM_REQUEST_TIMEOUT, DEFAULT_OPENAI_LLM_BASE_URL,
+    DEFAULT_OPENAI_LLM_CONNECT_TIMEOUT, DEFAULT_OPENAI_LLM_MODEL,
+    DEFAULT_OPENAI_LLM_REQUEST_TIMEOUT,
+};
 pub use local_store::{
     LocalMemoryCatalog, LocalMemoryCatalogEntry, LocalMemoryExportResult, LocalMemoryPaths,
     LocalMemoryQueryOptions, LocalMemoryStore, LocalMemoryStoreError, LocalMemoryStoreInitResult,
@@ -30,10 +43,12 @@ pub use local_store::{
     LOCAL_MEMORY_SINGLE_WRITER_POSTURE, LOCAL_MEMORY_STATE_DIR, LOCAL_MEMORY_STORE_KIND,
     LOCAL_MEMORY_WRITE_LOCK_RELATIVE_PATH,
 };
+pub use promotion::PromotionEngine;
 pub use storage::{init_database, SqliteMemoryStore, CURRENT_SCHEMA_VERSION};
 pub use traits::{
-    ConsolidationAction, EmbeddingProvider, GateDecision, MemoryConsolidator, MemoryFilter,
-    MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate, SalienceGate,
+    ConsolidationAction, EmbeddingProvider, GateDecision, LlmProvider, MemoryConsolidator,
+    MemoryFilter, MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate,
+    SalienceGate,
 };
 pub use types::{
     ConsolidationCandidate, ContradictionEntry, ContradictionRecord, ExportFormat, Memory,

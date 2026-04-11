@@ -13,9 +13,9 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
     ("budget_active_max", "500"),
     ("storage_cap_mb", "100"),
     ("decay_lambda_base", "0.10"),
-    ("dedup_threshold", "0.92"),
+    ("dedup_threshold", "0.85"),
     ("salience_threshold", "0.20"),
-    ("novelty_doubt_threshold", "0.85"),
+    ("novelty_doubt_threshold", "0.80"),
     ("embedding_dimensions", "768"),
     ("similarity_weight", "0.4"),
     ("recency_weight", "0.25"),
@@ -23,7 +23,7 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
     ("priority_weight", "0.2"),
     ("memory_context_ratio", "0.10"),
     ("response_reserve", "4096"),
-    ("merge_similarity_threshold", "0.92"),
+    ("merge_similarity_threshold", "0.85"),
     ("duplicate_similarity_threshold", "0.99"),
     ("agent_inferred_importance_threshold", "0.50"),
 ];
@@ -146,6 +146,34 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
         CREATE INDEX IF NOT EXISTS idx_versions_memory
             ON memory_versions(memory_id);
 
+        CREATE TABLE IF NOT EXISTS memory_promotions (
+            id                 TEXT PRIMARY KEY,
+            memory_id          TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            from_scope         TEXT NOT NULL,
+            to_scope           TEXT NOT NULL,
+            reason             TEXT NOT NULL,
+            trigger_session_id TEXT,
+            promoted_at        TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_memory_promotions_memory
+            ON memory_promotions(memory_id);
+        CREATE INDEX IF NOT EXISTS idx_memory_promotions_promoted_at
+            ON memory_promotions(promoted_at);
+
+        CREATE TABLE IF NOT EXISTS memory_session_accesses (
+            memory_id          TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            session_id         TEXT NOT NULL,
+            first_accessed_at  TEXT NOT NULL,
+            last_accessed_at   TEXT NOT NULL,
+            PRIMARY KEY(memory_id, session_id)
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_memory_session_accesses_memory
+            ON memory_session_accesses(memory_id);
+        CREATE INDEX IF NOT EXISTS idx_memory_session_accesses_session
+            ON memory_session_accesses(session_id);
+
         CREATE TABLE IF NOT EXISTS contradictions (
             id                TEXT PRIMARY KEY,
             memory_a_id       TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
@@ -223,6 +251,17 @@ fn initialize_scope_config(connection: &Connection) -> Result<(), StoreError> {
         connection.execute(
             "INSERT OR IGNORE INTO scope_config(key, value) VALUES (?1, ?2)",
             (key, value),
+        )?;
+    }
+
+    for (key, legacy_default, replacement_default) in [
+        ("dedup_threshold", "0.92", "0.85"),
+        ("novelty_doubt_threshold", "0.85", "0.80"),
+        ("merge_similarity_threshold", "0.92", "0.85"),
+    ] {
+        connection.execute(
+            "UPDATE scope_config SET value = ?3 WHERE key = ?1 AND value = ?2",
+            (key, legacy_default, replacement_default),
         )?;
     }
 
@@ -319,6 +358,8 @@ mod tests {
             "memories_fts",
             "memory_embeddings",
             "memory_links",
+            "memory_promotions",
+            "memory_session_accesses",
             "memory_versions",
             "scope_config",
             "vec_memories",
@@ -417,6 +458,77 @@ mod tests {
         }
     }
 
+    #[test]
+    fn init_database_updates_legacy_threshold_defaults_without_overriding_custom_values() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-schema-{}.sqlite3", Uuid::new_v4()));
+
+        let connection = must(
+            Connection::open(&database_path),
+            "create legacy temporary scope config database",
+        );
+        must(
+            connection.execute_batch(
+                r#"
+                CREATE TABLE scope_config (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                INSERT INTO scope_config(key, value) VALUES
+                    ('dedup_threshold', '0.92'),
+                    ('novelty_doubt_threshold', '0.85'),
+                    ('merge_similarity_threshold', '0.87'),
+                    ('schema_version', '1');
+                "#,
+            ),
+            "create legacy scope_config table",
+        );
+        drop(connection);
+
+        let upgraded_connection = must(
+            init_database(&database_path),
+            "upgrade legacy temporary scope config database",
+        );
+        let dedup_threshold = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'dedup_threshold'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read updated dedup_threshold",
+        );
+        let novelty_doubt_threshold = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'novelty_doubt_threshold'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read updated novelty_doubt_threshold",
+        );
+        let merge_similarity_threshold = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'merge_similarity_threshold'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read preserved merge_similarity_threshold",
+        );
+
+        assert_eq!(dedup_threshold, "0.85");
+        assert_eq!(novelty_doubt_threshold, "0.80");
+        assert_eq!(merge_similarity_threshold, "0.87");
+        drop(upgraded_connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::NotFound,
+                "failed to remove temporary database {}: {error}",
+                database_path.display()
+            );
+        }
+    }
+
     fn load_object_names(
         connection: &rusqlite::Connection,
     ) -> Result<Vec<String>, rusqlite::Error> {
@@ -430,6 +542,8 @@ mod tests {
                 'memories_fts',
                 'memory_embeddings',
                 'memory_links',
+                'memory_promotions',
+                'memory_session_accesses',
                 'memory_versions',
                 'scope_config',
                 'vec_memories'

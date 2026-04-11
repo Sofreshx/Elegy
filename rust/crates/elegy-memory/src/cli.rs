@@ -2,7 +2,7 @@ use std::{
     collections::BTreeMap,
     ffi::OsString,
     fs,
-    io::{self, Write},
+    io::{self, Read, Write},
     path::PathBuf,
     process::ExitCode,
     sync::Arc,
@@ -10,17 +10,21 @@ use std::{
 
 use chrono::Utc;
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
-    DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision, GateError, Memory,
-    MemoryCandidate, MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState,
-    MemoryStore, MemoryType, MemoryVersion, OllamaEmbeddingProvider, ProvenanceLevel,
-    ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery, SensitivityLevel, SqliteMemoryStore,
-    StoreError, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL,
+    ConsolidationAction, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision,
+    GateError, LlmConsolidator, LlmProvider, Memory, MemoryCandidate, MemoryConsolidator,
+    MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
+    MemoryVersion, OllamaEmbeddingProvider, OllamaLlmProvider, OpenAiEmbeddingProvider,
+    OpenAiLlmProvider, PromotionEngine, ProvenanceLevel, ResolutionStatus, SalienceGate,
+    ScoredMemory, SearchQuery, SensitivityLevel, SimpleConsolidator, SqliteMemoryStore, StoreError,
+    DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL,
+    DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS,
+    DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -31,11 +35,15 @@ const PREVIEW_LIMIT: usize = 80;
 #[derive(Debug, Error)]
 pub enum CliError {
     #[error("{0}")]
+    Consolidation(#[from] crate::ConsolidationError),
+    #[error("{0}")]
     Store(#[from] StoreError),
     #[error("{0}")]
     Gate(#[from] GateError),
     #[error("{0}")]
     Embedding(#[from] EmbeddingError),
+    #[error("{0}")]
+    Llm(#[from] crate::LlmError),
     #[error("{0}")]
     Io(#[from] io::Error),
     #[error("{0}")]
@@ -119,6 +127,8 @@ enum Command {
         store: StoreArgs,
         #[arg(long)]
         output: Option<PathBuf>,
+        #[arg(long)]
+        all_scopes: bool,
     },
     /// Re-embed stale memories when a provider is configured.
     Reembed {
@@ -127,10 +137,55 @@ enum Command {
         #[arg(long, default_value_t = DEFAULT_REEMBED_LIMIT)]
         limit: usize,
     },
-    /// List unresolved contradiction records.
+    /// List unresolved contradiction records or resolve one by id.
     Contradictions {
         #[command(flatten)]
         store: StoreArgs,
+        /// Optional contradiction action. Omit to list unresolved contradictions.
+        #[arg(value_enum)]
+        action: Option<ContradictionsAction>,
+        /// Contradiction id to resolve.
+        #[arg(long)]
+        id: Option<String>,
+        /// Memory id to keep active while dormanting the other side.
+        #[arg(long)]
+        keep: Option<String>,
+        /// Resolve without dormanting either memory.
+        #[arg(long = "keep-both")]
+        keep_both: bool,
+    },
+    /// Import memories from a JSON file (or stdin when --input is omitted).
+    Import {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Path to a JSON file to import. Reads from stdin when omitted.
+        #[arg(long)]
+        input: Option<PathBuf>,
+        /// Bypass the salience gate and insert every item directly. Format A keeps exported states.
+        #[arg(long)]
+        force: bool,
+    },
+    /// Promote memories automatically or force a manual promotion.
+    Promote {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long)]
+        id: Option<String>,
+        #[arg(long, value_enum)]
+        to: Option<CliScope>,
+        #[arg(long, default_value_t = DEFAULT_LIMIT)]
+        limit: usize,
+    },
+    /// Consolidate near-duplicate memories.
+    Consolidate {
+        #[command(flatten)]
+        store: StoreArgs,
+        #[arg(long)]
+        cross_scope: bool,
+        #[arg(long, default_value_t = 50)]
+        consolidate_limit: usize,
+        #[arg(long)]
+        dry_run: bool,
     },
 }
 
@@ -153,6 +208,40 @@ struct StoreArgs {
     /// nomic-embed-text.
     #[arg(long)]
     ollama_model: Option<String>,
+    /// OpenAI API key when `--embedding-provider openai` is enabled.
+    #[arg(long)]
+    openai_api_key: Option<String>,
+    /// OpenAI model when `--embedding-provider openai` is enabled. Defaults to
+    /// text-embedding-3-small.
+    #[arg(long)]
+    openai_model: Option<String>,
+    /// OpenAI base URL when `--embedding-provider openai` is enabled. Defaults to
+    /// https://api.openai.com. Set to a custom URL for LM Studio / vLLM compatibility.
+    #[arg(long)]
+    openai_url: Option<String>,
+    /// Expected embedding dimensions when `--embedding-provider openai` is enabled.
+    /// Defaults to 1536.
+    #[arg(long)]
+    openai_dimensions: Option<usize>,
+    /// Optional LLM provider used for contradiction checks and consolidation.
+    #[arg(long = "llm-provider", value_enum)]
+    llm_provider: Option<CliLlmProvider>,
+    /// LLM model when `--llm-provider` is enabled. Defaults to `qwen3:8b` for Ollama and
+    /// `gpt-4.1-mini` for OpenAI.
+    #[arg(long = "llm-model")]
+    llm_model: Option<String>,
+    /// Ollama base URL when `--llm-provider ollama` is enabled.
+    #[arg(long = "llm-ollama-url")]
+    llm_ollama_url: Option<String>,
+    /// OpenAI API key when `--llm-provider openai` is enabled.
+    #[arg(long = "llm-openai-api-key")]
+    llm_openai_api_key: Option<String>,
+    /// OpenAI-compatible base URL when `--llm-provider openai` is enabled.
+    #[arg(long = "llm-openai-url")]
+    llm_openai_url: Option<String>,
+    /// Optional session identifier used to track cross-session access-driven promotions.
+    #[arg(long)]
+    session_id: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -197,6 +286,18 @@ enum CliProvenance {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 enum CliEmbeddingProvider {
     Ollama,
+    Openai,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum CliLlmProvider {
+    Ollama,
+    Openai,
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
+enum ContradictionsAction {
+    Resolve,
 }
 
 impl From<CliScope> for MemoryScope {
@@ -247,9 +348,12 @@ impl From<CliProvenance> for ProvenanceLevel {
 struct StoreContext {
     db_path: PathBuf,
     scope: MemoryScope,
+    session_id: Option<String>,
     store: SqliteMemoryStore,
     embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
     embedding_provider_label: Option<String>,
+    llm_provider: Option<Arc<dyn LlmProvider>>,
+    llm_provider_label: Option<String>,
 }
 
 impl StoreContext {
@@ -258,9 +362,11 @@ impl StoreContext {
     }
 
     fn embedding_provider_label(&self) -> &str {
-        self.embedding_provider_label
-            .as_deref()
-            .unwrap_or("none")
+        self.embedding_provider_label.as_deref().unwrap_or("none")
+    }
+
+    fn llm_provider_label(&self) -> &str {
+        self.llm_provider_label.as_deref().unwrap_or("none")
     }
 }
 
@@ -269,9 +375,12 @@ impl std::fmt::Debug for StoreContext {
         f.debug_struct("StoreContext")
             .field("db_path", &self.db_path)
             .field("scope", &self.scope)
+            .field("session_id", &self.session_id)
             .field("store", &self.store)
             .field("has_embedding_provider", &self.embedding_provider.is_some())
             .field("embedding_provider_label", &self.embedding_provider_label)
+            .field("has_llm_provider", &self.llm_provider.is_some())
+            .field("llm_provider_label", &self.llm_provider_label)
             .finish()
     }
 }
@@ -289,7 +398,7 @@ where
 #[serde(rename_all = "camelCase")]
 struct AddResponse {
     action: &'static str,
-    gate_result: &'static str,
+    gate_result: String,
     memory: Memory,
 }
 
@@ -345,7 +454,39 @@ struct InspectResponse {
 #[serde(rename_all = "camelCase")]
 struct HealthResponse {
     report: MemoryHealthReport,
+    per_scope_reports: Vec<MemoryHealthReport>,
     type_counts: BTreeMap<String, u64>,
+    average_importance: Option<f32>,
+    oldest_memory_age_days: Option<i64>,
+    database_size_human: String,
+    most_accessed_memory: Option<HealthMostAccessedMemory>,
+    stale_memories: Vec<HealthMemoryPreview>,
+    contradiction_summaries: Vec<HealthContradictionSummary>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthMemoryPreview {
+    id: String,
+    memory_type: String,
+    preview: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthMostAccessedMemory {
+    id: String,
+    preview: String,
+    access_count: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct HealthContradictionSummary {
+    id: String,
+    memory_a_id: String,
+    memory_b_id: String,
+    summary: String,
 }
 
 #[derive(Serialize)]
@@ -355,6 +496,27 @@ struct ExportResponse {
     db_path: String,
     scope: String,
     memories: Vec<Memory>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PromoteResponse {
+    db_path: String,
+    requested_scope: String,
+    promoted: Vec<Memory>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ConsolidateResponse {
+    db_path: String,
+    scope: String,
+    strategy: String,
+    cross_scope: bool,
+    dry_run: bool,
+    merged_count: usize,
+    merged_ids: Vec<String>,
+    contradiction_count: usize,
 }
 
 #[derive(Serialize)]
@@ -375,6 +537,60 @@ struct ReembedResponse {
     stale_found: usize,
     reembedded_count: usize,
     reembedded_ids: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ResolveContradictionResponse {
+    contradiction_id: String,
+    resolution_status: String,
+    kept_both: bool,
+    kept_memory_id: Option<String>,
+    dormant_memory_id: Option<String>,
+}
+
+/// Summary returned by the `import` command.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ImportResponse {
+    db_path: String,
+    scope: String,
+    total: usize,
+    imported: usize,
+    merged: usize,
+    contradictions: usize,
+    skipped: usize,
+    errors: Vec<String>,
+}
+
+/// Wrapper for Format A imports: an export-shape object with a `memories` array.
+#[derive(Deserialize)]
+struct ImportFormatA {
+    memories: Vec<Memory>,
+}
+
+enum ImportItem {
+    FormatA(Box<Memory>),
+    FormatB {
+        content: String,
+        memory_type: MemoryType,
+        importance: f32,
+        provenance: ProvenanceLevel,
+    },
+}
+
+/// A single entry in a Format B import array when the entry is an object.
+#[derive(Deserialize)]
+struct ImportFormatBObject {
+    content: String,
+    /// Memory type — accepts prompt-shaped values like `"fact"` plus common case variations.
+    #[serde(rename = "type")]
+    memory_type: Option<String>,
+    /// Importance score in `0.0..=1.0`. Defaults to `DEFAULT_IMPORTANCE` when absent.
+    importance: Option<f32>,
+    /// Provenance level — accepts CLI-style values like `"user-stated"` plus common case
+    /// variations.
+    provenance: Option<String>,
 }
 
 pub fn run_from_env() -> Result<ExitCode, CliError> {
@@ -434,16 +650,57 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         }
         Command::Purge { store, yes } => execute_purge_command(open_store(store)?, yes, cli.format),
         Command::Health { store } => execute_health_command(open_store(store)?, cli.format),
-        Command::Export { store, output } => {
-            execute_export_command(open_store(store)?, output, cli.format)
-        }
-        Command::Reembed {
+        Command::Export {
             store,
-            limit,
-        } => execute_reembed_command(open_store(store)?, limit, cli.format),
-        Command::Contradictions { store } => {
-            execute_contradictions_command(open_store(store)?, cli.format)
+            output,
+            all_scopes,
+        } => execute_export_command(open_store(store)?, output, all_scopes, cli.format),
+        Command::Reembed { store, limit } => {
+            execute_reembed_command(open_store(store)?, limit, cli.format)
         }
+        Command::Contradictions {
+            store,
+            action,
+            id,
+            keep,
+            keep_both,
+        } => execute_contradictions_command(
+            open_store(store)?,
+            action,
+            id,
+            keep,
+            keep_both,
+            cli.format,
+        ),
+        Command::Import {
+            store,
+            input,
+            force,
+        } => execute_import_command(open_store(store)?, input, force, cli.format),
+        Command::Promote {
+            store,
+            id,
+            to,
+            limit,
+        } => execute_promote_command(
+            open_store(store)?,
+            id,
+            to.map(Into::into),
+            limit,
+            cli.format,
+        ),
+        Command::Consolidate {
+            store,
+            cross_scope,
+            consolidate_limit,
+            dry_run,
+        } => execute_consolidate_command(
+            open_store(store)?,
+            cross_scope,
+            consolidate_limit,
+            dry_run,
+            cli.format,
+        ),
     }
 }
 
@@ -463,9 +720,10 @@ fn execute_add_command(
         ));
     }
 
-    let gate = DefaultSalienceGate::new_with_optional_embedding_provider(
+    let gate = DefaultSalienceGate::new_with_optional_providers(
         ctx.store.scope_config()?,
         ctx.embedding_provider.clone(),
+        ctx.llm_provider.clone(),
     );
     let candidate = MemoryCandidate {
         content: trimmed_content.clone(),
@@ -484,6 +742,7 @@ fn execute_add_command(
         GateDecision::Merge {
             target_id,
             enriched_content,
+            promote_to,
         } => {
             run_async(ctx.store.update_content(
                 &target_id,
@@ -491,12 +750,67 @@ fn execute_add_command(
                 "cli:add",
                 "merged by salience gate from CLI add",
             ))?;
+            if let Some(promote_to) = promote_to {
+                let _ = ctx.store.promote_memory_to(
+                    &target_id,
+                    promote_to,
+                    "cli:add",
+                    "scope-aware merge promotion from CLI add",
+                    ctx.session_id.as_deref(),
+                )?;
+            }
             let memory =
                 run_async(ctx.store.get_raw(&target_id))?.ok_or(StoreError::NotFound(target_id))?;
             AddResponse {
                 action: "merged",
-                gate_result: "merge",
+                gate_result: "merge".to_string(),
                 memory,
+            }
+        }
+        GateDecision::Contradiction {
+            conflicting_id,
+            description,
+        } => {
+            let now = Utc::now();
+            let memory = Memory {
+                id: Uuid::new_v4(),
+                content: trimmed_content,
+                summary: None,
+                scope: ctx.scope,
+                memory_type,
+                provenance,
+                importance_score: importance,
+                reliability_score: provenance.base_reliability(),
+                sensitivity: SensitivityLevel::Low,
+                state: MemoryState::Active,
+                tags: Vec::new(),
+                status: None,
+                custom_metadata: Default::default(),
+                access_count: 0,
+                corroboration_count: 0,
+                embedding_stale: true,
+                created_at: now,
+                updated_at: now,
+                last_accessed_at: None,
+                tenant_id: None,
+                user_id: None,
+                agent_id: None,
+            };
+            let id = memory.id;
+            run_async(ctx.store.store(memory))?;
+            if let Err(error) = run_async(ctx.store.record_contradiction(
+                &conflicting_id,
+                &id,
+                &description,
+            )) {
+                let _ = run_async(ctx.store.hard_delete(&id));
+                return Err(error);
+            }
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
+            AddResponse {
+                action: "added",
+                gate_result: format_contradiction_gate_result(conflicting_id),
+                memory: stored,
             }
         }
         GateDecision::Archive => {
@@ -527,15 +841,17 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored =
-                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
-                gate_result: "archived",
+                gate_result: "archived".to_string(),
                 memory: stored,
             }
         }
-        GateDecision::Accept => {
+        GateDecision::Accept {
+            similar_to,
+            similarity,
+        } => {
             let now = Utc::now();
             let memory = Memory {
                 id: Uuid::new_v4(),
@@ -563,11 +879,10 @@ fn execute_add_command(
             };
             let id = memory.id;
             run_async(ctx.store.store(memory))?;
-            let stored =
-                run_async(ctx.store.get_raw(&id))?.ok_or_else(|| StoreError::NotFound(id))?;
+            let stored = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
             AddResponse {
                 action: "added",
-                gate_result: "accepted",
+                gate_result: format_gate_result(similar_to, similarity),
                 memory: stored,
             }
         }
@@ -692,6 +1007,7 @@ fn execute_purge_command(
 
 fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
     let report = run_async(ctx.store.health_report())?;
+    let per_scope_reports = load_per_scope_reports(&ctx)?;
     let memories = run_async(ctx.store.list(MemoryFilter {
         scope: Some(ctx.scope),
         state: None,
@@ -704,15 +1020,72 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
         agent_id: None,
         limit: None,
     }))?;
+    let contradictions = run_async(
+        ctx.store
+            .list_contradictions(Some(ResolutionStatus::Unresolved)),
+    )?;
     let mut type_counts = BTreeMap::new();
-    for memory in memories {
+    let mut total_importance = 0.0_f32;
+    let now = Utc::now();
+    for memory in &memories {
         *type_counts
             .entry(display_memory_type(memory.memory_type))
             .or_insert(0) += 1;
+        total_importance += memory.importance_score;
     }
+    let average_importance =
+        (!memories.is_empty()).then_some(total_importance / memories.len() as f32);
+    let oldest_memory_age_days = memories
+        .iter()
+        .map(|memory| &memory.created_at)
+        .min()
+        .map(|created_at| now.signed_duration_since(*created_at).num_days().max(0));
+    let most_accessed_memory = memories
+        .iter()
+        .max_by_key(|memory| memory.access_count)
+        .map(|memory| HealthMostAccessedMemory {
+            id: memory.id.to_string(),
+            preview: preview(&memory.content),
+            access_count: memory.access_count,
+        });
+    let mut stale_memory_refs: Vec<_> = memories
+        .iter()
+        .filter(|memory| memory.embedding_stale)
+        .collect();
+    stale_memory_refs
+        .sort_by_key(|memory| (memory.created_at.timestamp_millis(), memory.id.as_u128()));
+    let stale_memories = stale_memory_refs
+        .into_iter()
+        .take(3)
+        .map(|memory| HealthMemoryPreview {
+            id: memory.id.to_string(),
+            memory_type: display_memory_type(memory.memory_type),
+            preview: preview(&memory.content),
+        })
+        .collect();
+    let mut contradiction_refs: Vec<_> = contradictions.iter().collect();
+    contradiction_refs.sort_by_key(|contradiction| contradiction.detected_at.timestamp_millis());
+    let contradiction_summaries = contradiction_refs
+        .into_iter()
+        .take(3)
+        .map(|contradiction| HealthContradictionSummary {
+            id: contradiction.id.clone(),
+            memory_a_id: contradiction.memory_a_id.to_string(),
+            memory_b_id: contradiction.memory_b_id.to_string(),
+            summary: preview(&contradiction.description),
+        })
+        .collect();
+    let database_size_human = human_readable_size(report.total_storage_bytes);
     let response = HealthResponse {
         report,
+        per_scope_reports,
         type_counts,
+        average_importance,
+        oldest_memory_age_days,
+        database_size_human,
+        most_accessed_memory,
+        stale_memories,
+        contradiction_summaries,
     };
 
     match format {
@@ -726,14 +1099,24 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
 fn execute_export_command(
     ctx: StoreContext,
     output: Option<PathBuf>,
+    all_scopes: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let response = ExportResponse {
-        exported_at: Utc::now().to_rfc3339(),
-        db_path: ctx.db_path.display().to_string(),
-        scope: display_scope(ctx.scope),
-        memories: run_async(ctx.store.list(MemoryFilter {
-            scope: Some(ctx.scope),
+    let scopes = if all_scopes {
+        vec![
+            MemoryScope::Session,
+            MemoryScope::Workspace,
+            MemoryScope::User,
+            MemoryScope::Agent,
+        ]
+    } else {
+        vec![ctx.scope]
+    };
+    let mut memories = Vec::new();
+    for scope in &scopes {
+        let scoped_store = SqliteMemoryStore::new(&ctx.db_path, *scope)?;
+        memories.extend(run_async(scoped_store.list(MemoryFilter {
+            scope: Some(*scope),
             state: None,
             memory_types: None,
             provenance_levels: None,
@@ -743,7 +1126,17 @@ fn execute_export_command(
             user_id: None,
             agent_id: None,
             limit: None,
-        }))?,
+        }))?);
+    }
+    let response = ExportResponse {
+        exported_at: Utc::now().to_rfc3339(),
+        db_path: ctx.db_path.display().to_string(),
+        scope: if all_scopes {
+            "all".to_string()
+        } else {
+            display_scope(ctx.scope)
+        },
+        memories,
     };
     let payload = serde_json::to_string_pretty(&response)?;
 
@@ -791,7 +1184,176 @@ fn execute_reembed_command(
     Ok(ExitCode::SUCCESS)
 }
 
+fn execute_promote_command(
+    ctx: StoreContext,
+    id: Option<String>,
+    to: Option<MemoryScope>,
+    limit: usize,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let engine = PromotionEngine;
+    let promoted = match (id, to) {
+        (Some(id), Some(to_scope)) => {
+            let id = parse_memory_id(&id)?;
+            engine
+                .promote_to(
+                    &ctx.store,
+                    &id,
+                    to_scope,
+                    "cli:promote",
+                    "manual CLI promote override",
+                    ctx.session_id.as_deref(),
+                )?
+                .into_iter()
+                .collect()
+        }
+        (None, None) => engine.run(&ctx.store, Some(limit), ctx.session_id.as_deref())?,
+        _ => return Err(CliError::Validation(
+            "`promote` requires both --id and --to for manual promotion, or neither for auto mode"
+                .to_string(),
+        )),
+    };
+    let response = PromoteResponse {
+        db_path: ctx.db_path.display().to_string(),
+        requested_scope: display_scope(ctx.scope),
+        promoted,
+    };
+    match format {
+        OutputFormat::Text => print_promote_text(&response),
+        OutputFormat::Json => print_json("promote", &response)?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_consolidate_command(
+    ctx: StoreContext,
+    cross_scope: bool,
+    consolidate_limit: usize,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    validate_limit(consolidate_limit, "consolidate-limit")?;
+    let scopes = if cross_scope {
+        ctx.scope.visible_scopes().to_vec()
+    } else {
+        vec![ctx.scope]
+    };
+    let candidates = ctx.store.list_consolidation_candidates(&scopes, None)?;
+    let (strategy, actions) = if let Some(llm_provider) = ctx.llm_provider.clone() {
+        let mut consolidator = LlmConsolidator::new(ctx.store.scope_config()?, llm_provider)
+            .with_cross_scope(cross_scope)
+            .with_pair_limit(Some(consolidate_limit));
+        if let Some(embedding_provider) = ctx.embedding_provider.clone() {
+            consolidator = consolidator.with_embedding_provider(embedding_provider);
+        }
+        (
+            format!("llm ({})", ctx.llm_provider_label()),
+            run_async(consolidator.consolidate(&candidates))?,
+        )
+    } else {
+        (
+            "simple".to_string(),
+            run_async(
+                SimpleConsolidator::default()
+                    .with_cross_scope(cross_scope)
+                    .with_pair_limit(Some(consolidate_limit))
+                    .consolidate(&candidates),
+            )?,
+        )
+    };
+    let mut merged_ids = Vec::new();
+    let mut contradiction_count = 0usize;
+    for action in &actions {
+        match action {
+            ConsolidationAction::Merged { source_ids, result } => {
+                merged_ids.push(result.id.to_string());
+                if dry_run {
+                    continue;
+                }
+                let current = run_async(ctx.store.get_raw(&result.id))?
+                    .ok_or(StoreError::NotFound(result.id))?;
+                if current.content != result.content {
+                    run_async(ctx.store.update_content(
+                        &result.id,
+                        &result.content,
+                        "cli:consolidate",
+                        "consolidated duplicate memories",
+                    ))?;
+                }
+                if current.scope != result.scope {
+                    let _ = ctx.store.promote_memory_to(
+                        &result.id,
+                        result.scope,
+                        "cli:consolidate",
+                        "cross-scope consolidation promotion",
+                        ctx.session_id.as_deref(),
+                    )?;
+                }
+                for source_id in source_ids {
+                    run_async(ctx.store.hard_delete(source_id))?;
+                }
+            }
+            ConsolidationAction::Contradiction {
+                memory_a_id,
+                memory_b_id,
+                description,
+            } => {
+                contradiction_count += 1;
+                if dry_run {
+                    continue;
+                }
+                run_async(
+                    ctx.store
+                        .record_contradiction(memory_a_id, memory_b_id, description),
+                )?;
+            }
+            _ => {}
+        }
+    }
+    if !dry_run {
+        ctx.store.mark_consolidation_run()?;
+    }
+    let response = ConsolidateResponse {
+        db_path: ctx.db_path.display().to_string(),
+        scope: display_scope(ctx.scope),
+        strategy,
+        cross_scope,
+        dry_run,
+        merged_count: merged_ids.len(),
+        merged_ids,
+        contradiction_count,
+    };
+    match format {
+        OutputFormat::Text => print_consolidate_text(&response),
+        OutputFormat::Json => print_json("consolidate", &response)?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 fn execute_contradictions_command(
+    ctx: StoreContext,
+    action: Option<ContradictionsAction>,
+    contradiction_id: Option<String>,
+    keep: Option<String>,
+    keep_both: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    match action {
+        None => {
+            if contradiction_id.is_some() || keep.is_some() || keep_both {
+                return Err(CliError::Validation(
+                    "resolution flags require `contradictions resolve`".to_string(),
+                ));
+            }
+            execute_list_contradictions_command(ctx, format)
+        }
+        Some(ContradictionsAction::Resolve) => {
+            execute_resolve_contradiction_command(ctx, contradiction_id, keep, keep_both, format)
+        }
+    }
+}
+
+fn execute_list_contradictions_command(
     ctx: StoreContext,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
@@ -807,6 +1369,484 @@ fn execute_contradictions_command(
     Ok(ExitCode::SUCCESS)
 }
 
+fn execute_resolve_contradiction_command(
+    ctx: StoreContext,
+    contradiction_id: Option<String>,
+    keep: Option<String>,
+    keep_both: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let contradiction_id = contradiction_id
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            CliError::Validation(
+                "`contradictions resolve` requires --id <contradiction_uuid>".to_string(),
+            )
+        })?;
+
+    if keep.is_some() == keep_both {
+        return Err(CliError::Validation(
+            "`contradictions resolve` requires exactly one of --keep <memory_uuid> or --keep-both"
+                .to_string(),
+        ));
+    }
+
+    let contradiction = load_contradiction_by_id(&ctx, &contradiction_id)?;
+    if contradiction.resolution_status != ResolutionStatus::Unresolved {
+        return Err(CliError::Validation(format!(
+            "contradiction {} is already {}",
+            contradiction.id,
+            display_resolution_status(contradiction.resolution_status)
+        )));
+    }
+
+    let response = if keep_both {
+        run_async(ctx.store.update_contradiction_status(
+            &contradiction.id,
+            ResolutionStatus::ResolvedByUser,
+            Some("user resolved contradiction and kept both memories active"),
+        ))?;
+
+        ResolveContradictionResponse {
+            contradiction_id: contradiction.id,
+            resolution_status: display_resolution_status(ResolutionStatus::ResolvedByUser),
+            kept_both: true,
+            kept_memory_id: None,
+            dormant_memory_id: None,
+        }
+    } else {
+        let keep_value = keep.ok_or_else(|| {
+            CliError::Validation(
+                "`contradictions resolve` requires exactly one of --keep <memory_uuid> or --keep-both"
+                    .to_string(),
+            )
+        })?;
+        let keep_id = parse_memory_id(&keep_value)?;
+        let dormant_id = if keep_id == contradiction.memory_a_id {
+            contradiction.memory_b_id
+        } else if keep_id == contradiction.memory_b_id {
+            contradiction.memory_a_id
+        } else {
+            return Err(CliError::Validation(format!(
+                "memory {keep_id} is not part of contradiction {}; expected {} or {}",
+                contradiction.id, contradiction.memory_a_id, contradiction.memory_b_id
+            )));
+        };
+
+        run_async(ctx.store.make_dormant(&dormant_id))?;
+        if let Err(error) = run_async(ctx.store.update_contradiction_status(
+            &contradiction.id,
+            ResolutionStatus::ResolvedByUser,
+            Some(&format!(
+                "user kept memory {keep_id} active and made memory {dormant_id} dormant"
+            )),
+        )) {
+            return match run_async(ctx.store.reactivate(&dormant_id)) {
+                Ok(()) => Err(CliError::Validation(format!(
+                    "failed to resolve contradiction {}: {error}; rolled back dormant transition for memory {dormant_id}",
+                    contradiction.id
+                ))),
+                Err(rollback_error) => Err(CliError::Validation(format!(
+                    "failed to resolve contradiction {}: {error}; rollback reactivation for memory {dormant_id} also failed: {rollback_error}",
+                    contradiction.id
+                ))),
+            };
+        }
+
+        ResolveContradictionResponse {
+            contradiction_id: contradiction.id,
+            resolution_status: display_resolution_status(ResolutionStatus::ResolvedByUser),
+            kept_both: false,
+            kept_memory_id: Some(keep_id.to_string()),
+            dormant_memory_id: Some(dormant_id.to_string()),
+        }
+    };
+
+    match format {
+        OutputFormat::Text => print_resolve_contradiction_text(&ctx, &response),
+        OutputFormat::Json => print_json("contradictions.resolve", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_import_command(
+    ctx: StoreContext,
+    input: Option<PathBuf>,
+    force: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    // ── 1. Read raw JSON text ────────────────────────────────────────────────
+    let json_str = if let Some(ref path) = input {
+        fs::read_to_string(path).map_err(|e| {
+            CliError::Validation(format!(
+                "failed to read import file {}: {e}",
+                path.display()
+            ))
+        })?
+    } else {
+        let mut buf = String::new();
+        io::stdin().read_to_string(&mut buf)?;
+        buf
+    };
+
+    // ── 2. Parse root JSON value ─────────────────────────────────────────────
+    let root: serde_json::Value = serde_json::from_str(&json_str)
+        .map_err(|e| CliError::Validation(format!("malformed JSON: {e}")))?;
+
+    // ── 3. Detect format and normalise into per-item results ─────────────────
+    //
+    // Format A — root object with a `memories` array (matches the export shape).
+    // Format B — root array of bare strings or simple `{ content, type?, importance?, provenance? }` objects.
+    //
+    // Each element is a normalized import item or an item-level validation error.
+    type ItemResult = Result<ImportItem, String>;
+
+    let items: Vec<ItemResult> = if root.is_object() {
+        let format_a: ImportFormatA = serde_json::from_value(root).map_err(|e| {
+            CliError::Validation(format!(
+                "invalid Format A import (expected object with `memories` array): {e}"
+            ))
+        })?;
+        format_a
+            .memories
+            .into_iter()
+            .map(|memory| {
+                if memory.content.trim().is_empty() {
+                    Err("memory has empty content".to_string())
+                } else {
+                    Ok(ImportItem::FormatA(Box::new(memory)))
+                }
+            })
+            .collect()
+    } else if let Some(array) = root.as_array() {
+        array
+            .iter()
+            .enumerate()
+            .map(|(i, entry)| {
+                if let Some(s) = entry.as_str() {
+                    let content = s.trim().to_string();
+                    if content.is_empty() {
+                        return Err(format!("item {i}: empty string content"));
+                    }
+                    Ok(ImportItem::FormatB {
+                        content,
+                        memory_type: MemoryType::Observation,
+                        importance: DEFAULT_IMPORTANCE,
+                        provenance: ProvenanceLevel::Imported,
+                    })
+                } else if entry.is_object() {
+                    let obj: ImportFormatBObject = serde_json::from_value(entry.clone())
+                        .map_err(|e| format!("item {i}: invalid object: {e}"))?;
+                    let content = obj.content.trim().to_string();
+                    if content.is_empty() {
+                        return Err(format!("item {i}: empty content field"));
+                    }
+                    if let Some(imp) = obj.importance {
+                        if !imp.is_finite() || !(0.0..=1.0).contains(&imp) {
+                            return Err(format!(
+                                "item {i}: importance must be a finite value in 0.0..=1.0"
+                            ));
+                        }
+                    }
+                    let memory_type = parse_import_memory_type(obj.memory_type.as_deref())
+                        .map_err(|error| format!("item {i}: {error}"))?;
+                    let provenance = parse_import_provenance(obj.provenance.as_deref())
+                        .map_err(|error| format!("item {i}: {error}"))?;
+                    Ok(ImportItem::FormatB {
+                        content,
+                        memory_type: memory_type.unwrap_or(MemoryType::Observation),
+                        importance: obj.importance.unwrap_or(DEFAULT_IMPORTANCE),
+                        provenance: provenance.unwrap_or(ProvenanceLevel::Imported),
+                    })
+                } else {
+                    Err(format!("item {i}: expected string or object, got {entry}"))
+                }
+            })
+            .collect()
+    } else {
+        return Err(CliError::Validation(
+            "import JSON must be an object with a `memories` field (Format A) \
+             or an array of strings/objects (Format B)"
+                .to_string(),
+        ));
+    };
+
+    // ── 4. Process items ─────────────────────────────────────────────────────
+    let total = items.len();
+    let mut imported = 0usize;
+    let mut merged = 0usize;
+    let mut contradictions = 0usize;
+    let mut skipped = 0usize;
+    let mut errors: Vec<String> = Vec::new();
+
+    if force {
+        // Force path: bypass the salience gate and store every item directly as Active.
+        for item in items {
+            match item {
+                Err(e) => {
+                    skipped += 1;
+                    errors.push(e);
+                }
+                Ok(ImportItem::FormatA(memory)) => {
+                    let memory = *memory;
+                    let memory = build_import_memory(
+                        ctx.scope,
+                        memory.content,
+                        memory.memory_type,
+                        memory.importance_score,
+                        memory.provenance,
+                        MemoryState::Active,
+                    );
+                    match run_async(ctx.store.store(memory)) {
+                        Ok(_) => imported += 1,
+                        Err(e) => {
+                            skipped += 1;
+                            errors.push(e.to_string());
+                        }
+                    }
+                }
+                Ok(ImportItem::FormatB {
+                    content,
+                    memory_type,
+                    importance,
+                    provenance,
+                }) => {
+                    let memory = build_import_memory(
+                        ctx.scope,
+                        content,
+                        memory_type,
+                        importance,
+                        provenance,
+                        MemoryState::Active,
+                    );
+                    match run_async(ctx.store.store(memory)) {
+                        Ok(_) => imported += 1,
+                        Err(e) => {
+                            skipped += 1;
+                            errors.push(e.to_string());
+                        }
+                    }
+                }
+            }
+        }
+    } else {
+        // Normal path: restore Format A exports directly and keep Format B on the salience gate.
+        let gate = DefaultSalienceGate::new_with_optional_providers(
+            ctx.store.scope_config()?,
+            ctx.embedding_provider.clone(),
+            ctx.llm_provider.clone(),
+        );
+        for item in items {
+            match item {
+                Err(e) => {
+                    skipped += 1;
+                    errors.push(e);
+                }
+                Ok(ImportItem::FormatA(memory)) => {
+                    let mut memory = *memory;
+                    memory.scope = ctx.scope;
+                    match run_async(ctx.store.store(memory)) {
+                        Ok(_) => imported += 1,
+                        Err(error) => {
+                            skipped += 1;
+                            errors.push(error.to_string());
+                        }
+                    }
+                }
+                Ok(ImportItem::FormatB {
+                    content,
+                    memory_type,
+                    importance,
+                    provenance,
+                }) => {
+                    let candidate = MemoryCandidate {
+                        content: content.clone(),
+                        summary: None,
+                        memory_type,
+                        provenance,
+                        importance_score: importance,
+                        sensitivity: SensitivityLevel::Low,
+                        tags: Vec::new(),
+                        custom_metadata: Default::default(),
+                        embedding: None,
+                    };
+                    let decision = match run_async(gate.evaluate(&candidate, &ctx.store)) {
+                        Ok(d) => d,
+                        Err(e) => {
+                            skipped += 1;
+                            errors.push(e.to_string());
+                            continue;
+                        }
+                    };
+                    match decision {
+                        GateDecision::Merge {
+                            target_id,
+                            enriched_content,
+                            promote_to,
+                        } => {
+                            match run_async(ctx.store.update_content(
+                                &target_id,
+                                &enriched_content,
+                                "cli:import",
+                                "merged by salience gate from CLI import",
+                            )) {
+                                Ok(_) => {
+                                    if let Some(promote_to) = promote_to {
+                                        let _ = ctx.store.promote_memory_to(
+                                            &target_id,
+                                            promote_to,
+                                            "cli:import",
+                                            "scope-aware merge promotion from CLI import",
+                                            ctx.session_id.as_deref(),
+                                        )?;
+                                    }
+                                    merged += 1
+                                }
+                                Err(e) => {
+                                    skipped += 1;
+                                    errors.push(e.to_string());
+                                }
+                            }
+                        }
+                        GateDecision::Contradiction {
+                            conflicting_id,
+                            description,
+                        } => {
+                            let memory = build_import_memory(
+                                ctx.scope,
+                                content,
+                                memory_type,
+                                importance,
+                                provenance,
+                                MemoryState::Active,
+                            );
+                            let id = memory.id;
+                            match run_async(ctx.store.store(memory)) {
+                                Ok(_) => {
+                                    match run_async(ctx.store.record_contradiction(
+                                        &conflicting_id,
+                                        &id,
+                                        &description,
+                                    )) {
+                                        Ok(_) => {
+                                            imported += 1;
+                                            contradictions += 1;
+                                        }
+                                        Err(error) => {
+                                            let _ = run_async(ctx.store.hard_delete(&id));
+                                            skipped += 1;
+                                            errors.push(error.to_string());
+                                        }
+                                    }
+                                }
+                                Err(error) => {
+                                    skipped += 1;
+                                    errors.push(error.to_string());
+                                }
+                            }
+                        }
+                        GateDecision::Archive => {
+                            let memory = build_import_memory(
+                                ctx.scope,
+                                content,
+                                memory_type,
+                                importance,
+                                provenance,
+                                MemoryState::Dormant,
+                            );
+                            match run_async(ctx.store.store(memory)) {
+                                Ok(_) => imported += 1,
+                                Err(e) => {
+                                    skipped += 1;
+                                    errors.push(e.to_string());
+                                }
+                            }
+                        }
+                        GateDecision::Accept { .. } => {
+                            let memory = build_import_memory(
+                                ctx.scope,
+                                content,
+                                memory_type,
+                                importance,
+                                provenance,
+                                MemoryState::Active,
+                            );
+                            match run_async(ctx.store.store(memory)) {
+                                Ok(_) => imported += 1,
+                                Err(e) => {
+                                    skipped += 1;
+                                    errors.push(e.to_string());
+                                }
+                            }
+                        }
+                        GateDecision::Reject { .. } => {
+                            // Exact duplicate detected by the gate — content already present.
+                            // Not stored; counted as merged since the existing record is kept.
+                            merged += 1;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    // ── 5. Emit response ─────────────────────────────────────────────────────
+    let response = ImportResponse {
+        db_path: ctx.db_path.display().to_string(),
+        scope: display_scope(ctx.scope),
+        total,
+        imported,
+        merged,
+        contradictions,
+        skipped,
+        errors,
+    };
+
+    match format {
+        OutputFormat::Text => print_import_text(&response),
+        OutputFormat::Json => print_json("import", &response)?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn build_import_memory(
+    scope: MemoryScope,
+    content: String,
+    memory_type: MemoryType,
+    importance: f32,
+    provenance: ProvenanceLevel,
+    state: MemoryState,
+) -> Memory {
+    let now = Utc::now();
+    Memory {
+        id: Uuid::new_v4(),
+        content,
+        summary: None,
+        scope,
+        memory_type,
+        provenance,
+        importance_score: importance,
+        reliability_score: provenance.base_reliability(),
+        sensitivity: SensitivityLevel::Low,
+        state,
+        tags: Vec::new(),
+        status: None,
+        custom_metadata: Default::default(),
+        access_count: 0,
+        corroboration_count: 0,
+        embedding_stale: true,
+        created_at: now,
+        updated_at: now,
+        last_accessed_at: None,
+        tenant_id: None,
+        user_id: None,
+        agent_id: None,
+    }
+}
+
 fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
     let db_path = normalize_path(args.db.clone().unwrap_or_else(default_db_path));
     if let Some(parent) = db_path.parent() {
@@ -814,19 +1854,26 @@ fn open_store(args: StoreArgs) -> Result<StoreContext, CliError> {
     }
     let scope: MemoryScope = args.scope.into();
     let (embedding_provider, embedding_provider_label) = resolve_embedding_provider(&args)?;
+    let (llm_provider, llm_provider_label) = resolve_llm_provider(&args)?;
     let store = match embedding_provider.clone() {
-        Some(provider) => SqliteMemoryStore::new_with_embedding_provider(&db_path, scope, provider)?,
+        Some(provider) => {
+            SqliteMemoryStore::new_with_embedding_provider(&db_path, scope, provider)?
+        }
         None => SqliteMemoryStore::new(&db_path, scope)?,
     };
     Ok(StoreContext {
         db_path,
         scope,
+        session_id: args.session_id,
         store,
         embedding_provider,
         embedding_provider_label,
+        llm_provider,
+        llm_provider_label,
     })
 }
 
+#[allow(clippy::type_complexity)]
 fn resolve_embedding_provider(
     args: &StoreArgs,
 ) -> Result<(Option<Arc<dyn EmbeddingProvider>>, Option<String>), CliError> {
@@ -840,18 +1887,117 @@ fn resolve_embedding_provider(
                 .ollama_model
                 .clone()
                 .unwrap_or_else(|| DEFAULT_OLLAMA_MODEL.to_string());
-            let provider =
-                Arc::new(OllamaEmbeddingProvider::new(base_url.clone(), model.clone())?)
-                    as Arc<dyn EmbeddingProvider>;
+            let provider = Arc::new(OllamaEmbeddingProvider::new(
+                base_url.clone(),
+                model.clone(),
+            )?) as Arc<dyn EmbeddingProvider>;
             Ok((
                 Some(provider),
                 Some(format!("ollama ({model} @ {base_url})")),
+            ))
+        }
+        Some(CliEmbeddingProvider::Openai) => {
+            let base_url = args
+                .openai_url
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OPENAI_BASE_URL.to_string());
+            let model = args
+                .openai_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OPENAI_MODEL.to_string());
+            let dimensions = args.openai_dimensions.unwrap_or(DEFAULT_OPENAI_DIMENSIONS);
+            let api_key = args.openai_api_key.clone().ok_or_else(|| {
+                CliError::Validation(
+                    "--openai-api-key is required when --embedding-provider openai is set"
+                        .to_string(),
+                )
+            })?;
+            let provider = Arc::new(OpenAiEmbeddingProvider::new_with_config(
+                base_url.clone(),
+                model.clone(),
+                dimensions,
+                api_key,
+            )?) as Arc<dyn EmbeddingProvider>;
+            Ok((
+                Some(provider),
+                Some(format!("openai ({model} @ {base_url}, {dimensions}d)")),
             ))
         }
         None => {
             if args.ollama_url.is_some() || args.ollama_model.is_some() {
                 return Err(CliError::Validation(
                     "Ollama configuration requires --embedding-provider ollama".to_string(),
+                ));
+            }
+            if args.openai_api_key.is_some()
+                || args.openai_model.is_some()
+                || args.openai_url.is_some()
+                || args.openai_dimensions.is_some()
+            {
+                return Err(CliError::Validation(
+                    "OpenAI configuration requires --embedding-provider openai".to_string(),
+                ));
+            }
+            Ok((None, None))
+        }
+    }
+}
+
+#[allow(clippy::type_complexity)]
+fn resolve_llm_provider(
+    args: &StoreArgs,
+) -> Result<(Option<Arc<dyn LlmProvider>>, Option<String>), CliError> {
+    match args.llm_provider {
+        Some(CliLlmProvider::Ollama) => {
+            let base_url = args
+                .llm_ollama_url
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OLLAMA_LLM_BASE_URL.to_string());
+            let model = args
+                .llm_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OLLAMA_LLM_MODEL.to_string());
+            let provider = Arc::new(OllamaLlmProvider::new(base_url.clone(), model.clone())?)
+                as Arc<dyn LlmProvider>;
+            Ok((
+                Some(provider),
+                Some(format!("ollama ({model} @ {base_url})")),
+            ))
+        }
+        Some(CliLlmProvider::Openai) => {
+            let base_url = args
+                .llm_openai_url
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OPENAI_LLM_BASE_URL.to_string());
+            let model = args
+                .llm_model
+                .clone()
+                .unwrap_or_else(|| DEFAULT_OPENAI_LLM_MODEL.to_string());
+            let api_key = args.llm_openai_api_key.clone().ok_or_else(|| {
+                CliError::Validation(
+                    "--llm-openai-api-key is required when --llm-provider openai is set"
+                        .to_string(),
+                )
+            })?;
+            let provider = Arc::new(OpenAiLlmProvider::new_with_config(
+                base_url.clone(),
+                model.clone(),
+                api_key,
+            )?) as Arc<dyn LlmProvider>;
+            Ok((
+                Some(provider),
+                Some(format!("openai ({model} @ {base_url})")),
+            ))
+        }
+        None => {
+            if args.llm_model.is_some()
+                || args.llm_ollama_url.is_some()
+                || args.llm_openai_api_key.is_some()
+                || args.llm_openai_url.is_some()
+            {
+                return Err(CliError::Validation(
+                    "LLM configuration requires --llm-provider ollama or --llm-provider openai"
+                        .to_string(),
                 ));
             }
             Ok((None, None))
@@ -911,6 +2057,50 @@ fn validate_limit(limit: usize, flag: &str) -> Result<(), CliError> {
     Ok(())
 }
 
+fn normalize_import_enum_value(value: &str) -> String {
+    let mut normalized: String = value
+        .trim()
+        .chars()
+        .filter(|character| character.is_ascii_alphanumeric())
+        .collect();
+    normalized.make_ascii_lowercase();
+    normalized
+}
+
+fn parse_import_memory_type(value: Option<&str>) -> Result<Option<MemoryType>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    match normalize_import_enum_value(value).as_str() {
+        "fact" => Ok(Some(MemoryType::Fact)),
+        "preference" => Ok(Some(MemoryType::Preference)),
+        "decision" => Ok(Some(MemoryType::Decision)),
+        "procedure" => Ok(Some(MemoryType::Procedure)),
+        "observation" => Ok(Some(MemoryType::Observation)),
+        _ => Err(format!(
+            "invalid type `{value}` (expected fact, preference, decision, procedure, or observation)"
+        )),
+    }
+}
+
+fn parse_import_provenance(value: Option<&str>) -> Result<Option<ProvenanceLevel>, String> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+
+    match normalize_import_enum_value(value).as_str() {
+        "userstated" => Ok(Some(ProvenanceLevel::UserStated)),
+        "agentobserved" => Ok(Some(ProvenanceLevel::AgentObserved)),
+        "consolidated" => Ok(Some(ProvenanceLevel::Consolidated)),
+        "imported" => Ok(Some(ProvenanceLevel::Imported)),
+        "agentinferred" => Ok(Some(ProvenanceLevel::AgentInferred)),
+        _ => Err(format!(
+            "invalid provenance `{value}` (expected user-stated, agent-observed, consolidated, imported, or agent-inferred)"
+        )),
+    }
+}
+
 fn build_search_response(
     ctx: &StoreContext,
     query: String,
@@ -933,6 +2123,7 @@ fn build_search_response(
         type_filter: None,
         max_results: limit,
         context_config: None,
+        session_id: ctx.session_id.clone(),
     }))?;
 
     if include_dormant {
@@ -944,6 +2135,7 @@ fn build_search_response(
             type_filter: None,
             max_results: limit,
             context_config: None,
+            session_id: ctx.session_id.clone(),
         }))?);
         sort_scored_memories(&mut results);
         results.truncate(limit);
@@ -962,7 +2154,7 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
     validate_limit(limit, "limit")?;
     let provider = ctx.embedding_provider.as_ref().ok_or_else(|| {
         CliError::Validation(
-            "reembed requires an embedding provider; rerun with --embedding-provider ollama"
+            "reembed requires an embedding provider; rerun with --embedding-provider ollama or --embedding-provider openai"
                 .to_string(),
         )
     })?;
@@ -990,7 +2182,9 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
                 .store_embedding(id, &embedding)
                 .await
                 .map_err(|error| {
-                    CliError::Validation(format!("failed to store embedding for memory {id}: {error}"))
+                    CliError::Validation(format!(
+                        "failed to store embedding for memory {id}: {error}"
+                    ))
                 })?;
             reembedded_ids.push(id.to_string());
         }
@@ -1012,6 +2206,30 @@ fn parse_memory_id(raw: &str) -> Result<MemoryId, CliError> {
         value: raw.to_string(),
         source,
     })
+}
+
+fn load_contradiction_by_id(
+    ctx: &StoreContext,
+    contradiction_id: &str,
+) -> Result<crate::ContradictionEntry, CliError> {
+    run_async(ctx.store.list_contradictions(None))?
+        .into_iter()
+        .find(|contradiction| contradiction.id == contradiction_id)
+        .ok_or_else(|| CliError::Validation(format!("contradiction not found: {contradiction_id}")))
+}
+
+fn load_per_scope_reports(ctx: &StoreContext) -> Result<Vec<MemoryHealthReport>, CliError> {
+    let mut reports = Vec::new();
+    for scope in [
+        MemoryScope::Session,
+        MemoryScope::Workspace,
+        MemoryScope::User,
+        MemoryScope::Agent,
+    ] {
+        let scoped_store = SqliteMemoryStore::new(&ctx.db_path, scope)?;
+        reports.push(run_async(scoped_store.health_report())?);
+    }
+    Ok(reports)
 }
 
 fn confirm_purge(ctx: &StoreContext) -> Result<bool, CliError> {
@@ -1119,6 +2337,16 @@ fn display_provenance(provenance: ProvenanceLevel) -> String {
     .to_string()
 }
 
+fn display_resolution_status(status: ResolutionStatus) -> String {
+    match status {
+        ResolutionStatus::Unresolved => "unresolved",
+        ResolutionStatus::ResolvedByUser => "resolved-by-user",
+        ResolutionStatus::ResolvedBySystem => "resolved-by-system",
+        ResolutionStatus::Dismissed => "dismissed",
+    }
+    .to_string()
+}
+
 fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
     println!(
         "{} memory {} in {}",
@@ -1136,6 +2364,20 @@ fn print_add_text(ctx: &StoreContext, response: &AddResponse) {
     );
     println!("gate: {}", response.gate_result);
     println!("content: {}", response.memory.content);
+}
+
+fn format_gate_result(similar_to: Option<MemoryId>, similarity: Option<f32>) -> String {
+    match (similar_to, similarity) {
+        (Some(memory_id), Some(similarity)) => {
+            format!("accepted (similar to {memory_id}, cosine={similarity:.3})")
+        }
+        (Some(memory_id), None) => format!("accepted (similar to {memory_id})"),
+        _ => "accepted".to_string(),
+    }
+}
+
+fn format_contradiction_gate_result(conflicting_id: MemoryId) -> String {
+    format!("contradiction (conflicts with {conflicting_id})")
 }
 
 fn print_search_text(response: &SearchResponse) {
@@ -1244,15 +2486,88 @@ fn print_health_text(response: &HealthResponse) {
     println!("active: {}", report.active_count);
     println!("dormant: {}", report.dormant_count);
     println!("stale embeddings: {}", report.stale_embeddings_count);
+    if response.stale_memories.is_empty() {
+        println!("stale memory previews: none");
+    } else {
+        println!("stale memory previews:");
+        for memory in &response.stale_memories {
+            println!(
+                "- {id} [{memory_type}]: {preview}",
+                id = memory.id,
+                memory_type = memory.memory_type,
+                preview = memory.preview
+            );
+        }
+    }
     println!(
         "unresolved contradictions: {}",
         report.unresolved_contradictions
     );
+    if response.contradiction_summaries.is_empty() {
+        println!("contradiction summaries: none");
+    } else {
+        println!("contradiction summaries:");
+        for contradiction in &response.contradiction_summaries {
+            println!(
+                "- {id} ({memory_a_id} <-> {memory_b_id}): {summary}",
+                id = contradiction.id,
+                memory_a_id = contradiction.memory_a_id,
+                memory_b_id = contradiction.memory_b_id,
+                summary = contradiction.summary
+            );
+        }
+    }
+    match response.average_importance {
+        Some(average_importance) => println!("average importance: {average_importance:.3}"),
+        None => println!("average importance: n/a"),
+    }
+    match response.oldest_memory_age_days {
+        Some(oldest_memory_age_days) => {
+            println!("oldest memory age (days): {oldest_memory_age_days}")
+        }
+        None => println!("oldest memory age (days): n/a"),
+    }
+    match &response.most_accessed_memory {
+        Some(memory) => println!(
+            "most accessed memory: {id} ({access_count}): {preview}",
+            id = memory.id,
+            access_count = memory.access_count,
+            preview = memory.preview
+        ),
+        None => println!("most accessed memory: n/a"),
+    }
     println!("storage bytes: {}", report.total_storage_bytes);
+    println!("database size: {}", response.database_size_human);
     println!("budget usage ratio: {:.3}", report.budget_usage_ratio);
+    println!("per-scope reports:");
+    for scope_report in &response.per_scope_reports {
+        println!(
+            "- {}: active={} dormant={} stale_embeddings={} unresolved_contradictions={}",
+            display_scope(scope_report.scope),
+            scope_report.active_count,
+            scope_report.dormant_count,
+            scope_report.stale_embeddings_count,
+            scope_report.unresolved_contradictions
+        );
+    }
     println!("type counts:");
     for (memory_type, count) in &response.type_counts {
         println!("- {memory_type}: {count}");
+    }
+}
+
+fn human_readable_size(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut size = bytes as f64;
+    let mut unit_index = 0;
+    while size >= 1024.0 && unit_index < UNITS.len() - 1 {
+        size /= 1024.0;
+        unit_index += 1;
+    }
+    if unit_index == 0 {
+        format!("{bytes} {}", UNITS[unit_index])
+    } else {
+        format!("{size:.1} {}", UNITS[unit_index])
     }
 }
 
@@ -1276,6 +2591,61 @@ fn print_contradictions_text(ctx: &StoreContext, contradictions: &[crate::Contra
     }
 }
 
+fn print_resolve_contradiction_text(ctx: &StoreContext, response: &ResolveContradictionResponse) {
+    println!("db: {}", ctx.db_path.display());
+    println!("scope: {}", display_scope(ctx.scope));
+    println!("resolved contradiction: {}", response.contradiction_id);
+    println!("status: {}", response.resolution_status);
+    if response.kept_both {
+        println!("kept both memories active");
+    } else {
+        if let Some(kept_memory_id) = &response.kept_memory_id {
+            println!("kept memory: {kept_memory_id}");
+        }
+        if let Some(dormant_memory_id) = &response.dormant_memory_id {
+            println!("dormant memory: {dormant_memory_id}");
+        }
+    }
+}
+
+fn print_import_text(response: &ImportResponse) {
+    println!("db: {}", response.db_path);
+    println!("scope: {}", response.scope);
+    println!("total: {}", response.total);
+    println!("imported: {}", response.imported);
+    println!("merged: {}", response.merged);
+    println!("contradictions: {}", response.contradictions);
+    println!("skipped: {}", response.skipped);
+    if !response.errors.is_empty() {
+        println!("errors:");
+        for error in &response.errors {
+            println!("  - {error}");
+        }
+    }
+}
+
+fn print_promote_text(response: &PromoteResponse) {
+    println!("db: {}", response.db_path);
+    println!("requested scope: {}", response.requested_scope);
+    println!("promoted: {}", response.promoted.len());
+    for memory in &response.promoted {
+        println!("- {} -> {}", memory.id, display_scope(memory.scope));
+    }
+}
+
+fn print_consolidate_text(response: &ConsolidateResponse) {
+    println!("db: {}", response.db_path);
+    println!("scope: {}", response.scope);
+    println!("strategy: {}", response.strategy);
+    println!("cross-scope: {}", response.cross_scope);
+    println!("dry-run: {}", response.dry_run);
+    println!("merged: {}", response.merged_count);
+    println!("contradictions: {}", response.contradiction_count);
+    for id in &response.merged_ids {
+        println!("- {id}");
+    }
+}
+
 fn print_json<T>(command: &'static str, data: &T) -> Result<(), CliError>
 where
     T: Serialize,
@@ -1291,8 +2661,7 @@ where
 mod tests {
     use std::{
         collections::HashMap,
-        env,
-        fs,
+        env, fs,
         path::PathBuf,
         sync::{Arc, Mutex},
         time::{SystemTime, UNIX_EPOCH},
@@ -1300,15 +2669,22 @@ mod tests {
 
     use async_trait::async_trait;
     use chrono::{Duration, Utc};
+    use clap::Parser;
+    use uuid::Uuid;
 
     use super::{
-        build_search_response, open_store, reembed_stale_memories, run_async,
-        CliEmbeddingProvider, CliScope, StoreArgs, StoreContext,
+        build_search_response, execute_add_command, execute_import_command,
+        format_contradiction_gate_result, format_gate_result, open_store, reembed_stale_memories,
+        run_async, Cli, CliEmbeddingProvider, CliLlmProvider, CliScope, Command, OutputFormat,
+        StoreArgs, StoreContext,
     };
     use crate::{
-        EmbeddingError, EmbeddingProvider, Memory, MemoryScope, MemoryState, MemoryStore,
-        MemoryType, ProvenanceLevel, SqliteMemoryStore, SensitivityLevel,
-        DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_MODEL,
+        EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
+        MemoryStore, MemoryType, ProvenanceLevel, ResolutionStatus, SensitivityLevel,
+        SqliteMemoryStore, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL,
+        DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL,
+        DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL,
+        DEFAULT_OPENAI_MODEL,
     };
 
     #[derive(Debug, Clone)]
@@ -1380,6 +2756,16 @@ mod tests {
             embedding_provider: Some(CliEmbeddingProvider::Ollama),
             ollama_url: None,
             ollama_model: None,
+            openai_api_key: None,
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: None,
+            llm_model: None,
+            llm_ollama_url: None,
+            llm_openai_api_key: None,
+            llm_openai_url: None,
+            session_id: None,
         })
         .expect("open provider-backed store");
 
@@ -1392,6 +2778,200 @@ mod tests {
     }
 
     #[test]
+    fn open_store_constructs_openai_provider_with_defaults() {
+        let db_path = unique_temp_path("elegy-memory-cli-open-store-openai");
+        let ctx = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: Some(CliEmbeddingProvider::Openai),
+            ollama_url: None,
+            ollama_model: None,
+            openai_api_key: Some("sk-test-key".to_string()),
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: None,
+            llm_model: None,
+            llm_ollama_url: None,
+            llm_openai_api_key: None,
+            llm_openai_url: None,
+            session_id: None,
+        })
+        .expect("open OpenAI provider-backed store");
+
+        assert!(ctx.has_embedding_provider());
+        let label = ctx.embedding_provider_label();
+        assert!(label.contains(DEFAULT_OPENAI_BASE_URL));
+        assert!(label.contains(DEFAULT_OPENAI_MODEL));
+        assert!(label.contains(&DEFAULT_OPENAI_DIMENSIONS.to_string()));
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn stray_openai_flags_without_embedding_provider_openai_are_rejected() {
+        let db_path = unique_temp_path("elegy-memory-cli-stray-openai-flags");
+        let error = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: None,
+            ollama_url: None,
+            ollama_model: None,
+            openai_api_key: Some("sk-stray-key".to_string()),
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: None,
+            llm_model: None,
+            llm_ollama_url: None,
+            llm_openai_api_key: None,
+            llm_openai_url: None,
+            session_id: None,
+        })
+        .expect_err("stray openai flags should be rejected");
+
+        assert!(
+            error.to_string().contains("--embedding-provider openai"),
+            "expected rejection message, got: {error}"
+        );
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn cli_parses_llm_flags_for_consolidate() {
+        let cli = Cli::try_parse_from([
+            "elegy-memory",
+            "consolidate",
+            "--llm-provider",
+            "openai",
+            "--llm-model",
+            "gpt-4.1-mini",
+            "--llm-openai-api-key",
+            "sk-test-key",
+            "--llm-openai-url",
+            "http://localhost:1234",
+        ])
+        .expect("cli should parse llm flags");
+
+        match cli.command {
+            Command::Consolidate { store, .. } => {
+                assert_eq!(store.llm_provider, Some(CliLlmProvider::Openai));
+                assert_eq!(store.llm_model.as_deref(), Some("gpt-4.1-mini"));
+                assert_eq!(store.llm_openai_api_key.as_deref(), Some("sk-test-key"));
+                assert_eq!(
+                    store.llm_openai_url.as_deref(),
+                    Some("http://localhost:1234")
+                );
+            }
+            command => panic!("expected consolidate command, got {command:?}"),
+        }
+    }
+
+    #[test]
+    fn open_store_constructs_ollama_llm_provider_with_defaults() {
+        let db_path = unique_temp_path("elegy-memory-cli-open-store-ollama-llm");
+        let ctx = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: None,
+            ollama_url: None,
+            ollama_model: None,
+            openai_api_key: None,
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: Some(CliLlmProvider::Ollama),
+            llm_model: None,
+            llm_ollama_url: None,
+            llm_openai_api_key: None,
+            llm_openai_url: None,
+            session_id: None,
+        })
+        .expect("open Ollama llm-backed store");
+
+        assert_eq!(
+            ctx.llm_provider_label(),
+            format!("ollama ({DEFAULT_OLLAMA_LLM_MODEL} @ {DEFAULT_OLLAMA_LLM_BASE_URL})")
+        );
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn open_store_constructs_openai_llm_provider_with_defaults() {
+        let db_path = unique_temp_path("elegy-memory-cli-open-store-openai-llm");
+        let ctx = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: None,
+            ollama_url: None,
+            ollama_model: None,
+            openai_api_key: None,
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: Some(CliLlmProvider::Openai),
+            llm_model: None,
+            llm_ollama_url: None,
+            llm_openai_api_key: Some("sk-test-key".to_string()),
+            llm_openai_url: None,
+            session_id: None,
+        })
+        .expect("open OpenAI llm-backed store");
+
+        assert_eq!(
+            ctx.llm_provider_label(),
+            format!("openai ({DEFAULT_OPENAI_LLM_MODEL} @ {DEFAULT_OPENAI_LLM_BASE_URL})")
+        );
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn stray_llm_flags_without_llm_provider_are_rejected() {
+        let db_path = unique_temp_path("elegy-memory-cli-stray-llm-flags");
+        let error = open_store(StoreArgs {
+            db: Some(db_path.clone()),
+            scope: CliScope::Workspace,
+            embedding_provider: None,
+            ollama_url: None,
+            ollama_model: None,
+            openai_api_key: None,
+            openai_model: None,
+            openai_url: None,
+            openai_dimensions: None,
+            llm_provider: None,
+            llm_model: Some("qwen3:8b".to_string()),
+            llm_ollama_url: None,
+            llm_openai_api_key: None,
+            llm_openai_url: None,
+            session_id: None,
+        })
+        .expect_err("stray llm flags should be rejected");
+
+        assert!(error.to_string().contains("--llm-provider"));
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn format_gate_result_surfaces_likely_duplicate_warning_details() {
+        let similar_to = Uuid::nil();
+
+        assert_eq!(
+            format_gate_result(Some(similar_to), Some(0.8249)),
+            format!("accepted (similar to {similar_to}, cosine=0.825)")
+        );
+        assert_eq!(format_gate_result(None, None), "accepted");
+    }
+
+    #[test]
+    fn format_gate_result_surfaces_contradiction_details() {
+        let conflicting_id = Uuid::nil();
+        assert_eq!(
+            format_contradiction_gate_result(conflicting_id),
+            format!("contradiction (conflicts with {conflicting_id})")
+        );
+    }
+
+    #[test]
     fn provider_backed_search_response_is_not_marked_keyword_only() {
         let db_path = unique_temp_path("elegy-memory-cli-search-provider");
         let provider = Arc::new(StubEmbeddingProvider::new([
@@ -1399,7 +2979,10 @@ mod tests {
                 "semantic launch checklist",
                 StubEmbeddingResponse::Embedding(vec![1.0; 768]),
             ),
-            ("semantic probe", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
+            (
+                "semantic probe",
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
         ]));
         let store = SqliteMemoryStore::new_with_embedding_provider(
             &db_path,
@@ -1415,9 +2998,12 @@ mod tests {
         let ctx = StoreContext {
             db_path: db_path.clone(),
             scope: MemoryScope::Workspace,
+            session_id: None,
             store,
             embedding_provider: Some(provider.clone()),
             embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
         };
         let response = build_search_response(&ctx, "semantic probe".to_string(), 5, false)
             .expect("build provider-backed search response");
@@ -1440,8 +3026,14 @@ mod tests {
     fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
         let db_path = unique_temp_path("elegy-memory-cli-reembed");
         let provider = Arc::new(StubEmbeddingProvider::new([
-            ("older stale memory", StubEmbeddingResponse::Embedding(vec![1.0; 768])),
-            ("newer stale memory", StubEmbeddingResponse::Embedding(vec![0.5; 768])),
+            (
+                "older stale memory",
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                "newer stale memory",
+                StubEmbeddingResponse::Embedding(vec![0.5; 768]),
+            ),
         ]));
         let store =
             SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
@@ -1458,9 +3050,12 @@ mod tests {
         let ctx = StoreContext {
             db_path: db_path.clone(),
             scope: MemoryScope::Workspace,
+            session_id: None,
             store,
             embedding_provider: Some(provider.clone()),
             embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
         };
         let response = reembed_stale_memories(&ctx, 1).expect("re-embed stale memories");
 
@@ -1468,15 +3063,11 @@ mod tests {
         assert_eq!(response.reembedded_count, 1);
         assert_eq!(response.reembedded_ids, vec![older_id.to_string()]);
 
-        let older_memory = ctx
-            .store
-            .get_raw(&older_id);
+        let older_memory = ctx.store.get_raw(&older_id);
         let older_memory = run_async(older_memory)
             .expect("load older memory")
             .expect("older memory exists");
-        let newer_memory = ctx
-            .store
-            .get_raw(&newer_id);
+        let newer_memory = ctx.store.get_raw(&newer_id);
         let newer_memory = run_async(newer_memory)
             .expect("load newer memory")
             .expect("newer memory exists");
@@ -1496,15 +3087,16 @@ mod tests {
         let ctx = StoreContext {
             db_path: db_path.clone(),
             scope: MemoryScope::Workspace,
+            session_id: None,
             store,
             embedding_provider: None,
             embedding_provider_label: None,
+            llm_provider: None,
+            llm_provider_label: None,
         };
         let error = reembed_stale_memories(&ctx, 5).expect_err("provider should be required");
 
-        assert!(error
-            .to_string()
-            .contains("--embedding-provider ollama"));
+        assert!(error.to_string().contains("--embedding-provider ollama"));
 
         cleanup_temp_path(&db_path);
     }
@@ -1525,9 +3117,12 @@ mod tests {
         let ctx = StoreContext {
             db_path: db_path.clone(),
             scope: MemoryScope::Workspace,
+            session_id: None,
             store,
             embedding_provider: Some(provider),
             embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
         };
         let error = reembed_stale_memories(&ctx, 5).expect_err("provider failure should surface");
 
@@ -1576,5 +3171,229 @@ mod tests {
 
     fn cleanup_temp_path(path: &PathBuf) {
         let _ = fs::remove_file(path);
+    }
+
+    #[test]
+    fn import_without_force_merges_identical_content_via_stub_provider() {
+        let db_path = unique_temp_path("elegy-memory-cli-import-merge");
+        let content = "import deduplication test content";
+
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+
+        // Store the memory with its embedding using a provider-backed store.
+        let store = SqliteMemoryStore::new_with_embedding_provider(
+            &db_path,
+            MemoryScope::Workspace,
+            provider.clone(),
+        )
+        .expect("create provider-backed store");
+        run_async(store.store(sample_memory(content))).expect("store original memory");
+        drop(store);
+
+        // Write a Format B JSON file with the same content.
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let json_path = env::temp_dir().join(format!("elegy-import-merge-{unique}.json"));
+        fs::write(&json_path, format!("[\"{content}\"]")).expect("write import JSON");
+
+        // Import without force — the gate should detect the duplicate and merge.
+        let store = SqliteMemoryStore::new_with_embedding_provider(
+            &db_path,
+            MemoryScope::Workspace,
+            provider.clone(),
+        )
+        .expect("reopen store");
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            session_id: None,
+            store,
+            embedding_provider: Some(provider),
+            embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
+        };
+        execute_import_command(ctx, Some(json_path.clone()), false, OutputFormat::Text)
+            .expect("import should succeed");
+
+        // Verify the memory count did not increase (content was merged, not doubled).
+        let check_store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("reopen for check");
+        let memories = run_async(check_store.list(MemoryFilter {
+            scope: Some(MemoryScope::Workspace),
+            state: None,
+            memory_types: None,
+            provenance_levels: None,
+            tags: None,
+            status: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+            limit: None,
+        }))
+        .expect("list memories");
+
+        assert_eq!(
+            memories.len(),
+            1,
+            "should still have 1 memory after merging duplicate, got {}",
+            memories.len()
+        );
+
+        cleanup_temp_path(&db_path);
+        let _ = fs::remove_file(&json_path);
+    }
+
+    #[test]
+    fn add_records_contradiction_and_keeps_both_memories() {
+        let db_path = unique_temp_path("elegy-memory-cli-add-contradiction");
+        let existing_content = "Backend is C# with gRPC";
+        let candidate_content = "Backend is Python with Flask";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                existing_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                candidate_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+        ]));
+        let store = SqliteMemoryStore::new_with_embedding_provider(
+            &db_path,
+            MemoryScope::Workspace,
+            provider.clone(),
+        )
+        .expect("create provider-backed store");
+        let existing_id =
+            run_async(store.store(sample_memory(existing_content))).expect("store existing memory");
+
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            session_id: None,
+            store: store.clone(),
+            embedding_provider: Some(provider),
+            embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
+        };
+        execute_add_command(
+            ctx,
+            candidate_content.to_string(),
+            MemoryType::Observation,
+            0.8,
+            ProvenanceLevel::UserStated,
+            OutputFormat::Json,
+        )
+        .expect("add should succeed");
+
+        let memories = run_async(store.list(MemoryFilter {
+            scope: Some(MemoryScope::Workspace),
+            state: None,
+            memory_types: None,
+            provenance_levels: None,
+            tags: None,
+            status: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+            limit: None,
+        }))
+        .expect("list memories");
+        assert_eq!(memories.len(), 2);
+        assert!(memories
+            .iter()
+            .all(|memory| memory.state == MemoryState::Active));
+        assert!(memories
+            .iter()
+            .any(|memory| memory.content == candidate_content && memory.id != existing_id));
+
+        let contradictions =
+            run_async(store.list_contradictions(Some(ResolutionStatus::Unresolved)))
+                .expect("list contradictions");
+        assert_eq!(contradictions.len(), 1);
+        assert_eq!(contradictions[0].memory_a_id, existing_id);
+        assert!(contradictions[0].description.contains("python"));
+
+        cleanup_temp_path(&db_path);
+    }
+
+    #[test]
+    fn import_without_force_records_contradiction_and_keeps_both_memories() {
+        let db_path = unique_temp_path("elegy-memory-cli-import-contradiction");
+        let existing_content = "Cap RTSS 120fps";
+        let candidate_content = "Cap RTSS 60fps";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                existing_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                candidate_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+        ]));
+        let store = SqliteMemoryStore::new_with_embedding_provider(
+            &db_path,
+            MemoryScope::Workspace,
+            provider.clone(),
+        )
+        .expect("create provider-backed store");
+        let existing_id =
+            run_async(store.store(sample_memory(existing_content))).expect("store existing memory");
+
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let json_path = env::temp_dir().join(format!("elegy-import-contradiction-{unique}.json"));
+        fs::write(&json_path, format!("[\"{candidate_content}\"]")).expect("write import JSON");
+
+        let ctx = StoreContext {
+            db_path: db_path.clone(),
+            scope: MemoryScope::Workspace,
+            session_id: None,
+            store: store.clone(),
+            embedding_provider: Some(provider),
+            embedding_provider_label: Some("stub".to_string()),
+            llm_provider: None,
+            llm_provider_label: None,
+        };
+        execute_import_command(ctx, Some(json_path.clone()), false, OutputFormat::Json)
+            .expect("import should succeed");
+
+        let memories = run_async(store.list(MemoryFilter {
+            scope: Some(MemoryScope::Workspace),
+            state: None,
+            memory_types: None,
+            provenance_levels: None,
+            tags: None,
+            status: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+            limit: None,
+        }))
+        .expect("list memories");
+        assert_eq!(memories.len(), 2);
+        assert!(memories.iter().any(
+            |memory| memory.content == candidate_content && memory.state == MemoryState::Active
+        ));
+
+        let contradictions =
+            run_async(store.list_contradictions(Some(ResolutionStatus::Unresolved)))
+                .expect("list contradictions");
+        assert_eq!(contradictions.len(), 1);
+        assert_eq!(contradictions[0].memory_a_id, existing_id);
+        assert!(contradictions[0].description.contains("60fps"));
+
+        cleanup_temp_path(&db_path);
+        let _ = fs::remove_file(&json_path);
     }
 }

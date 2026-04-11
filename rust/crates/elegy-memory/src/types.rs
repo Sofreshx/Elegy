@@ -25,11 +25,11 @@ pub const DEFAULT_RESPONSE_RESERVE: u32 = 4_096;
 /// Default importance threshold below which the salience gate archives memories.
 pub const DEFAULT_SALIENCE_THRESHOLD: f32 = 0.2;
 
-/// Default lower bound of the novelty doubt zone used by the salience gate.
-pub const DEFAULT_NOVELTY_DOUBT_THRESHOLD: f32 = 0.85;
+/// Default lower bound of the likely-duplicate warning band used by the salience gate.
+pub const DEFAULT_NOVELTY_DOUBT_THRESHOLD: f32 = 0.80;
 
 /// Default semantic similarity threshold used for conservative merge decisions.
-pub const DEFAULT_MERGE_SIMILARITY_THRESHOLD: f32 = 0.92;
+pub const DEFAULT_MERGE_SIMILARITY_THRESHOLD: f32 = 0.85;
 
 /// Default semantic similarity threshold used for exact-duplicate rejection.
 pub const DEFAULT_DUPLICATE_SIMILARITY_THRESHOLD: f32 = 0.99;
@@ -114,6 +114,57 @@ pub enum MemoryScope {
     User,
     /// Procedural memory associated with an agent identity.
     Agent,
+}
+
+impl MemoryScope {
+    /// Returns the relative hierarchy rank for this scope.
+    #[must_use]
+    pub const fn rank(self) -> u8 {
+        match self {
+            Self::Session => 0,
+            Self::Workspace => 1,
+            Self::User => 2,
+            Self::Agent => 3,
+        }
+    }
+
+    /// Returns the next broader scope in the hierarchy, if any.
+    #[must_use]
+    pub const fn next(self) -> Option<Self> {
+        match self {
+            Self::Session => Some(Self::Workspace),
+            Self::Workspace => Some(Self::User),
+            Self::User => Some(Self::Agent),
+            Self::Agent => None,
+        }
+    }
+
+    /// Returns the scopes visible from this scope, ordered from nearest to broadest.
+    #[must_use]
+    pub const fn visible_scopes(self) -> &'static [Self] {
+        match self {
+            Self::Session => &[Self::Session, Self::Workspace, Self::User, Self::Agent],
+            Self::Workspace => &[Self::Workspace, Self::User, Self::Agent],
+            Self::User => &[Self::User, Self::Agent],
+            Self::Agent => &[Self::Agent],
+        }
+    }
+
+    /// Returns true when `target` is broader than `self`.
+    #[must_use]
+    pub const fn can_promote_to(self, target: Self) -> bool {
+        self.rank() < target.rank()
+    }
+
+    /// Returns the broader of the two scopes.
+    #[must_use]
+    pub const fn max(self, other: Self) -> Self {
+        if self.rank() >= other.rank() {
+            self
+        } else {
+            other
+        }
+    }
 }
 
 /// Semantic category for a memory item.
@@ -383,6 +434,9 @@ pub struct SearchQuery {
     /// Optional context budgeting parameters for prompt injection.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub context_config: Option<MemoryContextConfig>,
+    /// Optional session identifier used to record cross-session access.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub session_id: Option<String>,
 }
 
 /// Export encoding supported by observability and portability flows.

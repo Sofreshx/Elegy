@@ -109,6 +109,139 @@ impl SqliteMemoryStore {
         self.scope
     }
 
+    /// Promote a memory to a broader scope and record promotion provenance.
+    pub fn promote_memory_to(
+        &self,
+        id: &MemoryId,
+        to_scope: MemoryScope,
+        changed_by: &str,
+        reason: &str,
+        trigger_session_id: Option<&str>,
+    ) -> Result<Option<Memory>, StoreError> {
+        self.with_connection(|connection| {
+            let scope_config = load_scope_config(connection)?;
+            let transaction = connection.transaction()?;
+            let Some(mut memory) = require_memory(&transaction, id)? else {
+                return Ok(None);
+            };
+
+            if memory.scope == to_scope {
+                return Ok(Some(memory));
+            }
+            if !memory.scope.can_promote_to(to_scope) {
+                return Err(StoreError::Validation(format!(
+                    "cannot promote memory {} from {} to {}",
+                    memory.id,
+                    scope_to_db(memory.scope),
+                    scope_to_db(to_scope)
+                )));
+            }
+
+            record_promotion(
+                &transaction,
+                &mut memory,
+                to_scope,
+                reason,
+                changed_by,
+                trigger_session_id,
+                &scope_config,
+            )?;
+            transaction.commit()?;
+            Ok(Some(memory))
+        })
+    }
+
+    /// Evaluate automatic promotion criteria and apply promotions for the visible scopes.
+    pub fn run_promotion_pass(
+        &self,
+        limit: Option<usize>,
+        trigger_session_id: Option<&str>,
+    ) -> Result<Vec<Memory>, StoreError> {
+        self.with_connection(|connection| {
+            let scope_config = load_scope_config(connection)?;
+            let mut memories = load_search_memories(
+                connection,
+                self.scope.visible_scopes(),
+                MemoryState::Active,
+                None,
+            )?;
+            memories.sort_by(|left, right| {
+                right
+                    .updated_at
+                    .cmp(&left.updated_at)
+                    .then_with(|| right.id.cmp(&left.id))
+            });
+            if let Some(limit) = limit {
+                memories.truncate(limit);
+            }
+
+            let mut promoted = Vec::new();
+            for memory in memories {
+                if let Some(to_scope) =
+                    promotion_target(connection, &memory, &scope_config, trigger_session_id)?
+                {
+                    let transaction = connection.transaction()?;
+                    let Some(mut latest) = require_memory(&transaction, &memory.id)? else {
+                        continue;
+                    };
+                    record_promotion(
+                        &transaction,
+                        &mut latest,
+                        to_scope,
+                        "automatic promotion pass",
+                        "system:promotion",
+                        trigger_session_id,
+                        &scope_config,
+                    )?;
+                    transaction.commit()?;
+                    promoted.push(latest);
+                }
+            }
+
+            Ok(promoted)
+        })
+    }
+
+    /// Load active memories plus their stored embeddings for consolidation.
+    pub fn list_consolidation_candidates(
+        &self,
+        scopes: &[MemoryScope],
+        limit: Option<usize>,
+    ) -> Result<Vec<crate::ConsolidationCandidate>, StoreError> {
+        self.with_connection(|connection| {
+            let mut memories = load_search_memories(connection, scopes, MemoryState::Active, None)?;
+            memories.sort_by(|left, right| {
+                right
+                    .updated_at
+                    .cmp(&left.updated_at)
+                    .then_with(|| right.id.cmp(&left.id))
+            });
+            if let Some(limit) = limit {
+                memories.truncate(limit);
+            }
+
+            let expected_dimensions = load_embedding_dimensions(connection)?;
+            let mut candidates = Vec::with_capacity(memories.len());
+            for memory in memories {
+                let embedding = load_stored_embedding(connection, &memory.id, expected_dimensions)?;
+                candidates.push(crate::ConsolidationCandidate { memory, embedding });
+            }
+            Ok(candidates)
+        })
+    }
+
+    /// Record the timestamp of the latest consolidation pass.
+    pub fn mark_consolidation_run(&self) -> Result<(), StoreError> {
+        self.with_connection(|connection| {
+            connection.execute(
+                "INSERT INTO scope_config(key, value) VALUES ('last_consolidation_at', ?1) \
+                 ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+                [format_timestamp(Utc::now())],
+            )?;
+            Ok(())
+        })
+    }
+
     async fn generate_embedding(&self, text: &str) -> Result<Option<Vec<f32>>, EmbeddingError> {
         let trimmed_text = text.trim();
         if trimmed_text.is_empty() {
@@ -192,6 +325,10 @@ impl SqliteMemoryStore {
 
 #[async_trait]
 impl MemoryStore for SqliteMemoryStore {
+    fn scope(&self) -> MemoryScope {
+        self.scope
+    }
+
     async fn store(&self, memory: Memory) -> Result<MemoryId, StoreError> {
         let should_attempt_embedding =
             self.embedding_provider.is_some() && !memory.content.trim().is_empty();
@@ -443,17 +580,12 @@ impl MemoryStore for SqliteMemoryStore {
         if matches!(filter.limit, Some(0)) {
             return Ok(Vec::new());
         }
-
-        if let Some(scope) = filter.scope {
-            if scope != self.scope {
-                return Ok(Vec::new());
-            }
-        }
+        let list_scope = filter.scope.unwrap_or(self.scope);
 
         self.with_connection(|connection| {
             let mut sql = format!("SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE scope = ?1");
             let mut params: Vec<rusqlite::types::Value> = vec![rusqlite::types::Value::from(
-                scope_to_db(self.scope).to_string(),
+                scope_to_db(list_scope).to_string(),
             )];
 
             if let Some(state) = filter.state {
@@ -512,9 +644,6 @@ impl MemoryStore for SqliteMemoryStore {
         if query.max_results == 0 {
             return Ok(Vec::new());
         }
-        if query.scope != self.scope {
-            return Ok(Vec::new());
-        }
         if trimmed_text.is_empty() && query.embedding.is_none() {
             return Err(StoreError::Validation(
                 "search requires non-empty text or a query embedding".to_string(),
@@ -527,16 +656,16 @@ impl MemoryStore for SqliteMemoryStore {
         }
 
         let derived_query_embedding = if query.embedding.is_none() {
-            match self.generate_embedding(&trimmed_text).await {
-                Ok(embedding) => embedding,
-                Err(_) => None,
-            }
+            self.generate_embedding(&trimmed_text)
+                .await
+                .unwrap_or_default()
         } else {
             None
         };
 
         self.with_connection(|connection| {
             let scope_config = load_scope_config(connection)?;
+            let visible_scopes = query.scope.visible_scopes();
             let query_embedding = match query.embedding.as_deref() {
                 Some(embedding) => {
                     let expected_dimensions = load_embedding_dimensions(connection)?;
@@ -561,7 +690,7 @@ impl MemoryStore for SqliteMemoryStore {
             } else {
                 load_keyword_scores(
                     connection,
-                    self.scope,
+                    visible_scopes,
                     requested_state,
                     query.type_filter.as_deref(),
                     &trimmed_text,
@@ -571,7 +700,7 @@ impl MemoryStore for SqliteMemoryStore {
             let mut vector_scores = match query_embedding {
                 Some(embedding) => load_vector_similarity_scores(
                     connection,
-                    self.scope,
+                    visible_scopes,
                     requested_state,
                     query.type_filter.as_deref(),
                     embedding,
@@ -591,7 +720,7 @@ impl MemoryStore for SqliteMemoryStore {
 
             let candidate_memories = load_search_memories(
                 connection,
-                self.scope,
+                visible_scopes,
                 requested_state,
                 query.type_filter.as_deref(),
             )?;
@@ -635,6 +764,12 @@ impl MemoryStore for SqliteMemoryStore {
                 &scope_config,
             );
             touch_scored_memories(connection, &mut results)?;
+            auto_promote_scored_memories(
+                connection,
+                &mut results,
+                query.session_id.as_deref(),
+                &scope_config,
+            )?;
             Ok(results)
         })
     }
@@ -653,10 +788,11 @@ impl MemoryStore for SqliteMemoryStore {
         self.with_connection(|connection| {
             let expected_dimensions = load_embedding_dimensions(connection)?;
             validate_query_embedding(embedding, expected_dimensions)?;
+            let visible_scopes = self.scope.visible_scopes();
 
             let similarity_scores = load_vector_similarity_scores(
                 connection,
-                self.scope,
+                visible_scopes,
                 MemoryState::Active,
                 None,
                 embedding,
@@ -667,7 +803,7 @@ impl MemoryStore for SqliteMemoryStore {
             }
 
             let memories_by_id: HashMap<MemoryId, Memory> =
-                load_search_memories(connection, self.scope, MemoryState::Active, None)?
+                load_search_memories(connection, visible_scopes, MemoryState::Active, None)?
                     .into_iter()
                     .filter_map(|memory| {
                         similarity_scores
@@ -925,16 +1061,27 @@ impl MemoryStore for SqliteMemoryStore {
     ) -> Result<Vec<ContradictionEntry>, StoreError> {
         self.with_connection(|connection| {
             let mut sql = String::from(
-                "SELECT id, memory_a_id, memory_b_id, detected_at, description, resolution_status, resolved_at, resolution_note FROM contradictions",
+                "SELECT c.id, c.memory_a_id, c.memory_b_id, c.detected_at, c.description, c.resolution_status, c.resolved_at, c.resolution_note \
+                 FROM contradictions c \
+                 JOIN memories a ON a.id = c.memory_a_id \
+                 JOIN memories b ON b.id = c.memory_b_id \
+                 WHERE ",
             );
-            let mut params = Vec::new();
+            let visible_scopes = self.scope.visible_scopes();
+            let mut params: Vec<rusqlite::types::Value> = Vec::new();
+            sql.push('(');
+            sql.push_str(&scope_in_clause("a.scope", visible_scopes, &mut params));
+            sql.push_str(") AND (");
+            sql.push_str(&scope_in_clause("b.scope", visible_scopes, &mut params));
+            sql.push(')');
             if let Some(status) = status {
-                sql.push_str(" WHERE resolution_status = ?1");
+                sql.push_str(" AND c.resolution_status = ?");
+                sql.push_str(&(params.len() + 1).to_string());
                 params.push(rusqlite::types::Value::from(
                     resolution_status_to_db(status).to_string(),
                 ));
             }
-            sql.push_str(" ORDER BY detected_at DESC, id ASC");
+            sql.push_str(" ORDER BY c.detected_at DESC, c.id ASC");
 
             let mut statement = connection.prepare(&sql)?;
             let rows = statement.query_map(rusqlite::params_from_iter(params), map_contradiction_row)?;
@@ -1006,21 +1153,123 @@ impl MemoryStore for SqliteMemoryStore {
             Ok(())
         })
     }
+
+    async fn update_contradiction_status(
+        &self,
+        contradiction_id: &str,
+        status: ResolutionStatus,
+        note: Option<&str>,
+    ) -> Result<(), StoreError> {
+        let trimmed_id = contradiction_id.trim();
+        if trimmed_id.is_empty() {
+            return Err(StoreError::Validation(
+                "contradiction id must not be empty".to_string(),
+            ));
+        }
+
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+            let normalized_note = note.and_then(|value| {
+                let trimmed = value.trim();
+                (!trimmed.is_empty()).then_some(trimmed)
+            });
+            let resolved_at = if status == ResolutionStatus::Unresolved {
+                None
+            } else {
+                Some(format_timestamp(Utc::now()))
+            };
+            let updated_rows = transaction.execute(
+                r#"
+                UPDATE contradictions
+                SET resolution_status = ?2,
+                    resolved_at = ?3,
+                    resolution_note = ?4
+                WHERE id = ?1
+                "#,
+                params![
+                    trimmed_id,
+                    resolution_status_to_db(status),
+                    resolved_at,
+                    normalized_note,
+                ],
+            )?;
+            if updated_rows == 0 {
+                return Err(StoreError::Validation(format!(
+                    "contradiction not found: {trimmed_id}"
+                )));
+            }
+
+            transaction.commit()?;
+            Ok(())
+        })
+    }
 }
 
 fn embedding_degradation_warning(error: &EmbeddingError) -> Option<String> {
     let EmbeddingError::Provider(message) = error else {
         return None;
     };
-    let reachable_prefix = "ollama not reachable at ";
-    let url = message
-        .strip_prefix(reachable_prefix)
-        .and_then(|remainder| remainder.split_once(": ").map(|(url, _)| url.trim()))?;
 
-    Some(format!(
-        "Ollama not reachable at {}, storing without embeddings. Run reembed later.",
-        url
-    ))
+    provider_not_reachable_warning(message, "ollama not reachable at ", "Ollama")
+        .or_else(|| provider_not_reachable_warning(message, "openai not reachable at ", "OpenAI"))
+        .or_else(|| openai_degradation_warning(message))
+}
+
+fn provider_not_reachable_warning(
+    message: &str,
+    prefix: &str,
+    display_name: &str,
+) -> Option<String> {
+    message
+        .strip_prefix(prefix)
+        .and_then(|remainder| remainder.split_once(": ").map(|(url, _)| url.trim()))
+        .map(|url| {
+            format!(
+                "{display_name} not reachable at {url}, storing without embeddings. Run reembed later.",
+            )
+        })
+}
+
+fn openai_degradation_warning(message: &str) -> Option<String> {
+    if let Some(remainder) = message.strip_prefix("openai returned ") {
+        let (status, detail) = remainder
+            .split_once(": ")
+            .map_or((remainder.trim(), None), |(status, detail)| {
+                (status.trim(), summarize_openai_error_detail(detail))
+            });
+        let context = detail.map_or_else(
+            || status.to_string(),
+            |detail| format!("{status}: {detail}"),
+        );
+        return Some(format!(
+            "OpenAI embeddings unavailable ({context}), storing without embeddings. Run reembed later.",
+        ));
+    }
+
+    if let Some(remainder) = message.strip_prefix("openai embeddings request returned ") {
+        let status = remainder
+            .split_once(": ")
+            .map_or(remainder.trim(), |(status, _)| status.trim());
+        return Some(format!(
+            "OpenAI embeddings unavailable ({status}), storing without embeddings. Run reembed later.",
+        ));
+    }
+
+    None
+}
+
+fn summarize_openai_error_detail(detail: &str) -> Option<&str> {
+    let detail = detail.trim();
+    if detail.is_empty() {
+        return None;
+    }
+
+    let summary = detail.split(" (").next().unwrap_or(detail).trim();
+    if summary.is_empty() {
+        None
+    } else {
+        Some(summary)
+    }
 }
 
 async fn transition_state(
@@ -1158,13 +1407,14 @@ fn sync_fts_entry(
     if let Some(previous_memory) = previous_memory {
         delete_fts_entry(connection, row_id, previous_memory)?;
     }
+    let indexed_fields = indexed_fts_fields(memory);
     connection.execute(
         "INSERT INTO memories_fts(rowid, content, summary, tags) VALUES (?1, ?2, ?3, ?4)",
         params![
             row_id,
-            &memory.content,
-            memory.summary.as_deref(),
-            indexed_tags(memory)
+            indexed_fields.content,
+            indexed_fields.summary.as_deref(),
+            indexed_fields.tags
         ],
     )?;
     Ok(())
@@ -1175,20 +1425,120 @@ fn delete_fts_entry(
     row_id: i64,
     memory: &Memory,
 ) -> Result<(), StoreError> {
+    let indexed_fields = indexed_fts_fields(memory);
     connection.execute(
         "INSERT INTO memories_fts(memories_fts, rowid, content, summary, tags) VALUES ('delete', ?1, ?2, ?3, ?4)",
         params![
             row_id,
-            &memory.content,
-            memory.summary.as_deref(),
-            indexed_tags(memory)
+            indexed_fields.content,
+            indexed_fields.summary.as_deref(),
+            indexed_fields.tags
         ],
     )?;
     Ok(())
 }
 
+struct IndexedFtsFields {
+    content: String,
+    summary: Option<String>,
+    tags: String,
+}
+
+fn indexed_fts_fields(memory: &Memory) -> IndexedFtsFields {
+    IndexedFtsFields {
+        content: expand_compound_words(&memory.content),
+        summary: memory.summary.as_deref().map(expand_compound_words),
+        tags: indexed_tags(memory),
+    }
+}
+
 fn indexed_tags(memory: &Memory) -> String {
-    memory.tags.join(" ")
+    expand_compound_words(&memory.tags.join(" "))
+}
+
+fn expand_compound_words(text: &str) -> String {
+    let mut expansions = Vec::new();
+    let mut seen_expansions = HashSet::new();
+    let mut token = String::new();
+
+    for character in text.chars() {
+        if character.is_alphanumeric() || character == '_' {
+            token.push(character);
+        } else {
+            collect_compound_word_expansion(&token, &mut expansions, &mut seen_expansions);
+            token.clear();
+        }
+    }
+
+    collect_compound_word_expansion(&token, &mut expansions, &mut seen_expansions);
+
+    if expansions.is_empty() {
+        return text.to_string();
+    }
+
+    let expansion_length = expansions.iter().map(String::len).sum::<usize>();
+    let mut expanded = String::with_capacity(text.len() + expansion_length + expansions.len());
+    expanded.push_str(text);
+
+    for expansion in expansions {
+        expanded.push(' ');
+        expanded.push_str(&expansion);
+    }
+
+    expanded
+}
+
+fn collect_compound_word_expansion(
+    token: &str,
+    expansions: &mut Vec<String>,
+    seen_expansions: &mut HashSet<String>,
+) {
+    let Some(expansion) = split_compound_word(token) else {
+        return;
+    };
+
+    if seen_expansions.insert(expansion.clone()) {
+        expansions.push(expansion);
+    }
+}
+
+fn split_compound_word(token: &str) -> Option<String> {
+    let characters = token.chars().collect::<Vec<_>>();
+    if characters.len() < 2 {
+        return None;
+    }
+
+    let mut parts = Vec::new();
+    let mut current_part = String::new();
+
+    for (index, character) in characters.iter().copied().enumerate() {
+        if index > 0 {
+            let previous = characters[index - 1];
+            let next = characters.get(index + 1).copied();
+            let has_boundary = (previous.is_lowercase() && character.is_uppercase())
+                || (previous.is_uppercase()
+                    && character.is_uppercase()
+                    && next.is_some_and(|next_character| next_character.is_lowercase()))
+                || (previous.is_ascii_digit() && character.is_alphabetic())
+                || (previous.is_alphabetic() && character.is_ascii_digit());
+
+            if has_boundary && !current_part.is_empty() {
+                parts.push(std::mem::take(&mut current_part));
+            }
+        }
+
+        current_part.push(character);
+    }
+
+    if !current_part.is_empty() {
+        parts.push(current_part);
+    }
+
+    if parts.len() > 1 {
+        Some(parts.join(" "))
+    } else {
+        None
+    }
 }
 
 fn require_memory_rowid(connection: &Connection, id: &MemoryId) -> Result<i64, StoreError> {
@@ -1522,6 +1872,191 @@ fn parse_resolution_status_for_sqlite(raw: &str) -> rusqlite::Result<ResolutionS
     parse_resolution_status(raw).map_err(sqlite_conversion_error)
 }
 
+fn scope_in_clause(
+    column_name: &str,
+    scopes: &[MemoryScope],
+    params: &mut Vec<rusqlite::types::Value>,
+) -> String {
+    let mut clause = String::new();
+    clause.push_str(column_name);
+    clause.push_str(" IN (");
+    for (index, scope) in scopes.iter().enumerate() {
+        if index > 0 {
+            clause.push_str(", ");
+        }
+        clause.push('?');
+        clause.push_str(&(params.len() + 1).to_string());
+        params.push(rusqlite::types::Value::from(
+            scope_to_db(*scope).to_string(),
+        ));
+    }
+    clause.push(')');
+    clause
+}
+
+fn auto_promote_scored_memories(
+    connection: &mut Connection,
+    results: &mut [ScoredMemory],
+    session_id: Option<&str>,
+    scope_config: &ScopeConfig,
+) -> Result<(), StoreError> {
+    if results.is_empty() {
+        return Ok(());
+    }
+
+    if let Some(session_id) = session_id {
+        validate_session_id(session_id)?;
+        record_session_accesses(
+            connection,
+            results.iter().map(|result| result.memory.id),
+            session_id,
+        )?;
+    }
+
+    for result in results {
+        let Some(to_scope) =
+            promotion_target(connection, &result.memory, scope_config, session_id)?
+        else {
+            continue;
+        };
+        let transaction = connection.transaction()?;
+        let Some(mut latest) = require_memory(&transaction, &result.memory.id)? else {
+            continue;
+        };
+        record_promotion(
+            &transaction,
+            &mut latest,
+            to_scope,
+            "automatic promotion during search",
+            "system:promotion",
+            session_id,
+            scope_config,
+        )?;
+        transaction.commit()?;
+        result.memory = latest;
+    }
+
+    Ok(())
+}
+
+fn validate_session_id(session_id: &str) -> Result<(), StoreError> {
+    Uuid::parse_str(session_id).map(|_| ()).map_err(|error| {
+        StoreError::Validation(format!("invalid session_id `{session_id}`: {error}"))
+    })
+}
+
+fn record_session_accesses(
+    connection: &Connection,
+    memory_ids: impl IntoIterator<Item = MemoryId>,
+    session_id: &str,
+) -> Result<(), StoreError> {
+    let now = format_timestamp(Utc::now());
+    for memory_id in memory_ids {
+        connection.execute(
+            r#"
+            INSERT INTO memory_session_accesses(memory_id, session_id, first_accessed_at, last_accessed_at)
+            VALUES (?1, ?2, ?3, ?3)
+            ON CONFLICT(memory_id, session_id) DO UPDATE
+            SET last_accessed_at = excluded.last_accessed_at
+            "#,
+            params![memory_id.to_string(), session_id, now],
+        )?;
+    }
+    Ok(())
+}
+
+fn promotion_target(
+    connection: &Connection,
+    memory: &Memory,
+    scope_config: &ScopeConfig,
+    _trigger_session_id: Option<&str>,
+) -> Result<Option<MemoryScope>, StoreError> {
+    let Some(next_scope) = memory.scope.next() else {
+        return Ok(None);
+    };
+
+    if memory.scope == MemoryScope::Session {
+        let distinct_sessions = connection.query_row(
+            "SELECT COUNT(DISTINCT session_id) FROM memory_session_accesses WHERE memory_id = ?1",
+            [memory.id.to_string()],
+            |row| row.get::<_, i64>(0),
+        )?;
+        if distinct_sessions >= 3 {
+            return Ok(Some(MemoryScope::Workspace));
+        }
+    }
+
+    if memory.corroboration_count >= 2 {
+        return Ok(Some(next_scope));
+    }
+
+    let age_days = (Utc::now() - memory.updated_at).num_days();
+    if age_days >= 7
+        && (memory.importance_score as f64) * decay::retention(memory, Utc::now(), scope_config)
+            >= 0.4
+    {
+        return Ok(Some(next_scope));
+    }
+
+    Ok(None)
+}
+
+fn record_promotion(
+    connection: &Connection,
+    memory: &mut Memory,
+    to_scope: MemoryScope,
+    reason: &str,
+    changed_by: &str,
+    trigger_session_id: Option<&str>,
+    _scope_config: &ScopeConfig,
+) -> Result<(), StoreError> {
+    let from_scope = memory.scope;
+    if from_scope == to_scope {
+        return Ok(());
+    }
+
+    let previous_memory = memory.clone();
+    let now = Utc::now();
+    let next_version = load_next_version_number(connection, &memory.id)?;
+    connection.execute(
+        r#"
+        INSERT INTO memory_versions(id, memory_id, version_number, content, changed_at, changed_by, change_reason)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "#,
+        params![
+            Uuid::new_v4().to_string(),
+            memory.id.to_string(),
+            i64::from(next_version),
+            memory.content.clone(),
+            format_timestamp(now),
+            changed_by,
+            format!("scope promotion: {} -> {} ({reason})", scope_to_db(from_scope), scope_to_db(to_scope)),
+        ],
+    )?;
+    connection.execute(
+        r#"
+        INSERT INTO memory_promotions(id, memory_id, from_scope, to_scope, reason, trigger_session_id, promoted_at)
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "#,
+        params![
+            Uuid::new_v4().to_string(),
+            memory.id.to_string(),
+            scope_to_db(from_scope),
+            scope_to_db(to_scope),
+            reason,
+            trigger_session_id,
+            format_timestamp(now),
+        ],
+    )?;
+
+    memory.scope = to_scope;
+    memory.updated_at = now;
+    persist_memory(connection, memory)?;
+    let row_id = require_memory_rowid(connection, &memory.id)?;
+    sync_fts_entry(connection, row_id, Some(&previous_memory), memory)?;
+    Ok(())
+}
+
 fn matches_filter(memory: &Memory, filter: &MemoryFilter) -> bool {
     if let Some(memory_types) = &filter.memory_types {
         if !memory_types.contains(&memory.memory_type) {
@@ -1604,6 +2139,28 @@ fn load_cached_embedding_blob(
         )
         .optional()
         .map_err(StoreError::from)
+}
+
+fn load_stored_embedding(
+    connection: &Connection,
+    id: &MemoryId,
+    expected_dimensions: usize,
+) -> Result<Option<Vec<f32>>, StoreError> {
+    let encoded: Option<Vec<u8>> = connection
+        .query_row(
+            r#"
+            SELECT v.embedding
+            FROM memory_embeddings me
+            JOIN vec_memories v ON v.rowid = me.vec_rowid
+            WHERE me.memory_id = ?1
+            "#,
+            [id.to_string()],
+            |row| row.get(0),
+        )
+        .optional()?;
+    encoded
+        .map(|bytes| decode_embedding(&bytes, expected_dimensions))
+        .transpose()
 }
 
 fn load_scope_config(connection: &Connection) -> Result<ScopeConfig, StoreError> {
@@ -1813,16 +2370,20 @@ fn validate_similarity_threshold(threshold: f32) -> Result<(), StoreError> {
 
 fn load_search_memories(
     connection: &Connection,
-    scope: MemoryScope,
+    scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
 ) -> Result<Vec<Memory>, StoreError> {
-    let mut sql =
-        format!("SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE scope = ?1 AND state = ?2");
-    let mut params: Vec<rusqlite::types::Value> = vec![
-        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
-        rusqlite::types::Value::from(state_to_db(state).to_string()),
-    ];
+    if scopes.is_empty() {
+        return Ok(Vec::new());
+    }
+    let mut params: Vec<rusqlite::types::Value> = Vec::new();
+    let scope_clause = scope_in_clause("scope", scopes, &mut params);
+    let mut sql = format!(
+        "SELECT {MEMORY_SELECT_COLUMNS} FROM memories WHERE {scope_clause} AND state = ?{}",
+        params.len() + 1
+    );
+    params.push(rusqlite::types::Value::from(state_to_db(state).to_string()));
 
     if let Some(type_filter) = type_filter {
         if type_filter.is_empty() {
@@ -1856,7 +2417,7 @@ fn load_search_memories(
 
 fn load_keyword_scores(
     connection: &Connection,
-    scope: MemoryScope,
+    scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
     text: &str,
@@ -1864,22 +2425,24 @@ fn load_keyword_scores(
     let Some(fts_query) = build_fts_query(text) else {
         return Ok(HashMap::new());
     };
+    if scopes.is_empty() {
+        return Ok(HashMap::new());
+    }
 
-    let mut sql = String::from(
+    let mut params: Vec<rusqlite::types::Value> = vec![rusqlite::types::Value::from(fts_query)];
+    let scope_clause = scope_in_clause("m.scope", scopes, &mut params);
+    let mut sql = format!(
         r#"
         SELECT m.id, bm25(memories_fts) AS bm25_score
         FROM memories_fts
         JOIN memories m ON m.rowid = memories_fts.rowid
         WHERE memories_fts MATCH ?1
-          AND m.scope = ?2
-          AND m.state = ?3
+          AND {scope_clause}
+          AND m.state = ?{}
         "#,
+        params.len() + 1
     );
-    let mut params: Vec<rusqlite::types::Value> = vec![
-        rusqlite::types::Value::from(fts_query),
-        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
-        rusqlite::types::Value::from(state_to_db(state).to_string()),
-    ];
+    params.push(rusqlite::types::Value::from(state_to_db(state).to_string()));
 
     if let Some(type_filter) = type_filter {
         if type_filter.is_empty() {
@@ -1955,7 +2518,7 @@ fn build_fts_query(text: &str) -> Option<String> {
 
 fn load_vector_similarity_scores(
     connection: &Connection,
-    scope: MemoryScope,
+    scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
     query_embedding: &[f32],
@@ -1963,21 +2526,24 @@ fn load_vector_similarity_scores(
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
     let expected_dimensions = load_embedding_dimensions(connection)?;
     validate_query_embedding(query_embedding, expected_dimensions)?;
+    if scopes.is_empty() {
+        return Ok(HashMap::new());
+    }
 
-    let mut sql = String::from(
+    let mut params: Vec<rusqlite::types::Value> = Vec::new();
+    let scope_clause = scope_in_clause("m.scope", scopes, &mut params);
+    let mut sql = format!(
         r#"
         SELECT m.id, v.embedding
         FROM memories m
         JOIN memory_embeddings me ON me.memory_id = m.id
         JOIN vec_memories v ON v.rowid = me.vec_rowid
-        WHERE m.scope = ?1
-          AND m.state = ?2
+        WHERE {scope_clause}
+          AND m.state = ?{}
         "#,
+        params.len() + 1
     );
-    let mut params: Vec<rusqlite::types::Value> = vec![
-        rusqlite::types::Value::from(scope_to_db(scope).to_string()),
-        rusqlite::types::Value::from(state_to_db(state).to_string()),
-    ];
+    params.push(rusqlite::types::Value::from(state_to_db(state).to_string()));
 
     if let Some(type_filter) = type_filter {
         if type_filter.is_empty() {
@@ -2041,11 +2607,12 @@ fn compute_retrieval_score(
     let recency = decay::retention(memory, now, scope_config) as f32;
     let access = ((memory.access_count as f32) + 1.0).ln();
     let priority = memory.importance_score * memory.reliability_score;
+    let similarity_gated_priority = similarity * priority;
 
     (scope_config.similarity_weight * similarity)
         + (scope_config.recency_weight * recency)
         + (scope_config.access_weight * access)
-        + (scope_config.priority_weight * priority)
+        + (scope_config.priority_weight * similarity_gated_priority)
 }
 
 fn trim_results_to_context_budget(
@@ -2224,7 +2791,7 @@ mod tests {
     use tokio;
     use uuid::Uuid;
 
-    use super::SqliteMemoryStore;
+    use super::{expand_compound_words, split_compound_word, SqliteMemoryStore};
     use crate::{
         EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
         MemoryStore, MemoryType, MetadataUpdate, OptionalFieldUpdate, ProvenanceLevel,
@@ -2294,6 +2861,31 @@ mod tests {
         fn model_id(&self) -> &str {
             "stub-embedding-provider"
         }
+    }
+
+    #[test]
+    fn split_compound_word_handles_camel_case_and_acronym_boundaries() {
+        assert_eq!(
+            split_compound_word("JavaScript").as_deref(),
+            Some("Java Script")
+        );
+        assert_eq!(
+            split_compound_word("ProtonVPN").as_deref(),
+            Some("Proton VPN")
+        );
+        assert_eq!(
+            split_compound_word("XMLParser").as_deref(),
+            Some("XML Parser")
+        );
+        assert_eq!(split_compound_word("VPN"), None);
+    }
+
+    #[test]
+    fn expand_compound_words_preserves_original_text_and_appends_split_forms() {
+        assert_eq!(
+            expand_compound_words("ProtonVPN avec WireGuard et JavaScript"),
+            "ProtonVPN avec WireGuard et JavaScript Proton VPN Wire Guard Java Script"
+        );
     }
 
     #[tokio::test]
@@ -2623,6 +3215,7 @@ mod tests {
                 type_filter: None,
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run keyword search");
@@ -2771,6 +3364,7 @@ mod tests {
                 type_filter: None,
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run hybrid search");
@@ -2780,6 +3374,84 @@ mod tests {
         assert_eq!(results[1].memory.id, keyword_only_id);
         assert!(results[0].score > results[1].score);
         assert!(results[0].similarity >= results[1].similarity);
+    }
+
+    #[tokio::test]
+    async fn search_prefers_higher_similarity_over_higher_importance() {
+        let fixture = test_fixture();
+
+        let mut higher_similarity =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        higher_similarity.content = "higher semantic match".to_string();
+        higher_similarity.importance_score = 0.5;
+        higher_similarity.reliability_score = 1.0;
+        let higher_similarity_id = higher_similarity.id;
+
+        let mut higher_importance =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        higher_importance.content = "lower semantic match".to_string();
+        higher_importance.importance_score = 0.8;
+        higher_importance.reliability_score = 1.0;
+        let higher_importance_id = higher_importance.id;
+
+        fixture
+            .store
+            .store(higher_similarity)
+            .await
+            .expect("store higher-similarity memory");
+        fixture
+            .store
+            .store(higher_importance)
+            .await
+            .expect("store higher-importance memory");
+
+        fixture
+            .store
+            .store_embedding(&higher_similarity_id, &embedding_with_similarity(0.9))
+            .await
+            .expect("store higher-similarity embedding");
+        fixture
+            .store
+            .store_embedding(&higher_importance_id, &embedding_with_similarity(0.5))
+            .await
+            .expect("store higher-importance embedding");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.0' WHERE key IN ('recency_weight', 'access_weight')",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET access_count = 0, last_accessed_at = NULL WHERE id IN (?1, ?2)",
+                    [higher_similarity_id.to_string(), higher_importance_id.to_string()],
+                )?;
+                Ok(())
+            })
+            .expect("isolate similarity-vs-priority scoring");
+
+        let results = fixture
+            .store
+            .search(SearchQuery {
+                text: String::new(),
+                embedding: Some(query_embedding()),
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("run similarity-priority ordering search");
+
+        assert_eq!(results.len(), 2);
+        assert_eq!(results[0].memory.id, higher_similarity_id);
+        assert_eq!(results[1].memory.id, higher_importance_id);
+        assert!((results[0].similarity - 0.9).abs() < 1e-5);
+        assert!((results[1].similarity - 0.5).abs() < 1e-5);
+        assert!(results[0].score > results[1].score);
     }
 
     #[tokio::test]
@@ -2845,6 +3517,7 @@ mod tests {
                 type_filter: None,
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run recency-focused search");
@@ -2902,6 +3575,7 @@ mod tests {
                 type_filter: Some(vec![MemoryType::Decision]),
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run active decision search");
@@ -2918,6 +3592,7 @@ mod tests {
                 type_filter: Some(vec![MemoryType::Decision]),
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run dormant decision search");
@@ -3140,6 +3815,7 @@ mod tests {
                 type_filter: None,
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run provider-backed semantic search");
@@ -3215,6 +3891,7 @@ mod tests {
                 type_filter: None,
                 max_results: 5,
                 context_config: None,
+                session_id: None,
             })
             .await
             .expect("run keyword fallback search");
@@ -3245,6 +3922,277 @@ mod tests {
             "ollama embeddings request returned 500 Internal Server Error: boom".to_string(),
         ));
         assert!(non_offline_warning.is_none());
+    }
+
+    #[test]
+    fn openai_offline_errors_map_to_user_facing_degradation_warning() {
+        let warning = super::embedding_degradation_warning(&EmbeddingError::Provider(
+            "openai not reachable at https://api.openai.com: request timed out after 30s"
+                .to_string(),
+        ))
+        .expect("offline openai errors should produce a degradation warning");
+
+        assert_eq!(
+            warning,
+            "OpenAI not reachable at https://api.openai.com, storing without embeddings. Run reembed later."
+        );
+
+        let invalid_api_key_warning =
+            super::embedding_degradation_warning(&EmbeddingError::Provider(
+                "openai returned 401 Unauthorized: invalid API key (...)".to_string(),
+            ))
+            .expect("openai auth errors should produce a degradation warning");
+
+        assert_eq!(
+            invalid_api_key_warning,
+            "OpenAI embeddings unavailable (401 Unauthorized: invalid API key), storing without embeddings. Run reembed later."
+        );
+    }
+
+    #[test]
+    fn openai_http_errors_map_to_user_facing_degradation_warning() {
+        let rate_limit_warning = super::embedding_degradation_warning(&EmbeddingError::Provider(
+            "openai returned 429 Too Many Requests: rate limited, try again later (...)"
+                .to_string(),
+        ))
+        .expect("rate limit errors should produce a degradation warning");
+
+        assert_eq!(
+            rate_limit_warning,
+            "OpenAI embeddings unavailable (429 Too Many Requests: rate limited, try again later), storing without embeddings. Run reembed later."
+        );
+
+        let server_error_warning = super::embedding_degradation_warning(&EmbeddingError::Provider(
+            "openai embeddings request returned 500 Internal Server Error: boom".to_string(),
+        ))
+        .expect("openai http status errors should produce a degradation warning");
+
+        assert_eq!(
+            server_error_warning,
+            "OpenAI embeddings unavailable (500 Internal Server Error), storing without embeddings. Run reembed later."
+        );
+    }
+
+    #[tokio::test]
+    async fn search_cascades_upward_while_list_stays_exact_scope() {
+        let fixture = test_fixture();
+        let session_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Session).expect("session store");
+        let workspace_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Workspace).expect("workspace store");
+        let user_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::User).expect("user store");
+        let agent_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Agent).expect("agent store");
+
+        let mut session = sample_memory(MemoryScope::Session, ProvenanceLevel::UserStated);
+        session.content = "shared scope note session".to_string();
+        let session_id = session.id;
+        let mut workspace = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        workspace.content = "shared scope note workspace".to_string();
+        let workspace_id = workspace.id;
+        let mut user = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        user.content = "shared scope note user".to_string();
+        let user_id = user.id;
+        let mut agent = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        agent.content = "shared scope note agent".to_string();
+        let agent_id = agent.id;
+
+        session_store
+            .store(session)
+            .await
+            .expect("store session memory");
+        workspace_store
+            .store(workspace)
+            .await
+            .expect("store workspace memory");
+        user_store.store(user).await.expect("store user memory");
+        agent_store.store(agent).await.expect("store agent memory");
+
+        let search_results = session_store
+            .search(SearchQuery {
+                text: "shared scope note".to_string(),
+                embedding: None,
+                scope: MemoryScope::Session,
+                state_filter: None,
+                type_filter: None,
+                max_results: 10,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("search visible scopes");
+        let ids = search_results
+            .iter()
+            .map(|result| result.memory.id)
+            .collect::<Vec<_>>();
+        assert!(ids.contains(&session_id));
+        assert!(ids.contains(&workspace_id));
+        assert!(ids.contains(&user_id));
+        assert!(ids.contains(&agent_id));
+
+        let listed = session_store
+            .list(MemoryFilter {
+                scope: Some(MemoryScope::Session),
+                ..MemoryFilter::default()
+            })
+            .await
+            .expect("list exact session scope");
+        assert_eq!(listed.len(), 1);
+        assert_eq!(listed[0].id, session_id);
+    }
+
+    #[tokio::test]
+    async fn find_similar_cascades_to_higher_visible_scopes() {
+        let fixture = test_fixture();
+        let session_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Session).expect("session store");
+        let workspace_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Workspace).expect("workspace store");
+
+        let workspace = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let workspace_id = workspace.id;
+        workspace_store
+            .store(workspace)
+            .await
+            .expect("store workspace memory");
+        workspace_store
+            .store_embedding(&workspace_id, &[1.0; 768])
+            .await
+            .expect("store workspace embedding");
+
+        let matches = session_store
+            .find_similar(&[1.0; 768], 0.95, 5)
+            .await
+            .expect("find visible similar memories");
+        assert_eq!(matches.len(), 1);
+        assert_eq!(matches[0].memory.id, workspace_id);
+        assert_eq!(matches[0].memory.scope, MemoryScope::Workspace);
+    }
+
+    #[tokio::test]
+    async fn search_promotes_session_memory_after_three_distinct_sessions_and_records_provenance() {
+        let fixture = test_fixture();
+        let session_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Session).expect("session store");
+        let workspace_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Workspace).expect("workspace store");
+
+        let mut memory = sample_memory(MemoryScope::Session, ProvenanceLevel::UserStated);
+        memory.content = "promotion candidate memory".to_string();
+        let id = memory.id;
+        session_store
+            .store(memory)
+            .await
+            .expect("store session memory");
+
+        for session_id in [
+            "00000000-0000-0000-0000-000000000001",
+            "00000000-0000-0000-0000-000000000002",
+            "00000000-0000-0000-0000-000000000003",
+        ] {
+            let _ = session_store
+                .search(SearchQuery {
+                    text: "promotion candidate".to_string(),
+                    embedding: None,
+                    scope: MemoryScope::Session,
+                    state_filter: None,
+                    type_filter: None,
+                    max_results: 5,
+                    context_config: None,
+                    session_id: Some(session_id.to_string()),
+                })
+                .await
+                .expect("search session memory");
+        }
+
+        let promoted = workspace_store
+            .get_raw(&id)
+            .await
+            .expect("reload promoted memory")
+            .expect("promoted memory exists");
+        assert_eq!(promoted.scope, MemoryScope::Workspace);
+
+        let (promotion_rows, version_rows) = workspace_store
+            .with_connection(|connection| {
+                let promotion_rows = connection.query_row(
+                    "SELECT COUNT(*) FROM memory_promotions WHERE memory_id = ?1",
+                    [id.to_string()],
+                    |row| row.get::<_, i64>(0),
+                )?;
+                let version_rows = connection.query_row(
+                    "SELECT COUNT(*) FROM memory_versions WHERE memory_id = ?1",
+                    [id.to_string()],
+                    |row| row.get::<_, i64>(0),
+                )?;
+                Ok((promotion_rows, version_rows))
+            })
+            .expect("load promotion provenance rows");
+        assert_eq!(promotion_rows, 1);
+        assert_eq!(version_rows, 1);
+    }
+
+    #[tokio::test]
+    async fn promotion_pass_advances_corroborated_and_durable_memories_one_scope_only() {
+        let fixture = test_fixture();
+        let workspace_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Workspace).expect("workspace store");
+        let user_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::User).expect("user store");
+        let agent_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Agent).expect("agent store");
+
+        let mut corroborated = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        corroborated.content = "corroborated promotion candidate".to_string();
+        corroborated.corroboration_count = 2;
+        let corroborated_id = corroborated.id;
+
+        let mut durable = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        durable.content = "durable promotion candidate".to_string();
+        durable.importance_score = 0.9;
+        durable.updated_at = Utc::now() - chrono::Duration::days(8);
+        durable.last_accessed_at = Some(Utc::now() - chrono::Duration::days(8));
+        let durable_id = durable.id;
+
+        let mut top_scope = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        top_scope.content = "top scope remains agent".to_string();
+        top_scope.corroboration_count = 5;
+        let top_scope_id = top_scope.id;
+
+        workspace_store
+            .store(corroborated)
+            .await
+            .expect("store corroborated memory");
+        user_store
+            .store(durable)
+            .await
+            .expect("store durable memory");
+        agent_store
+            .store(top_scope)
+            .await
+            .expect("store top-scope memory");
+
+        let promoted = workspace_store
+            .run_promotion_pass(None, None)
+            .expect("run promotion pass");
+        let promoted_ids = promoted.iter().map(|memory| memory.id).collect::<Vec<_>>();
+        assert!(promoted_ids.contains(&corroborated_id));
+        assert!(promoted_ids.contains(&durable_id));
+        assert!(!promoted_ids.contains(&top_scope_id));
+
+        let corroborated_promoted = user_store
+            .get_raw(&corroborated_id)
+            .await
+            .expect("load corroborated promoted memory")
+            .expect("corroborated memory exists");
+        assert_eq!(corroborated_promoted.scope, MemoryScope::User);
+
+        let durable_promoted = agent_store
+            .get_raw(&durable_id)
+            .await
+            .expect("load durable promoted memory")
+            .expect("durable memory exists");
+        assert_eq!(durable_promoted.scope, MemoryScope::Agent);
     }
 
     struct TestFixture {
@@ -3299,5 +4247,18 @@ mod tests {
             user_id: Some("user-1".to_string()),
             agent_id: Some("agent-1".to_string()),
         }
+    }
+
+    fn query_embedding() -> Vec<f32> {
+        embedding_with_similarity(1.0)
+    }
+
+    fn embedding_with_similarity(similarity: f32) -> Vec<f32> {
+        let clamped_similarity = similarity.clamp(0.0, 1.0);
+        let orthogonal_component = (1.0 - (clamped_similarity * clamped_similarity)).sqrt();
+        let mut embedding = vec![0.0; 768];
+        embedding[0] = clamped_similarity;
+        embedding[1] = orthogonal_component;
+        embedding
     }
 }

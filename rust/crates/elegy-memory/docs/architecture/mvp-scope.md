@@ -1,12 +1,12 @@
 # MVP Scope
 
-> **This document is the source of truth for what to implement.** If it's not marked MVP, don't implement it. Create the type/trait skeleton with `todo!()` instead.
+> Milestone labels describe target product maturity, not just whether code exists. Session 4 landed several first-pass v1 features in the codebase; those rows now call out current implementation status explicitly.
 
 ## Milestone Definitions
 
-- **MVP** — Implement fully. Working code with tests. Used by the two co-founders daily.
-- **v1** — Trait/struct/table skeleton exists. Implementation is `todo!()` or no-op. Implement when MVP is stable and in daily use.
-- **v2** — Documented in architecture docs. No code at all. Implement when v1 features are validated.
+- **MVP** — required baseline behavior; implemented and expected to work in the current codebase.
+- **v1** — beyond the original MVP bar. A feature may already have a first implementation, but it is still treated as v1-grade behavior rather than finished platform baseline.
+- **v2** — documented future direction; not part of the current implementation baseline.
 
 ## Feature Matrix
 
@@ -14,79 +14,83 @@
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| SQLite + rusqlite (bundled) | **MVP** | Single backend, all tables created |
-| sqlite-vec virtual table | **MVP** | KNN search working |
+| SQLite + rusqlite (bundled) | **MVP** | Single backend, all core tables created |
+| sqlite-vec virtual table | **MVP** | Vector storage/search path working |
 | FTS5 virtual table | **MVP** | Keyword search working |
-| Hybrid search (vector + FTS5) | **MVP** | Weighted combination |
-| `MemoryStore` trait definition | **MVP** | Full trait with all methods |
-| `SqliteMemoryStore` implementation | **MVP** | All CRUD + search + purge |
-| `PgMemoryStore` trait skeleton | **v1** | Trait exists, impl = `todo!()` |
-| Schema migrations | **MVP** | Version-based, idempotent |
-| Multi-tenant schema (tenant_id) | **v1** | Column exists in MVP, unused |
+| Hybrid search (vector + FTS5) | **MVP** | Vector similarity is blended ahead of final scoring |
+| `MemoryStore` trait definition | **MVP** | Full async CRUD/search/health contract |
+| `SqliteMemoryStore` implementation | **MVP** | CRUD, search, embeddings, contradictions, export support, purge_all |
+| `PgMemoryStore` trait skeleton | **v1** | Still absent |
+| Schema migrations | **MVP** | Version-based initialization |
+| Multi-tenant schema (tenant_id) | **v1** | Fields exist, not enforced end-to-end |
 
 ### Scopes
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Single global scope | **MVP** | One .db file, scope column = 'global' |
-| Session scope (JSON) | **v1** | In-memory JSON, purgeable |
-| Workspace scope (per-workspace .db) | **v1** | Separate files per workspace |
-| User scope | **v1** | Separate user.db |
-| Agent scope | **v1** | Separate agent.db |
-| Scope Promotion | **v2** | Auto-promote recurring memories cross-scope |
+| Selected scope per store instance | **MVP** | Store and CLI operate against one explicit `MemoryScope` at a time |
+| Upward visibility search model | **v1** | Search / duplicate checks cascade to broader visible scopes |
+| Session scope backend | **v1** | Session rows persist in the shared SQLite backend today, not a dedicated JSON backend |
+| Workspace scope | **v1** | Implemented as a scope value and visible from `session` |
+| User scope | **v1** | Implemented as a scope value and visible from `session` / `workspace` |
+| Agent scope | **v1** | Implemented as a scope value and visible from all lower scopes |
+| Scope Promotion | **v1** | Automatic and manual upward promotion are now implemented |
 
 ### Memory Model
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `Memory` struct with all fields | **MVP** | All fields present, even if some unused |
+| `Memory` struct with full persisted fields | **MVP** | Includes tags/status/custom metadata, counters, embedding freshness, ids |
 | `MemoryType` enum | **MVP** | All variants defined |
-| `ProvenanceLevel` enum + base_reliability() | **MVP** | All variants and scoring |
-| `SensitivityLevel` enum | **MVP** | Field exists, always Low in MVP |
-| `MemoryState` enum (Active/Dormant/Deleted) | **MVP** | States exist, Dormant transition manual only |
-| `MemoryMetadata` (tags, status, custom) | **MVP** | Stored as JSON in SQLite |
+| `ProvenanceLevel` enum + base reliability | **MVP** | `base_reliability()` is implemented |
+| `SensitivityLevel` enum | **MVP** | Fully modeled |
+| `MemoryState` enum | **MVP** | `Dormant` is now used by archive flows and contradiction keep-one resolution |
 
 ### Scoring & Retrieval
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Cosine similarity via sqlite-vec | **MVP** | Core retrieval mechanism |
-| BM25 via FTS5 | **MVP** | Keyword fallback |
-| Combined scoring formula | **MVP** | α × similarity + β × recency + γ × log(access + 1) + δ × priority |
-| Configurable weights (α, β, γ, δ) | **MVP** | In `scope_config` table |
-| Recency decay (Ebbinghaus) | **MVP** | Fixed λ, not adaptive |
-| Adaptive Decay Rate | **v1** | λ adjusts to user frequency |
-| Memory Type-Modulated Decay | **v1** | Different λ_base per type |
-| Context window budget (ratio) | **MVP** | `memory_context_ratio` config |
+| Cosine similarity via stored embeddings | **MVP** | Core retrieval mechanism |
+| BM25 via FTS5 | **MVP** | Keyword fallback / blend |
+| Combined scoring formula | **MVP** | `α × similarity + β × recency + γ × ln(access + 1) + δ × (similarity × priority)` |
+| Configurable weights (α, β, γ, δ) | **MVP** | Loaded from `scope_config` |
+| Recency decay (fixed λ) | **MVP** | Fixed base lambda, not adaptive |
+| Adaptive Decay Rate | **v1** | Still future |
+| Memory Type-Modulated Decay | **v1** | Still future |
+| Context window budget (ratio) | **MVP** | Implemented via `MemoryContextConfig` |
 
 ### Confidence Score
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Importance score (stored) | **MVP** | LLM provides at extraction |
-| Reliability score (computed from provenance) | **MVP** | Base = provenance level |
-| Corroboration bonus | **v1** | +0.1 per corroboration |
-| Contradiction penalty | **v1** | -0.3 on contradiction |
+| Importance score (stored) | **MVP** | Provided at extraction/import time |
+| Reliability score (seeded from provenance) | **MVP** | Stored on write from `base_reliability()` |
+| Corroboration bonus | **v1** | Counter exists, bonus logic still future |
+| Contradiction penalty | **v1** | Implemented now when contradiction records are created |
 | Priority = importance × reliability | **MVP** | Used in retrieval scoring |
 
 ### Write-Time Gate
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `SalienceGate` trait | **MVP** | Full trait defined |
-| Novelty check (semantic dedup, cosine > 0.92) | **MVP** | Critical for anti-bloat |
-| Salience check (importance > 0.2 → active) | **MVP** | Low-importance → dormant |
-| Provenance check (agent-inferred + low importance → dormant) | **MVP** | Prevents inference pollution |
-| Configurable thresholds | **MVP** | In `scope_config` |
+| `SalienceGate` trait | **MVP** | Async contract |
+| Novelty check with conservative warning band | **MVP** | Accepts as new below `0.85`; `0.80–0.85` returns a `similar_to` warning |
+| Merge threshold | **MVP** | Current default is `0.85` |
+| Exact-duplicate threshold constant | **MVP** | Config default is `0.99`; current gate still prefers conservative merge handling over aggressive reject |
+| Salience check | **MVP** | `importance < 0.20` archives |
+| Provenance check | **MVP** | `AgentInferred` with `importance < 0.50` archives |
+| Configurable thresholds | **MVP** | Loaded from `scope_config` |
+| LLM-assisted contradiction classification | **v1** | Implemented now as an optional pre-heuristic check with graceful fallback to the heuristic gate |
 
 ### Contradiction Journal
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `contradictions` table | **MVP** | Table created |
-| Manual contradiction recording | **MVP** | API to record a contradiction |
-| Automatic contradiction detection at write time | **v1** | LLM-based or heuristic |
-| Contradiction resolution workflow | **v1** | User-facing resolution |
+| `contradictions` table | **MVP** | Active and queried |
+| Manual contradiction recording | **MVP** | Store API implemented |
+| Automatic contradiction detection at write time | **v1** | Implemented now with conservative heuristics in the high-similarity merge branch |
+| LLM contradiction classification at write time | **v1** | Implemented now as an optional enhancement before the heuristic branch |
+| Contradiction resolution workflow | **v1** | Implemented now in CLI: list unresolved, resolve with keep-one or keep-both |
 
 ### Memory Versioning
 
@@ -94,104 +98,126 @@
 |---------|-----------|-------|
 | `memory_versions` table | **MVP** | Table created |
 | Auto-versioning on content update | **MVP** | Every `update_content()` creates a version |
-| Version history query | **MVP** | List versions by memory_id |
-| Rollback to previous version | **v1** | Restore old content |
+| Version history query | **MVP** | Exposed by `SqliteMemoryStore::list_versions()` |
+| Rollback to previous version | **v1** | Still future |
 
 ### Embedding
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `EmbeddingProvider` trait | **MVP** | Full trait |
-| Single provider implementation | **MVP** | OpenAI OR Ollama, whichever you use |
-| `embedding_stale` flag | **MVP** | Set on content update |
-| Batch re-embedding of stale memories | **MVP** | CLI command or function |
-| Multiple provider implementations | **v1** | OpenAI + Ollama + Voyage |
+| `EmbeddingProvider` trait | **MVP** | Full async trait |
+| Provider-backed embeddings | **MVP** | Working search/reembed flows |
+| `LlmProvider` trait | **v1** | Implemented now for Ollama and OpenAI text-generation calls |
+| `embedding_stale` flag | **MVP** | Set on content update and used by re-embed flows |
+| Batch re-embedding of stale memories | **MVP** | CLI command implemented |
+| Multiple provider implementations | **v1** | Implemented now with both Ollama and OpenAI; more providers remain future |
 
 ### Consolidation
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | `MemoryConsolidator` trait | **MVP** | Trait defined |
-| Simple dedup consolidator | **MVP** | Merge memories with cosine > 0.92 |
-| LLM-based consolidation (sleep-time) | **v1** | LLM reviews and summarizes |
+| Simple dedup consolidator | **MVP** | Uses the configured merge threshold (default `0.85`) |
+| LLM-based consolidation | **v1** | Implemented now as an optional CLI/runtime path with graceful fallback to the simple consolidator |
 
 ### Observability
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `MemoryHealthReport` struct | **MVP** | All fields |
-| `health_report()` implementation | **MVP** | Counts, sizes, stale count |
-| Contradiction listing | **MVP** | `list_contradictions()` |
-| Export (JSON) | **MVP** | Full export of scope |
-| Export (SQLite) | **v1** | `.elegy` portable format |
-| Import | **v1** | Import from `.elegy` file |
-| Selective scope export | **v1** | Choose which scopes to include |
+| `MemoryHealthReport` struct | **MVP** | Base store health snapshot |
+| `health_report()` implementation | **MVP** | Core counts/sizes plus richer CLI-derived health output |
+| Contradiction listing | **MVP** | `list_contradictions()` implemented |
+| Export (JSON) | **MVP** | Full scope export |
+| Export (SQLite / `.elegy`) | **v1** | Still future |
+| Import | **v1** | Implemented now for JSON export-shape and simplified JSON inputs |
+| Selective scope export | **v1** | Implemented now as exact-scope export by default plus `export --all-scopes` for aggregate export |
 
 ### Purge & Privacy
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `purge_all()` | **MVP** | Delete everything |
-| `purge_user(user_id)` | **v1** | GDPR-compliant per-user purge |
+| `purge_all()` | **MVP** | Implemented |
+| `purge_user(user_id)` | **v1** | Still an explicit stub |
 
 ### CLI
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| `add` — add a memory | **MVP** | With all required fields |
-| `search` — hybrid search | **MVP** | Query string, returns scored results |
-| `list` — list with filters | **MVP** | By state, type, provenance |
-| `inspect` — show a memory + versions | **MVP** | Full detail view |
-| `purge` — purge all or by filter | **MVP** | With confirmation prompt |
-| `health` — show health report | **MVP** | Stats output |
-| `export` — export to JSON | **MVP** | Stdout or file |
-| `import` — import from file | **v1** | From JSON or .elegy |
-| `consolidate` — run consolidation | **v1** | Trigger manual consolidation |
-| `reembed` — re-embed stale memories | **MVP** | Batch re-embedding |
-| `contradictions` — list contradictions | **MVP** | Show unresolved |
+| `add` | **MVP** | Gate-aware memory creation |
+| `search` | **MVP** | Hybrid search |
+| `list` | **MVP** | Filtered listing |
+| `inspect` | **MVP** | Memory + version history |
+| `purge` | **MVP** | Confirmation flow |
+| `health` | **MVP** | Base report plus average importance, stale previews, contradiction previews, oldest age, most-accessed memory, human-readable DB size |
+| `export` | **MVP** | JSON to stdout or file |
+| `import` | **v1** | Implemented now for JSON file/stdin inputs; full export-shape imports preserve exported state and `--force` still bypasses the gate |
+| `reembed` | **MVP** | Batch re-embedding |
+| `contradictions` list | **MVP** | Shows unresolved contradictions |
+| `contradictions resolve` | **v1** | Implemented now; keep-one makes the losing memory dormant, keep-both leaves both active |
+| `consolidate` | **v1** | Implemented now with simple dedup; optional `--cross-scope` lifts results to the highest scope in the pair |
+| `promote` | **v1** | Implemented now for automatic and manual scope promotion |
 
 ### Memory Links
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | `memory_links` table | **MVP** | Table created |
-| `supersedes` links on update | **MVP** | Created automatically by versioning |
-| Manual link creation | **v1** | API to link memories |
-| Graph traversal queries | **v2** | Multi-hop reasoning |
+| `supersedes` links on update | **MVP** | Still the intended versioning relation |
+| Manual link creation | **v1** | Still future |
+| Graph traversal queries | **v2** | Still future |
 
 ### Forgetting Budget
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Budget config per scope | **MVP** | In `scope_config`, unused in MVP |
-| Automatic dormant transition at budget | **v1** | Lowest retention → dormant |
-| Hard delete at storage cap | **v1** | Oldest dormant → deleted |
+| Budget config per scope | **MVP** | Present in configuration / health usage ratio |
+| Automatic dormant transition at budget | **v1** | Still future |
+| Hard delete at storage cap | **v1** | Still future |
 
 ### Security
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Input validation on all writes | **MVP** | Content length, field bounds |
-| Row-level security (multi-tenant) | **v1** | PostgreSQL only |
-| Memory poisoning detection | **v2** | Anomaly detection on writes |
+| Input validation on writes | **MVP** | Implemented on candidates, store writes, import, and CLI args |
+| Row-level security (multi-tenant) | **v1** | Still future / PostgreSQL-oriented |
+| Memory poisoning detection | **v2** | Still future |
 
 ### Advanced (v2)
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Memory Portability Format (.elegy) | **v2** | Standardized export/import |
-| Cross-Agent Memory Sharing Protocol | **v2** | Read-shared, write-isolated |
-| User Correction Feedback Loop | **v2** | Auto-learn from corrections |
-| Parameter Learning (regression on usage logs) | **v2** | Use access_count + retrieval-but-not-used signals to auto-tune α β γ δ and gate thresholds |
-| Knowledge Graph migration (Neo4j/FalkorDB) | **v2** | If memory_links aren't enough |
+| Memory Portability Format (.elegy) | **v2** | Still future |
+| Cross-Agent Memory Sharing Protocol | **v2** | Still future |
+| User Correction Feedback Loop | **v2** | Still future |
+| Parameter Learning | **v2** | Still future |
+| Knowledge Graph migration | **v2** | Still future |
 
-## MVP Summary
+## Current Baseline Summary
 
-The MVP is a **single SQLite file with all tables**, a **single embedding provider**, a **working write-time gate**, **hybrid search**, **basic scoring**, **versioning on update**, and a **CLI**. Two people use it daily. It's simple, it works, and it doesn't bloat.
+The codebase still has an MVP core: SQLite storage, hybrid search, working gate, versioning, export, re-embedding, and CLI flows. It now also includes several v1-tier features that were not present in the original MVP baseline:
 
-Everything else is a skeleton that compiles but doesn't run.
+- OpenAI and Ollama embedding providers
+- OpenAI and Ollama LLM providers
+- JSON import
+- heuristic contradiction detection
+- optional LLM contradiction classification
+- manual contradiction resolution
+- richer health reporting
+- optional LLM-backed consolidation
+- automatic and manual scope promotion
+- exact-scope export plus `--all-scopes`
+
+These are implemented now, but they should still be read as first-pass v1 behavior rather than fully expanded end-state platform features.
 
 ### Note on Thresholds
 
-All thresholds in this architecture (cosine similarity 0.92, salience minimum 0.2, scoring weights α=0.4 β=0.25 γ=0.15 δ=0.2, decay λ values, forgetting budget sizes) are conservative initial values stored in the `scope_config` table. They are NOT hardcoded constants. A calibration cycle based on real usage data is planned for v1 — specifically, logged retrieval data (which memories are actually used by the agent after retrieval vs ignored) will be used to adjust scoring weights via regression analysis. This is documented as a v2 feature: "Parameter Learning".
+Current default gate thresholds are stored in `scope_config` and default to:
+
+- likely-duplicate warning floor: `0.80`
+- merge threshold: `0.85`
+- duplicate threshold constant: `0.99`
+- salience threshold: `0.20`
+- agent-inferred archive threshold: `0.50`
+
+Retrieval scoring weights remain configurable (`0.40 / 0.25 / 0.15 / 0.20` by default). Thresholds are architecture defaults, not a claim that all higher-order tuning work is finished.
 

@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 
-use crate::error::{ConsolidationError, EmbeddingError, GateError, ObservabilityError, StoreError};
+use crate::error::{
+    ConsolidationError, EmbeddingError, GateError, LlmError, ObservabilityError, StoreError,
+};
 use crate::types::{
     ConsolidationCandidate, ContradictionEntry, ExportFormat, Memory, MemoryCandidate,
     MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryType, ProvenanceLevel,
@@ -85,7 +87,14 @@ pub struct MemoryFilter {
 #[serde(rename_all = "camelCase")]
 pub enum GateDecision {
     /// Store the candidate as an active memory.
-    Accept,
+    Accept {
+        /// Similar existing memory surfaced as a likely duplicate, when applicable.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        similar_to: Option<MemoryId>,
+        /// Similarity score associated with `similar_to`, when applicable.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        similarity: Option<f32>,
+    },
     /// Store the candidate directly as a dormant memory.
     Archive,
     /// Merge the candidate into an existing memory instead of creating a new one.
@@ -94,6 +103,16 @@ pub enum GateDecision {
         target_id: MemoryId,
         /// The merged content that should replace the target's current content.
         enriched_content: String,
+        /// Optional broader scope to promote the merged result into.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        promote_to: Option<MemoryScope>,
+    },
+    /// Store the candidate independently and record a contradiction with an existing memory.
+    Contradiction {
+        /// The existing memory that conflicts with the candidate.
+        conflicting_id: MemoryId,
+        /// Human-readable explanation for the contradiction record.
+        description: String,
     },
     /// Discard the candidate instead of storing it.
     Reject {
@@ -137,11 +156,23 @@ pub enum ConsolidationAction {
         /// The relation label recorded between the memories.
         relation: String,
     },
+    /// A candidate pair was classified as contradictory and should be journaled instead of merged.
+    Contradiction {
+        /// The first conflicting memory.
+        memory_a_id: MemoryId,
+        /// The second conflicting memory.
+        memory_b_id: MemoryId,
+        /// Human-readable explanation of the conflict.
+        description: String,
+    },
 }
 
 /// Primary storage contract for memory CRUD, search, lifecycle, and health flows.
 #[async_trait]
 pub trait MemoryStore: Send + Sync {
+    /// Return the explicit write scope bound to this store instance.
+    fn scope(&self) -> MemoryScope;
+
     /// Store a new memory that has already passed through the salience gate.
     async fn store(&self, memory: Memory) -> Result<MemoryId, StoreError>;
 
@@ -218,6 +249,14 @@ pub trait MemoryStore: Send + Sync {
         b_id: &MemoryId,
         description: &str,
     ) -> Result<(), StoreError>;
+
+    /// Update the resolution status for an existing contradiction.
+    async fn update_contradiction_status(
+        &self,
+        contradiction_id: &str,
+        status: ResolutionStatus,
+        note: Option<&str>,
+    ) -> Result<(), StoreError>;
 }
 
 /// Provider contract for embedding models used by search and novelty checks.
@@ -240,6 +279,19 @@ pub trait EmbeddingProvider: Send + Sync {
 
     /// Return the provider model identifier.
     fn model_id(&self) -> &str;
+}
+
+/// Provider contract for text-generation models used during consolidation and contradiction checks.
+#[async_trait]
+pub trait LlmProvider: Send + Sync {
+    /// Generate a completion for the supplied prompt.
+    async fn complete(&self, prompt: &str) -> Result<String, LlmError>;
+
+    /// Return the provider name used for logging and display.
+    fn name(&self) -> &str;
+
+    /// Return the active model identifier used for logging and display.
+    fn model(&self) -> &str;
 }
 
 /// Write-time decision gate that protects the store from low-value or duplicate memories.

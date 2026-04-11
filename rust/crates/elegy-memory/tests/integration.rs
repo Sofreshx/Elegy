@@ -67,6 +67,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             type_filter: None,
             max_results: 10,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("search active memories");
@@ -84,6 +85,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             type_filter: None,
             max_results: 10,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("search active memories after archival");
@@ -98,6 +100,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             type_filter: None,
             max_results: 10,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("search dormant memories");
@@ -139,6 +142,7 @@ async fn gate_integration_merges_near_duplicates_and_preserves_version_history()
     let GateDecision::Merge {
         target_id,
         enriched_content,
+        ..
     } = decision
     else {
         panic!("expected merge decision");
@@ -181,7 +185,114 @@ async fn gate_integration_merges_near_duplicates_and_preserves_version_history()
 }
 
 #[tokio::test]
-async fn gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone() {
+async fn gate_integration_avoids_concatenation_for_moderate_similarity_merges() {
+    let (_temp_dir, store) = test_store("gate-moderate-merge");
+    let gate = DefaultSalienceGate::new(store.scope_config().expect("load scope config"));
+    let original = sample_memory(
+        "Remember the Apollo launch checklist with rollback owners",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.6,
+        Utc::now(),
+    );
+
+    let original_id = store.store(original.clone()).await.expect("store original");
+    store
+        .store_embedding(&original_id, &axis_embedding())
+        .await
+        .expect("store original embedding");
+
+    let candidate = sample_candidate(
+        "Remember the Apollo launch checklist with fallback owners",
+        0.9,
+        ProvenanceLevel::UserStated,
+        Some(cosine_embedding(0.94)),
+    );
+
+    let decision = gate
+        .evaluate(&candidate, &store)
+        .await
+        .expect("evaluate merge candidate");
+
+    let GateDecision::Merge {
+        target_id,
+        enriched_content,
+        ..
+    } = decision
+    else {
+        panic!("expected merge decision");
+    };
+    assert_eq!(target_id, original_id);
+    assert_eq!(enriched_content, original.content);
+    assert!(!enriched_content.contains("\n\n"));
+
+    store
+        .update_content(
+            &target_id,
+            &enriched_content,
+            "integration:test",
+            "gate merge without concatenation",
+        )
+        .await
+        .expect("apply merge result");
+
+    let merged = store
+        .get_raw(&target_id)
+        .await
+        .expect("load merged memory")
+        .expect("merged memory should exist");
+    assert_eq!(merged.content, original.content);
+
+    let versions = store
+        .list_versions(&target_id)
+        .expect("load merge version history");
+    assert!(versions.is_empty());
+}
+
+#[tokio::test]
+async fn gate_integration_merges_rust_and_tauri_near_duplicates_at_lowered_threshold() {
+    let (_temp_dir, store) = test_store("gate-rust-tauri-merge");
+    let gate = DefaultSalienceGate::new(store.scope_config().expect("load scope config"));
+    let original = sample_memory(
+        "Project uses Rust",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+
+    let original_id = store.store(original.clone()).await.expect("store original");
+    store
+        .store_embedding(&original_id, &axis_embedding())
+        .await
+        .expect("store original embedding");
+
+    let candidate = sample_candidate(
+        "Project uses Rust and Tauri",
+        0.9,
+        ProvenanceLevel::UserStated,
+        Some(cosine_embedding(0.86)),
+    );
+
+    let decision = gate
+        .evaluate(&candidate, &store)
+        .await
+        .expect("evaluate near-duplicate candidate");
+
+    let GateDecision::Merge {
+        target_id,
+        enriched_content,
+        ..
+    } = decision
+    else {
+        panic!("expected merge decision");
+    };
+    assert_eq!(target_id, original_id);
+    assert_eq!(enriched_content, candidate.content);
+}
+
+#[tokio::test]
+async fn gate_safety_yields_only_accept_merge_or_archive_and_warns_in_likely_duplicate_band() {
     let (_temp_dir, store) = test_store("gate-safety");
     let gate = DefaultSalienceGate::new(ScopeConfig::default());
     let existing = sample_memory(
@@ -242,26 +353,32 @@ async fn gate_safety_yields_only_accept_merge_or_archive_and_accepts_doubt_zone(
     assert!(decisions.iter().all(|decision| {
         matches!(
             decision,
-            GateDecision::Accept | GateDecision::Archive | GateDecision::Merge { .. }
+            GateDecision::Accept { .. } | GateDecision::Archive | GateDecision::Merge { .. }
         )
     }));
     assert!(decisions
         .iter()
         .all(|decision| !matches!(decision, GateDecision::Reject { .. })));
 
-    let doubt_zone = gate
+    let likely_duplicate = gate
         .evaluate(
             &sample_candidate(
                 "Known launch preference but with a distinct rider",
                 0.8,
                 ProvenanceLevel::UserStated,
-                Some(cosine_embedding(0.90)),
+                Some(cosine_embedding(0.82)),
             ),
             &store,
         )
         .await
-        .expect("evaluate doubt-zone candidate");
-    assert_eq!(doubt_zone, GateDecision::Accept);
+        .expect("evaluate likely-duplicate candidate");
+    assert_eq!(
+        likely_duplicate,
+        GateDecision::Accept {
+            similar_to: Some(existing_id),
+            similarity: Some(0.82),
+        }
+    );
 }
 
 #[tokio::test]
@@ -292,7 +409,10 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
         Utc::now(),
     );
 
-    store.store(semantic_match).await.expect("store semantic match");
+    store
+        .store(semantic_match)
+        .await
+        .expect("store semantic match");
     store.store(non_match).await.expect("store non-match");
 
     let results = store
@@ -304,6 +424,7 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
             type_filter: None,
             max_results: 5,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("run provider-backed semantic search");
@@ -344,6 +465,7 @@ async fn text_only_search_without_provider_remains_keyword_driven() {
             type_filter: None,
             max_results: 5,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("search without provider");
@@ -351,6 +473,180 @@ async fn text_only_search_without_provider_remains_keyword_driven() {
     assert_eq!(results.len(), 1);
     assert_eq!(results[0].memory.id, id);
     assert!(results[0].similarity > 0.0);
+}
+
+#[tokio::test]
+async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
+    let (_temp_dir, store) = test_store("compound-word-search");
+    let memory = sample_memory(
+        "ProtonVPN avec WireGuard et JavaScript",
+        MemoryType::Observation,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+    let id = memory.id;
+    let original_content = memory.content.clone();
+
+    store
+        .store(memory)
+        .await
+        .expect("store compound word memory");
+
+    let stored = store
+        .get_raw(&id)
+        .await
+        .expect("load raw stored memory")
+        .expect("compound word memory should exist");
+    assert_eq!(stored.content, original_content);
+
+    for query_text in ["VPN", "VPN WireGuard", "Script"] {
+        let results = store
+            .search(SearchQuery {
+                text: query_text.to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("search compound word memory");
+
+        assert_eq!(results.len(), 1, "query `{query_text}` should match");
+        assert_eq!(
+            results[0].memory.id, id,
+            "query `{query_text}` should return the indexed memory"
+        );
+    }
+
+    store
+        .update_content(
+            &id,
+            "OpenSSH tunnel notes",
+            "integration:test",
+            "exercise FTS delete/insert",
+        )
+        .await
+        .expect("update compound word memory");
+
+    let removed_results = store
+        .search(SearchQuery {
+            text: "VPN".to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+        })
+        .await
+        .expect("search for removed compound token");
+    assert!(removed_results.is_empty());
+
+    let updated_results = store
+        .search(SearchQuery {
+            text: "SSH".to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+        })
+        .await
+        .expect("search updated compound token");
+    assert_eq!(updated_results.len(), 1);
+    assert_eq!(updated_results[0].memory.id, id);
+}
+
+#[tokio::test]
+async fn gate_merge_preserves_searchable_compound_enrichment_for_keyword_search() {
+    let (_temp_dir, store) = test_store("compound-word-merge-search");
+    let gate = DefaultSalienceGate::new(store.scope_config().expect("load scope config"));
+    let original = sample_memory(
+        "ProtonVPN avec WireGuard protege tout le trafic reseau",
+        MemoryType::Preference,
+        ProvenanceLevel::UserStated,
+        0.5,
+        Utc::now(),
+    );
+
+    let original_id = store.store(original.clone()).await.expect("store original");
+    store
+        .store_embedding(&original_id, &axis_embedding())
+        .await
+        .expect("store original embedding");
+
+    let candidate = sample_candidate(
+        "ProtonVPN avec WireGuard et JavaScript protegent le reseau",
+        0.5,
+        ProvenanceLevel::UserStated,
+        Some(cosine_embedding(0.94)),
+    );
+
+    let decision = gate
+        .evaluate(&candidate, &store)
+        .await
+        .expect("evaluate merge candidate");
+
+    let GateDecision::Merge {
+        target_id,
+        enriched_content,
+        ..
+    } = decision
+    else {
+        panic!("expected merge decision");
+    };
+    assert_eq!(target_id, original_id);
+    assert_eq!(enriched_content, candidate.content);
+
+    store
+        .update_content(
+            &target_id,
+            &enriched_content,
+            "integration:test",
+            "preserve searchable compound enrichment",
+        )
+        .await
+        .expect("apply merge result");
+
+    let merged = store
+        .get_raw(&target_id)
+        .await
+        .expect("load merged memory")
+        .expect("merged memory should exist");
+    assert_eq!(merged.content, candidate.content);
+
+    for query_text in ["VPN", "Script"] {
+        let results = store
+            .search(SearchQuery {
+                text: query_text.to_string(),
+                embedding: None,
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("search merged memory");
+
+        assert_eq!(results.len(), 1, "query `{query_text}` should match");
+        assert_eq!(
+            results[0].memory.id, target_id,
+            "query `{query_text}` should return the merged memory"
+        );
+        assert_eq!(
+            results[0].memory.content, candidate.content,
+            "query `{query_text}` should surface the enriched merged content"
+        );
+    }
 }
 
 #[tokio::test]
@@ -447,6 +743,7 @@ async fn gate_uses_provider_embedding_when_candidate_embedding_is_missing() {
     let GateDecision::Merge {
         target_id,
         enriched_content,
+        ..
     } = decision
     else {
         panic!("expected merge decision");
@@ -517,6 +814,7 @@ async fn search_orders_results_by_combined_scoring_signals() {
             type_filter: None,
             max_results: 10,
             context_config: None,
+            session_id: None,
         })
         .await
         .expect("search by vector similarity");
@@ -604,12 +902,9 @@ fn test_store_with_provider(
 ) -> (TempDir, SqliteMemoryStore) {
     let temp_dir = TempDir::new().expect("create temp directory");
     let db_path = temp_dir.path().join(format!("{prefix}.sqlite3"));
-    let store = SqliteMemoryStore::new_with_embedding_provider(
-        &db_path,
-        MemoryScope::Workspace,
-        provider,
-    )
-    .expect("create sqlite store with embedding provider");
+    let store =
+        SqliteMemoryStore::new_with_embedding_provider(&db_path, MemoryScope::Workspace, provider)
+            .expect("create sqlite store with embedding provider");
     (temp_dir, store)
 }
 
