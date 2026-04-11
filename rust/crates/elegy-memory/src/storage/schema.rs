@@ -9,11 +9,10 @@ const EMBEDDING_DIMENSIONS: usize = 768;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const SQLITE_VEC_MODULE_NAME: &str = "vec0";
 
-const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
+const DEFAULT_SCOPE_CONFIG: [(&str, &str); 15] = [
     ("budget_active_max", "500"),
     ("storage_cap_mb", "100"),
     ("decay_lambda_base", "0.10"),
-    ("dedup_threshold", "0.85"),
     ("salience_threshold", "0.20"),
     ("novelty_doubt_threshold", "0.80"),
     ("embedding_dimensions", "768"),

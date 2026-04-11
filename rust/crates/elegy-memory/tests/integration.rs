@@ -888,6 +888,76 @@ async fn decay_integration_uses_age_and_fixed_lambda_consistently() {
     assert!((fact_retention - preference_retention).abs() < 1.0e-12);
 }
 
+#[tokio::test]
+async fn record_link_and_list_links_round_trip() {
+    let (_temp_dir, store) = test_store("link-round-trip");
+
+    let mem_a = sample_memory("Source memory", MemoryType::Fact, ProvenanceLevel::UserStated, 0.7, Utc::now());
+    let mem_b = sample_memory("Target memory", MemoryType::Fact, ProvenanceLevel::UserStated, 0.7, Utc::now());
+
+    let source_id = mem_a.id;
+    let target_id = mem_b.id;
+
+    store.store(mem_a).await.expect("store source memory");
+    store.store(mem_b).await.expect("store target memory");
+
+    store
+        .record_link(&source_id, &target_id, "supersedes")
+        .expect("record_link should succeed");
+
+    // list_links from source side
+    let links_from_source = store.list_links(&source_id).expect("list_links for source");
+    assert_eq!(links_from_source.len(), 1, "source should see exactly 1 link");
+    let link = &links_from_source[0];
+    assert_eq!(link.source_id, source_id);
+    assert_eq!(link.target_id, target_id);
+    assert_eq!(link.relation_type, "supersedes");
+    assert!((link.weight - 1.0).abs() < f32::EPSILON, "default weight should be 1.0");
+
+    // list_links from target side — same link should appear
+    let links_from_target = store.list_links(&target_id).expect("list_links for target");
+    assert_eq!(links_from_target.len(), 1, "target should see exactly 1 link");
+    assert_eq!(links_from_target[0].source_id, source_id);
+    assert_eq!(links_from_target[0].target_id, target_id);
+}
+
+#[tokio::test]
+async fn record_link_rejects_self_link() {
+    let (_temp_dir, store) = test_store("link-self-reject");
+
+    let mem = sample_memory("Self-referencing memory", MemoryType::Fact, ProvenanceLevel::UserStated, 0.7, Utc::now());
+    let id = mem.id;
+
+    store.store(mem).await.expect("store memory");
+
+    let result = store.record_link(&id, &id, "supersedes");
+    assert!(result.is_err(), "self-link should be rejected with a validation error");
+}
+
+#[tokio::test]
+async fn record_link_ignores_duplicate_link() {
+    let (_temp_dir, store) = test_store("link-dup-ignore");
+
+    let mem_a = sample_memory("First memory", MemoryType::Fact, ProvenanceLevel::UserStated, 0.7, Utc::now());
+    let mem_b = sample_memory("Second memory", MemoryType::Fact, ProvenanceLevel::UserStated, 0.7, Utc::now());
+
+    let source_id = mem_a.id;
+    let target_id = mem_b.id;
+
+    store.store(mem_a).await.expect("store first memory");
+    store.store(mem_b).await.expect("store second memory");
+
+    store
+        .record_link(&source_id, &target_id, "related")
+        .expect("first record_link should succeed");
+    store
+        .record_link(&source_id, &target_id, "related")
+        .expect("duplicate record_link should succeed (INSERT OR IGNORE)");
+
+    let links = store.list_links(&source_id).expect("list_links after duplicate insert");
+    assert_eq!(links.len(), 1, "duplicate link should be silently ignored, only 1 link expected");
+}
+
 fn test_store(prefix: &str) -> (TempDir, SqliteMemoryStore) {
     let temp_dir = TempDir::new().expect("create temp directory");
     let db_path = temp_dir.path().join(format!("{prefix}.sqlite3"));

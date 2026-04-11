@@ -17,9 +17,9 @@ use crate::{
     similarity::cosine_similarity,
     traits::{EmbeddingProvider, MemoryStore},
     types::{
-        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
-        MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport, ResolutionStatus,
-        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
+        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryLink,
+        MemoryScope, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport,
+        ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
     },
     EmbeddingError, MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
 };
@@ -320,6 +320,34 @@ impl SqliteMemoryStore {
             }
             Ok(versions)
         })
+    }
+
+    /// Record a directional link between two memories in the proto-graph.
+    pub fn record_link(
+        &self,
+        source_id: &MemoryId,
+        target_id: &MemoryId,
+        relation_type: &str,
+    ) -> Result<(), StoreError> {
+        if source_id == target_id {
+            return Err(StoreError::Validation(
+                "link source and target must be different memories".to_string(),
+            ));
+        }
+        let relation = relation_type.trim();
+        if relation.is_empty() {
+            return Err(StoreError::Validation(
+                "relation_type must not be empty".to_string(),
+            ));
+        }
+        self.with_connection(|connection| {
+            record_link_row(connection, source_id, target_id, relation)
+        })
+    }
+
+    /// Query all links involving a given memory (as source or target).
+    pub fn list_links(&self, memory_id: &MemoryId) -> Result<Vec<MemoryLink>, StoreError> {
+        self.with_connection(|connection| load_links(connection, memory_id))
     }
 }
 
@@ -2774,6 +2802,56 @@ fn lower_reliability(
         ],
     )?;
     Ok(())
+}
+
+fn record_link_row(
+    connection: &Connection,
+    source_id: &MemoryId,
+    target_id: &MemoryId,
+    relation_type: &str,
+) -> Result<(), StoreError> {
+    connection.execute(
+        r#"
+        INSERT OR IGNORE INTO memory_links(id, source_id, target_id, relation_type, created_at)
+        VALUES (?1, ?2, ?3, ?4, ?5)
+        "#,
+        params![
+            Uuid::new_v4().to_string(),
+            source_id.to_string(),
+            target_id.to_string(),
+            relation_type,
+            format_timestamp(Utc::now()),
+        ],
+    )?;
+    Ok(())
+}
+
+fn load_links(connection: &Connection, memory_id: &MemoryId) -> Result<Vec<MemoryLink>, StoreError> {
+    let id_str = memory_id.to_string();
+    let mut statement = connection.prepare(
+        r#"
+        SELECT id, source_id, target_id, relation_type, weight, created_at
+        FROM memory_links
+        WHERE source_id = ?1 OR target_id = ?1
+        ORDER BY created_at
+        "#,
+    )?;
+    let links = statement
+        .query_map([&id_str], |row| {
+            let raw_source_id: String = row.get(1)?;
+            let raw_target_id: String = row.get(2)?;
+            let raw_created_at: String = row.get(5)?;
+            Ok(MemoryLink {
+                id: row.get(0)?,
+                source_id: parse_uuid_for_sqlite(&raw_source_id)?,
+                target_id: parse_uuid_for_sqlite(&raw_target_id)?,
+                relation_type: row.get(3)?,
+                weight: row.get(4)?,
+                created_at: parse_datetime_for_sqlite(&raw_created_at)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(links)
 }
 
 #[cfg(test)]

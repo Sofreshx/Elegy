@@ -52,7 +52,7 @@ pub use traits::{
 };
 pub use types::{
     ConsolidationCandidate, ContradictionEntry, ContradictionRecord, ExportFormat, Memory,
-    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
+    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryLink, MemoryScope,
     MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel,
     PurgeReport, ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
 };
