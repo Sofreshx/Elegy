@@ -100,6 +100,8 @@ enum Command {
         memory_type: Option<CliMemoryType>,
         #[arg(long, value_enum)]
         state: Option<CliMemoryState>,
+        #[arg(long)]
+        include_dormant: bool,
         #[arg(long, default_value_t = DEFAULT_LIMIT)]
         limit: usize,
     },
@@ -637,11 +639,13 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             store,
             memory_type,
             state,
+            include_dormant,
             limit,
         } => execute_list_command(
             open_store(store)?,
             memory_type.map(Into::into),
             state.map(Into::into),
+            include_dormant,
             limit,
             cli.format,
         ),
@@ -922,13 +926,25 @@ fn execute_list_command(
     ctx: StoreContext,
     memory_type: Option<MemoryType>,
     state: Option<MemoryState>,
+    include_dormant: bool,
     limit: usize,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     validate_limit(limit, "limit")?;
+    // Resolve effective state filter:
+    // - explicit --state takes priority
+    // - --include-dormant with no --state: no state filter (returns active + dormant)
+    // - default: active only
+    let effective_state = if state.is_some() {
+        state
+    } else if include_dormant {
+        None
+    } else {
+        Some(MemoryState::Active)
+    };
     let memories = run_async(ctx.store.list(MemoryFilter {
         scope: Some(ctx.scope),
-        state,
+        state: effective_state,
         memory_types: memory_type.map(|kind| vec![kind]),
         provenance_levels: None,
         tags: None,

@@ -1438,6 +1438,101 @@ fn ollama_offline_add_succeeds_and_warns_about_degraded_storage() {
     );
 }
 
+#[test]
+fn list_excludes_dormant_by_default_and_includes_with_flag() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-list-include-dormant");
+    let db_path = temp_dir.join("memory.sqlite3");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    // Seed two memories via the store API so we can make one dormant.
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build runtime");
+    let store =
+        SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
+
+    let active = sample_memory("Active memory for list test");
+    let active_id = active.id;
+    let dormant = sample_memory("Dormant memory for list test");
+    let dormant_id = dormant.id;
+
+    runtime
+        .block_on(store.store(active))
+        .expect("store active memory");
+    runtime
+        .block_on(store.store(dormant))
+        .expect("store dormant memory");
+    runtime
+        .block_on(store.make_dormant(&dormant_id))
+        .expect("make memory dormant");
+
+    // Default list (no --include-dormant): should only contain the active memory.
+    let list_default = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args(["--format", "json", "list", "--db", db, "--limit", "50"])
+        .output()
+        .expect("run list without --include-dormant");
+    assert!(
+        list_default.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&list_default.stderr)
+    );
+    let default_json: serde_json::Value =
+        serde_json::from_slice(&list_default.stdout).expect("parse default list json");
+    let default_memories = default_json["data"]["memories"]
+        .as_array()
+        .expect("memories array");
+    assert!(
+        default_memories
+            .iter()
+            .any(|m| m["id"].as_str() == Some(&active_id.to_string())),
+        "expected active memory {active_id} in default list, got {default_json}"
+    );
+    assert!(
+        !default_memories
+            .iter()
+            .any(|m| m["id"].as_str() == Some(&dormant_id.to_string())),
+        "dormant memory {dormant_id} should NOT appear in default list, got {default_json}"
+    );
+
+    // List with --include-dormant: should contain both memories.
+    let list_dormant = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "list",
+            "--db",
+            db,
+            "--include-dormant",
+            "--limit",
+            "50",
+        ])
+        .output()
+        .expect("run list with --include-dormant");
+    assert!(
+        list_dormant.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&list_dormant.stderr)
+    );
+    let dormant_json: serde_json::Value =
+        serde_json::from_slice(&list_dormant.stdout).expect("parse include-dormant list json");
+    let dormant_memories = dormant_json["data"]["memories"]
+        .as_array()
+        .expect("memories array");
+    assert!(
+        dormant_memories
+            .iter()
+            .any(|m| m["id"].as_str() == Some(&active_id.to_string())),
+        "expected active memory {active_id} in dormant list, got {dormant_json}"
+    );
+    assert!(
+        dormant_memories
+            .iter()
+            .any(|m| m["id"].as_str() == Some(&dormant_id.to_string())),
+        "expected dormant memory {dormant_id} in dormant list, got {dormant_json}"
+    );
+}
+
 fn sample_memory(content: &str) -> Memory {
     let now = Utc::now();
     Memory {
@@ -2134,5 +2229,106 @@ fn import_malformed_json_returns_clear_error() {
         "expected 'malformed JSON' in output, stderr={} stdout={}",
         String::from_utf8_lossy(&import.stderr),
         String::from_utf8_lossy(&import.stdout)
+    );
+}
+
+#[test]
+fn list_include_dormant_shows_both_active_and_dormant_memories() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-list-include-dormant");
+    let db_path = temp_dir.join("memory.sqlite3");
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .expect("build runtime");
+    let store =
+        SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
+
+    let active_memory = sample_memory("Active memory stays visible");
+    let dormant_memory = sample_memory("Dormant memory hidden by default");
+    let dormant_id = dormant_memory.id;
+
+    runtime
+        .block_on(store.store(active_memory))
+        .expect("store active memory");
+    runtime
+        .block_on(store.store(dormant_memory))
+        .expect("store dormant memory");
+    runtime
+        .block_on(store.make_dormant(&dormant_id))
+        .expect("make memory dormant");
+
+    // Default list: only active memories.
+    let list_default = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "list",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+        ])
+        .output()
+        .expect("run default list");
+    assert!(
+        list_default.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&list_default.stderr)
+    );
+    let default_json: serde_json::Value =
+        serde_json::from_slice(&list_default.stdout).expect("parse default list json");
+    assert_eq!(
+        default_json["data"]["count"].as_u64(),
+        Some(1),
+        "default list should show only active memory, got {default_json}"
+    );
+
+    // List with --include-dormant: shows both active and dormant.
+    let list_with_dormant = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "list",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--include-dormant",
+        ])
+        .output()
+        .expect("run list --include-dormant");
+    assert!(
+        list_with_dormant.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&list_with_dormant.stderr)
+    );
+    let dormant_json: serde_json::Value =
+        serde_json::from_slice(&list_with_dormant.stdout).expect("parse include-dormant list json");
+    assert_eq!(
+        dormant_json["data"]["count"].as_u64(),
+        Some(2),
+        "list --include-dormant should show both memories, got {dormant_json}"
+    );
+
+    // List with --state dormant: only dormant memory.
+    let list_state_dormant = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "list",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--state",
+            "dormant",
+        ])
+        .output()
+        .expect("run list --state dormant");
+    assert!(
+        list_state_dormant.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&list_state_dormant.stderr)
+    );
+    let state_dormant_json: serde_json::Value =
+        serde_json::from_slice(&list_state_dormant.stdout).expect("parse state dormant list json");
+    assert_eq!(
+        state_dormant_json["data"]["count"].as_u64(),
+        Some(1),
+        "list --state dormant should show only dormant memory, got {state_dormant_json}"
     );
 }
