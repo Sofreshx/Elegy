@@ -518,6 +518,24 @@ pub struct MemoryVersion {
     pub changed_at: DateTime<Utc>,
 }
 
+/// A directional link between two memory records in the proto-graph.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryLink {
+    /// Stable link-row identifier.
+    pub id: String,
+    /// Origin memory of the relationship.
+    pub source_id: MemoryId,
+    /// Destination memory of the relationship.
+    pub target_id: MemoryId,
+    /// Kind of relationship (e.g. `supersedes`, `contradicts`, `corroborates`).
+    pub relation_type: String,
+    /// Strength or confidence of the link (default 1.0).
+    pub weight: f32,
+    /// Timestamp when the link was created.
+    pub created_at: DateTime<Utc>,
+}
+
 /// Prompt-compatibility alias for contradiction records.
 pub type ContradictionRecord = ContradictionEntry;
 

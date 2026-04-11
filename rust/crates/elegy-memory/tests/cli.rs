@@ -1210,9 +1210,9 @@ fn consolidate_cross_scope_promotes_survivor_and_deletes_duplicate() {
     assert!(
         runtime
             .block_on(user_store.get_raw(&duplicate_id))
-            .expect("load deleted duplicate")
-            .is_none(),
-        "expected duplicate {duplicate_id} to be removed"
+            .expect("load dormant duplicate")
+            .is_some_and(|memory| memory.state == MemoryState::Dormant),
+        "expected duplicate {duplicate_id} to be dormant after consolidation"
     );
 }
 
@@ -1315,9 +1315,9 @@ fn consolidate_with_ollama_llm_merges_and_updates_survivor_content() {
     assert!(
         runtime
             .block_on(store.get_raw(&duplicate_id))
-            .expect("load deleted duplicate")
-            .is_none(),
-        "expected duplicate {duplicate_id} to be removed"
+            .expect("load dormant duplicate")
+            .is_some_and(|memory| memory.state == MemoryState::Dormant),
+        "expected duplicate {duplicate_id} to be dormant after consolidation"
     );
 }
 

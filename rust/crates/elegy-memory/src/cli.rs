@@ -1306,7 +1306,8 @@ fn execute_consolidate_command(
                     )?;
                 }
                 for source_id in source_ids {
-                    run_async(ctx.store.hard_delete(source_id))?;
+                    run_async(ctx.store.make_dormant(source_id))?;
+                    let _ = ctx.store.record_link(&result.id, source_id, "supersedes");
                 }
             }
             ConsolidationAction::Contradiction {
@@ -1469,6 +1470,8 @@ fn execute_resolve_contradiction_command(
                 ))),
             };
         }
+
+        let _ = ctx.store.record_link(&keep_id, &dormant_id, "supersedes");
 
         ResolveContradictionResponse {
             contradiction_id: contradiction.id,
