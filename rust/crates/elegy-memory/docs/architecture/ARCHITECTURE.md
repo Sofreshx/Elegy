@@ -1,6 +1,6 @@
 # Elegy — Architecture Documentation
 
-> Last updated: 2026-03-24 | Status: Design complete, MVP implementation in progress
+> Last updated: 2026-07-25 | Status: MVP complete, v1 features in progress
 
 ## What is Elegy?
 
@@ -10,7 +10,7 @@ Elegy is a modular AI agent infrastructure project. It provides independent syst
 
 | System | Crate | Status | Description |
 |--------|-------|--------|-------------|
-| **elegy-memory** | `rust/crates/elegy-memory` | 🟡 MVP in progress | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation |
+| **elegy-memory** | `rust/crates/elegy-memory` | 🟢 MVP complete, v1 in progress | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation |
 
 ## Design Philosophy
 
