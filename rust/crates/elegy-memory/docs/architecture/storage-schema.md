@@ -76,13 +76,28 @@ CREATE VIRTUAL TABLE vec_memories USING vec0(
 );
 ```
 
+When the `vec0` module is not available at runtime (e.g., sqlite-vec extension not loaded), the schema initialization falls back to a regular table:
+
+```sql
+CREATE TABLE vec_memories (
+    embedding BLOB NOT NULL
+);
+```
+
+This keeps the `rowid`-based mapping intact so that the rest of the schema can reference `vec_memories` uniformly.
+
 The `rowid` of `vec_memories` maps to a separate lookup. We maintain a mapping table:
 
 ```sql
 CREATE TABLE memory_embeddings (
-    memory_id   TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
-    vec_rowid   INTEGER NOT NULL UNIQUE  -- Maps to vec_memories rowid
+    memory_id      TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+    vec_rowid      INTEGER NOT NULL UNIQUE,  -- Maps to vec_memories rowid
+    content_sha256 TEXT                       -- Content hash for embedding-cache deduplication
 );
+
+CREATE INDEX idx_memory_embeddings_content_sha256
+    ON memory_embeddings(content_sha256)
+    WHERE content_sha256 IS NOT NULL;
 ```
 
 **KNN Query Pattern:**
@@ -122,10 +137,10 @@ LIMIT ?k;
 
 ### Hybrid Search
 
-Combine vector and keyword results with weighted scoring:
+Combine vector and keyword results into a blended similarity signal (see [Memory Model → Retrieval Scoring](memory-model.md#retrieval-scoring) for the full formula):
 ```sql
 -- Pseudo-query (implemented in Rust, not raw SQL)
-final_score = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
+blended_similarity = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
 ```
 
 ### Table: memory_links (Proto-Graph)
@@ -177,6 +192,11 @@ CREATE TABLE memory_promotions (
     trigger_session_id TEXT,
     promoted_at        TEXT NOT NULL
 );
+
+CREATE INDEX idx_memory_promotions_memory
+    ON memory_promotions(memory_id);
+CREATE INDEX idx_memory_promotions_promoted_at
+    ON memory_promotions(promoted_at);
 ```
 
 ### Table: memory_session_accesses
@@ -189,6 +209,11 @@ CREATE TABLE memory_session_accesses (
     last_accessed_at  TEXT NOT NULL,
     PRIMARY KEY(memory_id, session_id)
 );
+
+CREATE INDEX idx_memory_session_accesses_memory
+    ON memory_session_accesses(memory_id);
+CREATE INDEX idx_memory_session_accesses_session
+    ON memory_session_accesses(session_id);
 ```
 
 ### Table: contradictions
@@ -223,6 +248,7 @@ CREATE TABLE scope_config (
 -- 'schema_version' → current schema version
 -- 'budget_active_max' → '500'
 -- 'storage_cap_mb' → '100'
+-- 'embedding_dimensions' → '768'
 -- 'decay_lambda_base' → '0.10'
 -- 'similarity_weight' → '0.40'
 -- 'recency_weight' → '0.25'
@@ -235,6 +261,8 @@ CREATE TABLE scope_config (
 -- 'merge_similarity_threshold' → '0.85'
 -- 'duplicate_similarity_threshold' → '0.99'
 -- 'agent_inferred_importance_threshold' → '0.50'
+
+The key `dedup_threshold` also exists in databases created before the threshold rename and is maintained by the schema migration path, but it is not loaded by current application code.
 ```
 
 ## Migration Strategy

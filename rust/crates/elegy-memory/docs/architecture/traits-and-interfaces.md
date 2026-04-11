@@ -271,6 +271,8 @@ pub trait MemoryObservability: Send + Sync {
 }
 ```
 
+`MemoryObservability` is currently a **definition-only** trait with no concrete implementation. The equivalent functionality is available through the async `MemoryStore` methods (`health_report`, `list_contradictions`, `purge_user`, `purge_all`) and the CLI export command. Implementing this synchronous observability facade for external tooling is planned for a future milestone.
+
 ## Key Types
 
 ```rust
