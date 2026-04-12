@@ -187,6 +187,30 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
         CREATE INDEX IF NOT EXISTS idx_contradictions_status
             ON contradictions(resolution_status);
 
+        CREATE TABLE IF NOT EXISTS memory_corrections (
+            id               TEXT PRIMARY KEY,
+            memory_id        TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            previous_content TEXT NOT NULL,
+            corrected_content TEXT NOT NULL,
+            corrected_by     TEXT NOT NULL,
+            reason           TEXT NOT NULL,
+            corrected_at     TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_corrections_memory
+            ON memory_corrections(memory_id);
+
+        CREATE TABLE IF NOT EXISTS retrieval_feedback (
+            id          TEXT PRIMARY KEY,
+            memory_id   TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            relevant    INTEGER NOT NULL,
+            query_text  TEXT,
+            recorded_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_feedback_memory
+            ON retrieval_feedback(memory_id);
+
         CREATE TABLE IF NOT EXISTS scope_config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -355,11 +379,13 @@ mod tests {
             "contradictions",
             "memories",
             "memories_fts",
+            "memory_corrections",
             "memory_embeddings",
             "memory_links",
             "memory_promotions",
             "memory_session_accesses",
             "memory_versions",
+            "retrieval_feedback",
             "scope_config",
             "vec_memories",
         ];
@@ -539,11 +565,13 @@ mod tests {
                 'contradictions',
                 'memories',
                 'memories_fts',
+                'memory_corrections',
                 'memory_embeddings',
                 'memory_links',
                 'memory_promotions',
                 'memory_session_accesses',
                 'memory_versions',
+                'retrieval_feedback',
                 'scope_config',
                 'vec_memories'
             )

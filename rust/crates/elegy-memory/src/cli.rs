@@ -16,15 +16,16 @@ use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
-    ConsolidationAction, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision,
-    GateError, LlmConsolidator, LlmProvider, Memory, MemoryCandidate, MemoryConsolidator,
-    MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
-    MemoryVersion, OllamaEmbeddingProvider, OllamaLlmProvider, OpenAiEmbeddingProvider,
-    OpenAiLlmProvider, PromotionEngine, ProvenanceLevel, ResolutionStatus, SalienceGate,
-    ScoredMemory, SearchQuery, SensitivityLevel, SimpleConsolidator, SqliteMemoryStore, StoreError,
-    DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL,
-    DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS,
-    DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
+    ConsolidationAction, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, ExportFormat,
+    GateDecision, GateError, LlmConsolidator, LlmProvider, Memory, MemoryCandidate,
+    MemoryConsolidator, MemoryFilter, MemoryHealthReport, MemoryId, MemoryObservability,
+    MemoryScope, MemoryState, MemoryStore, MemoryType, MemoryVersion, OllamaEmbeddingProvider,
+    OllamaLlmProvider, OpenAiEmbeddingProvider, OpenAiLlmProvider, PromotionEngine,
+    ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery, SensitivityLevel,
+    ShareConfig, SimpleConsolidator, SqliteMemoryStore, StoreError, DEFAULT_OLLAMA_BASE_URL,
+    DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL,
+    DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL,
+    DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -123,14 +124,19 @@ enum Command {
         #[command(flatten)]
         store: StoreArgs,
     },
-    /// Export memories as JSON to stdout or a file.
+    /// Export memories in JSON, SQLite, or .elegy format.
     Export {
         #[command(flatten)]
         store: StoreArgs,
+        /// Output file path. Writes to stdout when omitted (JSON only).
         #[arg(long)]
         output: Option<PathBuf>,
+        /// Export all scopes instead of just the active scope.
         #[arg(long)]
         all_scopes: bool,
+        /// Export format.
+        #[arg(long, value_enum, default_value_t = CliExportFormat::Json)]
+        export_format: CliExportFormat,
     },
     /// Re-embed stale memories when a provider is configured.
     Reembed {
@@ -188,6 +194,111 @@ enum Command {
         consolidate_limit: usize,
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Rollback a memory to a previous version.
+    Rollback {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID to rollback.
+        id: String,
+        /// Version number to restore.
+        #[arg(long)]
+        version: i64,
+    },
+    /// Corroborate a memory with another, boosting its reliability.
+    Corroborate {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// ID of the memory to corroborate (receives the reliability boost).
+        id: String,
+        /// ID of the corroborating memory.
+        #[arg(long)]
+        with: String,
+    },
+    /// Enforce storage budget: dormant low-scoring active memories and purge excess dormant ones.
+    Budget {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Apply a user correction to a memory.
+    Correct {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID to correct.
+        id: String,
+        /// New corrected content.
+        content: String,
+        /// Who is making the correction.
+        #[arg(long, default_value = "cli-user")]
+        by: String,
+        /// Optional reason for the correction.
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    /// Record relevance feedback for a memory returned by search.
+    Feedback {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID the feedback is about.
+        id: String,
+        /// The query that returned this memory.
+        #[arg(long)]
+        query: String,
+        /// Whether the memory was relevant to the query.
+        #[arg(long)]
+        relevant: bool,
+    },
+    /// Show learned scoring weights based on accumulated feedback.
+    Weights {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Traverse the memory link graph starting from a given memory.
+    Traverse {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Starting memory ID.
+        id: String,
+        /// Maximum depth to traverse.
+        #[arg(long, default_value_t = 3)]
+        depth: u32,
+        /// Optional relation type filter.
+        #[arg(long)]
+        relation: Option<String>,
+    },
+    /// Run poisoning detection heuristics on the memory store.
+    DetectPoisoning {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Delete a link between two memories by link ID.
+    DeleteLink {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Link ID to delete.
+        id: String,
+    },
+    /// Export memories for sharing with other agents, filtered by sensitivity and reliability.
+    ShareExport {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Output file path. Writes to stdout when omitted.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Maximum sensitivity level to include (default: medium).
+        #[arg(long, value_enum, default_value_t = CliSensitivityLevel::Medium)]
+        max_sensitivity: CliSensitivityLevel,
+        /// Minimum reliability score to include (default: 0.5).
+        #[arg(long, default_value_t = 0.5)]
+        min_reliability: f32,
+    },
+    /// Import shared memories from a JSON file or stdin.
+    ShareImport {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Input file path. Reads from stdin when omitted.
+        #[arg(long)]
+        input: Option<PathBuf>,
     },
 }
 
@@ -300,6 +411,47 @@ enum CliLlmProvider {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 enum ContradictionsAction {
     Resolve,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum CliExportFormat {
+    /// JSON export (default).
+    #[default]
+    Json,
+    /// SQLite portable database file.
+    Sqlite,
+    /// Portable .elegy archive (JSON envelope with links and versions).
+    Elegy,
+}
+
+impl From<CliExportFormat> for ExportFormat {
+    fn from(value: CliExportFormat) -> Self {
+        match value {
+            CliExportFormat::Json => ExportFormat::Json,
+            CliExportFormat::Sqlite => ExportFormat::Sqlite,
+            CliExportFormat::Elegy => ExportFormat::Elegy,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum CliSensitivityLevel {
+    #[default]
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl From<CliSensitivityLevel> for SensitivityLevel {
+    fn from(value: CliSensitivityLevel) -> Self {
+        match value {
+            CliSensitivityLevel::Low => SensitivityLevel::Low,
+            CliSensitivityLevel::Medium => SensitivityLevel::Medium,
+            CliSensitivityLevel::High => SensitivityLevel::High,
+            CliSensitivityLevel::Critical => SensitivityLevel::Critical,
+        }
+    }
 }
 
 impl From<CliScope> for MemoryScope {
@@ -595,6 +747,110 @@ struct ImportFormatBObject {
     provenance: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RollbackResponse {
+    memory_id: String,
+    restored_version: i64,
+    content_preview: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorroborateResponse {
+    memory_id: String,
+    corroborating_id: String,
+    new_reliability: f32,
+    corroboration_count: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetResponse {
+    dormanted: u64,
+    deleted: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorrectResponse {
+    correction_id: String,
+    memory_id: String,
+    corrected_by: String,
+    new_reliability: f32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FeedbackResponse {
+    feedback_id: String,
+    memory_id: String,
+    was_relevant: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightsResponse {
+    weights: std::collections::HashMap<String, f64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TraverseResponse {
+    start_id: String,
+    max_depth: u32,
+    node_count: usize,
+    nodes: Vec<TraverseNodeRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TraverseNodeRow {
+    id: String,
+    depth: u32,
+    content_preview: String,
+    memory_type: String,
+    link_count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningResponse {
+    alert_count: usize,
+    alerts: Vec<PoisoningAlertRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningAlertRow {
+    alert_type: String,
+    severity: f32,
+    description: String,
+    affected_count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteLinkResponse {
+    link_id: String,
+    deleted: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareExportResponse {
+    exported_count: usize,
+    max_sensitivity: String,
+    min_reliability: f32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareImportResponse {
+    imported_count: usize,
+    new_ids: Vec<String>,
+}
+
 pub fn run_from_env() -> Result<ExitCode, CliError> {
     run_from(std::env::args_os())
 }
@@ -658,7 +914,14 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             store,
             output,
             all_scopes,
-        } => execute_export_command(open_store(store)?, output, all_scopes, cli.format),
+            export_format,
+        } => execute_export_command(
+            open_store(store)?,
+            output,
+            all_scopes,
+            export_format.into(),
+            cli.format,
+        ),
         Command::Reembed { store, limit } => {
             execute_reembed_command(open_store(store)?, limit, cli.format)
         }
@@ -705,6 +968,54 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             dry_run,
             cli.format,
         ),
+        Command::Rollback { store, id, version } => {
+            execute_rollback_command(open_store(store)?, id, version, cli.format)
+        }
+        Command::Corroborate { store, id, with } => {
+            execute_corroborate_command(open_store(store)?, id, with, cli.format)
+        }
+        Command::Budget { store } => execute_budget_command(open_store(store)?, cli.format),
+        Command::Correct {
+            store,
+            id,
+            content,
+            by,
+            reason,
+        } => execute_correct_command(open_store(store)?, id, content, by, reason, cli.format),
+        Command::Feedback {
+            store,
+            id,
+            query,
+            relevant,
+        } => execute_feedback_command(open_store(store)?, id, query, relevant, cli.format),
+        Command::Weights { store } => execute_weights_command(open_store(store)?, cli.format),
+        Command::Traverse {
+            store,
+            id,
+            depth,
+            relation,
+        } => execute_traverse_command(open_store(store)?, id, depth, relation, cli.format),
+        Command::DetectPoisoning { store } => {
+            execute_detect_poisoning_command(open_store(store)?, cli.format)
+        }
+        Command::DeleteLink { store, id } => {
+            execute_delete_link_command(open_store(store)?, id, cli.format)
+        }
+        Command::ShareExport {
+            store,
+            output,
+            max_sensitivity,
+            min_reliability,
+        } => execute_share_export_command(
+            open_store(store)?,
+            output,
+            max_sensitivity.into(),
+            min_reliability,
+            cli.format,
+        ),
+        Command::ShareImport { store, input } => {
+            execute_share_import_command(open_store(store)?, input, cli.format)
+        }
     }
 }
 
@@ -1022,7 +1333,7 @@ fn execute_purge_command(
 }
 
 fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
-    let report = run_async(ctx.store.health_report())?;
+    let report = run_async(MemoryStore::health_report(&ctx.store))?;
     let per_scope_reports = load_per_scope_reports(&ctx)?;
     let memories = run_async(ctx.store.list(MemoryFilter {
         scope: Some(ctx.scope),
@@ -1037,8 +1348,7 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
         limit: None,
     }))?;
     let contradictions = run_async(
-        ctx.store
-            .list_contradictions(Some(ResolutionStatus::Unresolved)),
+        MemoryStore::list_contradictions(&ctx.store, Some(ResolutionStatus::Unresolved)),
     )?;
     let mut type_counts = BTreeMap::new();
     let mut total_importance = 0.0_f32;
@@ -1116,73 +1426,118 @@ fn execute_export_command(
     ctx: StoreContext,
     output: Option<PathBuf>,
     all_scopes: bool,
+    export_format: ExportFormat,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let scopes = if all_scopes {
-        vec![
-            MemoryScope::Session,
-            MemoryScope::Workspace,
-            MemoryScope::User,
-            MemoryScope::Agent,
-        ]
-    } else {
-        vec![ctx.scope]
-    };
-    let mut memories = Vec::new();
-    for scope in &scopes {
-        let scoped_store = SqliteMemoryStore::new(&ctx.db_path, *scope)?;
-        memories.extend(run_async(scoped_store.list(MemoryFilter {
-            scope: Some(*scope),
-            state: None,
-            memory_types: None,
-            provenance_levels: None,
-            tags: None,
-            status: None,
-            tenant_id: None,
-            user_id: None,
-            agent_id: None,
-            limit: None,
-        }))?);
-    }
-    let response = ExportResponse {
-        exported_at: Utc::now().to_rfc3339(),
-        db_path: ctx.db_path.display().to_string(),
-        scope: if all_scopes {
-            "all".to_string()
-        } else {
-            display_scope(ctx.scope)
-        },
-        memories,
-    };
-    let payload = serde_json::to_string_pretty(&response)?;
-
-    if let Some(path) = output {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&path, payload)?;
-        match format {
-            OutputFormat::Text => {
-                println!(
-                    "Exported {} memories to {}",
-                    response.memories.len(),
-                    path.display()
-                );
+    match export_format {
+        ExportFormat::Json => {
+            let scopes = if all_scopes {
+                vec![
+                    MemoryScope::Session,
+                    MemoryScope::Workspace,
+                    MemoryScope::User,
+                    MemoryScope::Agent,
+                ]
+            } else {
+                vec![ctx.scope]
+            };
+            let mut memories = Vec::new();
+            for scope in &scopes {
+                let scoped_store = SqliteMemoryStore::new(&ctx.db_path, *scope)?;
+                memories.extend(run_async(scoped_store.list(MemoryFilter {
+                    scope: Some(*scope),
+                    state: None,
+                    memory_types: None,
+                    provenance_levels: None,
+                    tags: None,
+                    status: None,
+                    tenant_id: None,
+                    user_id: None,
+                    agent_id: None,
+                    limit: None,
+                }))?);
             }
-            OutputFormat::Json => print_json(
-                "export",
-                &serde_json::json!({
-                    "outputPath": path.display().to_string(),
-                    "memoryCount": response.memories.len(),
-                    "scope": response.scope,
-                }),
-            )?,
-        }
-    } else {
-        println!("{payload}");
-    }
+            let response = ExportResponse {
+                exported_at: Utc::now().to_rfc3339(),
+                db_path: ctx.db_path.display().to_string(),
+                scope: if all_scopes {
+                    "all".to_string()
+                } else {
+                    display_scope(ctx.scope)
+                },
+                memories,
+            };
+            let payload = serde_json::to_string_pretty(&response)?;
 
-    Ok(ExitCode::SUCCESS)
+            if let Some(path) = output {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(&path, payload)?;
+                match format {
+                    OutputFormat::Text => {
+                        println!(
+                            "Exported {} memories to {}",
+                            response.memories.len(),
+                            path.display()
+                        );
+                    }
+                    OutputFormat::Json => print_json(
+                        "export",
+                        &serde_json::json!({
+                            "outputPath": path.display().to_string(),
+                            "memoryCount": response.memories.len(),
+                            "scope": response.scope,
+                        }),
+                    )?,
+                }
+            } else {
+                println!("{payload}");
+            }
+
+            Ok(ExitCode::SUCCESS)
+        }
+        ExportFormat::Sqlite | ExportFormat::Elegy => {
+            if all_scopes {
+                return Err(CliError::Validation(
+                    "SQLite and .elegy exports operate on a single scope; remove --all-scopes"
+                        .to_string(),
+                ));
+            }
+            let output_path = output.ok_or_else(|| {
+                CliError::Validation(
+                    "--output is required for SQLite and .elegy export formats".to_string(),
+                )
+            })?;
+            let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
+            let bytes = store
+                .export_memories(ctx.scope, export_format)
+                .map_err(|error| CliError::Validation(format!("export failed: {error}")))?;
+            if let Some(parent) = output_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&output_path, &bytes)?;
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Exported {} bytes to {}",
+                        bytes.len(),
+                        output_path.display()
+                    );
+                }
+                OutputFormat::Json => print_json(
+                    "export",
+                    &serde_json::json!({
+                        "outputPath": output_path.display().to_string(),
+                        "byteCount": bytes.len(),
+                        "scope": display_scope(ctx.scope),
+                        "format": format!("{export_format:?}"),
+                    }),
+                )?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+    }
 }
 
 fn execute_reembed_command(
@@ -1375,8 +1730,7 @@ fn execute_list_contradictions_command(
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     let contradictions = run_async(
-        ctx.store
-            .list_contradictions(Some(ResolutionStatus::Unresolved)),
+        MemoryStore::list_contradictions(&ctx.store, Some(ResolutionStatus::Unresolved)),
     )?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
@@ -2231,7 +2585,7 @@ fn load_contradiction_by_id(
     ctx: &StoreContext,
     contradiction_id: &str,
 ) -> Result<crate::ContradictionEntry, CliError> {
-    run_async(ctx.store.list_contradictions(None))?
+    run_async(MemoryStore::list_contradictions(&ctx.store, None))?
         .into_iter()
         .find(|contradiction| contradiction.id == contradiction_id)
         .ok_or_else(|| CliError::Validation(format!("contradiction not found: {contradiction_id}")))
@@ -2246,7 +2600,7 @@ fn load_per_scope_reports(ctx: &StoreContext) -> Result<Vec<MemoryHealthReport>,
         MemoryScope::Agent,
     ] {
         let scoped_store = SqliteMemoryStore::new(&ctx.db_path, scope)?;
-        reports.push(run_async(scoped_store.health_report())?);
+        reports.push(run_async(MemoryStore::health_report(&scoped_store))?);
     }
     Ok(reports)
 }
@@ -2674,6 +3028,390 @@ where
         serde_json::to_string_pretty(&JsonEnvelope { command, data })?
     );
     Ok(())
+}
+
+fn execute_rollback_command(
+    ctx: StoreContext,
+    id: String,
+    version: i64,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let version_u32 = u32::try_from(version).map_err(|_| {
+        CliError::Validation(format!("version must be a non-negative 32-bit integer, got {version}"))
+    })?;
+    ctx.store.rollback_to_version(&memory_id, version_u32)?;
+    let memory =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    match format {
+        OutputFormat::Text => {
+            println!("Rolled back {} to version {version}", memory.id);
+            println!("Content: {}", preview(&memory.content));
+        }
+        OutputFormat::Json => {
+            print_json(
+                "rollback",
+                &RollbackResponse {
+                    memory_id: memory.id.to_string(),
+                    restored_version: version,
+                    content_preview: preview(&memory.content),
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_corroborate_command(
+    ctx: StoreContext,
+    id: String,
+    with: String,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let corroborating_id = parse_memory_id(&with)?;
+    ctx.store.corroborate(&memory_id, &corroborating_id)?;
+    let memory =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    match format {
+        OutputFormat::Text => {
+            println!("Corroborated {} with {}", memory.id, corroborating_id);
+            println!(
+                "Reliability: {:.2} | Corroboration count: {}",
+                memory.reliability_score, memory.corroboration_count
+            );
+        }
+        OutputFormat::Json => {
+            print_json(
+                "corroborate",
+                &CorroborateResponse {
+                    memory_id: memory.id.to_string(),
+                    corroborating_id: corroborating_id.to_string(),
+                    new_reliability: memory.reliability_score,
+                    corroboration_count: memory.corroboration_count,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_budget_command(
+    ctx: StoreContext,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let (dormanted, deleted) = ctx.store.enforce_budget()?;
+    match format {
+        OutputFormat::Text => {
+            println!("Budget enforcement complete");
+            println!("  Dormanted: {dormanted}");
+            println!("  Deleted: {deleted}");
+        }
+        OutputFormat::Json => {
+            print_json("budget", &BudgetResponse { dormanted, deleted })?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_correct_command(
+    ctx: StoreContext,
+    id: String,
+    content: String,
+    by: String,
+    reason: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let correction =
+        ctx.store
+            .correct_memory(&memory_id, &content, &by, reason.as_deref())?;
+    let updated =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    match format {
+        OutputFormat::Text => {
+            println!("Corrected memory {memory_id}");
+            println!("  Correction ID: {}", correction.id);
+            println!("  New reliability: {:.2}", updated.reliability_score);
+        }
+        OutputFormat::Json => {
+            print_json(
+                "correct",
+                &CorrectResponse {
+                    correction_id: correction.id,
+                    memory_id: memory_id.to_string(),
+                    corrected_by: by,
+                    new_reliability: updated.reliability_score,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_feedback_command(
+    ctx: StoreContext,
+    id: String,
+    query: String,
+    relevant: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let feedback = ctx.store.record_feedback(&memory_id, &query, relevant)?;
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "Recorded {} feedback for {memory_id}",
+                if relevant { "positive" } else { "negative" }
+            );
+        }
+        OutputFormat::Json => {
+            print_json(
+                "feedback",
+                &FeedbackResponse {
+                    feedback_id: feedback.id,
+                    memory_id: memory_id.to_string(),
+                    was_relevant: relevant,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_weights_command(
+    ctx: StoreContext,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let weights = ctx.store.compute_learned_weights()?;
+    match format {
+        OutputFormat::Text => {
+            println!("Learned scoring weights:");
+            let mut sorted: Vec<_> = weights.iter().collect();
+            sorted.sort_by_key(|(key, _)| (*key).clone());
+            for (key, value) in sorted {
+                println!("  {key}: {value:.4}");
+            }
+        }
+        OutputFormat::Json => {
+            print_json("weights", &WeightsResponse { weights })?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_traverse_command(
+    ctx: StoreContext,
+    id: String,
+    depth: u32,
+    relation: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let result = ctx
+        .store
+        .traverse_links(&memory_id, depth, relation.as_deref())?;
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "Graph traversal from {memory_id} (max depth: {depth})"
+            );
+            println!("Found {} connected memories", result.nodes.len());
+            for node in &result.nodes {
+                println!(
+                    "  [depth={}] {} — {}",
+                    node.depth,
+                    node.memory.id,
+                    preview(&node.memory.content)
+                );
+            }
+        }
+        OutputFormat::Json => {
+            let nodes: Vec<TraverseNodeRow> = result
+                .nodes
+                .iter()
+                .map(|node| TraverseNodeRow {
+                    id: node.memory.id.to_string(),
+                    depth: node.depth,
+                    content_preview: preview(&node.memory.content),
+                    memory_type: display_memory_type(node.memory.memory_type),
+                    link_count: node.incoming_links.len(),
+                })
+                .collect();
+            print_json(
+                "traverse",
+                &TraverseResponse {
+                    start_id: memory_id.to_string(),
+                    max_depth: depth,
+                    node_count: nodes.len(),
+                    nodes,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_detect_poisoning_command(
+    ctx: StoreContext,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let alerts = ctx.store.detect_poisoning()?;
+    match format {
+        OutputFormat::Text => {
+            if alerts.is_empty() {
+                println!("No poisoning indicators detected.");
+            } else {
+                println!("Detected {} poisoning alert(s):", alerts.len());
+                for alert in &alerts {
+                    println!(
+                        "  [{:.1}] {:?} — {} ({} memories affected)",
+                        alert.severity,
+                        alert.alert_type,
+                        alert.description,
+                        alert.memory_ids.len()
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => {
+            let rows: Vec<PoisoningAlertRow> = alerts
+                .iter()
+                .map(|alert| PoisoningAlertRow {
+                    alert_type: format!("{:?}", alert.alert_type),
+                    severity: alert.severity,
+                    description: alert.description.clone(),
+                    affected_count: alert.memory_ids.len(),
+                })
+                .collect();
+            print_json(
+                "detect-poisoning",
+                &PoisoningResponse {
+                    alert_count: rows.len(),
+                    alerts: rows,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_delete_link_command(
+    ctx: StoreContext,
+    id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let deleted = ctx.store.delete_link(&id)?;
+    match format {
+        OutputFormat::Text => {
+            if deleted {
+                println!("Deleted link {id}");
+            } else {
+                println!("Link {id} not found");
+            }
+        }
+        OutputFormat::Json => {
+            print_json(
+                "delete-link",
+                &DeleteLinkResponse {
+                    link_id: id,
+                    deleted,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_share_export_command(
+    ctx: StoreContext,
+    output: Option<PathBuf>,
+    max_sensitivity: SensitivityLevel,
+    min_reliability: f32,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
+    let config = ShareConfig {
+        max_sensitivity,
+        min_reliability,
+        type_filter: None,
+        tag_filter: None,
+    };
+    let memories = store.export_for_sharing(&config)?;
+    let payload = serde_json::to_string_pretty(&memories)?;
+
+    if let Some(path) = output {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, &payload)?;
+        match format {
+            OutputFormat::Text => {
+                println!(
+                    "Exported {} memories for sharing to {}",
+                    memories.len(),
+                    path.display()
+                );
+            }
+            OutputFormat::Json => print_json(
+                "share-export",
+                &ShareExportResponse {
+                    exported_count: memories.len(),
+                    max_sensitivity: format!("{max_sensitivity:?}"),
+                    min_reliability,
+                },
+            )?,
+        }
+    } else {
+        match format {
+            OutputFormat::Text => println!("{payload}"),
+            OutputFormat::Json => print_json(
+                "share-export",
+                &serde_json::json!({
+                    "exportedCount": memories.len(),
+                    "memories": memories,
+                }),
+            )?,
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_share_import_command(
+    ctx: StoreContext,
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let raw = if let Some(path) = &input {
+        fs::read_to_string(path)?
+    } else {
+        let mut buf = String::new();
+        io::stdin().read_to_string(&mut buf)?;
+        buf
+    };
+
+    let memories: Vec<Memory> = serde_json::from_str(&raw)?;
+    let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
+    let ids = store.import_shared(&memories)?;
+
+    match format {
+        OutputFormat::Text => {
+            println!("Imported {} shared memories", ids.len());
+            for id in &ids {
+                println!("  {id}");
+            }
+        }
+        OutputFormat::Json => print_json(
+            "share-import",
+            &ShareImportResponse {
+                imported_count: ids.len(),
+                new_ids: ids.iter().map(ToString::to_string).collect(),
+            },
+        )?,
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 #[cfg(test)]

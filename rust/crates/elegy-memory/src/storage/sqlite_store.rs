@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::{HashMap, HashSet, VecDeque},
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -15,13 +15,16 @@ use super::schema::init_database;
 use crate::{
     decay,
     similarity::cosine_similarity,
-    traits::{EmbeddingProvider, MemoryStore},
+    traits::{EmbeddingProvider, MemoryObservability, MemoryStore},
     types::{
-        ContradictionEntry, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryLink,
-        MemoryScope, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel, PurgeReport,
-        ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
+        ContradictionEntry, CorrectionRecord, ElegyArchive, ExportFormat, GraphNode,
+        GraphTraversalResult, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId,
+        MemoryLink, MemoryScope, MemoryState, MemoryType, MemoryVersion, PoisoningAlert,
+        PoisoningAlertType, ProvenanceLevel, PurgeReport, ResolutionStatus, RetrievalFeedback,
+        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig,
     },
-    EmbeddingError, MemoryFilter, MetadataUpdate, OptionalFieldUpdate, StoreError,
+    EmbeddingError, MemoryFilter, MetadataUpdate, ObservabilityError, OptionalFieldUpdate,
+    StoreError,
 };
 
 const MEMORY_SELECT_COLUMNS: &str = r#"
@@ -348,6 +351,855 @@ impl SqliteMemoryStore {
     /// Query all links involving a given memory (as source or target).
     pub fn list_links(&self, memory_id: &MemoryId) -> Result<Vec<MemoryLink>, StoreError> {
         self.with_connection(|connection| load_links(connection, memory_id))
+    }
+
+    /// Record a corroboration between two memories, boosting the target's reliability.
+    ///
+    /// Increments the target memory's `corroboration_count` and adjusts its
+    /// `reliability_score` by `+0.05` per corroboration, capped at
+    /// `base_reliability + 0.2` where `base_reliability` is the provenance-level default.
+    /// Also records a `"corroborates"` link from `source_id` to `target_id`.
+    pub fn corroborate(
+        &self,
+        source_id: &MemoryId,
+        target_id: &MemoryId,
+    ) -> Result<(), StoreError> {
+        if source_id == target_id {
+            return Err(StoreError::Validation(
+                "corroboration source and target must be different memories".to_string(),
+            ));
+        }
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+
+            // Verify source exists
+            require_memory(&transaction, source_id)?.ok_or(StoreError::NotFound(*source_id))?;
+
+            // Load target for mutation
+            let mut target =
+                require_memory(&transaction, target_id)?.ok_or(StoreError::NotFound(*target_id))?;
+
+            // Increment corroboration count
+            target.corroboration_count += 1;
+
+            // Calculate new reliability: min(current + 0.05, base + 0.2)
+            let base = target.provenance.base_reliability();
+            let cap = base + 0.2;
+            let new_reliability = (target.reliability_score + 0.05).min(cap);
+            target.reliability_score = new_reliability;
+            target.updated_at = Utc::now();
+
+            // Persist updated target
+            persist_memory(&transaction, &target)?;
+
+            // Record corroborates link
+            record_link_row(&transaction, source_id, target_id, "corroborates")?;
+
+            transaction.commit()?;
+            Ok(())
+        })
+    }
+
+    /// Restore a memory's content to a specific previous version.
+    ///
+    /// Loads the specified version from the `memory_versions` table and applies
+    /// it as a new content update, creating a new version entry that records
+    /// the rollback.
+    pub fn rollback_to_version(
+        &self,
+        id: &MemoryId,
+        version_number: u32,
+    ) -> Result<(), StoreError> {
+        self.with_connection(|connection| {
+            let version_content: String = connection
+                .query_row(
+                    "SELECT content FROM memory_versions WHERE memory_id = ?1 AND version_number = ?2",
+                    params![id.to_string(), version_number],
+                    |row| row.get(0),
+                )
+                .optional()?
+                .ok_or_else(|| {
+                    StoreError::Validation(format!(
+                        "version {version_number} not found for memory {id}"
+                    ))
+                })?;
+
+            let transaction = connection.transaction()?;
+            let memory =
+                require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
+
+            if memory.content == version_content {
+                return Ok(());
+            }
+
+            let row_id = require_memory_rowid(&transaction, id)?;
+            let next_version_number = load_next_version_number(&transaction, id)?;
+            let now = Utc::now();
+
+            transaction.execute(
+                r#"
+                INSERT INTO memory_versions(
+                    id,
+                    memory_id,
+                    version_number,
+                    content,
+                    changed_at,
+                    changed_by,
+                    change_reason
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                "#,
+                params![
+                    Uuid::new_v4().to_string(),
+                    id.to_string(),
+                    i64::from(next_version_number),
+                    memory.content,
+                    format_timestamp(now),
+                    "system:rollback",
+                    format!("rollback to version {version_number}"),
+                ],
+            )?;
+
+            let mut updated = memory.clone();
+            updated.content = version_content;
+            updated.embedding_stale = true;
+            updated.updated_at = now;
+
+            persist_memory(&transaction, &updated)?;
+            sync_fts_entry(&transaction, row_id, Some(&memory), &updated)?;
+
+            transaction.commit()?;
+            Ok(())
+        })
+    }
+
+    /// Enforce the active memory budget and storage cap for this scope.
+    ///
+    /// When the number of active memories exceeds `budget_active_max` from the
+    /// scope configuration, the lowest-scoring active memories are transitioned
+    /// to dormant. When total storage exceeds the storage cap, the lowest-scoring
+    /// dormant memories are hard-deleted.
+    ///
+    /// Returns the number of memories made dormant and the number hard-deleted.
+    pub fn enforce_budget(&self) -> Result<(u64, u64), StoreError> {
+        self.with_connection(|connection| {
+            let scope = self.scope;
+
+            // Load budget_active_max with scope-appropriate defaults
+            let configured_budget = load_config_value(connection, "budget_active_max")?;
+            let budget_active_max: u64 = match configured_budget {
+                Some(value) => value.parse::<u64>().map_err(|error| {
+                    StoreError::Serialization(format!(
+                        "invalid budget_active_max config `{value}`: {error}"
+                    ))
+                })?,
+                None => match scope {
+                    MemoryScope::Workspace => DEFAULT_WORKSPACE_BUDGET as u64,
+                    MemoryScope::User => DEFAULT_USER_BUDGET as u64,
+                    MemoryScope::Agent => DEFAULT_AGENT_BUDGET as u64,
+                    MemoryScope::Session => 0,
+                },
+            };
+
+            // Load storage_cap_mb (default 512 MB)
+            let configured_cap = load_config_value(connection, "storage_cap_mb")?;
+            let storage_cap_mb: u64 = match configured_cap {
+                Some(value) => value.parse::<u64>().map_err(|error| {
+                    StoreError::Serialization(format!(
+                        "invalid storage_cap_mb config `{value}`: {error}"
+                    ))
+                })?,
+                None => 512,
+            };
+
+            let mut dormant_count: u64 = 0;
+            let mut deleted_count: u64 = 0;
+
+            // Phase 1: Enforce active budget
+            if budget_active_max > 0 {
+                let active_count =
+                    count_memories_by_state(connection, scope, MemoryState::Active)?;
+                if active_count > 0 {
+                    let active_u64 = active_count as u64;
+                    if active_u64 > budget_active_max {
+                        let excess = active_u64 - budget_active_max;
+                        let mut active_memories = load_search_memories(
+                            connection,
+                            &[scope],
+                            MemoryState::Active,
+                            None,
+                        )?;
+                        // Sort ascending by composite score (lowest first = eviction candidates)
+                        active_memories.sort_by(|a, b| {
+                            let score_a = a.importance_score * a.reliability_score;
+                            let score_b = b.importance_score * b.reliability_score;
+                            score_a
+                                .partial_cmp(&score_b)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                                .then_with(|| a.id.cmp(&b.id))
+                        });
+
+                        let to_demote = excess.min(active_memories.len() as u64) as usize;
+                        let now = Utc::now();
+                        let transaction = connection.transaction()?;
+                        for memory in active_memories.iter().take(to_demote) {
+                            let mut dormant = memory.clone();
+                            dormant.state = MemoryState::Dormant;
+                            dormant.updated_at = now;
+                            persist_memory(&transaction, &dormant)?;
+                            dormant_count += 1;
+                        }
+                        transaction.commit()?;
+                    }
+                }
+            }
+
+            // Phase 2: Enforce storage cap
+            let page_count: u64 = connection.query_row(
+                "SELECT page_count FROM pragma_page_count",
+                [],
+                |row| row.get(0),
+            )?;
+            let page_size: u64 = connection.query_row(
+                "SELECT page_size FROM pragma_page_size",
+                [],
+                |row| row.get(0),
+            )?;
+            let current_bytes = page_count * page_size;
+            let cap_bytes = storage_cap_mb * 1024 * 1024;
+
+            if current_bytes > cap_bytes {
+                let mut dormant_memories = load_search_memories(
+                    connection,
+                    &[scope],
+                    MemoryState::Dormant,
+                    None,
+                )?;
+                // Sort ascending by composite score (lowest first = deletion candidates)
+                dormant_memories.sort_by(|a, b| {
+                    let score_a = a.importance_score * a.reliability_score;
+                    let score_b = b.importance_score * b.reliability_score;
+                    score_a
+                        .partial_cmp(&score_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.id.cmp(&b.id))
+                });
+
+                for memory in &dormant_memories {
+                    let transaction = connection.transaction()?;
+                    let row_id = require_memory_rowid(&transaction, &memory.id)?;
+
+                    let vec_rowid: Option<i64> = transaction
+                        .query_row(
+                            "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
+                            [memory.id.to_string()],
+                            |row| row.get(0),
+                        )
+                        .optional()?;
+
+                    delete_fts_entry(&transaction, row_id, memory)?;
+
+                    if let Some(vec_rowid) = vec_rowid {
+                        transaction
+                            .execute("DELETE FROM vec_memories WHERE rowid = ?1", [vec_rowid])?;
+                    }
+                    transaction.execute(
+                        "DELETE FROM memory_embeddings WHERE memory_id = ?1",
+                        [memory.id.to_string()],
+                    )?;
+                    transaction.execute(
+                        "DELETE FROM memory_versions WHERE memory_id = ?1",
+                        [memory.id.to_string()],
+                    )?;
+                    transaction.execute(
+                        "DELETE FROM memory_links WHERE source_id = ?1 OR target_id = ?1",
+                        [memory.id.to_string()],
+                    )?;
+                    transaction.execute(
+                        "DELETE FROM contradictions WHERE memory_a_id = ?1 OR memory_b_id = ?1",
+                        [memory.id.to_string()],
+                    )?;
+                    transaction.execute(
+                        "DELETE FROM memories WHERE id = ?1",
+                        [memory.id.to_string()],
+                    )?;
+
+                    transaction.commit()?;
+                    deleted_count += 1;
+
+                    // Re-check storage after each deletion
+                    let new_page_count: u64 = connection.query_row(
+                        "SELECT page_count FROM pragma_page_count",
+                        [],
+                        |row| row.get(0),
+                    )?;
+                    let new_bytes = new_page_count * page_size;
+                    if new_bytes <= cap_bytes {
+                        break;
+                    }
+                }
+            }
+
+            Ok((dormant_count, deleted_count))
+        })
+    }
+
+    /// Delete a link between two memories by its unique identifier.
+    ///
+    /// Returns `Ok(true)` if a link was deleted, `Ok(false)` if no link matched.
+    pub fn delete_link(&self, link_id: &str) -> Result<bool, StoreError> {
+        let trimmed = link_id.trim();
+        if trimmed.is_empty() {
+            return Err(StoreError::Validation(
+                "link_id must not be empty".to_string(),
+            ));
+        }
+        self.with_connection(|connection| {
+            let deleted_rows = connection.execute(
+                "DELETE FROM memory_links WHERE id = ?1",
+                [trimmed],
+            )?;
+            Ok(deleted_rows > 0)
+        })
+    }
+
+    /// Traverse the memory link graph starting from a given memory using BFS.
+    ///
+    /// Discovers connected memories up to `max_depth` hops away, optionally
+    /// filtering by relation type. Returns a [`GraphTraversalResult`] with
+    /// all discovered nodes ordered by depth.
+    pub fn traverse_links(
+        &self,
+        start_id: &MemoryId,
+        max_depth: u32,
+        relation_filter: Option<&str>,
+    ) -> Result<GraphTraversalResult, StoreError> {
+        self.with_connection(|connection| {
+            // Validate start memory exists.
+            let start_memory = require_memory(connection, start_id)?
+                .ok_or(StoreError::NotFound(*start_id))?;
+
+            let mut visited = HashSet::new();
+            visited.insert(*start_id);
+
+            let mut queue: VecDeque<(MemoryId, u32)> = VecDeque::new();
+            queue.push_back((*start_id, 0));
+
+            // Root node at depth 0 with no incoming links.
+            let mut nodes = vec![GraphNode {
+                memory: start_memory,
+                depth: 0,
+                incoming_links: Vec::new(),
+            }];
+
+            while let Some((current_id, current_depth)) = queue.pop_front() {
+                if current_depth >= max_depth {
+                    continue;
+                }
+
+                let links = load_links(connection, &current_id)?;
+
+                for link in links {
+                    // Apply optional relation-type filter.
+                    if let Some(filter) = relation_filter {
+                        if link.relation_type != filter {
+                            continue;
+                        }
+                    }
+
+                    // Determine the neighbor (the other end of the link).
+                    let neighbor_id = if link.source_id == current_id {
+                        link.target_id
+                    } else {
+                        link.source_id
+                    };
+
+                    if visited.contains(&neighbor_id) {
+                        continue;
+                    }
+                    visited.insert(neighbor_id);
+
+                    // Only include neighbors whose memory record still exists.
+                    if let Some(neighbor_memory) = require_memory(connection, &neighbor_id)? {
+                        nodes.push(GraphNode {
+                            memory: neighbor_memory,
+                            depth: current_depth + 1,
+                            incoming_links: vec![link],
+                        });
+                        queue.push_back((neighbor_id, current_depth + 1));
+                    }
+                }
+            }
+
+            Ok(GraphTraversalResult {
+                start_id: *start_id,
+                max_depth,
+                nodes,
+            })
+        })
+    }
+
+    /// Run heuristic-based poisoning detection on the memory store.
+    ///
+    /// Checks for:
+    /// - **Frequency anomaly**: unusually high write frequency in recent time windows
+    /// - **Trust mismatch**: low-provenance memories with high importance scores
+    /// - **Bulk overwrite**: many memory updates in a short window
+    /// - **Mass contradiction**: memories that contradict many existing memories
+    ///
+    /// Returns a list of [`PoisoningAlert`] values ordered by severity descending.
+    pub fn detect_poisoning(&self) -> Result<Vec<PoisoningAlert>, StoreError> {
+        self.with_connection(|connection| {
+            let mut alerts: Vec<PoisoningAlert> = Vec::new();
+            let now = Utc::now();
+            let scope_str = scope_to_db(self.scope);
+            let one_hour_ago = format_timestamp(now - chrono::Duration::hours(1));
+            let one_day_ago = format_timestamp(now - chrono::Duration::hours(24));
+
+            // ── Frequency anomaly ──────────────────────────────────────
+            let hourly_count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND created_at > ?2",
+                params![scope_str, one_hour_ago],
+                |row| row.get(0),
+            )?;
+
+            let daily_count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND created_at > ?2",
+                params![scope_str, one_day_ago],
+                |row| row.get(0),
+            )?;
+
+            if hourly_count > 50
+                || (hourly_count > 20 && daily_count > 0 && hourly_count > daily_count / 4)
+            {
+                let mut stmt = connection.prepare(
+                    "SELECT id FROM memories WHERE scope = ?1 AND created_at > ?2",
+                )?;
+                let ids: Vec<MemoryId> = stmt
+                    .query_map(params![scope_str, one_hour_ago], |row| {
+                        let raw: String = row.get(0)?;
+                        parse_uuid_for_sqlite(&raw)
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                alerts.push(PoisoningAlert {
+                    id: Uuid::new_v4().to_string(),
+                    alert_type: PoisoningAlertType::FrequencyAnomaly,
+                    description: format!(
+                        "Unusually high write frequency: {hourly_count} memories created in the last hour \
+                         ({daily_count} in the last 24 h)."
+                    ),
+                    severity: 0.8,
+                    memory_ids: ids,
+                    detected_at: now,
+                });
+            }
+
+            // ── Trust mismatch ─────────────────────────────────────────
+            {
+                let mut stmt = connection.prepare(
+                    "SELECT id FROM memories \
+                     WHERE scope = ?1 \
+                       AND provenance IN ('agent_inferred', 'imported') \
+                       AND importance_score > 0.8 \
+                       AND state = 'active'",
+                )?;
+                let ids: Vec<MemoryId> = stmt
+                    .query_map(params![scope_str], |row| {
+                        let raw: String = row.get(0)?;
+                        parse_uuid_for_sqlite(&raw)
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                if ids.len() > 5 {
+                    alerts.push(PoisoningAlert {
+                        id: Uuid::new_v4().to_string(),
+                        alert_type: PoisoningAlertType::TrustMismatch,
+                        description: format!(
+                            "{} low-provenance memories have high importance scores (>0.8).",
+                            ids.len()
+                        ),
+                        severity: 0.6,
+                        memory_ids: ids,
+                        detected_at: now,
+                    });
+                }
+            }
+
+            // ── Bulk overwrite ─────────────────────────────────────────
+            {
+                let distinct_updated: i64 = connection.query_row(
+                    "SELECT COUNT(DISTINCT memory_id) FROM memory_versions WHERE changed_at > ?1",
+                    params![one_hour_ago],
+                    |row| row.get(0),
+                )?;
+
+                if distinct_updated > 20 {
+                    let mut stmt = connection.prepare(
+                        "SELECT DISTINCT memory_id FROM memory_versions WHERE changed_at > ?1",
+                    )?;
+                    let ids: Vec<MemoryId> = stmt
+                        .query_map(params![one_hour_ago], |row| {
+                            let raw: String = row.get(0)?;
+                            parse_uuid_for_sqlite(&raw)
+                        })?
+                        .collect::<Result<Vec<_>, _>>()?;
+
+                    alerts.push(PoisoningAlert {
+                        id: Uuid::new_v4().to_string(),
+                        alert_type: PoisoningAlertType::BulkOverwrite,
+                        description: format!(
+                            "{distinct_updated} distinct memories updated in the last hour."
+                        ),
+                        severity: 0.7,
+                        memory_ids: ids,
+                        detected_at: now,
+                    });
+                }
+            }
+
+            // ── Mass contradiction ─────────────────────────────────────
+            {
+                let mut stmt = connection.prepare(
+                    "SELECT memory_id, SUM(cnt) AS total FROM ( \
+                         SELECT memory_a_id AS memory_id, COUNT(*) AS cnt \
+                           FROM contradictions \
+                          WHERE resolution_status = 'unresolved' \
+                          GROUP BY memory_a_id \
+                         UNION ALL \
+                         SELECT memory_b_id, COUNT(*) \
+                           FROM contradictions \
+                          WHERE resolution_status = 'unresolved' \
+                          GROUP BY memory_b_id \
+                     ) GROUP BY memory_id HAVING total >= 3",
+                )?;
+                let rows: Vec<MemoryId> = stmt
+                    .query_map([], |row| {
+                        let raw: String = row.get(0)?;
+                        parse_uuid_for_sqlite(&raw)
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+
+                if !rows.is_empty() {
+                    alerts.push(PoisoningAlert {
+                        id: Uuid::new_v4().to_string(),
+                        alert_type: PoisoningAlertType::MassContradiction,
+                        description: format!(
+                            "{} memories involved in 3 or more unresolved contradictions.",
+                            rows.len()
+                        ),
+                        severity: 0.9,
+                        memory_ids: rows,
+                        detected_at: now,
+                    });
+                }
+            }
+
+            // Sort by severity descending.
+            alerts.sort_by(|a, b| {
+                b.severity
+                    .partial_cmp(&a.severity)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            });
+
+            Ok(alerts)
+        })
+    }
+
+    /// Apply a user-supplied correction to an existing memory.
+    ///
+    /// Records the correction in `memory_corrections`, updates the memory
+    /// content, bumps reliability by +0.1 (capped at 1.0), marks the
+    /// embedding as stale, and creates a version entry for the change.
+    pub fn correct_memory(
+        &self,
+        id: &MemoryId,
+        corrected_content: &str,
+        corrected_by: &str,
+        reason: Option<&str>,
+    ) -> Result<CorrectionRecord, StoreError> {
+        self.with_connection(|connection| {
+            let mut memory =
+                require_memory(connection, id)?.ok_or(StoreError::NotFound(*id))?;
+            let previous_content = memory.content.clone();
+
+            let transaction = connection.transaction()?;
+
+            let correction_id = Uuid::new_v4().to_string();
+            let now = Utc::now();
+            let reason_text = reason.unwrap_or("");
+
+            transaction.execute(
+                r#"
+                INSERT INTO memory_corrections (id, memory_id, previous_content, corrected_content, corrected_by, reason, corrected_at)
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                "#,
+                params![
+                    correction_id,
+                    id.to_string(),
+                    previous_content,
+                    corrected_content,
+                    corrected_by,
+                    reason_text,
+                    format_timestamp(now),
+                ],
+            )?;
+
+            let next_version_number = load_next_version_number(&transaction, id)?;
+            transaction.execute(
+                r#"
+                INSERT INTO memory_versions(
+                    id,
+                    memory_id,
+                    version_number,
+                    content,
+                    changed_at,
+                    changed_by,
+                    change_reason
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                "#,
+                params![
+                    Uuid::new_v4().to_string(),
+                    id.to_string(),
+                    i64::from(next_version_number),
+                    previous_content,
+                    format_timestamp(now),
+                    corrected_by,
+                    format!("user correction: {reason_text}"),
+                ],
+            )?;
+
+            let row_id = require_memory_rowid(&transaction, id)?;
+            let previous_memory = memory.clone();
+
+            memory.content = corrected_content.to_string();
+            memory.reliability_score = (memory.reliability_score + 0.1).min(1.0);
+            memory.embedding_stale = true;
+            memory.updated_at = now;
+
+            persist_memory(&transaction, &memory)?;
+            sync_fts_entry(&transaction, row_id, Some(&previous_memory), &memory)?;
+
+            transaction.commit()?;
+
+            Ok(CorrectionRecord {
+                id: correction_id,
+                memory_id: *id,
+                previous_content,
+                corrected_content: corrected_content.to_string(),
+                corrected_by: corrected_by.to_string(),
+                reason: reason_text.to_string(),
+                corrected_at: now,
+            })
+        })
+    }
+
+    /// Record relevance feedback for a memory that was returned by a search.
+    ///
+    /// This feedback accumulates in `retrieval_feedback` for future scoring
+    /// weight adjustments.  When a memory is marked relevant, its access
+    /// count is incremented; when irrelevant, its importance score is nudged
+    /// downward by 0.02 (floored at 0.0).
+    pub fn record_feedback(
+        &self,
+        memory_id: &MemoryId,
+        query_text: &str,
+        was_relevant: bool,
+    ) -> Result<RetrievalFeedback, StoreError> {
+        self.with_connection(|connection| {
+            let mut memory =
+                require_memory(connection, memory_id)?.ok_or(StoreError::NotFound(*memory_id))?;
+
+            let transaction = connection.transaction()?;
+
+            let feedback_id = Uuid::new_v4().to_string();
+            let now = Utc::now();
+
+            transaction.execute(
+                r#"
+                INSERT INTO retrieval_feedback (id, memory_id, query_text, relevant, recorded_at)
+                VALUES (?1, ?2, ?3, ?4, ?5)
+                "#,
+                params![
+                    feedback_id,
+                    memory_id.to_string(),
+                    query_text,
+                    i64::from(was_relevant),
+                    format_timestamp(now),
+                ],
+            )?;
+
+            if was_relevant {
+                memory.access_count += 1;
+            } else {
+                memory.importance_score = (memory.importance_score - 0.02).max(0.0);
+            }
+            persist_memory(&transaction, &memory)?;
+
+            transaction.commit()?;
+
+            Ok(RetrievalFeedback {
+                id: feedback_id,
+                memory_id: *memory_id,
+                relevant: was_relevant,
+                query_text: Some(query_text.to_string()),
+                recorded_at: now,
+            })
+        })
+    }
+
+    /// Compute adjusted scoring weights based on accumulated feedback.
+    ///
+    /// Analyzes the `retrieval_feedback` table to determine how well the
+    /// current scoring formula predicts relevance.  Returns a map of
+    /// weight names to suggested values.
+    ///
+    /// If fewer than 20 feedback records exist, the default weights are
+    /// returned unchanged (insufficient data to learn from).
+    pub fn compute_learned_weights(&self) -> Result<HashMap<String, f64>, StoreError> {
+        self.with_connection(|connection| {
+            let total: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM retrieval_feedback",
+                [],
+                |row| row.get(0),
+            )?;
+
+            let relevant_count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM retrieval_feedback WHERE relevant = 1",
+                [],
+                |row| row.get(0),
+            )?;
+
+            let mut weights = HashMap::new();
+
+            let default_similarity = f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT);
+            let default_recency = f64::from(crate::types::DEFAULT_RECENCY_WEIGHT);
+            let default_access = f64::from(crate::types::DEFAULT_ACCESS_WEIGHT);
+            let default_importance = f64::from(crate::types::DEFAULT_PRIORITY_WEIGHT);
+
+            if total < 20 {
+                weights.insert("similarity".to_string(), default_similarity);
+                weights.insert("recency".to_string(), default_recency);
+                weights.insert("access_count".to_string(), default_access);
+                weights.insert("importance".to_string(), default_importance);
+                return Ok(weights);
+            }
+
+            let relevance_ratio = (relevant_count as f64) / (total as f64);
+
+            if relevance_ratio >= 0.5 {
+                // Current weights are performing adequately or well — return defaults.
+                weights.insert("similarity".to_string(), default_similarity);
+                weights.insert("recency".to_string(), default_recency);
+                weights.insert("access_count".to_string(), default_access);
+                weights.insert("importance".to_string(), default_importance);
+            } else {
+                // Low relevance ratio — boost similarity, reduce recency.
+                weights.insert("similarity".to_string(), default_similarity + 0.1);
+                weights.insert("recency".to_string(), (default_recency - 0.05).max(0.0));
+                weights.insert("access_count".to_string(), default_access);
+                weights.insert("importance".to_string(), default_importance);
+            }
+
+            Ok(weights)
+        })
+    }
+
+    /// Export memories suitable for sharing with other agents.
+    ///
+    /// Filters active memories by the criteria in `config` (sensitivity ceiling,
+    /// minimum reliability, optional type and tag filters), then returns sanitized
+    /// copies with provenance reset to [`ProvenanceLevel::Imported`] and identity
+    /// fields (`tenant_id`, `user_id`, `agent_id`) cleared.
+    pub fn export_for_sharing(&self, config: &ShareConfig) -> Result<Vec<Memory>, StoreError> {
+        self.with_connection(|connection| {
+            let type_filter = config.type_filter.as_deref();
+            let all = load_search_memories(
+                connection,
+                &[self.scope],
+                MemoryState::Active,
+                type_filter,
+            )?;
+            let max_ord = sensitivity_ord(config.max_sensitivity);
+            let shared: Vec<Memory> = all
+                .into_iter()
+                .filter(|m| {
+                    sensitivity_ord(m.sensitivity) <= max_ord
+                        && m.reliability_score >= config.min_reliability
+                })
+                .filter(|m| {
+                    config
+                        .tag_filter
+                        .as_ref()
+                        .is_none_or(|required| required.iter().all(|t| m.tags.contains(t)))
+                })
+                .map(|mut m| {
+                    m.provenance = ProvenanceLevel::Imported;
+                    m.tenant_id = None;
+                    m.user_id = None;
+                    m.agent_id = None;
+                    m
+                })
+                .collect();
+            Ok(shared)
+        })
+    }
+
+    /// Import memories shared from another agent.
+    ///
+    /// Each memory receives a fresh identifier, is assigned
+    /// [`ProvenanceLevel::Imported`] provenance, has its reliability capped at
+    /// `0.6`, and is marked with a stale embedding flag.  Identity fields are
+    /// cleared and the scope is set to the store's own scope.
+    ///
+    /// Returns the newly assigned [`MemoryId`] values.
+    pub fn import_shared(&self, memories: &[Memory]) -> Result<Vec<MemoryId>, StoreError> {
+        self.with_connection(|connection| {
+            let transaction = connection.unchecked_transaction()?;
+            let mut ids = Vec::with_capacity(memories.len());
+            let now = Utc::now();
+            for source in memories {
+                let new_id = Uuid::new_v4();
+                let mut imported = source.clone();
+                imported.id = new_id;
+                imported.scope = self.scope;
+                imported.provenance = ProvenanceLevel::Imported;
+                imported.reliability_score = imported.reliability_score.min(0.6);
+                imported.embedding_stale = true;
+                imported.tenant_id = None;
+                imported.user_id = None;
+                imported.agent_id = None;
+                imported.created_at = now;
+                imported.updated_at = now;
+                imported.last_accessed_at = None;
+                imported.access_count = 0;
+
+                transaction.execute(
+                    r#"
+                    INSERT INTO memories(
+                        id, content, summary, scope, memory_type, provenance,
+                        importance_score, reliability_score, sensitivity, state,
+                        tags, status, custom_metadata, access_count,
+                        corroboration_count, embedding_stale, created_at,
+                        updated_at, last_accessed_at, tenant_id, user_id, agent_id
+                    )
+                    VALUES (
+                        ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                        ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22
+                    )
+                    "#,
+                    rusqlite::params_from_iter(memory_insert_params(&imported)?),
+                )?;
+
+                let row_id = require_memory_rowid(&transaction, &imported.id)?;
+                sync_fts_entry(&transaction, row_id, None, &imported)?;
+
+                ids.push(new_id);
+            }
+            transaction.commit()?;
+            Ok(ids)
+        })
     }
 }
 
@@ -966,11 +1818,93 @@ impl MemoryStore for SqliteMemoryStore {
         })
     }
 
-    async fn purge_user(&self, _user_id: &str) -> Result<PurgeReport, StoreError> {
-        Err(StoreError::Validation(
-            "purge_user is reserved for a later work unit and is intentionally left as an explicit stub in WU4"
-                .to_string(),
-        ))
+    async fn purge_user(&self, user_id: &str) -> Result<PurgeReport, StoreError> {
+        let user_id = user_id.trim().to_string();
+        if user_id.is_empty() {
+            return Err(StoreError::Validation(
+                "user_id must not be empty".to_string(),
+            ));
+        }
+
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+
+            // Count affected rows before deletion
+            let memories_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ?1",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let versions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let links_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE user_id = ?1) OR target_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let contradictions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE user_id = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let embeddings_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+
+            // Delete in dependency order: dependents first, then memories
+            transaction.execute(
+                "DELETE FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE user_id = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE user_id = ?1) OR target_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+
+            // Delete vec_memories rows BEFORE deleting memory_embeddings
+            transaction.execute(
+                "DELETE FROM vec_memories WHERE rowid IN (SELECT vec_rowid FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1))",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+
+            // Delete the memories themselves
+            transaction.execute(
+                "DELETE FROM memories WHERE user_id = ?1",
+                params![user_id],
+            )?;
+
+            // Rebuild FTS index
+            transaction.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                [],
+            )?;
+
+            transaction.commit()?;
+
+            Ok(PurgeReport {
+                memories_deleted: i64_to_u64(memories_deleted, "memories_deleted")?,
+                versions_deleted: i64_to_u64(versions_deleted, "versions_deleted")?,
+                links_deleted: i64_to_u64(links_deleted, "links_deleted")?,
+                contradictions_deleted: i64_to_u64(
+                    contradictions_deleted,
+                    "contradictions_deleted",
+                )?,
+                embeddings_deleted: i64_to_u64(embeddings_deleted, "embeddings_deleted")?,
+            })
+        })
     }
 
     async fn purge_all(&self) -> Result<PurgeReport, StoreError> {
@@ -1230,6 +2164,382 @@ impl MemoryStore for SqliteMemoryStore {
             transaction.commit()?;
             Ok(())
         })
+    }
+}
+
+impl MemoryObservability for SqliteMemoryStore {
+    /// Produce a health report for the given scope.
+    ///
+    /// Queries the backing store for active/dormant counts, stale embeddings,
+    /// unresolved contradictions, storage size, and temporal bounds, then
+    /// assembles a [`MemoryHealthReport`].
+    fn health_report(&self, scope: MemoryScope) -> Result<MemoryHealthReport, ObservabilityError> {
+        self.with_connection(|connection| {
+            let active_count =
+                count_memories_by_state(connection, scope, MemoryState::Active)?;
+            let dormant_count =
+                count_memories_by_state(connection, scope, MemoryState::Dormant)?;
+            let stale_embeddings_count = connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND embedding_stale = 1",
+                [scope_to_db(scope)],
+                |row| row.get::<_, i64>(0),
+            )?;
+            let unresolved_contradictions = connection.query_row(
+                "SELECT COUNT(*) FROM contradictions WHERE resolution_status = 'unresolved'",
+                [],
+                |row| row.get::<_, i64>(0),
+            )?;
+            let page_count =
+                connection.query_row("PRAGMA page_count", [], |row| row.get::<_, i64>(0))?;
+            let page_size =
+                connection.query_row("PRAGMA page_size", [], |row| row.get::<_, i64>(0))?;
+            let oldest_active_memory = connection
+                .query_row(
+                    "SELECT MIN(created_at) FROM memories WHERE scope = ?1 AND state = 'active'",
+                    [scope_to_db(scope)],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()?
+                .flatten()
+                .map(|value| parse_datetime(&value))
+                .transpose()?;
+            let newest_memory = connection
+                .query_row(
+                    "SELECT MAX(created_at) FROM memories WHERE scope = ?1",
+                    [scope_to_db(scope)],
+                    |row| row.get::<_, Option<String>>(0),
+                )
+                .optional()?
+                .flatten()
+                .map(|value| parse_datetime(&value))
+                .transpose()?;
+            let last_consolidation = connection
+                .query_row(
+                    "SELECT value FROM scope_config WHERE key = 'last_consolidation_at'",
+                    [],
+                    |row| row.get::<_, String>(0),
+                )
+                .optional()?
+                .map(|value| parse_datetime(&value))
+                .transpose()?;
+
+            Ok(MemoryHealthReport {
+                scope,
+                active_count: i64_to_u64(active_count, "active_count")?,
+                dormant_count: i64_to_u64(dormant_count, "dormant_count")?,
+                total_storage_bytes: i64_to_u64(page_count, "page_count")?
+                    .saturating_mul(i64_to_u64(page_size, "page_size")?),
+                budget_usage_ratio: compute_budget_usage_ratio(
+                    connection,
+                    scope,
+                    active_count,
+                )?,
+                unresolved_contradictions: i64_to_u64(
+                    unresolved_contradictions,
+                    "unresolved_contradictions",
+                )?,
+                stale_embeddings_count: i64_to_u64(
+                    stale_embeddings_count,
+                    "stale_embeddings_count",
+                )?,
+                last_consolidation,
+                oldest_active_memory,
+                newest_memory,
+            })
+        })
+        .map_err(ObservabilityError::Store)
+    }
+
+    /// List contradictions visible from the store's configured scope.
+    ///
+    /// Optionally filters by [`ResolutionStatus`].  Results are ordered by
+    /// detection time descending, then by contradiction id ascending.
+    fn list_contradictions(
+        &self,
+        status: Option<ResolutionStatus>,
+    ) -> Result<Vec<ContradictionEntry>, ObservabilityError> {
+        self.with_connection(|connection| {
+            let mut sql = String::from(
+                "SELECT c.id, c.memory_a_id, c.memory_b_id, c.detected_at, c.description, \
+                 c.resolution_status, c.resolved_at, c.resolution_note \
+                 FROM contradictions c \
+                 JOIN memories a ON a.id = c.memory_a_id \
+                 JOIN memories b ON b.id = c.memory_b_id \
+                 WHERE ",
+            );
+            let visible_scopes = self.scope.visible_scopes();
+            let mut params: Vec<rusqlite::types::Value> = Vec::new();
+            sql.push('(');
+            sql.push_str(&scope_in_clause("a.scope", visible_scopes, &mut params));
+            sql.push_str(") AND (");
+            sql.push_str(&scope_in_clause("b.scope", visible_scopes, &mut params));
+            sql.push(')');
+            if let Some(status) = status {
+                sql.push_str(" AND c.resolution_status = ?");
+                sql.push_str(&(params.len() + 1).to_string());
+                params.push(rusqlite::types::Value::from(
+                    resolution_status_to_db(status).to_string(),
+                ));
+            }
+            sql.push_str(" ORDER BY c.detected_at DESC, c.id ASC");
+
+            let mut statement = connection.prepare(&sql)?;
+            let rows =
+                statement.query_map(rusqlite::params_from_iter(params), map_contradiction_row)?;
+            let mut contradictions = Vec::new();
+            for row in rows {
+                contradictions.push(row?);
+            }
+            Ok(contradictions)
+        })
+        .map_err(ObservabilityError::Store)
+    }
+
+    /// Export memories for the given scope in the requested format.
+    ///
+    /// Currently supports [`ExportFormat::Json`].  The SQLite portable export
+    /// format is planned for a future work unit and returns an error.
+    fn export_memories(
+        &self,
+        scope: MemoryScope,
+        format: ExportFormat,
+    ) -> Result<Vec<u8>, ObservabilityError> {
+        match format {
+            ExportFormat::Json => {
+                let memories = self
+                    .with_connection(|connection| {
+                        load_search_memories(connection, &[scope], MemoryState::Active, None)
+                    })
+                    .map_err(ObservabilityError::Store)?;
+                serde_json::to_vec(&memories).map_err(|error| {
+                    ObservabilityError::Operation(format!(
+                        "failed to serialize memories to JSON: {error}"
+                    ))
+                })
+            }
+            ExportFormat::Sqlite => {
+                let (memories, links, versions) = self
+                    .with_connection(|connection| {
+                        load_export_payload(connection, scope)
+                    })
+                    .map_err(ObservabilityError::Store)?;
+
+                let temp_path = std::env::temp_dir()
+                    .join(format!("elegy-export-{}.sqlite3", Uuid::new_v4()));
+                let result =
+                    export_to_sqlite_file(&temp_path, &memories, &links, &versions);
+                let _ = std::fs::remove_file(&temp_path);
+                result.map_err(|error| {
+                    ObservabilityError::Operation(format!(
+                        "sqlite export failed: {error}"
+                    ))
+                })
+            }
+            ExportFormat::Elegy => {
+                let (memories, links, versions) = self
+                    .with_connection(|connection| {
+                        load_export_payload(connection, scope)
+                    })
+                    .map_err(ObservabilityError::Store)?;
+
+                let archive = ElegyArchive {
+                    format_version: "1".to_string(),
+                    exported_at: Utc::now(),
+                    scope,
+                    memories,
+                    links,
+                    versions,
+                };
+                serde_json::to_vec(&archive).map_err(|error| {
+                    ObservabilityError::Operation(format!(
+                        "failed to serialize .elegy archive: {error}"
+                    ))
+                })
+            }
+        }
+    }
+
+    /// Purge all data associated with a specific user.
+    ///
+    /// Delegates to the internal purge logic used by the async
+    /// [`MemoryStore::purge_user`] implementation, performing the operation
+    /// synchronously.
+    fn purge_user(&self, user_id: &str) -> Result<PurgeReport, ObservabilityError> {
+        let user_id = user_id.trim().to_string();
+        if user_id.is_empty() {
+            return Err(ObservabilityError::Operation(
+                "user_id must not be empty".to_string(),
+            ));
+        }
+
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+
+            // Count affected rows before deletion
+            let memories_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memories WHERE user_id = ?1",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let versions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let links_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE user_id = ?1) OR target_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let contradictions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE user_id = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+            let embeddings_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+                |row| row.get(0),
+            )?;
+
+            // Delete in dependency order: dependents first, then memories
+            transaction.execute(
+                "DELETE FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE user_id = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE user_id = ?1) OR target_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+
+            // Delete vec_memories rows BEFORE deleting memory_embeddings
+            transaction.execute(
+                "DELETE FROM vec_memories WHERE rowid IN (SELECT vec_rowid FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1))",
+                params![user_id],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE user_id = ?1)",
+                params![user_id],
+            )?;
+
+            // Delete the memories themselves
+            transaction.execute(
+                "DELETE FROM memories WHERE user_id = ?1",
+                params![user_id],
+            )?;
+
+            // Rebuild FTS index
+            transaction.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                [],
+            )?;
+
+            transaction.commit()?;
+
+            Ok(PurgeReport {
+                memories_deleted: i64_to_u64(memories_deleted, "memories_deleted")?,
+                versions_deleted: i64_to_u64(versions_deleted, "versions_deleted")?,
+                links_deleted: i64_to_u64(links_deleted, "links_deleted")?,
+                contradictions_deleted: i64_to_u64(
+                    contradictions_deleted,
+                    "contradictions_deleted",
+                )?,
+                embeddings_deleted: i64_to_u64(embeddings_deleted, "embeddings_deleted")?,
+            })
+        })
+        .map_err(ObservabilityError::Store)
+    }
+
+    /// Purge all data for a specific scope.
+    ///
+    /// Deletes every memory whose scope matches the given value, along with
+    /// associated versions, links, contradictions, and embeddings.
+    fn purge_scope(&self, scope: MemoryScope) -> Result<PurgeReport, ObservabilityError> {
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+            let scope_db = scope_to_db(scope);
+
+            // Count affected rows before deletion
+            let memories_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1",
+                params![scope_db],
+                |row| row.get(0),
+            )?;
+            let versions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+                |row| row.get(0),
+            )?;
+            let links_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE scope = ?1) OR target_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+                |row| row.get(0),
+            )?;
+            let contradictions_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE scope = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+                |row| row.get(0),
+            )?;
+            let embeddings_deleted: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+                |row| row.get(0),
+            )?;
+
+            // Delete in dependency order: dependents first, then memories
+            transaction.execute(
+                "DELETE FROM contradictions WHERE memory_a_id IN (SELECT id FROM memories WHERE scope = ?1) OR memory_b_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_links WHERE source_id IN (SELECT id FROM memories WHERE scope = ?1) OR target_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_versions WHERE memory_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+            )?;
+
+            // Delete vec_memories rows BEFORE deleting memory_embeddings
+            transaction.execute(
+                "DELETE FROM vec_memories WHERE rowid IN (SELECT vec_rowid FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE scope = ?1))",
+                params![scope_db],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id IN (SELECT id FROM memories WHERE scope = ?1)",
+                params![scope_db],
+            )?;
+
+            // Delete the memories themselves
+            transaction.execute(
+                "DELETE FROM memories WHERE scope = ?1",
+                params![scope_db],
+            )?;
+
+            // Rebuild FTS index
+            transaction.execute(
+                "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+                [],
+            )?;
+
+            transaction.commit()?;
+
+            Ok(PurgeReport {
+                memories_deleted: i64_to_u64(memories_deleted, "memories_deleted")?,
+                versions_deleted: i64_to_u64(versions_deleted, "versions_deleted")?,
+                links_deleted: i64_to_u64(links_deleted, "links_deleted")?,
+                contradictions_deleted: i64_to_u64(
+                    contradictions_deleted,
+                    "contradictions_deleted",
+                )?,
+                embeddings_deleted: i64_to_u64(embeddings_deleted, "embeddings_deleted")?,
+            })
+        })
+        .map_err(ObservabilityError::Store)
     }
 }
 
@@ -2854,6 +4164,174 @@ fn load_links(connection: &Connection, memory_id: &MemoryId) -> Result<Vec<Memor
     Ok(links)
 }
 
+/// Map a [`SensitivityLevel`] variant to a comparable ordinal.
+fn sensitivity_ord(level: SensitivityLevel) -> u8 {
+    match level {
+        SensitivityLevel::Low => 0,
+        SensitivityLevel::Medium => 1,
+        SensitivityLevel::High => 2,
+        SensitivityLevel::Critical => 3,
+    }
+}
+
+/// Payload returned by [`load_export_payload`]: memories, links, and versions.
+type ExportPayload = (Vec<Memory>, Vec<MemoryLink>, Vec<MemoryVersion>);
+
+/// Load all active and dormant memories, their links, and version history for
+/// a single scope.  Used by the SQLite and `.elegy` export paths.
+fn load_export_payload(
+    connection: &Connection,
+    scope: MemoryScope,
+) -> Result<ExportPayload, StoreError> {
+    let mut memories =
+        load_search_memories(connection, &[scope], MemoryState::Active, None)?;
+    memories.extend(load_search_memories(
+        connection,
+        &[scope],
+        MemoryState::Dormant,
+        None,
+    )?);
+
+    let scope_str = scope_to_db(scope);
+    let links = load_scope_links(connection, scope_str)?;
+    let versions = load_scope_versions(connection, scope_str)?;
+
+    Ok((memories, links, versions))
+}
+
+/// Load all links where **both** endpoints belong to the given scope.
+fn load_scope_links(
+    connection: &Connection,
+    scope_str: &str,
+) -> Result<Vec<MemoryLink>, StoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT ml.id, ml.source_id, ml.target_id, ml.relation_type, ml.weight, ml.created_at
+        FROM memory_links ml
+        JOIN memories ms ON ml.source_id = ms.id
+        JOIN memories mt ON ml.target_id = mt.id
+        WHERE ms.scope = ?1 AND mt.scope = ?1
+        ORDER BY ml.created_at
+        "#,
+    )?;
+    let links = statement
+        .query_map([scope_str], |row| {
+            let raw_source_id: String = row.get(1)?;
+            let raw_target_id: String = row.get(2)?;
+            let raw_created_at: String = row.get(5)?;
+            Ok(MemoryLink {
+                id: row.get(0)?,
+                source_id: parse_uuid_for_sqlite(&raw_source_id)?,
+                target_id: parse_uuid_for_sqlite(&raw_target_id)?,
+                relation_type: row.get(3)?,
+                weight: row.get(4)?,
+                created_at: parse_datetime_for_sqlite(&raw_created_at)?,
+            })
+        })?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(links)
+}
+
+/// Load all version-history rows for memories that belong to the given scope.
+fn load_scope_versions(
+    connection: &Connection,
+    scope_str: &str,
+) -> Result<Vec<MemoryVersion>, StoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT mv.id, mv.memory_id, mv.version_number, mv.content,
+               mv.changed_by, mv.change_reason, mv.changed_at
+        FROM memory_versions mv
+        JOIN memories m ON mv.memory_id = m.id
+        WHERE m.scope = ?1
+        ORDER BY mv.memory_id, mv.version_number DESC
+        "#,
+    )?;
+    let versions = statement
+        .query_map([scope_str], map_memory_version_row)?
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(versions)
+}
+
+/// Create a self-contained SQLite file containing the given memories, links,
+/// and version history.  Returns the raw file bytes.
+fn export_to_sqlite_file(
+    path: &Path,
+    memories: &[Memory],
+    links: &[MemoryLink],
+    versions: &[MemoryVersion],
+) -> Result<Vec<u8>, StoreError> {
+    let mut connection = init_database(path)?;
+
+    let transaction = connection.transaction()?;
+
+    for memory in memories {
+        transaction.execute(
+            r#"
+            INSERT INTO memories(
+                id, content, summary, scope, memory_type, provenance,
+                importance_score, reliability_score, sensitivity, state,
+                tags, status, custom_metadata, access_count,
+                corroboration_count, embedding_stale, created_at,
+                updated_at, last_accessed_at, tenant_id, user_id, agent_id
+            )
+            VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22
+            )
+            "#,
+            rusqlite::params_from_iter(memory_insert_params(memory)?),
+        )?;
+    }
+
+    for link in links {
+        transaction.execute(
+            r#"
+            INSERT INTO memory_links(id, source_id, target_id, relation_type, weight, created_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+            "#,
+            params![
+                link.id,
+                link.source_id.to_string(),
+                link.target_id.to_string(),
+                link.relation_type,
+                link.weight,
+                format_timestamp(link.created_at),
+            ],
+        )?;
+    }
+
+    for version in versions {
+        transaction.execute(
+            r#"
+            INSERT INTO memory_versions(id, memory_id, version_number, content, changed_by, change_reason, changed_at)
+            VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+            "#,
+            params![
+                version.id,
+                version.memory_id.to_string(),
+                version.version_number,
+                version.content,
+                version.changed_by,
+                version.change_reason,
+                format_timestamp(version.changed_at),
+            ],
+        )?;
+    }
+
+    // Rebuild FTS index so full-text search works in the exported DB
+    transaction.execute_batch(
+        "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+    )?;
+
+    transaction.commit()?;
+    drop(connection);
+
+    std::fs::read(path).map_err(|error| {
+        StoreError::Migration(format!("failed to read exported SQLite file: {error}"))
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -2871,9 +4349,9 @@ mod tests {
 
     use super::{expand_compound_words, split_compound_word, SqliteMemoryStore};
     use crate::{
-        EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
-        MemoryStore, MemoryType, MetadataUpdate, OptionalFieldUpdate, ProvenanceLevel,
-        ResolutionStatus, SearchQuery, SensitivityLevel,
+        ElegyArchive, EmbeddingError, EmbeddingProvider, ExportFormat, Memory, MemoryFilter,
+        MemoryScope, MemoryState, MemoryStore, MemoryType, MetadataUpdate, OptionalFieldUpdate,
+        ProvenanceLevel, ResolutionStatus, SearchQuery, SensitivityLevel, ShareConfig,
     };
 
     #[derive(Debug, Clone)]
@@ -4338,5 +5816,472 @@ mod tests {
         embedding[0] = clamped_similarity;
         embedding[1] = orthogonal_component;
         embedding
+    }
+
+    #[tokio::test]
+    async fn correct_memory_updates_content_and_reliability() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.content = "old content".to_string();
+        memory.reliability_score = 0.7;
+        let id = memory.id;
+        let old_reliability = memory.reliability_score;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        let correction = fixture
+            .store
+            .correct_memory(&id, "corrected content", "test-user", Some("was wrong"))
+            .expect("correction should succeed");
+
+        assert_eq!(correction.previous_content, "old content");
+        assert_eq!(correction.corrected_content, "corrected content");
+        assert_eq!(correction.corrected_by, "test-user");
+        assert_eq!(correction.reason, "was wrong");
+        assert_eq!(correction.memory_id, id);
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(updated.content, "corrected content");
+        assert!(
+            updated.reliability_score > old_reliability,
+            "reliability should have increased: {} vs {}",
+            updated.reliability_score,
+            old_reliability,
+        );
+        assert!(updated.embedding_stale);
+    }
+
+    #[tokio::test]
+    async fn correct_memory_creates_version_entry() {
+        let fixture = test_fixture();
+        let memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        fixture
+            .store
+            .correct_memory(&id, "v2 content", "corrector", None)
+            .expect("correction should succeed");
+
+        let versions = fixture.store.list_versions(&id).expect("list versions");
+        assert!(
+            !versions.is_empty(),
+            "should have at least one version entry after correction"
+        );
+    }
+
+    #[tokio::test]
+    async fn correct_memory_not_found() {
+        let fixture = test_fixture();
+        let missing_id = Uuid::new_v4();
+
+        let result =
+            fixture
+                .store
+                .correct_memory(&missing_id, "new", "user", None);
+        assert!(result.is_err(), "correcting missing memory should fail");
+    }
+
+    #[tokio::test]
+    async fn correct_memory_caps_reliability_at_one() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.reliability_score = 0.95;
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        fixture
+            .store
+            .correct_memory(&id, "better", "user", None)
+            .expect("correction should succeed");
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert!(
+            (updated.reliability_score - 1.0).abs() < f32::EPSILON,
+            "reliability should be capped at 1.0, got {}",
+            updated.reliability_score,
+        );
+    }
+
+    #[tokio::test]
+    async fn record_feedback_relevant_increments_access_count() {
+        let fixture = test_fixture();
+        let memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let id = memory.id;
+        let original_access = memory.access_count;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        let feedback = fixture
+            .store
+            .record_feedback(&id, "test query", true)
+            .expect("feedback should succeed");
+
+        assert!(feedback.relevant);
+        assert_eq!(feedback.memory_id, id);
+        assert_eq!(feedback.query_text.as_deref(), Some("test query"));
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(
+            updated.access_count,
+            original_access + 1,
+            "access count should be incremented for relevant feedback"
+        );
+    }
+
+    #[tokio::test]
+    async fn record_feedback_irrelevant_reduces_importance() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.importance_score = 0.5;
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        let feedback = fixture
+            .store
+            .record_feedback(&id, "bad query", false)
+            .expect("feedback should succeed");
+
+        assert!(!feedback.relevant);
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert!(
+            (updated.importance_score - 0.48).abs() < f32::EPSILON,
+            "importance should be reduced by 0.02, got {}",
+            updated.importance_score,
+        );
+    }
+
+    #[tokio::test]
+    async fn record_feedback_irrelevant_floors_importance_at_zero() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.importance_score = 0.01;
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        fixture
+            .store
+            .record_feedback(&id, "q", false)
+            .expect("feedback should succeed");
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert!(
+            updated.importance_score >= 0.0,
+            "importance should be floored at 0.0, got {}",
+            updated.importance_score,
+        );
+    }
+
+    #[tokio::test]
+    async fn record_feedback_not_found() {
+        let fixture = test_fixture();
+        let missing_id = Uuid::new_v4();
+
+        let result = fixture.store.record_feedback(&missing_id, "q", true);
+        assert!(
+            result.is_err(),
+            "recording feedback for missing memory should fail"
+        );
+    }
+
+    #[test]
+    fn compute_learned_weights_defaults_with_insufficient_data() {
+        let fixture = test_fixture();
+
+        let weights = fixture
+            .store
+            .compute_learned_weights()
+            .expect("compute weights");
+
+        assert_eq!(weights.len(), 4);
+        assert!(
+            (weights["similarity"] - f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT)).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (weights["recency"] - f64::from(crate::types::DEFAULT_RECENCY_WEIGHT)).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (weights["access_count"] - f64::from(crate::types::DEFAULT_ACCESS_WEIGHT)).abs()
+                < f64::EPSILON
+        );
+        assert!(
+            (weights["importance"] - f64::from(crate::types::DEFAULT_PRIORITY_WEIGHT)).abs()
+                < f64::EPSILON
+        );
+    }
+
+    #[tokio::test]
+    async fn compute_learned_weights_adjusts_on_low_relevance() {
+        let fixture = test_fixture();
+
+        // Store enough memories and feedback to exceed the threshold (20)
+        for i in 0..25 {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            memory.content = format!("feedback test memory {i}");
+            let id = memory.id;
+            fixture.store.store(memory).await.expect("store");
+
+            // Make most feedback irrelevant (only 5 relevant out of 25 = 20% ratio)
+            let relevant = i < 5;
+            fixture
+                .store
+                .record_feedback(&id, &format!("query {i}"), relevant)
+                .expect("record feedback");
+        }
+
+        let weights = fixture
+            .store
+            .compute_learned_weights()
+            .expect("compute weights");
+
+        let default_similarity = f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT);
+        assert!(
+            weights["similarity"] > default_similarity,
+            "similarity weight should be boosted, got {}",
+            weights["similarity"],
+        );
+    }
+
+    #[tokio::test]
+    async fn export_sqlite_round_trips_memories() {
+        let fixture = test_fixture();
+
+        let mut m = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m.content = "sqlite-export-test".to_string();
+        let id = m.id;
+        fixture.store.store(m).await.expect("store");
+
+        let bytes = crate::MemoryObservability::export_memories(
+            &fixture.store,
+            MemoryScope::Workspace,
+            ExportFormat::Sqlite,
+        )
+        .expect("sqlite export");
+        assert!(!bytes.is_empty(), "exported bytes must be non-empty");
+
+        // Open the exported DB and verify the memory is there
+        let export_path = fixture.path.with_extension("export.sqlite3");
+        std::fs::write(&export_path, &bytes).expect("write export");
+        let conn = rusqlite::Connection::open(&export_path).expect("open export");
+        let count: i64 = conn
+            .query_row(
+                "SELECT COUNT(*) FROM memories WHERE id = ?1",
+                [id.to_string()],
+                |r| r.get(0),
+            )
+            .expect("count");
+        let _ = std::fs::remove_file(&export_path);
+        assert_eq!(count, 1, "exported DB should contain the stored memory");
+    }
+
+    #[tokio::test]
+    async fn export_elegy_round_trips_memories() {
+        let fixture = test_fixture();
+
+        let mut m = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m.content = "elegy-export-test".to_string();
+        fixture.store.store(m).await.expect("store");
+
+        let bytes = crate::MemoryObservability::export_memories(
+            &fixture.store,
+            MemoryScope::Workspace,
+            ExportFormat::Elegy,
+        )
+        .expect("elegy export");
+        let archive: ElegyArchive =
+            serde_json::from_slice(&bytes).expect("deserialize archive");
+        assert_eq!(archive.format_version, "1");
+        assert_eq!(archive.scope, MemoryScope::Workspace);
+        assert_eq!(archive.memories.len(), 1);
+        assert_eq!(archive.memories[0].content, "elegy-export-test");
+    }
+
+    #[tokio::test]
+    async fn export_sqlite_includes_links_and_versions() {
+        let fixture = test_fixture();
+
+        let mut m1 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m1.content = "linked-a".to_string();
+        let mut m2 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m2.content = "linked-b".to_string();
+        let id1 = m1.id;
+        let id2 = m2.id;
+        fixture.store.store(m1).await.expect("store m1");
+        fixture.store.store(m2).await.expect("store m2");
+        fixture.store.record_link(&id1, &id2, "related").expect("link");
+
+        // Create a version by correcting m1
+        fixture
+            .store
+            .correct_memory(&id1, "linked-a-v2", "tester", Some("test reason"))
+            .expect("correct");
+
+        let bytes = crate::MemoryObservability::export_memories(
+            &fixture.store,
+            MemoryScope::Workspace,
+            ExportFormat::Sqlite,
+        )
+        .expect("sqlite export");
+        let export_path = fixture.path.with_extension("check-links.sqlite3");
+        std::fs::write(&export_path, &bytes).expect("write");
+        let conn = rusqlite::Connection::open(&export_path).expect("open");
+
+        let link_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM memory_links", [], |r| r.get(0))
+            .expect("count links");
+        let _ = std::fs::remove_file(&export_path);
+        assert!(link_count >= 1, "should export at least one link");
+
+        let version_count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM memory_versions", [], |r| r.get(0))
+            .expect("count versions");
+        assert!(version_count >= 1, "should export at least one version");
+    }
+
+    #[tokio::test]
+    async fn export_for_sharing_filters_by_config() {
+        let fixture = test_fixture();
+
+        // Store a Low-sensitivity memory
+        let mut low = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        low.content = "shareable".to_string();
+        low.sensitivity = SensitivityLevel::Low;
+        low.reliability_score = 0.8;
+        fixture.store.store(low).await.expect("store low");
+
+        // Store a Critical-sensitivity memory
+        let mut crit = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        crit.content = "secret".to_string();
+        crit.sensitivity = SensitivityLevel::Critical;
+        crit.reliability_score = 0.9;
+        fixture.store.store(crit).await.expect("store critical");
+
+        // Store a low-reliability memory
+        let mut unreliable = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        unreliable.content = "unreliable".to_string();
+        unreliable.reliability_score = 0.2;
+        fixture.store.store(unreliable).await.expect("store unreliable");
+
+        let config = ShareConfig {
+            max_sensitivity: SensitivityLevel::Medium,
+            min_reliability: 0.5,
+            type_filter: None,
+            tag_filter: None,
+        };
+        let shared = fixture.store.export_for_sharing(&config).expect("export");
+        assert_eq!(shared.len(), 1, "only the low-sensitivity reliable memory");
+        assert_eq!(shared[0].content, "shareable");
+        assert_eq!(shared[0].provenance, ProvenanceLevel::Imported);
+        assert!(shared[0].tenant_id.is_none());
+        assert!(shared[0].user_id.is_none());
+        assert!(shared[0].agent_id.is_none());
+    }
+
+    #[tokio::test]
+    async fn export_for_sharing_applies_tag_filter() {
+        let fixture = test_fixture();
+
+        let mut tagged = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        tagged.content = "tagged".to_string();
+        tagged.tags = vec!["rust".to_string(), "memory".to_string()];
+        tagged.reliability_score = 0.8;
+        fixture.store.store(tagged).await.expect("store tagged");
+
+        let mut untagged = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        untagged.content = "untagged".to_string();
+        untagged.reliability_score = 0.8;
+        fixture.store.store(untagged).await.expect("store untagged");
+
+        let config = ShareConfig {
+            max_sensitivity: SensitivityLevel::Critical,
+            min_reliability: 0.0,
+            type_filter: None,
+            tag_filter: Some(vec!["rust".to_string()]),
+        };
+        let shared = fixture.store.export_for_sharing(&config).expect("export");
+        assert_eq!(shared.len(), 1);
+        assert_eq!(shared[0].content, "tagged");
+    }
+
+    #[tokio::test]
+    async fn import_shared_creates_new_memories() {
+        let fixture = test_fixture();
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = "imported-content".to_string();
+        source.reliability_score = 0.9;
+        source.provenance = ProvenanceLevel::UserStated;
+        source.tenant_id = Some("other-tenant".to_string());
+        source.user_id = Some("other-user".to_string());
+        source.agent_id = Some("other-agent".to_string());
+
+        let ids = fixture.store.import_shared(&[source]).expect("import");
+        assert_eq!(ids.len(), 1);
+
+        let imported = fixture
+            .store
+            .get_raw(&ids[0])
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(imported.content, "imported-content");
+        assert_eq!(imported.provenance, ProvenanceLevel::Imported);
+        assert!(
+            imported.reliability_score <= 0.6,
+            "reliability should be capped at 0.6"
+        );
+        assert_eq!(imported.scope, MemoryScope::Workspace, "scope rewritten");
+        assert!(imported.tenant_id.is_none(), "tenant cleared");
+        assert!(imported.user_id.is_none(), "user cleared");
+        assert!(imported.agent_id.is_none(), "agent cleared");
+        assert!(imported.embedding_stale, "embedding marked stale");
+    }
+
+    #[tokio::test]
+    async fn import_shared_assigns_fresh_ids() {
+        let fixture = test_fixture();
+
+        let m1 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let m2 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let original_id1 = m1.id;
+        let original_id2 = m2.id;
+
+        let ids = fixture.store.import_shared(&[m1, m2]).expect("import");
+        assert_eq!(ids.len(), 2);
+        assert_ne!(ids[0], original_id1, "should be fresh ID");
+        assert_ne!(ids[1], original_id2, "should be fresh ID");
+        assert_ne!(ids[0], ids[1], "each import gets unique ID");
     }
 }
