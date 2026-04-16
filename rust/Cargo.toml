@@ -14,7 +14,7 @@ members = [
     "crates/elegy-runtime",
     "crates/elegy-core",
     "crates/elegy-host-mcp",
-    "crates/elegy-cli",
+    "crates/elegy-cli", "crates/elegy-diagram",
 ]
 resolver = "2"
 

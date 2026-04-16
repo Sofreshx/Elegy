@@ -390,6 +390,7 @@ dependencies = [
  "clap",
  "elegy-contracts",
  "elegy-core",
+ "elegy-diagram",
  "elegy-host-mcp",
  "elegy-mcp",
  "elegy-memory",
@@ -432,6 +433,15 @@ dependencies = [
  "thiserror",
  "toml",
  "url",
+]
+
+[[package]]
+name = "elegy-diagram"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
