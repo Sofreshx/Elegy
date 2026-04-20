@@ -15,6 +15,8 @@ members = [
     "crates/elegy-core",
     "crates/elegy-host-mcp",
     "crates/elegy-cli", "crates/elegy-diagram",
+    "crates/elegy-observe-win32",
+    "crates/elegy-observe",
 ]
 resolver = "2"
 
@@ -44,6 +46,9 @@ tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std",
 toml = "0.8.20"
 url = { version = "2.5.4", features = ["serde"] }
 zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+arboard = "3.4"
+png = "0.17"
+sysinfo = "0.33"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

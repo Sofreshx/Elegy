@@ -20,6 +20,7 @@ elegy-mermaid = { version = "0.1.0", path = "../elegy-mermaid" }
 elegy-diagram = { version = "0.1.0", path = "../elegy-diagram" }
 elegy-mcp = { version = "0.1.0", path = "../elegy-mcp" }
 elegy-memory = { version = "0.1.0", path = "../elegy-memory" }
+elegy-observe = { version = "0.1.0", path = "../elegy-observe" }
 elegy-tooling = { version = "0.1.0", path = "../elegy-tooling" }
 serde.workspace = true
 serde_json.workspace = true

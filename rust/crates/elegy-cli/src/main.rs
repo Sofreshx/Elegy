@@ -25,6 +25,10 @@ use elegy_mermaid::{
     MermaidWorkflowProjection,
 };
 use elegy_diagram::{CanonicalDiagram, DiagramNode, DiagramEdge, DiagramPatch};
+use elegy_observe::{
+    capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
+    snapshot_processes, system_info,
+};
 use elegy_tooling::{
     generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
     ToolingError as SkillsSurfaceError,
@@ -65,6 +69,10 @@ const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
     (
         "skill-router",
         include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
+    ),
+    (
+        "observe",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
     ),
 ];
 
@@ -150,6 +158,11 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    /// Desktop and OS observation commands
+    Observe {
+        #[command(subcommand)]
+        command: ObserveCommand,
     },
 }
 
@@ -315,6 +328,47 @@ enum SkillsCommand {
         #[arg(long)]
         detail: bool,
     },
+}
+
+/// Desktop and OS observation commands for agentic workflows.
+#[derive(Subcommand, Debug)]
+enum ObserveCommand {
+    /// Snapshot of running processes
+    Processes {
+        /// Filter processes by name pattern (case-insensitive substring match)
+        #[arg(long)]
+        filter: Option<String>,
+    },
+    /// Current foreground (active) window info (Windows only)
+    Window,
+    /// List all visible windows, optionally filtered by title
+    Windows {
+        /// Filter windows by title pattern (case-insensitive substring match)
+        #[arg(long)]
+        filter: Option<String>,
+    },
+    /// Capture the current screen as PNG
+    Screen {
+        /// Monitor index (0 = primary, default)
+        #[arg(long)]
+        monitor: Option<u32>,
+        /// Save PNG to file instead of returning base64 in JSON
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Read current clipboard contents
+    Clipboard,
+    /// Observe a filesystem path for changes over a bounded time window
+    Filesystem {
+        /// Directory path to observe
+        #[arg(long)]
+        path: PathBuf,
+        /// Observation duration in seconds (default: 5)
+        #[arg(long, default_value = "5")]
+        timeout_seconds: u64,
+    },
+    /// System hardware and OS information snapshot
+    System,
 }
 
 #[derive(Subcommand, Debug)]
@@ -846,6 +900,27 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Skills {
             command: SkillsCommand::Search { query, detail },
         } => execute_skills_search_command(query, detail, format),
+        Command::Observe {
+            command: ObserveCommand::Processes { filter },
+        } => execute_observe_processes_command(filter, format),
+        Command::Observe {
+            command: ObserveCommand::Window,
+        } => execute_observe_window_command(format),
+        Command::Observe {
+            command: ObserveCommand::Windows { filter },
+        } => execute_observe_windows_command(filter, format),
+        Command::Observe {
+            command: ObserveCommand::Screen { monitor, output },
+        } => execute_observe_screen_command(monitor, output, format),
+        Command::Observe {
+            command: ObserveCommand::Clipboard,
+        } => execute_observe_clipboard_command(format),
+        Command::Observe {
+            command: ObserveCommand::Filesystem { path, timeout_seconds },
+        } => execute_observe_filesystem_command(path, timeout_seconds, format),
+        Command::Observe {
+            command: ObserveCommand::System,
+        } => execute_observe_system_command(format),
     }
 }
 
@@ -871,7 +946,8 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "cliSchemaVersion": CLI_SCHEMA_VERSION,
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
-                        "local", "mermaid", "diagram", "run", "contracts", "skills"
+                        "local", "mermaid", "diagram", "run", "contracts", "skills",
+                        "observe"
                     ],
                     "skillDefinitionFormat": 2,
                     "mcpHostCapable": true
@@ -2868,9 +2944,9 @@ fn estimate_context_cost(
     let full_bytes = serde_json::to_vec(full).map(|v| v.len()).unwrap_or(0);
 
     ContextCostEstimate {
-        index_tokens: (index_bytes + 3) / 4,
-        detail_tokens: (detail_bytes + 3) / 4,
-        full_tokens: (full_bytes + 3) / 4,
+        index_tokens: index_bytes.div_ceil(4),
+        detail_tokens: detail_bytes.div_ceil(4),
+        full_tokens: full_bytes.div_ceil(4),
     }
 }
 
@@ -3685,6 +3761,320 @@ fn execute_diagram_render_command(
             Vec::new(),
             Some("elegy://schemas/diagram-render"),
         ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+// ---------------------------------------------------------------------------
+// Observe command executors
+// ---------------------------------------------------------------------------
+
+fn execute_observe_processes_command(
+    filter: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let snap = snapshot_processes(filter.as_deref());
+    match format {
+        OutputFormat::Text => {
+            println!("Processes snapshot ({} found):", snap.processes.len());
+            for p in &snap.processes {
+                println!(
+                    "  [{}] {} — {:.1} MB, {:.1}% CPU",
+                    p.pid, p.name, p.memory_mb, p.cpu_percent
+                );
+            }
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["observe", "processes"],
+                "ok",
+                Summary::default(),
+                json!(snap),
+                Vec::new(),
+            ))?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_observe_window_command(
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match foreground_window() {
+        Ok(info) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Foreground window: \"{}\" (PID {})",
+                        info.title, info.process_id
+                    );
+                    println!(
+                        "  Bounds: {}x{} at ({}, {})",
+                        info.bounds.width, info.bounds.height, info.bounds.x, info.bounds.y
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "window"],
+                        "ok",
+                        Summary::default(),
+                        json!({ "foregroundWindow": info }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "window"],
+                        "error",
+                        Summary { errors: 1, warnings: 0 },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_windows_command(
+    filter: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match list_windows(filter.as_deref()) {
+        Ok(windows) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Visible windows ({} found):", windows.len());
+                    for w in &windows {
+                        println!(
+                            "  [PID {}] \"{}\" — {}x{}",
+                            w.process_id, w.title, w.bounds.width, w.bounds.height
+                        );
+                    }
+                }
+                OutputFormat::Json => {
+                    let count = windows.len();
+                    print_json(&build_envelope(
+                        ["observe", "windows"],
+                        "ok",
+                        Summary::default(),
+                        json!({ "windows": windows, "count": count }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "windows"],
+                        "error",
+                        Summary { errors: 1, warnings: 0 },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_screen_command(
+    monitor: Option<u32>,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match capture_screen(monitor, output.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Screen captured: {}x{} (monitor {})",
+                        result.width, result.height, result.monitor
+                    );
+                    if let Some(ref path) = result.output_path {
+                        println!("  Saved to: {path}");
+                    } else {
+                        println!("  (base64 PNG in JSON output; use --json to retrieve)");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "screen"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "screen"],
+                        "error",
+                        Summary { errors: 1, warnings: 0 },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_clipboard_command(
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match read_clipboard() {
+        Ok(contents) => {
+            match format {
+                OutputFormat::Text => {
+                    if let Some(ref text) = contents.text {
+                        let preview = if text.len() > 200 {
+                            &text[..200]
+                        } else {
+                            text.as_str()
+                        };
+                        println!("Clipboard text: {preview}");
+                    } else {
+                        println!("Clipboard: (no text content)");
+                    }
+                    if contents.has_image {
+                        println!("  (clipboard also contains an image)");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "clipboard"],
+                        "ok",
+                        Summary::default(),
+                        json!(contents),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "clipboard"],
+                        "error",
+                        Summary { errors: 1, warnings: 0 },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_filesystem_command(
+    path: PathBuf,
+    timeout_seconds: u64,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let timeout = std::time::Duration::from_secs(timeout_seconds);
+    match observe_filesystem(&path, timeout) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Filesystem observation of \"{}\" for {}s:",
+                        result.watched_path, result.duration_seconds
+                    );
+                    if result.changes.is_empty() {
+                        println!("  No changes detected.");
+                    } else {
+                        for c in &result.changes {
+                            println!("  [{}] {}", c.change_type, c.path);
+                        }
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "filesystem"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "filesystem"],
+                        "error",
+                        Summary { errors: 1, warnings: 0 },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_system_command(
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let info = system_info();
+    match format {
+        OutputFormat::Text => {
+            println!("System: {} {}", info.os_name, info.os_version);
+            println!("  Host: {}", info.hostname);
+            println!(
+                "  Memory: {} / {} MB",
+                info.used_memory_mb, info.total_memory_mb
+            );
+            println!("  CPUs: {}", info.cpu_count);
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["observe", "system"],
+                "ok",
+                Summary::default(),
+                json!(info),
+                Vec::new(),
+            ))?;
+        }
     }
     Ok(ExitCode::SUCCESS)
 }

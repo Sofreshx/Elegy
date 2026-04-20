@@ -23,6 +23,10 @@ const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
         "skill-router",
         include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
     ),
+    (
+        "observe",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
+    ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -698,7 +702,7 @@ mod tests {
         let tools = build_tools_from_skill_definitions();
 
         // The diagram skill definition has 4 capabilities
-        assert_eq!(tools.len(), 7, "expected 7 tools from diagram + skill-router skill defs");
+        assert_eq!(tools.len(), 14, "expected 14 tools from diagram + skill-router + observe skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"), "missing diagram-create");
@@ -717,6 +721,13 @@ mod tests {
             names.contains(&"router-skill-list"),
             "missing router-skill-list"
         );
+        assert!(names.contains(&"observe-processes"), "missing observe-processes");
+        assert!(names.contains(&"observe-window"), "missing observe-window");
+        assert!(names.contains(&"observe-windows"), "missing observe-windows");
+        assert!(names.contains(&"observe-screen"), "missing observe-screen");
+        assert!(names.contains(&"observe-clipboard"), "missing observe-clipboard");
+        assert!(names.contains(&"observe-filesystem"), "missing observe-filesystem");
+        assert!(names.contains(&"observe-system"), "missing observe-system");
     }
 
     #[test]
@@ -875,7 +886,7 @@ mod tests {
             .await
             .expect("client should list tools");
 
-        assert_eq!(tools.len(), 7, "expected 7 tools from diagram + skill-router skill defs");
+        assert_eq!(tools.len(), 14, "expected 14 tools from diagram + skill-router + observe skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"));
@@ -885,6 +896,13 @@ mod tests {
         assert!(names.contains(&"router-skill-search"));
         assert!(names.contains(&"router-skill-describe"));
         assert!(names.contains(&"router-skill-list"));
+        assert!(names.contains(&"observe-processes"));
+        assert!(names.contains(&"observe-window"));
+        assert!(names.contains(&"observe-windows"));
+        assert!(names.contains(&"observe-screen"));
+        assert!(names.contains(&"observe-clipboard"));
+        assert!(names.contains(&"observe-filesystem"));
+        assert!(names.contains(&"observe-system"));
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");

@@ -53,6 +53,13 @@ Everything else in the release exists to support verified installation, automati
 | `elegy-mcp` | Ready now | Dedicated CLI for governed MCP descriptor authoring and descriptor analysis. |
 | `elegy-skills` | Ready now | Dedicated CLI for governed MCP-to-skill generation. |
 | `elegy-memory` | MVP / preview | Dedicated local memory CLI backed by the in-repo Rust implementation. Usable now for add, search, list, inspect, health, export, purge, contradictions, and the current preview `reembed` command surface. |
+| `elegy observe processes` | Ready now | Snapshot running processes with PID, name, memory, and CPU. Supports `--filter` for name matching. |
+| `elegy observe window` | Ready now | Get foreground window info including title, PID, and bounds. Windows only. |
+| `elegy observe windows` | Ready now | List all visible windows. Supports `--filter` for title matching. Windows only. |
+| `elegy observe screen` | Ready now | Capture screen as PNG. Save to file with `--output` or get base64 in JSON. Windows only. |
+| `elegy observe clipboard` | Ready now | Read current clipboard text and image presence. Cross-platform. |
+| `elegy observe filesystem` | Ready now | Snapshot-diff a directory over a bounded time window. Cross-platform. |
+| `elegy observe system` | Ready now | System hardware and OS info snapshot. Cross-platform. |
 
 ## What is intentionally not a separate release package
 
@@ -107,6 +114,7 @@ Not every Rust crate in the workspace is a directly shipped user-facing tool. Th
 - Governed/data crates: `elegy-contracts`, `elegy-policy`, `elegy-descriptor`
 - Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp` (resources + tool dispatch), `elegy-agent-events`
 - Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`, `elegy-diagram`
+- Observation crates: `elegy-observe` (safe observation API), `elegy-observe-win32` (isolated Win32 FFI leaf)
 
 That distinction matters for consumers: the release lane is CLI-first, while the rest of the workspace is primarily implementation and runtime support.
 
