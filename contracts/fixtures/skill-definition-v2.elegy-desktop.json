@@ -27,7 +27,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "click", "--x", "${x}", "--y", "${y}", "--button", "${button}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "click", "--x", "${x}", "--y", "${y}", "--button", "${button}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -51,7 +51,7 @@
             "default": "left"
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without injecting input.",
             "required": false,
@@ -75,7 +75,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "type", "--text", "${text}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "type", "--text", "${text}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -86,7 +86,7 @@
             "required": true
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without injecting input.",
             "required": false,
@@ -110,7 +110,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "key", "--combo", "${combo}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "key", "--combo", "${combo}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -121,7 +121,7 @@
             "required": true
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without injecting input.",
             "required": false,
@@ -145,7 +145,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "focus", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "focus", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -162,7 +162,7 @@
             "required": false
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without executing it.",
             "required": false,
@@ -186,7 +186,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "move", "--title", "${title}", "--hwnd", "${hwnd}", "--x", "${x}", "--y", "${y}", "--width", "${width}", "--height", "${height}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "move", "--title", "${title}", "--hwnd", "${hwnd}", "--x", "${x}", "--y", "${y}", "--width", "${width}", "--height", "${height}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -227,7 +227,7 @@
             "required": false
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without executing it.",
             "required": false,
@@ -251,7 +251,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "minimize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "minimize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -268,7 +268,7 @@
             "required": false
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without executing it.",
             "required": false,
@@ -292,7 +292,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["desktop", "maximize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+        "arguments": ["desktop", "maximize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dry_run}", "--json"]
       },
       "input": {
         "parameters": [
@@ -309,7 +309,7 @@
             "required": false
           },
           {
-            "name": "dryRun",
+            "name": "dry_run",
             "type": "boolean",
             "description": "When true, preview the action without executing it.",
             "required": false,
