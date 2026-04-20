@@ -24,9 +24,6 @@ use elegy_mermaid::{
     MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
     MermaidWorkflowProjection,
 };
-use elegy_desktop::{
-    click, focus_window, maximize_window, minimize_window, move_window, send_key, type_text,
-};
 use elegy_diagram::{CanonicalDiagram, DiagramNode, DiagramEdge, DiagramPatch};
 use elegy_observe::{
     capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
@@ -591,6 +588,8 @@ where
 struct Summary {
     errors: usize,
     warnings: usize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    text: String,
 }
 
 #[derive(Serialize)]
@@ -1065,18 +1064,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                 height,
                 dry_run,
             },
-        } => execute_desktop_move_command(
-            title,
-            hwnd,
-            DesktopMoveGeometry {
-                x,
-                y,
-                width,
-                height,
-            },
-            dry_run,
-            format,
-        ),
+        } => execute_desktop_move_command(title, hwnd, x, y, width, height, dry_run, format),
         Command::Desktop {
             command: DesktopCommand::Minimize {
                 title,
@@ -2146,6 +2134,7 @@ fn summarize(diagnostics: &[Diagnostic]) -> Summary {
             .iter()
             .filter(|diagnostic| diagnostic.severity == Severity::Warning)
             .count(),
+        ..Summary::default()
     }
 }
 
@@ -4004,7 +3993,11 @@ fn execute_observe_window_command(
                     print_json(&build_envelope(
                         ["observe", "window"],
                         "error",
-                        Summary { errors: 1, warnings: 0 },
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
                         json!({ "error": e.to_string() }),
                         Vec::new(),
                     ))?;
@@ -4053,7 +4046,11 @@ fn execute_observe_windows_command(
                     print_json(&build_envelope(
                         ["observe", "windows"],
                         "error",
-                        Summary { errors: 1, warnings: 0 },
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
                         json!({ "error": e.to_string() }),
                         Vec::new(),
                     ))?;
@@ -4104,7 +4101,11 @@ fn execute_observe_screen_command(
                     print_json(&build_envelope(
                         ["observe", "screen"],
                         "error",
-                        Summary { errors: 1, warnings: 0 },
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
                         json!({ "error": e.to_string() }),
                         Vec::new(),
                     ))?;
@@ -4157,7 +4158,11 @@ fn execute_observe_clipboard_command(
                     print_json(&build_envelope(
                         ["observe", "clipboard"],
                         "error",
-                        Summary { errors: 1, warnings: 0 },
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
                         json!({ "error": e.to_string() }),
                         Vec::new(),
                     ))?;
@@ -4211,7 +4216,11 @@ fn execute_observe_filesystem_command(
                     print_json(&build_envelope(
                         ["observe", "filesystem"],
                         "error",
-                        Summary { errors: 1, warnings: 0 },
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
                         json!({ "error": e.to_string() }),
                         Vec::new(),
                     ))?;
@@ -4256,7 +4265,7 @@ fn execute_desktop_click_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match click(x, y, &button, dry_run) {
+    match elegy_desktop::click(x, y, &button, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4286,10 +4295,10 @@ fn execute_desktop_click_command(
                         ["desktop", "click"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4304,7 +4313,7 @@ fn execute_desktop_type_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match type_text(&text, dry_run) {
+    match elegy_desktop::type_text(&text, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4334,10 +4343,10 @@ fn execute_desktop_type_command(
                         ["desktop", "type"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4352,7 +4361,7 @@ fn execute_desktop_key_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match send_key(&combo, dry_run) {
+    match elegy_desktop::send_key(&combo, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4382,10 +4391,10 @@ fn execute_desktop_key_command(
                         ["desktop", "key"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4401,7 +4410,7 @@ fn execute_desktop_focus_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match focus_window(title.as_deref(), hwnd, dry_run) {
+    match elegy_desktop::focus_window(title.as_deref(), hwnd, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4431,10 +4440,10 @@ fn execute_desktop_focus_command(
                         ["desktop", "focus"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4444,27 +4453,18 @@ fn execute_desktop_focus_command(
     }
 }
 
-struct DesktopMoveGeometry {
+#[allow(clippy::too_many_arguments)]
+fn execute_desktop_move_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
     x: i32,
     y: i32,
     width: Option<u32>,
     height: Option<u32>,
-}
-
-fn execute_desktop_move_command(
-    title: Option<String>,
-    hwnd: Option<u64>,
-    geometry: DesktopMoveGeometry,
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let DesktopMoveGeometry {
-        x,
-        y,
-        width,
-        height,
-    } = geometry;
-    match move_window(title.as_deref(), hwnd, x, y, width, height, dry_run) {
+    match elegy_desktop::move_window(title.as_deref(), hwnd, x, y, width, height, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4497,10 +4497,10 @@ fn execute_desktop_move_command(
                         ["desktop", "move"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4516,7 +4516,7 @@ fn execute_desktop_minimize_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match minimize_window(title.as_deref(), hwnd, dry_run) {
+    match elegy_desktop::minimize_window(title.as_deref(), hwnd, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4546,10 +4546,10 @@ fn execute_desktop_minimize_command(
                         ["desktop", "minimize"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }
@@ -4565,7 +4565,7 @@ fn execute_desktop_maximize_command(
     dry_run: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    match maximize_window(title.as_deref(), hwnd, dry_run) {
+    match elegy_desktop::maximize_window(title.as_deref(), hwnd, dry_run) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => {
@@ -4595,10 +4595,10 @@ fn execute_desktop_maximize_command(
                         ["desktop", "maximize"],
                         "error",
                         Summary {
-                            errors: 1,
-                            warnings: 0,
+                            text: e.to_string(),
+                            ..Summary::default()
                         },
-                        json!({ "error": e.to_string() }),
+                        json!(null),
                         Vec::new(),
                     ))?;
                 }

@@ -226,8 +226,14 @@ fn build_cli_arguments(
             if next_s.starts_with("${") && next_s.ends_with('}') {
                 let key = &next_s[2..next_s.len() - 1];
                 if let Some(val) = params.get(key) {
-                    result.push(s.to_string());
-                    result.push(value_as_string(val));
+                    if let Some(flag_value) = val.as_bool() {
+                        if flag_value {
+                            result.push(s.to_string());
+                        }
+                    } else {
+                        result.push(s.to_string());
+                        result.push(value_as_string(val));
+                    }
                     skip_next = true;
                     continue;
                 }
@@ -734,8 +740,11 @@ mod tests {
         assert!(names.contains(&"observe-system"), "missing observe-system");
         assert!(names.contains(&"desktop-click"), "missing desktop-click");
         assert!(names.contains(&"desktop-type"), "missing desktop-type");
+        assert!(names.contains(&"desktop-key"), "missing desktop-key");
         assert!(names.contains(&"desktop-focus"), "missing desktop-focus");
         assert!(names.contains(&"desktop-move"), "missing desktop-move");
+        assert!(names.contains(&"desktop-minimize"), "missing desktop-minimize");
+        assert!(names.contains(&"desktop-maximize"), "missing desktop-maximize");
     }
 
     #[test]
@@ -856,6 +865,31 @@ mod tests {
     }
 
     #[test]
+    fn build_cli_arguments_treats_boolean_placeholder_as_flag() {
+        let template: Vec<serde_json::Value> = vec![
+            json!("desktop"),
+            json!("click"),
+            json!("--dry-run"),
+            json!("${dry_run}"),
+            json!("--json"),
+        ];
+
+        let mut true_params = serde_json::Map::new();
+        true_params.insert("dry_run".to_string(), json!(true));
+        assert_eq!(
+            build_cli_arguments(&template, &true_params),
+            vec!["desktop", "click", "--dry-run", "--json"]
+        );
+
+        let mut false_params = serde_json::Map::new();
+        false_params.insert("dry_run".to_string(), json!(false));
+        assert_eq!(
+            build_cli_arguments(&template, &false_params),
+            vec!["desktop", "click", "--json"]
+        );
+    }
+
+    #[test]
     fn find_capability_returns_matching_capability() {
         let (cap, _def) =
             find_capability("diagram-create").expect("should find diagram-create capability");
@@ -912,7 +946,11 @@ mod tests {
         assert!(names.contains(&"observe-filesystem"));
         assert!(names.contains(&"observe-system"));
         assert!(names.contains(&"desktop-click"));
+        assert!(names.contains(&"desktop-type"));
         assert!(names.contains(&"desktop-key"));
+        assert!(names.contains(&"desktop-focus"));
+        assert!(names.contains(&"desktop-move"));
+        assert!(names.contains(&"desktop-minimize"));
         assert!(names.contains(&"desktop-maximize"));
 
         client_service.cancel().await.expect("client should cancel");
