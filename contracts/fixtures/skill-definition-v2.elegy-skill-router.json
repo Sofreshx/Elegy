@@ -1,0 +1,175 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "skill-router",
+    "version": "0.1.0",
+    "displayName": "Elegy Skill Router",
+    "aliases": ["skill-router", "skills", "discovery"]
+  },
+  "metadata": {
+    "displayName": "Elegy Skill Router",
+    "description": "Search and discover Elegy capabilities on demand. Use this instead of loading all skill definitions into context. Start with skill-search to find relevant capabilities, then use skill-describe to get full invocation details.",
+    "summary": "On-demand skill discovery and routing — search, list, and describe Elegy capabilities without loading all definitions into context.",
+    "category": "meta",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["discovery", "routing", "meta", "skills", "search"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "router-skill-search",
+      "name": "Search Skills",
+      "description": "Find relevant skills by keyword or task description. Returns compact index-level results by default. Use --detail for capability-level information.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skills", "search", "--query", "${query}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "Free-text search query matched against skill names, keywords, triggers, and capability descriptions.",
+            "required": true
+          },
+          {
+            "name": "detail",
+            "type": "boolean",
+            "description": "When true, returns capability-level detail including parameters and execution metadata.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "Array of matching skills with match scores, matched capabilities, and match reasons. Includes expandCommand hint for full details."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "router-skill-describe",
+      "name": "Describe Skill",
+      "description": "Get the complete v2 skill definition for a specific skill, including all capabilities with full implementation details, governance, and constraints.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skills", "describe", "--skill-id", "${skillId}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "skillId",
+            "type": "string",
+            "description": "The skill identifier (e.g. 'diagram', 'skill-router').",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "description": "Complete v2 skill definition JSON with all capabilities, implementation blocks, governance, and constraints."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "router-skill-list",
+      "name": "List All Skills",
+      "description": "List all available skills with compact index-level metadata. Use --detail for capability-level information.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skills", "list", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "category",
+            "type": "string",
+            "description": "Filter by category (e.g. 'design', 'memory', 'meta').",
+            "required": false
+          },
+          {
+            "name": "lifecycle",
+            "type": "string",
+            "description": "Filter by lifecycle state (e.g. 'active', 'draft').",
+            "required": false
+          },
+          {
+            "name": "detail",
+            "type": "boolean",
+            "description": "When true, includes capability-level detail for each skill.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "Array of skills with id, name, description, category, capability count, and lifecycle state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "progressive-disclosure",
+      "description": "Discovery responses use progressive disclosure: index (default) is compact, --detail adds capabilities, elegy skills describe returns full definitions. This minimizes context token usage.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "meta-discovery"]
+  },
+  "discovery": {
+    "keywords": ["skill", "search", "discover", "find", "list", "capabilities", "tools", "routing", "meta"],
+    "triggers": [
+      {
+        "pattern": "find skill",
+        "description": "When an agent needs to discover which Elegy capabilities are available."
+      },
+      {
+        "pattern": "search capabilities",
+        "description": "When searching for specific Elegy tools or operations."
+      },
+      {
+        "pattern": "what can elegy do",
+        "description": "When an agent wants to understand all available Elegy capabilities."
+      },
+      {
+        "pattern": "skill discovery",
+        "description": "When setting up skill routing or progressive context loading."
+      }
+    ],
+    "capabilityHints": [
+      "skill-search-by-keyword",
+      "skill-describe-full-detail",
+      "skill-list-all-available"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-skill-router.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

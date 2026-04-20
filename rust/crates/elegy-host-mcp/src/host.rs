@@ -14,10 +14,16 @@ use tokio::task;
 // ---------------------------------------------------------------------------
 // Embedded v2 skill definitions (compile-time)
 // ---------------------------------------------------------------------------
-const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[(
-    "diagram",
-    include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
-)];
+const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
+    (
+        "diagram",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
+    ),
+    (
+        "skill-router",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
+    ),
+];
 
 // ---------------------------------------------------------------------------
 // Cached tool list built from the embedded skill definitions
@@ -692,13 +698,25 @@ mod tests {
         let tools = build_tools_from_skill_definitions();
 
         // The diagram skill definition has 4 capabilities
-        assert_eq!(tools.len(), 4, "expected 4 tools from diagram skill def");
+        assert_eq!(tools.len(), 7, "expected 7 tools from diagram + skill-router skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"), "missing diagram-create");
         assert!(names.contains(&"diagram-patch"), "missing diagram-patch");
         assert!(names.contains(&"diagram-narrate"), "missing diagram-narrate");
         assert!(names.contains(&"diagram-render"), "missing diagram-render");
+        assert!(
+            names.contains(&"router-skill-search"),
+            "missing router-skill-search"
+        );
+        assert!(
+            names.contains(&"router-skill-describe"),
+            "missing router-skill-describe"
+        );
+        assert!(
+            names.contains(&"router-skill-list"),
+            "missing router-skill-list"
+        );
     }
 
     #[test]
@@ -857,13 +875,16 @@ mod tests {
             .await
             .expect("client should list tools");
 
-        assert_eq!(tools.len(), 4, "expected 4 tools from diagram skill def");
+        assert_eq!(tools.len(), 7, "expected 7 tools from diagram + skill-router skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"));
         assert!(names.contains(&"diagram-patch"));
         assert!(names.contains(&"diagram-narrate"));
         assert!(names.contains(&"diagram-render"));
+        assert!(names.contains(&"router-skill-search"));
+        assert!(names.contains(&"router-skill-describe"));
+        assert!(names.contains(&"router-skill-list"));
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");

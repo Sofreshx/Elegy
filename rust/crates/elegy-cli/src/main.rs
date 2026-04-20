@@ -57,10 +57,16 @@ const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
 /// Each entry is a `(skill_id, json_str)` pair where the JSON is baked in at
 /// compile time via `include_str!`. Only v2-format fixtures are included;
 /// v1 skills are omitted until they are migrated.
-const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[(
-    "diagram",
-    include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
-)];
+const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
+    (
+        "diagram",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
+    ),
+    (
+        "skill-router",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
+    ),
+];
 
 static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
@@ -290,6 +296,9 @@ enum SkillsCommand {
         /// Filter by lifecycle state (e.g. "active", "draft", "deprecated")
         #[arg(long)]
         lifecycle: Option<String>,
+        /// Show capability-level detail (parameters, execution metadata)
+        #[arg(long)]
+        detail: bool,
     },
     /// Show full detail for a specific skill
     Describe {
@@ -302,6 +311,9 @@ enum SkillsCommand {
         /// Free-text query matched against keywords, triggers, and descriptions
         #[arg(long)]
         query: String,
+        /// Show capability-level detail (parameters, execution metadata)
+        #[arg(long)]
+        detail: bool,
     },
 }
 
@@ -546,6 +558,102 @@ struct SkillSummary {
     lifecycle_state: String,
 }
 
+/// A capability summary for detail-level disclosure.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CapabilityDetail {
+    /// Capability identifier.
+    id: String,
+    /// Human-readable name.
+    name: String,
+    /// Short description.
+    description: String,
+    /// Input parameters (if any).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    parameters: Vec<ParameterDetail>,
+    /// Execution metadata.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    execution: Option<ExecutionDetail>,
+}
+
+/// A parameter summary for detail-level disclosure.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ParameterDetail {
+    name: String,
+    #[serde(rename = "type")]
+    param_type: String,
+    description: String,
+    required: bool,
+}
+
+/// Execution metadata for a capability.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExecutionDetail {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    mode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    has_side_effects: Option<bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    is_deterministic: Option<bool>,
+}
+
+/// A search result with match metadata for progressive disclosure.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillSearchResult {
+    /// Skill summary (always included).
+    #[serde(flatten)]
+    summary: SkillSummary,
+    /// Which capabilities matched the query (IDs only).
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    matched_capabilities: Vec<String>,
+    /// Which fields caused the match.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    match_reasons: Vec<String>,
+    /// Match relevance score (0.0 - 1.0).
+    match_score: f64,
+    /// Discovery trigger keywords from the skill definition.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    trigger_keywords: Vec<String>,
+    /// Command to get full details.
+    expand_command: String,
+    /// Estimated context cost at each disclosure level (in tokens).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context_cost_estimate: Option<ContextCostEstimate>,
+    /// Capabilities detail (only when --detail is set).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    capabilities: Option<Vec<CapabilityDetail>>,
+}
+
+/// Token cost estimates for progressive disclosure levels.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ContextCostEstimate {
+    /// Tokens for index-level (compact) representation.
+    index_tokens: usize,
+    /// Tokens for detail-level representation.
+    detail_tokens: usize,
+    /// Tokens for full v2 skill definition.
+    full_tokens: usize,
+}
+
+/// Extended skill summary with detail-level information for list output.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillListEntry {
+    /// Skill summary (always included).
+    #[serde(flatten)]
+    summary: SkillSummary,
+    /// Estimated context cost.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    context_cost_estimate: Option<ContextCostEstimate>,
+    /// Capabilities detail (only when --detail is set).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    capabilities: Option<Vec<CapabilityDetail>>,
+}
+
 enum MermaidInputSource {
     File(PathBuf),
     Stdin,
@@ -730,14 +838,14 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             format,
         ),
         Command::Skills {
-            command: SkillsCommand::List { category, lifecycle },
-        } => execute_skills_list_command(category, lifecycle, format),
+            command: SkillsCommand::List { category, lifecycle, detail },
+        } => execute_skills_list_command(category, lifecycle, detail, format),
         Command::Skills {
             command: SkillsCommand::Describe { skill_id },
         } => execute_skills_describe_command(skill_id, format),
         Command::Skills {
-            command: SkillsCommand::Search { query },
-        } => execute_skills_search_command(query, format),
+            command: SkillsCommand::Search { query, detail },
+        } => execute_skills_search_command(query, detail, format),
     }
 }
 
@@ -2676,16 +2784,124 @@ fn parse_skill_summary(json_str: &str) -> Option<(SkillSummary, serde_json::Valu
     Some((summary, val))
 }
 
+/// Extract capability details from a parsed skill definition.
+fn extract_capabilities(full: &serde_json::Value) -> Vec<CapabilityDetail> {
+    let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) else {
+        return Vec::new();
+    };
+
+    caps.iter()
+        .filter_map(|cap| {
+            let id = cap.get("id")?.as_str()?.to_string();
+            let name = cap
+                .get("name")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            let description = cap
+                .get("description")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+
+            let parameters = cap
+                .get("input")
+                .and_then(|i| i.get("parameters"))
+                .and_then(|p| p.as_array())
+                .map(|params| {
+                    params
+                        .iter()
+                        .filter_map(|p| {
+                            Some(ParameterDetail {
+                                name: p.get("name")?.as_str()?.to_string(),
+                                param_type: p
+                                    .get("type")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("string")
+                                    .to_string(),
+                                description: p
+                                    .get("description")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    .to_string(),
+                                required: p
+                                    .get("required")
+                                    .and_then(|v| v.as_bool())
+                                    .unwrap_or(false),
+                            })
+                        })
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            let execution = cap.get("execution").map(|e| ExecutionDetail {
+                mode: e.get("mode").and_then(|v| v.as_str()).map(String::from),
+                has_side_effects: e.get("hasSideEffects").and_then(|v| v.as_bool()),
+                is_deterministic: e.get("isDeterministic").and_then(|v| v.as_bool()),
+            });
+
+            Some(CapabilityDetail {
+                id,
+                name,
+                description,
+                parameters,
+                execution,
+            })
+        })
+        .collect()
+}
+
+/// Estimate context cost at each disclosure level for a skill definition.
+///
+/// Uses serialized byte length / 4 as a rough token proxy. The estimate is
+/// computed from the actual shaped output at each level, not the raw source JSON.
+fn estimate_context_cost(
+    summary: &SkillSummary,
+    capabilities: &[CapabilityDetail],
+    full: &serde_json::Value,
+) -> ContextCostEstimate {
+    let index_bytes = serde_json::to_vec(summary).map(|v| v.len()).unwrap_or(0);
+    let detail_bytes = index_bytes
+        + serde_json::to_vec(capabilities)
+            .map(|v| v.len())
+            .unwrap_or(0);
+    let full_bytes = serde_json::to_vec(full).map(|v| v.len()).unwrap_or(0);
+
+    ContextCostEstimate {
+        index_tokens: (index_bytes + 3) / 4,
+        detail_tokens: (detail_bytes + 3) / 4,
+        full_tokens: (full_bytes + 3) / 4,
+    }
+}
+
+/// Extract trigger keywords from a skill definition's discovery block.
+fn extract_trigger_keywords(full: &serde_json::Value) -> Vec<String> {
+    let Some(discovery) = full.get("discovery") else {
+        return Vec::new();
+    };
+
+    let mut keywords = Vec::new();
+    if let Some(kws) = discovery.get("keywords").and_then(|v| v.as_array()) {
+        for kw in kws {
+            if let Some(s) = kw.as_str() {
+                keywords.push(s.to_string());
+            }
+        }
+    }
+    keywords
+}
+
 /// Execute `elegy skills list`.
 fn execute_skills_list_command(
     category: Option<String>,
     lifecycle: Option<String>,
+    detail: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let mut summaries = Vec::new();
+    let mut entries = Vec::new();
 
     for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
-        if let Some((summary, _full)) = parse_skill_summary(json_str) {
+        if let Some((summary, full)) = parse_skill_summary(json_str) {
             let cat_match = category
                 .as_ref()
                 .is_none_or(|c| summary.category.eq_ignore_ascii_case(c));
@@ -2693,34 +2909,68 @@ fn execute_skills_list_command(
                 .as_ref()
                 .is_none_or(|l| summary.lifecycle_state.eq_ignore_ascii_case(l));
             if cat_match && lc_match {
-                summaries.push(summary);
+                let capabilities = extract_capabilities(&full);
+                let context_cost = estimate_context_cost(&summary, &capabilities, &full);
+
+                let entry = SkillListEntry {
+                    summary,
+                    context_cost_estimate: Some(context_cost),
+                    capabilities: if detail { Some(capabilities) } else { None },
+                };
+                entries.push(entry);
             }
         }
     }
 
     match format {
         OutputFormat::Text => {
-            if summaries.is_empty() {
+            if entries.is_empty() {
                 println!("No skills found matching the given filters.");
             } else {
                 println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
                 println!("{}", "-".repeat(70));
-                for s in &summaries {
+                for e in &entries {
                     println!(
                         "{:<16} {:<32} {:<6} {}",
-                        s.id, s.name, s.capabilities_count, s.lifecycle_state
+                        e.summary.id,
+                        e.summary.name,
+                        e.summary.capabilities_count,
+                        e.summary.lifecycle_state
                     );
+                    if detail {
+                        if let Some(ref caps) = e.capabilities {
+                            for cap in caps {
+                                println!("  └─ {} ({})", cap.name, cap.id);
+                                if !cap.parameters.is_empty() {
+                                    for p in &cap.parameters {
+                                        let req = if p.required { "required" } else { "optional" };
+                                        println!(
+                                            "     {} ({}, {}): {}",
+                                            p.name, p.param_type, req, p.description
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
             }
         }
-        OutputFormat::Json => print_json(&build_envelope_with_schema(
-            ["skills", "list"],
-            "ok",
-            Summary::default(),
-            json!({ "skills": summaries }),
-            Vec::new(),
-            Some("elegy://schemas/skill-list"),
-        ))?,
+        OutputFormat::Json => {
+            let disclosure = if detail { "detail" } else { "index" };
+            print_json(&build_envelope_with_schema(
+                ["skills", "list"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "skills": entries,
+                    "disclosureLevel": disclosure,
+                    "totalCount": entries.len()
+                }),
+                Vec::new(),
+                Some("elegy://schemas/skill-list"),
+            ))?;
+        }
     }
 
     Ok(ExitCode::SUCCESS)
@@ -2786,19 +3036,48 @@ fn execute_skills_describe_command(
 /// Execute `elegy skills search`.
 fn execute_skills_search_command(
     query: String,
+    detail: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
     let query_lower = query.to_lowercase();
-    let mut results = Vec::new();
+    let mut results: Vec<SkillSearchResult> = Vec::new();
 
     for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
         if let Some((summary, full)) = parse_skill_summary(json_str) {
-            let matched = skill_matches_query(&summary, &full, &query_lower);
-            if matched {
-                results.push(summary);
+            let match_result = score_skill_match(&summary, &full, &query_lower);
+            if match_result.matched {
+                let capabilities_detail = extract_capabilities(&full);
+                let context_cost = estimate_context_cost(&summary, &capabilities_detail, &full);
+                let trigger_keywords = extract_trigger_keywords(&full);
+
+                let result = SkillSearchResult {
+                    expand_command: format!(
+                        "elegy skills describe --skill-id {} --json",
+                        summary.id
+                    ),
+                    summary,
+                    matched_capabilities: match_result.matched_capabilities,
+                    match_reasons: match_result.match_reasons,
+                    match_score: match_result.score,
+                    trigger_keywords,
+                    context_cost_estimate: Some(context_cost),
+                    capabilities: if detail {
+                        Some(capabilities_detail)
+                    } else {
+                        None
+                    },
+                };
+                results.push(result);
             }
         }
     }
+
+    // Sort by match score descending
+    results.sort_by(|a, b| {
+        b.match_score
+            .partial_cmp(&a.match_score)
+            .unwrap_or(std::cmp::Ordering::Equal)
+    });
 
     match format {
         OutputFormat::Text => {
@@ -2807,83 +3086,224 @@ fn execute_skills_search_command(
             } else {
                 println!("Skills matching \"{query}\":");
                 println!();
-                println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
-                println!("{}", "-".repeat(70));
-                for s in &results {
+                println!(
+                    "{:<16} {:<32} {:<6} {:<6} MATCHED",
+                    "ID", "NAME", "SCORE", "CAPS"
+                );
+                println!("{}", "-".repeat(80));
+                for r in &results {
                     println!(
-                        "{:<16} {:<32} {:<6} {}",
-                        s.id, s.name, s.capabilities_count, s.lifecycle_state
+                        "{:<16} {:<32} {:<6.2} {:<6} {}",
+                        r.summary.id,
+                        r.summary.name,
+                        r.match_score,
+                        r.summary.capabilities_count,
+                        r.match_reasons.join(", ")
                     );
+                    if detail {
+                        if let Some(ref caps) = r.capabilities {
+                            for cap in caps {
+                                let marker = if r.matched_capabilities.contains(&cap.id) {
+                                    "→"
+                                } else {
+                                    " "
+                                };
+                                println!("  {marker} {} ({})", cap.name, cap.id);
+                            }
+                        }
+                    }
                 }
             }
         }
-        OutputFormat::Json => print_json(&build_envelope_with_schema(
-            ["skills", "search"],
-            "ok",
-            Summary::default(),
-            json!({ "query": query, "results": results }),
-            Vec::new(),
-            Some("elegy://schemas/skill-search"),
-        ))?,
+        OutputFormat::Json => {
+            let disclosure = if detail { "detail" } else { "index" };
+            print_json(&build_envelope_with_schema(
+                ["skills", "search"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "query": query,
+                    "results": results,
+                    "disclosureLevel": disclosure,
+                    "totalResults": results.len()
+                }),
+                Vec::new(),
+                Some("elegy://schemas/skill-search"),
+            ))?;
+        }
     }
 
     Ok(ExitCode::SUCCESS)
 }
 
-/// Check whether a skill matches a free-text query across all discoverable fields.
-fn skill_matches_query(
+/// Match result with scoring and field tracking.
+struct SkillMatchResult {
+    /// Whether the skill matched at all.
+    matched: bool,
+    /// Relevance score (0.0 - 1.0).
+    score: f64,
+    /// Capability IDs that matched.
+    matched_capabilities: Vec<String>,
+    /// Which fields caused the match.
+    match_reasons: Vec<String>,
+}
+
+/// Score a skill against a free-text query with two-stage ranking.
+///
+/// Stage 1: Exact/phrase match boost — if the full query string appears in a
+/// field, that field gets a high-weight contribution.
+/// Stage 2: Token overlap — individual query words are matched against fields
+/// with tiered weights.
+///
+/// Field weight tiers:
+///   - Capability ID/name: 1.0
+///   - Skill ID/name: 0.9
+///   - Discovery keywords: 0.8
+///   - Discovery triggers: 0.7
+///   - Descriptions: 0.5
+fn score_skill_match(
     summary: &SkillSummary,
     full: &serde_json::Value,
     query_lower: &str,
-) -> bool {
-    // Match against summary fields
-    if summary.id.to_lowercase().contains(query_lower)
-        || summary.name.to_lowercase().contains(query_lower)
-        || summary.description.to_lowercase().contains(query_lower)
-        || summary.category.to_lowercase().contains(query_lower)
-    {
-        return true;
+) -> SkillMatchResult {
+    let mut score: f64 = 0.0;
+    let mut matched_capabilities = Vec::new();
+    let mut match_reasons = Vec::new();
+    let mut field_hits = 0u32;
+    let total_possible_fields = 5u32; // id, name, keywords, triggers, capabilities
+
+    // --- Stage 1: phrase/exact match boost ---
+
+    let id_lower = summary.id.to_lowercase();
+    let name_lower = summary.name.to_lowercase();
+    let desc_lower = summary.description.to_lowercase();
+    let cat_lower = summary.category.to_lowercase();
+
+    if id_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-id".to_string());
+        field_hits += 1;
+    }
+    if name_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-name".to_string());
+        field_hits += 1;
+    }
+    if cat_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.contains(&"category".to_string()) {
+            match_reasons.push("category".to_string());
+        }
+    }
+    if desc_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.contains(&"description".to_string()) {
+            match_reasons.push("description".to_string());
+        }
     }
 
-    // Match against discovery keywords and triggers
+    // Keywords phrase match
+    let mut keyword_phrase_hit = false;
     if let Some(discovery) = full.get("discovery") {
         if let Some(keywords) = discovery.get("keywords").and_then(|v| v.as_array()) {
             for kw in keywords {
                 if let Some(s) = kw.as_str() {
                     if s.to_lowercase().contains(query_lower) {
-                        return true;
+                        score += 0.8;
+                        keyword_phrase_hit = true;
+                        if !match_reasons.contains(&"discovery-keyword".to_string()) {
+                            match_reasons.push("discovery-keyword".to_string());
+                            field_hits += 1;
+                        }
+                        break;
                     }
                 }
             }
         }
+
+        // Trigger phrase match
         if let Some(triggers) = discovery.get("triggers").and_then(|v| v.as_array()) {
             for trigger in triggers {
                 if let Some(pattern) = trigger.get("pattern").and_then(|v| v.as_str()) {
                     if pattern.to_lowercase().contains(query_lower) {
-                        return true;
+                        score += 0.7;
+                        if !match_reasons.contains(&"discovery-trigger".to_string()) {
+                            match_reasons.push("discovery-trigger".to_string());
+                            field_hits += 1;
+                        }
+                        break;
                     }
                 }
             }
         }
     }
 
-    // Match against capability descriptions and names
+    // Capability phrase match
     if let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) {
         for cap in caps {
-            if let Some(desc) = cap.get("description").and_then(|v| v.as_str()) {
-                if desc.to_lowercase().contains(query_lower) {
-                    return true;
-                }
+            let cap_id = cap.get("id").and_then(|v| v.as_str()).unwrap_or("");
+            let cap_name = cap.get("name").and_then(|v| v.as_str()).unwrap_or("");
+            let cap_desc = cap.get("description").and_then(|v| v.as_str()).unwrap_or("");
+
+            let mut cap_matched = false;
+            if cap_id.to_lowercase().contains(query_lower)
+                || cap_name.to_lowercase().contains(query_lower)
+            {
+                score += 1.0;
+                cap_matched = true;
+            } else if cap_desc.to_lowercase().contains(query_lower) {
+                score += 0.5;
+                cap_matched = true;
             }
-            if let Some(cap_name) = cap.get("name").and_then(|v| v.as_str()) {
-                if cap_name.to_lowercase().contains(query_lower) {
-                    return true;
+
+            if cap_matched {
+                matched_capabilities.push(cap_id.to_string());
+                if !match_reasons.contains(&"capability".to_string()) {
+                    match_reasons.push("capability".to_string());
+                    field_hits += 1;
                 }
             }
         }
     }
 
-    false
+    // --- Stage 2: token overlap (additive) ---
+    // Split query into words and check each against all fields
+    let query_tokens: Vec<&str> = query_lower.split_whitespace().collect();
+    if query_tokens.len() > 1 {
+        let mut token_hits = 0u32;
+
+        for token in &query_tokens {
+            if id_lower.contains(token) || name_lower.contains(token) {
+                token_hits += 1;
+            } else if keyword_phrase_hit {
+                // Already counted above
+            } else if desc_lower.contains(token) || cat_lower.contains(token) {
+                token_hits += 1;
+            }
+        }
+
+        // Bonus for multi-token overlap (up to 0.3)
+        let token_ratio = token_hits as f64 / query_tokens.len() as f64;
+        score += token_ratio * 0.3;
+    }
+
+    // Normalize: cap at 1.0
+    let normalized = if score > 0.0 {
+        // Use field coverage as part of normalization
+        let field_coverage = field_hits as f64 / total_possible_fields as f64;
+        let raw = (score / 3.0).min(1.0); // 3.0 is roughly max possible score
+        // Blend raw score with field coverage
+        (raw * 0.7 + field_coverage * 0.3).min(1.0)
+    } else {
+        0.0
+    };
+
+    SkillMatchResult {
+        matched: score > 0.0,
+        score: (normalized * 100.0).round() / 100.0, // round to 2 decimal places
+        matched_capabilities,
+        match_reasons,
+    }
 }
 
 fn execute_diagram_create_command(

@@ -46,9 +46,9 @@ Everything else in the release exists to support verified installation, automati
 | `elegy diagram patch` | Ready now | Surgically add/remove nodes and edges. Supports JSON stdin (`--patch-stdin`) for agent-friendly invocation. |
 | `elegy diagram narrate` | Ready now | Produce human-readable summaries of diagram content. Accepts file or stdin. |
 | `elegy diagram render` | Ready now | Render diagrams to Mermaid or other formats. Accepts file or stdin. |
-| `elegy skills list` | Ready now | List all available skill definitions with metadata, category filtering, and lifecycle state. |
+| `elegy skills list` | Ready now | List all available skill definitions with metadata, category filtering, and lifecycle state. Supports `--detail` for capability-level progressive disclosure. |
 | `elegy skills describe` | Ready now | Show full detail for a specific skill including all capabilities and implementation info. |
-| `elegy skills search` | Ready now | Search skills by keyword or trigger pattern for runtime discovery. |
+| `elegy skills search` | Ready now | Search skills by keyword or trigger pattern with scored ranking. Supports `--detail` for capability-level progressive disclosure. |
 | `elegy run` (MCP host) | Ready now | Start the MCP host server over stdio. Now serves both resources and tools. |
 | `elegy-mcp` | Ready now | Dedicated CLI for governed MCP descriptor authoring and descriptor analysis. |
 | `elegy-skills` | Ready now | Dedicated CLI for governed MCP-to-skill generation. |
@@ -94,6 +94,8 @@ Elegy is designed to be consumable by LLM agents and automation systems. Key pat
 - **Governed skill definitions:** Each capability family has a v2 skill definition in `contracts/fixtures/` describing exact invocation patterns, parameters, and governance metadata.
 - **MCP tool dispatch:** The MCP host (`elegy run`) auto-generates MCP tools from v2 skill definitions. Agents connecting via MCP get `tools/list` and `tools/call` backed by CLI subprocess dispatch — zero configuration required.
 - **Runtime discovery:** Use `elegy skills list --json` and `elegy skills describe --skill-id <id> --json` to discover all capabilities, their invocation patterns, and parameters at runtime.
+- **Progressive disclosure:** Discovery commands support `--detail` for capability-level information. Default output is compact (~50 tokens per skill). Use `elegy skills describe` for full definitions. Token cost estimates are included in JSON output to help agents manage context budgets.
+- **Skill router meta-skill:** The `skill-router` skill definition lets agents discover the discovery surface itself. Load one skill definition to access all capabilities on demand.
 
 For the full agent integration guide, see [docs/agent-integration.md](docs/agent-integration.md) (coming soon).
 
