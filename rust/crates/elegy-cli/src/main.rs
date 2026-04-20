@@ -52,6 +52,16 @@ const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
 
+/// Embedded v2 skill definitions, compiled into the binary.
+///
+/// Each entry is a `(skill_id, json_str)` pair where the JSON is baked in at
+/// compile time via `include_str!`. Only v2-format fixtures are included;
+/// v1 skills are omitted until they are migrated.
+const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[(
+    "diagram",
+    include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
+)];
+
 static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
 #[derive(Parser, Debug)]
@@ -126,6 +136,11 @@ enum Command {
     Contracts {
         #[command(subcommand)]
         command: ContractsCommand,
+    },
+    /// Discover available skill definitions
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
     },
 }
 
@@ -258,6 +273,32 @@ enum ContractsCommand {
         create_archive: bool,
         #[arg(long)]
         archive_output_path: Option<PathBuf>,
+    },
+}
+
+/// Runtime skill discovery commands for agents.
+#[derive(Subcommand, Debug)]
+enum SkillsCommand {
+    /// List all available skill definitions
+    List {
+        /// Filter by category (e.g. "design", "memory", "projection")
+        #[arg(long)]
+        category: Option<String>,
+        /// Filter by lifecycle state (e.g. "active", "draft", "deprecated")
+        #[arg(long)]
+        lifecycle: Option<String>,
+    },
+    /// Show full detail for a specific skill
+    Describe {
+        /// Skill identifier (e.g. "diagram", "memory", "mermaid")
+        #[arg(long)]
+        skill_id: String,
+    },
+    /// Search skills by keyword or trigger pattern
+    Search {
+        /// Free-text query matched against keywords, triggers, and descriptions
+        #[arg(long)]
+        query: String,
     },
 }
 
@@ -481,6 +522,24 @@ struct MermaidNarrateReport {
     input_path: Option<String>,
 }
 
+/// A loaded skill definition summary for listing and search output.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SkillSummary {
+    /// Unique skill identifier derived from `identity.name`.
+    id: String,
+    /// Human-readable display name.
+    name: String,
+    /// Short description text.
+    description: String,
+    /// Skill category (e.g. "design", "memory").
+    category: String,
+    /// Number of capabilities declared in the definition.
+    capabilities_count: usize,
+    /// Lifecycle state (e.g. "active", "draft", "deprecated").
+    lifecycle_state: String,
+}
+
 enum MermaidInputSource {
     File(PathBuf),
     Stdin,
@@ -649,6 +708,15 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             archive_output_path,
             format,
         ),
+        Command::Skills {
+            command: SkillsCommand::List { category, lifecycle },
+        } => execute_skills_list_command(category, lifecycle, format),
+        Command::Skills {
+            command: SkillsCommand::Describe { skill_id },
+        } => execute_skills_describe_command(skill_id, format),
+        Command::Skills {
+            command: SkillsCommand::Search { query },
+        } => execute_skills_search_command(query, format),
     }
 }
 
@@ -2496,6 +2564,247 @@ impl From<CliTransport> for McpTransportKind {
     }
 }
 
+
+/// Parse an embedded skill definition JSON string into a summary and full value.
+///
+/// Returns `None` when the JSON is malformed or lacks required fields.
+fn parse_skill_summary(json_str: &str) -> Option<(SkillSummary, serde_json::Value)> {
+    let val: serde_json::Value = serde_json::from_str(json_str).ok()?;
+    let identity = val.get("identity")?;
+    let metadata = val.get("metadata");
+    let capabilities = val.get("capabilities")?.as_array()?;
+
+    let summary = SkillSummary {
+        id: identity.get("name")?.as_str()?.to_string(),
+        name: metadata
+            .and_then(|m| m.get("displayName"))
+            .and_then(|v| v.as_str())
+            .or_else(|| identity.get("name").and_then(|v| v.as_str()))
+            .unwrap_or("unknown")
+            .to_string(),
+        description: metadata
+            .and_then(|m| m.get("summary"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        category: metadata
+            .and_then(|m| m.get("category"))
+            .and_then(|v| v.as_str())
+            .unwrap_or("")
+            .to_string(),
+        capabilities_count: capabilities.len(),
+        lifecycle_state: val.get("lifecycleState")?.as_str()?.to_string(),
+    };
+
+    Some((summary, val))
+}
+
+/// Execute `elegy skills list`.
+fn execute_skills_list_command(
+    category: Option<String>,
+    lifecycle: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let mut summaries = Vec::new();
+
+    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
+        if let Some((summary, _full)) = parse_skill_summary(json_str) {
+            let cat_match = category
+                .as_ref()
+                .is_none_or(|c| summary.category.eq_ignore_ascii_case(c));
+            let lc_match = lifecycle
+                .as_ref()
+                .is_none_or(|l| summary.lifecycle_state.eq_ignore_ascii_case(l));
+            if cat_match && lc_match {
+                summaries.push(summary);
+            }
+        }
+    }
+
+    match format {
+        OutputFormat::Text => {
+            if summaries.is_empty() {
+                println!("No skills found matching the given filters.");
+            } else {
+                println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
+                println!("{}", "-".repeat(70));
+                for s in &summaries {
+                    println!(
+                        "{:<16} {:<32} {:<6} {}",
+                        s.id, s.name, s.capabilities_count, s.lifecycle_state
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["skills", "list"],
+            "ok",
+            Summary::default(),
+            json!({ "skills": summaries }),
+            Vec::new(),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Execute `elegy skills describe`.
+fn execute_skills_describe_command(
+    skill_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
+        if let Some((summary, full)) = parse_skill_summary(json_str) {
+            if summary.id == skill_id {
+                match format {
+                    OutputFormat::Text => {
+                        println!("Skill: {} ({})", summary.name, summary.id);
+                        println!("Category: {}", summary.category);
+                        println!("State: {}", summary.lifecycle_state);
+                        println!("Description: {}", summary.description);
+                        println!();
+                        if let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) {
+                            println!("Capabilities ({}):", caps.len());
+                            for cap in caps {
+                                let cap_id =
+                                    cap.get("id").and_then(|v| v.as_str()).unwrap_or("?");
+                                let cap_name =
+                                    cap.get("name").and_then(|v| v.as_str()).unwrap_or("?");
+                                let cap_desc = cap
+                                    .get("description")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+                                println!("  - {cap_name} ({cap_id}): {cap_desc}");
+                            }
+                        }
+                    }
+                    OutputFormat::Json => print_json(&build_envelope(
+                        ["skills", "describe"],
+                        "ok",
+                        Summary::default(),
+                        &full,
+                        Vec::new(),
+                    ))?,
+                }
+                return Ok(ExitCode::SUCCESS);
+            }
+        }
+    }
+
+    emit_diagnostics(
+        format,
+        vec!["skills", "describe"],
+        vec![Diagnostic::error(
+            "CLI-SKILLS-001",
+            format!("skill '{skill_id}' not found"),
+        )],
+        json!({}),
+        "not_found",
+        exit_invalid(),
+    )
+}
+
+/// Execute `elegy skills search`.
+fn execute_skills_search_command(
+    query: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let query_lower = query.to_lowercase();
+    let mut results = Vec::new();
+
+    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
+        if let Some((summary, full)) = parse_skill_summary(json_str) {
+            let matched = skill_matches_query(&summary, &full, &query_lower);
+            if matched {
+                results.push(summary);
+            }
+        }
+    }
+
+    match format {
+        OutputFormat::Text => {
+            if results.is_empty() {
+                println!("No skills matched query: \"{query}\"");
+            } else {
+                println!("Skills matching \"{query}\":");
+                println!();
+                println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
+                println!("{}", "-".repeat(70));
+                for s in &results {
+                    println!(
+                        "{:<16} {:<32} {:<6} {}",
+                        s.id, s.name, s.capabilities_count, s.lifecycle_state
+                    );
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["skills", "search"],
+            "ok",
+            Summary::default(),
+            json!({ "query": query, "results": results }),
+            Vec::new(),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Check whether a skill matches a free-text query across all discoverable fields.
+fn skill_matches_query(
+    summary: &SkillSummary,
+    full: &serde_json::Value,
+    query_lower: &str,
+) -> bool {
+    // Match against summary fields
+    if summary.id.to_lowercase().contains(query_lower)
+        || summary.name.to_lowercase().contains(query_lower)
+        || summary.description.to_lowercase().contains(query_lower)
+        || summary.category.to_lowercase().contains(query_lower)
+    {
+        return true;
+    }
+
+    // Match against discovery keywords and triggers
+    if let Some(discovery) = full.get("discovery") {
+        if let Some(keywords) = discovery.get("keywords").and_then(|v| v.as_array()) {
+            for kw in keywords {
+                if let Some(s) = kw.as_str() {
+                    if s.to_lowercase().contains(query_lower) {
+                        return true;
+                    }
+                }
+            }
+        }
+        if let Some(triggers) = discovery.get("triggers").and_then(|v| v.as_array()) {
+            for trigger in triggers {
+                if let Some(pattern) = trigger.get("pattern").and_then(|v| v.as_str()) {
+                    if pattern.to_lowercase().contains(query_lower) {
+                        return true;
+                    }
+                }
+            }
+        }
+    }
+
+    // Match against capability descriptions and names
+    if let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) {
+        for cap in caps {
+            if let Some(desc) = cap.get("description").and_then(|v| v.as_str()) {
+                if desc.to_lowercase().contains(query_lower) {
+                    return true;
+                }
+            }
+            if let Some(cap_name) = cap.get("name").and_then(|v| v.as_str()) {
+                if cap_name.to_lowercase().contains(query_lower) {
+                    return true;
+                }
+            }
+        }
+    }
+
+    false
+}
 
 fn execute_diagram_create_command(
     diagram_type: String,

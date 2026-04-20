@@ -944,6 +944,317 @@ impl CapabilityValidationResult {
     }
 }
 
+// ─── Skill Definition V2 ────────────────────────────────────────────
+
+/// Unified skill definition (v2) combining governance, lifecycle,
+/// discovery metadata, and per-capability implementation details
+/// for agent-consumable invocation.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillDefinitionV2 {
+    /// Must be `"elegy-skill-definition"`.
+    pub skill_format: String,
+    /// Must be `2`.
+    pub skill_version: u32,
+    /// Skill identity: namespace, name, version.
+    pub identity: SkillIdentityV2,
+    /// Optional display metadata.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<SkillMetadataV2>,
+    /// One or more capabilities this skill exposes.
+    pub capabilities: Vec<SkillCapability>,
+    /// Constraints that apply to the skill as a whole.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub constraints: Vec<SkillConstraint>,
+    /// Governance posture: risk level, approval requirement, allowed contexts.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub governance: Option<SkillGovernance>,
+    /// Discovery metadata: keywords, triggers, hints.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub discovery: Option<SkillDiscovery>,
+    /// Provenance: how this definition was created.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub origin: Option<SkillOriginV2>,
+    /// Lifecycle state of the skill.
+    pub lifecycle_state: String,
+}
+
+/// Identity block for a v2 skill definition.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillIdentityV2 {
+    /// Organizational namespace (e.g. `"elegy"`).
+    pub namespace: String,
+    /// Skill name (e.g. `"diagram"`).
+    pub name: String,
+    /// Semver version string.
+    pub version: String,
+    /// Human-friendly display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Alternative names agents can use to refer to this skill.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub aliases: Vec<String>,
+}
+
+/// Display and categorization metadata for a v2 skill.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillMetadataV2 {
+    /// Human-friendly display name.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    /// Longer description of what the skill does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// One-sentence summary.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub summary: Option<String>,
+    /// Category tag (e.g. `"design"`, `"memory"`, `"projection"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    /// Author or team.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<String>,
+    /// SPDX license identifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    /// Free-form tags.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    /// Owning teams.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub owners: Vec<String>,
+    /// Link to documentation.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub documentation_uri: Option<String>,
+}
+
+/// A single capability within a v2 skill definition.
+///
+/// Each capability maps to a specific CLI invocation or MCP tool
+/// that an agent can call.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillCapability {
+    /// Unique capability identifier (e.g. `"diagram-patch"`).
+    pub id: String,
+    /// Human-readable capability name.
+    pub name: String,
+    /// Description of what this capability does.
+    pub description: String,
+    /// How to invoke this capability (subprocess, library, mcp).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub implementation: Option<SkillImplementation>,
+    /// Input parameters and stdin format.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input: Option<SkillCapabilityInput>,
+    /// Output description and schema reference.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output: Option<SkillCapabilityOutput>,
+    /// Execution characteristics (determinism, side effects, timeout).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub execution: Option<SkillCapabilityExecution>,
+    /// Optional composition hints for agent chaining.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composes_well: Option<SkillComposition>,
+}
+
+/// How a capability is invoked.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillImplementation {
+    /// Invocation mechanism: `"subprocess"`, `"library"`, or `"mcp"`.
+    pub execution_type: String,
+    /// Binary or library name to invoke.
+    pub executable_name: String,
+    /// CLI arguments, possibly containing `${var}` placeholders.
+    #[serde(default)]
+    pub arguments: Vec<String>,
+}
+
+/// Input specification for a capability.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillCapabilityInput {
+    /// Typed parameter definitions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub parameters: Vec<SkillParameterV2>,
+    /// Expected stdin format: `"json"`, `"text"`, or absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub stdin_format: Option<String>,
+    /// Reference to a JSON Schema for the input.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_ref: Option<String>,
+}
+
+/// A single typed parameter within a v2 capability's input block.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillParameterV2 {
+    /// Parameter name.
+    pub name: String,
+    /// Type identifier (e.g. `"string"`, `"path"`, `"boolean"`).
+    #[serde(rename = "type")]
+    pub param_type: String,
+    /// What this parameter controls.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    /// Whether this parameter is mandatory.
+    #[serde(default)]
+    pub required: bool,
+    /// Default value when the parameter is omitted.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<serde_json::Value>,
+}
+
+/// Output specification for a capability.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillCapabilityOutput {
+    /// Type of the result (e.g. `"CanonicalDiagram"`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub result_type: Option<String>,
+    /// Reference to a JSON Schema for the output.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub schema_ref: Option<String>,
+    /// Whether the result is a collection.
+    #[serde(default)]
+    pub returns_collection: bool,
+    /// Human-readable description of what is returned.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+/// Execution characteristics for a capability.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillCapabilityExecution {
+    /// Execution mode: `"requestResponse"`, `"longRunning"`, `"streaming"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+    /// Whether the capability always produces the same output for the same input.
+    #[serde(default)]
+    pub is_deterministic: bool,
+    /// Whether the capability has side effects (writes files, mutates state).
+    #[serde(default)]
+    pub has_side_effects: bool,
+    /// Optional timeout in seconds.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout_seconds: Option<u32>,
+}
+
+/// Composition hints so agents can chain capabilities.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillComposition {
+    /// Capabilities that typically follow this one.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub typical_next: Vec<String>,
+    /// Capabilities this one can pipe output to.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pipeable_to: Vec<String>,
+    /// Capabilities that consume this one's output.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub output_consumed_by: Vec<String>,
+}
+
+/// Governance posture for a v2 skill.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillGovernance {
+    /// Risk level: `"low"`, `"medium"`, `"high"`, `"critical"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub risk_level: Option<String>,
+    /// Approval requirement: `"none"`, `"advisory"`, `"required"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub approval_requirement: Option<String>,
+    /// References to policy documents.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_refs: Vec<String>,
+    /// Contexts in which this skill may be used.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub allowed_contexts: Vec<String>,
+}
+
+/// Discovery metadata for agents to find a v2 skill.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillDiscovery {
+    /// Searchable keywords.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub keywords: Vec<String>,
+    /// Trigger patterns and their descriptions.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub triggers: Vec<SkillTrigger>,
+    /// Capability hint strings.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_hints: Vec<String>,
+    /// Whether this skill should be excluded from default listings.
+    #[serde(default)]
+    pub is_hidden: bool,
+}
+
+/// Origin/provenance of a v2 skill definition.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillOriginV2 {
+    /// How the definition was created: `"declared"` or `"dynamic"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub materialization_kind: Option<String>,
+    /// Source type: `"manual"`, `"imported"`, `"generated"`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_kind: Option<String>,
+    /// Path or URI to the source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
+    /// Version of the source.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_version: Option<String>,
+}
+
+/// Validate a v2 skill definition for structural correctness.
+///
+/// Checks required fields and basic invariants without performing
+/// schema validation against the JSON Schema.
+pub fn validate_skill_definition_v2(def: &SkillDefinitionV2) -> Result<(), ContractsError> {
+    if def.skill_format != "elegy-skill-definition" {
+        return Err(ContractsError::Compatibility(format!(
+            "expected skillFormat \"elegy-skill-definition\", got \"{}\"",
+            def.skill_format,
+        )));
+    }
+    if def.skill_version != 2 {
+        return Err(ContractsError::Compatibility(format!(
+            "expected skillVersion 2, got {}",
+            def.skill_version,
+        )));
+    }
+    if def.identity.namespace.is_empty() {
+        return Err(ContractsError::Compatibility(
+            "identity.namespace must not be empty".to_string(),
+        ));
+    }
+    if def.identity.name.is_empty() {
+        return Err(ContractsError::Compatibility(
+            "identity.name must not be empty".to_string(),
+        ));
+    }
+    if def.capabilities.is_empty() {
+        return Err(ContractsError::Compatibility(
+            "capabilities must contain at least one entry".to_string(),
+        ));
+    }
+    for cap in &def.capabilities {
+        if cap.id.is_empty() {
+            return Err(ContractsError::Compatibility(
+                "capability id must not be empty".to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
 pub fn default_support_manifest_path() -> PathBuf {
     resolve_contracts_source_dir()
         .join("support")
@@ -2237,4 +2548,96 @@ fn usage_total_is_inconsistent(usage: &AgentUsage) -> bool {
         || usage
             .output_tokens
             .is_some_and(|value| value > total_tokens)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_v2_minimal_fixture() {
+        let json =
+            include_str!("../../../../contracts/fixtures/skill-definition-v2.minimal.json");
+        let def: SkillDefinitionV2 =
+            serde_json::from_str(json).expect("minimal v2 fixture should parse");
+        assert_eq!(def.skill_format, "elegy-skill-definition");
+        assert_eq!(def.skill_version, 2);
+        assert_eq!(def.identity.name, "minimal-v2-example");
+        assert_eq!(def.capabilities.len(), 1);
+        validate_skill_definition_v2(&def).expect("minimal fixture should validate");
+    }
+
+    #[test]
+    fn parse_v2_diagram_fixture() {
+        let json =
+            include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json");
+        let def: SkillDefinitionV2 =
+            serde_json::from_str(json).expect("diagram v2 fixture should parse");
+        assert_eq!(def.identity.namespace, "elegy");
+        assert_eq!(def.identity.name, "diagram");
+        assert_eq!(def.capabilities.len(), 4);
+        assert_eq!(def.lifecycle_state, "active");
+        validate_skill_definition_v2(&def).expect("diagram fixture should validate");
+    }
+
+    #[test]
+    fn validate_rejects_empty_namespace() {
+        let def = SkillDefinitionV2 {
+            skill_format: "elegy-skill-definition".to_string(),
+            skill_version: 2,
+            identity: SkillIdentityV2 {
+                namespace: String::new(),
+                name: "test".to_string(),
+                ..Default::default()
+            },
+            capabilities: vec![SkillCapability {
+                id: "cap".to_string(),
+                name: "Cap".to_string(),
+                description: "d".to_string(),
+                ..Default::default()
+            }],
+            lifecycle_state: "draft".to_string(),
+            ..Default::default()
+        };
+        assert!(validate_skill_definition_v2(&def).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_wrong_format() {
+        let def = SkillDefinitionV2 {
+            skill_format: "wrong".to_string(),
+            skill_version: 2,
+            identity: SkillIdentityV2 {
+                namespace: "x".to_string(),
+                name: "y".to_string(),
+                ..Default::default()
+            },
+            capabilities: vec![SkillCapability {
+                id: "c".to_string(),
+                name: "C".to_string(),
+                description: "d".to_string(),
+                ..Default::default()
+            }],
+            lifecycle_state: "draft".to_string(),
+            ..Default::default()
+        };
+        assert!(validate_skill_definition_v2(&def).is_err());
+    }
+
+    #[test]
+    fn validate_rejects_empty_capabilities() {
+        let def = SkillDefinitionV2 {
+            skill_format: "elegy-skill-definition".to_string(),
+            skill_version: 2,
+            identity: SkillIdentityV2 {
+                namespace: "x".to_string(),
+                name: "y".to_string(),
+                ..Default::default()
+            },
+            capabilities: vec![],
+            lifecycle_state: "draft".to_string(),
+            ..Default::default()
+        };
+        assert!(validate_skill_definition_v2(&def).is_err());
+    }
 }
