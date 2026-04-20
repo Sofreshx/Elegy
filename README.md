@@ -46,6 +46,10 @@ Everything else in the release exists to support verified installation, automati
 | `elegy diagram patch` | Ready now | Surgically add/remove nodes and edges. Supports JSON stdin (`--patch-stdin`) for agent-friendly invocation. |
 | `elegy diagram narrate` | Ready now | Produce human-readable summaries of diagram content. Accepts file or stdin. |
 | `elegy diagram render` | Ready now | Render diagrams to Mermaid or other formats. Accepts file or stdin. |
+| `elegy skills list` | Ready now | List all available skill definitions with metadata, category filtering, and lifecycle state. |
+| `elegy skills describe` | Ready now | Show full detail for a specific skill including all capabilities and implementation info. |
+| `elegy skills search` | Ready now | Search skills by keyword or trigger pattern for runtime discovery. |
+| `elegy run` (MCP host) | Ready now | Start the MCP host server over stdio. Now serves both resources and tools. |
 | `elegy-mcp` | Ready now | Dedicated CLI for governed MCP descriptor authoring and descriptor analysis. |
 | `elegy-skills` | Ready now | Dedicated CLI for governed MCP-to-skill generation. |
 | `elegy-memory` | MVP / preview | Dedicated local memory CLI backed by the in-repo Rust implementation. Usable now for add, search, list, inspect, health, export, purge, contradictions, and the current preview `reembed` command surface. |
@@ -88,6 +92,8 @@ Elegy is designed to be consumable by LLM agents and automation systems. Key pat
 - **Stdin-friendly:** Diagram and Mermaid commands accept input from stdin when `--input` is omitted, enabling pipe-based composition.
 - **JSON patch for mutations:** Use `--patch-stdin` to pipe a JSON `DiagramPatch` object instead of fragile positional arguments.
 - **Governed skill definitions:** Each capability family has a v2 skill definition in `contracts/fixtures/` describing exact invocation patterns, parameters, and governance metadata.
+- **MCP tool dispatch:** The MCP host (`elegy run`) auto-generates MCP tools from v2 skill definitions. Agents connecting via MCP get `tools/list` and `tools/call` backed by CLI subprocess dispatch — zero configuration required.
+- **Runtime discovery:** Use `elegy skills list --json` and `elegy skills describe --skill-id <id> --json` to discover all capabilities, their invocation patterns, and parameters at runtime.
 
 For the full agent integration guide, see [docs/agent-integration.md](docs/agent-integration.md) (coming soon).
 
@@ -97,7 +103,7 @@ Not every Rust crate in the workspace is a directly shipped user-facing tool. Th
 
 - User-facing CLI crates: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-skills`
 - Governed/data crates: `elegy-contracts`, `elegy-policy`, `elegy-descriptor`
-- Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp`, `elegy-agent-events`
+- Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp` (resources + tool dispatch), `elegy-agent-events`
 - Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`, `elegy-diagram`
 
 That distinction matters for consumers: the release lane is CLI-first, while the rest of the workspace is primarily implementation and runtime support.
