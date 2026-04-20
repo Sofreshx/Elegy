@@ -24,6 +24,9 @@ use elegy_mermaid::{
     MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
     MermaidWorkflowProjection,
 };
+use elegy_desktop::{
+    click, focus_window, maximize_window, minimize_window, move_window, send_key, type_text,
+};
 use elegy_diagram::{CanonicalDiagram, DiagramNode, DiagramEdge, DiagramPatch};
 use elegy_observe::{
     capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
@@ -73,6 +76,10 @@ const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
     (
         "observe",
         include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
+    ),
+    (
+        "desktop",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
     ),
 ];
 
@@ -163,6 +170,11 @@ enum Command {
     Observe {
         #[command(subcommand)]
         command: ObserveCommand,
+    },
+    /// Desktop input automation commands
+    Desktop {
+        #[command(subcommand)]
+        command: DesktopCommand,
     },
 }
 
@@ -369,6 +381,107 @@ enum ObserveCommand {
     },
     /// System hardware and OS information snapshot
     System,
+}
+
+/// Desktop input automation commands for agentic workflows.
+///
+/// All mutation commands support `--dry-run` to preview the action without executing.
+/// Window commands accept `--title` (substring match, must be unambiguous) or `--hwnd` (precise).
+#[derive(Subcommand, Debug)]
+enum DesktopCommand {
+    /// Simulate a mouse click at pixel coordinates
+    Click {
+        /// X coordinate in screen pixels
+        #[arg(long)]
+        x: i32,
+        /// Y coordinate in screen pixels
+        #[arg(long)]
+        y: i32,
+        /// Mouse button: left, right, or middle
+        #[arg(long, default_value = "left")]
+        button: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Simulate keyboard text input
+    Type {
+        /// Text to type (Unicode supported)
+        #[arg(long)]
+        text: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Simulate a key combination (e.g., "ctrl+s", "alt+tab")
+    Key {
+        /// Key combo string (e.g., "ctrl+s", "alt+tab", "enter", "ctrl+shift+f5")
+        #[arg(long)]
+        combo: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Focus a window by title pattern or HWND
+    Focus {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Move and optionally resize a window
+    Move {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Target X position in screen pixels
+        #[arg(long)]
+        x: i32,
+        /// Target Y position in screen pixels
+        #[arg(long)]
+        y: i32,
+        /// New width in pixels (preserves current if omitted)
+        #[arg(long)]
+        width: Option<u32>,
+        /// New height in pixels (preserves current if omitted)
+        #[arg(long)]
+        height: Option<u32>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Minimize a window
+    Minimize {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Maximize a window
+    Maximize {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -921,6 +1034,63 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Observe {
             command: ObserveCommand::System,
         } => execute_observe_system_command(format),
+        Command::Desktop {
+            command: DesktopCommand::Click {
+                x,
+                y,
+                button,
+                dry_run,
+            },
+        } => execute_desktop_click_command(x, y, button, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Type { text, dry_run },
+        } => execute_desktop_type_command(text, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Key { combo, dry_run },
+        } => execute_desktop_key_command(combo, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Focus {
+                title,
+                hwnd,
+                dry_run,
+            },
+        } => execute_desktop_focus_command(title, hwnd, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Move {
+                title,
+                hwnd,
+                x,
+                y,
+                width,
+                height,
+                dry_run,
+            },
+        } => execute_desktop_move_command(
+            title,
+            hwnd,
+            DesktopMoveGeometry {
+                x,
+                y,
+                width,
+                height,
+            },
+            dry_run,
+            format,
+        ),
+        Command::Desktop {
+            command: DesktopCommand::Minimize {
+                title,
+                hwnd,
+                dry_run,
+            },
+        } => execute_desktop_minimize_command(title, hwnd, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Maximize {
+                title,
+                hwnd,
+                dry_run,
+            },
+        } => execute_desktop_maximize_command(title, hwnd, dry_run, format),
     }
 }
 
@@ -947,7 +1117,7 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
                         "local", "mermaid", "diagram", "run", "contracts", "skills",
-                        "observe"
+                        "observe", "desktop"
                     ],
                     "skillDefinitionFormat": 2,
                     "mcpHostCapable": true
@@ -4077,4 +4247,363 @@ fn execute_observe_system_command(
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn execute_desktop_click_command(
+    x: i32,
+    y: i32,
+    button: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match click(x, y, &button, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!("Click{mode}: ({x}, {y}) button={button}");
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "click"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "click"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_type_command(
+    text: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match type_text(&text, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!("Type{mode}: \"{}\" ({} chars)", text, result.character_count);
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "type"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "type"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_key_command(
+    combo: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match send_key(&combo, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!("Key{mode}: {combo}");
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "key"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "key"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_focus_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match focus_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Focus{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "focus"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "focus"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+struct DesktopMoveGeometry {
+    x: i32,
+    y: i32,
+    width: Option<u32>,
+    height: Option<u32>,
+}
+
+fn execute_desktop_move_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    geometry: DesktopMoveGeometry,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let DesktopMoveGeometry {
+        x,
+        y,
+        width,
+        height,
+    } = geometry;
+    match move_window(title.as_deref(), hwnd, x, y, width, height, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Move{mode}: {} → ({x}, {y})",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                    if let (Some(w), Some(h)) = (width, height) {
+                        println!("  Resize: {w}x{h}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "move"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "move"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_minimize_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match minimize_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Minimize{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "minimize"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "minimize"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_maximize_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match maximize_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Maximize{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "maximize"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "maximize"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
 }

@@ -1,0 +1,393 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "desktop",
+    "version": "0.1.0",
+    "displayName": "Elegy Desktop Automation",
+    "aliases": ["desktop", "desktop-automation", "ui-automation"]
+  },
+  "metadata": {
+    "displayName": "Elegy Desktop Automation",
+    "description": "High-risk desktop automation capabilities for bounded UI input and window management. Supports mouse clicks, text entry, key combinations, and strict window focus/move/minimize/maximize operations.",
+    "summary": "Desktop automation for click, type, key, and strict window control with dry-run support.",
+    "category": "automation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["desktop", "automation", "ui", "windows", "input", "window-management", "high-risk"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "desktop-click",
+      "name": "Click",
+      "description": "Simulate a mouse click at screen coordinates. Supports left, right, or middle button and dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "click", "--x", "${x}", "--y", "${y}", "--button", "${button}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "x",
+            "type": "integer",
+            "description": "X coordinate in screen pixels.",
+            "required": true
+          },
+          {
+            "name": "y",
+            "type": "integer",
+            "description": "Y coordinate in screen pixels.",
+            "required": true
+          },
+          {
+            "name": "button",
+            "type": "string",
+            "description": "Mouse button: left, right, or middle.",
+            "required": false,
+            "default": "left"
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without injecting input.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "ClickResult with coordinates, button, dry-run flag, target window evidence, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-type",
+      "name": "Type Text",
+      "description": "Inject Unicode text into the current foreground window. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "type", "--text", "${text}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "text",
+            "type": "string",
+            "description": "Text to type.",
+            "required": true
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without injecting input.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "TypeResult with typed text, character count, dry-run flag, target window evidence, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-key",
+      "name": "Send Key Combo",
+      "description": "Send a parsed key combination such as ctrl+s, alt+tab, or enter. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "key", "--combo", "${combo}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "combo",
+            "type": "string",
+            "description": "Key combo string such as ctrl+s, alt+tab, enter, or ctrl+shift+f5.",
+            "required": true
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without injecting input.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "KeyResult with combo, parsed keys, dry-run flag, target window evidence, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-focus",
+      "name": "Focus Window",
+      "description": "Focus a single target window resolved by strict title matching or exact HWND. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "focus", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Case-insensitive substring window title pattern. Must resolve to exactly one visible window when hwnd is omitted.",
+            "required": false
+          },
+          {
+            "name": "hwnd",
+            "type": "integer",
+            "description": "Raw window handle. Takes priority over title matching when provided.",
+            "required": false
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without executing it.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-move",
+      "name": "Move Window",
+      "description": "Move a target window and optionally resize it, resolved by strict title matching or exact HWND. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "move", "--title", "${title}", "--hwnd", "${hwnd}", "--x", "${x}", "--y", "${y}", "--width", "${width}", "--height", "${height}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Case-insensitive substring window title pattern. Must resolve to exactly one visible window when hwnd is omitted.",
+            "required": false
+          },
+          {
+            "name": "hwnd",
+            "type": "integer",
+            "description": "Raw window handle. Takes priority over title matching when provided.",
+            "required": false
+          },
+          {
+            "name": "x",
+            "type": "integer",
+            "description": "Target X position in screen pixels.",
+            "required": true
+          },
+          {
+            "name": "y",
+            "type": "integer",
+            "description": "Target Y position in screen pixels.",
+            "required": true
+          },
+          {
+            "name": "width",
+            "type": "integer",
+            "description": "Optional new width in pixels.",
+            "required": false
+          },
+          {
+            "name": "height",
+            "type": "integer",
+            "description": "Optional new height in pixels.",
+            "required": false
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without executing it.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-minimize",
+      "name": "Minimize Window",
+      "description": "Minimize a target window resolved by strict title matching or exact HWND. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "minimize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Case-insensitive substring window title pattern. Must resolve to exactly one visible window when hwnd is omitted.",
+            "required": false
+          },
+          {
+            "name": "hwnd",
+            "type": "integer",
+            "description": "Raw window handle. Takes priority over title matching when provided.",
+            "required": false
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without executing it.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "desktop-maximize",
+      "name": "Maximize Window",
+      "description": "Maximize a target window resolved by strict title matching or exact HWND. Supports dry-run preview.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["desktop", "maximize", "--title", "${title}", "--hwnd", "${hwnd}", "--dry-run", "${dryRun}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Case-insensitive substring window title pattern. Must resolve to exactly one visible window when hwnd is omitted.",
+            "required": false
+          },
+          {
+            "name": "hwnd",
+            "type": "integer",
+            "description": "Raw window handle. Takes priority over title matching when provided.",
+            "required": false
+          },
+          {
+            "name": "dryRun",
+            "type": "boolean",
+            "description": "When true, preview the action without executing it.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "windows-only",
+      "description": "Desktop automation is Windows-only. On non-Windows platforms these capabilities fail with an unsupported error.",
+      "required": true
+    },
+    {
+      "constraintId": "uipi-and-foreground-limitations",
+      "description": "Win32 input injection and window control are bounded by Windows UIPI, integrity level, desktop/session boundaries, and foreground activation rules. Elevated or protected targets may reject input or focus changes.",
+      "required": true
+    },
+    {
+      "constraintId": "dry-run-supported",
+      "description": "All capabilities support dry-run mode for preview-only execution and evidence capture without injecting input or mutating window state.",
+      "required": true
+    },
+    {
+      "constraintId": "strict-window-matching",
+      "description": "Window-targeting commands use strict matching: title-based targeting must resolve to exactly one visible window or fail. Provide hwnd for precise targeting.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "high",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "desktop-automation"]
+  },
+  "discovery": {
+    "keywords": ["desktop", "automation", "click", "type", "keyboard", "window", "focus", "move", "minimize", "maximize", "dry-run"],
+    "triggers": [
+      {
+        "pattern": "click on screen",
+        "description": "When an agent needs bounded mouse input."
+      },
+      {
+        "pattern": "type into window",
+        "description": "When an agent needs bounded text entry."
+      },
+      {
+        "pattern": "press key combo",
+        "description": "When an agent needs bounded keyboard shortcut input."
+      },
+      {
+        "pattern": "focus or move window",
+        "description": "When an agent needs to target and manage a specific desktop window."
+      }
+    ],
+    "capabilityHints": [
+      "desktop-click-coordinates",
+      "desktop-type-unicode",
+      "desktop-key-combo",
+      "desktop-window-control"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-desktop.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

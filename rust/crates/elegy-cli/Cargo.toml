@@ -15,6 +15,7 @@ path = "src/main.rs"
 clap.workspace = true
 elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 elegy-core = { version = "0.1.0", path = "../elegy-core" }
+elegy-desktop = { version = "0.1.0", path = "../elegy-desktop" }
 elegy-host-mcp = { version = "0.1.0", path = "../elegy-host-mcp" }
 elegy-mermaid = { version = "0.1.0", path = "../elegy-mermaid" }
 elegy-diagram = { version = "0.1.0", path = "../elegy-diagram" }

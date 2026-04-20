@@ -60,6 +60,13 @@ Everything else in the release exists to support verified installation, automati
 | `elegy observe clipboard` | Ready now | Read current clipboard text and image presence. Cross-platform. |
 | `elegy observe filesystem` | Ready now | Snapshot-diff a directory over a bounded time window. Cross-platform. |
 | `elegy observe system` | Ready now | System hardware and OS info snapshot. Cross-platform. |
+| `elegy desktop click` | Ready now | Simulate mouse click at pixel coordinates. Supports `--dry-run` for preview. Windows only. |
+| `elegy desktop type` | Ready now | Simulate keyboard text input (Unicode). Supports `--dry-run`. Windows only. |
+| `elegy desktop key` | Ready now | Simulate key combos (e.g., ctrl+s, alt+tab). Supports `--dry-run`. Windows only. |
+| `elegy desktop focus` | Ready now | Focus a window by title or HWND. Strict matching — fails on ambiguity. Windows only. |
+| `elegy desktop move` | Ready now | Move and resize a window by title or HWND. Supports `--dry-run`. Windows only. |
+| `elegy desktop minimize` | Ready now | Minimize a window by title or HWND. Supports `--dry-run`. Windows only. |
+| `elegy desktop maximize` | Ready now | Maximize a window by title or HWND. Supports `--dry-run`. Windows only. |
 
 ## What is intentionally not a separate release package
 
@@ -115,6 +122,7 @@ Not every Rust crate in the workspace is a directly shipped user-facing tool. Th
 - Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp` (resources + tool dispatch), `elegy-agent-events`
 - Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`, `elegy-diagram`
 - Observation crates: `elegy-observe` (safe observation API), `elegy-observe-win32` (isolated Win32 FFI leaf)
+- Desktop automation crates: `elegy-desktop` (safe automation API), `elegy-desktop-win32` (isolated Win32 FFI leaf)
 
 That distinction matters for consumers: the release lane is CLI-first, while the rest of the workspace is primarily implementation and runtime support.
 

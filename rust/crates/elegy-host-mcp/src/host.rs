@@ -27,6 +27,10 @@ const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
         "observe",
         include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
     ),
+    (
+        "desktop",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
+    ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -702,7 +706,7 @@ mod tests {
         let tools = build_tools_from_skill_definitions();
 
         // The diagram skill definition has 4 capabilities
-        assert_eq!(tools.len(), 14, "expected 14 tools from diagram + skill-router + observe skill defs");
+        assert_eq!(tools.len(), 21, "expected 21 tools from diagram + skill-router + observe + desktop skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"), "missing diagram-create");
@@ -728,6 +732,10 @@ mod tests {
         assert!(names.contains(&"observe-clipboard"), "missing observe-clipboard");
         assert!(names.contains(&"observe-filesystem"), "missing observe-filesystem");
         assert!(names.contains(&"observe-system"), "missing observe-system");
+        assert!(names.contains(&"desktop-click"), "missing desktop-click");
+        assert!(names.contains(&"desktop-type"), "missing desktop-type");
+        assert!(names.contains(&"desktop-focus"), "missing desktop-focus");
+        assert!(names.contains(&"desktop-move"), "missing desktop-move");
     }
 
     #[test]
@@ -886,7 +894,7 @@ mod tests {
             .await
             .expect("client should list tools");
 
-        assert_eq!(tools.len(), 14, "expected 14 tools from diagram + skill-router + observe skill defs");
+        assert_eq!(tools.len(), 21, "expected 21 tools from diagram + skill-router + observe + desktop skill defs");
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"));
@@ -903,6 +911,9 @@ mod tests {
         assert!(names.contains(&"observe-clipboard"));
         assert!(names.contains(&"observe-filesystem"));
         assert!(names.contains(&"observe-system"));
+        assert!(names.contains(&"desktop-click"));
+        assert!(names.contains(&"desktop-key"));
+        assert!(names.contains(&"desktop-maximize"));
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");

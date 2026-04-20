@@ -478,6 +478,7 @@ dependencies = [
  "clap",
  "elegy-contracts",
  "elegy-core",
+ "elegy-desktop",
  "elegy-diagram",
  "elegy-host-mcp",
  "elegy-mcp",
@@ -522,6 +523,28 @@ dependencies = [
  "thiserror",
  "toml",
  "url",
+]
+
+[[package]]
+name = "elegy-desktop"
+version = "0.1.0"
+dependencies = [
+ "elegy-desktop-win32",
+ "elegy-observe",
+ "serde",
+ "serde_json",
+ "thiserror",
+ "time",
+]
+
+[[package]]
+name = "elegy-desktop-win32"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror",
+ "windows 0.58.0",
 ]
 
 [[package]]
