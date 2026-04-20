@@ -1,0 +1,161 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "data",
+    "version": "0.1.0",
+    "displayName": "Elegy Data Tools",
+    "aliases": ["data", "data-transform", "data-automation"]
+  },
+  "metadata": {
+    "displayName": "Elegy Data Tools",
+    "description": "Structured data helpers for format conversion, JSON extraction, and JSON Schema validation.",
+    "summary": "Convert json/csv/yaml/toml, extract JSON values, and validate JSON with schemas.",
+    "category": "automation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["data", "json", "yaml", "toml", "csv", "schema", "validation", "automation"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "data-convert",
+      "name": "Convert Data",
+      "description": "Convert structured data between json, yaml, toml, and csv. Prefer stdin for the source payload and --json for structured command output.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["data", "convert", "--from", "${from}", "--to", "${to}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "from",
+            "type": "string",
+            "description": "Source format: json, yaml, toml, or csv.",
+            "required": true
+          },
+          {
+            "name": "to",
+            "type": "string",
+            "description": "Target format: json, yaml, toml, or csv.",
+            "required": true
+          }
+        ],
+        "stdinFormat": "text"
+      },
+      "output": {
+        "description": "Structured conversion result including normalized format metadata, JSON intermediate value, and rendered output text."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "data-extract",
+      "name": "Extract JSON Value",
+      "description": "Extract a JSON value using either JSON Pointer or a simple dotted path expression.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["data", "extract", "--query", "${query}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "JSON Pointer (/a/b/0) or dotted path (a.b.0) to extract.",
+            "required": true
+          }
+        ],
+        "stdinFormat": "json"
+      },
+      "output": {
+        "description": "Structured extraction result with the extracted JSON value and normalized query kind metadata."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "data-validate",
+      "name": "Validate JSON",
+      "description": "Validate input JSON against a supplied JSON Schema and return a structured validity report.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["data", "validate", "--schema", "${schema}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "schema",
+            "type": "string",
+            "description": "Inline JSON Schema string or schema reference accepted by the future CLI surface.",
+            "required": true
+          }
+        ],
+        "stdinFormat": "json"
+      },
+      "output": {
+        "description": "ValidateResult JSON containing a boolean valid flag and zero or more validation error messages."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "structured-data-only",
+      "description": "The data skill operates on structured document formats and does not attempt lossy schema inference or opaque binary transformations.",
+      "required": true
+    },
+    {
+      "constraintId": "json-extract-only",
+      "description": "Extraction is limited to JSON inputs and supports JSON Pointer plus simple dotted path addressing.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "data-automation"]
+  },
+  "discovery": {
+    "keywords": ["data", "convert", "extract", "validate", "json", "yaml", "toml", "csv", "schema"],
+    "triggers": [
+      {
+        "pattern": "convert data format",
+        "description": "When structured data needs to move between json, yaml, toml, or csv."
+      },
+      {
+        "pattern": "extract json value",
+        "description": "When a JSON field must be selected by pointer or dotted path."
+      },
+      {
+        "pattern": "validate json schema",
+        "description": "When JSON payloads need schema-based validity checks."
+      }
+    ],
+    "capabilityHints": ["data-convert-formats", "data-extract-query", "data-validate-schema"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-data.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

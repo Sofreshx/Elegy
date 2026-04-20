@@ -47,7 +47,9 @@ The contracts bundle remains the canonical machine-readable handoff for schemas,
 
 GitHub Releases are the primary downstream distribution lane. The standalone installer archive is a convenience bootstrap that carries the generic install helper only; it does not introduce a separate package-feed or runtime distribution path. Stable downstream consumption should continue to use explicit semver tags such as `v1.3.2`, while the rolling `main-snapshot` prerelease exists only as a continuously refreshed integration build.
 
-Each CLI archive is a thin distribution of its corresponding executable for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary. The current published target set is intentionally narrow:
+Downloadable archives are self-describing. Packaging stages `PACKAGE_README.md` into every downloadable zip as archive-root `README.md`, and manifest validation treats that README as a required payload entry for the CLI, wrapper, and installer archive families.
+
+Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills discovery, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
 
 - `x86_64-pc-windows-msvc`
 - `x86_64-unknown-linux-gnu`
@@ -88,7 +90,7 @@ Output:
 
 - versioned archive: `artifacts/distribution/elegy-installer-<bundleVersion>.zip`
 
-The standalone installer archive contains `install-distribution.ps1` at the archive root so downstream repos can download a single GitHub release asset, extract it into a repo-local tools/bootstrap directory, and then fetch the contracts bundle plus the selected CLI and wrapper archives through the supported installer path.
+The standalone installer archive contains `install-distribution.ps1` and `README.md` at the archive root so downstream repos can download a single GitHub release asset, extract it into a repo-local tools/bootstrap directory, and then fetch the contracts bundle plus the selected CLI and wrapper archives through the supported installer path.
 
 The generic installer now requires the manifest and checksums JSON assets alongside the zip assets. It verifies exact asset presence, file size, SHA-256, and required archive entries before extraction, then writes `install-receipt.json` into the destination root with the request, source, host target, installed assets, and verification evidence.
 
@@ -142,9 +144,9 @@ Output:
 
 Release workflows publish the explicit target set above by calling `pwsh ./scripts/package-cli.ps1 -Surface <surface> -Target <target>` for each current CLI surface and supported target.
 
-Each archive contains only its corresponding executable. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
+Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The Mermaid commands remain general-surface commands under the existing `elegy` executable rather than a dedicated release target.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills discovery, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
 
 ## Wrapper archive
 
@@ -160,7 +162,7 @@ Outputs:
 - `artifacts/distribution/elegy-mcp-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-skills-wrapper-<bundleVersion>.zip`
 
-Each wrapper archive contains the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
+Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
 
 Wrapper archives already embed the generic installer helper. Consumers that only need a dedicated wrapper surface can use the wrapper archive directly without separately downloading the standalone installer asset.
 

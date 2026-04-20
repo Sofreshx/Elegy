@@ -27,12 +27,39 @@ Everything else in the release exists to support verified installation, automati
 | Asset family | Example | Who usually needs it | Why it ships |
 | --- | --- | --- | --- |
 | Contracts bundle | `elegy-contracts-<bundleVersion>.zip` | Any downstream that validates or consumes governed artifacts | Canonical schemas, fixtures, compatibility metadata, and parity fixtures. |
-| Umbrella CLI archive | `elegy-cli-<cliVersion>-<target>.zip` | Most CLI users | Ships the `elegy` binary. This is the umbrella entrypoint and the home of Mermaid commands. |
+| Umbrella CLI archive | `elegy-cli-<cliVersion>-<target>.zip` | Most CLI users | Ships the `elegy` binary plus an archive README. This is the umbrella entrypoint for Mermaid, diagram, skills discovery/runtime, observe, desktop, repo, web, data, and notify. |
 | Dedicated CLI archives | `elegy-mcp-<cliVersion>-<target>.zip`, `elegy-skills-<cliVersion>-<target>.zip`, `elegy-memory-<cliVersion>-<target>.zip` | Users who want bounded tool-specific binaries | Ships dedicated binaries for MCP authoring/analysis, skill generation, and the preview memory surface. |
-| Installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Downstream repos that want scripted installation | Carries the generic installer helper. Useful for bootstrapping, but not required if you extract archives directly. |
-| Wrapper archives | `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip` | Hosts that want a thin repo-local integration surface | Packages wrapper metadata, a local install entrypoint, and a bundled installer copy for that bounded surface. |
+| Installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Downstream repos that want scripted installation | Carries the generic installer helper plus an archive README. Useful for bootstrapping, but not required if you extract archives directly. |
+| Wrapper archives | `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip` | Hosts that want a thin repo-local integration surface | Packages wrapper metadata, a local install entrypoint, a bundled installer copy, and an archive README for that bounded surface. |
 | Release manifest | `elegy-release-manifest-<bundleVersion>.json` | Installer and maintainers | Declares the authoritative asset set, archive contents, targets, sizes, and hashes the installer should trust. |
 | Release checksums | `elegy-release-checksums-<bundleVersion>.json` | Installer and maintainers | Lets the installer verify downloaded assets fail-closed instead of guessing. |
+
+## Feature families in `elegy`
+
+The umbrella `elegy` binary carries these feature families:
+
+- **Discovery/runtime** — `elegy skills list`, `elegy skills describe`, `elegy skills search`, `elegy run`
+- **Mermaid / diagram** — `elegy mermaid *`, `elegy diagram *`
+- **Observe** — `elegy observe processes|window|windows|screen|clipboard|filesystem|system`
+- **Desktop** — `elegy desktop click|type|key|focus|move|minimize|maximize`
+- **Repo** — `elegy repo status|diff|branches|log`
+- **Web** — `elegy web fetch|ping`
+- **Data** — `elegy data convert|extract|validate`
+- **Notify** — `elegy notify toast|webhook`
+- **Dedicated binaries** — `elegy-memory`, `elegy-mcp`, `elegy-skills`
+
+## Which download contains which features
+
+| Download | What you get |
+| --- | --- |
+| `elegy-cli-<cliVersion>-<target>.zip` | The `elegy` binary and all umbrella feature families above in one archive. |
+| `elegy-memory-<cliVersion>-<target>.zip` | The dedicated `elegy-memory` binary. |
+| `elegy-mcp-<cliVersion>-<target>.zip` | The dedicated `elegy-mcp` binary. |
+| `elegy-skills-<cliVersion>-<target>.zip` | The dedicated `elegy-skills` binary. |
+| `elegy-*-wrapper-<bundleVersion>.zip` | Wrapper-specific integration content plus bundled installer helper. |
+| `elegy-installer-<bundleVersion>.zip` | Standalone installer bootstrap. |
+
+Every downloadable zip now includes an archive-root `README.md` so the distribution stays self-describing after extraction or mirroring.
 
 ## User-facing tools
 
@@ -67,6 +94,17 @@ Everything else in the release exists to support verified installation, automati
 | `elegy desktop move` | Ready now | Move and resize a window by title or HWND. Supports `--dry-run`. Windows only. |
 | `elegy desktop minimize` | Ready now | Minimize a window by title or HWND. Supports `--dry-run`. Windows only. |
 | `elegy desktop maximize` | Ready now | Maximize a window by title or HWND. Supports `--dry-run`. Windows only. |
+| `elegy repo status` | Ready now | Structured read-only git status with branch tracking and changed entry counts. |
+| `elegy repo diff` | Ready now | Structured read-only diff summary against `HEAD` or an explicit base ref. |
+| `elegy repo branches` | Ready now | List local branches, current branch, and upstream tracking refs. |
+| `elegy repo log` | Ready now | Return a bounded structured commit log. |
+| `elegy web fetch` | Ready now | Perform bounded HTTP fetches with optional headers, request body, and JSON extraction. |
+| `elegy web ping` | Ready now | Check HTTP/HTTPS reachability with bounded timeouts. |
+| `elegy data convert` | Ready now | Convert structured data between JSON, YAML, TOML, and CSV. |
+| `elegy data extract` | Ready now | Extract JSON values by JSON Pointer or dotted path. |
+| `elegy data validate` | Ready now | Validate input JSON against a JSON Schema file. |
+| `elegy notify toast` | Ready now | Show a local toast notification. Windows only. |
+| `elegy notify webhook` | Ready now | Send an outbound webhook POST with optional text or JSON payload. |
 
 ## What is intentionally not a separate release package
 
@@ -121,6 +159,7 @@ Not every Rust crate in the workspace is a directly shipped user-facing tool. Th
 - Governed/data crates: `elegy-contracts`, `elegy-policy`, `elegy-descriptor`
 - Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp` (resources + tool dispatch), `elegy-agent-events`
 - Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`, `elegy-diagram`
+- Automation crates: `elegy-repo` (repo automation), `elegy-web` (web automation), `elegy-data` (data transformation), `elegy-notify` (notifications)
 - Observation crates: `elegy-observe` (safe observation API), `elegy-observe-win32` (isolated Win32 FFI leaf)
 - Desktop automation crates: `elegy-desktop` (safe automation API), `elegy-desktop-win32` (isolated Win32 FFI leaf)
 

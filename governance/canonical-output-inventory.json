@@ -263,12 +263,14 @@
     "checksums": "artifacts/distribution/elegy-release-checksums-*.json"
   },
   "wrapperArchiveRequiredEntries": [
+    "README.md",
     "install.ps1",
     "wrapper-entrypoint.json",
     "scripts/install-distribution.ps1"
   ],
   "installerArchiveRequiredEntries": [
-    "install-distribution.ps1"
+    "install-distribution.ps1",
+    "README.md"
   ],
   "wrapperArchiveSurfaceSpecificEntries": {
     "artifacts/distribution/elegy-memory-wrapper-*.zip": [

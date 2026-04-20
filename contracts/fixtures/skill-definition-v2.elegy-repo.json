@@ -1,0 +1,159 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "repo",
+    "version": "0.1.0",
+    "displayName": "Elegy Repository Automation",
+    "aliases": ["repo", "git", "repository"]
+  },
+  "metadata": {
+    "displayName": "Elegy Repository Automation",
+    "description": "Read-only repository automation for structured git status, diff summary, branch listing, and commit log queries.",
+    "summary": "Read-only git and repository queries for status, diff, branches, and log.",
+    "category": "automation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["git", "repo", "repository", "status", "diff", "branches", "log", "automation", "read-only"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "repo-status",
+      "name": "Repository Status",
+      "description": "Return a structured read-only summary of repository status, branch tracking, and changed entries.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["repo", "status", "--json"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "description": "RepoStatus with repo root, branch tracking, entry list, and staged/unstaged/untracked counts."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "repo-diff",
+      "name": "Repository Diff Summary",
+      "description": "Return a structured read-only diff summary against HEAD or an explicit base reference.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["repo", "diff", "--base", "${base}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "base",
+            "type": "string",
+            "description": "Optional git base reference to compare as <base>...HEAD.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "description": "RepoDiffSummary with file counts plus per-file insertions and deletions."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "repo-branches",
+      "name": "Repository Branches",
+      "description": "Return a structured read-only list of local branches, the current branch, and upstream tracking refs.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["repo", "branches", "--json"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "description": "RepoBranches with the current branch and all local branches."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "repo-log",
+      "name": "Repository Log",
+      "description": "Return a structured read-only commit log with bounded commit count.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["repo", "log", "--count", "${count}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "count",
+            "type": "integer",
+            "description": "Optional maximum number of commits to return.",
+            "required": false,
+            "default": 20
+          }
+        ]
+      },
+      "output": {
+        "description": "RepoLog with structured commit metadata."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "repository-automation"]
+  },
+  "discovery": {
+    "keywords": ["git", "repo", "repository", "status", "diff", "branches", "branch", "log", "commit", "read-only"],
+    "triggers": [
+      {
+        "pattern": "git status",
+        "description": "When an agent needs a structured repository status summary."
+      },
+      {
+        "pattern": "git diff summary",
+        "description": "When an agent needs a bounded repository diff summary."
+      },
+      {
+        "pattern": "list repository branches",
+        "description": "When an agent needs local branch and upstream information."
+      },
+      {
+        "pattern": "show recent commits",
+        "description": "When an agent needs a structured repository log."
+      }
+    ],
+    "capabilityHints": ["repo-status-readonly", "repo-diff-numstat", "repo-branches-local", "repo-log-bounded"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-repo.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

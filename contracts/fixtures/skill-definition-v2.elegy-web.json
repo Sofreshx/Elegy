@@ -1,0 +1,159 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "web",
+    "version": "0.1.0",
+    "displayName": "Elegy Web Automation",
+    "aliases": ["web", "http", "network-fetch"]
+  },
+  "metadata": {
+    "displayName": "Elegy Web Automation",
+    "description": "Bounded HTTP automation for safe fetch and reachability checks over http and https.",
+    "summary": "HTTP fetch and ping helpers with bounded timeouts, response limits, and JSON extraction.",
+    "category": "automation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["web", "http", "https", "fetch", "ping", "json", "automation"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "web-fetch",
+      "name": "Fetch",
+      "description": "Issue a bounded HTTP request over http or https and return status, headers, text, parsed JSON, and optional extracted JSON value.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["web", "fetch", "--url", "${url}", "--method", "${method}", "--header", "${headers}", "--body", "${body}", "--extract", "${extract}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "url",
+            "type": "string",
+            "description": "Target http or https URL.",
+            "required": true
+          },
+          {
+            "name": "method",
+            "type": "string",
+            "description": "HTTP method: GET, POST, PUT, PATCH, DELETE, or HEAD.",
+            "required": false,
+            "default": "GET"
+          },
+          {
+            "name": "headers",
+            "type": "array",
+            "description": "Optional repeated request headers formatted as 'Name: Value'.",
+            "required": false
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "description": "Optional request body text.",
+            "required": false
+          },
+          {
+            "name": "extract",
+            "type": "string",
+            "description": "Optional JSON Pointer (/a/b/0) or dotted path (a.b.0) to extract from a JSON response.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "description": "FetchResponse with final URL, method, status, headers, content type, optional body text, optional parsed JSON body, and optional extracted JSON value."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true,
+        "timeoutSeconds": 10
+      }
+    },
+    {
+      "id": "web-ping",
+      "name": "Ping",
+      "description": "Perform a bounded reachability check for an http or https URL and return reachability, HTTP status, and elapsed time.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["web", "ping", "--url", "${url}", "--timeout-seconds", "${timeout_seconds}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "url",
+            "type": "string",
+            "description": "Target http or https URL.",
+            "required": true
+          },
+          {
+            "name": "timeout_seconds",
+            "type": "integer",
+            "description": "Bounded timeout in seconds.",
+            "required": false,
+            "default": 5
+          }
+        ]
+      },
+      "output": {
+        "description": "PingResult with final URL, reachability flag, optional HTTP status code, and elapsed milliseconds."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false,
+        "timeoutSeconds": 5
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "http-https-only",
+      "description": "Fetch and ping only allow http and https URLs.",
+      "required": true
+    },
+    {
+      "constraintId": "bounded-network-defaults",
+      "description": "Operations use bounded timeouts, limited redirects, and bounded request and response body sizes.",
+      "required": true
+    },
+    {
+      "constraintId": "json-extract-only",
+      "description": "Extract applies only to JSON responses and supports JSON Pointer or dotted path syntax.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "medium",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "network-automation"]
+  },
+  "discovery": {
+    "keywords": ["web", "http", "https", "fetch", "ping", "json", "api", "reachability"],
+    "triggers": [
+      {
+        "pattern": "fetch a URL",
+        "description": "When an agent needs bounded HTTP retrieval or API invocation."
+      },
+      {
+        "pattern": "check if endpoint is reachable",
+        "description": "When an agent needs a fast reachability probe for a web endpoint."
+      }
+    ],
+    "capabilityHints": ["web-fetch-json", "web-ping-reachability"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-web.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

@@ -238,7 +238,7 @@ Returns:
   "data": {
     "version": "0.1.0",
     "cliSchemaVersion": "1",
-    "availableCommands": ["author", "analyze", "generate", "validate", "inspect", "local", "mermaid", "diagram", "run", "contracts", "skills"],
+    "availableCommands": ["author", "analyze", "generate", "validate", "inspect", "local", "mermaid", "diagram", "run", "contracts", "skills", "observe", "desktop", "repo", "web", "data", "notify"],
     "skillDefinitionFormat": 2,
     "mcpHostCapable": true
   }
@@ -259,7 +259,18 @@ Returns:
 | `skills list` | List all skill definitions | No |
 | `skills describe` | Show full skill detail | No |
 | `skills search` | Search skills by keyword | No |
+| `repo status` | Return structured repository status | No |
+| `repo diff` | Return bounded repository diff summaries | No |
+| `repo branches` | List local branches and upstream refs | No |
+| `repo log` | Return bounded structured commit history | No |
+| `web fetch` | Perform bounded HTTP fetches with optional extraction | Yes |
+| `web ping` | Perform bounded HTTP reachability checks | No |
+| `data convert` | Convert between JSON, YAML, TOML, and CSV | No |
+| `data extract` | Extract JSON values by pointer or dotted path | No |
+| `data validate` | Validate JSON against a JSON Schema | No |
+| `notify toast` | Deliver a local toast notification | Yes |
+| `notify webhook` | Send an outbound webhook POST | Yes |
 
-## MCP integration (planned)
+## MCP integration
 
-Elegy's MCP host (`elegy-host-mcp`) currently serves resources. Tool support is planned, which will expose each skill capability as an MCP tool callable over stdio transport.
+Elegy's MCP host (`elegy-host-mcp`) serves both resources and tools over stdio. Each embedded skill capability is exposed as an MCP tool callable via `tools/list` and `tools/call`.

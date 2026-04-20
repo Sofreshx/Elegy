@@ -31,6 +31,22 @@ const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
         "desktop",
         include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
     ),
+    (
+        "repo",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-repo.json"),
+    ),
+    (
+        "web",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-web.json"),
+    ),
+    (
+        "data",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-data.json"),
+    ),
+    (
+        "notify",
+        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-notify.json"),
+    ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -87,7 +103,9 @@ fn build_tools_from_skill_definitions() -> Vec<Tool> {
 
 /// Construct a JSON-Schema `{ "type": "object", "properties": {...}, "required": [...] }`
 /// from the capability's `input.parameters` array.
-fn build_input_schema(capability: &serde_json::Value) -> serde_json::Map<String, serde_json::Value> {
+fn build_input_schema(
+    capability: &serde_json::Value,
+) -> serde_json::Map<String, serde_json::Value> {
     let mut properties = serde_json::Map::new();
     let mut required: Vec<serde_json::Value> = Vec::new();
 
@@ -112,10 +130,14 @@ fn build_input_schema(capability: &serde_json::Value) -> serde_json::Map<String,
             let schema_type = match param_type {
                 "boolean" => "boolean",
                 "integer" | "number" => param_type,
+                "array" => "array",
                 // path, path-or-stdin, string, and anything else map to string
                 _ => "string",
             };
             prop.insert("type".to_string(), json!(schema_type));
+            if param_type == "array" {
+                prop.insert("items".to_string(), json!({ "type": "string" }));
+            }
 
             if let Some(desc) = param.get("description").and_then(|d| d.as_str()) {
                 prop.insert("description".to_string(), json!(desc));
@@ -124,7 +146,11 @@ fn build_input_schema(capability: &serde_json::Value) -> serde_json::Map<String,
                 prop.insert("default".to_string(), default.clone());
             }
 
-            if param.get("required").and_then(|r| r.as_bool()).unwrap_or(false) {
+            if param
+                .get("required")
+                .and_then(|r| r.as_bool())
+                .unwrap_or(false)
+            {
                 required.push(json!(name));
             }
 
@@ -229,6 +255,11 @@ fn build_cli_arguments(
                     if let Some(flag_value) = val.as_bool() {
                         if flag_value {
                             result.push(s.to_string());
+                        }
+                    } else if let Some(values) = val.as_array() {
+                        for value in values {
+                            result.push(s.to_string());
+                            result.push(value_as_string(value));
                         }
                     } else {
                         result.push(s.to_string());
@@ -712,12 +743,19 @@ mod tests {
         let tools = build_tools_from_skill_definitions();
 
         // The diagram skill definition has 4 capabilities
-        assert_eq!(tools.len(), 21, "expected 21 tools from diagram + skill-router + observe + desktop skill defs");
+        assert_eq!(
+            tools.len(),
+            32,
+            "expected 32 tools from diagram + skill-router + observe + desktop + repo + web + data + notify skill defs"
+        );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"), "missing diagram-create");
         assert!(names.contains(&"diagram-patch"), "missing diagram-patch");
-        assert!(names.contains(&"diagram-narrate"), "missing diagram-narrate");
+        assert!(
+            names.contains(&"diagram-narrate"),
+            "missing diagram-narrate"
+        );
         assert!(names.contains(&"diagram-render"), "missing diagram-render");
         assert!(
             names.contains(&"router-skill-search"),
@@ -731,20 +769,46 @@ mod tests {
             names.contains(&"router-skill-list"),
             "missing router-skill-list"
         );
-        assert!(names.contains(&"observe-processes"), "missing observe-processes");
+        assert!(
+            names.contains(&"observe-processes"),
+            "missing observe-processes"
+        );
         assert!(names.contains(&"observe-window"), "missing observe-window");
-        assert!(names.contains(&"observe-windows"), "missing observe-windows");
+        assert!(
+            names.contains(&"observe-windows"),
+            "missing observe-windows"
+        );
         assert!(names.contains(&"observe-screen"), "missing observe-screen");
-        assert!(names.contains(&"observe-clipboard"), "missing observe-clipboard");
-        assert!(names.contains(&"observe-filesystem"), "missing observe-filesystem");
+        assert!(
+            names.contains(&"observe-clipboard"),
+            "missing observe-clipboard"
+        );
+        assert!(
+            names.contains(&"observe-filesystem"),
+            "missing observe-filesystem"
+        );
         assert!(names.contains(&"observe-system"), "missing observe-system");
         assert!(names.contains(&"desktop-click"), "missing desktop-click");
         assert!(names.contains(&"desktop-type"), "missing desktop-type");
         assert!(names.contains(&"desktop-key"), "missing desktop-key");
         assert!(names.contains(&"desktop-focus"), "missing desktop-focus");
         assert!(names.contains(&"desktop-move"), "missing desktop-move");
-        assert!(names.contains(&"desktop-minimize"), "missing desktop-minimize");
-        assert!(names.contains(&"desktop-maximize"), "missing desktop-maximize");
+        assert!(
+            names.contains(&"desktop-minimize"),
+            "missing desktop-minimize"
+        );
+        assert!(
+            names.contains(&"desktop-maximize"),
+            "missing desktop-maximize"
+        );
+        assert!(names.contains(&"repo-status"), "missing repo-status");
+        assert!(names.contains(&"repo-log"), "missing repo-log");
+        assert!(names.contains(&"web-fetch"), "missing web-fetch");
+        assert!(names.contains(&"web-ping"), "missing web-ping");
+        assert!(names.contains(&"data-convert"), "missing data-convert");
+        assert!(names.contains(&"data-validate"), "missing data-validate");
+        assert!(names.contains(&"notify-toast"), "missing notify-toast");
+        assert!(names.contains(&"notify-webhook"), "missing notify-webhook");
     }
 
     #[test]
@@ -808,6 +872,29 @@ mod tests {
     }
 
     #[test]
+    fn build_tools_preserves_array_param_types() {
+        let tools = build_tools_from_skill_definitions();
+
+        let fetch_tool = tools
+            .iter()
+            .find(|t| t.name.as_ref() == "web-fetch")
+            .expect("web-fetch tool should exist");
+
+        let props = fetch_tool
+            .input_schema
+            .get("properties")
+            .and_then(|v| v.as_object())
+            .expect("schema should have properties");
+        assert_eq!(
+            props
+                .get("headers")
+                .and_then(|value| value.get("type"))
+                .and_then(|value| value.as_str()),
+            Some("array")
+        );
+    }
+
+    #[test]
     fn build_tools_annotations_reflect_execution_metadata() {
         let tools = build_tools_from_skill_definitions();
 
@@ -816,7 +903,10 @@ mod tests {
             .iter()
             .find(|t| t.name.as_ref() == "diagram-create")
             .expect("diagram-create");
-        let ann = create.annotations.as_ref().expect("should have annotations");
+        let ann = create
+            .annotations
+            .as_ref()
+            .expect("should have annotations");
         assert_eq!(ann.read_only_hint, Some(true));
         assert_eq!(ann.idempotent_hint, Some(true));
 
@@ -845,7 +935,13 @@ mod tests {
         let result = build_cli_arguments(&template, &params);
         assert_eq!(
             result,
-            vec!["diagram", "create", "--diagram-type", "architecture", "--json"]
+            vec![
+                "diagram",
+                "create",
+                "--diagram-type",
+                "architecture",
+                "--json"
+            ]
         );
     }
 
@@ -890,10 +986,43 @@ mod tests {
     }
 
     #[test]
+    fn build_cli_arguments_expands_array_placeholder_per_flag() {
+        let template: Vec<serde_json::Value> = vec![
+            json!("web"),
+            json!("fetch"),
+            json!("--header"),
+            json!("${headers}"),
+            json!("--json"),
+        ];
+        let mut params = serde_json::Map::new();
+        params.insert(
+            "headers".to_string(),
+            json!(["Accept: application/json", "X-Test: true"]),
+        );
+
+        let result = build_cli_arguments(&template, &params);
+        assert_eq!(
+            result,
+            vec![
+                "web",
+                "fetch",
+                "--header",
+                "Accept: application/json",
+                "--header",
+                "X-Test: true",
+                "--json",
+            ]
+        );
+    }
+
+    #[test]
     fn find_capability_returns_matching_capability() {
         let (cap, _def) =
             find_capability("diagram-create").expect("should find diagram-create capability");
-        assert_eq!(cap.get("id").and_then(|v| v.as_str()), Some("diagram-create"));
+        assert_eq!(
+            cap.get("id").and_then(|v| v.as_str()),
+            Some("diagram-create")
+        );
     }
 
     #[test]
@@ -928,7 +1057,11 @@ mod tests {
             .await
             .expect("client should list tools");
 
-        assert_eq!(tools.len(), 21, "expected 21 tools from diagram + skill-router + observe + desktop skill defs");
+        assert_eq!(
+            tools.len(),
+            32,
+            "expected 32 tools from diagram + skill-router + observe + desktop + repo + web + data + notify skill defs"
+        );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"));
@@ -952,6 +1085,14 @@ mod tests {
         assert!(names.contains(&"desktop-move"));
         assert!(names.contains(&"desktop-minimize"));
         assert!(names.contains(&"desktop-maximize"));
+        assert!(names.contains(&"repo-status"));
+        assert!(names.contains(&"repo-log"));
+        assert!(names.contains(&"web-fetch"));
+        assert!(names.contains(&"web-ping"));
+        assert!(names.contains(&"data-convert"));
+        assert!(names.contains(&"data-validate"));
+        assert!(names.contains(&"notify-toast"));
+        assert!(names.contains(&"notify-webhook"));
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");

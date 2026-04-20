@@ -19,6 +19,10 @@ members = [
     "crates/elegy-observe",
     "crates/elegy-desktop-win32",
     "crates/elegy-desktop",
+    "crates/elegy-repo",
+    "crates/elegy-web",
+    "crates/elegy-data",
+    "crates/elegy-notify",
 ]
 resolver = "2"
 

@@ -7,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$packageReadmePath = Join-Path $repoRoot 'PACKAGE_README.md'
 
 function Get-WrapperSurfaceMetadata {
     return [ordered]@{
@@ -97,6 +98,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts/distribution'
 }
 
+if (-not (Test-Path $packageReadmePath)) {
+    throw "Missing package README source: $packageReadmePath"
+}
+
 $surfaceMetadata = Get-WrapperSurfaceMetadata
 $resolvedSurfaces = Resolve-WrapperSurfaces -RequestedSurfaces $Surface
 $bundleVersion = Get-BundleVersion -RepositoryRoot $repoRoot
@@ -130,6 +135,7 @@ foreach ($surfaceName in $resolvedSurfaces) {
 
     New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
     Copy-Item -Path (Join-Path $surfaceRoot '*') -Destination $stagingDirectory -Recurse -Force
+    Copy-Item -Path $packageReadmePath -Destination (Join-Path $stagingDirectory 'README.md') -Force
 
     $stagedScriptsPath = Join-Path $stagingDirectory 'scripts'
     New-Item -ItemType Directory -Path $stagedScriptsPath -Force | Out-Null

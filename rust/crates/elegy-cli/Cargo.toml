@@ -16,13 +16,17 @@ clap.workspace = true
 elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 elegy-core = { version = "0.1.0", path = "../elegy-core" }
 elegy-desktop = { version = "0.1.0", path = "../elegy-desktop" }
+elegy-data = { version = "0.1.0", path = "../elegy-data" }
 elegy-host-mcp = { version = "0.1.0", path = "../elegy-host-mcp" }
 elegy-mermaid = { version = "0.1.0", path = "../elegy-mermaid" }
 elegy-diagram = { version = "0.1.0", path = "../elegy-diagram" }
 elegy-mcp = { version = "0.1.0", path = "../elegy-mcp" }
 elegy-memory = { version = "0.1.0", path = "../elegy-memory" }
+elegy-notify = { version = "0.1.0", path = "../elegy-notify" }
 elegy-observe = { version = "0.1.0", path = "../elegy-observe" }
+elegy-repo = { version = "0.1.0", path = "../elegy-repo" }
 elegy-tooling = { version = "0.1.0", path = "../elegy-tooling" }
+elegy-web = { version = "0.1.0", path = "../elegy-web" }
 serde.workspace = true
 serde_json.workspace = true
 tokio.workspace = true

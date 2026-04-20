@@ -3,6 +3,12 @@
 **/[Oo]bj/
 rust/target/
 
+# Standalone crate outputs under rust/crates/
+rust/crates/**/target/
+
+# Standalone crate lockfiles under rust/crates/
+rust/crates/**/Cargo.lock
+
 # Test artifacts
 TestResults/
 *.trx

@@ -1,0 +1,132 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "notify",
+    "version": "0.1.0",
+    "displayName": "Elegy Notify",
+    "aliases": ["notify", "notifications", "webhook-notify", "toast-notify"]
+  },
+  "metadata": {
+    "displayName": "Elegy Notify",
+    "description": "Notification helpers for local toast delivery and outbound webhook calls. Toast delivery is Windows-only; webhook delivery supports cross-platform blocking HTTP POST execution.",
+    "summary": "Automation notifications via Windows toast and outbound webhook POST requests.",
+    "category": "automation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["automation", "notify", "toast", "webhook", "http", "windows"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "notify-toast",
+      "name": "Toast Notification",
+      "description": "Display a local toast notification with a title and body. Windows-only.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["notify", "toast", "--title", "${title}", "--body", "${body}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Toast title text.",
+            "required": true
+          },
+          {
+            "name": "body",
+            "type": "string",
+            "description": "Toast body text.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "description": "ToastResult with title, body, delivery flag, and platform."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "notify-webhook",
+      "name": "Webhook Notification",
+      "description": "Send an outbound HTTP POST webhook with an optional JSON or text payload and return response metadata.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["notify", "webhook", "--url", "${url}", "--payload", "${payload}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "url",
+            "type": "string",
+            "description": "Target webhook URL.",
+            "required": true
+          },
+          {
+            "name": "payload",
+            "type": "string",
+            "description": "Optional JSON or plain-text request body. When omitted, an empty POST body is sent.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "description": "WebhookResult with target URL, HTTP status, success flag, and optional response text."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "toast-is-windows-only",
+      "description": "notify-toast is supported on Windows only and returns an unsupported error on other platforms.",
+      "required": true
+    },
+    {
+      "constraintId": "webhook-performs-outbound-network-io",
+      "description": "notify-webhook performs outbound HTTP POST requests and may receive non-success upstream responses while still returning structured metadata.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "medium",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "automation"]
+  },
+  "discovery": {
+    "keywords": ["notify", "notification", "toast", "webhook", "alert", "post", "http"],
+    "triggers": [
+      {
+        "pattern": "send a toast",
+        "description": "When an agent needs to show a local user-facing notification."
+      },
+      {
+        "pattern": "call a webhook",
+        "description": "When an agent needs to notify an external HTTP endpoint."
+      }
+    ],
+    "capabilityHints": ["notify-local-toast", "notify-outbound-webhook"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-notify.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}
