@@ -68,6 +68,9 @@ static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 #[command(name = "elegy")]
 #[command(about = "Bootstrap CLI for Elegy runtime and MCP authoring")]
 struct Cli {
+    /// Print version and capability information, then exit
+    #[arg(long)]
+    version: bool,
     #[arg(long)]
     project: Option<PathBuf>,
     #[arg(long, value_enum, default_value_t = OutputFormat::Text, global = true)]
@@ -79,7 +82,7 @@ struct Cli {
     #[arg(long, global = true)]
     correlation_id: Option<String>,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
@@ -398,6 +401,9 @@ where
     command: Vec<String>,
     status: &'static str,
     summary: Summary,
+    /// Optional schema URI identifying the type of the `data` field.
+    #[serde(rename = "dataSchema", skip_serializing_if = "Option::is_none")]
+    data_schema: Option<&'static str>,
     data: T,
     diagnostics: Vec<Diagnostic>,
 }
@@ -575,11 +581,26 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         non_interactive: cli.non_interactive,
         correlation_id: cli.correlation_id,
     });
+    if cli.version {
+        return execute_version_command(format);
+    }
+
+    let command = match cli.command {
+        Some(cmd) => cmd,
+        None => {
+            // No command and no --version: show help
+            use clap::CommandFactory;
+            Cli::command().print_help().ok();
+            println!();
+            return Ok(ExitCode::SUCCESS);
+        }
+    };
+
     let locator = cli
         .project
         .map_or(ProjectLocator::Auto, ProjectLocator::Path);
 
-    match cli.command {
+    match command {
         Command::Author {
             command:
                 AuthorCommand::Mcp {
@@ -718,6 +739,41 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: SkillsCommand::Search { query },
         } => execute_skills_search_command(query, format),
     }
+}
+
+/// Execute `elegy --version`.
+///
+/// In JSON mode emits a structured envelope with version, available commands,
+/// and capability metadata for agent consumption. In text mode emits a simple
+/// version string.
+fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    match format {
+        OutputFormat::Text => {
+            println!("elegy {version}");
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["version"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "version": version,
+                    "cliSchemaVersion": CLI_SCHEMA_VERSION,
+                    "availableCommands": [
+                        "author", "analyze", "generate", "validate", "inspect",
+                        "local", "mermaid", "diagram", "run", "contracts", "skills"
+                    ],
+                    "skillDefinitionFormat": 2,
+                    "mcpHostCapable": true
+                }),
+                Vec::new(),
+            ))?;
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
@@ -2403,6 +2459,26 @@ where
     T: Serialize,
     S: Into<String>,
 {
+    build_envelope_with_schema(command, status, summary, data, diagnostics, None)
+}
+
+/// Build a CLI envelope that includes a `data_schema` annotation.
+///
+/// Identical to [`build_envelope`] but attaches an optional schema URI to the
+/// `data_schema` field so consumers can identify the shape of the `data`
+/// payload at runtime.
+fn build_envelope_with_schema<T, S>(
+    command: impl IntoIterator<Item = S>,
+    status: &'static str,
+    summary: Summary,
+    data: T,
+    diagnostics: Vec<Diagnostic>,
+    data_schema: Option<&'static str>,
+) -> Envelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
     let context = current_machine_context();
     let _ = context.format;
     Envelope {
@@ -2412,6 +2488,7 @@ where
         command: command.into_iter().map(Into::into).collect(),
         status,
         summary,
+        data_schema,
         data,
         diagnostics,
     }
@@ -2636,12 +2713,13 @@ fn execute_skills_list_command(
                 }
             }
         }
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["skills", "list"],
             "ok",
             Summary::default(),
             json!({ "skills": summaries }),
             Vec::new(),
+            Some("elegy://schemas/skill-list"),
         ))?,
     }
 
@@ -2678,12 +2756,13 @@ fn execute_skills_describe_command(
                             }
                         }
                     }
-                    OutputFormat::Json => print_json(&build_envelope(
+                    OutputFormat::Json => print_json(&build_envelope_with_schema(
                         ["skills", "describe"],
                         "ok",
                         Summary::default(),
                         &full,
                         Vec::new(),
+                        Some("elegy://schemas/skill-definition-v2"),
                     ))?,
                 }
                 return Ok(ExitCode::SUCCESS);
@@ -2738,12 +2817,13 @@ fn execute_skills_search_command(
                 }
             }
         }
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["skills", "search"],
             "ok",
             Summary::default(),
             json!({ "query": query, "results": results }),
             Vec::new(),
+            Some("elegy://schemas/skill-search"),
         ))?,
     }
 
@@ -2820,12 +2900,13 @@ fn execute_diagram_create_command(
     
     match format {
         OutputFormat::Text => println!("Created empty diagram of type: {}", diagram.diagram_type),
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["diagram", "create"],
             "ok",
             Summary::default(),
             &diagram,
             Vec::new(),
+            Some("elegy://schemas/canonical-diagram"),
         ))?,
     }
     Ok(ExitCode::SUCCESS)
@@ -3053,12 +3134,13 @@ fn execute_diagram_patch_command(
                 println!("Diagram patched successfully.");
             }
         }
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["diagram", "patch"],
             "ok",
             Summary::default(),
             &diagram,
             Vec::new(),
+            Some("elegy://schemas/canonical-diagram"),
         ))?,
     }
 
@@ -3104,12 +3186,13 @@ fn execute_diagram_narrate_command(
 
     match format {
         OutputFormat::Text => println!("{narrative}"),
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["diagram", "narrate"],
             "ok",
             Summary::default(),
             json!({ "narrative": narrative }),
             Vec::new(),
+            Some("elegy://schemas/diagram-narrative"),
         ))?,
     }
     Ok(ExitCode::SUCCESS)
@@ -3174,12 +3257,13 @@ fn execute_diagram_render_command(
 
     match format {
         OutputFormat::Text => println!("{rendered}"),
-        OutputFormat::Json => print_json(&build_envelope(
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["diagram", "render"],
             "ok",
             Summary::default(),
             json!({ "rendered": rendered, "format": render_format }),
             Vec::new(),
+            Some("elegy://schemas/diagram-render"),
         ))?,
     }
     Ok(ExitCode::SUCCESS)
