@@ -42,6 +42,10 @@ Everything else in the release exists to support verified installation, automati
 | `elegy mermaid render` | Ready now | Render canonical workflow inputs into Mermaid output. |
 | `elegy mermaid reverse` | Ready now | Perform bounded reverse projection from Mermaid into canonical workflow graph semantics. |
 | `elegy mermaid narrate` | Ready now | Produce concise narrative output from Mermaid or canonical workflow graph inputs. |
+| `elegy diagram create` | Ready now | Create empty semantic diagrams of a given type. |
+| `elegy diagram patch` | Ready now | Surgically add/remove nodes and edges. Supports JSON stdin (`--patch-stdin`) for agent-friendly invocation. |
+| `elegy diagram narrate` | Ready now | Produce human-readable summaries of diagram content. Accepts file or stdin. |
+| `elegy diagram render` | Ready now | Render diagrams to Mermaid or other formats. Accepts file or stdin. |
 | `elegy-mcp` | Ready now | Dedicated CLI for governed MCP descriptor authoring and descriptor analysis. |
 | `elegy-skills` | Ready now | Dedicated CLI for governed MCP-to-skill generation. |
 | `elegy-memory` | MVP / preview | Dedicated local memory CLI backed by the in-repo Rust implementation. Usable now for add, search, list, inspect, health, export, purge, contradictions, and the current preview `reembed` command surface. |
@@ -76,6 +80,17 @@ Detailed distribution, archive, and installer guidance lives in [docs/distributi
 - Wrapper roots under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are thin integration surfaces only.
 - Stable downstream consumption should pin semver release tags. The rolling `main-snapshot` prerelease is for latest-integration validation only.
 
+## Agent integration
+
+Elegy is designed to be consumable by LLM agents and automation systems. Key patterns:
+
+- **Structured JSON output:** All commands support `--json` for machine-readable envelope output with `correlationId`, diagnostics, and typed data.
+- **Stdin-friendly:** Diagram and Mermaid commands accept input from stdin when `--input` is omitted, enabling pipe-based composition.
+- **JSON patch for mutations:** Use `--patch-stdin` to pipe a JSON `DiagramPatch` object instead of fragile positional arguments.
+- **Governed skill definitions:** Each capability family has a v2 skill definition in `contracts/fixtures/` describing exact invocation patterns, parameters, and governance metadata.
+
+For the full agent integration guide, see [docs/agent-integration.md](docs/agent-integration.md) (coming soon).
+
 ## Workspace crate map
 
 Not every Rust crate in the workspace is a directly shipped user-facing tool. The current workspace is organized into:
@@ -83,7 +98,7 @@ Not every Rust crate in the workspace is a directly shipped user-facing tool. Th
 - User-facing CLI crates: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-skills`
 - Governed/data crates: `elegy-contracts`, `elegy-policy`, `elegy-descriptor`
 - Runtime/host crates: `elegy-runtime`, `elegy-core`, `elegy-host-mcp`, `elegy-agent-events`
-- Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`
+- Adapter/tooling crates: `elegy-adapter-fs`, `elegy-adapter-http`, `elegy-tooling`, `elegy-mermaid`, `elegy-diagram`
 
 That distinction matters for consumers: the release lane is CLI-first, while the rest of the workspace is primarily implementation and runtime support.
 
@@ -93,3 +108,4 @@ That distinction matters for consumers: the release lane is CLI-first, while the
 - [docs/architecture/elegy-memory-v1.md](docs/architecture/elegy-memory-v1.md)
 - [docs/distribution.md](docs/distribution.md)
 - [CONTRIBUTING.md](CONTRIBUTING.md)
+- [Agentic Adoption Plan](docs/roadmaps/agentic-adoption-plan.md) (planned)

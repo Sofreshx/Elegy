@@ -1,0 +1,17 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "minimal-v2-example",
+    "version": "0.1.0"
+  },
+  "capabilities": [
+    {
+      "id": "example-capability",
+      "name": "Example",
+      "description": "Minimal example capability."
+    }
+  ],
+  "lifecycleState": "draft"
+}

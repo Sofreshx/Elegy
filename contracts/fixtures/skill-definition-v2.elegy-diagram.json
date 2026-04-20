@@ -1,0 +1,217 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "diagram",
+    "version": "0.1.0",
+    "displayName": "Elegy Semantic Diagram Tools",
+    "aliases": ["diagram", "canonical-diagram"]
+  },
+  "metadata": {
+    "displayName": "Elegy Semantic Diagram Tools",
+    "description": "Semantic diagram capabilities for creating, patching, narrating, and rendering structured visual diagrams. Agents can manipulate diagrams through JSON-based operations without managing UI layouts or coordinates.",
+    "summary": "Create, patch, narrate, and render semantic diagrams through structured JSON operations.",
+    "category": "design",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["diagram", "semantic", "architecture", "visualization", "mermaid"],
+    "owners": ["elegy"],
+    "documentationUri": null
+  },
+  "capabilities": [
+    {
+      "id": "diagram-create",
+      "name": "Create Diagram",
+      "description": "Initialize an empty semantic diagram of a given type (e.g., concept, architecture, mindmap).",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["diagram", "create", "--diagram-type", "${type}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "type",
+            "type": "string",
+            "description": "Diagram type. Examples: concept, architecture, mindmap.",
+            "required": false,
+            "default": "concept"
+          }
+        ]
+      },
+      "output": {
+        "description": "A new empty CanonicalDiagram JSON object with the specified type."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "diagram-patch",
+      "name": "Patch Diagram",
+      "description": "Surgically add or remove nodes and edges from an existing diagram. Preferred invocation: pipe a JSON DiagramPatch to stdin with --patch-stdin.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["diagram", "patch", "--input", "${inputPath}", "--patch-stdin", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "inputPath",
+            "type": "path",
+            "description": "Path to the existing diagram JSON file.",
+            "required": true
+          },
+          {
+            "name": "patchStdin",
+            "type": "boolean",
+            "description": "When true, read a JSON DiagramPatch object from stdin. This is the recommended invocation pattern for agents.",
+            "required": false,
+            "default": true
+          },
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Optional output path to write the patched diagram. When omitted, result goes to stdout.",
+            "required": false
+          }
+        ],
+        "stdinFormat": "json",
+        "schemaRef": "elegy://schemas/diagram-patch"
+      },
+      "output": {
+        "description": "The patched CanonicalDiagram JSON object. Also written to --output path if specified."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": true
+      },
+      "composesWell": {
+        "typicalNext": ["diagram-render", "diagram-narrate"],
+        "pipeableTo": ["diagram-render", "diagram-narrate"],
+        "outputConsumedBy": ["diagram-patch"]
+      }
+    },
+    {
+      "id": "diagram-narrate",
+      "name": "Narrate Diagram",
+      "description": "Read a semantic diagram and produce a textual human-readable summary of nodes and relations. Accepts diagram JSON from file (--input) or stdin.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["diagram", "narrate", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "input",
+            "type": "path-or-stdin",
+            "description": "Diagram JSON file path. When omitted, reads diagram JSON from stdin.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "description": "A human-readable narrative describing the diagram's nodes, edges, and structure."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "diagram-render",
+      "name": "Render Diagram",
+      "description": "Transform a semantic diagram into a visual format such as Mermaid.js. Accepts diagram JSON from file (--input) or stdin.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["diagram", "render", "--render-format", "${format}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "input",
+            "type": "path-or-stdin",
+            "description": "Diagram JSON file path. When omitted, reads diagram JSON from stdin.",
+            "required": false
+          },
+          {
+            "name": "format",
+            "type": "string",
+            "description": "Output render format.",
+            "required": false,
+            "default": "mermaid"
+          }
+        ]
+      },
+      "output": {
+        "description": "The diagram rendered in the specified format (default: Mermaid flowchart)."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "diagram-is-semantic-only",
+      "description": "Diagrams are semantic structures with typed nodes and edges. They do not carry layout, styling, or coordinate information.",
+      "required": true
+    },
+    {
+      "constraintId": "patch-validates-integrity",
+      "description": "After patching, the diagram is validated for structural integrity. Edges referencing non-existent nodes will cause an error.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "diagram-operations"]
+  },
+  "discovery": {
+    "keywords": ["diagram", "semantic", "architecture", "concept", "mindmap", "render", "mermaid", "patch", "narrate"],
+    "triggers": [
+      {
+        "pattern": "diagram",
+        "description": "When work involves creating, editing, or rendering semantic diagrams."
+      },
+      {
+        "pattern": "diagram patch",
+        "description": "When nodes or edges need to be added or removed from an existing diagram."
+      },
+      {
+        "pattern": "diagram render",
+        "description": "When a semantic diagram needs to be visualized as Mermaid or another format."
+      },
+      {
+        "pattern": "architecture diagram",
+        "description": "When architecture or system diagrams need to be created or edited programmatically."
+      }
+    ],
+    "capabilityHints": [
+      "diagram-create-empty",
+      "diagram-patch-json-stdin",
+      "diagram-narrate-summary",
+      "diagram-render-mermaid"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-diagram.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

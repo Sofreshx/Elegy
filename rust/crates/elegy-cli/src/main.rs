@@ -286,22 +286,36 @@ enum DiagramCommand {
     Patch {
         #[arg(long)]
         input: PathBuf,
+        /// Read a JSON DiagramPatch from stdin instead of using legacy positional args
+        #[arg(long)]
+        patch_stdin: bool,
+        /// [Legacy] Add node as "id,label[,conceptType]"
         #[arg(long)]
         add_node: Option<String>,
+        /// [Legacy] Add edge as "id,sourceId,targetId[,label]"
         #[arg(long)]
         add_edge: Option<String>,
+        /// [Legacy] Remove node by ID
         #[arg(long)]
         remove_node: Option<String>,
+        /// [Legacy] Remove edge by ID
         #[arg(long)]
         remove_edge: Option<String>,
+        /// Write patched diagram to file instead of stdout
+        #[arg(long)]
+        output: Option<PathBuf>,
     },
+    /// Narrate a diagram from file or stdin
     Narrate {
+        /// Diagram JSON file path; reads from stdin when omitted
         #[arg(long)]
-        input: PathBuf,
+        input: Option<PathBuf>,
     },
+    /// Render a diagram to a visual format
     Render {
+        /// Diagram JSON file path; reads from stdin when omitted
         #[arg(long)]
-        input: PathBuf,
+        input: Option<PathBuf>,
         #[arg(long, default_value = "mermaid")]
         render_format: String,
     },
@@ -613,8 +627,8 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: DiagramCommand::Create { diagram_type },
         } => execute_diagram_create_command(diagram_type, format),
         Command::Diagram {
-            command: DiagramCommand::Patch { input, add_node, add_edge, remove_node, remove_edge },
-        } => execute_diagram_patch_command(input, add_node, add_edge, remove_node, remove_edge, format),
+            command: DiagramCommand::Patch { input, patch_stdin, add_node, add_edge, remove_node, remove_edge, output },
+        } => execute_diagram_patch_command(input, patch_stdin, add_node, add_edge, remove_node, remove_edge, output, format),
         Command::Diagram {
             command: DiagramCommand::Narrate { input },
         } => execute_diagram_narrate_command(input, format),
@@ -2508,69 +2522,228 @@ fn execute_diagram_create_command(
     Ok(ExitCode::SUCCESS)
 }
 
+/// Source of a diagram input: either a file path or stdin.
+#[allow(dead_code)]
+enum DiagramInputSource {
+    /// Diagram loaded from a file.
+    File(PathBuf),
+    /// Diagram loaded from stdin.
+    Stdin,
+}
+
+/// Load diagram JSON content from a file path or stdin.
+///
+/// Returns the raw content string and the source indicator on success,
+/// or a diagnostic vector and source indicator on failure.
+fn load_diagram_input(
+    input: Option<PathBuf>,
+) -> Result<(String, DiagramInputSource), (Vec<Diagnostic>, DiagramInputSource)> {
+    match input {
+        Some(path) => match fs::read_to_string(&path) {
+            Ok(contents) => Ok((contents, DiagramInputSource::File(path))),
+            Err(e) => Err((
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-001",
+                    format!("failed to read diagram file {}: {e}", path.display()),
+                )
+                .with_path(path.display().to_string())],
+                DiagramInputSource::File(path),
+            )),
+        },
+        None => {
+            let mut contents = String::new();
+            match io::stdin().read_to_string(&mut contents) {
+                Ok(_) => Ok((contents, DiagramInputSource::Stdin)),
+                Err(e) => Err((
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-001",
+                        format!("failed to read diagram from stdin: {e}"),
+                    )
+                    .with_path("<stdin>".to_string())],
+                    DiagramInputSource::Stdin,
+                )),
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
 fn execute_diagram_patch_command(
     input: PathBuf,
+    patch_stdin: bool,
     add_node: Option<String>,
     add_edge: Option<String>,
     remove_node: Option<String>,
     remove_edge: Option<String>,
+    output: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["diagram", "patch"];
+
     let content = match std::fs::read_to_string(&input) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("Failed to read diagram file: {}", e);
-            return Ok(exit_invalid());
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-001",
+                    format!("failed to read diagram file {}: {e}", input.display()),
+                )
+                .with_path(input.display().to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
         }
     };
     let mut diagram: CanonicalDiagram = match serde_json::from_str(&content) {
         Ok(d) => d,
         Err(e) => {
-            eprintln!("Failed to parse JSON diagram: {}", e);
-            return Ok(exit_invalid());
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON from {}: {e}", input.display()),
+                )
+                .with_path(input.display().to_string())],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
         }
     };
 
-    let mut patch = DiagramPatch::default();
-    
-    if let Some(id) = remove_node { patch.remove_node_ids.push(id) }
-    if let Some(id) = remove_edge { patch.remove_edge_ids.push(id) }
-    
-    if let Some(n) = add_node {
-        let parts: Vec<&str> = n.split(',').collect();
-        if parts.len() >= 2 {
-            patch.add_nodes.push(DiagramNode {
-                id: parts[0].to_string(),
-                label: parts[1].to_string(),
-                concept_type: parts.get(2).map(|s| s.to_string()),
-                properties: Default::default(),
-            });
+    let patch = if patch_stdin {
+        let mut stdin_content = String::new();
+        if let Err(e) = io::stdin().read_to_string(&mut stdin_content) {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-003",
+                    format!("failed to read DiagramPatch from stdin: {e}"),
+                )
+                .with_path("<stdin>".to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
         }
-    }
-    
-    if let Some(e) = add_edge {
-        let parts: Vec<&str> = e.split(',').collect();
-        if parts.len() >= 3 {
-            patch.add_edges.push(DiagramEdge {
-                id: parts[0].to_string(),
-                source_id: parts[1].to_string(),
-                target_id: parts[2].to_string(),
-                label: parts.get(3).map(|s| s.to_string()),
-                relationship_type: None,
-                properties: Default::default(),
-            });
+        match serde_json::from_str::<DiagramPatch>(&stdin_content) {
+            Ok(p) => p,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-004",
+                        format!("failed to parse DiagramPatch JSON from stdin: {e}"),
+                    )
+                    .with_path("<stdin>".to_string())],
+                    json!({}),
+                    "invalid",
+                    exit_invalid(),
+                );
+            }
         }
-    }
+    } else {
+        let mut patch = DiagramPatch::default();
+        if let Some(id) = remove_node {
+            patch.remove_node_ids.push(id);
+        }
+        if let Some(id) = remove_edge {
+            patch.remove_edge_ids.push(id);
+        }
+        if let Some(n) = add_node {
+            let parts: Vec<&str> = n.split(',').collect();
+            if parts.len() >= 2 {
+                patch.add_nodes.push(DiagramNode {
+                    id: parts[0].to_string(),
+                    label: parts[1].to_string(),
+                    concept_type: parts.get(2).map(|s| s.to_string()),
+                    properties: Default::default(),
+                });
+            }
+        }
+        if let Some(e) = add_edge {
+            let parts: Vec<&str> = e.split(',').collect();
+            if parts.len() >= 3 {
+                patch.add_edges.push(DiagramEdge {
+                    id: parts[0].to_string(),
+                    source_id: parts[1].to_string(),
+                    target_id: parts[2].to_string(),
+                    label: parts.get(3).map(|s| s.to_string()),
+                    relationship_type: None,
+                    properties: Default::default(),
+                });
+            }
+        }
+        patch
+    };
 
     diagram.apply_patch(patch);
-    
+
     if let Err(e) = diagram.validate() {
-        eprintln!("Invalid patch resulted in invalid diagram: {}", e);
-        return Ok(exit_invalid());
+        return emit_diagnostics(
+            format,
+            command,
+            vec![Diagnostic::error(
+                "CLI-DIAGRAM-005",
+                format!("patch resulted in invalid diagram: {e}"),
+            )],
+            json!({}),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    // Write to output file if specified
+    if let Some(output_path) = &output {
+        let json_output = match serde_json::to_string_pretty(&diagram) {
+            Ok(s) => s,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-006",
+                        format!("failed to serialize patched diagram: {e}"),
+                    )],
+                    json!({}),
+                    "error",
+                    exit_invalid(),
+                );
+            }
+        };
+        if let Err(e) = std::fs::write(output_path, &json_output) {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-007",
+                    format!(
+                        "failed to write patched diagram to {}: {e}",
+                        output_path.display()
+                    ),
+                )
+                .with_path(output_path.display().to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
     }
 
     match format {
-        OutputFormat::Text => println!("Diagram patched successfully."),
+        OutputFormat::Text => {
+            if output.is_some() {
+                println!("Diagram patched and written to output file.");
+            } else {
+                println!("Diagram patched successfully.");
+            }
+        }
         OutputFormat::Json => print_json(&build_envelope(
             ["diagram", "patch"],
             "ok",
@@ -2584,22 +2757,44 @@ fn execute_diagram_patch_command(
 }
 
 fn execute_diagram_narrate_command(
-    input: PathBuf,
+    input: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let content = match std::fs::read_to_string(&input) {
-        Ok(c) => c,
-        Err(_) => return Ok(exit_invalid()),
+    let command = vec!["diagram", "narrate"];
+    let (content, _source) = match load_diagram_input(input) {
+        Ok(result) => result,
+        Err((diagnostics, _)) => {
+            return emit_diagnostics(
+                format,
+                command,
+                diagnostics,
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
     };
     let diagram: CanonicalDiagram = match serde_json::from_str(&content) {
         Ok(d) => d,
-        Err(_) => return Ok(exit_invalid()),
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON: {e}"),
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
     };
-    
+
     let narrative = diagram.narrate_diagram();
-    
+
     match format {
-        OutputFormat::Text => println!("{}", narrative),
+        OutputFormat::Text => println!("{narrative}"),
         OutputFormat::Json => print_json(&build_envelope(
             ["diagram", "narrate"],
             "ok",
@@ -2612,27 +2807,64 @@ fn execute_diagram_narrate_command(
 }
 
 fn execute_diagram_render_command(
-    input: PathBuf,
+    input: Option<PathBuf>,
     render_format: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let content = match std::fs::read_to_string(&input) {
-        Ok(c) => c,
-        Err(_) => return Ok(exit_invalid()),
+    let command = vec!["diagram", "render"];
+    let (content, _source) = match load_diagram_input(input) {
+        Ok(result) => result,
+        Err((diagnostics, _)) => {
+            return emit_diagnostics(
+                format,
+                command,
+                diagnostics,
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
     };
     let diagram: CanonicalDiagram = match serde_json::from_str(&content) {
         Ok(d) => d,
-        Err(_) => return Ok(exit_invalid()),
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON: {e}"),
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
     };
-    
+
     let rendered = if render_format == "mermaid" {
         diagram.render_mermaid()
     } else {
-        serde_json::to_string_pretty(&diagram).unwrap()
+        match serde_json::to_string_pretty(&diagram) {
+            Ok(s) => s,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-008",
+                        format!("failed to serialize diagram: {e}"),
+                    )],
+                    json!({}),
+                    "error",
+                    exit_invalid(),
+                );
+            }
+        }
     };
-    
+
     match format {
-        OutputFormat::Text => println!("{}", rendered),
+        OutputFormat::Text => println!("{rendered}"),
         OutputFormat::Json => print_json(&build_envelope(
             ["diagram", "render"],
             "ok",

@@ -174,9 +174,9 @@ impl CanonicalDiagram {
                 let source_label = node_map.get(&edge.source_id).copied().unwrap_or(&edge.source_id);
                 let target_label = node_map.get(&edge.target_id).copied().unwrap_or(&edge.target_id);
                 if let Some(label) = &edge.label {
-                    out.push_str(&format!("- '{}' connects to '{}' via relationship '{}'\n", source_label, target_label, label));
+                    out.push_str(&format!("- '{source_label}' connects to '{target_label}' via relationship '{label}'\n"));
                 } else {
-                    out.push_str(&format!("- '{}' connects to '{}'\n", source_label, target_label));
+                    out.push_str(&format!("- '{source_label}' connects to '{target_label}'\n"));
                 }
             }
         }
