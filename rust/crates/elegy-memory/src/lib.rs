@@ -51,12 +51,12 @@ pub use traits::{
     SalienceGate,
 };
 pub use types::{
-    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, CorrectionRecord, ElegyArchive,
-    ExportFormat, GraphNode, GraphTraversalResult, Memory, MemoryCandidate, MemoryContextConfig,
-    MemoryHealthReport, MemoryId, MemoryLink, MemoryScope, MemorySearchQuery, MemorySearchResult,
-    MemoryState, MemoryType, MemoryVersion, PoisoningAlert, PoisoningAlertType, ProvenanceLevel,
-    PurgeReport, ResolutionStatus, RetrievalFeedback, ScopeConfig, ScoredMemory, SearchQuery,
-    SensitivityLevel, ShareConfig,
+    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, CorrectionDisposition,
+    CorrectionRecord, ElegyArchive, ExportFormat, GraphNode, GraphTraversalResult, Memory,
+    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryLink, MemoryScope,
+    MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, PoisoningAlert,
+    PoisoningAlertType, ProvenanceLevel, PurgeReport, ResolutionStatus, RetrievalFeedback,
+    ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig,
 };
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =

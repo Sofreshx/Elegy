@@ -76,8 +76,9 @@ pub fn adaptive_retention(
     let type_mult = type_decay_multiplier(memory.memory_type);
 
     let activity_rate = recent_writes_30d as f64 / total_memories.max(1) as f64;
-    let effective_lambda =
-        f64::from(scope_config.decay_lambda_base.max(0.0)) * type_mult * (1.0 + 0.5 * activity_rate);
+    let effective_lambda = f64::from(scope_config.decay_lambda_base.max(0.0))
+        * type_mult
+        * (1.0 + 0.5 * activity_rate);
 
     let decay = (-effective_lambda * elapsed_days).exp();
     let importance = f64::from(memory.importance_score);
@@ -295,7 +296,10 @@ mod tests {
 
         // total_memories = 0 should not panic; max(0,1) = 1 is used
         let ret = adaptive_retention(&memory, now, &scope_config, 0, 5);
-        assert!(ret > 0.0, "retention should be positive even with zero total memories");
+        assert!(
+            ret > 0.0,
+            "retention should be positive even with zero total memories"
+        );
         assert!(ret.is_finite(), "retention should be finite");
     }
 

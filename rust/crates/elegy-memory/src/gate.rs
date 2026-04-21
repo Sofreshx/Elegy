@@ -7,8 +7,8 @@ use std::{
 use async_trait::async_trait;
 
 use crate::{
-    EmbeddingProvider, GateDecision, GateError, LlmProvider, MemoryCandidate, MemoryScope,
-    MemoryStore, ProvenanceLevel, SalienceGate, ScopeConfig,
+    EmbeddingProvider, GateDecision, GateError, LlmProvider, MemoryCandidate, MemoryId,
+    MemoryScope, MemoryStore, ProvenanceLevel, SalienceGate, ScopeConfig,
 };
 
 /// Default MVP salience gate using scope-configured novelty and salience thresholds.
@@ -220,6 +220,28 @@ impl SalienceGate for DefaultSalienceGate {
         candidate: &MemoryCandidate,
         store: &dyn MemoryStore,
     ) -> Result<GateDecision, GateError> {
+        self.evaluate_internal(candidate, store, None).await
+    }
+}
+
+impl DefaultSalienceGate {
+    /// Evaluate a candidate while excluding one existing memory from duplicate checks.
+    pub async fn evaluate_excluding(
+        &self,
+        candidate: &MemoryCandidate,
+        store: &dyn MemoryStore,
+        excluded_id: MemoryId,
+    ) -> Result<GateDecision, GateError> {
+        self.evaluate_internal(candidate, store, Some(excluded_id))
+            .await
+    }
+
+    async fn evaluate_internal(
+        &self,
+        candidate: &MemoryCandidate,
+        store: &dyn MemoryStore,
+        excluded_id: Option<MemoryId>,
+    ) -> Result<GateDecision, GateError> {
         self.validate_candidate(candidate)?;
 
         let mut likely_duplicate = None;
@@ -227,9 +249,16 @@ impl SalienceGate for DefaultSalienceGate {
 
         if let Some(embedding) = self.novelty_embedding(candidate).await {
             let matches = store
-                .find_similar(embedding.as_ref(), self.novelty_floor(), 1)
+                .find_similar(
+                    embedding.as_ref(),
+                    self.novelty_floor(),
+                    if excluded_id.is_some() { 2 } else { 1 },
+                )
                 .await?;
-            if let Some(best_match) = matches.into_iter().next() {
+            if let Some(best_match) = matches
+                .into_iter()
+                .find(|scored| excluded_id != Some(scored.memory.id))
+            {
                 if best_match.memory.scope.rank() > candidate_scope.rank() {
                     return Ok(GateDecision::Reject {
                         reason: format!(

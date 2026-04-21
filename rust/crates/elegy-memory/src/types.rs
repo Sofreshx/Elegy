@@ -569,6 +569,20 @@ pub enum PoisoningAlertType {
     MassContradiction,
 }
 
+/// Final safety disposition recorded for a user correction.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrectionDisposition {
+    /// The corrected content replaced the existing memory body and stayed in its current lane.
+    Applied,
+    /// The corrected content was accepted, but the write-time gate archived the memory.
+    Archived,
+    /// The corrected content merged into another existing memory.
+    Merged,
+    /// The corrected content was applied and journaled as a contradiction.
+    Contradiction,
+}
+
 /// Record of a user-initiated correction applied to a memory.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
@@ -585,6 +599,11 @@ pub struct CorrectionRecord {
     pub corrected_by: String,
     /// Human-readable reason for the correction.
     pub reason: String,
+    /// Final safety disposition chosen for the correction.
+    pub disposition: CorrectionDisposition,
+    /// Related memory referenced by the correction outcome, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_memory_id: Option<MemoryId>,
     /// Timestamp when the correction was applied.
     pub corrected_at: DateTime<Utc>,
 }

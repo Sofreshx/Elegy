@@ -1,7 +1,8 @@
 use std::{
-    collections::{HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::Path,
     sync::{Arc, Mutex},
+    thread,
 };
 
 use async_trait::async_trait;
@@ -14,17 +15,19 @@ use uuid::Uuid;
 use super::schema::init_database;
 use crate::{
     decay,
+    gate::DefaultSalienceGate,
     similarity::cosine_similarity,
-    traits::{EmbeddingProvider, MemoryObservability, MemoryStore},
+    traits::{EmbeddingProvider, MemoryObservability, MemoryStore, SalienceGate},
     types::{
-        ContradictionEntry, CorrectionRecord, ElegyArchive, ExportFormat, GraphNode,
-        GraphTraversalResult, Memory, MemoryContextConfig, MemoryHealthReport, MemoryId,
-        MemoryLink, MemoryScope, MemoryState, MemoryType, MemoryVersion, PoisoningAlert,
-        PoisoningAlertType, ProvenanceLevel, PurgeReport, ResolutionStatus, RetrievalFeedback,
-        ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig,
+        ContradictionEntry, CorrectionDisposition, CorrectionRecord, ElegyArchive, ExportFormat,
+        GraphNode, GraphTraversalResult, Memory, MemoryCandidate, MemoryContextConfig,
+        MemoryHealthReport, MemoryId, MemoryLink, MemoryScope, MemoryState, MemoryType,
+        MemoryVersion, PoisoningAlert, PoisoningAlertType, ProvenanceLevel, PurgeReport,
+        ResolutionStatus, RetrievalFeedback, ScopeConfig, ScoredMemory, SearchQuery,
+        SensitivityLevel, ShareConfig,
     },
-    EmbeddingError, MemoryFilter, MetadataUpdate, ObservabilityError, OptionalFieldUpdate,
-    StoreError,
+    EmbeddingError, GateDecision, GateError, MemoryFilter, MetadataUpdate, ObservabilityError,
+    OptionalFieldUpdate, StoreError,
 };
 
 const MEMORY_SELECT_COLUMNS: &str = r#"
@@ -60,6 +63,23 @@ const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
 const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
 const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
 const BASE_MEMORY_TOKEN_OVERHEAD: u32 = 16;
+const QUARANTINED_STATUS: &str = "quarantined";
+const SHARED_REVIEW_STATUS: &str = "shared_review";
+const SHARED_IMPORT_SOURCE_METADATA_KEY: &str = "shared_import_source";
+const SHARED_IMPORT_DISPOSITION_METADATA_KEY: &str = "shared_import_disposition";
+const SHARED_IMPORT_REASON_METADATA_KEY: &str = "shared_import_reason";
+const SHARED_IMPORT_REFERENCED_MEMORY_METADATA_KEY: &str = "shared_import_referenced_memory_id";
+const SHARED_IMPORT_ORIGINAL_ID_METADATA_KEY: &str = "shared_import_original_id";
+const POISONING_QUARANTINED_AT_METADATA_KEY: &str = "poisoning_quarantined_at";
+const POISONING_ALERT_TYPES_METADATA_KEY: &str = "poisoning_alert_types";
+const POISONING_ALERT_IDS_METADATA_KEY: &str = "poisoning_alert_ids";
+const POISONING_REMEDIATION_METADATA_KEY: &str = "poisoning_remediation";
+const LEARNING_MIN_TOTAL_FEEDBACK: usize = 12;
+const LEARNING_MIN_CLASS_FEEDBACK: usize = 3;
+const LEARNING_FULL_CONFIDENCE_FEEDBACK: usize = 48;
+const LEARNING_WEIGHT_FLOOR: f64 = 0.05;
+const LEARNING_SIMILARITY_WEIGHT_CEILING: f64 = 0.70;
+const LEARNING_SECONDARY_WEIGHT_CEILING: f64 = 0.45;
 
 /// SQLite-backed [`MemoryStore`] implementation for the MVP memory schema.
 #[derive(Clone)]
@@ -67,6 +87,230 @@ pub struct SqliteMemoryStore {
     connection: Arc<Mutex<Connection>>,
     scope: MemoryScope,
     embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct SharedImportReport {
+    pub(crate) new_ids: Vec<MemoryId>,
+    pub(crate) review_ids: Vec<MemoryId>,
+    pub(crate) quarantined_ids: Vec<MemoryId>,
+    pub(crate) skipped_reasons: Vec<String>,
+    pub(crate) outcomes: Vec<SharedImportOutcome>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SharedImportAction {
+    Review,
+    Quarantine,
+    Skip,
+}
+
+impl SharedImportAction {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Review => "review",
+            Self::Quarantine => "quarantine",
+            Self::Skip => "skip",
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct SharedImportOutcome {
+    pub(crate) memory_id: Option<MemoryId>,
+    pub(crate) disposition: SharedImportAction,
+    pub(crate) reason: String,
+    pub(crate) related_memory_id: Option<MemoryId>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub(crate) struct LearnedWeightValues {
+    pub(crate) similarity_weight: f64,
+    pub(crate) recency_weight: f64,
+    pub(crate) access_weight: f64,
+    pub(crate) priority_weight: f64,
+}
+
+impl LearnedWeightValues {
+    fn defaults() -> Self {
+        let defaults = ScopeConfig::default();
+        Self::from_scope_config(&defaults)
+    }
+
+    fn from_scope_config(config: &ScopeConfig) -> Self {
+        Self {
+            similarity_weight: f64::from(config.similarity_weight),
+            recency_weight: f64::from(config.recency_weight),
+            access_weight: f64::from(config.access_weight),
+            priority_weight: f64::from(config.priority_weight),
+        }
+    }
+
+    fn normalize(self) -> Self {
+        let sum = self.similarity_weight
+            + self.recency_weight
+            + self.access_weight
+            + self.priority_weight;
+        if sum <= f64::EPSILON {
+            return Self::defaults();
+        }
+
+        Self {
+            similarity_weight: self.similarity_weight / sum,
+            recency_weight: self.recency_weight / sum,
+            access_weight: self.access_weight / sum,
+            priority_weight: self.priority_weight / sum,
+        }
+    }
+
+    fn clamp(self) -> Self {
+        Self {
+            similarity_weight: self
+                .similarity_weight
+                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SIMILARITY_WEIGHT_CEILING),
+            recency_weight: self
+                .recency_weight
+                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
+            access_weight: self
+                .access_weight
+                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
+            priority_weight: self
+                .priority_weight
+                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
+        }
+        .normalize()
+    }
+
+    fn blend(self, other: Self, factor: f64) -> Self {
+        let factor = factor.clamp(0.0, 1.0);
+        Self {
+            similarity_weight: (self.similarity_weight * (1.0 - factor))
+                + (other.similarity_weight * factor),
+            recency_weight: (self.recency_weight * (1.0 - factor))
+                + (other.recency_weight * factor),
+            access_weight: (self.access_weight * (1.0 - factor)) + (other.access_weight * factor),
+            priority_weight: (self.priority_weight * (1.0 - factor))
+                + (other.priority_weight * factor),
+        }
+        .clamp()
+    }
+
+    fn with_multipliers(
+        self,
+        similarity_multiplier: f64,
+        recency_multiplier: f64,
+        access_multiplier: f64,
+        priority_multiplier: f64,
+    ) -> Self {
+        Self {
+            similarity_weight: self.similarity_weight * similarity_multiplier,
+            recency_weight: self.recency_weight * recency_multiplier,
+            access_weight: self.access_weight * access_multiplier,
+            priority_weight: self.priority_weight * priority_multiplier,
+        }
+        .clamp()
+    }
+
+    fn to_hash_map(self) -> HashMap<String, f64> {
+        HashMap::from([
+            ("similarity_weight".to_string(), self.similarity_weight),
+            ("recency_weight".to_string(), self.recency_weight),
+            ("access_weight".to_string(), self.access_weight),
+            ("priority_weight".to_string(), self.priority_weight),
+        ])
+    }
+
+    pub(crate) fn to_btree_map(self) -> BTreeMap<String, f64> {
+        BTreeMap::from([
+            ("access_weight".to_string(), self.access_weight),
+            ("priority_weight".to_string(), self.priority_weight),
+            ("recency_weight".to_string(), self.recency_weight),
+            ("similarity_weight".to_string(), self.similarity_weight),
+        ])
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub(crate) struct LearnedWeightsReport {
+    pub(crate) sample_size: usize,
+    pub(crate) relevant_samples: usize,
+    pub(crate) irrelevant_samples: usize,
+    pub(crate) using_defaults: bool,
+    pub(crate) confidence: f64,
+    pub(crate) status_detail: String,
+    pub(crate) effective_weights: LearnedWeightValues,
+    pub(crate) default_weights: LearnedWeightValues,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct RetrievalFeedbackSample {
+    relevant: bool,
+    similarity_signal: f64,
+    recency_signal: f64,
+    access_signal: f64,
+    priority_signal: f64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct PoisoningRemediationReport {
+    pub(crate) quarantined_ids: Vec<MemoryId>,
+    pub(crate) skipped_ids: Vec<MemoryId>,
+    pub(crate) actions: Vec<PoisoningRemediationAction>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct PoisoningRemediationAction {
+    pub(crate) memory_id: MemoryId,
+    pub(crate) action: PoisoningRemediationDisposition,
+    pub(crate) reason: String,
+    pub(crate) alert_ids: Vec<String>,
+    pub(crate) alert_types: Vec<PoisoningAlertType>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PoisoningRemediationDisposition {
+    Quarantined,
+    Skipped,
+}
+
+impl PoisoningRemediationDisposition {
+    pub(crate) const fn as_str(self) -> &'static str {
+        match self {
+            Self::Quarantined => "quarantined",
+            Self::Skipped => "skipped",
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct PoisoningConfig {
+    frequency_hourly_threshold: u32,
+    frequency_scope_ratio: f32,
+    frequency_burst_ratio: f32,
+    frequency_burst_min_hourly: u32,
+    trust_mismatch_importance_threshold: f32,
+    trust_mismatch_count_threshold: u32,
+    trust_mismatch_scope_ratio: f32,
+    bulk_overwrite_count_threshold: u32,
+    bulk_overwrite_scope_ratio: f32,
+    mass_contradiction_per_memory_threshold: u32,
+    mass_contradiction_scope_ratio: f32,
+    remediation_reliability_ceiling: f32,
+}
+
+#[derive(Debug, Clone)]
+enum SharedImportDisposition {
+    Review {
+        reason: String,
+        related_memory_id: Option<MemoryId>,
+    },
+    Quarantine {
+        reason: String,
+        related_memory_id: Option<MemoryId>,
+    },
+    Skip {
+        reason: String,
+    },
 }
 
 impl std::fmt::Debug for SqliteMemoryStore {
@@ -110,6 +354,237 @@ impl SqliteMemoryStore {
     #[must_use]
     pub const fn scope(&self) -> MemoryScope {
         self.scope
+    }
+
+    pub(crate) fn import_shared_with_report(
+        &self,
+        memories: &[Memory],
+    ) -> Result<SharedImportReport, StoreError> {
+        let gate = DefaultSalienceGate::new_with_optional_embedding_provider(
+            self.scope_config()?,
+            self.embedding_provider.clone(),
+        );
+        let mut report = SharedImportReport::default();
+
+        for source in memories {
+            let candidate = build_shared_import_candidate(source);
+            let gate_decision = evaluate_gate_sync(gate.clone(), self.clone(), candidate)?;
+            let decision =
+                exact_shared_import_duplicate_decision(self, source)?.unwrap_or(gate_decision);
+            let disposition = shared_import_disposition(&decision);
+
+            match disposition {
+                SharedImportDisposition::Skip { reason } => {
+                    report.skipped_reasons.push(reason);
+                    report.outcomes.push(SharedImportOutcome {
+                        memory_id: None,
+                        disposition: SharedImportAction::Skip,
+                        reason: report.skipped_reasons.last().cloned().unwrap_or_default(),
+                        related_memory_id: None,
+                    });
+                }
+                SharedImportDisposition::Review {
+                    reason,
+                    related_memory_id,
+                } => {
+                    let imported = prepare_shared_import_memory(
+                        source,
+                        self.scope,
+                        SHARED_REVIEW_STATUS,
+                        "review",
+                        &reason,
+                        related_memory_id.as_ref(),
+                    );
+                    let imported_id = imported.id;
+                    insert_memory_without_embedding(self, &imported)?;
+                    report.new_ids.push(imported_id);
+                    report.review_ids.push(imported_id);
+                    report.outcomes.push(SharedImportOutcome {
+                        memory_id: Some(imported_id),
+                        disposition: SharedImportAction::Review,
+                        reason,
+                        related_memory_id,
+                    });
+                }
+                SharedImportDisposition::Quarantine {
+                    reason,
+                    related_memory_id,
+                } => {
+                    let imported = prepare_shared_import_memory(
+                        source,
+                        self.scope,
+                        QUARANTINED_STATUS,
+                        "quarantine",
+                        &reason,
+                        related_memory_id.as_ref(),
+                    );
+                    let imported_id = imported.id;
+                    insert_memory_without_embedding(self, &imported)?;
+
+                    if let GateDecision::Contradiction {
+                        conflicting_id,
+                        description,
+                    } = &decision
+                    {
+                        self.with_connection(|connection| {
+                            let transaction = connection.transaction()?;
+                            record_contradiction_row(
+                                &transaction,
+                                conflicting_id,
+                                &imported_id,
+                                description,
+                            )?;
+                            transaction.commit()?;
+                            Ok(())
+                        })?;
+                    }
+
+                    report.new_ids.push(imported_id);
+                    report.quarantined_ids.push(imported_id);
+                    report.outcomes.push(SharedImportOutcome {
+                        memory_id: Some(imported_id),
+                        disposition: SharedImportAction::Quarantine,
+                        reason,
+                        related_memory_id,
+                    });
+                }
+            }
+        }
+
+        Ok(report)
+    }
+
+    pub(crate) fn remediate_poisoning(
+        &self,
+        alerts: &[PoisoningAlert],
+    ) -> Result<PoisoningRemediationReport, StoreError> {
+        let mut alert_types_by_id: HashMap<MemoryId, Vec<PoisoningAlertType>> = HashMap::new();
+        let mut alert_ids_by_id: HashMap<MemoryId, Vec<String>> = HashMap::new();
+        for alert in alerts {
+            for memory_id in &alert.memory_ids {
+                alert_types_by_id
+                    .entry(*memory_id)
+                    .or_default()
+                    .push(alert.alert_type);
+                alert_ids_by_id
+                    .entry(*memory_id)
+                    .or_default()
+                    .push(alert.id.clone());
+            }
+        }
+
+        self.with_connection(|connection| {
+            let transaction = connection.transaction()?;
+            let config = load_poisoning_config(&transaction)?;
+            let now = Utc::now();
+            let mut report = PoisoningRemediationReport::default();
+            let mut memory_ids: Vec<MemoryId> = alert_types_by_id.keys().copied().collect();
+            sort_memory_ids(&mut memory_ids);
+
+            for memory_id in memory_ids {
+                let mut alert_types = alert_types_by_id.remove(&memory_id).unwrap_or_default();
+                alert_types.sort_by_key(display_poisoning_alert_type);
+                alert_types.dedup();
+                let mut alert_ids = alert_ids_by_id.remove(&memory_id).unwrap_or_default();
+                alert_ids.sort();
+                alert_ids.dedup();
+                let Some(mut memory) = require_memory(&transaction, &memory_id)? else {
+                    report.skipped_ids.push(memory_id);
+                    report.actions.push(PoisoningRemediationAction {
+                        memory_id,
+                        action: PoisoningRemediationDisposition::Skipped,
+                        reason: "memory no longer exists; remediation skipped".to_string(),
+                        alert_ids,
+                        alert_types,
+                    });
+                    continue;
+                };
+
+                if memory.state != MemoryState::Active {
+                    report.skipped_ids.push(memory_id);
+                    report.actions.push(PoisoningRemediationAction {
+                        memory_id,
+                        action: PoisoningRemediationDisposition::Skipped,
+                        reason: format!(
+                            "memory is {:?}; remediation only quarantines active memories",
+                            memory.state
+                        ),
+                        alert_ids,
+                        alert_types,
+                    });
+                    continue;
+                }
+
+                if !is_low_trust_memory(&memory, config.remediation_reliability_ceiling) {
+                    report.skipped_ids.push(memory_id);
+                    report.actions.push(PoisoningRemediationAction {
+                        memory_id,
+                        action: PoisoningRemediationDisposition::Skipped,
+                        reason: format!(
+                            "memory remained active because reliability {:.2} and provenance {:?} exceed the low-trust ceiling {:.2}",
+                            memory.reliability_score,
+                            memory.provenance,
+                            config.remediation_reliability_ceiling
+                        ),
+                        alert_ids,
+                        alert_types,
+                    });
+                    continue;
+                }
+
+                let previous_memory = memory.clone();
+                memory.state = MemoryState::Dormant;
+                memory.status = Some(QUARANTINED_STATUS.to_string());
+                memory.updated_at = now;
+                memory.custom_metadata.insert(
+                    POISONING_QUARANTINED_AT_METADATA_KEY.to_string(),
+                    format_timestamp(now),
+                );
+                memory.custom_metadata.insert(
+                    POISONING_ALERT_TYPES_METADATA_KEY.to_string(),
+                    alert_types
+                        .iter()
+                        .map(display_poisoning_alert_type)
+                        .collect::<Vec<_>>()
+                        .join(","),
+                );
+                memory.custom_metadata.insert(
+                    POISONING_ALERT_IDS_METADATA_KEY.to_string(),
+                    alert_ids.join(","),
+                );
+                memory.custom_metadata.insert(
+                    POISONING_REMEDIATION_METADATA_KEY.to_string(),
+                    "dormant quarantine".to_string(),
+                );
+
+                persist_memory(&transaction, &memory)?;
+                let row_id = require_memory_rowid(&transaction, &memory_id)?;
+                sync_fts_entry(&transaction, row_id, Some(&previous_memory), &memory)?;
+                report.quarantined_ids.push(memory_id);
+                report.actions.push(PoisoningRemediationAction {
+                    memory_id,
+                    action: PoisoningRemediationDisposition::Quarantined,
+                    reason: format!(
+                        "quarantined low-trust active memory after alerts: {}",
+                        alert_types
+                            .iter()
+                            .map(display_poisoning_alert_type)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    ),
+                    alert_ids,
+                    alert_types,
+                });
+            }
+
+            sort_memory_ids(&mut report.quarantined_ids);
+            sort_memory_ids(&mut report.skipped_ids);
+            report
+                .actions
+                .sort_by(|left, right| left.memory_id.cmp(&right.memory_id));
+            transaction.commit()?;
+            Ok(report)
+        })
     }
 
     /// Promote a memory to a broader scope and record promotion provenance.
@@ -325,6 +800,56 @@ impl SqliteMemoryStore {
         })
     }
 
+    /// Load correction-history rows, optionally filtered to a single memory.
+    pub fn list_corrections(
+        &self,
+        memory_id: Option<&MemoryId>,
+        limit: usize,
+    ) -> Result<Vec<CorrectionRecord>, StoreError> {
+        if limit == 0 {
+            return Ok(Vec::new());
+        }
+
+        self.with_connection(|connection| {
+            if let Some(memory_id) = memory_id {
+                if require_memory(connection, memory_id)?.is_none() {
+                    return Err(StoreError::NotFound(*memory_id));
+                }
+            }
+
+            let mut params: Vec<rusqlite::types::Value> = Vec::new();
+            let mut sql = String::from(
+                r#"
+                SELECT id, memory_id, previous_content, corrected_content, corrected_by, reason,
+                       disposition, related_memory_id, corrected_at
+                FROM memory_corrections
+                "#,
+            );
+
+            if let Some(memory_id) = memory_id {
+                sql.push_str(" WHERE memory_id = ?1");
+                params.push(rusqlite::types::Value::from(memory_id.to_string()));
+            }
+
+            sql.push_str(&format!(
+                " ORDER BY corrected_at DESC, id DESC LIMIT ?{}",
+                params.len() + 1
+            ));
+            params.push(rusqlite::types::Value::from(
+                i64::try_from(limit).unwrap_or(i64::MAX),
+            ));
+
+            let mut statement = connection.prepare(&sql)?;
+            let rows =
+                statement.query_map(rusqlite::params_from_iter(params), map_correction_row)?;
+            let mut corrections = Vec::new();
+            for row in rows {
+                corrections.push(row?);
+            }
+            Ok(corrections)
+        })
+    }
+
     /// Record a directional link between two memories in the proto-graph.
     pub fn record_link(
         &self,
@@ -517,18 +1042,13 @@ impl SqliteMemoryStore {
 
             // Phase 1: Enforce active budget
             if budget_active_max > 0 {
-                let active_count =
-                    count_memories_by_state(connection, scope, MemoryState::Active)?;
+                let active_count = count_memories_by_state(connection, scope, MemoryState::Active)?;
                 if active_count > 0 {
                     let active_u64 = active_count as u64;
                     if active_u64 > budget_active_max {
                         let excess = active_u64 - budget_active_max;
-                        let mut active_memories = load_search_memories(
-                            connection,
-                            &[scope],
-                            MemoryState::Active,
-                            None,
-                        )?;
+                        let mut active_memories =
+                            load_search_memories(connection, &[scope], MemoryState::Active, None)?;
                         // Sort ascending by composite score (lowest first = eviction candidates)
                         active_memories.sort_by(|a, b| {
                             let score_a = a.importance_score * a.reliability_score;
@@ -555,26 +1075,20 @@ impl SqliteMemoryStore {
             }
 
             // Phase 2: Enforce storage cap
-            let page_count: u64 = connection.query_row(
-                "SELECT page_count FROM pragma_page_count",
-                [],
-                |row| row.get(0),
-            )?;
-            let page_size: u64 = connection.query_row(
-                "SELECT page_size FROM pragma_page_size",
-                [],
-                |row| row.get(0),
-            )?;
+            let page_count: u64 =
+                connection.query_row("SELECT page_count FROM pragma_page_count", [], |row| {
+                    row.get(0)
+                })?;
+            let page_size: u64 =
+                connection.query_row("SELECT page_size FROM pragma_page_size", [], |row| {
+                    row.get(0)
+                })?;
             let current_bytes = page_count * page_size;
             let cap_bytes = storage_cap_mb * 1024 * 1024;
 
             if current_bytes > cap_bytes {
-                let mut dormant_memories = load_search_memories(
-                    connection,
-                    &[scope],
-                    MemoryState::Dormant,
-                    None,
-                )?;
+                let mut dormant_memories =
+                    load_search_memories(connection, &[scope], MemoryState::Dormant, None)?;
                 // Sort ascending by composite score (lowest first = deletion candidates)
                 dormant_memories.sort_by(|a, b| {
                     let score_a = a.importance_score * a.reliability_score;
@@ -655,10 +1169,8 @@ impl SqliteMemoryStore {
             ));
         }
         self.with_connection(|connection| {
-            let deleted_rows = connection.execute(
-                "DELETE FROM memory_links WHERE id = ?1",
-                [trimmed],
-            )?;
+            let deleted_rows =
+                connection.execute("DELETE FROM memory_links WHERE id = ?1", [trimmed])?;
             Ok(deleted_rows > 0)
         })
     }
@@ -676,8 +1188,8 @@ impl SqliteMemoryStore {
     ) -> Result<GraphTraversalResult, StoreError> {
         self.with_connection(|connection| {
             // Validate start memory exists.
-            let start_memory = require_memory(connection, start_id)?
-                .ok_or(StoreError::NotFound(*start_id))?;
+            let start_memory =
+                require_memory(connection, start_id)?.ok_or(StoreError::NotFound(*start_id))?;
 
             let mut visited = HashSet::new();
             visited.insert(*start_id);
@@ -751,46 +1263,92 @@ impl SqliteMemoryStore {
     pub fn detect_poisoning(&self) -> Result<Vec<PoisoningAlert>, StoreError> {
         self.with_connection(|connection| {
             let mut alerts: Vec<PoisoningAlert> = Vec::new();
+            let poisoning_config = load_poisoning_config(connection)?;
             let now = Utc::now();
             let scope_str = scope_to_db(self.scope);
             let one_hour_ago = format_timestamp(now - chrono::Duration::hours(1));
             let one_day_ago = format_timestamp(now - chrono::Duration::hours(24));
-
-            // ── Frequency anomaly ──────────────────────────────────────
-            let hourly_count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND created_at > ?2",
-                params![scope_str, one_hour_ago],
+            let scope_total: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND state != 'deleted'",
+                params![scope_str],
+                |row| row.get(0),
+            )?;
+            let scope_active: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND state = 'active'",
+                params![scope_str],
                 |row| row.get(0),
             )?;
 
+            // ── Frequency anomaly ──────────────────────────────────────
+            let mut hourly_stmt = connection.prepare(
+                "SELECT id \
+                 FROM memories \
+                 WHERE scope = ?1 \
+                   AND state = 'active' \
+                   AND created_at > ?2 \
+                 ORDER BY created_at DESC, id ASC",
+            )?;
+            let mut hourly_ids: Vec<MemoryId> = hourly_stmt
+                .query_map(params![scope_str, one_hour_ago], |row| {
+                    let raw: String = row.get(0)?;
+                    parse_uuid_for_sqlite(&raw)
+                })?
+                .collect::<Result<Vec<_>, _>>()?;
+            sort_memory_ids(&mut hourly_ids);
+            let hourly_count = i64::try_from(hourly_ids.len()).unwrap_or(i64::MAX);
+
             let daily_count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND created_at > ?2",
+                "SELECT COUNT(*) \
+                 FROM memories \
+                 WHERE scope = ?1 \
+                   AND state = 'active' \
+                   AND created_at > ?2",
                 params![scope_str, one_day_ago],
                 |row| row.get(0),
             )?;
 
-            if hourly_count > 50
-                || (hourly_count > 20 && daily_count > 0 && hourly_count > daily_count / 4)
+            let frequency_threshold = scaled_threshold(
+                scope_total,
+                poisoning_config.frequency_hourly_threshold,
+                poisoning_config.frequency_scope_ratio,
+                1,
+            );
+            let burst_detected = daily_count > 0
+                && usize::try_from(hourly_count).unwrap_or(usize::MAX)
+                    >= usize::try_from(poisoning_config.frequency_burst_min_hourly).unwrap_or(usize::MAX)
+                && ((hourly_count as f32) / (daily_count as f32))
+                    >= poisoning_config.frequency_burst_ratio;
+
+            if usize::try_from(hourly_count).unwrap_or(usize::MAX) >= frequency_threshold
+                || burst_detected
             {
-                let mut stmt = connection.prepare(
-                    "SELECT id FROM memories WHERE scope = ?1 AND created_at > ?2",
-                )?;
-                let ids: Vec<MemoryId> = stmt
-                    .query_map(params![scope_str, one_hour_ago], |row| {
-                        let raw: String = row.get(0)?;
-                        parse_uuid_for_sqlite(&raw)
-                    })?
-                    .collect::<Result<Vec<_>, _>>()?;
+                let severity = compute_poisoning_severity(
+                    compute_threshold_pressure(
+                        usize::try_from(hourly_count).unwrap_or(usize::MAX),
+                        frequency_threshold,
+                    )
+                    .max(if daily_count > 0 && poisoning_config.frequency_burst_ratio > 0.0 {
+                        ((hourly_count as f32) / (daily_count as f32))
+                            / poisoning_config.frequency_burst_ratio
+                    } else {
+                        0.0
+                    }),
+                    hourly_ids.len(),
+                    scope_total,
+                    0.45,
+                );
 
                 alerts.push(PoisoningAlert {
                     id: Uuid::new_v4().to_string(),
                     alert_type: PoisoningAlertType::FrequencyAnomaly,
                     description: format!(
-                        "Unusually high write frequency: {hourly_count} memories created in the last hour \
-                         ({daily_count} in the last 24 h)."
+                        "Unusually high write frequency in scope `{scope_str}`: {hourly_count} memories \
+                         created in the last hour ({daily_count} in the last 24 h; alert threshold \
+                         {frequency_threshold}, burst ratio {:.2}).",
+                        poisoning_config.frequency_burst_ratio
                     ),
-                    severity: 0.8,
-                    memory_ids: ids,
+                    severity,
+                    memory_ids: hourly_ids,
                     detected_at: now,
                 });
             }
@@ -801,25 +1359,66 @@ impl SqliteMemoryStore {
                     "SELECT id FROM memories \
                      WHERE scope = ?1 \
                        AND provenance IN ('agent_inferred', 'imported') \
-                       AND importance_score > 0.8 \
-                       AND state = 'active'",
+                        AND importance_score >= ?2 \
+                        AND state = 'active'",
                 )?;
-                let ids: Vec<MemoryId> = stmt
-                    .query_map(params![scope_str], |row| {
-                        let raw: String = row.get(0)?;
-                        parse_uuid_for_sqlite(&raw)
-                    })?
+                let mut ids: Vec<MemoryId> = stmt
+                    .query_map(
+                        params![
+                            scope_str,
+                            f64::from(poisoning_config.trust_mismatch_importance_threshold)
+                        ],
+                        |row| {
+                            let raw: String = row.get(0)?;
+                            parse_uuid_for_sqlite(&raw)
+                        },
+                    )?
                     .collect::<Result<Vec<_>, _>>()?;
+                sort_memory_ids(&mut ids);
 
-                if ids.len() > 5 {
+                let trust_mismatch_threshold = scaled_threshold(
+                    scope_active,
+                    poisoning_config.trust_mismatch_count_threshold,
+                    poisoning_config.trust_mismatch_scope_ratio,
+                    1,
+                );
+
+                if ids.len() >= trust_mismatch_threshold {
+                    let average_importance: f32 = connection.query_row(
+                        "SELECT COALESCE(AVG(importance_score), 0.0) FROM memories \
+                         WHERE scope = ?1 \
+                           AND provenance IN ('agent_inferred', 'imported') \
+                           AND importance_score >= ?2 \
+                           AND state = 'active'",
+                        params![
+                            scope_str,
+                            f64::from(poisoning_config.trust_mismatch_importance_threshold)
+                        ],
+                        |row| row.get(0),
+                    )?;
+                    let severity = compute_poisoning_severity(
+                        compute_threshold_pressure(ids.len(), trust_mismatch_threshold).max(
+                            average_importance
+                                / poisoning_config
+                                    .trust_mismatch_importance_threshold
+                                    .max(f32::EPSILON),
+                        ),
+                        ids.len(),
+                        scope_active,
+                        0.35,
+                    );
+
                     alerts.push(PoisoningAlert {
                         id: Uuid::new_v4().to_string(),
                         alert_type: PoisoningAlertType::TrustMismatch,
                         description: format!(
-                            "{} low-provenance memories have high importance scores (>0.8).",
-                            ids.len()
+                            "{} low-provenance memories in scope `{scope_str}` have importance >= {:.2} \
+                             (alert threshold {}).",
+                            ids.len(),
+                            poisoning_config.trust_mismatch_importance_threshold,
+                            trust_mismatch_threshold
                         ),
-                        severity: 0.6,
+                        severity,
                         memory_ids: ids,
                         detected_at: now,
                     });
@@ -828,30 +1427,54 @@ impl SqliteMemoryStore {
 
             // ── Bulk overwrite ─────────────────────────────────────────
             {
-                let distinct_updated: i64 = connection.query_row(
-                    "SELECT COUNT(DISTINCT memory_id) FROM memory_versions WHERE changed_at > ?1",
-                    params![one_hour_ago],
-                    |row| row.get(0),
+                let mut stmt = connection.prepare(
+                    "SELECT v.memory_id, v.changed_by \
+                     FROM memory_versions v \
+                     JOIN memories m ON m.id = v.memory_id \
+                     WHERE m.scope = ?1 \
+                       AND m.state = 'active' \
+                       AND v.changed_at > ?2 \
+                     ORDER BY v.changed_at DESC, v.memory_id ASC",
                 )?;
+                let version_rows = stmt
+                    .query_map(params![scope_str, one_hour_ago], |row| {
+                        let raw_id: String = row.get(0)?;
+                        Ok((parse_uuid_for_sqlite(&raw_id)?, row.get::<_, String>(1)?))
+                    })?
+                    .collect::<Result<Vec<_>, _>>()?;
+                let mut ids: Vec<MemoryId> = version_rows
+                    .into_iter()
+                    .filter_map(|(memory_id, changed_by)| {
+                        (!is_benign_poisoning_update(&changed_by)).then_some(memory_id)
+                    })
+                    .collect();
+                sort_memory_ids(&mut ids);
+                ids.dedup();
 
-                if distinct_updated > 20 {
-                    let mut stmt = connection.prepare(
-                        "SELECT DISTINCT memory_id FROM memory_versions WHERE changed_at > ?1",
-                    )?;
-                    let ids: Vec<MemoryId> = stmt
-                        .query_map(params![one_hour_ago], |row| {
-                            let raw: String = row.get(0)?;
-                            parse_uuid_for_sqlite(&raw)
-                        })?
-                        .collect::<Result<Vec<_>, _>>()?;
+                let bulk_overwrite_threshold = scaled_threshold(
+                    scope_active,
+                    poisoning_config.bulk_overwrite_count_threshold,
+                    poisoning_config.bulk_overwrite_scope_ratio,
+                    1,
+                );
+
+                if ids.len() >= bulk_overwrite_threshold {
+                    let severity = compute_poisoning_severity(
+                        compute_threshold_pressure(ids.len(), bulk_overwrite_threshold),
+                        ids.len(),
+                        scope_active,
+                        0.4,
+                    );
 
                     alerts.push(PoisoningAlert {
                         id: Uuid::new_v4().to_string(),
                         alert_type: PoisoningAlertType::BulkOverwrite,
                         description: format!(
-                            "{distinct_updated} distinct memories updated in the last hour."
+                            "{} distinct active memories in scope `{scope_str}` were updated \
+                             in the last hour by non-system actors (alert threshold {bulk_overwrite_threshold}).",
+                            ids.len()
                         ),
-                        severity: 0.7,
+                        severity,
                         memory_ids: ids,
                         detected_at: now,
                     });
@@ -860,36 +1483,86 @@ impl SqliteMemoryStore {
 
             // ── Mass contradiction ─────────────────────────────────────
             {
+                let mass_contradiction_population_threshold = scaled_threshold(
+                    scope_active,
+                    1,
+                    poisoning_config.mass_contradiction_scope_ratio,
+                    1,
+                );
                 let mut stmt = connection.prepare(
-                    "SELECT memory_id, SUM(cnt) AS total FROM ( \
-                         SELECT memory_a_id AS memory_id, COUNT(*) AS cnt \
-                           FROM contradictions \
-                          WHERE resolution_status = 'unresolved' \
-                          GROUP BY memory_a_id \
-                         UNION ALL \
-                         SELECT memory_b_id, COUNT(*) \
-                           FROM contradictions \
-                          WHERE resolution_status = 'unresolved' \
-                          GROUP BY memory_b_id \
-                     ) GROUP BY memory_id HAVING total >= 3",
+                    "SELECT \
+                        c.memory_a_id, ma.scope, ma.state, ma.reliability_score, ma.provenance, \
+                        c.memory_b_id, mb.scope, mb.state, mb.reliability_score, mb.provenance \
+                     FROM contradictions c \
+                     JOIN memories ma ON ma.id = c.memory_a_id \
+                     JOIN memories mb ON mb.id = c.memory_b_id \
+                     WHERE c.resolution_status = 'unresolved' \
+                       AND ( \
+                           (ma.scope = ?1 AND ma.state = 'active') \
+                           OR (mb.scope = ?1 AND mb.state = 'active') \
+                       )",
                 )?;
-                let rows: Vec<MemoryId> = stmt
-                    .query_map([], |row| {
-                        let raw: String = row.get(0)?;
-                        parse_uuid_for_sqlite(&raw)
+                let contradiction_pairs = stmt
+                    .query_map(params![scope_str], |row| {
+                        Ok((
+                            load_poisoning_memory_snapshot(row, 0)?,
+                            load_poisoning_memory_snapshot(row, 5)?,
+                        ))
                     })?
                     .collect::<Result<Vec<_>, _>>()?;
+                let mut contradiction_counts: HashMap<MemoryId, u32> = HashMap::new();
+                for (memory_a, memory_b) in contradiction_pairs {
+                    for memory_id in select_mass_contradiction_candidates(
+                        self.scope,
+                        &memory_a,
+                        &memory_b,
+                        poisoning_config.remediation_reliability_ceiling,
+                    ) {
+                        *contradiction_counts.entry(memory_id).or_default() += 1;
+                    }
+                }
+                let mut rows: Vec<(MemoryId, u32)> = contradiction_counts
+                    .into_iter()
+                    .filter(|(_, total)| {
+                        *total >= poisoning_config.mass_contradiction_per_memory_threshold
+                    })
+                    .collect();
+                rows.sort_by(|(left_id, left_total), (right_id, right_total)| {
+                    right_total.cmp(left_total).then_with(|| left_id.cmp(right_id))
+                });
 
-                if !rows.is_empty() {
+                if rows.len() >= mass_contradiction_population_threshold {
+                    let ids: Vec<MemoryId> = rows.iter().map(|(id, _)| *id).collect();
+                    let max_total = rows.iter().map(|(_, total)| *total).max().unwrap_or(0);
+                    let severity = compute_poisoning_severity(
+                        compute_threshold_pressure(
+                            usize::try_from(max_total).unwrap_or(usize::MAX),
+                            usize::try_from(
+                                poisoning_config.mass_contradiction_per_memory_threshold,
+                            )
+                            .unwrap_or(usize::MAX),
+                        )
+                        .max(compute_threshold_pressure(
+                            ids.len(),
+                            mass_contradiction_population_threshold,
+                        )),
+                        ids.len(),
+                        scope_active,
+                        0.5,
+                    );
+
                     alerts.push(PoisoningAlert {
                         id: Uuid::new_v4().to_string(),
                         alert_type: PoisoningAlertType::MassContradiction,
                         description: format!(
-                            "{} memories involved in 3 or more unresolved contradictions.",
-                            rows.len()
+                            "{} low-trust active memories in scope `{scope_str}` are on the weaker \
+                             side of {} or more unresolved contradictions (alert threshold {}).",
+                            rows.len(),
+                            poisoning_config.mass_contradiction_per_memory_threshold,
+                            mass_contradiction_population_threshold
                         ),
-                        severity: 0.9,
-                        memory_ids: rows,
+                        severity,
+                        memory_ids: ids,
                         detected_at: now,
                     });
                 }
@@ -908,9 +1581,10 @@ impl SqliteMemoryStore {
 
     /// Apply a user-supplied correction to an existing memory.
     ///
-    /// Records the correction in `memory_corrections`, updates the memory
-    /// content, bumps reliability by +0.1 (capped at 1.0), marks the
-    /// embedding as stale, and creates a version entry for the change.
+    /// Routes the corrected content back through the store's write-time
+    /// duplicate / contradiction safety model, records the outcome in
+    /// `memory_corrections`, creates version entries, and refreshes any
+    /// affected embeddings immediately when a provider or cache is available.
     pub fn correct_memory(
         &self,
         id: &MemoryId,
@@ -918,80 +1592,263 @@ impl SqliteMemoryStore {
         corrected_by: &str,
         reason: Option<&str>,
     ) -> Result<CorrectionRecord, StoreError> {
-        self.with_connection(|connection| {
-            let mut memory =
-                require_memory(connection, id)?.ok_or(StoreError::NotFound(*id))?;
-            let previous_content = memory.content.clone();
+        let trimmed_content = corrected_content.trim();
+        if trimmed_content.is_empty() {
+            return Err(StoreError::Validation(
+                "corrected content must not be empty".to_string(),
+            ));
+        }
+        let corrected_by = corrected_by.trim();
+        if corrected_by.is_empty() {
+            return Err(StoreError::Validation(
+                "corrected_by must not be empty".to_string(),
+            ));
+        }
 
+        let existing_memory = self.with_connection(|connection| {
+            require_memory(connection, id)?.ok_or(StoreError::NotFound(*id))
+        })?;
+        if existing_memory.content.trim() == trimmed_content {
+            return Err(StoreError::Validation(
+                "corrected content must differ from the current memory content".to_string(),
+            ));
+        }
+
+        let decision = self.evaluate_correction_decision(id, &existing_memory, trimmed_content)?;
+        let reason_text = reason.unwrap_or("").trim().to_string();
+        let mut embeddings_to_refresh = vec![(*id, trimmed_content.to_string())];
+
+        let (correction, target_embedding_refresh) = self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-
+            let mut memory = require_memory(&transaction, id)?.ok_or(StoreError::NotFound(*id))?;
+            let previous_content = memory.content.clone();
+            let previous_memory = memory.clone();
+            let row_id = require_memory_rowid(&transaction, id)?;
             let correction_id = Uuid::new_v4().to_string();
             let now = Utc::now();
-            let reason_text = reason.unwrap_or("");
+            let mut disposition = CorrectionDisposition::Applied;
+            let mut related_memory_id = None;
+            let mut target_embedding_refresh = None;
+
+            insert_memory_version_row(
+                &transaction,
+                id,
+                &previous_content,
+                now,
+                corrected_by,
+                &format!("user correction: {reason_text}"),
+            )?;
+
+            memory.content = trimmed_content.to_string();
+            memory.reliability_score = (memory.reliability_score + 0.1).min(1.0);
+            memory.embedding_stale = true;
+            memory.updated_at = now;
+
+            match &decision {
+                GateDecision::Accept { similar_to, .. } => {
+                    related_memory_id = *similar_to;
+                }
+                GateDecision::Archive => {
+                    disposition = CorrectionDisposition::Archived;
+                    memory.state = MemoryState::Dormant;
+                }
+                GateDecision::Merge {
+                    target_id,
+                    enriched_content,
+                    ..
+                } => {
+                    disposition = CorrectionDisposition::Merged;
+                    related_memory_id = Some(*target_id);
+                    memory.state = MemoryState::Dormant;
+
+                    let mut target = require_memory(&transaction, target_id)?
+                        .ok_or(StoreError::NotFound(*target_id))?;
+                    let target_previous = target.clone();
+                    let target_row_id = require_memory_rowid(&transaction, target_id)?;
+                    let target_content_changed = target.content != *enriched_content;
+
+                    if target_content_changed {
+                        insert_memory_version_row(
+                            &transaction,
+                            target_id,
+                            &target.content,
+                            now,
+                            corrected_by,
+                            &format!("merged from correction on {id}: {reason_text}"),
+                        )?;
+                        target.content = enriched_content.clone();
+                        target.embedding_stale = true;
+                        target.updated_at = now;
+                    }
+
+                    target.reliability_score = (target.reliability_score + 0.1).min(1.0);
+                    persist_memory(&transaction, &target)?;
+                    sync_fts_entry(&transaction, target_row_id, Some(&target_previous), &target)?;
+
+                    if target_content_changed {
+                        target_embedding_refresh = Some((*target_id, enriched_content.clone()));
+                    }
+                }
+                GateDecision::Contradiction { conflicting_id, .. } => {
+                    disposition = CorrectionDisposition::Contradiction;
+                    related_memory_id = Some(*conflicting_id);
+                }
+                GateDecision::Reject { reason } => {
+                    return Err(StoreError::Validation(format!(
+                        "correction rejected by safety gate: {reason}"
+                    )));
+                }
+            }
+
+            persist_memory(&transaction, &memory)?;
+            sync_fts_entry(&transaction, row_id, Some(&previous_memory), &memory)?;
+
+            if let GateDecision::Contradiction {
+                conflicting_id,
+                description,
+            } = &decision
+            {
+                record_contradiction_row(&transaction, conflicting_id, id, description)?;
+            }
 
             transaction.execute(
                 r#"
-                INSERT INTO memory_corrections (id, memory_id, previous_content, corrected_content, corrected_by, reason, corrected_at)
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                INSERT INTO memory_corrections(
+                    id,
+                    memory_id,
+                    previous_content,
+                    corrected_content,
+                    corrected_by,
+                    reason,
+                    disposition,
+                    related_memory_id,
+                    corrected_at
+                )
+                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
                 "#,
                 params![
                     correction_id,
                     id.to_string(),
                     previous_content,
-                    corrected_content,
+                    trimmed_content,
                     corrected_by,
-                    reason_text,
+                    &reason_text,
+                    correction_disposition_to_db(disposition),
+                    related_memory_id.map(|memory_id| memory_id.to_string()),
                     format_timestamp(now),
                 ],
             )?;
-
-            let next_version_number = load_next_version_number(&transaction, id)?;
-            transaction.execute(
-                r#"
-                INSERT INTO memory_versions(
-                    id,
-                    memory_id,
-                    version_number,
-                    content,
-                    changed_at,
-                    changed_by,
-                    change_reason
-                )
-                VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
-                "#,
-                params![
-                    Uuid::new_v4().to_string(),
-                    id.to_string(),
-                    i64::from(next_version_number),
-                    previous_content,
-                    format_timestamp(now),
-                    corrected_by,
-                    format!("user correction: {reason_text}"),
-                ],
-            )?;
-
-            let row_id = require_memory_rowid(&transaction, id)?;
-            let previous_memory = memory.clone();
-
-            memory.content = corrected_content.to_string();
-            memory.reliability_score = (memory.reliability_score + 0.1).min(1.0);
-            memory.embedding_stale = true;
-            memory.updated_at = now;
-
-            persist_memory(&transaction, &memory)?;
-            sync_fts_entry(&transaction, row_id, Some(&previous_memory), &memory)?;
 
             transaction.commit()?;
 
-            Ok(CorrectionRecord {
-                id: correction_id,
-                memory_id: *id,
-                previous_content,
-                corrected_content: corrected_content.to_string(),
-                corrected_by: corrected_by.to_string(),
-                reason: reason_text.to_string(),
-                corrected_at: now,
-            })
+            Ok((
+                CorrectionRecord {
+                    id: correction_id,
+                    memory_id: *id,
+                    previous_content,
+                    corrected_content: trimmed_content.to_string(),
+                    corrected_by: corrected_by.to_string(),
+                    reason: reason_text.clone(),
+                    disposition,
+                    related_memory_id,
+                    corrected_at: now,
+                },
+                target_embedding_refresh,
+            ))
+        })?;
+
+        if let Some(target_embedding_refresh) = target_embedding_refresh {
+            embeddings_to_refresh.push(target_embedding_refresh);
+        }
+        for (memory_id, content) in embeddings_to_refresh {
+            self.refresh_embedding_after_content_change(&memory_id, &content)?;
+        }
+
+        Ok(correction)
+    }
+
+    fn evaluate_correction_decision(
+        &self,
+        id: &MemoryId,
+        memory: &Memory,
+        corrected_content: &str,
+    ) -> Result<GateDecision, StoreError> {
+        if let Some(decision) = exact_correction_duplicate_decision(self, id, corrected_content)? {
+            return Ok(decision);
+        }
+
+        let gate = DefaultSalienceGate::new_with_optional_embedding_provider(
+            self.scope_config()?,
+            self.embedding_provider.clone(),
+        );
+        let candidate = MemoryCandidate {
+            content: corrected_content.to_string(),
+            summary: memory.summary.clone(),
+            memory_type: memory.memory_type,
+            provenance: memory.provenance,
+            importance_score: memory.importance_score,
+            sensitivity: memory.sensitivity,
+            tags: memory.tags.clone(),
+            custom_metadata: memory.custom_metadata.clone(),
+            embedding: None,
+        };
+
+        run_store_future({
+            let store = self.clone();
+            let candidate = candidate.clone();
+            let excluded_id = *id;
+            async move {
+                gate.evaluate_excluding(&candidate, &store, excluded_id)
+                    .await
+                    .map_err(|error| match error {
+                        GateError::Store(store_error) => store_error,
+                        other => StoreError::Validation(format!(
+                            "correction gate evaluation failed: {other}"
+                        )),
+                    })
+            }
+        })
+    }
+
+    fn refresh_embedding_after_content_change(
+        &self,
+        id: &MemoryId,
+        content: &str,
+    ) -> Result<(), StoreError> {
+        let trimmed_content = content.trim();
+        if trimmed_content.is_empty() {
+            return Ok(());
+        }
+
+        run_store_future({
+            let store = self.clone();
+            let memory_id = *id;
+            let content_sha = content_sha256(trimmed_content);
+            let content = trimmed_content.to_string();
+            async move {
+                if store
+                    .reuse_cached_embedding(&memory_id, &content_sha)
+                    .await?
+                {
+                    return Ok(());
+                }
+
+                let embedding = match store.generate_embedding(&content).await {
+                    Ok(Some(embedding)) => embedding,
+                    Ok(None) => return Ok(()),
+                    Err(error) => {
+                        if let Some(warning) = embedding_degradation_warning(&error) {
+                            eprintln!("warning: {warning}");
+                        }
+                        return Ok(());
+                    }
+                };
+
+                match store.store_embedding(&memory_id, &embedding).await {
+                    Ok(()) | Err(StoreError::Validation(_)) => Ok(()),
+                    Err(error) => Err(error),
+                }
+            }
         })
     }
 
@@ -1037,6 +1894,9 @@ impl SqliteMemoryStore {
             }
             persist_memory(&transaction, &memory)?;
 
+            let learning_report = compute_learned_weights_report(&transaction)?;
+            persist_learned_weights(&transaction, learning_report.effective_weights)?;
+
             transaction.commit()?;
 
             Ok(RetrievalFeedback {
@@ -1051,59 +1911,15 @@ impl SqliteMemoryStore {
 
     /// Compute adjusted scoring weights based on accumulated feedback.
     ///
-    /// Analyzes the `retrieval_feedback` table to determine how well the
-    /// current scoring formula predicts relevance.  Returns a map of
-    /// weight names to suggested values.
-    ///
-    /// If fewer than 20 feedback records exist, the default weights are
-    /// returned unchanged (insufficient data to learn from).
+    /// Analyzes the `retrieval_feedback` table and derives effective
+    /// `scope_config` weights keyed exactly the way live search reads them.
     pub fn compute_learned_weights(&self) -> Result<HashMap<String, f64>, StoreError> {
-        self.with_connection(|connection| {
-            let total: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM retrieval_feedback",
-                [],
-                |row| row.get(0),
-            )?;
+        self.learned_weights_report()
+            .map(|report| report.effective_weights.to_hash_map())
+    }
 
-            let relevant_count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM retrieval_feedback WHERE relevant = 1",
-                [],
-                |row| row.get(0),
-            )?;
-
-            let mut weights = HashMap::new();
-
-            let default_similarity = f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT);
-            let default_recency = f64::from(crate::types::DEFAULT_RECENCY_WEIGHT);
-            let default_access = f64::from(crate::types::DEFAULT_ACCESS_WEIGHT);
-            let default_importance = f64::from(crate::types::DEFAULT_PRIORITY_WEIGHT);
-
-            if total < 20 {
-                weights.insert("similarity".to_string(), default_similarity);
-                weights.insert("recency".to_string(), default_recency);
-                weights.insert("access_count".to_string(), default_access);
-                weights.insert("importance".to_string(), default_importance);
-                return Ok(weights);
-            }
-
-            let relevance_ratio = (relevant_count as f64) / (total as f64);
-
-            if relevance_ratio >= 0.5 {
-                // Current weights are performing adequately or well — return defaults.
-                weights.insert("similarity".to_string(), default_similarity);
-                weights.insert("recency".to_string(), default_recency);
-                weights.insert("access_count".to_string(), default_access);
-                weights.insert("importance".to_string(), default_importance);
-            } else {
-                // Low relevance ratio — boost similarity, reduce recency.
-                weights.insert("similarity".to_string(), default_similarity + 0.1);
-                weights.insert("recency".to_string(), (default_recency - 0.05).max(0.0));
-                weights.insert("access_count".to_string(), default_access);
-                weights.insert("importance".to_string(), default_importance);
-            }
-
-            Ok(weights)
-        })
+    pub(crate) fn learned_weights_report(&self) -> Result<LearnedWeightsReport, StoreError> {
+        self.with_connection(|connection| compute_learned_weights_report(connection))
     }
 
     /// Export memories suitable for sharing with other agents.
@@ -1115,12 +1931,8 @@ impl SqliteMemoryStore {
     pub fn export_for_sharing(&self, config: &ShareConfig) -> Result<Vec<Memory>, StoreError> {
         self.with_connection(|connection| {
             let type_filter = config.type_filter.as_deref();
-            let all = load_search_memories(
-                connection,
-                &[self.scope],
-                MemoryState::Active,
-                type_filter,
-            )?;
+            let all =
+                load_search_memories(connection, &[self.scope], MemoryState::Active, type_filter)?;
             let max_ord = sensitivity_ord(config.max_sensitivity);
             let shared: Vec<Memory> = all
                 .into_iter()
@@ -1155,51 +1967,7 @@ impl SqliteMemoryStore {
     ///
     /// Returns the newly assigned [`MemoryId`] values.
     pub fn import_shared(&self, memories: &[Memory]) -> Result<Vec<MemoryId>, StoreError> {
-        self.with_connection(|connection| {
-            let transaction = connection.unchecked_transaction()?;
-            let mut ids = Vec::with_capacity(memories.len());
-            let now = Utc::now();
-            for source in memories {
-                let new_id = Uuid::new_v4();
-                let mut imported = source.clone();
-                imported.id = new_id;
-                imported.scope = self.scope;
-                imported.provenance = ProvenanceLevel::Imported;
-                imported.reliability_score = imported.reliability_score.min(0.6);
-                imported.embedding_stale = true;
-                imported.tenant_id = None;
-                imported.user_id = None;
-                imported.agent_id = None;
-                imported.created_at = now;
-                imported.updated_at = now;
-                imported.last_accessed_at = None;
-                imported.access_count = 0;
-
-                transaction.execute(
-                    r#"
-                    INSERT INTO memories(
-                        id, content, summary, scope, memory_type, provenance,
-                        importance_score, reliability_score, sensitivity, state,
-                        tags, status, custom_metadata, access_count,
-                        corroboration_count, embedding_stale, created_at,
-                        updated_at, last_accessed_at, tenant_id, user_id, agent_id
-                    )
-                    VALUES (
-                        ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
-                        ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22
-                    )
-                    "#,
-                    rusqlite::params_from_iter(memory_insert_params(&imported)?),
-                )?;
-
-                let row_id = require_memory_rowid(&transaction, &imported.id)?;
-                sync_fts_entry(&transaction, row_id, None, &imported)?;
-
-                ids.push(new_id);
-            }
-            transaction.commit()?;
-            Ok(ids)
-        })
+        Ok(self.import_shared_with_report(memories)?.new_ids)
     }
 }
 
@@ -2074,43 +2842,7 @@ impl MemoryStore for SqliteMemoryStore {
 
         self.with_connection(|connection| {
             let transaction = connection.transaction()?;
-            let memory_a =
-                require_memory(&transaction, a_id)?.ok_or(StoreError::NotFound(*a_id))?;
-            let memory_b =
-                require_memory(&transaction, b_id)?.ok_or(StoreError::NotFound(*b_id))?;
-            let now = Utc::now();
-
-            transaction.execute(
-                r#"
-                INSERT INTO contradictions(
-                    id,
-                    memory_a_id,
-                    memory_b_id,
-                    detected_at,
-                    description,
-                    resolution_status,
-                    resolved_at,
-                    resolution_note
-                )
-                VALUES (?1, ?2, ?3, ?4, ?5, 'unresolved', NULL, NULL)
-                "#,
-                params![
-                    Uuid::new_v4().to_string(),
-                    a_id.to_string(),
-                    b_id.to_string(),
-                    format_timestamp(now),
-                    description.trim(),
-                ],
-            )?;
-
-            if memory_a.provenance.base_reliability() > memory_b.provenance.base_reliability() {
-                lower_reliability(&transaction, &memory_b, now)?;
-            } else if memory_b.provenance.base_reliability()
-                > memory_a.provenance.base_reliability()
-            {
-                lower_reliability(&transaction, &memory_a, now)?;
-            }
-
+            record_contradiction_row(&transaction, a_id, b_id, description)?;
             transaction.commit()?;
             Ok(())
         })
@@ -2175,10 +2907,8 @@ impl MemoryObservability for SqliteMemoryStore {
     /// assembles a [`MemoryHealthReport`].
     fn health_report(&self, scope: MemoryScope) -> Result<MemoryHealthReport, ObservabilityError> {
         self.with_connection(|connection| {
-            let active_count =
-                count_memories_by_state(connection, scope, MemoryState::Active)?;
-            let dormant_count =
-                count_memories_by_state(connection, scope, MemoryState::Dormant)?;
+            let active_count = count_memories_by_state(connection, scope, MemoryState::Active)?;
+            let dormant_count = count_memories_by_state(connection, scope, MemoryState::Dormant)?;
             let stale_embeddings_count = connection.query_row(
                 "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND embedding_stale = 1",
                 [scope_to_db(scope)],
@@ -2229,11 +2959,7 @@ impl MemoryObservability for SqliteMemoryStore {
                 dormant_count: i64_to_u64(dormant_count, "dormant_count")?,
                 total_storage_bytes: i64_to_u64(page_count, "page_count")?
                     .saturating_mul(i64_to_u64(page_size, "page_size")?),
-                budget_usage_ratio: compute_budget_usage_ratio(
-                    connection,
-                    scope,
-                    active_count,
-                )?,
+                budget_usage_ratio: compute_budget_usage_ratio(connection, scope, active_count)?,
                 unresolved_contradictions: i64_to_u64(
                     unresolved_contradictions,
                     "unresolved_contradictions",
@@ -2319,27 +3045,20 @@ impl MemoryObservability for SqliteMemoryStore {
             }
             ExportFormat::Sqlite => {
                 let (memories, links, versions) = self
-                    .with_connection(|connection| {
-                        load_export_payload(connection, scope)
-                    })
+                    .with_connection(|connection| load_export_payload(connection, scope))
                     .map_err(ObservabilityError::Store)?;
 
-                let temp_path = std::env::temp_dir()
-                    .join(format!("elegy-export-{}.sqlite3", Uuid::new_v4()));
-                let result =
-                    export_to_sqlite_file(&temp_path, &memories, &links, &versions);
+                let temp_path =
+                    std::env::temp_dir().join(format!("elegy-export-{}.sqlite3", Uuid::new_v4()));
+                let result = export_to_sqlite_file(&temp_path, &memories, &links, &versions);
                 let _ = std::fs::remove_file(&temp_path);
                 result.map_err(|error| {
-                    ObservabilityError::Operation(format!(
-                        "sqlite export failed: {error}"
-                    ))
+                    ObservabilityError::Operation(format!("sqlite export failed: {error}"))
                 })
             }
             ExportFormat::Elegy => {
                 let (memories, links, versions) = self
-                    .with_connection(|connection| {
-                        load_export_payload(connection, scope)
-                    })
+                    .with_connection(|connection| load_export_payload(connection, scope))
                     .map_err(ObservabilityError::Store)?;
 
                 let archive = ElegyArchive {
@@ -2984,6 +3703,28 @@ fn map_memory_version_row(row: &Row<'_>) -> rusqlite::Result<MemoryVersion> {
     })
 }
 
+fn map_correction_row(row: &Row<'_>) -> rusqlite::Result<CorrectionRecord> {
+    let raw_memory_id: String = row.get(1)?;
+    let raw_disposition: String = row.get(6)?;
+    let raw_related_memory_id: Option<String> = row.get(7)?;
+    let raw_corrected_at: String = row.get(8)?;
+
+    Ok(CorrectionRecord {
+        id: row.get(0)?,
+        memory_id: parse_uuid_for_sqlite(&raw_memory_id)?,
+        previous_content: row.get(2)?,
+        corrected_content: row.get(3)?,
+        corrected_by: row.get(4)?,
+        reason: row.get(5)?,
+        disposition: parse_correction_disposition_for_sqlite(&raw_disposition)?,
+        related_memory_id: raw_related_memory_id
+            .as_deref()
+            .map(parse_uuid_for_sqlite)
+            .transpose()?,
+        corrected_at: parse_datetime_for_sqlite(&raw_corrected_at)?,
+    })
+}
+
 fn parse_json<T>(raw: &str) -> Result<T, StoreError>
 where
     T: DeserializeOwned,
@@ -2991,6 +3732,20 @@ where
     serde_json::from_str(raw).map_err(|error| {
         StoreError::Serialization(format!("failed to decode JSON `{raw}`: {error}"))
     })
+}
+
+fn parse_correction_disposition_for_sqlite(raw: &str) -> rusqlite::Result<CorrectionDisposition> {
+    match raw {
+        "applied" => Ok(CorrectionDisposition::Applied),
+        "archived" => Ok(CorrectionDisposition::Archived),
+        "merged" => Ok(CorrectionDisposition::Merged),
+        "contradiction" => Ok(CorrectionDisposition::Contradiction),
+        other => Err(rusqlite::Error::FromSqlConversionFailure(
+            0,
+            Type::Text,
+            format!("invalid correction disposition `{other}`").into(),
+        )),
+    }
 }
 
 fn serialize_json<T>(value: &T) -> Result<String, StoreError>
@@ -3878,6 +4633,7 @@ fn load_vector_similarity_scores(
         JOIN vec_memories v ON v.rowid = me.vec_rowid
         WHERE {scope_clause}
           AND m.state = ?{}
+          AND m.embedding_stale = 0
         "#,
         params.len() + 1
     );
@@ -3951,6 +4707,336 @@ fn compute_retrieval_score(
         + (scope_config.recency_weight * recency)
         + (scope_config.access_weight * access)
         + (scope_config.priority_weight * similarity_gated_priority)
+}
+
+fn compute_learned_weights_report(
+    connection: &Connection,
+) -> Result<LearnedWeightsReport, StoreError> {
+    let default_weights = LearnedWeightValues::defaults();
+    let scope_config = load_scope_config(connection)?;
+    let samples = load_feedback_learning_samples(connection, &scope_config)?;
+    let sample_size = samples.len();
+    let relevant_samples = samples.iter().filter(|sample| sample.relevant).count();
+    let irrelevant_samples = sample_size.saturating_sub(relevant_samples);
+
+    if sample_size < LEARNING_MIN_TOTAL_FEEDBACK {
+        return Ok(LearnedWeightsReport {
+            sample_size,
+            relevant_samples,
+            irrelevant_samples,
+            using_defaults: true,
+            confidence: 0.0,
+            status_detail: format!(
+                "using defaults until at least {LEARNING_MIN_TOTAL_FEEDBACK} feedback rows exist"
+            ),
+            effective_weights: default_weights,
+            default_weights,
+        });
+    }
+
+    if relevant_samples < LEARNING_MIN_CLASS_FEEDBACK
+        || irrelevant_samples < LEARNING_MIN_CLASS_FEEDBACK
+    {
+        return Ok(LearnedWeightsReport {
+            sample_size,
+            relevant_samples,
+            irrelevant_samples,
+            using_defaults: true,
+            confidence: 0.0,
+            status_detail: format!(
+                "using defaults until feedback contains at least {LEARNING_MIN_CLASS_FEEDBACK} relevant and {LEARNING_MIN_CLASS_FEEDBACK} irrelevant judgments"
+            ),
+            effective_weights: default_weights,
+            default_weights,
+        });
+    }
+
+    let similarity_signal = feature_separation(&samples, |sample| sample.similarity_signal);
+    let recency_signal = feature_separation(&samples, |sample| sample.recency_signal);
+    let access_signal = feature_separation(&samples, |sample| sample.access_signal);
+    let priority_signal = feature_separation(&samples, |sample| sample.priority_signal);
+
+    let strongest_signal = similarity_signal
+        .abs()
+        .max(recency_signal.abs())
+        .max(access_signal.abs())
+        .max(priority_signal.abs());
+    if strongest_signal < 0.10 {
+        return Ok(LearnedWeightsReport {
+            sample_size,
+            relevant_samples,
+            irrelevant_samples,
+            using_defaults: true,
+            confidence: 0.0,
+            status_detail:
+                "feedback has not separated any scoring component strongly enough; keeping defaults"
+                    .to_string(),
+            effective_weights: default_weights,
+            default_weights,
+        });
+    }
+
+    let confidence = learning_confidence(sample_size, relevant_samples, irrelevant_samples);
+    let learned_weights = default_weights.with_multipliers(
+        feature_multiplier(similarity_signal),
+        feature_multiplier(recency_signal),
+        feature_multiplier(access_signal),
+        feature_multiplier(priority_signal),
+    );
+    let effective_weights = default_weights.blend(learned_weights, confidence);
+
+    Ok(LearnedWeightsReport {
+        sample_size,
+        relevant_samples,
+        irrelevant_samples,
+        using_defaults: false,
+        confidence,
+        status_detail: "live scoring weights are being updated from retrieval feedback".to_string(),
+        effective_weights,
+        default_weights,
+    })
+}
+
+fn load_feedback_learning_samples(
+    connection: &Connection,
+    scope_config: &ScopeConfig,
+) -> Result<Vec<RetrievalFeedbackSample>, StoreError> {
+    let mut statement = connection.prepare(
+        r#"
+        SELECT
+            rf.relevant,
+            rf.query_text,
+            rf.recorded_at,
+            m.content,
+            m.summary,
+            m.tags,
+            m.access_count,
+            m.importance_score,
+            m.reliability_score,
+            m.updated_at,
+            m.last_accessed_at
+        FROM retrieval_feedback rf
+        JOIN memories m ON m.id = rf.memory_id
+        ORDER BY rf.recorded_at ASC, rf.id ASC
+        "#,
+    )?;
+
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)? != 0,
+            row.get::<_, Option<String>>(1)?,
+            row.get::<_, String>(2)?,
+            row.get::<_, String>(3)?,
+            row.get::<_, Option<String>>(4)?,
+            row.get::<_, String>(5)?,
+            row.get::<_, u32>(6)?,
+            row.get::<_, f32>(7)?,
+            row.get::<_, f32>(8)?,
+            row.get::<_, String>(9)?,
+            row.get::<_, Option<String>>(10)?,
+        ))
+    })?;
+
+    let mut samples = Vec::new();
+    for row in rows {
+        let (
+            relevant,
+            query_text,
+            raw_recorded_at,
+            content,
+            summary,
+            raw_tags,
+            access_count,
+            importance_score,
+            reliability_score,
+            raw_updated_at,
+            raw_last_accessed_at,
+        ) = row?;
+
+        let recorded_at = parse_datetime_for_sqlite(&raw_recorded_at)?;
+        let updated_at = parse_datetime_for_sqlite(&raw_updated_at)?;
+        let last_accessed_at = raw_last_accessed_at
+            .as_deref()
+            .map(parse_datetime_for_sqlite)
+            .transpose()?;
+        let tags = parse_json::<Vec<String>>(&raw_tags)?;
+
+        let similarity_signal = compute_feedback_similarity_signal(
+            query_text.as_deref(),
+            &content,
+            summary.as_deref(),
+            &tags,
+        );
+        let recency_signal = compute_feedback_recency_signal(
+            updated_at,
+            last_accessed_at,
+            recorded_at,
+            scope_config,
+        );
+        let access_signal = (f64::from(access_count) + 1.0).ln();
+        let priority_signal =
+            similarity_signal * f64::from(importance_score.max(0.0) * reliability_score.max(0.0));
+
+        samples.push(RetrievalFeedbackSample {
+            relevant,
+            similarity_signal,
+            recency_signal,
+            access_signal,
+            priority_signal,
+        });
+    }
+
+    Ok(samples)
+}
+
+fn compute_feedback_similarity_signal(
+    query_text: Option<&str>,
+    content: &str,
+    summary: Option<&str>,
+    tags: &[String],
+) -> f64 {
+    let query_text = query_text.unwrap_or("").trim();
+    if query_text.is_empty() {
+        return 0.0;
+    }
+
+    let query_lower = query_text.to_lowercase();
+    let memory_text = if let Some(summary) = summary {
+        format!("{content} {summary} {}", tags.join(" "))
+    } else {
+        format!("{content} {}", tags.join(" "))
+    };
+    let memory_lower = memory_text.to_lowercase();
+    if memory_lower.contains(&query_lower) {
+        return 1.0;
+    }
+
+    let query_tokens = tokenize_learning_text(query_text);
+    let memory_tokens = tokenize_learning_text(&memory_text);
+    if query_tokens.is_empty() || memory_tokens.is_empty() {
+        return 0.0;
+    }
+
+    let overlap = query_tokens.intersection(&memory_tokens).count() as f64;
+    let coverage = overlap / query_tokens.len() as f64;
+    let union = query_tokens.union(&memory_tokens).count() as f64;
+    let jaccard = if union <= f64::EPSILON {
+        0.0
+    } else {
+        overlap / union
+    };
+
+    (0.7 * coverage + 0.3 * jaccard).clamp(0.0, 1.0)
+}
+
+fn tokenize_learning_text(text: &str) -> HashSet<String> {
+    text.to_lowercase()
+        .split(|character: char| !character.is_alphanumeric() && character != '_')
+        .filter(|token| token.len() >= 2)
+        .map(ToOwned::to_owned)
+        .collect()
+}
+
+fn compute_feedback_recency_signal(
+    updated_at: DateTime<Utc>,
+    last_accessed_at: Option<DateTime<Utc>>,
+    recorded_at: DateTime<Utc>,
+    scope_config: &ScopeConfig,
+) -> f64 {
+    let reference_time = last_accessed_at.unwrap_or(updated_at);
+    let elapsed_seconds = (recorded_at - reference_time).num_seconds().max(0) as f64;
+    let elapsed_days = elapsed_seconds / 86_400.0;
+    (-f64::from(scope_config.decay_lambda_base.max(0.0)) * elapsed_days).exp()
+}
+
+fn feature_separation(
+    samples: &[RetrievalFeedbackSample],
+    selector: impl Fn(&RetrievalFeedbackSample) -> f64,
+) -> f64 {
+    let mut relevant_values = Vec::new();
+    let mut irrelevant_values = Vec::new();
+    let mut all_values = Vec::with_capacity(samples.len());
+
+    for sample in samples {
+        let value = selector(sample);
+        all_values.push(value);
+        if sample.relevant {
+            relevant_values.push(value);
+        } else {
+            irrelevant_values.push(value);
+        }
+    }
+
+    let relevant_mean = mean(&relevant_values);
+    let irrelevant_mean = mean(&irrelevant_values);
+    let spread = standard_deviation(&all_values).max(0.05);
+    ((relevant_mean - irrelevant_mean) / spread).clamp(-2.0, 2.0)
+}
+
+fn mean(values: &[f64]) -> f64 {
+    if values.is_empty() {
+        0.0
+    } else {
+        values.iter().sum::<f64>() / values.len() as f64
+    }
+}
+
+fn standard_deviation(values: &[f64]) -> f64 {
+    if values.len() <= 1 {
+        return 0.0;
+    }
+
+    let average = mean(values);
+    let variance = values
+        .iter()
+        .map(|value| {
+            let delta = value - average;
+            delta * delta
+        })
+        .sum::<f64>()
+        / values.len() as f64;
+    variance.sqrt()
+}
+
+fn learning_confidence(
+    sample_size: usize,
+    relevant_samples: usize,
+    irrelevant_samples: usize,
+) -> f64 {
+    let balance = if relevant_samples == 0 || irrelevant_samples == 0 {
+        0.0
+    } else {
+        (relevant_samples.min(irrelevant_samples) as f64
+            / relevant_samples.max(irrelevant_samples) as f64)
+            .sqrt()
+    };
+    let sample_progress = if sample_size <= LEARNING_MIN_TOTAL_FEEDBACK {
+        0.0
+    } else {
+        ((sample_size - LEARNING_MIN_TOTAL_FEEDBACK) as f64
+            / (LEARNING_FULL_CONFIDENCE_FEEDBACK - LEARNING_MIN_TOTAL_FEEDBACK) as f64)
+            .clamp(0.0, 1.0)
+    };
+
+    ((0.35 + (0.65 * sample_progress)) * balance).clamp(0.0, 1.0)
+}
+
+fn feature_multiplier(signal: f64) -> f64 {
+    (1.0 + (0.45 * signal)).clamp(0.30, 2.50)
+}
+
+fn persist_learned_weights(
+    connection: &Connection,
+    weights: LearnedWeightValues,
+) -> Result<(), StoreError> {
+    for (key, value) in weights.to_btree_map() {
+        connection.execute(
+            "INSERT INTO scope_config(key, value) VALUES (?1, ?2) \
+             ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            params![key, format!("{value:.6}")],
+        )?;
+    }
+    Ok(())
 }
 
 fn trim_results_to_context_budget(
@@ -4097,6 +5183,484 @@ fn compute_budget_usage_ratio(
     Ok((active_count as f32) / budget)
 }
 
+fn load_poisoning_config(connection: &Connection) -> Result<PoisoningConfig, StoreError> {
+    Ok(PoisoningConfig {
+        frequency_hourly_threshold: load_u32_config(
+            connection,
+            "poison_frequency_hourly_threshold",
+            50,
+        )?,
+        frequency_scope_ratio: load_f32_config(connection, "poison_frequency_scope_ratio", 0.30)?,
+        frequency_burst_ratio: load_f32_config(connection, "poison_frequency_burst_ratio", 0.25)?,
+        frequency_burst_min_hourly: load_u32_config(
+            connection,
+            "poison_frequency_burst_min_hourly",
+            12,
+        )?,
+        trust_mismatch_importance_threshold: load_f32_config(
+            connection,
+            "poison_trust_mismatch_importance_threshold",
+            0.80,
+        )?,
+        trust_mismatch_count_threshold: load_u32_config(
+            connection,
+            "poison_trust_mismatch_count_threshold",
+            5,
+        )?,
+        trust_mismatch_scope_ratio: load_f32_config(
+            connection,
+            "poison_trust_mismatch_scope_ratio",
+            0.10,
+        )?,
+        bulk_overwrite_count_threshold: load_u32_config(
+            connection,
+            "poison_bulk_overwrite_count_threshold",
+            20,
+        )?,
+        bulk_overwrite_scope_ratio: load_f32_config(
+            connection,
+            "poison_bulk_overwrite_scope_ratio",
+            0.15,
+        )?,
+        mass_contradiction_per_memory_threshold: load_u32_config(
+            connection,
+            "poison_mass_contradiction_per_memory_threshold",
+            3,
+        )?,
+        mass_contradiction_scope_ratio: load_f32_config(
+            connection,
+            "poison_mass_contradiction_scope_ratio",
+            0.05,
+        )?,
+        remediation_reliability_ceiling: load_f32_config(
+            connection,
+            "poison_remediation_reliability_ceiling",
+            0.60,
+        )?,
+    })
+}
+
+fn scaled_threshold(population: i64, absolute: u32, ratio: f32, minimum: u32) -> usize {
+    let population = usize::try_from(population.max(0)).unwrap_or(usize::MAX);
+    let ratio_count = ((population as f64) * f64::from(ratio.clamp(0.0, 1.0))).ceil() as usize;
+    usize::try_from(absolute)
+        .unwrap_or(usize::MAX)
+        .max(ratio_count)
+        .max(usize::try_from(minimum).unwrap_or(1))
+}
+
+fn compute_threshold_pressure(actual: usize, threshold: usize) -> f32 {
+    if threshold == 0 {
+        return 1.0;
+    }
+
+    (actual as f32) / (threshold as f32)
+}
+
+fn compute_poisoning_severity(
+    pressure: f32,
+    impacted_count: usize,
+    population: i64,
+    baseline: f32,
+) -> f32 {
+    let normalized_pressure = ((pressure - 1.0).max(0.0) / 2.0).clamp(0.0, 1.0);
+    let impact_ratio = if population <= 0 {
+        0.0
+    } else {
+        (impacted_count as f32 / population as f32).clamp(0.0, 1.0)
+    };
+
+    (baseline + (normalized_pressure * 0.35) + (impact_ratio * 0.30)).clamp(0.0, 1.0)
+}
+
+pub(crate) fn display_poisoning_alert_type(alert_type: &PoisoningAlertType) -> &'static str {
+    match alert_type {
+        PoisoningAlertType::FrequencyAnomaly => "frequency_anomaly",
+        PoisoningAlertType::TrustMismatch => "trust_mismatch",
+        PoisoningAlertType::BulkOverwrite => "bulk_overwrite",
+        PoisoningAlertType::MassContradiction => "mass_contradiction",
+    }
+}
+
+fn is_low_trust_memory(memory: &Memory, reliability_ceiling: f32) -> bool {
+    memory.reliability_score <= reliability_ceiling
+        || memory.provenance.base_reliability() <= reliability_ceiling
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PoisoningMemorySnapshot {
+    id: MemoryId,
+    scope: MemoryScope,
+    state: MemoryState,
+    reliability_score: f32,
+    provenance: ProvenanceLevel,
+}
+
+fn sort_memory_ids(ids: &mut [MemoryId]) {
+    ids.sort();
+}
+
+fn is_benign_poisoning_update(changed_by: &str) -> bool {
+    changed_by.trim_start().starts_with("system:")
+}
+
+fn load_poisoning_memory_snapshot(
+    row: &Row<'_>,
+    offset: usize,
+) -> rusqlite::Result<PoisoningMemorySnapshot> {
+    let raw_id: String = row.get(offset)?;
+    let raw_scope: String = row.get(offset + 1)?;
+    let raw_state: String = row.get(offset + 2)?;
+    let raw_provenance: String = row.get(offset + 4)?;
+    Ok(PoisoningMemorySnapshot {
+        id: parse_uuid_for_sqlite(&raw_id)?,
+        scope: parse_scope_for_sqlite(&raw_scope)?,
+        state: parse_state_for_sqlite(&raw_state)?,
+        reliability_score: row.get(offset + 3)?,
+        provenance: parse_provenance_for_sqlite(&raw_provenance)?,
+    })
+}
+
+fn is_low_trust_snapshot(snapshot: &PoisoningMemorySnapshot, reliability_ceiling: f32) -> bool {
+    snapshot.reliability_score <= reliability_ceiling
+        || snapshot.provenance.base_reliability() <= reliability_ceiling
+}
+
+fn compare_poisoning_trust(
+    left: &PoisoningMemorySnapshot,
+    right: &PoisoningMemorySnapshot,
+) -> std::cmp::Ordering {
+    left.reliability_score
+        .partial_cmp(&right.reliability_score)
+        .unwrap_or(std::cmp::Ordering::Equal)
+        .then_with(|| {
+            left.provenance
+                .base_reliability()
+                .partial_cmp(&right.provenance.base_reliability())
+                .unwrap_or(std::cmp::Ordering::Equal)
+        })
+}
+
+fn select_mass_contradiction_candidates(
+    scope: MemoryScope,
+    left: &PoisoningMemorySnapshot,
+    right: &PoisoningMemorySnapshot,
+    reliability_ceiling: f32,
+) -> Vec<MemoryId> {
+    let left_in_scope = left.scope == scope && left.state == MemoryState::Active;
+    let right_in_scope = right.scope == scope && right.state == MemoryState::Active;
+    let left_low_trust = is_low_trust_snapshot(left, reliability_ceiling);
+    let right_low_trust = is_low_trust_snapshot(right, reliability_ceiling);
+
+    match compare_poisoning_trust(left, right) {
+        std::cmp::Ordering::Less if left_in_scope && left_low_trust => vec![left.id],
+        std::cmp::Ordering::Greater if right_in_scope && right_low_trust => vec![right.id],
+        std::cmp::Ordering::Equal => {
+            let mut ids = Vec::new();
+            if left_in_scope && left_low_trust {
+                ids.push(left.id);
+            }
+            if right_in_scope && right_low_trust {
+                ids.push(right.id);
+            }
+            ids
+        }
+        _ => Vec::new(),
+    }
+}
+
+fn build_shared_import_candidate(source: &Memory) -> MemoryCandidate {
+    MemoryCandidate {
+        content: source.content.clone(),
+        summary: source.summary.clone(),
+        memory_type: source.memory_type,
+        provenance: ProvenanceLevel::Imported,
+        importance_score: source.importance_score,
+        sensitivity: source.sensitivity,
+        tags: source.tags.clone(),
+        custom_metadata: source.custom_metadata.clone(),
+        embedding: None,
+    }
+}
+
+fn prepare_shared_import_memory(
+    source: &Memory,
+    scope: MemoryScope,
+    status: &str,
+    disposition: &str,
+    reason: &str,
+    related_memory_id: Option<&MemoryId>,
+) -> Memory {
+    let now = Utc::now();
+    let mut imported = source.clone();
+    imported.id = Uuid::new_v4();
+    imported.scope = scope;
+    imported.provenance = ProvenanceLevel::Imported;
+    imported.reliability_score = imported.reliability_score.min(0.6);
+    imported.embedding_stale = true;
+    imported.state = MemoryState::Dormant;
+    imported.status = Some(status.to_string());
+    imported.tenant_id = None;
+    imported.user_id = None;
+    imported.agent_id = None;
+    imported.created_at = now;
+    imported.updated_at = now;
+    imported.last_accessed_at = None;
+    imported.access_count = 0;
+    imported.custom_metadata.insert(
+        SHARED_IMPORT_SOURCE_METADATA_KEY.to_string(),
+        "cross_agent".to_string(),
+    );
+    imported.custom_metadata.insert(
+        SHARED_IMPORT_DISPOSITION_METADATA_KEY.to_string(),
+        disposition.to_string(),
+    );
+    imported.custom_metadata.insert(
+        SHARED_IMPORT_REASON_METADATA_KEY.to_string(),
+        reason.to_string(),
+    );
+    imported.custom_metadata.insert(
+        SHARED_IMPORT_ORIGINAL_ID_METADATA_KEY.to_string(),
+        source.id.to_string(),
+    );
+    if let Some(related_memory_id) = related_memory_id {
+        imported.custom_metadata.insert(
+            SHARED_IMPORT_REFERENCED_MEMORY_METADATA_KEY.to_string(),
+            related_memory_id.to_string(),
+        );
+    }
+    imported
+}
+
+fn exact_shared_import_duplicate_decision(
+    store: &SqliteMemoryStore,
+    source: &Memory,
+) -> Result<Option<GateDecision>, StoreError> {
+    let normalized_source = normalize_shared_import_content(&source.content);
+    if normalized_source.is_empty() {
+        return Ok(None);
+    }
+
+    let exact_match = store.with_connection(|connection| {
+        let visible = load_search_memories(
+            connection,
+            store.scope.visible_scopes(),
+            MemoryState::Active,
+            None,
+        )?;
+        Ok(visible
+            .into_iter()
+            .filter(|memory| normalize_shared_import_content(&memory.content) == normalized_source)
+            .max_by_key(|memory| memory.scope.rank()))
+    })?;
+
+    Ok(exact_match.map(|memory| {
+        if memory.scope.rank() > store.scope.rank() {
+            GateDecision::Reject {
+                reason: "near-duplicate already exists in a higher visible scope".to_string(),
+            }
+        } else {
+            GateDecision::Accept {
+                similar_to: Some(memory.id),
+                similarity: Some(1.0),
+            }
+        }
+    }))
+}
+
+fn normalize_shared_import_content(text: &str) -> String {
+    text.split_whitespace()
+        .collect::<Vec<_>>()
+        .join(" ")
+        .to_lowercase()
+}
+
+fn exact_correction_duplicate_decision(
+    store: &SqliteMemoryStore,
+    excluded_id: &MemoryId,
+    corrected_content: &str,
+) -> Result<Option<GateDecision>, StoreError> {
+    let normalized = normalize_shared_import_content(corrected_content);
+    if normalized.is_empty() {
+        return Ok(None);
+    }
+
+    let exact_match = store.with_connection(|connection| {
+        let visible = load_search_memories(
+            connection,
+            store.scope.visible_scopes(),
+            MemoryState::Active,
+            None,
+        )?;
+        Ok(visible
+            .into_iter()
+            .filter(|memory| memory.id != *excluded_id)
+            .filter(|memory| normalize_shared_import_content(&memory.content) == normalized)
+            .max_by_key(|memory| memory.scope.rank()))
+    })?;
+
+    Ok(exact_match.map(|memory| GateDecision::Merge {
+        target_id: memory.id,
+        enriched_content: memory.content,
+        promote_to: None,
+    }))
+}
+
+fn insert_memory_version_row(
+    connection: &Connection,
+    memory_id: &MemoryId,
+    previous_content: &str,
+    changed_at: DateTime<Utc>,
+    changed_by: &str,
+    change_reason: &str,
+) -> Result<(), StoreError> {
+    let next_version_number = load_next_version_number(connection, memory_id)?;
+    connection.execute(
+        r#"
+        INSERT INTO memory_versions(
+            id,
+            memory_id,
+            version_number,
+            content,
+            changed_at,
+            changed_by,
+            change_reason
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+        "#,
+        params![
+            Uuid::new_v4().to_string(),
+            memory_id.to_string(),
+            i64::from(next_version_number),
+            previous_content,
+            format_timestamp(changed_at),
+            changed_by,
+            change_reason,
+        ],
+    )?;
+    Ok(())
+}
+
+fn correction_disposition_to_db(disposition: CorrectionDisposition) -> &'static str {
+    match disposition {
+        CorrectionDisposition::Applied => "applied",
+        CorrectionDisposition::Archived => "archived",
+        CorrectionDisposition::Merged => "merged",
+        CorrectionDisposition::Contradiction => "contradiction",
+    }
+}
+
+fn shared_import_disposition(decision: &GateDecision) -> SharedImportDisposition {
+    match decision {
+        GateDecision::Accept {
+            similar_to: Some(memory_id),
+            ..
+        } => SharedImportDisposition::Quarantine {
+            reason: "near-duplicate shared memory requires review".to_string(),
+            related_memory_id: Some(*memory_id),
+        },
+        GateDecision::Accept { .. } | GateDecision::Archive => SharedImportDisposition::Review {
+            reason: "shared memory imported as dormant review-only entry".to_string(),
+            related_memory_id: None,
+        },
+        GateDecision::Merge { target_id, .. } => SharedImportDisposition::Quarantine {
+            reason: "shared memory would have merged with an existing memory; quarantined instead"
+                .to_string(),
+            related_memory_id: Some(*target_id),
+        },
+        GateDecision::Contradiction { conflicting_id, .. } => SharedImportDisposition::Quarantine {
+            reason: "shared memory contradicts an existing memory and was quarantined".to_string(),
+            related_memory_id: Some(*conflicting_id),
+        },
+        GateDecision::Reject { reason } => SharedImportDisposition::Skip {
+            reason: format!("skipped shared memory: {reason}"),
+        },
+    }
+}
+
+fn evaluate_gate_sync(
+    gate: DefaultSalienceGate,
+    store: SqliteMemoryStore,
+    candidate: MemoryCandidate,
+) -> Result<GateDecision, StoreError> {
+    run_store_future(async move {
+        gate.evaluate(&candidate, &store)
+            .await
+            .map_err(|error| match error {
+                GateError::Store(store_error) => store_error,
+                other => {
+                    StoreError::Validation(format!("shared import gate evaluation failed: {other}"))
+                }
+            })
+    })
+}
+
+fn run_store_future<T, F>(future: F) -> Result<T, StoreError>
+where
+    T: Send + 'static,
+    F: std::future::Future<Output = Result<T, StoreError>> + Send + 'static,
+{
+    thread::spawn(move || {
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .map_err(|error| {
+                StoreError::Validation(format!("failed to build async runtime: {error}"))
+            })?;
+        runtime.block_on(future)
+    })
+    .join()
+    .map_err(|_| StoreError::Validation("shared import worker thread panicked".to_string()))?
+}
+
+fn insert_memory_without_embedding(
+    store: &SqliteMemoryStore,
+    memory: &Memory,
+) -> Result<(), StoreError> {
+    validate_memory_for_store(memory, store.scope)?;
+    store.with_connection(|connection| {
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            r#"
+            INSERT INTO memories(
+                id,
+                content,
+                summary,
+                scope,
+                memory_type,
+                provenance,
+                importance_score,
+                reliability_score,
+                sensitivity,
+                state,
+                tags,
+                status,
+                custom_metadata,
+                access_count,
+                corroboration_count,
+                embedding_stale,
+                created_at,
+                updated_at,
+                last_accessed_at,
+                tenant_id,
+                user_id,
+                agent_id
+            )
+            VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10,
+                ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22
+            )
+            "#,
+            rusqlite::params_from_iter(memory_insert_params(memory)?),
+        )?;
+
+        let row_id = require_memory_rowid(&transaction, &memory.id)?;
+        sync_fts_entry(&transaction, row_id, None, memory)?;
+        transaction.commit()?;
+        Ok(())
+    })
+}
+
 fn lower_reliability(
     connection: &Connection,
     memory: &Memory,
@@ -4111,6 +5675,48 @@ fn lower_reliability(
             format_timestamp(now),
         ],
     )?;
+    Ok(())
+}
+
+fn record_contradiction_row(
+    connection: &Connection,
+    a_id: &MemoryId,
+    b_id: &MemoryId,
+    description: &str,
+) -> Result<(), StoreError> {
+    let memory_a = require_memory(connection, a_id)?.ok_or(StoreError::NotFound(*a_id))?;
+    let memory_b = require_memory(connection, b_id)?.ok_or(StoreError::NotFound(*b_id))?;
+    let now = Utc::now();
+
+    connection.execute(
+        r#"
+        INSERT INTO contradictions(
+            id,
+            memory_a_id,
+            memory_b_id,
+            detected_at,
+            description,
+            resolution_status,
+            resolved_at,
+            resolution_note
+        )
+        VALUES (?1, ?2, ?3, ?4, ?5, 'unresolved', NULL, NULL)
+        "#,
+        params![
+            Uuid::new_v4().to_string(),
+            a_id.to_string(),
+            b_id.to_string(),
+            format_timestamp(now),
+            description.trim(),
+        ],
+    )?;
+
+    if memory_a.provenance.base_reliability() > memory_b.provenance.base_reliability() {
+        lower_reliability(connection, &memory_b, now)?;
+    } else if memory_b.provenance.base_reliability() > memory_a.provenance.base_reliability() {
+        lower_reliability(connection, &memory_a, now)?;
+    }
+
     Ok(())
 }
 
@@ -4136,7 +5742,10 @@ fn record_link_row(
     Ok(())
 }
 
-fn load_links(connection: &Connection, memory_id: &MemoryId) -> Result<Vec<MemoryLink>, StoreError> {
+fn load_links(
+    connection: &Connection,
+    memory_id: &MemoryId,
+) -> Result<Vec<MemoryLink>, StoreError> {
     let id_str = memory_id.to_string();
     let mut statement = connection.prepare(
         r#"
@@ -4183,8 +5792,7 @@ fn load_export_payload(
     connection: &Connection,
     scope: MemoryScope,
 ) -> Result<ExportPayload, StoreError> {
-    let mut memories =
-        load_search_memories(connection, &[scope], MemoryState::Active, None)?;
+    let mut memories = load_search_memories(connection, &[scope], MemoryState::Active, None)?;
     memories.extend(load_search_memories(
         connection,
         &[scope],
@@ -4320,9 +5928,7 @@ fn export_to_sqlite_file(
     }
 
     // Rebuild FTS index so full-text search works in the exported DB
-    transaction.execute_batch(
-        "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
-    )?;
+    transaction.execute_batch("INSERT INTO memories_fts(memories_fts) VALUES('rebuild')")?;
 
     transaction.commit()?;
     drop(connection);
@@ -4347,11 +5953,16 @@ mod tests {
     use tokio;
     use uuid::Uuid;
 
-    use super::{expand_compound_words, split_compound_word, SqliteMemoryStore};
+    use super::{
+        expand_compound_words, format_timestamp, split_compound_word, SqliteMemoryStore,
+        POISONING_QUARANTINED_AT_METADATA_KEY, POISONING_REMEDIATION_METADATA_KEY,
+        QUARANTINED_STATUS, SHARED_REVIEW_STATUS,
+    };
     use crate::{
-        ElegyArchive, EmbeddingError, EmbeddingProvider, ExportFormat, Memory, MemoryFilter,
-        MemoryScope, MemoryState, MemoryStore, MemoryType, MetadataUpdate, OptionalFieldUpdate,
-        ProvenanceLevel, ResolutionStatus, SearchQuery, SensitivityLevel, ShareConfig,
+        CorrectionDisposition, ElegyArchive, EmbeddingError, EmbeddingProvider, ExportFormat,
+        Memory, MemoryFilter, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
+        MetadataUpdate, OptionalFieldUpdate, PoisoningAlert, PoisoningAlertType, ProvenanceLevel,
+        ResolutionStatus, SearchQuery, SensitivityLevel, ShareConfig,
     };
 
     #[derive(Debug, Clone)]
@@ -5805,6 +7416,317 @@ mod tests {
         }
     }
 
+    fn set_scope_config(store: &SqliteMemoryStore, key: &str, value: &str) {
+        store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = ?2 WHERE key = ?1",
+                    params![key, value],
+                )?;
+                Ok(())
+            })
+            .expect("update scope config");
+    }
+
+    fn insert_version_snapshot(store: &SqliteMemoryStore, memory_id: &MemoryId) {
+        store
+            .with_connection(|connection| {
+                connection.execute(
+                    "INSERT INTO memory_versions(id, memory_id, version_number, content, changed_by, change_reason, changed_at) \
+                     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+                    params![
+                        Uuid::new_v4().to_string(),
+                        memory_id.to_string(),
+                        1_i64,
+                        "before update",
+                        "test",
+                        "test snapshot",
+                        format_timestamp(Utc::now()),
+                    ],
+                )?;
+                Ok(())
+            })
+            .expect("insert version snapshot");
+    }
+
+    #[test]
+    fn poisoning_severity_increases_with_pressure_and_scope_impact() {
+        let mild = super::compute_poisoning_severity(1.1, 1, 20, 0.35);
+        let severe = super::compute_poisoning_severity(3.0, 10, 20, 0.35);
+
+        assert!(severe > mild);
+        assert!((0.0..=1.0).contains(&mild));
+        assert!((0.0..=1.0).contains(&severe));
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_flags_frequency_anomaly_from_scope_config() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "poison_frequency_hourly_threshold", "2");
+        set_scope_config(&fixture.store, "poison_frequency_scope_ratio", "0.0");
+        set_scope_config(&fixture.store, "poison_frequency_burst_ratio", "1.0");
+        set_scope_config(&fixture.store, "poison_frequency_burst_min_hourly", "99");
+
+        let mut ids = Vec::new();
+        for idx in 0..3 {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+            memory.content = format!("frequency anomaly memory {idx}");
+            ids.push(memory.id);
+            fixture.store.store(memory).await.expect("store memory");
+        }
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let alert = alerts
+            .into_iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::FrequencyAnomaly)
+            .expect("frequency anomaly alert");
+
+        assert_eq!(alert.memory_ids.len(), ids.len());
+        for id in ids {
+            assert!(alert.memory_ids.contains(&id));
+        }
+        assert!(alert.description.contains("alert threshold 2"));
+        assert!(alert.severity > 0.45);
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_flags_trust_mismatch_for_low_trust_active_memories() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "poison_trust_mismatch_count_threshold", "2");
+        set_scope_config(&fixture.store, "poison_trust_mismatch_scope_ratio", "0.0");
+        set_scope_config(
+            &fixture.store,
+            "poison_trust_mismatch_importance_threshold",
+            "0.75",
+        );
+
+        let mut imported_a = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        imported_a.content = "imported trust mismatch a".to_string();
+        imported_a.importance_score = 0.95;
+        let imported_a_id = imported_a.id;
+        fixture
+            .store
+            .store(imported_a)
+            .await
+            .expect("store imported a");
+
+        let mut imported_b = sample_memory(MemoryScope::Workspace, ProvenanceLevel::AgentInferred);
+        imported_b.content = "imported trust mismatch b".to_string();
+        imported_b.importance_score = 0.85;
+        let imported_b_id = imported_b.id;
+        fixture
+            .store
+            .store(imported_b)
+            .await
+            .expect("store imported b");
+
+        let mut trusted = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        trusted.content = "trusted high importance".to_string();
+        trusted.importance_score = 0.99;
+        fixture.store.store(trusted).await.expect("store trusted");
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let alert = alerts
+            .into_iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::TrustMismatch)
+            .expect("trust mismatch alert");
+
+        assert_eq!(alert.memory_ids.len(), 2);
+        assert!(alert.memory_ids.contains(&imported_a_id));
+        assert!(alert.memory_ids.contains(&imported_b_id));
+        assert!(!alert.description.is_empty());
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_bulk_overwrite_stays_within_scope() {
+        let fixture = test_fixture();
+        let user_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::User).expect("open user store");
+        set_scope_config(&fixture.store, "poison_bulk_overwrite_count_threshold", "2");
+        set_scope_config(&fixture.store, "poison_bulk_overwrite_scope_ratio", "0.0");
+
+        let workspace_a = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let workspace_a_id = workspace_a.id;
+        fixture
+            .store
+            .store(workspace_a)
+            .await
+            .expect("store workspace a");
+        insert_version_snapshot(&fixture.store, &workspace_a_id);
+
+        let workspace_b = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let workspace_b_id = workspace_b.id;
+        fixture
+            .store
+            .store(workspace_b)
+            .await
+            .expect("store workspace b");
+        insert_version_snapshot(&fixture.store, &workspace_b_id);
+
+        let user = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        let user_id = user.id;
+        user_store.store(user).await.expect("store user");
+        insert_version_snapshot(&user_store, &user_id);
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let alert = alerts
+            .into_iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::BulkOverwrite)
+            .expect("bulk overwrite alert");
+
+        assert_eq!(alert.memory_ids.len(), 2);
+        assert!(alert.memory_ids.contains(&workspace_a_id));
+        assert!(alert.memory_ids.contains(&workspace_b_id));
+        assert!(!alert.memory_ids.contains(&user_id));
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_mass_contradiction_stays_within_scope() {
+        let fixture = test_fixture();
+        let user_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::User).expect("open user store");
+        set_scope_config(
+            &fixture.store,
+            "poison_mass_contradiction_per_memory_threshold",
+            "2",
+        );
+        set_scope_config(
+            &fixture.store,
+            "poison_mass_contradiction_scope_ratio",
+            "0.0",
+        );
+
+        let focus = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        let focus_id = focus.id;
+        fixture.store.store(focus).await.expect("store focus");
+
+        let peer_a = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let peer_a_id = peer_a.id;
+        fixture.store.store(peer_a).await.expect("store peer a");
+
+        let peer_b = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let peer_b_id = peer_b.id;
+        fixture.store.store(peer_b).await.expect("store peer b");
+
+        fixture
+            .store
+            .record_contradiction(&focus_id, &peer_a_id, "workspace contradiction a")
+            .await
+            .expect("record contradiction a");
+        fixture
+            .store
+            .record_contradiction(&focus_id, &peer_b_id, "workspace contradiction b")
+            .await
+            .expect("record contradiction b");
+
+        let user_focus = sample_memory(MemoryScope::User, ProvenanceLevel::Imported);
+        let user_focus_id = user_focus.id;
+        user_store
+            .store(user_focus)
+            .await
+            .expect("store user focus");
+        let user_peer_a = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        let user_peer_a_id = user_peer_a.id;
+        user_store
+            .store(user_peer_a)
+            .await
+            .expect("store user peer a");
+        let user_peer_b = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        let user_peer_b_id = user_peer_b.id;
+        user_store
+            .store(user_peer_b)
+            .await
+            .expect("store user peer b");
+        user_store
+            .record_contradiction(&user_focus_id, &user_peer_a_id, "user contradiction a")
+            .await
+            .expect("record user contradiction a");
+        user_store
+            .record_contradiction(&user_focus_id, &user_peer_b_id, "user contradiction b")
+            .await
+            .expect("record user contradiction b");
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let alert = alerts
+            .into_iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::MassContradiction)
+            .expect("mass contradiction alert");
+
+        assert_eq!(alert.memory_ids, vec![focus_id]);
+        assert!(!alert.memory_ids.contains(&user_focus_id));
+    }
+
+    #[tokio::test]
+    async fn remediate_poisoning_quarantines_only_low_trust_active_memories() {
+        let fixture = test_fixture();
+        set_scope_config(
+            &fixture.store,
+            "poison_remediation_reliability_ceiling",
+            "0.60",
+        );
+
+        let low_trust = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        let low_trust_id = low_trust.id;
+        fixture
+            .store
+            .store(low_trust)
+            .await
+            .expect("store low trust");
+
+        let trusted = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let trusted_id = trusted.id;
+        fixture.store.store(trusted).await.expect("store trusted");
+
+        let mut dormant = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        dormant.state = MemoryState::Dormant;
+        let dormant_id = dormant.id;
+        fixture.store.store(dormant).await.expect("store dormant");
+
+        let alert = PoisoningAlert {
+            id: Uuid::new_v4().to_string(),
+            alert_type: PoisoningAlertType::TrustMismatch,
+            description: "test remediation".to_string(),
+            severity: 0.8,
+            memory_ids: vec![low_trust_id, trusted_id, dormant_id],
+            detected_at: Utc::now(),
+        };
+
+        let report = fixture
+            .store
+            .remediate_poisoning(&[alert])
+            .expect("remediate poisoning");
+
+        assert_eq!(report.quarantined_ids, vec![low_trust_id]);
+        assert_eq!(report.skipped_ids.len(), 2);
+
+        let remediated = fixture
+            .store
+            .get_raw(&low_trust_id)
+            .await
+            .expect("load remediated")
+            .expect("remediated memory exists");
+        assert_eq!(remediated.state, MemoryState::Dormant);
+        assert_eq!(remediated.status.as_deref(), Some(QUARANTINED_STATUS));
+        assert_eq!(
+            remediated
+                .custom_metadata
+                .get(POISONING_REMEDIATION_METADATA_KEY)
+                .map(String::as_str),
+            Some("dormant quarantine")
+        );
+        assert!(remediated
+            .custom_metadata
+            .contains_key(POISONING_QUARANTINED_AT_METADATA_KEY));
+
+        let trusted = fixture
+            .store
+            .get_raw(&trusted_id)
+            .await
+            .expect("load trusted")
+            .expect("trusted memory exists");
+        assert_eq!(trusted.state, MemoryState::Active);
+    }
+
     fn query_embedding() -> Vec<f32> {
         embedding_with_similarity(1.0)
     }
@@ -5857,6 +7779,192 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn correct_memory_archives_low_salience_memory() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.content = "old content".to_string();
+        memory.importance_score = 0.1;
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+
+        let correction = fixture
+            .store
+            .correct_memory(
+                &id,
+                "still low salience",
+                "test-user",
+                Some("archive expected"),
+            )
+            .expect("correction should succeed");
+
+        assert_eq!(correction.disposition, CorrectionDisposition::Archived);
+        assert_eq!(correction.related_memory_id, None);
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert_eq!(updated.state, MemoryState::Dormant);
+    }
+
+    #[tokio::test]
+    async fn correct_memory_merges_into_existing_memory_and_archives_source() {
+        let fixture = test_fixture();
+
+        let mut target = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        target.content = "Canonical backend is Rust with Axum".to_string();
+        target.embedding_stale = false;
+        let target_id = target.id;
+        fixture.store.store(target).await.expect("store target");
+
+        let mut source = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        source.content = "Legacy backend is Ruby on Rails".to_string();
+        let source_id = source.id;
+        fixture.store.store(source).await.expect("store source");
+
+        let correction = fixture
+            .store
+            .correct_memory(
+                &source_id,
+                "Canonical backend is Rust with Axum",
+                "test-user",
+                Some("merge into canonical memory"),
+            )
+            .expect("correction should succeed");
+
+        assert_eq!(correction.disposition, CorrectionDisposition::Merged);
+        assert_eq!(correction.related_memory_id, Some(target_id));
+
+        let source_after = fixture
+            .store
+            .get_raw(&source_id)
+            .await
+            .expect("get source")
+            .expect("source exists");
+        assert_eq!(source_after.state, MemoryState::Dormant);
+
+        let target_after = fixture
+            .store
+            .get_raw(&target_id)
+            .await
+            .expect("get target")
+            .expect("target exists");
+        assert_eq!(target_after.content, "Canonical backend is Rust with Axum");
+        assert!(target_after.reliability_score >= 1.0);
+    }
+
+    #[tokio::test]
+    async fn correct_memory_records_contradiction_disposition() {
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                "Backend is C# with gRPC",
+                StubEmbeddingResponse::Embedding(query_embedding()),
+            ),
+            (
+                "Legacy backend note",
+                StubEmbeddingResponse::Embedding(embedding_with_similarity(0.2)),
+            ),
+            (
+                "Backend is Python with Flask",
+                StubEmbeddingResponse::Embedding(query_embedding()),
+            ),
+        ]));
+        let fixture = test_fixture_with_provider(provider);
+
+        let mut existing = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        existing.content = "Backend is C# with gRPC".to_string();
+        let existing_id = existing.id;
+        fixture.store.store(existing).await.expect("store existing");
+
+        let mut source = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        source.content = "Legacy backend note".to_string();
+        let source_id = source.id;
+        fixture.store.store(source).await.expect("store source");
+
+        let correction = fixture
+            .store
+            .correct_memory(
+                &source_id,
+                "Backend is Python with Flask",
+                "test-user",
+                Some("contradiction expected"),
+            )
+            .expect("correction should succeed");
+
+        assert_eq!(correction.disposition, CorrectionDisposition::Contradiction);
+        assert_eq!(correction.related_memory_id, Some(existing_id));
+
+        let contradictions = fixture
+            .store
+            .list_contradictions(None)
+            .await
+            .expect("list contradictions");
+        assert_eq!(contradictions.len(), 1);
+        assert_eq!(contradictions[0].memory_a_id, existing_id);
+        assert_eq!(contradictions[0].memory_b_id, source_id);
+
+        let source_after = fixture
+            .store
+            .get_raw(&source_id)
+            .await
+            .expect("get source")
+            .expect("source exists");
+        assert_eq!(source_after.state, MemoryState::Active);
+        assert_eq!(source_after.content, "Backend is Python with Flask");
+    }
+
+    #[tokio::test]
+    async fn correct_memory_excludes_stale_vectors_from_similarity_search() {
+        let fixture = test_fixture();
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        memory.content = "vector-backed memory".to_string();
+        let id = memory.id;
+
+        fixture.store.store(memory).await.expect("store memory");
+        fixture
+            .store
+            .store_embedding(&id, &query_embedding())
+            .await
+            .expect("store embedding");
+
+        let before = fixture
+            .store
+            .find_similar(&query_embedding(), 0.8, 5)
+            .await
+            .expect("find similar before correction");
+        assert_eq!(before.len(), 1);
+        assert_eq!(before[0].memory.id, id);
+
+        fixture
+            .store
+            .correct_memory(
+                &id,
+                "corrected content",
+                "test-user",
+                Some("stale vector check"),
+            )
+            .expect("correction should succeed");
+
+        let updated = fixture
+            .store
+            .get_raw(&id)
+            .await
+            .expect("get")
+            .expect("exists");
+        assert!(updated.embedding_stale);
+
+        let after = fixture
+            .store
+            .find_similar(&query_embedding(), 0.8, 5)
+            .await
+            .expect("find similar after correction");
+        assert!(after.is_empty(), "stale embeddings should be excluded");
+    }
+
+    #[tokio::test]
     async fn correct_memory_creates_version_entry() {
         let fixture = test_fixture();
         let memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
@@ -5881,10 +7989,9 @@ mod tests {
         let fixture = test_fixture();
         let missing_id = Uuid::new_v4();
 
-        let result =
-            fixture
-                .store
-                .correct_memory(&missing_id, "new", "user", None);
+        let result = fixture
+            .store
+            .correct_memory(&missing_id, "new", "user", None);
         assert!(result.is_err(), "correcting missing memory should fail");
     }
 
@@ -6025,52 +8132,245 @@ mod tests {
 
         assert_eq!(weights.len(), 4);
         assert!(
-            (weights["similarity"] - f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT)).abs()
+            (weights["similarity_weight"] - f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT))
+                .abs()
                 < f64::EPSILON
         );
         assert!(
-            (weights["recency"] - f64::from(crate::types::DEFAULT_RECENCY_WEIGHT)).abs()
+            (weights["recency_weight"] - f64::from(crate::types::DEFAULT_RECENCY_WEIGHT)).abs()
                 < f64::EPSILON
         );
         assert!(
-            (weights["access_count"] - f64::from(crate::types::DEFAULT_ACCESS_WEIGHT)).abs()
+            (weights["access_weight"] - f64::from(crate::types::DEFAULT_ACCESS_WEIGHT)).abs()
                 < f64::EPSILON
         );
         assert!(
-            (weights["importance"] - f64::from(crate::types::DEFAULT_PRIORITY_WEIGHT)).abs()
+            (weights["priority_weight"] - f64::from(crate::types::DEFAULT_PRIORITY_WEIGHT)).abs()
                 < f64::EPSILON
         );
     }
 
     #[tokio::test]
-    async fn compute_learned_weights_adjusts_on_low_relevance() {
+    async fn record_feedback_persists_live_learned_weights_after_balanced_feedback() {
         let fixture = test_fixture();
 
-        // Store enough memories and feedback to exceed the threshold (20)
-        for i in 0..25 {
-            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
-            memory.content = format!("feedback test memory {i}");
-            let id = memory.id;
-            fixture.store.store(memory).await.expect("store");
+        for idx in 0..6 {
+            let mut relevant_memory =
+                sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            relevant_memory.content = format!("apollo rollout checklist canonical {idx}");
+            relevant_memory.importance_score = 0.35;
+            let relevant_id = relevant_memory.id;
 
-            // Make most feedback irrelevant (only 5 relevant out of 25 = 20% ratio)
-            let relevant = i < 5;
+            let mut irrelevant_memory =
+                sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            irrelevant_memory.content = format!("apollo archive reference {idx}");
+            irrelevant_memory.importance_score = 0.95;
+            let irrelevant_id = irrelevant_memory.id;
+
             fixture
                 .store
-                .record_feedback(&id, &format!("query {i}"), relevant)
-                .expect("record feedback");
+                .store(relevant_memory)
+                .await
+                .expect("store relevant memory");
+            fixture
+                .store
+                .store(irrelevant_memory)
+                .await
+                .expect("store irrelevant memory");
+
+            fixture
+                .store
+                .record_feedback(&relevant_id, "apollo rollout checklist", true)
+                .expect("record relevant feedback");
+            fixture
+                .store
+                .record_feedback(&irrelevant_id, "apollo rollout checklist", false)
+                .expect("record irrelevant feedback");
         }
 
-        let weights = fixture
+        let report = fixture
             .store
-            .compute_learned_weights()
-            .expect("compute weights");
+            .learned_weights_report()
+            .expect("load learned weights report");
+        let scope_config = fixture.store.scope_config().expect("scope config");
 
-        let default_similarity = f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT);
+        assert_eq!(report.sample_size, 12);
+        assert_eq!(report.relevant_samples, 6);
+        assert_eq!(report.irrelevant_samples, 6);
+        assert!(!report.using_defaults, "report should be in learned mode");
         assert!(
-            weights["similarity"] > default_similarity,
+            report.effective_weights.similarity_weight
+                > f64::from(crate::types::DEFAULT_SIMILARITY_WEIGHT),
             "similarity weight should be boosted, got {}",
-            weights["similarity"],
+            report.effective_weights.similarity_weight,
+        );
+        assert!(
+            (f64::from(scope_config.similarity_weight)
+                - report.effective_weights.similarity_weight)
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (f64::from(scope_config.recency_weight) - report.effective_weights.recency_weight)
+                .abs()
+                < 1e-6
+        );
+        assert!(
+            (f64::from(scope_config.access_weight) - report.effective_weights.access_weight).abs()
+                < 1e-6
+        );
+        assert!(
+            (f64::from(scope_config.priority_weight) - report.effective_weights.priority_weight)
+                .abs()
+                < 1e-6
+        );
+    }
+
+    #[tokio::test]
+    async fn feedback_learning_updates_live_search_ranking_via_scope_config() {
+        let fixture = test_fixture();
+
+        let mut similarity_favored =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        similarity_favored.content = "apollo rollout checklist canonical".to_string();
+        similarity_favored.importance_score = 0.35;
+        similarity_favored.reliability_score = 1.0;
+        let similarity_favored_id = similarity_favored.id;
+
+        let mut priority_favored =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        priority_favored.content = "apollo archive reference".to_string();
+        priority_favored.importance_score = 0.9;
+        priority_favored.reliability_score = 1.0;
+        let priority_favored_id = priority_favored.id;
+
+        fixture
+            .store
+            .store(similarity_favored)
+            .await
+            .expect("store high-similarity memory");
+        fixture
+            .store
+            .store(priority_favored)
+            .await
+            .expect("store high-priority memory");
+
+        fixture
+            .store
+            .store_embedding(&similarity_favored_id, &embedding_with_similarity(0.95))
+            .await
+            .expect("store high-similarity embedding");
+        fixture
+            .store
+            .store_embedding(&priority_favored_id, &embedding_with_similarity(0.50))
+            .await
+            .expect("store high-priority embedding");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = super::format_timestamp(Utc::now());
+                connection.execute(
+                    "UPDATE memories SET access_count = 0, importance_score = 0.35, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    params![similarity_favored_id.to_string(), now.clone()],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET access_count = 8, importance_score = 0.9, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    params![priority_favored_id.to_string(), now],
+                )?;
+                Ok(())
+            })
+            .expect("seed deterministic ranking baseline");
+
+        let before = fixture
+            .store
+            .search(SearchQuery {
+                text: String::new(),
+                embedding: Some(query_embedding()),
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("baseline search");
+
+        assert_eq!(before.len(), 2);
+        assert_eq!(before[0].memory.id, priority_favored_id);
+        assert_eq!(before[1].memory.id, similarity_favored_id);
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = super::format_timestamp(Utc::now());
+                for _ in 0..24 {
+                    connection.execute(
+                        "INSERT INTO retrieval_feedback (id, memory_id, query_text, relevant, recorded_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            Uuid::new_v4().to_string(),
+                            similarity_favored_id.to_string(),
+                            "apollo rollout checklist",
+                            1_i64,
+                            now.clone(),
+                        ],
+                    )?;
+                    connection.execute(
+                        "INSERT INTO retrieval_feedback (id, memory_id, query_text, relevant, recorded_at) VALUES (?1, ?2, ?3, ?4, ?5)",
+                        params![
+                            Uuid::new_v4().to_string(),
+                            priority_favored_id.to_string(),
+                            "apollo rollout checklist",
+                            0_i64,
+                            now.clone(),
+                        ],
+                    )?;
+                }
+
+                let report = super::compute_learned_weights_report(connection)?;
+                super::persist_learned_weights(connection, report.effective_weights)?;
+
+                connection.execute(
+                    "UPDATE memories SET access_count = 0, importance_score = 0.35, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    params![similarity_favored_id.to_string(), now.clone()],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET access_count = 8, importance_score = 0.9, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    params![priority_favored_id.to_string(), now],
+                )?;
+                Ok(())
+            })
+            .expect("restore memory fields so ranking shift comes from learned weights");
+
+        let learned_scope_config = fixture.store.scope_config().expect("scope config");
+        assert!(
+            learned_scope_config.similarity_weight > crate::types::DEFAULT_SIMILARITY_WEIGHT,
+            "similarity weight should be learned upward, got {}",
+            learned_scope_config.similarity_weight,
+        );
+
+        let after = fixture
+            .store
+            .search(SearchQuery {
+                text: String::new(),
+                embedding: Some(query_embedding()),
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 5,
+                context_config: None,
+                session_id: None,
+            })
+            .await
+            .expect("search after learning");
+
+        assert_eq!(after.len(), 2);
+        assert_eq!(after[0].memory.id, similarity_favored_id);
+        assert_eq!(after[1].memory.id, priority_favored_id);
+        assert!(
+            after[0].score > after[1].score,
+            "learned weights should make the more relevant memory rank first",
         );
     }
 
@@ -6120,8 +8420,7 @@ mod tests {
             ExportFormat::Elegy,
         )
         .expect("elegy export");
-        let archive: ElegyArchive =
-            serde_json::from_slice(&bytes).expect("deserialize archive");
+        let archive: ElegyArchive = serde_json::from_slice(&bytes).expect("deserialize archive");
         assert_eq!(archive.format_version, "1");
         assert_eq!(archive.scope, MemoryScope::Workspace);
         assert_eq!(archive.memories.len(), 1);
@@ -6140,7 +8439,10 @@ mod tests {
         let id2 = m2.id;
         fixture.store.store(m1).await.expect("store m1");
         fixture.store.store(m2).await.expect("store m2");
-        fixture.store.record_link(&id1, &id2, "related").expect("link");
+        fixture
+            .store
+            .record_link(&id1, &id2, "related")
+            .expect("link");
 
         // Create a version by correcting m1
         fixture
@@ -6192,7 +8494,11 @@ mod tests {
         let mut unreliable = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
         unreliable.content = "unreliable".to_string();
         unreliable.reliability_score = 0.2;
-        fixture.store.store(unreliable).await.expect("store unreliable");
+        fixture
+            .store
+            .store(unreliable)
+            .await
+            .expect("store unreliable");
 
         let config = ShareConfig {
             max_sensitivity: SensitivityLevel::Medium,
@@ -6262,6 +8568,11 @@ mod tests {
             imported.reliability_score <= 0.6,
             "reliability should be capped at 0.6"
         );
+        assert_eq!(
+            imported.state,
+            MemoryState::Dormant,
+            "shared imports stay dormant"
+        );
         assert_eq!(imported.scope, MemoryScope::Workspace, "scope rewritten");
         assert!(imported.tenant_id.is_none(), "tenant cleared");
         assert!(imported.user_id.is_none(), "user cleared");
@@ -6283,5 +8594,462 @@ mod tests {
         assert_ne!(ids[0], original_id1, "should be fresh ID");
         assert_ne!(ids[1], original_id2, "should be fresh ID");
         assert_ne!(ids[0], ids[1], "each import gets unique ID");
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_uses_scope_ratio_for_frequency_alerts() {
+        let fixture = test_fixture();
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = '4' WHERE key = 'poison_frequency_hourly_threshold'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.75' WHERE key = 'poison_frequency_scope_ratio'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("configure poisoning thresholds");
+
+        for index in 0..4 {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+            memory.content = format!("frequency-memory-{index}");
+            fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store frequency memory");
+        }
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "DELETE FROM memories WHERE content = 'frequency-memory-3'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("delete one memory to drop below ratio threshold");
+
+        let no_alerts = fixture
+            .store
+            .detect_poisoning()
+            .expect("detect without threshold hit");
+        assert!(no_alerts
+            .iter()
+            .all(|alert| alert.alert_type != PoisoningAlertType::FrequencyAnomaly));
+
+        let mut restored = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        restored.content = "frequency-memory-restored".to_string();
+        fixture
+            .store
+            .store(restored)
+            .await
+            .expect("restore ratio threshold");
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let frequency = alerts
+            .iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::FrequencyAnomaly)
+            .expect("frequency alert");
+        assert_eq!(frequency.memory_ids.len(), 4);
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_flags_trust_mismatch_and_remediates_only_low_trust_memories() {
+        let fixture = test_fixture();
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = '1' WHERE key = 'poison_trust_mismatch_count_threshold'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.95' WHERE key = 'poison_trust_mismatch_importance_threshold'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("configure trust mismatch thresholds");
+
+        let mut imported = sample_memory(MemoryScope::Workspace, ProvenanceLevel::Imported);
+        imported.content = "suspicious imported memory".to_string();
+        imported.importance_score = 0.96;
+        let imported_id = fixture
+            .store
+            .store(imported)
+            .await
+            .expect("store imported memory");
+
+        let mut trusted = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        trusted.content = "trusted memory".to_string();
+        let trusted_id = fixture
+            .store
+            .store(trusted)
+            .await
+            .expect("store trusted memory");
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let trust_mismatch = alerts
+            .iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::TrustMismatch)
+            .expect("trust mismatch alert");
+        assert_eq!(trust_mismatch.memory_ids, vec![imported_id]);
+
+        let remediation = fixture
+            .store
+            .remediate_poisoning(&alerts)
+            .expect("remediate poisoning");
+        assert_eq!(remediation.quarantined_ids, vec![imported_id]);
+        assert!(remediation.skipped_ids.is_empty());
+
+        let imported = fixture
+            .store
+            .get_raw(&imported_id)
+            .await
+            .expect("reload imported")
+            .expect("imported exists");
+        assert_eq!(imported.state, MemoryState::Dormant);
+        assert_eq!(imported.status.as_deref(), Some(QUARANTINED_STATUS));
+
+        let trusted = fixture
+            .store
+            .get_raw(&trusted_id)
+            .await
+            .expect("reload trusted")
+            .expect("trusted exists");
+        assert_eq!(trusted.state, MemoryState::Active);
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_bulk_overwrite_stays_scoped() {
+        let fixture = test_fixture();
+        let agent_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::Agent).expect("open agent store");
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = '1' WHERE key = 'poison_bulk_overwrite_count_threshold'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.0' WHERE key = 'poison_bulk_overwrite_scope_ratio'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("configure bulk overwrite thresholds");
+
+        let agent_id = agent_store
+            .store(sample_memory(
+                MemoryScope::Agent,
+                ProvenanceLevel::UserStated,
+            ))
+            .await
+            .expect("store agent memory");
+        agent_store
+            .update_content(
+                &agent_id,
+                "updated agent memory",
+                "test",
+                "scope-only agent edit",
+            )
+            .await
+            .expect("update agent memory");
+        let no_workspace_alert = fixture
+            .store
+            .detect_poisoning()
+            .expect("detect poisoning without workspace updates");
+        assert!(no_workspace_alert
+            .iter()
+            .all(|alert| alert.alert_type != PoisoningAlertType::BulkOverwrite));
+
+        let workspace_id = fixture
+            .store
+            .store(sample_memory(
+                MemoryScope::Workspace,
+                ProvenanceLevel::UserStated,
+            ))
+            .await
+            .expect("store workspace memory");
+        fixture
+            .store
+            .update_content(
+                &workspace_id,
+                "updated workspace memory",
+                "test",
+                "workspace edit",
+            )
+            .await
+            .expect("update workspace memory");
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let bulk = alerts
+            .iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::BulkOverwrite)
+            .expect("bulk overwrite alert");
+        assert_eq!(bulk.memory_ids, vec![workspace_id]);
+    }
+
+    #[tokio::test]
+    async fn detect_poisoning_mass_contradiction_stays_scoped() {
+        let fixture = test_fixture();
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE scope_config SET value = '2' WHERE key = 'poison_mass_contradiction_per_memory_threshold'",
+                    [],
+                )?;
+                connection.execute(
+                    "UPDATE scope_config SET value = '0.0' WHERE key = 'poison_mass_contradiction_scope_ratio'",
+                    [],
+                )?;
+                Ok(())
+            })
+            .expect("configure mass contradiction thresholds");
+
+        let target_id = fixture
+            .store
+            .store(sample_memory(
+                MemoryScope::Workspace,
+                ProvenanceLevel::Imported,
+            ))
+            .await
+            .expect("store contradiction target");
+        for content in ["counter-a", "counter-b"] {
+            let mut other = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            other.content = content.to_string();
+            let other_id = fixture
+                .store
+                .store(other)
+                .await
+                .expect("store contradiction peer");
+            fixture
+                .store
+                .record_contradiction(&target_id, &other_id, "contradiction")
+                .await
+                .expect("record contradiction");
+        }
+
+        let alerts = fixture.store.detect_poisoning().expect("detect poisoning");
+        let contradiction_alert = alerts
+            .iter()
+            .find(|alert| alert.alert_type == PoisoningAlertType::MassContradiction)
+            .expect("mass contradiction alert");
+        assert_eq!(contradiction_alert.memory_ids, vec![target_id]);
+    }
+
+    #[tokio::test]
+    async fn import_shared_uses_gate_and_keeps_novel_content_dormant() {
+        let content = "novel shared import content";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = content.to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import shared memory");
+        assert_eq!(report.review_ids.len(), 1);
+        assert_eq!(provider.call_count(), 1, "gate should request an embedding");
+
+        let imported = fixture
+            .store
+            .get_raw(&report.review_ids[0])
+            .await
+            .expect("get imported memory")
+            .expect("imported memory exists");
+        assert_eq!(imported.state, MemoryState::Dormant);
+        assert_eq!(imported.status.as_deref(), Some(SHARED_REVIEW_STATUS));
+    }
+
+    #[tokio::test]
+    async fn import_shared_never_merges_into_existing_trusted_memories() {
+        let content = "existing trusted memory";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut existing = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        existing.content = content.to_string();
+        let existing_id = fixture.store.store(existing).await.expect("store existing");
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = content.to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import shared duplicate");
+        assert_eq!(report.quarantined_ids.len(), 1);
+
+        let existing = fixture
+            .store
+            .get_raw(&existing_id)
+            .await
+            .expect("reload existing")
+            .expect("existing memory exists");
+        assert_eq!(existing.content, content);
+        assert_eq!(existing.state, MemoryState::Active);
+
+        let imported = fixture
+            .store
+            .get_raw(&report.quarantined_ids[0])
+            .await
+            .expect("reload imported")
+            .expect("imported memory exists");
+        assert_eq!(imported.state, MemoryState::Dormant);
+        assert_eq!(imported.status.as_deref(), Some(QUARANTINED_STATUS));
+    }
+
+    #[tokio::test]
+    async fn import_shared_exact_duplicate_without_provider_still_quarantines() {
+        let fixture = test_fixture();
+
+        let mut existing = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        existing.content = "existing trusted memory".to_string();
+        let existing_id = fixture.store.store(existing).await.expect("store existing");
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = " existing   trusted memory ".to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import shared duplicate without provider");
+        assert_eq!(report.review_ids.len(), 0);
+        assert_eq!(report.quarantined_ids.len(), 1);
+
+        let existing = fixture
+            .store
+            .get_raw(&existing_id)
+            .await
+            .expect("reload existing")
+            .expect("existing memory exists");
+        assert_eq!(existing.state, MemoryState::Active);
+
+        let imported = fixture
+            .store
+            .get_raw(&report.quarantined_ids[0])
+            .await
+            .expect("reload imported")
+            .expect("imported memory exists");
+        assert_eq!(imported.state, MemoryState::Dormant);
+        assert_eq!(imported.status.as_deref(), Some(QUARANTINED_STATUS));
+    }
+
+    #[tokio::test]
+    async fn import_shared_quarantines_contradictions_and_records_journal() {
+        let existing_content = "Cap RTSS 120fps";
+        let candidate_content = "Cap RTSS 60fps";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (
+                existing_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+            (
+                candidate_content,
+                StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+            ),
+        ]));
+        let fixture = test_fixture_with_provider(provider.clone());
+
+        let mut existing = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        existing.content = existing_content.to_string();
+        let existing_id = fixture.store.store(existing).await.expect("store existing");
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = candidate_content.to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import contradictory shared memory");
+        assert_eq!(report.quarantined_ids.len(), 1);
+
+        let contradictions = fixture
+            .store
+            .list_contradictions(Some(ResolutionStatus::Unresolved))
+            .await
+            .expect("list contradictions");
+        assert_eq!(contradictions.len(), 1);
+        assert_eq!(contradictions[0].memory_a_id, existing_id);
+        assert_eq!(contradictions[0].memory_b_id, report.quarantined_ids[0]);
+    }
+
+    #[tokio::test]
+    async fn import_shared_skips_higher_scope_near_duplicates() {
+        let content = "higher scope canonical memory";
+        let provider = Arc::new(StubEmbeddingProvider::new([(
+            content,
+            StubEmbeddingResponse::Embedding(vec![1.0; 768]),
+        )]));
+        let fixture = test_fixture_with_provider(provider.clone());
+        let user_store = SqliteMemoryStore::new_with_embedding_provider(
+            &fixture.path,
+            MemoryScope::User,
+            provider,
+        )
+        .expect("open user store");
+
+        let mut higher_scope = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        higher_scope.content = content.to_string();
+        user_store
+            .store(higher_scope)
+            .await
+            .expect("store higher scope memory");
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = content.to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import shared duplicate");
+        assert!(report.new_ids.is_empty());
+        assert_eq!(report.skipped_reasons.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn import_shared_skips_higher_scope_exact_duplicate_without_provider() {
+        let fixture = test_fixture();
+        let user_store =
+            SqliteMemoryStore::new(&fixture.path, MemoryScope::User).expect("open user store");
+
+        let mut higher_scope = sample_memory(MemoryScope::User, ProvenanceLevel::UserStated);
+        higher_scope.content = "higher scope canonical memory".to_string();
+        user_store
+            .store(higher_scope)
+            .await
+            .expect("store higher scope memory");
+
+        let mut source = sample_memory(MemoryScope::Agent, ProvenanceLevel::UserStated);
+        source.content = "  Higher   scope canonical memory ".to_string();
+
+        let report = fixture
+            .store
+            .import_shared_with_report(&[source])
+            .expect("import shared duplicate without provider");
+        assert!(report.new_ids.is_empty());
+        assert_eq!(report.skipped_reasons.len(), 1);
+        assert!(
+            report.skipped_reasons[0].contains("higher visible scope"),
+            "expected skip reason to mention higher visible scope, got {:?}",
+            report.skipped_reasons
+        );
     }
 }

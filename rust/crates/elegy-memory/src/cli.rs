@@ -16,16 +16,18 @@ use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
-    ConsolidationAction, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, ExportFormat,
-    GateDecision, GateError, LlmConsolidator, LlmProvider, Memory, MemoryCandidate,
-    MemoryConsolidator, MemoryFilter, MemoryHealthReport, MemoryId, MemoryObservability,
-    MemoryScope, MemoryState, MemoryStore, MemoryType, MemoryVersion, OllamaEmbeddingProvider,
-    OllamaLlmProvider, OpenAiEmbeddingProvider, OpenAiLlmProvider, PromotionEngine,
-    ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery, SensitivityLevel,
-    ShareConfig, SimpleConsolidator, SqliteMemoryStore, StoreError, DEFAULT_OLLAMA_BASE_URL,
-    DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL,
-    DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL,
-    DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
+    storage::{LearnedWeightValues, LearnedWeightsReport},
+    ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
+    EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
+    LlmProvider, Memory, MemoryCandidate, MemoryConsolidator, MemoryFilter, MemoryHealthReport,
+    MemoryId, MemoryObservability, MemoryScope, MemoryState, MemoryStore, MemoryType,
+    MemoryVersion, OllamaEmbeddingProvider, OllamaLlmProvider, OpenAiEmbeddingProvider,
+    OpenAiLlmProvider, PromotionEngine, ProvenanceLevel, ResolutionStatus, SalienceGate,
+    ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig, SimpleConsolidator,
+    SqliteMemoryStore, StoreError, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL,
+    DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL,
+    DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL,
+    DEFAULT_OPENAI_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -106,7 +108,7 @@ enum Command {
         #[arg(long, default_value_t = DEFAULT_LIMIT)]
         limit: usize,
     },
-    /// Inspect a single memory and show its version history.
+    /// Inspect a single memory and show its version and correction history.
     Inspect {
         #[command(flatten)]
         store: StoreArgs,
@@ -270,6 +272,9 @@ enum Command {
     DetectPoisoning {
         #[command(flatten)]
         store: StoreArgs,
+        /// Make implicated low-trust active memories dormant after detection.
+        #[arg(long = "quarantine", visible_alias = "remediate")]
+        quarantine: bool,
     },
     /// Delete a link between two memories by link ID.
     DeleteLink {
@@ -602,6 +607,7 @@ struct ListRow {
 struct InspectResponse {
     memory: Memory,
     versions: Vec<MemoryVersion>,
+    corrections: Vec<CorrectionHistoryRow>,
 }
 
 #[derive(Serialize)]
@@ -774,10 +780,30 @@ struct BudgetResponse {
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct CorrectResponse {
-    correction_id: String,
-    memory_id: String,
-    corrected_by: String,
+    correction: CorrectionHistoryRow,
+    corrected_memory_state: String,
     new_reliability: f32,
+    embedding_stale: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorrectionHistoryRow {
+    id: String,
+    memory_id: String,
+    corrected_at: String,
+    corrected_by: String,
+    reason: String,
+    disposition: String,
+    previous_content: String,
+    corrected_content: String,
+    outcome: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_preview: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -786,12 +812,35 @@ struct FeedbackResponse {
     feedback_id: String,
     memory_id: String,
     was_relevant: bool,
+    learning: WeightsSummaryResponse,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WeightsResponse {
-    weights: std::collections::HashMap<String, f64>,
+    learning: WeightsSummaryResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightsSummaryResponse {
+    strategy: String,
+    status_detail: String,
+    sample_size: usize,
+    relevant_samples: usize,
+    irrelevant_samples: usize,
+    learning_confidence: f64,
+    effective_weights: WeightValuesResponse,
+    default_weights: WeightValuesResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightValuesResponse {
+    similarity_weight: f64,
+    recency_weight: f64,
+    access_weight: f64,
+    priority_weight: f64,
 }
 
 #[derive(Serialize)]
@@ -818,15 +867,39 @@ struct TraverseNodeRow {
 struct PoisoningResponse {
     alert_count: usize,
     alerts: Vec<PoisoningAlertRow>,
+    remediation: Option<PoisoningRemediationRow>,
 }
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct PoisoningAlertRow {
+    id: String,
+    detected_at: String,
     alert_type: String,
     severity: f32,
     description: String,
     affected_count: usize,
+    memory_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningRemediationRow {
+    quarantined_count: usize,
+    quarantined_ids: Vec<String>,
+    skipped_count: usize,
+    skipped_ids: Vec<String>,
+    actions: Vec<PoisoningRemediationActionRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningRemediationActionRow {
+    memory_id: String,
+    action: String,
+    reason: String,
+    alert_ids: Vec<String>,
+    alert_types: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -848,7 +921,23 @@ struct ShareExportResponse {
 #[serde(rename_all = "camelCase")]
 struct ShareImportResponse {
     imported_count: usize,
+    review_count: usize,
+    quarantined_count: usize,
+    skipped_count: usize,
     new_ids: Vec<String>,
+    review_ids: Vec<String>,
+    quarantined_ids: Vec<String>,
+    skipped_reasons: Vec<String>,
+    outcomes: Vec<ShareImportOutcomeRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareImportOutcomeRow {
+    memory_id: Option<String>,
+    disposition: String,
+    reason: String,
+    related_memory_id: Option<String>,
 }
 
 pub fn run_from_env() -> Result<ExitCode, CliError> {
@@ -995,8 +1084,8 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             depth,
             relation,
         } => execute_traverse_command(open_store(store)?, id, depth, relation, cli.format),
-        Command::DetectPoisoning { store } => {
-            execute_detect_poisoning_command(open_store(store)?, cli.format)
+        Command::DetectPoisoning { store, quarantine } => {
+            execute_detect_poisoning_command(open_store(store)?, quarantine, cli.format)
         }
         Command::DeleteLink { store, id } => {
             execute_delete_link_command(open_store(store)?, id, cli.format)
@@ -1288,7 +1377,13 @@ fn execute_inspect_command(
     let id = parse_memory_id(&raw_id)?;
     let memory = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
     let versions = ctx.store.list_versions(&id)?;
-    let response = InspectResponse { memory, versions };
+    let corrections =
+        build_correction_history_rows(&ctx, ctx.store.list_corrections(Some(&id), usize::MAX)?)?;
+    let response = InspectResponse {
+        memory,
+        versions,
+        corrections,
+    };
 
     match format {
         OutputFormat::Text => print_inspect_text(&response),
@@ -1347,9 +1442,10 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
         agent_id: None,
         limit: None,
     }))?;
-    let contradictions = run_async(
-        MemoryStore::list_contradictions(&ctx.store, Some(ResolutionStatus::Unresolved)),
-    )?;
+    let contradictions = run_async(MemoryStore::list_contradictions(
+        &ctx.store,
+        Some(ResolutionStatus::Unresolved),
+    ))?;
     let mut type_counts = BTreeMap::new();
     let mut total_importance = 0.0_f32;
     let now = Utc::now();
@@ -1729,9 +1825,10 @@ fn execute_list_contradictions_command(
     ctx: StoreContext,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let contradictions = run_async(
-        MemoryStore::list_contradictions(&ctx.store, Some(ResolutionStatus::Unresolved)),
-    )?;
+    let contradictions = run_async(MemoryStore::list_contradictions(
+        &ctx.store,
+        Some(ResolutionStatus::Unresolved),
+    ))?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
         OutputFormat::Json => print_json("contradictions", &contradictions)?,
@@ -2642,6 +2739,53 @@ fn search_result_row(result: ScoredMemory) -> SearchResultRow {
     }
 }
 
+fn build_correction_history_rows(
+    ctx: &StoreContext,
+    corrections: Vec<CorrectionRecord>,
+) -> Result<Vec<CorrectionHistoryRow>, CliError> {
+    corrections
+        .into_iter()
+        .map(|correction| correction_history_row(ctx, correction))
+        .collect()
+}
+
+fn correction_history_row(
+    ctx: &StoreContext,
+    correction: CorrectionRecord,
+) -> Result<CorrectionHistoryRow, CliError> {
+    let related_memory = correction
+        .related_memory_id
+        .map(|related_id| {
+            run_async(ctx.store.get_raw(&related_id)).map(|memory| (related_id, memory))
+        })
+        .transpose()?;
+
+    let (related_memory_id, related_memory_state, related_memory_preview) = match related_memory {
+        Some((related_id, Some(memory))) => (
+            Some(related_id.to_string()),
+            Some(display_state(memory.state)),
+            Some(preview(&memory.content)),
+        ),
+        Some((related_id, None)) => (Some(related_id.to_string()), None, None),
+        None => (None, None, None),
+    };
+
+    Ok(CorrectionHistoryRow {
+        id: correction.id,
+        memory_id: correction.memory_id.to_string(),
+        corrected_at: correction.corrected_at.to_rfc3339(),
+        corrected_by: correction.corrected_by,
+        reason: correction.reason,
+        disposition: display_correction_disposition(correction.disposition),
+        previous_content: correction.previous_content,
+        corrected_content: correction.corrected_content,
+        outcome: describe_correction_outcome(correction.disposition),
+        related_memory_id,
+        related_memory_state,
+        related_memory_preview,
+    })
+}
+
 fn list_row(memory: Memory) -> ListRow {
     ListRow {
         id: memory.id.to_string(),
@@ -2706,6 +2850,34 @@ fn display_provenance(provenance: ProvenanceLevel) -> String {
         ProvenanceLevel::Consolidated => "consolidated",
         ProvenanceLevel::Imported => "imported",
         ProvenanceLevel::AgentInferred => "agent-inferred",
+    }
+    .to_string()
+}
+
+fn display_correction_disposition(disposition: CorrectionDisposition) -> String {
+    match disposition {
+        CorrectionDisposition::Applied => "applied",
+        CorrectionDisposition::Archived => "archived",
+        CorrectionDisposition::Merged => "merged",
+        CorrectionDisposition::Contradiction => "contradiction",
+    }
+    .to_string()
+}
+
+fn describe_correction_outcome(disposition: CorrectionDisposition) -> String {
+    match disposition {
+        CorrectionDisposition::Applied => {
+            "applied in place; the corrected memory remains the active canonical row"
+        }
+        CorrectionDisposition::Archived => {
+            "applied, then archived by the safety gate; the corrected memory is now dormant"
+        }
+        CorrectionDisposition::Merged => {
+            "merged into the related memory; the corrected memory was archived to dormant"
+        }
+        CorrectionDisposition::Contradiction => {
+            "applied in place and journaled as a contradiction against the related memory"
+        }
     }
     .to_string()
 }
@@ -2837,6 +3009,35 @@ fn print_inspect_text(response: &InspectResponse) {
             println!("  reason: {}", version.change_reason);
         }
         println!("  content: {}", preview(&version.content));
+    }
+    println!("correction history: {}", response.corrections.len());
+    for correction in &response.corrections {
+        println!(
+            "- {} at {} by {} [{}]",
+            correction.id, correction.corrected_at, correction.corrected_by, correction.disposition
+        );
+        if !correction.reason.is_empty() {
+            println!("  reason: {}", correction.reason);
+        }
+        println!("  previous: {}", preview(&correction.previous_content));
+        println!("  corrected: {}", preview(&correction.corrected_content));
+        if let Some(related_memory_id) = &correction.related_memory_id {
+            match (
+                correction.related_memory_state.as_deref(),
+                correction.related_memory_preview.as_deref(),
+            ) {
+                (Some(state), Some(related_preview)) => {
+                    println!("  related memory: {related_memory_id} ({state}) — {related_preview}");
+                }
+                (Some(state), None) => {
+                    println!("  related memory: {related_memory_id} ({state})");
+                }
+                _ => {
+                    println!("  related memory: {related_memory_id}");
+                }
+            }
+        }
+        println!("  outcome: {}", correction.outcome);
     }
 }
 
@@ -3038,7 +3239,9 @@ fn execute_rollback_command(
 ) -> Result<ExitCode, CliError> {
     let memory_id = parse_memory_id(&id)?;
     let version_u32 = u32::try_from(version).map_err(|_| {
-        CliError::Validation(format!("version must be a non-negative 32-bit integer, got {version}"))
+        CliError::Validation(format!(
+            "version must be a non-negative 32-bit integer, got {version}"
+        ))
     })?;
     ctx.store.rollback_to_version(&memory_id, version_u32)?;
     let memory =
@@ -3096,10 +3299,7 @@ fn execute_corroborate_command(
     Ok(ExitCode::SUCCESS)
 }
 
-fn execute_budget_command(
-    ctx: StoreContext,
-    format: OutputFormat,
-) -> Result<ExitCode, CliError> {
+fn execute_budget_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
     let (dormanted, deleted) = ctx.store.enforce_budget()?;
     match format {
         OutputFormat::Text => {
@@ -3123,25 +3323,48 @@ fn execute_correct_command(
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     let memory_id = parse_memory_id(&id)?;
-    let correction =
-        ctx.store
-            .correct_memory(&memory_id, &content, &by, reason.as_deref())?;
+    let correction = ctx
+        .store
+        .correct_memory(&memory_id, &content, &by, reason.as_deref())?;
     let updated =
         run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    let correction_row = correction_history_row(&ctx, correction)?;
     match format {
         OutputFormat::Text => {
             println!("Corrected memory {memory_id}");
-            println!("  Correction ID: {}", correction.id);
+            println!("  Correction ID: {}", correction_row.id);
+            println!("  Disposition: {}", correction_row.disposition);
+            println!("  Current state: {}", display_state(updated.state));
             println!("  New reliability: {:.2}", updated.reliability_score);
+            println!("  Embedding stale: {}", updated.embedding_stale);
+            if let Some(related_memory_id) = &correction_row.related_memory_id {
+                match (
+                    correction_row.related_memory_state.as_deref(),
+                    correction_row.related_memory_preview.as_deref(),
+                ) {
+                    (Some(state), Some(related_preview)) => {
+                        println!(
+                            "  Related memory: {related_memory_id} ({state}) — {related_preview}"
+                        );
+                    }
+                    (Some(state), None) => {
+                        println!("  Related memory: {related_memory_id} ({state})");
+                    }
+                    _ => {
+                        println!("  Related memory: {related_memory_id}");
+                    }
+                }
+            }
+            println!("  Outcome: {}", correction_row.outcome);
         }
         OutputFormat::Json => {
             print_json(
                 "correct",
                 &CorrectResponse {
-                    correction_id: correction.id,
-                    memory_id: memory_id.to_string(),
-                    corrected_by: by,
+                    correction: correction_row,
+                    corrected_memory_state: display_state(updated.state),
                     new_reliability: updated.reliability_score,
+                    embedding_stale: updated.embedding_stale,
                 },
             )?;
         }
@@ -3158,12 +3381,14 @@ fn execute_feedback_command(
 ) -> Result<ExitCode, CliError> {
     let memory_id = parse_memory_id(&id)?;
     let feedback = ctx.store.record_feedback(&memory_id, &query, relevant)?;
+    let learning_report = ctx.store.learned_weights_report()?;
     match format {
         OutputFormat::Text => {
             println!(
                 "Recorded {} feedback for {memory_id}",
                 if relevant { "positive" } else { "negative" }
             );
+            print_weights_summary_text(&learning_report);
         }
         OutputFormat::Json => {
             print_json(
@@ -3172,6 +3397,7 @@ fn execute_feedback_command(
                     feedback_id: feedback.id,
                     memory_id: memory_id.to_string(),
                     was_relevant: relevant,
+                    learning: weights_summary_response(&learning_report),
                 },
             )?;
         }
@@ -3179,25 +3405,75 @@ fn execute_feedback_command(
     Ok(ExitCode::SUCCESS)
 }
 
-fn execute_weights_command(
-    ctx: StoreContext,
-    format: OutputFormat,
-) -> Result<ExitCode, CliError> {
-    let weights = ctx.store.compute_learned_weights()?;
+fn execute_weights_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
+    let learning_report = ctx.store.learned_weights_report()?;
     match format {
         OutputFormat::Text => {
-            println!("Learned scoring weights:");
-            let mut sorted: Vec<_> = weights.iter().collect();
-            sorted.sort_by_key(|(key, _)| (*key).clone());
-            for (key, value) in sorted {
-                println!("  {key}: {value:.4}");
-            }
+            print_weights_summary_text(&learning_report);
         }
         OutputFormat::Json => {
-            print_json("weights", &WeightsResponse { weights })?;
+            print_json(
+                "weights",
+                &WeightsResponse {
+                    learning: weights_summary_response(&learning_report),
+                },
+            )?;
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn print_weights_summary_text(report: &LearnedWeightsReport) {
+    println!(
+        "Scoring mode: {} (samples: {} total = {} relevant / {} irrelevant, confidence: {:.2})",
+        if report.using_defaults {
+            "defaults"
+        } else {
+            "learned"
+        },
+        report.sample_size,
+        report.relevant_samples,
+        report.irrelevant_samples,
+        report.confidence,
+    );
+    println!("Reason: {}", report.status_detail);
+    println!("Effective live weights:");
+    print_weight_values_text(report.effective_weights);
+    println!("Default weights:");
+    print_weight_values_text(report.default_weights);
+}
+
+fn print_weight_values_text(weights: LearnedWeightValues) {
+    println!("  similarity_weight: {:.4}", weights.similarity_weight);
+    println!("  recency_weight: {:.4}", weights.recency_weight);
+    println!("  access_weight: {:.4}", weights.access_weight);
+    println!("  priority_weight: {:.4}", weights.priority_weight);
+}
+
+fn weights_summary_response(report: &LearnedWeightsReport) -> WeightsSummaryResponse {
+    WeightsSummaryResponse {
+        strategy: if report.using_defaults {
+            "defaults".to_string()
+        } else {
+            "learned".to_string()
+        },
+        status_detail: report.status_detail.clone(),
+        sample_size: report.sample_size,
+        relevant_samples: report.relevant_samples,
+        irrelevant_samples: report.irrelevant_samples,
+        learning_confidence: report.confidence,
+        effective_weights: weight_values_response(report.effective_weights),
+        default_weights: weight_values_response(report.default_weights),
+    }
+}
+
+fn weight_values_response(weights: LearnedWeightValues) -> WeightValuesResponse {
+    WeightValuesResponse {
+        similarity_weight: weights.similarity_weight,
+        recency_weight: weights.recency_weight,
+        access_weight: weights.access_weight,
+        priority_weight: weights.priority_weight,
+    }
 }
 
 fn execute_traverse_command(
@@ -3213,9 +3489,7 @@ fn execute_traverse_command(
         .traverse_links(&memory_id, depth, relation.as_deref())?;
     match format {
         OutputFormat::Text => {
-            println!(
-                "Graph traversal from {memory_id} (max depth: {depth})"
-            );
+            println!("Graph traversal from {memory_id} (max depth: {depth})");
             println!("Found {} connected memories", result.nodes.len());
             for node in &result.nodes {
                 println!(
@@ -3254,9 +3528,13 @@ fn execute_traverse_command(
 
 fn execute_detect_poisoning_command(
     ctx: StoreContext,
+    quarantine: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     let alerts = ctx.store.detect_poisoning()?;
+    let remediation = quarantine
+        .then(|| ctx.store.remediate_poisoning(&alerts))
+        .transpose()?;
     match format {
         OutputFormat::Text => {
             if alerts.is_empty() {
@@ -3271,6 +3549,52 @@ fn execute_detect_poisoning_command(
                         alert.description,
                         alert.memory_ids.len()
                     );
+                    println!("    alert_id: {}", alert.id);
+                    println!("    detected_at: {}", alert.detected_at.to_rfc3339());
+                    println!(
+                        "    memory_ids: {}",
+                        alert
+                            .memory_ids
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+                if !quarantine {
+                    println!(
+                        "Run `detect-poisoning --quarantine` to dormant-quarantine implicated low-trust active memories (`--remediate` alias also works)."
+                    );
+                }
+                if let Some(remediation) = &remediation {
+                    println!(
+                        "Quarantine remediated {} low-trust active memories and skipped {} memories.",
+                        remediation.quarantined_ids.len(),
+                        remediation.skipped_ids.len()
+                    );
+                    for action in &remediation.actions {
+                        println!(
+                            "  {} {} — {}",
+                            action.action.as_str(),
+                            action.memory_id,
+                            action.reason
+                        );
+                        if !action.alert_ids.is_empty() {
+                            println!("    alert_ids: {}", action.alert_ids.join(", "));
+                        }
+                        if !action.alert_types.is_empty() {
+                            println!(
+                                "    alert_types: {}",
+                                action
+                                    .alert_types
+                                    .iter()
+                                    .map(crate::storage::display_poisoning_alert_type)
+                                    .map(str::to_string)
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            );
+                        }
+                    }
                 }
             }
         }
@@ -3278,10 +3602,14 @@ fn execute_detect_poisoning_command(
             let rows: Vec<PoisoningAlertRow> = alerts
                 .iter()
                 .map(|alert| PoisoningAlertRow {
-                    alert_type: format!("{:?}", alert.alert_type),
+                    id: alert.id.clone(),
+                    detected_at: alert.detected_at.to_rfc3339(),
+                    alert_type: crate::storage::display_poisoning_alert_type(&alert.alert_type)
+                        .to_string(),
                     severity: alert.severity,
                     description: alert.description.clone(),
                     affected_count: alert.memory_ids.len(),
+                    memory_ids: alert.memory_ids.iter().map(ToString::to_string).collect(),
                 })
                 .collect();
             print_json(
@@ -3289,6 +3617,32 @@ fn execute_detect_poisoning_command(
                 &PoisoningResponse {
                     alert_count: rows.len(),
                     alerts: rows,
+                    remediation: remediation.map(|report| PoisoningRemediationRow {
+                        quarantined_count: report.quarantined_ids.len(),
+                        quarantined_ids: report
+                            .quarantined_ids
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect(),
+                        skipped_count: report.skipped_ids.len(),
+                        skipped_ids: report.skipped_ids.iter().map(ToString::to_string).collect(),
+                        actions: report
+                            .actions
+                            .into_iter()
+                            .map(|action| PoisoningRemediationActionRow {
+                                memory_id: action.memory_id.to_string(),
+                                action: action.action.as_str().to_string(),
+                                reason: action.reason,
+                                alert_ids: action.alert_ids,
+                                alert_types: action
+                                    .alert_types
+                                    .iter()
+                                    .map(crate::storage::display_poisoning_alert_type)
+                                    .map(str::to_string)
+                                    .collect(),
+                            })
+                            .collect(),
+                    }),
                 },
             )?;
         }
@@ -3392,21 +3746,56 @@ fn execute_share_import_command(
     };
 
     let memories: Vec<Memory> = serde_json::from_str(&raw)?;
-    let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
-    let ids = store.import_shared(&memories)?;
+    let report = ctx.store.import_shared_with_report(&memories)?;
 
     match format {
         OutputFormat::Text => {
-            println!("Imported {} shared memories", ids.len());
-            for id in &ids {
-                println!("  {id}");
+            println!(
+                "Imported {} shared memories as dormant review entries ({} quarantined, {} skipped)",
+                report.new_ids.len(),
+                report.quarantined_ids.len(),
+                report.skipped_reasons.len()
+            );
+            for outcome in &report.outcomes {
+                match outcome.memory_id {
+                    Some(memory_id) => println!(
+                        "  {} {} — {}",
+                        outcome.disposition.as_str(),
+                        memory_id,
+                        outcome.reason
+                    ),
+                    None => println!("  {} — {}", outcome.disposition.as_str(), outcome.reason),
+                }
+                if let Some(related_memory_id) = outcome.related_memory_id {
+                    println!("    related_memory_id: {related_memory_id}");
+                }
             }
         }
         OutputFormat::Json => print_json(
             "share-import",
             &ShareImportResponse {
-                imported_count: ids.len(),
-                new_ids: ids.iter().map(ToString::to_string).collect(),
+                imported_count: report.new_ids.len(),
+                review_count: report.review_ids.len(),
+                quarantined_count: report.quarantined_ids.len(),
+                skipped_count: report.skipped_reasons.len(),
+                new_ids: report.new_ids.iter().map(ToString::to_string).collect(),
+                review_ids: report.review_ids.iter().map(ToString::to_string).collect(),
+                quarantined_ids: report
+                    .quarantined_ids
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+                skipped_reasons: report.skipped_reasons,
+                outcomes: report
+                    .outcomes
+                    .into_iter()
+                    .map(|outcome| ShareImportOutcomeRow {
+                        memory_id: outcome.memory_id.map(|id| id.to_string()),
+                        disposition: outcome.disposition.as_str().to_string(),
+                        reason: outcome.reason,
+                        related_memory_id: outcome.related_memory_id.map(|id| id.to_string()),
+                    })
+                    .collect(),
             },
         )?,
     }
