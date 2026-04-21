@@ -235,6 +235,17 @@
 | After WU7 (OpenAI provider) | 106 |
 | After WU8 (JSON import command) | **112** |
 
+## WU5 MCP bearer middleware (`wu5-mcp-bearer`)
+- Scope stayed inside `rust/crates/elegy-memory-mcp`; no branch switching was performed in this lane.
+- Added `/mcp`-only bearer enforcement in `src/main.rs` and kept `/oauth/*` plus `/.well-known/*` public.
+- Reused the WU4 signing key/JWT machinery in `src/oauth.rs` to validate HS256 signatures, service-clock `exp`, and exact `claude-ai-remote` scope.
+- Added WU5 coverage in `src/tests.rs` for missing token, expired token, invalid signature, wrong scope, and authenticated initialize success.
+- Updated `docs/AUTH.md` and `docs/TRANSPORT.md` for the `/mcp` bearer requirement and exact `WWW-Authenticate` challenge format.
+- Validation queued in-lane:
+  - `cargo fmt --check -p elegy-memory-mcp`
+  - `cargo check -p elegy-memory-mcp --tests`
+  - `cargo clippy -p elegy-memory-mcp --tests -- -D warnings`
+
 ## WU9 Contradiction Auto-Detection (`wu9-contradictions`)
 
 ### Session authority
@@ -247,6 +258,33 @@
 
 ### After-state
 - Added `GateDecision::Contradiction { conflicting_id, description }` so the merge branch can stop cleanly without overloading `Accept`/`Reject`.
+
+## WU6 MCP read tools + fixed namespace enforcement (`mcp-wu6-read-tools`)
+- Scope stayed inside `rust/crates/elegy-memory-mcp`; no branch switching was performed in this lane.
+- Safe resolution recorded for the earlier structural contradiction:
+  - did **not** extend `elegy-memory::MemoryScope`
+  - mapped MCP namespace `claude-ai-remote` to `MemoryScope::Agent` + fixed `agent_id = "claude-ai-remote"` in the MCP layer
+  - added an MCP-local repository/wrapper so read tools stay inside that namespace
+- Added read-only MCP tools:
+  - `memory_search`
+  - `memory_recall`
+  - `memory_list`
+  - `memory_stats`
+- Added strict override rejection before argument deserialization:
+  - rejects `scope`, `scopes`, `namespace`, and obvious alias overrides
+  - returns MCP error `-32602` with the fixed hardwired-connector message
+- Updated crate docs (`rust/crates/elegy-memory-mcp/README.md`, `rust/crates/elegy-memory-mcp/docs/TRANSPORT.md`) to document the read tools and fixed namespace mapping.
+- Added integration-style MCP tests with temp SQLite data for:
+  - tool schema exposure check
+  - namespace-bound `memory_search`
+  - namespace-bound `memory_recall`
+  - namespace-bound `memory_list`
+  - namespace-bound `memory_stats`
+  - explicit override rejection
+- Validation queued in-lane:
+  - `cargo fmt --check -p elegy-memory-mcp`
+  - `cargo check -p elegy-memory-mcp --tests`
+  - `cargo clippy -p elegy-memory-mcp --tests -- -D warnings`
 - Added a conservative heuristic in `src/gate.rs` that runs only inside the current high-similarity merge branch:
   - technology/category swaps (for example `Backend is C# with gRPC` vs `Backend is Python with Flask`) now return `Contradiction`
   - numeric/unit swaps (for example `Cap RTSS 120fps` vs `Cap RTSS 60fps`) now return `Contradiction`
@@ -258,6 +296,26 @@
   - surface `gate: contradiction (conflicts with <uuid>)` / `gateResult`
 - Updated non-force `execute_import_command` so contradiction outcomes store the candidate independently, record the contradiction, and report a new `contradictions` count in text/JSON summaries.
 - Added coverage for gate heuristics, add/import contradiction persistence, and binary `contradictions` command listing.
+
+## WU2 MCP Config + Logging (`wu2-mcp-config-logging`)
+
+### Before-state
+- `rust/crates/elegy-memory-mcp/src/main.rs` only printed `elegy-memory-mcp starting` and exited.
+- The crate had no env-backed config surface, no startup validation for required vars, no JSON `tracing` bootstrap, and no crate-local config documentation.
+- Worktree was already dirty on `dev` (`FLIGHT_RECORDER.md`, `rust/Cargo.toml`, `rust/Cargo.lock`, and the untracked `rust/crates/elegy-memory-mcp/` tree), so no branch switch was forced for this WU.
+
+### After-state
+- Added `src/config.rs` with env parsing for all WU2 variables, explicit required-var failures, default port/data-dir resolution, and focused unit coverage for config parsing.
+- Updated `src/main.rs` to initialize JSON stdout logging via `tracing-subscriber`, load config at startup, emit a safe startup log, and exit non-zero on config failure.
+- Added `rust/crates/elegy-memory-mcp/docs/CONFIG.md` documenting required/optional env vars, defaults, and WU2 logging scope.
+
+### Validation
+- `cargo fmt --package elegy-memory-mcp --check` from `rust\` passed.
+- `cargo check -p elegy-memory-mcp --all-targets` from `rust\` passed.
+- `cargo clippy -p elegy-memory-mcp --all-targets -- -D warnings` from `rust\` passed.
+- `cargo run -p elegy-memory-mcp --quiet` from `rust\` without env vars failed as intended with exit code `1` and logged `missing required environment variables: ELEGY_MCP_ADMIN_PASSWORD, ELEGY_MCP_DB_PATH, ELEGY_MCP_PUBLIC_URL`.
+- `cargo run -p elegy-memory-mcp --quiet` from `rust\` with WU2 env vars set succeeded and emitted JSON stdout startup logging.
+- Todo DB status was not updated because no todo DB access path was available in this lane.
 
 ## Session 8 Safety Closeout (`s8-poisoning-detection-harden`, `s8-cross-agent-sharing-safeguard`)
 
@@ -358,6 +416,42 @@
   - `elegy-memory contradictions resolve --db <db> --id <contradiction_uuid> --keep <memory_uuid>` now resolves by keeping one memory active and making the other memory dormant
   - `elegy-memory contradictions resolve --db <db> --id <contradiction_uuid> --keep-both` now resolves without dormanting either memory
 - Added `MemoryStore::update_contradiction_status` plus SQLite support so contradiction status, resolution time, and note update cleanly.
+
+## WU4 MCP OAuth 2.1 (`wu4-mcp-oauth`)
+
+### Before-state
+- `rust/crates/elegy-memory-mcp` exposed only the public `/mcp` initialize transport from WU3; no OAuth metadata, registration, consent, token exchange, persistence, or rate limiting existed.
+- The shared worktree was already dirty (`FLIGHT_RECORDER.md`, `rust/Cargo.toml`, `rust/Cargo.lock`, and the untracked `rust/crates/elegy-memory-mcp/` tree), so branch switching was not forced.
+
+### After-state
+- Added OAuth 2.1 endpoints to the same axum binary as `/mcp`: protected-resource metadata, authorization-server metadata, dynamic client registration, consent GET/POST, and token exchange.
+- Enforced the fixed WU4 redirect allowlist, fixed scope `claude-ai-remote`, PKCE S256 auth-code flow, HS256 access tokens (1h), 30d refresh tokens with rotation, and `invalid_client` handling for unknown post-restart clients.
+- Added persisted local auth state under the data dir: `signing-key`, `clients.json`, and `refresh-tokens.json`.
+- Added in-memory IP rate limiting for `/oauth/register`, `/oauth/authorize`, and `/oauth/token` using `CF-Connecting-IP` with peer-address fallback.
+
+## WU7 MCP write tools (`mcp-wu7-write-tools`)
+- Scope stayed inside `rust/crates/elegy-memory-mcp`; no branch switching was forced in this lane.
+- Added MCP write tools:
+  - `memory_store`
+  - `memory_update`
+  - `memory_correct`
+  - `memory_delete`
+- Preserved the fixed `claude-ai-remote` confinement as `MemoryScope::Agent` + `agent_id = "claude-ai-remote"` and kept strict override rejection for `scope` / `scopes` / `namespace` / alias-like input.
+- Routed `memory_store` through the existing salience gate and `memory_correct` through `SqliteMemoryStore::correct_memory()` so write-time safety behavior is not bypassed.
+- Added INFO audit logging for successful writes with `tool`, `id`, `scope`, `timestamp`, and bearer-token `jti`, without logging memory content.
+- Updated crate docs (`rust/crates/elegy-memory-mcp/README.md`, `rust/crates/elegy-memory-mcp/docs/TRANSPORT.md`) for the full read/write MCP tool surface and audit logging.
+- Added integration-style MCP coverage for write/read visibility, update, correction merge behavior, delete, write-side override rejection, and audit log content redaction with `jti`.
+- Validation queued in-lane:
+  - `cargo fmt --check -p elegy-memory-mcp`
+  - `cargo check -p elegy-memory-mcp --tests`
+  - `cargo clippy -p elegy-memory-mcp --tests -- -D warnings`
+- Added crate docs for WU4 auth behavior and updated config/transport docs to reflect argon2 password-hash input plus `/mcp` remaining public until WU5.
+
+### Validation
+- `cargo fmt --package elegy-memory-mcp` from `rust\` passed.
+- `cargo fmt --package elegy-memory-mcp --check` from `rust\` passed.
+- `cargo check -p elegy-memory-mcp --all-targets` from `rust\` could not complete because Cargo was blocked from updating `rust\Cargo.lock` (`os error 1224`: user-mapped section open on the lockfile). Static review plus rustfmt validation were completed; compile/test rerun is still needed once the lockfile is writable.
+- Todo DB status was not updated because no todo DB access path was available in this lane.
 - Added rollback-safe CLI resolution flow: if dormanting succeeds but contradiction-status persistence fails, the CLI attempts to reactivate the memory before surfacing the error.
 - Added binary CLI coverage for:
   - resolve-keep: other memory becomes `Dormant`, contradiction becomes `ResolvedByUser`
@@ -399,6 +493,18 @@
 - `execute_health_command` already loaded the scope health report plus all memories for type-count aggregation, but returned only `{ report, type_counts }`.
 - Text health output surfaced counts only: active, dormant, stale embeddings, unresolved contradictions, storage bytes, budget usage ratio, and type distribution.
 - JSON health output existed only indirectly through the generic envelope and therefore exposed none of the richer preview/stat fields requested by WU11.
+
+## WU1 elegy-memory-mcp Skeleton (`wu1-memory-mcp-skeleton`)
+
+### Before-state
+- `rust/Cargo.toml` did not include `crates/elegy-memory-mcp` in the workspace members list.
+- `rust/crates/elegy-memory-mcp/` did not exist, so there was no dedicated MCP server crate alongside `elegy-memory`.
+- No WU1 execution record existed yet for the new MCP server scaffold.
+
+### After-state
+- Added the new workspace crate `rust/crates/elegy-memory-mcp`.
+- Added minimal initial dependencies: `tokio`, `axum`, `tracing`, and the local path dependency on `elegy-memory`.
+- Added `src/main.rs` with a minimal startup print and crate-local `README.md`; later WUs for config, auth, transport, and tools remain intentionally untouched.
 
 ### After-state
 - Enriched `HealthResponse` in `src/cli.rs` without widening store traits/types:
@@ -647,6 +753,12 @@
 
 - Start checkpoint (`2026-04-07 02:52:38+02:00`): beginning Phase A on the current `main` workspace without any git operations, per explicit safety decision.
 - Workflow deviation from `prompt.md`: branch creation / merge / push steps remain intentionally skipped because Session 4b bootstrap established that the local `dev` branch is missing and unrelated dirty files exist outside `rust\crates\elegy-memory\`.
+
+## WU4 OAuth Correction Checkpoint (`wu4-mcp-oauth`)
+- Current authoritative OAuth behavior is in `rust/crates/elegy-memory-mcp/docs/AUTH.md` and `rust/crates/elegy-memory-mcp/docs/CONFIG.md`.
+- Correction to the earlier WU4 note: `ELEGY_MCP_ADMIN_PASSWORD` is cleartext consent input; startup hashes it in memory with Argon2 for verification and rejects pre-hashed Argon2 strings.
+- OAuth remains fixed to `claude-ai-remote`, with the auth/resource server in the same binary, public-client PKCE flow, HS256 access tokens, 30d rotating refresh tokens, and persisted auth state under `ELEGY_MCP_DATA_DIR`.
+- Worktree safety was unchanged in that lane: the worktree was already dirty, so branch switching was not forced.
 - WU1 pre-checkpoint: prepare `C:\Temp\elegy-validation`, validate the release binary at `D:\cargo-targets\elegy\release\elegy-memory.exe`, and attempt the Ollama-backed seed dataset in a bounded way.
 
 - WU1 post-checkpoint ($timestamp): FAIL — --help includes import; Ollama was already ready; add-8 merged into the existing ProtonVPN memory, so list reported count: 7 instead of the expected 8 active memories.
@@ -686,6 +798,31 @@ Options:
 
 ```text
 PS> Get-Process -Name 'ollama' -ErrorAction SilentlyContinue
+```
+
+## WU1 elegy-memory-mcp Skeleton (`wu1-memory-mcp-skeleton`) — append correction
+
+- Correction note: an earlier WU1 block was inserted above due patch-anchor drift; this end-of-file checkpoint is the authoritative append-only WU1 record for the new crate scaffold.
+
+### Before-state
+- `rust/Cargo.toml` did not list `crates/elegy-memory-mcp` as a workspace member.
+- `rust/crates/elegy-memory-mcp/` did not exist.
+- No WU1 scaffold checkpoint existed yet for the new MCP server crate.
+
+### After-state
+- Added workspace member `crates/elegy-memory-mcp`.
+- Created `rust/crates/elegy-memory-mcp/Cargo.toml` with minimal initial dependencies: `tokio`, `axum`, `tracing`, and local path dependency `elegy-memory`.
+- Added `rust/crates/elegy-memory-mcp/src/main.rs` that prints `elegy-memory-mcp starting` and exits.
+- Added crate `README.md` with a short three-line purpose/next-steps description.
+- Deferred config, auth, transport, and tool implementation to later WUs by design.
+
+### Validation
+- `cargo check --workspace` from `rust\` — pass.
+- `cargo fmt --package elegy-memory-mcp --check` from `rust\` — pass.
+- `cargo clippy -p elegy-memory-mcp -- -D warnings` from `rust\` — pass.
+- `cargo run -p elegy-memory-mcp --quiet` from `rust\` — printed `elegy-memory-mcp starting`.
+
+```text
 process-running pid=9584,17872
 
 PS> Get-Command ollama -ErrorAction SilentlyContinue
@@ -1832,6 +1969,12 @@ All other items verified as matching: scoring formula, weights, contradiction pe
 - **Code changes:** 6 files, ~180 insertions, ~15 deletions
 - **Doc changes:** 0 (docs are the spec — never modified)
 - **Tests:** 177 passed, 0 failed (174 baseline + 3 new integration tests)
+
+### Correction note — WU4 MCP admin password semantics
+
+- Corrected `rust/crates/elegy-memory-mcp` so `ELEGY_MCP_ADMIN_PASSWORD` is the consent-page password, not a precomputed Argon2 hash string.
+- Startup now derives an Argon2 verifier in memory, rejects old hash-shaped inputs to catch stale WU4 configuration, and keeps the rest of the OAuth flow unchanged.
+- Updated crate docs and MCP tests to match the corrected WU4 behavior.
 - **Clippy:** clean
 - **Release build:** succeeds
 - **Key finding:** Code-side parity was nearly complete after Sessions 4–6. The only material gap was the `memory_links` table existing in schema but never being populated with data. The `dedup_threshold` cleanup was a minor hygiene issue. Both directions of parity (docs→code from Session 6, code→docs from Session 6b) are now fully closed.
@@ -2022,6 +2165,14 @@ cargo clippy -p elegy-memory --color never -- -D warnings
   - corrected `memory-model.md` so corroboration bonuses, adaptive/type-specific decay, and automatic budget enforcement are documented as implemented behavior
   - clarified `traits.rs` and `traits-and-interfaces.md` that `MemoryStore` is the core public contract while several advanced Session 8 capabilities remain concrete `SqliteMemoryStore` methods
 
+## WU1 append-only correction note (`wu1-memory-mcp-skeleton`)
+
+- The earlier WU1 `elegy-memory-mcp` entry was not a proper append-only checkpoint; it was placed mid-file and this note records the authoritative append-only correction.
+- Before: `rust/Cargo.toml` lacked `crates/elegy-memory-mcp`; `rust/crates/elegy-memory-mcp/` did not exist; no WU1 scaffold checkpoint existed.
+- After: added the `elegy-memory-mcp` workspace member, created `rust/crates/elegy-memory-mcp/Cargo.toml`, added `src/main.rs` with a startup stub, and added the crate README.
+- Current branch state: `dev`; no WU1 branch switch occurred in this lane.
+- Validation recorded in the authoritative WU1 block: `cargo check --workspace` (pass), `cargo fmt --package elegy-memory-mcp --check` (pass), `cargo clippy -p elegy-memory-mcp -- -D warnings` (pass), `cargo run -p elegy-memory-mcp --quiet` (printed `elegy-memory-mcp starting`).
+
 ### Exact commands and observed results
 
 - `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; rustfmt --edition 2021 crates/elegy-memory/src/traits.rs`
@@ -2107,3 +2258,105 @@ cargo clippy -p elegy-memory --color never -- -D warnings
 - Release build outcome: success for `elegy-memory` in the current workspace.
 - Full Session 8 closeout validation passed cleanly.
 - Todo tracker status update was not applied because no repository-local SQL access / todo database target was available to execute `UPDATE todos SET status = 'done' WHERE id = 's8-final-validation-closeout'` confidently.
+
+## WU1 append-only correction note (file-end record)
+
+- The earlier WU1 `elegy-memory-mcp` entry was not a proper append-only checkpoint; this end-of-file note records the authoritative correction.
+- Before: `rust/Cargo.toml` lacked `crates/elegy-memory-mcp`; `rust/crates/elegy-memory-mcp/` did not exist; no WU1 scaffold checkpoint existed.
+- After: added the `elegy-memory-mcp` workspace member, created `rust/crates/elegy-memory-mcp/Cargo.toml`, added `src/main.rs` with a startup stub, and added the crate README.
+- Current branch state: `dev`; no WU1 branch switch occurred in this lane.
+- Validation recorded in the authoritative WU1 block: `cargo check --workspace` (pass), `cargo fmt --package elegy-memory-mcp --check` (pass), `cargo clippy -p elegy-memory-mcp -- -D warnings` (pass), `cargo run -p elegy-memory-mcp --quiet` (printed `elegy-memory-mcp starting`).
+
+## WU2 append-only correction note (file-end record)
+
+- Correction note: the earlier `wu2-mcp-config-logging` block landed above newer historical entries due patch-anchor drift; this file-end note is the authoritative append-only WU2 checkpoint.
+- Before: `rust/crates/elegy-memory-mcp/src/main.rs` only printed a startup string, there was no env-backed config surface, and no crate-local config doc existed.
+- After: added `src/config.rs`, wired JSON stdout logging and explicit startup config validation in `src/main.rs`, added `docs/CONFIG.md`, and refreshed `rust/crates/elegy-memory-mcp/Cargo.toml` / `rust/Cargo.lock` for the new WU2 dependencies.
+- Validation: `cargo fmt --package elegy-memory-mcp --check` ✅, `cargo check -p elegy-memory-mcp --all-targets` ✅, `cargo clippy -p elegy-memory-mcp --all-targets -- -D warnings` ✅, `cargo run -p elegy-memory-mcp --quiet` without env vars ✅ failed with exit `1` and explicit missing-var message, `cargo run -p elegy-memory-mcp --quiet` with WU2 env vars ✅ succeeded with JSON stdout startup logging.
+- Safety note: no branch switch was forced because the shared worktree was already dirty on `dev`.
+- Todo tracker status was not updated because no todo DB access path was available in this lane.
+
+## WU3 append-only checkpoint (`wu3-memory-mcp-streamable-http`)
+
+- Before:
+  - `elegy-memory-mcp` still exited after config/logging bootstrap; no axum listener or `/mcp` route existed.
+  - The workspace already pinned `rmcp` `1.2.0`; WU3 retained that version and only widened features for Streamable HTTP server support.
+  - The shared worktree was already dirty, so no branch switch was forced in this lane.
+- After:
+  - Added a minimal `rmcp`-backed Streamable HTTP service mounted at `/mcp`.
+  - Bound the binary to `127.0.0.1:<ELEGY_MCP_PORT>` and kept the WU2 startup config/logging fields intact while adding `bind_address` and `mcp_path`.
+  - Exposed a public initialize-only MCP surface for WU3; no auth middleware, OAuth flow, or memory tools were added.
+  - Added crate-local transport notes in `rust/crates/elegy-memory-mcp/docs/TRANSPORT.md`.
+  - Added handshake coverage in `rust/crates/elegy-memory-mcp/src/main.rs` proving `initialize` succeeds without auth and yields an MCP session.
+- Validation:
+  - `cargo fmt --package elegy-memory-mcp` ✅
+  - `cargo check -p elegy-memory-mcp --all-targets` ⚠️ blocked by Windows file-locking on `rust/Cargo.lock` (`os error 1224: file with a user-mapped section open`) after dependency/feature changes required a lockfile refresh.
+  - `cargo check -p elegy-memory-mcp --all-targets --locked` ⚠️ confirmed the lockfile now needs refresh once the external lock is released.
+- Todo tracker status was not updated because no todo DB access path was available in this lane.
+
+## WU5 append-only checkpoint (`wu5-mcp-bearer`)
+
+- Correction note: an earlier WU5 note landed mid-file due patch-anchor drift; this end-of-file block is the authoritative append-only WU5 record.
+- Before:
+  - `rust/crates/elegy-memory-mcp/src/main.rs` still exposed `/mcp` without bearer validation.
+  - `rust/crates/elegy-memory-mcp/src/oauth.rs` minted HS256 access tokens but did not yet validate them on inbound MCP requests.
+  - `rust/crates/elegy-memory-mcp/src/tests.rs` covered OAuth issuance but not `/mcp` auth failures or authenticated initialize success.
+- After:
+  - Added `/mcp`-only bearer middleware in `src/main.rs`; `/oauth/*` and `/.well-known/*` remain public.
+  - Reused the WU4 signing key/JWT machinery in `src/oauth.rs` to validate HS256 signature, service-clock `exp`, and exact `claude-ai-remote` scope.
+  - Updated `src/tests.rs` with missing-token, expired-token, invalid-signature, wrong-scope, and nominal authenticated initialize coverage.
+  - Updated `rust/crates/elegy-memory-mcp/docs/AUTH.md` and `rust/crates/elegy-memory-mcp/docs/TRANSPORT.md` for the `/mcp` bearer requirement and exact `WWW-Authenticate` challenge shape.
+- Validation:
+  - `cargo fmt --package elegy-memory-mcp` from `rust\` ✅
+  - `cargo check -p elegy-memory-mcp --tests` from `rust\` ✅
+  - `cargo clippy -p elegy-memory-mcp --tests -- -D warnings` from `rust\` ✅
+- Todo tracker status was not updated because no todo DB access path was available in this lane.
+
+## WU7 append-only checkpoint (`mcp-wu7-write-tools`)
+
+- This end-of-file note is the authoritative append-only WU7 closeout record for `rust/crates/elegy-memory-mcp`.
+- After:
+  - exposed the 4 write tools: `memory_store`, `memory_update`, `memory_correct`, `memory_delete`
+  - kept the fixed `claude-ai-remote` namespace mapping as `MemoryScope::Agent` + `agent_id = "claude-ai-remote"`
+  - preserved strict rejection of scope/namespace override fields
+  - routed write paths through the existing gate/correction behavior instead of bypassing `elegy-memory`
+  - added INFO audit logging for successful writes with `tool`, `id`, `scope`, `timestamp`, and bearer `jti`, never memory content
+- Documentation state at WU7:
+  - crate README and transport docs reflected the full read/write MCP tool surface
+- Validation evidence:
+  - later WU8 crate validation covered the WU7 surface with `cargo test -p elegy-memory-mcp` ✅
+  - later WU8 crate validation covered linting with `cargo clippy -p elegy-memory-mcp --all-targets -- -D warnings` ✅
+
+## WU8 append-only checkpoint (`mcp-wu8-validation`)
+
+- This end-of-file note is the authoritative append-only WU8 validation record for `rust/crates/elegy-memory-mcp`.
+- Scope:
+  - validated the integrated OAuth + `/mcp` server after WU7
+  - confirmed the public OAuth/DCR routes and protected `/mcp` route remain in the intended split
+  - confirmed all 8 MCP tools are exposed in the fixed `claude-ai-remote` namespace
+- Validation:
+  - `cargo test -p elegy-memory-mcp` from `rust\` ✅
+  - `cargo clippy -p elegy-memory-mcp --all-targets -- -D warnings` from `rust\` ✅
+- Outcome:
+  - WU7/WU8 implementation state is validated on the current workspace
+
+## WU9 append-only checkpoint (`mcp-wu9-docs-closeout`)
+
+- Date: 2026-04-21
+- Scope:
+  - docs-only closeout for `rust/crates/elegy-memory-mcp`
+  - updated `README.md` to reflect status through WU9 and point to the crate docs set
+  - added `docs/DEPLOYMENT.md` for Windows + Cloudflare Tunnel + Claude connector setup
+  - added `docs/architecture/overview.md` for the crate architecture summary
+- Validation:
+  - no new code-path changes
+  - no new cargo validation required beyond the already-passing WU8 gate
+- Outcome:
+  - deployment and closeout documentation now matches the current implemented surface
+
+## Session 4 Final Lane Closeout
+- cargo build -p elegy-memory-mcp --release passed.
+- cargo clippy --workspace --all-targets --all-features -- -D warnings passed.
+- Rollout was committed directly on dev / is being finalized directly on dev because branch-per-WU flow was not forced in the shared dirty worktree.
+- WU1-WU9 implementation/docs are complete in this lane.
+

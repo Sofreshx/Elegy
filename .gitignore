@@ -46,4 +46,9 @@ elegy-memory-mvp-test-plan.md
 /.copilot/
 /target/agent-artifacts/
 
+# elegy-memory-mcp local auth state
+signing-key
+clients.json
+refresh-tokens.json
+
 .cargo/config.toml
