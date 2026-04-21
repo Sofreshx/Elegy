@@ -259,6 +259,63 @@
 - Updated non-force `execute_import_command` so contradiction outcomes store the candidate independently, record the contradiction, and report a new `contradictions` count in text/JSON summaries.
 - Added coverage for gate heuristics, add/import contradiction persistence, and binary `contradictions` command listing.
 
+## Session 8 Safety Closeout (`s8-poisoning-detection-harden`, `s8-cross-agent-sharing-safeguard`)
+
+### Direct inspection and fixes
+- Verified `tests\cli.rs` already contains `share-export` CLI coverage, so no extra export test was needed for this closeout.
+- Found one remaining poisoning UX mismatch: text guidance still told operators to run `detect-poisoning --remediate` even though the primary flag is now `--quarantine`.
+- Found one remaining sharing safety gap during live validation: provider-less `share-import` exact duplicates could fall back to dormant review instead of the stronger quarantine/skip dispositions expected by the safety lane.
+
+### Changes made
+- `rust\crates\elegy-memory\src\cli.rs`
+  - Switched detect-poisoning text guidance to prefer `--quarantine` and mention `--remediate` as an alias.
+  - Changed the clap flag declaration to `visible_alias = "remediate"` so help output exposes the legacy alias while keeping `--quarantine` primary.
+- `rust\crates\elegy-memory\src\storage\sqlite_store.rs`
+  - Added a provider-independent exact-text duplicate sweep for `share-import` across the store's visible active scopes.
+  - Exact duplicates in the current scope now quarantine as dormant review evidence instead of slipping through as generic review imports.
+  - Exact duplicates already present in a higher visible scope now skip import entirely.
+  - Added two store tests covering the provider-less quarantine and higher-scope skip paths.
+- `rust\crates\elegy-memory\tests\cli.rs`
+  - Updated the detect-poisoning text assertion to require `--quarantine` guidance while keeping alias visibility.
+  - Added `detect_poisoning_help_prefers_quarantine_flag_and_keeps_alias_visible`.
+- `rust\crates\elegy-memory\docs\architecture\memory-model.md`
+  - Documented the provider-independent exact-text duplicate sweep and higher-scope skip behavior for `share-import`.
+- `rust\crates\elegy-memory\docs\architecture\mvp-scope.md`
+  - Updated the `share-import` row to reflect exact-match protection without embeddings.
+
+### Exact commands run and observed results
+- `cargo fmt --package elegy-memory`
+  - Result: pass.
+- `cargo run -p elegy-memory -- detect-poisoning --help`
+  - Result before alias visibility fix: help showed `--quarantine` only.
+  - Result after fix: help shows `--quarantine` with `[aliases: --remediate]`.
+- `cargo test --package elegy-memory`
+  - First run result: **failed** in `tests\cli.rs` with 2 failures:
+    - `share_import_keeps_existing_active_memory_untouched`
+    - `share_import_skips_higher_scope_duplicates_in_json_output`
+  - Root cause observed from live workspace: provider-less exact duplicate share-imports were not taking the stronger quarantine/skip path.
+- `cargo fmt --package elegy-memory`
+  - Result: pass after the share-import fix.
+- `cargo test --package elegy-memory`
+  - Final result: **229 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out**
+    - `src\lib.rs`: `160 passed`
+    - `src\main.rs`: `0 passed`
+    - `tests\cli.rs`: `34 passed`
+    - `tests\governed_memory.rs`: `15 passed`
+    - `tests\integration.rs`: `16 passed`
+    - `tests\local_store.rs`: `4 passed`
+    - doc-tests: `0 passed`
+- `cargo clippy -p elegy-memory -- -D warnings`
+  - First run result: **failed** with 2 warnings denied as errors:
+    - redundant closure at `src\storage\sqlite_store.rs:351`
+    - `&mut Vec<_>` parameter at `src\storage\sqlite_store.rs:4603`
+- `cargo fmt --package elegy-memory`
+  - Result: pass after clippy fixes.
+- `cargo test --package elegy-memory`
+  - Final confirmation result: **229 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out**
+- `cargo clippy -p elegy-memory -- -D warnings`
+  - Final result: **pass** (`Finished dev profile` with no warnings/errors).
+
 ### Validation
 
 | Check | Result |
@@ -1778,3 +1835,275 @@ All other items verified as matching: scoring formula, weights, contradiction pe
 - **Clippy:** clean
 - **Release build:** succeeds
 - **Key finding:** Code-side parity was nearly complete after Sessions 4–6. The only material gap was the `memory_links` table existing in schema but never being populated with data. The `dedup_threshold` cleanup was a minor hygiene issue. Both directions of parity (docs→code from Session 6, code→docs from Session 6b) are now fully closed.
+
+---
+
+## Session 8 — Baseline Validation
+
+**Date:** 2025-01-02 (session start)
+**Branch:** dev
+**Objective:** Validate baseline state before S+ quality pass
+
+### Pre-Work Validation
+
+**Command 1: Baseline clippy validation**
+\\\powershell
+cd C:\Users\Romain\Projects\Elegy\rust
+cargo clippy -p elegy-memory -- -D warnings
+\\\
+
+**Result:** ✓ PASS
+- Exit code: 0
+- Output: Finished dev profile [unoptimized + debuginfo] target(s) in 0.26s
+- **Interpretation:** No warnings or errors. Codebase is clean for clippy checks.
+
+### Next Steps
+
+- Run cargo test --package elegy-memory to validate test suite
+- Read architecture docs and source to understand current feature state
+- Begin S+ quality review and implementation per prompt.md
+
+### WU `s8-baseline-read-and-validate` Pre-Checkpoint
+
+- Timestamp: 2026-04-12 19:29:55+02:00
+- Scope: read `FLIGHT_RECORDER_PROTOCOL.md`, `FLIGHT_RECORDER.md`, all `rust\crates\elegy-memory\docs\architecture\*.md`, all `rust\crates\elegy-memory\src\**\*.rs`, and all `rust\crates\elegy-memory\tests\*.rs`; capture recent git history; rerun baseline package validation from `C:\Users\Romain\Projects\Elegy\rust`.
+
+### WU `s8-baseline-read-and-validate` Validation
+
+**Command 2: Recent git history**
+\\\powershell
+Set-Location 'C:\Users\Romain\Projects\Elegy'
+git --no-pager log --oneline -10
+\\\
+
+**Result:** ✓ PASS
+- Exit code: 0
+- Observed commits (10):
+  - `7147d5d (HEAD -> dev) feat(elegy-memory): implement v1/v2 features — export, sharing, decay, budget, corrections, traversal`
+  - `0b003cc Merge session-6b/code-parity: close code-side parity gaps (supersedes links, dedup_threshold cleanup)`
+  - `aecc63b docs: add Session 6b flight recorder entry (code-side parity)`
+  - `8c2afca test(elegy-memory): add record_link and list_links integration tests`
+  - `7813be0 feat(elegy-memory): add MemoryLink proto-graph, use dormant in consolidation`
+  - `9ba3670 Merge session6/doc-parity: architecture doc parity fixes`
+  - `af6005f docs(elegy-memory): close doc-code parity gaps in architecture docs`
+  - `4bfebf1 (main) Merge session5b-stabilization: --include-dormant flag + stabilization`
+  - `1a665d1 feat(elegy-memory): add --include-dormant flag to list command`
+  - `5920f7e feat(elegy-memory): v1 Tier 2 — multi-scope search + LLM consolidation`
+
+**Command 3: Baseline package tests**
+\\\powershell
+Set-Location 'C:\Users\Romain\Projects\Elegy\rust'
+$env:CARGO_TERM_COLOR='never'
+cargo test --package elegy-memory --color never
+\\\
+
+**Result:** ✓ PASS
+- Exit code: 0
+- Observed harness summaries: `144 passed`, `28 passed`, `15 passed`, `16 passed`, `4 passed`; two zero-test targets also completed successfully.
+- Aggregate observed result: `207 passed; 0 failed`.
+
+**Command 4: Baseline clippy rerun**
+\\\powershell
+Set-Location 'C:\Users\Romain\Projects\Elegy\rust'
+$env:CARGO_TERM_COLOR='never'
+cargo clippy -p elegy-memory --color never -- -D warnings
+\\\
+
+**Result:** ✓ PASS
+- Exit code: 0
+- Output tail: `Finished dev profile [unoptimized + debuginfo] target(s) in 0.26s`
+
+### WU `s8-baseline-read-and-validate` Post-Checkpoint
+
+- Read counts confirmed: `5` architecture docs, `21` source files, `4` test files, plus `FLIGHT_RECORDER_PROTOCOL.md` and `FLIGHT_RECORDER.md`.
+- Feature inventory observed:
+  - CLI surface covers add/search/list/inspect/purge/health/export/reembed/contradictions/import/promote/consolidate/rollback/corroborate/budget/correct/feedback/weights/traverse/detect-poisoning/delete-link/share-export/share-import.
+  - SQLite store implements hybrid search, salience gating, contradiction journaling/resolution, versioning/rollback, promotion, consolidation, corroboration, budget enforcement, memory links/traversal, poisoning detection, correction/feedback/learned weights, and sharing import/export.
+  - Ollama and OpenAI embedding/LLM providers exist; governed-memory/local artifact-store support also exists.
+- Gap summary observed:
+  - `src/storage/schema.rs` still carries a TODO around sqlite-vec runtime loading fallback.
+  - `MemoryObservability` remains trait-only with no concrete implementation.
+  - PostgreSQL backend remains unimplemented.
+  - Architecture docs lag current code for corroboration, adaptive/type-specific decay, and automatic budget enforcement.
+  - Governed-memory/local artifact-store functionality exists in code/tests but is not described in the architecture docs.
+- Outcome: baseline reading and validation completed without source edits; this append is the only repository change from `s8-baseline-read-and-validate`.
+
+
+### Session 8 baseline package test backfill
+
+- Timestamp: 2026-04-12 19:32:02+02:00
+- Exact command: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test --package elegy-memory`
+- Result: PASS (exit code 0)
+- Per-target pass counts: `src\lib.rs=144`, `src\main.rs=0`, `tests\cli.rs=28`, `tests\governed_memory.rs=15`, `tests\integration.rs=16`, `tests\local_store.rs=4`, `doc-tests=0`
+- Total observed result: `207 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+
+### Session 8 safety closeout (`s8-poisoning-detection-harden`, `s8-cross-agent-sharing-safeguard`)
+
+- Timestamp: 2026-04-12 22:05:39+02:00
+- Safety surfaces closed:
+  - Poisoning detection hardening is present across `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/src/cli.rs`, store-local poisoning/remediation coverage in `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, and CLI coverage in `rust/crates/elegy-memory/tests/cli.rs` (`detect_poisoning_json_surfaces_memory_ids_and_remediation`, `detect_poisoning_text_surfaces_memory_ids`, `detect_poisoning_help_prefers_quarantine_flag_and_keeps_alias_visible`).
+  - Cross-agent sharing safeguards are present across `rust/crates/elegy-memory/src/storage/sqlite_store.rs`, `rust/crates/elegy-memory/src/cli.rs`, and `rust/crates/elegy-memory/tests/cli.rs` (`share_export_json_filters_memories_for_sharing`, `share_import_keeps_existing_active_memory_untouched`, `share_import_skips_higher_scope_duplicates_in_json_output`).
+  - Canonical docs already reflect the lane in `rust/crates/elegy-memory/docs/architecture/memory-model.md`, `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`, and `rust/crates/elegy-memory/docs/architecture/storage-schema.md`.
+- Fresh validation:
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test --package elegy-memory` → PASS (exit code 0); `src\lib.rs=160`, `src\main.rs=0`, `tests\cli.rs=34`, `tests\governed_memory.rs=15`, `tests\integration.rs=16`, `tests\local_store.rs=4`, `doc-tests=0`; total `229 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`.
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo clippy -p elegy-memory -- -D warnings` → PASS (exit code 0); clean with no warnings.
+- Outcome: Session 8 safety lane is closed; poisoning detection/remediation and cross-agent sharing safeguards are implemented, documented, and revalidated on the current workspace.
+
+## Session 8 corrections closeout (`s8-corrections-loop-complete`)
+
+- Timestamp: 2026-04-13 01:07:53+02:00
+- Follow-up scope completed on top of the existing correction backend:
+  - extended `inspect` so operators now get correction history in both text and JSON output
+  - expanded `correct` output to report correction disposition, resulting memory state, related memory details, and outcome text
+  - added CLI regressions for text + JSON correction/inspect flows
+  - added store regressions for archived / merged / contradiction correction dispositions and stale-vector exclusion after correction
+  - updated the directly relevant architecture docs in `rust/crates/elegy-memory/docs/architecture/`
+
+### Validation
+
+- Exact command: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo fmt --all`
+  - Result: PASS (exit code 0)
+  - Observed result: completed with no formatter errors
+- Exact command: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test --package elegy-memory`
+  - Result: PASS (exit code 0)
+  - Observed per-target results:
+    - `src\lib.rs`: `164 passed; 0 failed`
+    - `src\main.rs`: `0 passed; 0 failed`
+    - `tests\cli.rs`: `37 passed; 0 failed`
+    - `tests\governed_memory.rs`: `15 passed; 0 failed`
+    - `tests\integration.rs`: `16 passed; 0 failed`
+    - `tests\local_store.rs`: `4 passed; 0 failed`
+    - `doc-tests`: `0 passed; 0 failed`
+  - Total observed result: `236 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+- Exact command: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo clippy -p elegy-memory -- -D warnings`
+  - Result: PASS (exit code 0)
+  - Observed result: clean after a short Cargo file-lock wait; no warnings emitted
+
+- Outcome: `s8-corrections-loop-complete` is implemented and revalidated on the current workspace.
+
+## Session 8 parameter learning productionize (`s8-param-learning-productionize`)
+
+- Timestamp: 2026-04-13 01:21:57+02:00
+- Scope completed:
+  - replaced the toy feedback learner with a feedback-driven scoring loop that derives learned `similarity_weight`, `recency_weight`, `access_weight`, and `priority_weight` values from balanced relevant vs irrelevant retrieval feedback
+  - persisted the learned values back into the live `scope_config` keys that `search()` already reloads
+  - upgraded CLI `feedback` / `weights` output so operators can see mode (`defaults` vs `learned`), sample counts, confidence, and current effective live weights
+  - added store + CLI coverage proving the persisted learned weights affect live ranking
+  - reconciled the directly relevant architecture docs in `memory-model.md`, `mvp-scope.md`, and `storage-schema.md`
+
+### Exact commands and observed results
+
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo fmt --package elegy-memory`
+  - Result: PASS (exit code 0)
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo test --package elegy-memory feedback_learning_updates_live_search_ranking_via_scope_config --color never`
+  - Result: PASS (exit code 0)
+  - Observed result: targeted regression passed (`1 passed; 0 failed`)
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo test --package elegy-memory --color never`
+  - Result: PASS (exit code 0)
+  - Observed per-target results:
+    - `src\lib.rs`: `165 passed; 0 failed`
+    - `src\main.rs`: `0 passed; 0 failed`
+    - `tests\cli.rs`: `39 passed; 0 failed`
+    - `tests\governed_memory.rs`: `15 passed; 0 failed`
+    - `tests\integration.rs`: `16 passed; 0 failed`
+    - `tests\local_store.rs`: `4 passed; 0 failed`
+    - `doc-tests`: `0 passed; 0 failed`
+  - Total observed result: `239 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo clippy -p elegy-memory --color never -- -D warnings`
+  - Result: PASS (exit code 0)
+  - Observed result: clean; `Finished dev profile [unoptimized + debuginfo] target(s) in 3.92s`
+
+- Outcome: `s8-param-learning-productionize` is implemented and revalidated on the current workspace.
+
+## Session 8 trait surface and doc sync (`s8-trait-surface-doc-sync`)
+
+- Scope completed:
+  - updated `ARCHITECTURE.md` to reflect that `elegy-memory` now has a complete MVP core plus implemented v1/v2 features, with future work centered on knowledge-graph migration and PostgreSQL
+  - corrected `memory-model.md` so corroboration bonuses, adaptive/type-specific decay, and automatic budget enforcement are documented as implemented behavior
+  - clarified `traits.rs` and `traits-and-interfaces.md` that `MemoryStore` is the core public contract while several advanced Session 8 capabilities remain concrete `SqliteMemoryStore` methods
+
+### Exact commands and observed results
+
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; rustfmt --edition 2021 crates/elegy-memory/src/traits.rs`
+  - Result: PASS (exit code 0)
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo test --package elegy-memory --color never`
+  - Result: PASS (exit code 0)
+  - Observed per-target results:
+    - `src\lib.rs`: `165 passed; 0 failed`
+    - `src\main.rs`: `0 passed; 0 failed`
+    - `tests\cli.rs`: `39 passed; 0 failed`
+    - `tests\governed_memory.rs`: `15 passed; 0 failed`
+    - `tests\integration.rs`: `16 passed; 0 failed`
+    - `tests\local_store.rs`: `4 passed; 0 failed`
+    - `doc-tests`: `0 passed; 0 failed`
+  - Total observed result: `239 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo clippy -p elegy-memory --color never -- -D warnings`
+  - Result: PASS (exit code 0)
+  - Observed result: clean; `Finished dev profile [unoptimized + debuginfo] target(s) in 3.77s`
+
+- Outcome: `s8-trait-surface-doc-sync` is implemented and revalidated on the current workspace.
+
+## Session 8 final validation closeout (`s8-final-validation-closeout`)
+
+- Session 8 completed work units overall:
+  - safety/sharing: `s8-poisoning-detection-harden`, `s8-cross-agent-sharing-safeguard`
+  - corrections: `s8-corrections-loop-complete`
+  - parameter learning: `s8-param-learning-productionize`
+  - trait/doc sync: `s8-trait-surface-doc-sync`
+
+### Exact commands and observed results
+
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo test --package elegy-memory --color never`
+  - Result: PASS (exit code 0)
+  - Observed per-target results:
+    - `src\lib.rs`: `165 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `src\main.rs`: `0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\cli.rs`: `39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\governed_memory.rs`: `15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\integration.rs`: `16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\local_store.rs`: `4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `doc-tests`: `0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+  - Total observed result: `239 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo clippy -p elegy-memory --color never -- -D warnings`
+  - Result: PASS (exit code 0)
+  - Observed result: clean; `Finished dev profile [unoptimized + debuginfo] target(s) in 0.43s`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; $env:CARGO_TERM_COLOR='never'; cargo build -p elegy-memory --release --color never`
+  - Result: PASS (exit code 0)
+  - Observed result: `Compiling elegy-memory v0.1.0 (C:\Users\Romain\Projects\Elegy\rust\crates\elegy-memory)`; `Finished release profile [optimized] target(s) in 38.95s`
+
+- Release build outcome: success for `elegy-memory` in the current workspace.
+- Outcome: Session 8 is fully closed on the current workspace after final validation.
+
+## Session 8 final validation closeout — exact-command rerun (`s8-final-validation-closeout`)
+
+- Timestamp: 2026-04-13
+- Purpose: reran the requested Session 8 closeout gate with the exact Windows-compatible commands requested for the final recorder record.
+- Session 8 overall accomplishments confirmed in the current workspace:
+  - poisoning detection hardening and cross-agent sharing safeguards are closed
+  - correction flows now surface history/outcomes and preserve lifecycle correctness
+  - parameter learning now persists learned weights and affects live ranking
+  - trait/doc sync reflects the implemented Session 8 surface
+
+### Exact commands and observed results
+
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test --package elegy-memory`
+  - Result: PASS (exit code 0)
+  - Observed per-target results:
+    - `src\lib.rs`: `165 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `src\main.rs`: `0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\cli.rs`: `39 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\governed_memory.rs`: `15 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\integration.rs`: `16 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `tests\local_store.rs`: `4 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+    - `doc-tests`: `0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+  - Total observed result: `239 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo clippy -p elegy-memory -- -D warnings`
+  - Result: PASS (exit code 0)
+  - Observed output: transient `Blocking waiting for file lock on package cache`, then `Finished dev profile [unoptimized + debuginfo] target(s) in 0.42s`
+- `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo build -p elegy-memory --release`
+  - Result: PASS (exit code 0)
+  - Observed output: transient `Blocking waiting for file lock on package cache`, then `Finished release profile [optimized] target(s) in 0.39s`
+
+- Release build outcome: success for `elegy-memory` in the current workspace.
+- Full Session 8 closeout validation passed cleanly.
+- Todo tracker status update was not applied because no repository-local SQL access / todo database target was available to execute `UPDATE todos SET status = 'done' WHERE id = 's8-final-validation-closeout'` confidently.
