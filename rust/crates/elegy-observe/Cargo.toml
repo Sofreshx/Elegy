@@ -17,7 +17,7 @@ sysinfo.workspace = true
 arboard.workspace = true
 
 [target.'cfg(windows)'.dependencies]
-elegy-observe-win32 = { path = "../elegy-observe-win32" }
+elegy-observe-win32 = { version = "0.1.0", path = "../elegy-observe-win32" }
 
 [lints]
 workspace = true
