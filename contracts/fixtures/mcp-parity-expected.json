@@ -1,33 +1,59 @@
 {
   "generatedSkills": [
     {
-      "id": "mcp-parity-server-list-files",
-      "name": "list-files",
-      "description": "List files in a workspace",
+      "skillFormat": "elegy-skill-definition",
+      "skillVersion": 2,
       "identity": {
-        "definitionId": "mcp-parity-server-list-files",
+        "namespace": "parity-server",
+        "name": "mcp-parity-server-list-files",
+        "version": "0.1.0",
         "displayName": "list-files",
-        "namespace": "parity-server"
+        "aliases": ["list-files"]
       },
       "metadata": {
+        "displayName": "list-files",
+        "description": "List files in a workspace",
         "summary": "List files in a workspace",
         "category": "mcp",
         "tags": ["parity-server", "list", "files"]
       },
-      "triggers": [
+      "capabilities": [
         {
-          "pattern": "list files",
-          "description": "Extracted from MCP tool name"
+          "id": "mcp-parity-server-list-files",
+          "name": "list-files",
+          "description": "List files in a workspace",
+          "implementation": {
+            "executionType": "mcp",
+            "executableName": "parity-server",
+            "arguments": ["list-files"]
+          },
+          "input": {
+            "schemaRef": "mcp://parity-server/tools/parity-server-list-files/input-schema"
+          },
+          "output": {
+            "returnsCollection": false,
+            "description": "List files in a workspace"
+          },
+          "execution": {
+            "mode": "requestResponse",
+            "isDeterministic": false,
+            "hasSideEffects": false
+          }
         }
       ],
-      "input": {
-        "schemaRef": "mcp://parity-server/tools/parity-server-list-files/input-schema"
-      },
       "governance": {
+        "riskLevel": "low",
+        "approvalRequirement": "none",
         "allowedContexts": ["mcp"]
       },
       "discovery": {
         "keywords": ["parity-server", "list", "files"],
+        "triggers": [
+          {
+            "pattern": "list files",
+            "description": "Extracted from MCP tool name"
+          }
+        ],
         "capabilityHints": ["list files"],
         "isHidden": false
       },
@@ -39,33 +65,59 @@
       "lifecycleState": "draft"
     },
     {
-      "id": "mcp-parity-server-readfile",
-      "name": "readFile",
-      "description": "Read a file from a workspace",
+      "skillFormat": "elegy-skill-definition",
+      "skillVersion": 2,
       "identity": {
-        "definitionId": "mcp-parity-server-readfile",
+        "namespace": "parity-server",
+        "name": "mcp-parity-server-readfile",
+        "version": "0.1.0",
         "displayName": "readFile",
-        "namespace": "parity-server"
+        "aliases": ["readFile"]
       },
       "metadata": {
+        "displayName": "readFile",
+        "description": "Read a file from a workspace",
         "summary": "Read a file from a workspace",
         "category": "mcp",
         "tags": ["parity-server", "readfile"]
       },
-      "triggers": [
+      "capabilities": [
         {
-          "pattern": "read file",
-          "description": "Extracted from MCP tool name"
+          "id": "mcp-parity-server-readfile",
+          "name": "readFile",
+          "description": "Read a file from a workspace",
+          "implementation": {
+            "executionType": "mcp",
+            "executableName": "parity-server",
+            "arguments": ["readFile"]
+          },
+          "input": {
+            "schemaRef": "mcp://parity-server/tools/parity-server-readfile/input-schema"
+          },
+          "output": {
+            "returnsCollection": false,
+            "description": "Read a file from a workspace"
+          },
+          "execution": {
+            "mode": "requestResponse",
+            "isDeterministic": false,
+            "hasSideEffects": false
+          }
         }
       ],
-      "input": {
-        "schemaRef": "mcp://parity-server/tools/parity-server-readfile/input-schema"
-      },
       "governance": {
+        "riskLevel": "low",
+        "approvalRequirement": "none",
         "allowedContexts": ["mcp"]
       },
       "discovery": {
         "keywords": ["parity-server", "readfile"],
+        "triggers": [
+          {
+            "pattern": "read file",
+            "description": "Extracted from MCP tool name"
+          }
+        ],
         "capabilityHints": ["read file"],
         "isHidden": false
       },

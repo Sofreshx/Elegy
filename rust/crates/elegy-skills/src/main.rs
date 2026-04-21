@@ -179,7 +179,13 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     println!("generated skills: {}", result.generated_skills.len());
     println!("skipped tools: {}", result.skipped_tools.len());
     for skill in &result.generated_skills {
-        println!("- {} ({})", skill.effective_id(), skill.effective_name());
+        let name = skill
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.display_name.as_deref())
+            .or(skill.identity.display_name.as_deref())
+            .unwrap_or(skill.identity.name.as_str());
+        println!("- {} ({})", skill.identity.name, name);
     }
     for path in &result.written_files {
         println!("written: {path}");

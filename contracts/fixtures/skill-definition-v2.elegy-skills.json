@@ -1,0 +1,100 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "skills",
+    "version": "0.1.0",
+    "displayName": "Elegy Skill Generation",
+    "aliases": ["elegy-skills", "skill-generation", "mcp-to-skill"]
+  },
+  "metadata": {
+    "displayName": "Elegy Skill Generation",
+    "description": "MCP-to-skill generation from governed MCP descriptors into v2 skill definitions.",
+    "summary": "Generate v2 skill definitions from governed MCP descriptors.",
+    "category": "skills",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["skills", "generation", "mcp", "descriptor", "governed"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/architecture/skill-core-v1.md"
+  },
+  "capabilities": [
+    {
+      "id": "skills-generate-from-mcp",
+      "name": "Generate Skills From MCP Descriptor",
+      "description": "Generate v2 skill definitions from a governed MCP descriptor.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["generate", "skills", "--descriptor", "${descriptor}", "--output-dir", "${outputDir}", "--force", "${force}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "descriptor",
+            "type": "path",
+            "description": "Path to a governed MCP descriptor used as the generation source.",
+            "required": true
+          },
+          {
+            "name": "outputDir",
+            "type": "path",
+            "description": "Optional output directory for generated v2 skill definition artifacts.",
+            "required": false
+          },
+          {
+            "name": "force",
+            "type": "boolean",
+            "description": "Allow overwriting generated skill files when an output directory is provided.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "description": "Skill-generation report including generated v2 skills, skipped tools, and written files."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "descriptor-input-only",
+      "description": "This surface generates skill artifacts from governed MCP descriptor inputs only.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": ["docs/architecture/skill-core-v1.md", "docs/architecture/mcp-skill-tooling-placement.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "skill-generation"]
+  },
+  "discovery": {
+    "keywords": ["skills", "generate", "mcp", "descriptor", "governed", "v2"],
+    "triggers": [
+      {
+        "pattern": "generate skills",
+        "description": "When governed skill artifacts need to be generated from an MCP descriptor."
+      },
+      {
+        "pattern": "mcp to skill",
+        "description": "When a bounded MCP slice should be projected into v2 skill definitions."
+      }
+    ],
+    "capabilityHints": ["mcp-to-skill-generation", "governed-skill-output"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-skills.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

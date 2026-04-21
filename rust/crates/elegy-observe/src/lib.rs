@@ -390,10 +390,7 @@ pub struct FsDiffResult {
 /// Takes a snapshot of the directory, waits for `timeout`, then takes another
 /// snapshot and returns the diff. This is a bounded observation, not a
 /// continuous watch.
-pub fn observe_filesystem(
-    path: &Path,
-    timeout: Duration,
-) -> Result<FsDiffResult, ObserveError> {
+pub fn observe_filesystem(path: &Path, timeout: Duration) -> Result<FsDiffResult, ObserveError> {
     let started = utc_now_rfc3339();
     let before = snapshot_directory(path)?;
 
@@ -554,9 +551,6 @@ mod tests {
             foreground_window(),
             Err(ObserveError::Unsupported)
         ));
-        assert!(matches!(
-            list_windows(None),
-            Err(ObserveError::Unsupported)
-        ));
+        assert!(matches!(list_windows(None), Err(ObserveError::Unsupported)));
     }
 }

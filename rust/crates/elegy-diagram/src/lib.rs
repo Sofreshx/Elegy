@@ -81,20 +81,30 @@ impl CanonicalDiagram {
         let mut node_ids = std::collections::BTreeSet::new();
         for node in &self.nodes {
             if !node_ids.insert(&node.id) {
-                return Err(DiagramError::DuplicateNodeId { id: node.id.clone() });
+                return Err(DiagramError::DuplicateNodeId {
+                    id: node.id.clone(),
+                });
             }
         }
-        
+
         let mut edge_ids = std::collections::BTreeSet::new();
         for edge in &self.edges {
             if !edge_ids.insert(&edge.id) {
-                return Err(DiagramError::DuplicateEdgeId { id: edge.id.clone() });
+                return Err(DiagramError::DuplicateEdgeId {
+                    id: edge.id.clone(),
+                });
             }
             if !node_ids.contains(&edge.source_id) {
-                return Err(DiagramError::InvalidSourceReference { edge_id: edge.id.clone(), node_id: edge.source_id.clone() });
+                return Err(DiagramError::InvalidSourceReference {
+                    edge_id: edge.id.clone(),
+                    node_id: edge.source_id.clone(),
+                });
             }
             if !node_ids.contains(&edge.target_id) {
-                return Err(DiagramError::InvalidTargetReference { edge_id: edge.id.clone(), node_id: edge.target_id.clone() });
+                return Err(DiagramError::InvalidTargetReference {
+                    edge_id: edge.id.clone(),
+                    node_id: edge.target_id.clone(),
+                });
             }
         }
         Ok(())
@@ -105,9 +115,10 @@ impl CanonicalDiagram {
         for id in &patch.remove_node_ids {
             self.nodes.retain(|n| &n.id != id);
             // Cascading remove of connected edges
-            self.edges.retain(|e| &e.source_id != id && &e.target_id != id);
+            self.edges
+                .retain(|e| &e.source_id != id && &e.target_id != id);
         }
-        
+
         // Add/Update nodes
         for node in patch.add_nodes {
             if let Some(existing) = self.nodes.iter_mut().find(|n| n.id == node.id) {
@@ -116,12 +127,12 @@ impl CanonicalDiagram {
                 self.nodes.push(node);
             }
         }
-        
+
         // Remove edges
         for id in &patch.remove_edge_ids {
             self.edges.retain(|e| &e.id != id);
         }
-        
+
         // Add/Update edges
         for edge in patch.add_edges {
             if let Some(existing) = self.edges.iter_mut().find(|e| e.id == edge.id) {
@@ -132,7 +143,8 @@ impl CanonicalDiagram {
         }
 
         // Clean up groups avoiding removed nodes
-        let current_node_ids: std::collections::HashSet<_> = self.nodes.iter().map(|n| &n.id).collect();
+        let current_node_ids: std::collections::HashSet<_> =
+            self.nodes.iter().map(|n| &n.id).collect();
         for group in &mut self.groups {
             group.node_ids.retain(|id| current_node_ids.contains(&id));
         }
@@ -145,7 +157,10 @@ impl CanonicalDiagram {
         }
         for edge in &self.edges {
             if let Some(label) = &edge.label {
-                out.push_str(&format!("    {} -- \"{}\" --> {}\n", edge.source_id, label, edge.target_id));
+                out.push_str(&format!(
+                    "    {} -- \"{}\" --> {}\n",
+                    edge.source_id, label, edge.target_id
+                ));
             } else {
                 out.push_str(&format!("    {} --> {}\n", edge.source_id, edge.target_id));
             }
@@ -154,9 +169,15 @@ impl CanonicalDiagram {
     }
 
     pub fn narrate_diagram(&self) -> String {
-        let mut out = format!("The diagram is of type '{}' with {} nodes and {} edges.\n", self.diagram_type, self.nodes.len(), self.edges.len());
-        
-        let node_map: std::collections::HashMap<_, _> = self.nodes.iter().map(|n| (&n.id, &n.label)).collect();
+        let mut out = format!(
+            "The diagram is of type '{}' with {} nodes and {} edges.\n",
+            self.diagram_type,
+            self.nodes.len(),
+            self.edges.len()
+        );
+
+        let node_map: std::collections::HashMap<_, _> =
+            self.nodes.iter().map(|n| (&n.id, &n.label)).collect();
 
         if self.nodes.is_empty() {
             out.push_str("The diagram is currently empty.\n");
@@ -171,16 +192,24 @@ impl CanonicalDiagram {
         if !self.edges.is_empty() {
             out.push_str("Connections:\n");
             for edge in &self.edges {
-                let source_label = node_map.get(&edge.source_id).copied().unwrap_or(&edge.source_id);
-                let target_label = node_map.get(&edge.target_id).copied().unwrap_or(&edge.target_id);
+                let source_label = node_map
+                    .get(&edge.source_id)
+                    .copied()
+                    .unwrap_or(&edge.source_id);
+                let target_label = node_map
+                    .get(&edge.target_id)
+                    .copied()
+                    .unwrap_or(&edge.target_id);
                 if let Some(label) = &edge.label {
                     out.push_str(&format!("- '{source_label}' connects to '{target_label}' via relationship '{label}'\n"));
                 } else {
-                    out.push_str(&format!("- '{source_label}' connects to '{target_label}'\n"));
+                    out.push_str(&format!(
+                        "- '{source_label}' connects to '{target_label}'\n"
+                    ));
                 }
             }
         }
-        
+
         out
     }
 }

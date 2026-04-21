@@ -59,17 +59,23 @@ fn direct_skills_binary_generates_expected_skill_artifacts() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let stdout: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .expect("generate stdout should be valid json");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("generate stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
-    assert_eq!(stdout["data"]["generated_skills"].as_array().map(Vec::len), Some(1));
-    assert_eq!(stdout["data"]["skipped_tools"].as_array().map(Vec::len), Some(1));
+    assert_eq!(
+        stdout["data"]["generated_skills"].as_array().map(Vec::len),
+        Some(1)
+    );
+    assert_eq!(
+        stdout["data"]["skipped_tools"].as_array().map(Vec::len),
+        Some(1)
+    );
 
     let generated_skill_path = output_dir.join("mcp-weather-server-get-weather.json");
     assert!(generated_skill_path.is_file());
 
-    let generated_skill = fs::read_to_string(&generated_skill_path)
-        .expect("read generated skill definition");
+    let generated_skill =
+        fs::read_to_string(&generated_skill_path).expect("read generated skill definition");
     assert!(generated_skill.contains("mcp-weather-server-get-weather"));
     assert!(generated_skill.contains("get-weather"));
 

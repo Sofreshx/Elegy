@@ -42,8 +42,8 @@ fn direct_mcp_binary_authors_and_analyzes_descriptor() {
     );
     assert!(descriptor_path.is_file());
 
-    let author_stdout: serde_json::Value = serde_json::from_slice(&author.stdout)
-        .expect("author stdout should be valid json");
+    let author_stdout: serde_json::Value =
+        serde_json::from_slice(&author.stdout).expect("author stdout should be valid json");
     assert_eq!(author_stdout["status"], "ok");
 
     let descriptor = fs::read_to_string(&descriptor_path).expect("read authored descriptor");

@@ -86,7 +86,7 @@ Anything outside that subset is rejected rather than guessed.
 
 The Mermaid contributor-routing skill follows the same authority split as the other current skill surfaces:
 
-1. `contracts/fixtures/skill-definition.elegy-mermaid.json` is authoritative.
+1. `contracts/fixtures/skill-definition-v2.elegy-mermaid.json` is authoritative.
 2. `contracts/fixtures/skill-discovery-index.elegy-mermaid.json` is the governed discovery projection.
 3. `.github/skills/elegy-mermaid/SKILL.md` is the repo-local non-authoritative contributor-routing output.
 

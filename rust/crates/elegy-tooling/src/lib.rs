@@ -1,6 +1,6 @@
 use elegy_contracts::{
-    validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition,
-    McpAnalysisResult, McpServerDescriptor, McpToolDefinition, McpTransportKind, SkillDefinition,
+    validate_mcp_analysis_result, validate_mcp_server_descriptor, validate_skill_definition_v2,
+    McpAnalysisResult, McpServerDescriptor, McpToolDefinition, McpTransportKind, SkillDefinitionV2,
 };
 use elegy_mcp::{generated_skill_id, McpSkillGenerator, McpToolAnalyzer};
 use serde::Serialize;
@@ -33,7 +33,7 @@ pub struct AuthoredMcpDescriptor {
 pub struct GeneratedSkillArtifacts {
     pub source_descriptor: String,
     pub analysis: McpAnalysisResult,
-    pub generated_skills: Vec<SkillDefinition>,
+    pub generated_skills: Vec<SkillDefinitionV2>,
     pub skipped_tools: Vec<McpToolDefinition>,
     pub written_files: Vec<String>,
 }
@@ -225,11 +225,11 @@ fn generator_collision_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
     issues
 }
 
-fn validate_generated_skills(skills: &[SkillDefinition]) -> Result<(), ToolingError> {
+fn validate_generated_skills(skills: &[SkillDefinitionV2]) -> Result<(), ToolingError> {
     let mut distinct_ids = BTreeSet::new();
 
     for skill in skills {
-        let skill_id = skill.effective_id().trim();
+        let skill_id = skill.identity.name.trim();
         let normalized_skill_id = skill_id.to_ascii_lowercase();
         if !distinct_ids.insert(normalized_skill_id) {
             return Err(ToolingError::DuplicateSkillId {
@@ -237,11 +237,10 @@ fn validate_generated_skills(skills: &[SkillDefinition]) -> Result<(), ToolingEr
             });
         }
 
-        let validation = validate_skill_definition(skill);
-        if !validation.is_valid() {
+        if let Err(error) = validate_skill_definition_v2(skill) {
             return Err(ToolingError::InvalidSkillDefinition {
-                skill_id: skill.effective_id().to_string(),
-                issues: validation.issues,
+                skill_id: skill.identity.name.clone(),
+                issues: vec![error.to_string()],
             });
         }
     }
@@ -251,7 +250,7 @@ fn validate_generated_skills(skills: &[SkillDefinition]) -> Result<(), ToolingEr
 
 fn write_skill_files(
     output_dir: &Path,
-    skills: &[SkillDefinition],
+    skills: &[SkillDefinitionV2],
     overwrite: bool,
 ) -> Result<Vec<PathBuf>, ToolingError> {
     fs::create_dir_all(output_dir).map_err(|source| ToolingError::Io {
@@ -262,7 +261,7 @@ fn write_skill_files(
 
     let target_paths = skills
         .iter()
-        .map(|skill| output_dir.join(format!("{}.json", skill.effective_id())))
+        .map(|skill| output_dir.join(format!("{}.json", skill.identity.name)))
         .collect::<Vec<_>>();
 
     if !overwrite {
@@ -434,7 +433,7 @@ mod tests {
                 .expect("skill generation should succeed");
         assert_eq!(generated.generated_skills.len(), 1);
         assert_eq!(
-            generated.generated_skills[0].effective_id(),
+            generated.generated_skills[0].identity.name,
             "mcp-weather-server-get-weather"
         );
         assert_eq!(generated.skipped_tools.len(), 1);

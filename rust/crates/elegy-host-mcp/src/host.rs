@@ -1,5 +1,6 @@
 use crate::HostError;
 use base64::Engine as _;
+use elegy_contracts::{builtin_skill_definitions, find_builtin_skill_capability};
 use elegy_core::{
     compose_runtime_state, CatalogResource, ProjectLocator, ReadResourceError, ResourceReadResult,
     RuntimeState,
@@ -9,45 +10,8 @@ use rmcp::{
 };
 use serde_json::json;
 use std::sync::{Arc, OnceLock};
+use std::time::Duration;
 use tokio::task;
-
-// ---------------------------------------------------------------------------
-// Embedded v2 skill definitions (compile-time)
-// ---------------------------------------------------------------------------
-const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
-    (
-        "diagram",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
-    ),
-    (
-        "skill-router",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
-    ),
-    (
-        "observe",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
-    ),
-    (
-        "desktop",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
-    ),
-    (
-        "repo",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-repo.json"),
-    ),
-    (
-        "web",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-web.json"),
-    ),
-    (
-        "data",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-data.json"),
-    ),
-    (
-        "notify",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-notify.json"),
-    ),
-];
 
 // ---------------------------------------------------------------------------
 // Cached tool list built from the embedded skill definitions
@@ -64,8 +28,8 @@ fn cached_tools() -> Vec<Tool> {
 fn build_tools_from_skill_definitions() -> Vec<Tool> {
     let mut tools = Vec::new();
 
-    for &(_skill_name, json_text) in EMBEDDED_SKILL_DEFINITIONS {
-        let def: serde_json::Value = match serde_json::from_str(json_text) {
+    for definition in builtin_skill_definitions() {
+        let def: serde_json::Value = match serde_json::from_str(definition.json) {
             Ok(v) => v,
             Err(_) => continue,
         };
@@ -214,20 +178,10 @@ fn build_annotations(capability: &serde_json::Value) -> ToolAnnotations {
 /// Locate the raw capability JSON and its parent skill definition for a given
 /// tool name (= capability id).
 fn find_capability(tool_name: &str) -> Option<(serde_json::Value, serde_json::Value)> {
-    for &(_skill_name, json_text) in EMBEDDED_SKILL_DEFINITIONS {
-        let def: serde_json::Value = match serde_json::from_str(json_text) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-        if let Some(caps) = def.get("capabilities").and_then(|c| c.as_array()) {
-            for cap in caps {
-                if cap.get("id").and_then(|v| v.as_str()) == Some(tool_name) {
-                    return Some((cap.clone(), def.clone()));
-                }
-            }
-        }
-    }
-    None
+    let (capability, definition) = find_builtin_skill_capability(tool_name).ok()??;
+    let capability = serde_json::to_value(capability).ok()?;
+    let definition = serde_json::to_value(definition).ok()?;
+    Some((capability, definition))
 }
 
 /// Build the final CLI argument vector, correctly dropping `--flag ${param}`
@@ -245,6 +199,18 @@ fn build_cli_arguments(
             continue;
         }
         let s = arg.as_str().unwrap_or_default();
+
+        if s.starts_with("${") && s.ends_with('}') {
+            let key = &s[2..s.len() - 1];
+            if let Some(val) = params.get(key) {
+                if let Some(values) = val.as_array() {
+                    result.extend(values.iter().map(value_as_string));
+                } else {
+                    result.push(value_as_string(val));
+                }
+            }
+            continue;
+        }
 
         // Look ahead: if the *next* element is a placeholder, decide now
         if let Some(next) = template_args.get(i + 1) {
@@ -288,6 +254,81 @@ fn value_as_string(v: &serde_json::Value) -> String {
     }
 }
 
+fn capability_has_side_effects(capability: &serde_json::Value) -> bool {
+    capability
+        .get("execution")
+        .and_then(|execution| execution.get("hasSideEffects"))
+        .and_then(|value| value.as_bool())
+        .unwrap_or(false)
+}
+
+fn capability_supports_dry_run(capability: &serde_json::Value) -> bool {
+    let declares_parameter = capability
+        .get("input")
+        .and_then(|input| input.get("parameters"))
+        .and_then(|parameters| parameters.as_array())
+        .is_some_and(|parameters| {
+            parameters.iter().any(|parameter| {
+                parameter
+                    .get("name")
+                    .and_then(|name| name.as_str())
+                    .is_some_and(|name| name == "dry_run" || name == "dryRun")
+            })
+        });
+
+    let template_uses_parameter = capability
+        .get("implementation")
+        .and_then(|implementation| implementation.get("arguments"))
+        .and_then(|arguments| arguments.as_array())
+        .is_some_and(|arguments| {
+            arguments.iter().any(|argument| {
+                argument.as_str().is_some_and(|argument| {
+                    argument.contains("${dry_run}") || argument.contains("${dryRun}")
+                })
+            })
+        });
+
+    declares_parameter && template_uses_parameter
+}
+
+fn capability_timeout_seconds(capability: &serde_json::Value) -> Option<u64> {
+    capability
+        .get("execution")
+        .and_then(|execution| execution.get("timeoutSeconds"))
+        .and_then(|value| value.as_u64())
+}
+
+fn dry_run_argument_value(arguments: &serde_json::Map<String, serde_json::Value>) -> Option<bool> {
+    arguments
+        .get("dryRun")
+        .or_else(|| arguments.get("dry_run"))
+        .and_then(|value| value.as_bool())
+}
+
+fn arguments_request_dry_run(arguments: &serde_json::Map<String, serde_json::Value>) -> bool {
+    dry_run_argument_value(arguments).unwrap_or(false)
+}
+
+fn normalize_dry_run_argument(arguments: &mut serde_json::Map<String, serde_json::Value>) {
+    let Some(value) = dry_run_argument_value(arguments) else {
+        return;
+    };
+
+    arguments.insert("dry_run".to_string(), json!(value));
+    arguments.insert("dryRun".to_string(), json!(value));
+}
+
+fn bytes_to_capped_string(bytes: &[u8], max_bytes: usize) -> String {
+    if bytes.len() <= max_bytes {
+        return String::from_utf8_lossy(bytes).into_owned();
+    }
+
+    let capped = bytes.get(..max_bytes).unwrap_or(bytes);
+    let mut text = String::from_utf8_lossy(capped).into_owned();
+    text.push_str("\n... [truncated by elegy-host-mcp]");
+    text
+}
+
 /// Resolve the path for an executable name.  If it matches the current binary
 /// stem, returns the current exe path so the MCP host can self-dispatch even
 /// when the binary is not on `PATH`.
@@ -306,21 +347,53 @@ fn which_executable(name: &str) -> String {
     name.to_string()
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct HostOptions {
+    pub allow_side_effects: bool,
+    pub default_tool_timeout_seconds: u64,
+    pub max_tool_output_bytes: usize,
+}
+
+impl Default for HostOptions {
+    fn default() -> Self {
+        Self {
+            allow_side_effects: false,
+            default_tool_timeout_seconds: 30,
+            max_tool_output_bytes: 1_048_576,
+        }
+    }
+}
+
 pub struct ElegyMcpHost {
     state: Arc<RuntimeState>,
+    options: HostOptions,
 }
 
 impl ElegyMcpHost {
     pub fn new(state: RuntimeState) -> Self {
+        Self::with_options(state, HostOptions::default())
+    }
+
+    pub fn with_options(state: RuntimeState, options: HostOptions) -> Self {
         Self {
             state: Arc::new(state),
+            options,
         }
     }
 }
 
 pub async fn serve_stdio(locator: ProjectLocator) -> Result<(), HostError> {
+    serve_stdio_with_options(locator, HostOptions::default()).await
+}
+
+pub async fn serve_stdio_with_options(
+    locator: ProjectLocator,
+    options: HostOptions,
+) -> Result<(), HostError> {
     let state = compose_runtime_state(locator)?;
-    let server = ElegyMcpHost::new(state).serve(stdio()).await?;
+    let server = ElegyMcpHost::with_options(state, options)
+        .serve(stdio())
+        .await?;
     server.waiting().await?;
     Ok(())
 }
@@ -411,7 +484,7 @@ impl ServerHandler for ElegyMcpHost {
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<CallToolResult, McpError> {
         let tool_name = request.name.as_ref();
-        let arguments = request.arguments.unwrap_or_default();
+        let mut arguments = request.arguments.unwrap_or_default();
 
         // 1. Find the matching capability
         let (capability, _def) = find_capability(tool_name).ok_or_else(|| {
@@ -421,6 +494,18 @@ impl ServerHandler for ElegyMcpHost {
             )
         })?;
 
+        let has_side_effects = capability_has_side_effects(&capability);
+        let dry_run_requested = arguments_request_dry_run(&arguments);
+        let dry_run_allowed = dry_run_requested && capability_supports_dry_run(&capability);
+        if has_side_effects && !self.options.allow_side_effects && !dry_run_allowed {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "tool {tool_name} has side effects; restart the host with side-effect execution enabled or call a capability that explicitly supports dry-run"
+            ))]));
+        }
+        if dry_run_allowed {
+            normalize_dry_run_argument(&mut arguments);
+        }
+
         // 2. Extract implementation details
         let impl_block = capability.get("implementation").ok_or_else(|| {
             McpError::internal_error(
@@ -428,6 +513,16 @@ impl ServerHandler for ElegyMcpHost {
                 Some(json!({ "tool": tool_name })),
             )
         })?;
+
+        let execution_type = impl_block
+            .get("executionType")
+            .and_then(|v| v.as_str())
+            .unwrap_or("subprocess");
+        if execution_type != "subprocess" {
+            return Ok(CallToolResult::error(vec![Content::text(format!(
+                "tool {tool_name} uses unsupported executionType '{execution_type}' in this host"
+            ))]));
+        }
 
         let executable = impl_block
             .get("executableName")
@@ -458,6 +553,7 @@ impl ServerHandler for ElegyMcpHost {
         cmd.args(&cli_args);
         cmd.stdout(std::process::Stdio::piped());
         cmd.stderr(std::process::Stdio::piped());
+        cmd.kill_on_drop(true);
 
         if stdin_data.is_some() {
             cmd.stdin(std::process::Stdio::piped());
@@ -482,16 +578,30 @@ impl ServerHandler for ElegyMcpHost {
         }
 
         // 8. Await completion
-        let output = child.wait_with_output().await.map_err(|e| {
-            McpError::internal_error(
-                format!("subprocess I/O error: {e}"),
-                Some(json!({ "tool": tool_name })),
-            )
-        })?;
+        let timeout_seconds = capability_timeout_seconds(&capability)
+            .unwrap_or(self.options.default_tool_timeout_seconds);
+        let output = match tokio::time::timeout(
+            Duration::from_secs(timeout_seconds),
+            child.wait_with_output(),
+        )
+        .await
+        {
+            Ok(result) => result.map_err(|e| {
+                McpError::internal_error(
+                    format!("subprocess I/O error: {e}"),
+                    Some(json!({ "tool": tool_name })),
+                )
+            })?,
+            Err(_) => {
+                return Ok(CallToolResult::error(vec![Content::text(format!(
+                    "tool {tool_name} timed out after {timeout_seconds}s"
+                ))]));
+            }
+        };
 
         // 9. Return result
-        let stdout = String::from_utf8_lossy(&output.stdout).into_owned();
-        let stderr = String::from_utf8_lossy(&output.stderr).into_owned();
+        let stdout = bytes_to_capped_string(&output.stdout, self.options.max_tool_output_bytes);
+        let stderr = bytes_to_capped_string(&output.stderr, self.options.max_tool_output_bytes);
 
         if output.status.success() {
             Ok(CallToolResult::success(vec![Content::text(stdout)]))
@@ -745,12 +855,23 @@ mod tests {
         // The diagram skill definition has 4 capabilities
         assert_eq!(
             tools.len(),
-            32,
-            "expected 32 tools from diagram + skill-router + observe + desktop + repo + web + data + notify skill defs"
+            47,
+            "expected 47 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"), "missing diagram-create");
+        assert!(names.contains(&"memory-add"), "missing memory-add");
+        assert!(names.contains(&"memory-search"), "missing memory-search");
+        assert!(
+            names.contains(&"mcp-analyze-descriptor"),
+            "missing mcp-analyze-descriptor"
+        );
+        assert!(
+            names.contains(&"skills-generate-from-mcp"),
+            "missing skills-generate-from-mcp"
+        );
+        assert!(names.contains(&"mermaid-render"), "missing mermaid-render");
         assert!(names.contains(&"diagram-patch"), "missing diagram-patch");
         assert!(
             names.contains(&"diagram-narrate"),
@@ -1016,6 +1137,62 @@ mod tests {
     }
 
     #[test]
+    fn build_cli_arguments_substitutes_standalone_placeholders() {
+        let template: Vec<serde_json::Value> = vec![
+            json!("memory"),
+            json!("add"),
+            json!("${content}"),
+            json!("--format"),
+            json!("json"),
+        ];
+        let mut params = serde_json::Map::new();
+        params.insert("content".to_string(), json!("A distilled memory"));
+
+        let result = build_cli_arguments(&template, &params);
+        assert_eq!(
+            result,
+            vec!["memory", "add", "A distilled memory", "--format", "json"]
+        );
+    }
+
+    #[test]
+    fn side_effect_policy_helpers_require_explicit_dry_run_support() {
+        let unsupported_capability = json!({
+            "execution": {
+                "hasSideEffects": true
+            }
+        });
+        let mut args = serde_json::Map::new();
+
+        assert!(capability_has_side_effects(&unsupported_capability));
+        assert!(!capability_supports_dry_run(&unsupported_capability));
+        assert!(!arguments_request_dry_run(&args));
+
+        args.insert("dryRun".to_string(), json!(true));
+        assert!(arguments_request_dry_run(&args));
+        assert!(!capability_supports_dry_run(&unsupported_capability));
+
+        let supported_capability = json!({
+            "implementation": {
+                "arguments": ["desktop", "click", "--dry-run", "${dry_run}", "--json"]
+            },
+            "input": {
+                "parameters": [
+                    { "name": "dry_run", "type": "boolean", "required": false }
+                ]
+            },
+            "execution": {
+                "hasSideEffects": true
+            }
+        });
+        assert!(capability_supports_dry_run(&supported_capability));
+
+        normalize_dry_run_argument(&mut args);
+        assert_eq!(args.get("dry_run"), Some(&json!(true)));
+        assert_eq!(args.get("dryRun"), Some(&json!(true)));
+    }
+
+    #[test]
     fn find_capability_returns_matching_capability() {
         let (cap, _def) =
             find_capability("diagram-create").expect("should find diagram-create capability");
@@ -1059,12 +1236,17 @@ mod tests {
 
         assert_eq!(
             tools.len(),
-            32,
-            "expected 32 tools from diagram + skill-router + observe + desktop + repo + web + data + notify skill defs"
+            47,
+            "expected 47 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
         assert!(names.contains(&"diagram-create"));
+        assert!(names.contains(&"memory-add"));
+        assert!(names.contains(&"memory-search"));
+        assert!(names.contains(&"mcp-analyze-descriptor"));
+        assert!(names.contains(&"skills-generate-from-mcp"));
+        assert!(names.contains(&"mermaid-render"));
         assert!(names.contains(&"diagram-patch"));
         assert!(names.contains(&"diagram-narrate"));
         assert!(names.contains(&"diagram-render"));

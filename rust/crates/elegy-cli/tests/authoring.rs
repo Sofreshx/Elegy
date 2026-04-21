@@ -339,8 +339,8 @@ fn run_dry_run_command_matches_http_example_catalog() {
         String::from_utf8_lossy(&output.stderr)
     );
 
-    let stdout: serde_json::Value = serde_json::from_slice(&output.stdout)
-        .expect("dry-run stdout should be valid json");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("dry-run stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
     assert_eq!(stdout["command"], serde_json::json!(["run", "dry-run"]));
     assert_eq!(stdout["data"], expected);

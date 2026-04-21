@@ -4,14 +4,22 @@ This file is for Claude Code. For universal instructions, see AGENTS.md.
 
 ## Context
 
-Elegy is a Rust project building modular AI agent infrastructure. The active system is `elegy-memory`, a standalone memory engine for LLM agents. It uses SQLite + sqlite-vec + FTS5 for storage and semantic search.
+Elegy is a Rust project building modular AI agent infrastructure: governed contracts, CLI tools, v2 skill definitions, and an MCP host for runtime discovery and tool invocation. `elegy-memory` remains an important MVP subsystem, but current agent-facing work spans the umbrella CLI, contracts, skill generation, and MCP host.
 
 ## Before Coding
 
 Read these docs in order:
-1. `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` — system overview
-2. `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` — what to build now vs later
-3. The specific doc for whatever you're implementing
+1. `docs/agent-integration.md` — agent discovery and invocation model
+2. The specific doc for whatever you're implementing
+3. For memory work, `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md`
+4. For memory scope decisions, `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`
+
+## Discovery Surface
+
+- Use `elegy skills list/search/describe --json` as the first stop for agent-facing capability discovery.
+- V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are authoritative. Do not add v1 skill-definition files.
+- `elegy run` serves MCP resources and tool calls from the same built-in v2 registry.
+- Side-effecting MCP tool calls require dry-run input or a host started with `--allow-side-effects`.
 
 ## Key Constraints
 

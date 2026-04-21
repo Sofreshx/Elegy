@@ -10,7 +10,12 @@
     {
       "id": "example-capability",
       "name": "Example",
-      "description": "Minimal example capability."
+      "description": "Minimal example capability.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skills", "list", "--json"]
+      }
     }
   ],
   "lifecycleState": "draft"

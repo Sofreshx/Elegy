@@ -116,13 +116,13 @@ Current governed workflow artifacts in that bundle include both the portable wor
 
 Current governed dedicated-surface skill artifacts in that bundle include:
 
-- `fixtures/skill-definition.elegy-memory.json`
+- `fixtures/skill-definition-v2.elegy-memory.json`
 - `fixtures/skill-discovery-index.elegy-memory.json`
-- `fixtures/skill-definition.elegy-mcp.json`
+- `fixtures/skill-definition-v2.elegy-mcp.json`
 - `fixtures/skill-discovery-index.elegy-mcp.json`
-- `fixtures/skill-definition.elegy-skills.json`
+- `fixtures/skill-definition-v2.elegy-skills.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
-- `fixtures/skill-definition.elegy-mermaid.json`
+- `fixtures/skill-definition-v2.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-mermaid.json`
 
 The repo carries `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` as repo-local non-authoritative contributor-routing files for those surfaces. Those markdown files are not part of the governed contracts bundle.

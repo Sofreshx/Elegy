@@ -480,6 +480,7 @@ mod tests {
     use std::fs;
     use std::path::{Path, PathBuf};
     use std::process::Command;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     struct TestRepo {
@@ -674,11 +675,14 @@ mod tests {
     }
 
     fn unique_temp_path(prefix: &str) -> PathBuf {
+        static TEMP_COUNTER: AtomicU64 = AtomicU64::new(0);
+
         let nanos = SystemTime::now()
             .duration_since(UNIX_EPOCH)
             .map(|duration| duration.as_nanos())
             .unwrap_or(0);
-        std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()))
+        let counter = TEMP_COUNTER.fetch_add(1, Ordering::Relaxed);
+        std::env::temp_dir().join(format!("{prefix}-{}-{nanos}-{counter}", std::process::id()))
     }
 
     fn run_git(repo: Option<&Path>, args: &[&str]) -> Result<String, Box<dyn Error>> {

@@ -564,79 +564,6 @@ struct VersionPolicyDocument {
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
-pub struct SkillDefinition {
-    pub id: String,
-    pub name: String,
-    pub description: Option<String>,
-    #[serde(default)]
-    pub identity: SkillIdentity,
-    #[serde(default)]
-    pub metadata: SkillMetadata,
-    #[serde(default)]
-    pub triggers: Vec<SkillTrigger>,
-    #[serde(default)]
-    pub constraints: Vec<SkillConstraint>,
-    #[serde(default)]
-    pub input: SkillInputContract,
-    #[serde(default)]
-    pub output: SkillOutputContract,
-    #[serde(default)]
-    pub execution: SkillExecutionContract,
-    #[serde(default)]
-    pub governance: SkillGovernanceMetadata,
-    #[serde(default)]
-    pub discovery: SkillDiscoveryMetadata,
-    #[serde(default)]
-    pub origin: SkillOrigin,
-    #[serde(default)]
-    pub lifecycle_state: SkillLifecycleState,
-}
-
-impl SkillDefinition {
-    pub fn effective_id(&self) -> &str {
-        if self.identity.definition_id.trim().is_empty() {
-            self.id.as_str()
-        } else {
-            self.identity.definition_id.as_str()
-        }
-    }
-
-    pub fn effective_name(&self) -> &str {
-        if self.identity.display_name.trim().is_empty() {
-            self.name.as_str()
-        } else {
-            self.identity.display_name.as_str()
-        }
-    }
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillIdentity {
-    #[serde(default)]
-    pub definition_id: String,
-    #[serde(default)]
-    pub display_name: String,
-    pub namespace: Option<String>,
-    pub version: Option<String>,
-    #[serde(default)]
-    pub aliases: Vec<String>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillMetadata {
-    pub summary: Option<String>,
-    pub category: Option<String>,
-    #[serde(default)]
-    pub tags: Vec<String>,
-    #[serde(default)]
-    pub owners: Vec<String>,
-    pub documentation_uri: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
 pub struct SkillTrigger {
     pub pattern: String,
     pub description: Option<String>,
@@ -648,104 +575,6 @@ pub struct SkillConstraint {
     pub constraint_id: String,
     pub description: Option<String>,
     pub required: bool,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillInputContract {
-    #[serde(default)]
-    pub parameters: Vec<SkillParameter>,
-    pub schema_ref: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillParameter {
-    pub name: String,
-    pub r#type: String,
-    pub description: Option<String>,
-    pub required: bool,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillOutputContract {
-    pub result_type: Option<String>,
-    pub schema_ref: Option<String>,
-    pub returns_collection: bool,
-    pub description: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillExecutionContract {
-    #[serde(default)]
-    pub mode: SkillExecutionMode,
-    pub is_deterministic: bool,
-    pub has_side_effects: bool,
-    pub timeout_seconds: Option<i32>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum SkillExecutionMode {
-    #[default]
-    RequestResponse,
-    LongRunning,
-    Streaming,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillGovernanceMetadata {
-    #[serde(default)]
-    pub risk_level: SkillRiskLevel,
-    #[serde(default)]
-    pub approval_requirement: SkillApprovalRequirement,
-    #[serde(default)]
-    pub policy_refs: Vec<String>,
-    #[serde(default)]
-    pub allowed_contexts: Vec<String>,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum SkillRiskLevel {
-    #[default]
-    Low,
-    Medium,
-    High,
-    Critical,
-}
-
-#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub enum SkillApprovalRequirement {
-    #[default]
-    None,
-    Advisory,
-    Required,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillDiscoveryMetadata {
-    #[serde(default)]
-    pub keywords: Vec<String>,
-    #[serde(default)]
-    pub capability_hints: Vec<String>,
-    pub is_hidden: bool,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct SkillOrigin {
-    #[serde(default)]
-    pub materialization_kind: SkillMaterializationKind,
-    #[serde(default)]
-    pub source_kind: SkillSourceKind,
-    pub source_ref: Option<String>,
-    pub source_version: Option<String>,
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -1245,14 +1074,241 @@ pub fn validate_skill_definition_v2(def: &SkillDefinitionV2) -> Result<(), Contr
             "capabilities must contain at least one entry".to_string(),
         ));
     }
+    if has_duplicate_values(def.identity.aliases.iter().map(String::as_str)) {
+        return Err(ContractsError::Compatibility(
+            "identity aliases must be unique".to_string(),
+        ));
+    }
+    if let Some(metadata) = &def.metadata {
+        if metadata.tags.iter().any(|tag| tag.trim().is_empty()) {
+            return Err(ContractsError::Compatibility(
+                "metadata tags must not be blank".to_string(),
+            ));
+        }
+        if metadata.owners.iter().any(|owner| owner.trim().is_empty()) {
+            return Err(ContractsError::Compatibility(
+                "metadata owners must not be blank".to_string(),
+            ));
+        }
+    }
+    if def
+        .constraints
+        .iter()
+        .any(|constraint| constraint.constraint_id.trim().is_empty())
+    {
+        return Err(ContractsError::Compatibility(
+            "constraints must define non-empty constraint IDs".to_string(),
+        ));
+    }
+    if let Some(governance) = &def.governance {
+        if governance.approval_requirement.as_deref() == Some("required")
+            && governance.policy_refs.is_empty()
+        {
+            return Err(ContractsError::Compatibility(
+                "skills that require approval must declare at least one policy reference"
+                    .to_string(),
+            ));
+        }
+    }
+    if let Some(discovery) = &def.discovery {
+        if discovery
+            .triggers
+            .iter()
+            .any(|trigger| trigger.pattern.trim().is_empty())
+        {
+            return Err(ContractsError::Compatibility(
+                "discovery triggers must define non-empty patterns".to_string(),
+            ));
+        }
+    }
+    if let Some(origin) = &def.origin {
+        let is_dynamic = origin.materialization_kind.as_deref() == Some("dynamic");
+        let is_manual = origin
+            .source_kind
+            .as_deref()
+            .is_none_or(|kind| kind == "manual");
+        if is_dynamic && is_manual && origin.source_ref.is_none() {
+            return Err(ContractsError::Compatibility(
+                "dynamic skills must declare either a source reference or a non-manual source kind"
+                    .to_string(),
+            ));
+        }
+    }
+
+    let mut capability_ids = BTreeSet::new();
     for cap in &def.capabilities {
         if cap.id.is_empty() {
             return Err(ContractsError::Compatibility(
                 "capability id must not be empty".to_string(),
             ));
         }
+        if !capability_ids.insert(cap.id.to_ascii_lowercase()) {
+            return Err(ContractsError::Compatibility(format!(
+                "capability id '{}' is duplicated",
+                cap.id
+            )));
+        }
+        if cap.name.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "capability '{}' must define a name",
+                cap.id
+            )));
+        }
+        if cap.description.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "capability '{}' must define a description",
+                cap.id
+            )));
+        }
+        let Some(implementation) = &cap.implementation else {
+            return Err(ContractsError::Compatibility(format!(
+                "capability '{}' must define an implementation",
+                cap.id
+            )));
+        };
+        if implementation.execution_type.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "capability '{}' implementation.executionType must not be empty",
+                cap.id
+            )));
+        }
+        if implementation.executable_name.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "capability '{}' implementation.executableName must not be empty",
+                cap.id
+            )));
+        }
+        if let Some(input) = &cap.input {
+            let mut parameter_names = BTreeSet::new();
+            for parameter in &input.parameters {
+                if parameter.name.trim().is_empty() {
+                    return Err(ContractsError::Compatibility(format!(
+                        "capability '{}' input parameters must define non-empty names",
+                        cap.id
+                    )));
+                }
+                if !parameter_names.insert(parameter.name.to_ascii_lowercase()) {
+                    return Err(ContractsError::Compatibility(format!(
+                        "capability '{}' input parameter '{}' is duplicated",
+                        cap.id, parameter.name
+                    )));
+                }
+            }
+        }
     }
     Ok(())
+}
+
+/// One built-in skill definition compiled into Elegy binaries.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BuiltinSkillDefinition {
+    /// Runtime skill identifier, matching `identity.name`.
+    pub id: &'static str,
+    /// UTF-8 JSON text for the v2 skill definition.
+    pub json: &'static str,
+}
+
+/// Built-in v2 skill definitions available for runtime discovery.
+pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
+    BuiltinSkillDefinition {
+        id: "diagram",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "skill-router",
+        json: include_str!(
+            "../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"
+        ),
+    },
+    BuiltinSkillDefinition {
+        id: "memory",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-memory.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "mcp",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-mcp.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "skills",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skills.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "mermaid",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-mermaid.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "observe",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "desktop",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "repo",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-repo.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "web",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-web.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "data",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-data.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "notify",
+        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-notify.json"),
+    },
+];
+
+/// Return the built-in v2 skill registry.
+pub fn builtin_skill_definitions() -> &'static [BuiltinSkillDefinition] {
+    BUILTIN_SKILL_DEFINITIONS
+}
+
+/// Parse and validate every built-in v2 skill definition.
+pub fn parse_builtin_skill_definitions() -> Result<Vec<SkillDefinitionV2>, ContractsError> {
+    BUILTIN_SKILL_DEFINITIONS
+        .iter()
+        .map(|entry| {
+            let definition =
+                serde_json::from_str::<SkillDefinitionV2>(entry.json).map_err(|source| {
+                    ContractsError::Compatibility(format!(
+                        "built-in skill definition '{}' is invalid JSON: {source}",
+                        entry.id
+                    ))
+                })?;
+            validate_skill_definition_v2(&definition)?;
+            Ok(definition)
+        })
+        .collect()
+}
+
+/// Find a built-in v2 skill definition by `identity.name`.
+pub fn find_builtin_skill_definition(
+    skill_id: &str,
+) -> Result<Option<SkillDefinitionV2>, ContractsError> {
+    for definition in parse_builtin_skill_definitions()? {
+        if definition.identity.name == skill_id {
+            return Ok(Some(definition));
+        }
+    }
+    Ok(None)
+}
+
+/// Find a built-in capability and its parent v2 skill definition.
+pub fn find_builtin_skill_capability(
+    capability_id: &str,
+) -> Result<Option<(SkillCapability, SkillDefinitionV2)>, ContractsError> {
+    for definition in parse_builtin_skill_definitions()? {
+        for capability in &definition.capabilities {
+            if capability.id == capability_id {
+                return Ok(Some((capability.clone(), definition)));
+            }
+        }
+    }
+    Ok(None)
 }
 
 pub fn default_support_manifest_path() -> PathBuf {
@@ -1530,10 +1586,13 @@ pub fn load_capability_definition_fixture_from_dir(
     )
 }
 
-pub fn load_skill_definition_fixture_from_dir(
+pub fn load_skill_definition_v2_fixture_from_dir(
     dir: &Path,
-) -> Result<SkillDefinition, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("skill-definition.minimal.json"))
+) -> Result<SkillDefinitionV2, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("skill-definition-v2.minimal.json"),
+    )
 }
 
 pub fn load_skill_discovery_index_fixture_from_dir(
@@ -1948,164 +2007,6 @@ pub fn validate_capability_definition(
     }
 
     CapabilityValidationResult { issues }
-}
-
-pub fn validate_skill_definition(definition: &SkillDefinition) -> SkillValidationResult {
-    let mut issues = Vec::new();
-
-    if definition.effective_id().trim().is_empty() {
-        issues.push("Skill definition ID is required.".to_string());
-    }
-
-    if definition.effective_name().trim().is_empty() {
-        issues.push("Skill name is required.".to_string());
-    }
-
-    if definition
-        .triggers
-        .iter()
-        .any(|trigger| trigger.pattern.trim().is_empty())
-    {
-        issues.push("Skill triggers must define a non-empty pattern.".to_string());
-    }
-
-    if definition
-        .constraints
-        .iter()
-        .any(|constraint| constraint.constraint_id.trim().is_empty())
-    {
-        issues.push("Skill constraints must define a non-empty constraint ID.".to_string());
-    }
-
-    if definition
-        .identity
-        .aliases
-        .iter()
-        .any(|alias| alias.trim().is_empty())
-    {
-        issues.push("Skill identity aliases must not be blank.".to_string());
-    }
-
-    if has_duplicate_values(definition.identity.aliases.iter().map(String::as_str)) {
-        issues.push("Skill identity aliases must be unique.".to_string());
-    }
-
-    if definition
-        .metadata
-        .tags
-        .iter()
-        .any(|tag| tag.trim().is_empty())
-    {
-        issues.push("Skill metadata tags must not be blank.".to_string());
-    }
-
-    if definition
-        .metadata
-        .owners
-        .iter()
-        .any(|owner| owner.trim().is_empty())
-    {
-        issues.push("Skill metadata owners must not be blank.".to_string());
-    }
-
-    if definition
-        .input
-        .parameters
-        .iter()
-        .any(|parameter| parameter.name.trim().is_empty())
-    {
-        issues.push("Skill input parameters must define a non-empty name.".to_string());
-    }
-
-    if has_duplicate_values(
-        definition
-            .input
-            .parameters
-            .iter()
-            .map(|parameter| parameter.name.as_str()),
-    ) {
-        issues.push("Skill input parameter names must be unique.".to_string());
-    }
-
-    if definition
-        .input
-        .parameters
-        .iter()
-        .any(|parameter| parameter.r#type.trim().is_empty())
-    {
-        issues.push("Skill input parameters must define a non-empty type.".to_string());
-    }
-
-    if definition
-        .execution
-        .timeout_seconds
-        .is_some_and(|timeout| timeout <= 0)
-    {
-        issues.push(
-            "Skill execution timeout, when provided, must be greater than zero seconds."
-                .to_string(),
-        );
-    }
-
-    if definition.governance.approval_requirement != SkillApprovalRequirement::None
-        && definition.governance.policy_refs.is_empty()
-    {
-        issues.push(
-            "Skills that require approval must declare at least one policy reference.".to_string(),
-        );
-    }
-
-    if definition
-        .governance
-        .policy_refs
-        .iter()
-        .any(|policy_ref| policy_ref.trim().is_empty())
-    {
-        issues.push("Skill governance policy references must not be blank.".to_string());
-    }
-
-    if definition
-        .governance
-        .allowed_contexts
-        .iter()
-        .any(|context| context.trim().is_empty())
-    {
-        issues.push("Skill governance allowed contexts must not be blank.".to_string());
-    }
-
-    if definition
-        .discovery
-        .keywords
-        .iter()
-        .any(|keyword| keyword.trim().is_empty())
-    {
-        issues.push("Skill discovery keywords must not be blank.".to_string());
-    }
-
-    if definition
-        .discovery
-        .capability_hints
-        .iter()
-        .any(|hint| hint.trim().is_empty())
-    {
-        issues.push("Skill discovery capability hints must not be blank.".to_string());
-    }
-
-    if definition.origin.materialization_kind == SkillMaterializationKind::Dynamic
-        && definition.origin.source_kind == SkillSourceKind::Manual
-        && definition
-            .origin
-            .source_ref
-            .as_ref()
-            .is_none_or(|source_ref| source_ref.trim().is_empty())
-    {
-        issues.push(
-            "Dynamic skills must declare either a source reference or a non-manual source kind."
-                .to_string(),
-        );
-    }
-
-    SkillValidationResult { issues }
 }
 
 pub fn validate_agent_request_envelope(
@@ -2556,8 +2457,7 @@ mod tests {
 
     #[test]
     fn parse_v2_minimal_fixture() {
-        let json =
-            include_str!("../../../../contracts/fixtures/skill-definition-v2.minimal.json");
+        let json = include_str!("../../../../contracts/fixtures/skill-definition-v2.minimal.json");
         let def: SkillDefinitionV2 =
             serde_json::from_str(json).expect("minimal v2 fixture should parse");
         assert_eq!(def.skill_format, "elegy-skill-definition");
@@ -2578,6 +2478,23 @@ mod tests {
         assert_eq!(def.capabilities.len(), 4);
         assert_eq!(def.lifecycle_state, "active");
         validate_skill_definition_v2(&def).expect("diagram fixture should validate");
+    }
+
+    #[test]
+    fn builtin_registry_contains_only_valid_v2_definitions() {
+        let definitions =
+            parse_builtin_skill_definitions().expect("built-in skill registry should parse");
+        assert_eq!(definitions.len(), 12);
+        assert!(definitions
+            .iter()
+            .any(|definition| definition.identity.name == "memory"));
+        assert!(definitions
+            .iter()
+            .any(|definition| definition.identity.name == "mermaid"));
+        assert!(definitions.iter().all(|definition| definition
+            .capabilities
+            .iter()
+            .all(|capability| capability.implementation.is_some())));
     }
 
     #[test]

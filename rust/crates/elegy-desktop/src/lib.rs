@@ -118,9 +118,7 @@ pub struct WindowActionResult {
 
 /// Best-effort capture of the current foreground window title.
 fn capture_foreground_title() -> Option<String> {
-    elegy_observe::foreground_window()
-        .ok()
-        .map(|w| w.title)
+    elegy_observe::foreground_window().ok().map(|w| w.title)
 }
 
 fn utc_now_rfc3339() -> String {
@@ -210,8 +208,10 @@ pub fn send_key(combo: &str, dry_run: bool) -> Result<KeyResult, DesktopError> {
     let target_window = capture_foreground_title();
 
     if !dry_run {
-        let vkeys: Vec<elegy_desktop_win32::VirtualKey> =
-            parsed.into_iter().map(to_win32_vk).collect::<Result<_, _>>()?;
+        let vkeys: Vec<elegy_desktop_win32::VirtualKey> = parsed
+            .into_iter()
+            .map(to_win32_vk)
+            .collect::<Result<_, _>>()?;
         elegy_desktop_win32::send_key_combo(&vkeys)?;
     }
 
@@ -325,10 +325,7 @@ pub fn maximize_window(
 // Internal: target resolution
 // ---------------------------------------------------------------------------
 
-fn resolve_target(
-    title: Option<&str>,
-    hwnd: Option<u64>,
-) -> Result<(u64, String), DesktopError> {
+fn resolve_target(title: Option<&str>, hwnd: Option<u64>) -> Result<(u64, String), DesktopError> {
     match (title, hwnd) {
         (_, Some(h)) => {
             // HWND takes priority — use it directly. Title is best-effort.
@@ -427,9 +424,7 @@ fn parse_key_combo(combo: &str) -> Result<Vec<ParsedKey>, DesktopError> {
     }
 
     if keys.is_empty() {
-        return Err(DesktopError::InvalidKeyCombo(
-            "empty key combo".to_string(),
-        ));
+        return Err(DesktopError::InvalidKeyCombo("empty key combo".to_string()));
     }
 
     Ok(keys)

@@ -9,7 +9,7 @@ This file is a surface-local, non-authoritative skill bridge shipped with the `s
 
 Authority stays one-way:
 
-1. `contracts/fixtures/skill-definition.elegy-mcp.json` is the governed source of truth.
+1. `contracts/fixtures/skill-definition-v2.elegy-mcp.json` is the governed source of truth.
 2. `contracts/fixtures/skill-discovery-index.elegy-mcp.json` is the governed discovery projection.
 3. `.github/skills/elegy-mcp/SKILL.md` remains the repo-local contributor-routing output.
 4. This file mirrors the install and CLI handoff needed by wrapper consumers.

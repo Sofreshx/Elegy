@@ -17,7 +17,7 @@ That means:
 - `SKILL.md` materialization is an output format, not the source of truth
 - Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
 
-The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a repo-local non-authoritative contributor-routing output only.
+The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition-v2.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a repo-local non-authoritative contributor-routing output only.
 
 The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skills` do not change that authority split. They are pointer shells only, not skill authority surfaces, implementation centers, or release surfaces.
 

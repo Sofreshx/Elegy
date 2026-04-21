@@ -647,6 +647,7 @@ name = "elegy-host-mcp"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "elegy-contracts",
  "elegy-core",
  "rmcp",
  "serde_json",

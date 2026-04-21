@@ -105,7 +105,9 @@ mod win32 {
         // coordinates. No memory is read/written beyond the two integers.
         let result = unsafe { SetCursorPos(x, y) };
         if result.is_err() {
-            return Err(DesktopWin32Error::ApiError("SetCursorPos failed".to_string()));
+            return Err(DesktopWin32Error::ApiError(
+                "SetCursorPos failed".to_string(),
+            ));
         }
         Ok(())
     }
@@ -116,7 +118,9 @@ mod win32 {
         // SAFETY: GetCursorPos writes a POINT to our stack-allocated struct.
         let result = unsafe { GetCursorPos(&mut pt) };
         if result.is_err() {
-            return Err(DesktopWin32Error::ApiError("GetCursorPos failed".to_string()));
+            return Err(DesktopWin32Error::ApiError(
+                "GetCursorPos failed".to_string(),
+            ));
         }
         Ok((pt.x, pt.y))
     }

@@ -6,14 +6,22 @@
 
 - **Name:** Elegy
 - **Language:** Rust (latest stable)
-- **Type:** Modular AI agent infrastructure — a collection of independent crates
-- **Active system:** `elegy-memory` (memory engine for LLM agents)
+- **Type:** Modular AI agent infrastructure — governed contracts, Rust CLIs, MCP host, and agent-consumable skill definitions
+- **Active system:** agentic tool adoption across `elegy-cli`, `elegy-contracts`, `elegy-host-mcp`, `elegy-memory`, and related tool crates
 
 ## First Steps for Any Agent
 
-1. Read `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` for the full system overview.
-2. Read `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` to know what to implement and what to leave as stubs.
+1. Run `elegy skills list --json` or inspect `contracts/fixtures/skill-definition-v2.*.json` to discover the current agent-facing capability surface.
+2. Read `docs/agent-integration.md` when changing CLI, MCP host, skill-definition, or agent adoption behavior.
 3. Read the specific architecture doc for the system you're working on before writing code.
+4. For memory-specific work, read `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`.
+
+## Runtime Discovery
+
+- V2 skill definitions are the supported skill contract. Do not reintroduce v1 `skill-definition.*.json` files.
+- `elegy skills list/search/describe --json` is the primary discovery surface for agents.
+- `elegy run` exposes the same built-in v2 capabilities through MCP `tools/list` and `tools/call`.
+- Side-effecting MCP tools are blocked by default unless called in dry-run mode or the host is started with `--allow-side-effects`.
 
 ## Architecture Docs Index
 

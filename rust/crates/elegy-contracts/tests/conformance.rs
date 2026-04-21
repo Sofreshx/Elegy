@@ -4,18 +4,17 @@ use elegy_contracts::{
     load_consumer_support_manifest, load_execution_event_fixture_from_dir,
     load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
     load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
-    load_skill_definition_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
+    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
     load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
     validate_capability_definition, validate_execution_event, validate_invocation_request,
     validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
-    validate_skill_definition, validate_structured_failure,
+    validate_skill_definition_v2, validate_structured_failure,
     validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
     CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
     ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationRequest,
     InvocationResponse, InvocationStatus, McpAnalysisResult, McpServerDescriptor, McpToolAnalysis,
-    McpToolDefinition, SkillApprovalRequirement, SkillDefinition, SkillGovernanceMetadata,
-    SkillMaterializationKind, SkillOrigin, SkillSourceKind, StructuredFailure,
-    StructuredFailureCategory, StructuredFailureCause,
+    McpToolDefinition, SkillDefinitionV2, SkillGovernance, SkillIdentityV2, SkillImplementation,
+    SkillOriginV2, StructuredFailure, StructuredFailureCategory, StructuredFailureCause,
 };
 use std::collections::BTreeSet;
 use std::env;
@@ -41,7 +40,7 @@ fn upstream_bundle_contains_supported_schema_entries() {
         .map(|entry| entry.name.as_str())
         .collect::<BTreeSet<_>>();
 
-    assert!(schema_names.contains("skill-definition"));
+    assert!(schema_names.contains("skill-definition-v2"));
     assert!(schema_names.contains("skill-discovery-index"));
     assert!(schema_names.contains("mcp-tool-definition"));
     assert!(schema_names.contains("mcp-server-descriptor"));
@@ -142,15 +141,10 @@ fn upstream_capability_definition_fixture_is_semantically_valid() {
 #[test]
 fn upstream_skill_definition_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
-    let definition = load_skill_definition_fixture_from_dir(&contracts_dir)
-        .expect("load upstream skill-definition fixture");
+    let definition = load_skill_definition_v2_fixture_from_dir(&contracts_dir)
+        .expect("load upstream skill-definition-v2 fixture");
 
-    let validation = validate_skill_definition(&definition);
-    assert!(
-        validation.is_valid(),
-        "unexpected issues: {:?}",
-        validation.issues
-    );
+    validate_skill_definition_v2(&definition).expect("fixture should validate");
 }
 
 #[test]
@@ -172,37 +166,74 @@ fn upstream_skill_discovery_fixture_round_trips_as_projection() {
 
 #[test]
 fn validator_matches_phase_two_governance_and_origin_rules() {
-    let approval_required = SkillDefinition {
-        id: "skill.example".to_string(),
-        name: "Example skill".to_string(),
-        governance: SkillGovernanceMetadata {
-            approval_requirement: SkillApprovalRequirement::Required,
-            ..SkillGovernanceMetadata::default()
+    let approval_required = SkillDefinitionV2 {
+        skill_format: "elegy-skill-definition".to_string(),
+        skill_version: 2,
+        identity: SkillIdentityV2 {
+            namespace: "example".to_string(),
+            name: "approval-required".to_string(),
+            version: "0.1.0".to_string(),
+            ..SkillIdentityV2::default()
         },
-        ..SkillDefinition::default()
+        capabilities: vec![elegy_contracts::SkillCapability {
+            id: "approval-required".to_string(),
+            name: "Approval Required".to_string(),
+            description: "Example capability".to_string(),
+            implementation: Some(SkillImplementation {
+                execution_type: "subprocess".to_string(),
+                executable_name: "example".to_string(),
+                arguments: Vec::new(),
+            }),
+            ..elegy_contracts::SkillCapability::default()
+        }],
+        governance: Some(SkillGovernance {
+            approval_requirement: Some("required".to_string()),
+            ..SkillGovernance::default()
+        }),
+        lifecycle_state: "draft".to_string(),
+        ..SkillDefinitionV2::default()
     };
 
-    let approval_validation = validate_skill_definition(&approval_required);
-    assert!(approval_validation.issues.contains(
-        &"Skills that require approval must declare at least one policy reference.".to_string()
-    ));
+    let approval_error = validate_skill_definition_v2(&approval_required)
+        .expect_err("approval-required skills need policy refs");
+    assert!(approval_error
+        .to_string()
+        .contains("require approval must declare at least one policy reference"));
 
-    let dynamic_manual = SkillDefinition {
-        id: "skill.dynamic".to_string(),
-        name: "Dynamic skill".to_string(),
-        origin: SkillOrigin {
-            materialization_kind: SkillMaterializationKind::Dynamic,
-            source_kind: SkillSourceKind::Manual,
-            ..SkillOrigin::default()
+    let dynamic_manual = SkillDefinitionV2 {
+        skill_format: "elegy-skill-definition".to_string(),
+        skill_version: 2,
+        identity: SkillIdentityV2 {
+            namespace: "example".to_string(),
+            name: "dynamic-manual".to_string(),
+            version: "0.1.0".to_string(),
+            ..SkillIdentityV2::default()
         },
-        ..SkillDefinition::default()
+        capabilities: vec![elegy_contracts::SkillCapability {
+            id: "dynamic-manual".to_string(),
+            name: "Dynamic Manual".to_string(),
+            description: "Example capability".to_string(),
+            implementation: Some(SkillImplementation {
+                execution_type: "subprocess".to_string(),
+                executable_name: "example".to_string(),
+                arguments: Vec::new(),
+            }),
+            ..elegy_contracts::SkillCapability::default()
+        }],
+        origin: Some(SkillOriginV2 {
+            materialization_kind: Some("dynamic".to_string()),
+            source_kind: Some("manual".to_string()),
+            ..SkillOriginV2::default()
+        }),
+        lifecycle_state: "draft".to_string(),
+        ..SkillDefinitionV2::default()
     };
 
-    let origin_validation = validate_skill_definition(&dynamic_manual);
-    assert!(origin_validation.issues.contains(
-        &"Dynamic skills must declare either a source reference or a non-manual source kind."
-            .to_string()
-    ));
+    let origin_error =
+        validate_skill_definition_v2(&dynamic_manual).expect_err("dynamic manual needs source");
+    assert!(origin_error
+        .to_string()
+        .contains("dynamic skills must declare either a source reference"));
 }
 
 #[test]

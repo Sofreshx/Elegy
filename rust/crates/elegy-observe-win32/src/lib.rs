@@ -83,7 +83,7 @@ mod win32 {
     use windows::Win32::Graphics::Gdi::*;
     use windows::Win32::UI::WindowsAndMessaging::*;
 
-    use crate::{Rect, RawScreenCapture, Win32Error, WindowInfo};
+    use crate::{RawScreenCapture, Rect, Win32Error, WindowInfo};
 
     /// Context passed through the `EnumWindows` callback via LPARAM.
     struct EnumContext {
@@ -113,9 +113,7 @@ mod win32 {
         // window. `ctx_ptr` points to a stack-allocated `EnumContext` that
         // outlives the `EnumWindows` call. The callback uses `catch_unwind` to
         // prevent panics from crossing the FFI boundary.
-        let result = unsafe {
-            EnumWindows(Some(enum_windows_callback), LPARAM(ctx_ptr as isize))
-        };
+        let result = unsafe { EnumWindows(Some(enum_windows_callback), LPARAM(ctx_ptr as isize)) };
 
         if let Some(err) = ctx.error {
             return Err(err);
@@ -236,7 +234,9 @@ mod win32 {
         if width <= 0 || height <= 0 {
             // SAFETY: ReleaseDC releases the DC acquired above.
             unsafe { ReleaseDC(None, hdc_screen) };
-            return Err(Win32Error::ApiError("invalid screen dimensions".to_string()));
+            return Err(Win32Error::ApiError(
+                "invalid screen dimensions".to_string(),
+            ));
         }
 
         let result = capture_screen_inner(hdc_screen, width, height);
@@ -256,14 +256,18 @@ mod win32 {
         // screen DC. Must be deleted with DeleteDC when done.
         let hdc_mem = unsafe { CreateCompatibleDC(hdc_screen) };
         if hdc_mem.is_invalid() {
-            return Err(Win32Error::ApiError("CreateCompatibleDC failed".to_string()));
+            return Err(Win32Error::ApiError(
+                "CreateCompatibleDC failed".to_string(),
+            ));
         }
 
         // SAFETY: CreateCompatibleBitmap allocates a bitmap compatible with the
         // screen DC. Must be deleted with DeleteObject when done.
         let hbm = unsafe { CreateCompatibleBitmap(hdc_screen, width, height) };
         if hbm.is_invalid() {
-            unsafe { let _ = DeleteDC(hdc_mem); };
+            unsafe {
+                let _ = DeleteDC(hdc_mem);
+            };
             return Err(Win32Error::ApiError(
                 "CreateCompatibleBitmap failed".to_string(),
             ));
@@ -274,9 +278,7 @@ mod win32 {
         let old_bm = unsafe { SelectObject(hdc_mem, hbm) };
 
         // SAFETY: BitBlt copies pixel data from the screen DC to our memory DC.
-        let blt_result = unsafe {
-            BitBlt(hdc_mem, 0, 0, width, height, hdc_screen, 0, 0, SRCCOPY)
-        };
+        let blt_result = unsafe { BitBlt(hdc_mem, 0, 0, width, height, hdc_screen, 0, 0, SRCCOPY) };
 
         if blt_result.is_err() {
             unsafe {
@@ -327,7 +329,9 @@ mod win32 {
         }
 
         if lines == 0 {
-            return Err(Win32Error::ApiError("GetDIBits returned 0 lines".to_string()));
+            return Err(Win32Error::ApiError(
+                "GetDIBits returned 0 lines".to_string(),
+            ));
         }
 
         // Convert BGRA to RGBA and normalize alpha to 255 (desktop captures

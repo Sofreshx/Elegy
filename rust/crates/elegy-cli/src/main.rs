@@ -1,12 +1,14 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use elegy_contracts::{export_contract_bundle, ContractsBundleExport, ContractsError};
+use elegy_contracts::{
+    builtin_skill_definitions, export_contract_bundle, ContractsBundleExport, ContractsError,
+};
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
     McpAnalysisResult, McpTransportKind, ProjectLocator, ResourceFamily, Severity,
     CLI_SCHEMA_VERSION,
 };
 use elegy_diagram::{CanonicalDiagram, DiagramEdge, DiagramNode, DiagramPatch};
-use elegy_host_mcp::{serve_stdio, HostError};
+use elegy_host_mcp::{serve_stdio_with_options, HostError, HostOptions};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
     AuthorMcpToolRequest, AuthoredMcpDescriptor, McpSurfaceError,
@@ -55,46 +57,6 @@ const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
 const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
-
-/// Embedded v2 skill definitions, compiled into the binary.
-///
-/// Each entry is a `(skill_id, json_str)` pair where the JSON is baked in at
-/// compile time via `include_str!`. Only v2-format fixtures are included;
-/// v1 skills are omitted until they are migrated.
-const EMBEDDED_SKILL_DEFINITIONS: &[(&str, &str)] = &[
-    (
-        "diagram",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
-    ),
-    (
-        "skill-router",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"),
-    ),
-    (
-        "observe",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
-    ),
-    (
-        "desktop",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
-    ),
-    (
-        "repo",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-repo.json"),
-    ),
-    (
-        "web",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-web.json"),
-    ),
-    (
-        "data",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-data.json"),
-    ),
-    (
-        "notify",
-        include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-notify.json"),
-    ),
-];
 
 static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
@@ -169,6 +131,15 @@ enum Command {
     Run {
         #[arg(long)]
         dry_run: bool,
+        /// Allow MCP tools with side effects to execute without per-call dry-run protection.
+        #[arg(long)]
+        allow_side_effects: bool,
+        /// Default timeout for MCP tool subprocess calls.
+        #[arg(long, default_value_t = 30)]
+        tool_timeout_seconds: u64,
+        /// Maximum stdout/stderr bytes returned by one MCP tool call.
+        #[arg(long, default_value_t = 1_048_576)]
+        max_tool_output_bytes: usize,
     },
     Contracts {
         #[command(subcommand)]
@@ -1129,7 +1100,22 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     render_format,
                 },
         } => execute_diagram_render_command(input, render_format, format),
-        Command::Run { dry_run } => execute_run_command(locator, dry_run, format).await,
+        Command::Run {
+            dry_run,
+            allow_side_effects,
+            tool_timeout_seconds,
+            max_tool_output_bytes,
+        } => {
+            execute_run_command(
+                locator,
+                dry_run,
+                allow_side_effects,
+                tool_timeout_seconds,
+                max_tool_output_bytes,
+                format,
+            )
+            .await
+        }
         Command::Contracts {
             command:
                 ContractsCommand::Export {
@@ -1966,6 +1952,9 @@ fn execute_runtime_command(
 async fn execute_run_command(
     locator: ProjectLocator,
     dry_run: bool,
+    allow_side_effects: bool,
+    tool_timeout_seconds: u64,
+    max_tool_output_bytes: usize,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
     if !dry_run {
@@ -1984,7 +1973,13 @@ async fn execute_run_command(
             );
         }
 
-        return match serve_stdio(locator).await {
+        let options = HostOptions {
+            allow_side_effects,
+            default_tool_timeout_seconds: tool_timeout_seconds,
+            max_tool_output_bytes,
+        };
+
+        return match serve_stdio_with_options(locator, options).await {
             Ok(()) => Ok(ExitCode::SUCCESS),
             Err(HostError::Core(error)) => emit_error(error, format, vec!["run"], json!({})),
             Err(error) => emit_diagnostics(
@@ -2705,7 +2700,13 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     println!("generated skills: {}", result.generated_skills.len());
     println!("skipped tools: {}", result.skipped_tools.len());
     for skill in &result.generated_skills {
-        println!("- {} ({})", skill.effective_id(), skill.effective_name());
+        let name = skill
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.display_name.as_deref())
+            .or(skill.identity.display_name.as_deref())
+            .unwrap_or(skill.identity.name.as_str());
+        println!("- {} ({})", skill.identity.name, name);
     }
     for path in &result.written_files {
         println!("written: {path}");
@@ -3334,6 +3335,22 @@ fn extract_trigger_keywords(full: &serde_json::Value) -> Vec<String> {
     keywords
 }
 
+fn skill_matches_id(summary: &SkillSummary, full: &serde_json::Value, skill_id: &str) -> bool {
+    if summary.id == skill_id {
+        return true;
+    }
+
+    full.get("identity")
+        .and_then(|identity| identity.get("aliases"))
+        .and_then(|aliases| aliases.as_array())
+        .is_some_and(|aliases| {
+            aliases
+                .iter()
+                .filter_map(|alias| alias.as_str())
+                .any(|alias| alias == skill_id)
+        })
+}
+
 /// Execute `elegy skills list`.
 fn execute_skills_list_command(
     category: Option<String>,
@@ -3343,8 +3360,8 @@ fn execute_skills_list_command(
 ) -> Result<ExitCode, serde_json::Error> {
     let mut entries = Vec::new();
 
-    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
-        if let Some((summary, full)) = parse_skill_summary(json_str) {
+    for definition in builtin_skill_definitions() {
+        if let Some((summary, full)) = parse_skill_summary(definition.json) {
             let cat_match = category
                 .as_ref()
                 .is_none_or(|c| summary.category.eq_ignore_ascii_case(c));
@@ -3424,9 +3441,9 @@ fn execute_skills_describe_command(
     skill_id: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
-        if let Some((summary, full)) = parse_skill_summary(json_str) {
-            if summary.id == skill_id {
+    for definition in builtin_skill_definitions() {
+        if let Some((summary, full)) = parse_skill_summary(definition.json) {
+            if skill_matches_id(&summary, &full, &skill_id) {
                 match format {
                     OutputFormat::Text => {
                         println!("Skill: {} ({})", summary.name, summary.id);
@@ -3484,8 +3501,8 @@ fn execute_skills_search_command(
     let query_lower = query.to_lowercase();
     let mut results: Vec<SkillSearchResult> = Vec::new();
 
-    for &(_id, json_str) in EMBEDDED_SKILL_DEFINITIONS {
-        if let Some((summary, full)) = parse_skill_summary(json_str) {
+    for definition in builtin_skill_definitions() {
+        if let Some((summary, full)) = parse_skill_summary(definition.json) {
             let match_result = score_skill_match(&summary, &full, &query_lower);
             if match_result.matched {
                 let capabilities_detail = extract_capabilities(&full);
