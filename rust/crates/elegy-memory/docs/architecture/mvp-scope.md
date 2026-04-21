@@ -146,7 +146,7 @@
 | `add` | **MVP** | Gate-aware memory creation |
 | `search` | **MVP** | Hybrid search |
 | `list` | **MVP** | Filtered listing |
-| `inspect` | **MVP** | Memory + version history |
+| `inspect` | **MVP** | Memory + version history + correction history |
 | `purge` | **MVP** | Confirmation flow |
 | `health` | **MVP** | Base report plus average importance, stale previews, contradiction previews, oldest age, most-accessed memory, human-readable DB size |
 | `export` | **MVP** | JSON to stdout or file; `--export-format sqlite|elegy` for portable exports |
@@ -159,14 +159,14 @@
 | `rollback` | **v1** | Implemented now; restores a memory to a specific version |
 | `corroborate` | **v1** | Implemented now; records corroboration and boosts reliability |
 | `budget` | **v1** | Implemented now; enforces active/dormant budget limits |
-| `correct` | **v2** | Implemented now; user correction with version tracking and reliability boost |
-| `feedback` | **v2** | Implemented now; records retrieval relevance feedback |
-| `weights` | **v2** | Implemented now; computes learned scoring weights from feedback data |
+| `correct` | **v2** | Implemented now; gate-aware user correction with version tracking, disposition reporting (`applied` / `archived` / `merged` / `contradiction`), related-memory details, contradiction journaling, and reliability bump |
+| `feedback` | **v2** | Implemented now; records retrieval relevance feedback and immediately refreshes the live `scope_config` scoring weights |
+| `weights` | **v2** | Implemented now; reports current live weight mode (`defaults` vs `learned`), sample counts, confidence, and effective `scope_config` values |
 | `traverse` | **v2** | Implemented now; BFS graph traversal with depth limit and relation filter |
-| `detect-poisoning` | **v2** | Implemented now; runs 4 heuristic poisoning checks |
+| `detect-poisoning` | **v2** | Implemented now; runs 4 scoped heuristic checks, surfaces alert IDs/timestamps plus implicated memory IDs, and can dormant/quarantine low-trust memories via `--quarantine` (`--remediate` alias) with per-row action reasons |
 | `delete-link` | **v1** | Implemented now; removes a link by ID |
 | `share-export` | **v2** | Implemented now; exports memories filtered by sensitivity and reliability for cross-agent sharing |
-| `share-import` | **v2** | Implemented now; imports shared memories with fresh IDs and Imported provenance |
+| `share-import` | **v2** | Implemented now; shared memories are gate-reviewed, still exact-match checked across visible scopes without embeddings, never auto-merge into trusted existing memories, land as dormant review/quarantine entries, and report per-item dispositions/reasons in the CLI |
 
 ### Memory Links
 
@@ -192,16 +192,16 @@
 |---------|-----------|-------|
 | Input validation on writes | **MVP** | Implemented on candidates, store writes, import, and CLI args |
 | Row-level security (multi-tenant) | **v1** | Still future / PostgreSQL-oriented |
-| Memory poisoning detection | **v2** | Implemented now with 4 heuristics: frequency analysis, trust mismatch, bulk overwrite, mass contradiction |
+| Memory poisoning detection | **v2** | Implemented now with scoped/configurable heuristics plus dormant quarantine remediation for implicated low-trust active memories |
 
 ### Advanced (v2)
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | Memory Portability Format (.elegy) | **v2** | Implemented now as JSON archive with memories, links, and version history |
-| Cross-Agent Memory Sharing Protocol | **v2** | Implemented now with `export_for_sharing()` and `import_shared()`, sensitivity/reliability filtering |
-| User Correction Feedback Loop | **v2** | Implemented now with `correct_memory()`, version tracking, and +0.1 reliability bump |
-| Parameter Learning | **v2** | Implemented now with `record_feedback()` / `compute_learned_weights()` from retrieval relevance data |
+| Cross-Agent Memory Sharing Protocol | **v2** | Implemented now with `export_for_sharing()` and conservative `import_shared()` review semantics that protect the active store |
+| User Correction Feedback Loop | **v2** | Implemented now with `correct_memory()`, version tracking, disposition + related-memory history, contradiction journaling when needed, automatic embedding refresh attempts, and stale-vector exclusion until re-embed completes |
+| Parameter Learning | **v2** | Implemented now with a live write-back loop: `record_feedback()` recalculates and persists the effective `similarity_weight` / `recency_weight` / `access_weight` / `priority_weight` keys that `search()` already uses |
 | Knowledge Graph migration | **v2** | Still future; proto-graph links and BFS traversal provide the foundation |
 
 ## Current Baseline Summary
@@ -232,8 +232,8 @@ The codebase has a complete MVP core plus the full v1 and v2 feature set. Only K
 **v2 features (all implemented except Knowledge Graph migration):**
 - Graph traversal (BFS with depth limit and relation filter)
 - Memory poisoning detection (4 heuristics)
-- User correction feedback loop with version tracking
-- Parameter learning from retrieval relevance feedback
+- User correction feedback loop with gate-aware dispositions, contradiction journaling, inspectable history, and vector refresh / stale exclusion
+- Parameter learning from retrieval relevance feedback with live `scope_config` write-back
 - Cross-agent memory sharing (export/import with sensitivity filtering)
 - 11 new CLI commands: rollback, corroborate, budget, correct, feedback, weights, traverse, detect-poisoning, delete-link, share-export, share-import
 

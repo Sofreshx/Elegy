@@ -1,6 +1,6 @@
 # Elegy — Architecture Documentation
 
-> Last updated: 2026-07-25 | Status: MVP complete, v1 features in progress
+> Last updated: 2026-07-25 | Status: MVP complete; v1 and v2 features implemented, with future work focused on knowledge-graph migration and PostgreSQL
 
 ## What is Elegy?
 
@@ -10,7 +10,7 @@ Elegy is a modular AI agent infrastructure project. It provides independent syst
 
 | System | Crate | Status | Description |
 |--------|-------|--------|-------------|
-| **elegy-memory** | `rust/crates/elegy-memory` | 🟢 MVP complete, v1 in progress | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation |
+| **elegy-memory** | `rust/crates/elegy-memory` | 🟢 MVP complete + implemented v1/v2 features | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation, corrections, learning, sharing, and safety workflows |
 
 ## Design Philosophy
 
@@ -35,7 +35,7 @@ SQLite schema with all tables, columns, indexes, FTS5 setup, sqlite-vec virtual 
 Every Rust trait definition with method signatures, contracts, error types, and implementation notes. This is the API contract between components.
 
 ### 4. [MVP Scope](mvp-scope.md)
-The feature matrix: what is MVP (implement now), v1 (trait/struct skeleton, implement later), and v2 (documented idea, no code yet). **This is the source of truth for what to build.**
+The feature matrix and current baseline summary. It distinguishes the MVP baseline from v1/v2 maturity labels while also calling out what is already implemented in the current crate. **This is the source of truth for what to build and how the present implementation maps to those milestones.**
 
 ## Key Research References
 

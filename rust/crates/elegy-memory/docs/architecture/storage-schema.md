@@ -108,9 +108,12 @@ JOIN memory_embeddings me ON me.vec_rowid = v.rowid
 JOIN memories m ON m.id = me.memory_id
 WHERE v.embedding MATCH ?query_embedding
   AND m.state = 'active'
+  AND m.embedding_stale = 0
 ORDER BY v.distance
 LIMIT ?k;
 ```
+
+Vector-backed retrieval now explicitly excludes stale embeddings. This matters after content mutations such as `update_content()`, `rollback_to_version()`, consolidation rewrites, and user corrections: the row can remain queryable by keyword / exact state inspection, but its old vector is ignored until a fresh embedding is stored.
 
 ### Virtual Table: memories_fts (FTS5)
 
@@ -236,6 +239,50 @@ CREATE INDEX idx_contradictions_status ON contradictions(resolution_status);
 Tier 2 LLM consolidation does **not** add new persistence tables. When the model returns
 `CONTRADICTION: ...`, the implementation records that result in this same contradiction journal.
 
+### Table: memory_corrections
+
+```sql
+CREATE TABLE memory_corrections (
+    id                TEXT PRIMARY KEY,
+    memory_id         TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    previous_content  TEXT NOT NULL,
+    corrected_content TEXT NOT NULL,
+    corrected_by      TEXT NOT NULL,
+    reason            TEXT NOT NULL,
+    disposition       TEXT NOT NULL DEFAULT 'applied', -- 'applied' | 'archived' | 'merged' | 'contradiction'
+    related_memory_id TEXT,
+    corrected_at      TEXT NOT NULL
+);
+
+CREATE INDEX idx_corrections_memory
+    ON memory_corrections(memory_id);
+```
+
+`memory_corrections` records the operator-visible correction loop:
+
+- `disposition` captures the final backend outcome after the correction re-enters the write-time gate
+- `related_memory_id` points at the merge target, contradiction peer, or surfaced near-duplicate when one exists
+- corrections are ordered by `corrected_at DESC, id DESC` for CLI history queries
+
+The schema init path now also performs additive column backfills so older databases gain `disposition` and `related_memory_id` automatically.
+
+### Table: retrieval_feedback
+
+```sql
+CREATE TABLE retrieval_feedback (
+    id          TEXT PRIMARY KEY,
+    memory_id   TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    relevant    INTEGER NOT NULL,
+    query_text  TEXT,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_feedback_memory
+    ON retrieval_feedback(memory_id);
+```
+
+`retrieval_feedback` is the learner's evidence table. The current implementation does **not** create a second learned-weights table: each `feedback` write recomputes the effective retrieval profile and writes the resulting live values back into the existing `scope_config` retrieval-weight keys.
+
 ### Table: scope_config
 
 ```sql
@@ -261,9 +308,32 @@ CREATE TABLE scope_config (
 -- 'merge_similarity_threshold' → '0.85'
 -- 'duplicate_similarity_threshold' → '0.99'
 -- 'agent_inferred_importance_threshold' → '0.50'
+-- 'poison_frequency_hourly_threshold' → '50'
+-- 'poison_frequency_scope_ratio' → '0.30'
+-- 'poison_frequency_burst_ratio' → '0.25'
+-- 'poison_frequency_burst_min_hourly' → '12'
+-- 'poison_trust_mismatch_importance_threshold' → '0.80'
+-- 'poison_trust_mismatch_count_threshold' → '5'
+-- 'poison_trust_mismatch_scope_ratio' → '0.10'
+-- 'poison_bulk_overwrite_count_threshold' → '20'
+-- 'poison_bulk_overwrite_scope_ratio' → '0.15'
+-- 'poison_mass_contradiction_per_memory_threshold' → '3'
+-- 'poison_mass_contradiction_scope_ratio' → '0.05'
+-- 'poison_remediation_reliability_ceiling' → '0.60'
 
 The key `dedup_threshold` also exists in databases created before the threshold rename and is maintained by the schema migration path, but it is not loaded by current application code.
 ```
+
+The poisoning keys are internal operational controls used by scoped detection/remediation. No new tables or columns are required; quarantined memories continue to use the existing `state`, `status`, and `custom_metadata` fields, including alert/remediation trace keys such as `poisoning_quarantined_at`, `poisoning_alert_types`, `poisoning_alert_ids`, and `poisoning_remediation`.
+
+The four retrieval-weight keys are also the live parameter-learning write-back surface:
+
+- `similarity_weight`
+- `recency_weight`
+- `access_weight`
+- `priority_weight`
+
+`feedback` persists those exact keys, and `search()` reloads them directly from `scope_config` before scoring results.
 
 ## Migration Strategy
 

@@ -2,9 +2,27 @@
 
 This document mirrors the current Rust contracts in `src/traits.rs` and the key types they depend on.
 
+Important boundary: the public trait surface is currently smaller than the full implemented capability surface of `SqliteMemoryStore`. `MemoryStore` is the core CRUD/search/lifecycle/contradiction contract. Several advanced implemented features still remain concrete `SqliteMemoryStore` methods rather than public traits:
+
+- correction history and correction application
+- feedback learning and learned-weight reporting
+- poisoning detection and remediation
+- share export and share-import review flow
+
 ## Core Traits
 
 ### `MemoryStore`
+
+`MemoryStore` is the stable baseline contract for:
+
+- CRUD and metadata updates
+- hybrid retrieval
+- embedding persistence / stale-embedding discovery
+- lifecycle transitions
+- contradiction recording and resolution status updates
+- health reporting and purge operations
+
+It is **not** yet the whole feature surface of the crate. The current SQLite implementation also exposes concrete advanced APIs for the Session 8 areas listed above.
 
 ```rust
 #[async_trait]
@@ -271,7 +289,7 @@ pub trait MemoryObservability: Send + Sync {
 }
 ```
 
-`MemoryObservability` is currently a **definition-only** trait with no concrete implementation. The equivalent functionality is available through the async `MemoryStore` methods (`health_report`, `list_contradictions`, `purge_user`, `purge_all`) and the CLI export command. Implementing this synchronous observability facade for external tooling is planned for a future milestone.
+`SqliteMemoryStore` now provides a concrete `MemoryObservability` implementation for the synchronous health / contradiction / export / purge facade on top of the same SQLite backing store.
 
 ## Key Types
 
