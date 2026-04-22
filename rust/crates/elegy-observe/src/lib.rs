@@ -10,9 +10,11 @@
 //! - Filesystem snapshot diff (cross-platform)
 
 use std::collections::HashMap;
-use std::io::Cursor;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
+
+#[cfg(windows)]
+use std::io::Cursor;
 
 use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
