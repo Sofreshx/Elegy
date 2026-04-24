@@ -43,6 +43,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
 const LOCAL_DEFAULT_ROOT_DIR: &str = ".elegy-local-memory";
@@ -91,7 +92,7 @@ enum OutputFormat {
 struct CliMachineContext {
     format: OutputFormat,
     non_interactive: bool,
-    correlation_id: Option<String>,
+    correlation_id: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -942,7 +943,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
     let _ = CLI_MACHINE_CONTEXT.set(CliMachineContext {
         format,
         non_interactive: cli.non_interactive,
-        correlation_id: cli.correlation_id,
+        correlation_id: resolve_correlation_id(cli.correlation_id),
     });
     if cli.version {
         return execute_version_command(format);
@@ -2995,6 +2996,22 @@ fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
     }
 }
 
+fn resolve_correlation_id(correlation_id: Option<String>) -> String {
+    if let Some(value) = correlation_id {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let timestamp_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+
+    format!("elegy-cli-{}-{timestamp_nanos}", std::process::id())
+}
+
 fn current_machine_context() -> &'static CliMachineContext {
     CLI_MACHINE_CONTEXT
         .get()
@@ -3036,7 +3053,7 @@ where
     let _ = context.format;
     Envelope {
         schema_version: CLI_SCHEMA_VERSION,
-        correlation_id: context.correlation_id.clone().unwrap_or_default(),
+        correlation_id: context.correlation_id.clone(),
         non_interactive: context.non_interactive,
         command: command.into_iter().map(Into::into).collect(),
         status,

@@ -8,6 +8,14 @@ doc_kind: reference
 
 # Reusable AI Substrate Roadmap
 
+> Status note, 2026-04-25: the foundation contract schemas listed in Phase 1
+> now exist in `contracts/schemas/` and have conformance coverage in the Rust
+> workspace. Treat the remaining Phase 1 work as runtime wiring, shared
+> machine-output normalization, and real CLI/MCP output validation rather than
+> initial schema creation. See
+> [AI Agent Integration Roadmap](./ai-agent-integration-roadmap.md)
+> for the current integration hardening plan.
+
 ## Purpose
 
 Turn the research direction in [Reusable AI substrate patterns for Elegy](../research/reusable-ai-substrate-patterns.md) into a concrete phased roadmap that can guide contract work, Rust crate work, CLI hardening, and downstream adoption without pulling host-specific orchestration into Elegy.

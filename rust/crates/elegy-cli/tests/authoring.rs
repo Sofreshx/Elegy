@@ -564,6 +564,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
 
     let import_a = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-import-repeat",
             "local",
             "import",
             "--root",
@@ -586,6 +588,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
     );
     let import_a_repeat = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-import-repeat",
             "local",
             "import",
             "--root",
@@ -677,6 +681,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
 
     let default_list = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-list-repeat",
             "local",
             "list",
             "--root",
@@ -716,6 +722,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
 
     let list_all_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-list-repeat",
             "local",
             "list",
             "--root",
@@ -729,6 +737,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
         .expect("run local list all one");
     let list_all_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-list-repeat",
             "local",
             "list",
             "--root",
@@ -755,6 +765,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
 
     let show_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-show-repeat",
             "local",
             "show",
             "--root",
@@ -768,6 +780,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
         .expect("run local show one");
     let show_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-show-repeat",
             "local",
             "show",
             "--root",
@@ -783,6 +797,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
 
     let export_one = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-export-repeat",
             "local",
             "export",
             "--root",
@@ -796,6 +812,8 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
         .expect("run local export one");
     let export_two = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
+            "--correlation-id",
+            "corr-local-export-repeat",
             "local",
             "export",
             "--root",
