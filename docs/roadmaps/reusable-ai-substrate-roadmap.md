@@ -534,15 +534,19 @@ If conformance and evals lag behind new families, the repo will accumulate attra
 
 ## Recommended immediate next moves
 
-The best next slice after this roadmap is:
+The best next slice is now runtime adoption of the contract families that
+already exist:
 
-1. draft the capability-definition contract family
-2. draft the invocation-envelope contract family
-3. define the shared CLI machine-mode rules
-4. split `elegy-memory` thinking into memory-core versus operator shell
-5. reserve contract space for verifier outcomes and bounded experiment-result records so later workflow and eval work does not invent them ad hoc
+1. keep hardening `elegy agent ...` as the canonical host onboarding surface
+2. project built-in v2 skills into capability definitions
+3. normalize all shipped CLIs around shared machine-output and failure semantics
+4. wire invocation request/response and execution-event contracts into real CLI
+   and optional MCP execution paths
+5. package memory retrieval results for agent hosts without storing raw
+   transcripts
 
-That sequence creates the smallest meaningful substrate foundation while staying aligned with current repo boundaries.
+That sequence turns the existing contracts into executable integration behavior
+while staying aligned with current repo boundaries.
 
 ## References
 

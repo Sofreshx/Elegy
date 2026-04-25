@@ -1,18 +1,12 @@
 # Elegy
 
-Elegy is a Rust-based toolkit for making local CLI capabilities easy for AI agents to discover, reason about, and invoke safely. It combines governed contracts, schema-backed skill definitions, an umbrella CLI, dedicated helper CLIs, and an MCP host that exposes the same capabilities as runtime tools.
+Elegy is a Rust toolkit that makes local CLI capabilities discoverable,
+selectable, and safe for AI-agent hosts to invoke. Its core model is:
 
-The goal is practical agent adoption: an agent should be able to run one discovery command, learn what Elegy can do, inspect exact invocation templates, understand side effects, and call the right capability through either subprocesses or MCP.
-
-## What Elegy Provides
-
-- **Runtime skill discovery** through `elegy skills list`, `elegy skills search`, and `elegy skills describe`.
-- **V2 skill definitions only** in `contracts/fixtures/skill-definition-v2.*.json`, with per-capability implementation, input, output, execution, governance, and discovery metadata.
-- **MCP resource and tool hosting** through `elegy run`, backed by the same v2 skill registry used by the CLI.
-- **Agent-friendly JSON envelopes** with command path, status, diagnostics, summary, payload data, and optional `dataSchema` references.
-- **Structured stdin workflows** for diagram and Mermaid commands, including JSON `DiagramPatch` input via `--patch-stdin`.
-- **Perception and action primitives** through `observe` and `desktop`, with desktop mutations supporting `--dry-run`.
-- **Utility skills** for repo inspection, web fetches, data conversion/validation, notifications, MCP descriptor handling, and local memory.
+- governed contracts are the durable authority
+- v2 skill definitions are the discovery authority
+- CLI invocation templates are the default execution boundary
+- MCP is an optional projection for MCP-native clients
 
 ## Quick Start
 
@@ -21,8 +15,9 @@ From the Rust workspace:
 ```bash
 cd rust
 cargo run -p elegy-cli -- --version --json
-cargo run -p elegy-cli -- skills list --json
-cargo run -p elegy-cli -- skills describe --skill-id diagram --json
+cargo run -p elegy-cli -- agent check --json
+cargo run -p elegy-cli -- agent manifest --json
+cargo run -p elegy-cli -- agent discover --query "repo status" --json
 ```
 
 Build the umbrella CLI:
@@ -32,83 +27,97 @@ cd rust
 cargo build -p elegy-cli
 ```
 
-Run the MCP host over stdio:
+## Agent Onboarding Flow
 
-```bash
-elegy run
-```
+Host software should start with the `agent` surface instead of loading every
+Elegy capability into context:
 
-By default, MCP tool calls that have side effects are blocked unless the call is a dry run. Start the host with side-effect execution enabled only when the harness has its own approval policy:
+1. Validate the local setup:
 
-```bash
-elegy run --allow-side-effects --tool-timeout-seconds 30
-```
+   ```bash
+   elegy agent check --json
+   ```
 
-## Main CLI Surfaces
+2. Load the host integration packet:
+
+   ```bash
+   elegy agent manifest --json --profile ./tools/elegy-profile.json
+   ```
+
+3. Discover only what the task needs:
+
+   ```bash
+   elegy agent discover --query "memory search" --json --profile ./tools/elegy-profile.json
+   elegy agent discover --query "memory search" --detail --json --profile ./tools/elegy-profile.json
+   ```
+
+4. Invoke the advertised CLI template from the selected capability. Hosts still
+   enforce policy before running side-effecting capabilities.
+
+Profiles are host-owned allowlists. They let a downstream app opt into a subset
+of Elegy instead of exposing every built-in tool.
+
+## Main Surfaces
 
 | Surface | Purpose |
 | --- | --- |
-| `elegy skills list/search/describe` | Runtime discovery over the built-in v2 skill registry. |
-| `elegy run` | MCP stdio host serving resources and skill-backed tools. |
-| `elegy diagram create/patch/narrate/render` | Structured semantic diagram creation, mutation, explanation, and rendering. |
-| `elegy mermaid render/reverse/narrate` | Mermaid projection, bounded reverse projection, and narrative summaries. |
+| `elegy agent manifest/check/discover` | Host onboarding, profile validation, and profile-filtered discovery. |
+| `elegy skills list/search/describe` | Raw runtime discovery over the built-in v2 skill registry. |
+| `elegy run` | Optional MCP stdio host over the same capability registry. |
+| `elegy diagram ...` | Semantic diagram creation, mutation, explanation, and rendering. |
+| `elegy mermaid ...` | Mermaid rendering, reverse projection, and narration. |
 | `elegy observe ...` | Read-only OS/process/window/screen/clipboard/filesystem/system observation. |
 | `elegy desktop ...` | Desktop automation with dry-run support for high-risk actions. |
 | `elegy repo ...` | Read-only git status, diff, branch, and log inspection. |
 | `elegy web ...` | Bounded HTTP fetch and reachability checks. |
 | `elegy data ...` | JSON/YAML/TOML/CSV conversion, extraction, and schema validation. |
 | `elegy notify ...` | Local toast and webhook notification helpers. |
-| `elegy-memory` | Dedicated local memory MVP CLI. |
+| `elegy-memory` | Dedicated local memory CLI. |
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
 | `elegy-skills` | Dedicated MCP-to-v2-skill generation CLI. |
 
-## Agent Usage Pattern
+## Capability Profiles
 
-1. Discover compactly:
+Profile schema: `contracts/schemas/agent-capability-profile.schema.json`.
 
-   ```bash
-   elegy skills search --query "diagram" --json
-   ```
+Minimal example:
 
-2. Expand only the needed skill:
+```json
+{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "generic-agent-host",
+  "includeSkills": ["repo", "data"],
+  "includeCapabilities": ["memory-search"],
+  "excludeCapabilities": [],
+  "alwaysIncludeRouter": true
+}
+```
 
-   ```bash
-   elegy skills describe --skill-id diagram --json
-   ```
+Selection does not grant approval. A side-effecting capability selected by a
+profile is visible and invokable only after the host applies its own policy.
 
-3. Use `capabilities[].implementation.arguments` as the exact invocation template.
+## Optional MCP Projection
 
-4. Check `capabilities[].execution.hasSideEffects` before invoking mutations.
+MCP is available for clients that prefer protocol tools:
 
-5. Prefer stdin-capable commands when available:
+```bash
+elegy run --profile ./tools/elegy-profile.json
+```
 
-   ```bash
-   echo '{"addNodes":[{"id":"api","label":"API"}]}' \
-     | elegy diagram patch --input diagram.json --patch-stdin --output diagram.json --json
-   ```
+The same profile filters the MCP tool list. MCP should be treated as an adapter
+over governed skills and CLI behavior, not as the primary Elegy integration
+model.
 
 ## Contracts
 
 The authoritative contract bundle lives in `contracts/`:
 
 - `contracts/schemas/skill-definition-v2.schema.json`
+- `contracts/schemas/agent-capability-profile.schema.json`
 - `contracts/fixtures/skill-definition-v2.*.json`
 - `contracts/manifests/compatibility-manifest.json`
-- additional schemas and fixtures for invocation, execution, MCP descriptors, memory records, failures, and events
-
-V1 skill definitions have been removed during early development. Consumers should target v2 directly.
-
-## Repository Layout
-
-```text
-contracts/             Governed schemas, fixtures, manifests, and support metadata
-docs/                  Architecture, distribution, and integration guidance
-governance/            Policy and governance notes
-rust/                  Rust workspace
-rust/crates/elegy-cli  Umbrella CLI binary (`elegy`)
-rust/crates/elegy-host-mcp  MCP stdio host
-rust/crates/elegy-contracts Shared contract types and built-in skill registry
-```
+- additional schemas for invocation, responses, failures, memory records, MCP
+  descriptors, and events
 
 ## Development
 
@@ -117,7 +126,8 @@ Common checks:
 ```bash
 cd rust
 cargo fmt
-cargo test -p elegy-contracts -p elegy-mcp -p elegy-tooling -p elegy-host-mcp -p elegy-cli -p elegy-skills
+cargo test -p elegy-contracts -p elegy-host-mcp -p elegy-cli
 ```
 
-Distribution workflows and release asset details are documented in [docs/distribution.md](docs/distribution.md). Agent-oriented invocation guidance lives in [docs/agent-integration.md](docs/agent-integration.md).
+Distribution workflows are documented in [docs/distribution.md](docs/distribution.md).
+Agent integration guidance lives in [docs/agent-integration.md](docs/agent-integration.md).

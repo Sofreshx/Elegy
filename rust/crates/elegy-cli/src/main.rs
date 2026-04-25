@@ -1,6 +1,8 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use elegy_contracts::{
-    builtin_skill_definitions, export_contract_bundle, ContractsBundleExport, ContractsError,
+    builtin_skill_definitions, export_contract_bundle, validate_agent_capability_profile,
+    AgentCapabilityProfile, ContractsBundleExport, ContractsError,
+    AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
@@ -37,6 +39,7 @@ use elegy_tooling::{
 };
 use serde::Serialize;
 use serde_json::json;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
@@ -58,6 +61,8 @@ const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
 const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
+const AGENT_INTEGRATION_VERSION: &str = "elegy.agent/v1";
+const AGENT_ROUTER_SKILL_ID: &str = "skill-router";
 
 static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
@@ -135,6 +140,9 @@ enum Command {
         /// Allow MCP tools with side effects to execute without per-call dry-run protection.
         #[arg(long)]
         allow_side_effects: bool,
+        /// Host-owned profile limiting the capabilities exposed by optional MCP projection.
+        #[arg(long)]
+        profile: Option<PathBuf>,
         /// Default timeout for MCP tool subprocess calls.
         #[arg(long, default_value_t = 30)]
         tool_timeout_seconds: u64,
@@ -150,6 +158,11 @@ enum Command {
     Skills {
         #[command(subcommand)]
         command: SkillsCommand,
+    },
+    /// Agent host onboarding, profile checks, and filtered discovery
+    Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
     },
     /// Desktop and OS observation commands
     Observe {
@@ -340,6 +353,35 @@ enum SkillsCommand {
         /// Show capability-level detail (parameters, execution metadata)
         #[arg(long)]
         detail: bool,
+    },
+}
+
+/// Host-facing agent integration commands.
+#[derive(Subcommand, Debug)]
+enum AgentCommand {
+    /// Emit the canonical host integration packet.
+    Manifest {
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
+    /// Validate a host integration profile and built-in registry selection.
+    Check {
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
+    /// Discover profile-filtered skills and capabilities for an agent task.
+    Discover {
+        /// Free-text query matched against allowed skills and capabilities.
+        #[arg(long)]
+        query: Option<String>,
+        /// Include allowed capability implementation blocks.
+        #[arg(long)]
+        detail: bool,
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
     },
 }
 
@@ -797,7 +839,7 @@ struct MermaidNarrateReport {
 }
 
 /// A loaded skill definition summary for listing and search output.
-#[derive(Serialize)]
+#[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 struct SkillSummary {
     /// Unique skill identifier derived from `identity.name`.
@@ -908,6 +950,51 @@ struct SkillListEntry {
     /// Capabilities detail (only when --detail is set).
     #[serde(skip_serializing_if = "Option::is_none")]
     capabilities: Option<Vec<CapabilityDetail>>,
+}
+
+struct LoadedSkill {
+    summary: SkillSummary,
+    full: serde_json::Value,
+}
+
+struct AgentProfileSelection {
+    profile_path: Option<PathBuf>,
+    profile: Option<AgentCapabilityProfile>,
+    selected_skill_ids: BTreeSet<String>,
+    selected_capability_ids: BTreeSet<String>,
+    total_skill_count: usize,
+    total_capability_count: usize,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl AgentProfileSelection {
+    fn has_errors(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+    }
+
+    fn error_diagnostics(&self) -> Vec<Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == Severity::Error)
+            .cloned()
+            .collect()
+    }
+
+    fn allowed_tool_ids(&self) -> Option<BTreeSet<String>> {
+        self.profile
+            .as_ref()
+            .map(|_| self.selected_capability_ids.clone())
+    }
+
+    fn router_available(&self) -> bool {
+        self.selected_skill_ids.contains(AGENT_ROUTER_SKILL_ID)
+            && self
+                .selected_capability_ids
+                .iter()
+                .any(|id| id.starts_with("router-"))
+    }
 }
 
 enum MermaidInputSource {
@@ -1104,6 +1191,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Run {
             dry_run,
             allow_side_effects,
+            profile,
             tool_timeout_seconds,
             max_tool_output_bytes,
         } => {
@@ -1111,6 +1199,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                 locator,
                 dry_run,
                 allow_side_effects,
+                profile,
                 tool_timeout_seconds,
                 max_tool_output_bytes,
                 format,
@@ -1144,6 +1233,20 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Skills {
             command: SkillsCommand::Search { query, detail },
         } => execute_skills_search_command(query, detail, format),
+        Command::Agent {
+            command: AgentCommand::Manifest { profile },
+        } => execute_agent_manifest_command(profile, format),
+        Command::Agent {
+            command: AgentCommand::Check { profile },
+        } => execute_agent_check_command(profile, format),
+        Command::Agent {
+            command:
+                AgentCommand::Discover {
+                    query,
+                    detail,
+                    profile,
+                },
+        } => execute_agent_discover_command(query, detail, profile, format),
         Command::Observe {
             command: ObserveCommand::Processes { filter },
         } => execute_observe_processes_command(filter, format),
@@ -1289,7 +1392,7 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "cliSchemaVersion": CLI_SCHEMA_VERSION,
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
-                        "local", "mermaid", "diagram", "run", "contracts", "skills",
+                        "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
                         "observe", "desktop", "repo", "web", "data", "notify"
                     ],
                     "skillDefinitionFormat": 2,
@@ -1954,6 +2057,7 @@ async fn execute_run_command(
     locator: ProjectLocator,
     dry_run: bool,
     allow_side_effects: bool,
+    profile: Option<PathBuf>,
     tool_timeout_seconds: u64,
     max_tool_output_bytes: usize,
     format: OutputFormat,
@@ -1974,10 +2078,35 @@ async fn execute_run_command(
             );
         }
 
+        let selection = match load_agent_profile_selection(profile.as_deref()) {
+            Ok(selection) => selection,
+            Err(diagnostics) => {
+                return emit_diagnostics(
+                    format,
+                    vec!["run"],
+                    diagnostics,
+                    json!({}),
+                    "invalid",
+                    exit_invalid(),
+                );
+            }
+        };
+        if selection.has_errors() {
+            return emit_diagnostics(
+                format,
+                vec!["run"],
+                selection.error_diagnostics(),
+                json!(agent_check_data(&selection)),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+
         let options = HostOptions {
             allow_side_effects,
             default_tool_timeout_seconds: tool_timeout_seconds,
             max_tool_output_bytes,
+            allowed_tool_ids: selection.allowed_tool_ids(),
         };
 
         return match serve_stdio_with_options(locator, options).await {
@@ -3352,6 +3481,429 @@ fn extract_trigger_keywords(full: &serde_json::Value) -> Vec<String> {
     keywords
 }
 
+fn warning_diagnostic(code: impl Into<String>, message: impl Into<String>) -> Diagnostic {
+    let mut diagnostic = Diagnostic::error(code, message);
+    diagnostic.severity = Severity::Warning;
+    diagnostic
+}
+
+fn load_builtin_skills() -> Vec<LoadedSkill> {
+    builtin_skill_definitions()
+        .iter()
+        .filter_map(|definition| {
+            let (summary, full) = parse_skill_summary(definition.json)?;
+            Some(LoadedSkill { summary, full })
+        })
+        .collect()
+}
+
+fn skill_lookup_keys(full: &serde_json::Value) -> BTreeSet<String> {
+    let mut keys = BTreeSet::new();
+    if let Some(name) = full
+        .get("identity")
+        .and_then(|identity| identity.get("name"))
+        .and_then(|name| name.as_str())
+    {
+        keys.insert(name.to_ascii_lowercase());
+    }
+    if let Some(aliases) = full
+        .get("identity")
+        .and_then(|identity| identity.get("aliases"))
+        .and_then(|aliases| aliases.as_array())
+    {
+        for alias in aliases.iter().filter_map(|alias| alias.as_str()) {
+            keys.insert(alias.to_ascii_lowercase());
+        }
+    }
+    keys
+}
+
+fn capability_ids(full: &serde_json::Value) -> BTreeSet<String> {
+    full.get("capabilities")
+        .and_then(|capabilities| capabilities.as_array())
+        .map(|capabilities| {
+            capabilities
+                .iter()
+                .filter_map(|capability| capability.get("id").and_then(|id| id.as_str()))
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default()
+}
+
+fn load_agent_profile_selection(
+    profile_path: Option<&Path>,
+) -> Result<AgentProfileSelection, Vec<Diagnostic>> {
+    let profile = match profile_path {
+        Some(path) => {
+            let contents = fs::read_to_string(path).map_err(|source| {
+                vec![Diagnostic::error(
+                    "CLI-AGENT-001",
+                    format!("failed to read agent capability profile: {source}"),
+                )
+                .with_path(path.display().to_string())]
+            })?;
+            Some(
+                serde_json::from_str::<AgentCapabilityProfile>(&contents).map_err(|source| {
+                    vec![Diagnostic::error(
+                        "CLI-AGENT-002",
+                        format!("invalid agent capability profile JSON: {source}"),
+                    )
+                    .with_path(path.display().to_string())]
+                })?,
+            )
+        }
+        None => None,
+    };
+
+    Ok(build_agent_profile_selection(
+        profile_path.map(Path::to_path_buf),
+        profile,
+    ))
+}
+
+fn build_agent_profile_selection(
+    profile_path: Option<PathBuf>,
+    profile: Option<AgentCapabilityProfile>,
+) -> AgentProfileSelection {
+    let skills = load_builtin_skills();
+    let total_skill_count = skills.len();
+    let total_capability_count = skills
+        .iter()
+        .map(|skill| capability_ids(&skill.full).len())
+        .sum();
+    let mut diagnostics = Vec::new();
+
+    if let Some(profile) = &profile {
+        for issue in validate_agent_capability_profile(profile).issues {
+            diagnostics.push(
+                Diagnostic::error("CLI-AGENT-003", issue)
+                    .with_hint("use schemaVersion agent-capability-profile/v1"),
+            );
+        }
+    }
+
+    let include_skills: BTreeSet<String> = profile
+        .as_ref()
+        .map(|profile| {
+            profile
+                .include_skills
+                .iter()
+                .map(|skill| skill.to_ascii_lowercase())
+                .collect()
+        })
+        .unwrap_or_default();
+    let include_capabilities: BTreeSet<String> = profile
+        .as_ref()
+        .map(|profile| profile.include_capabilities.iter().cloned().collect())
+        .unwrap_or_default();
+    let exclude_capabilities: BTreeSet<String> = profile
+        .as_ref()
+        .map(|profile| profile.exclude_capabilities.iter().cloned().collect())
+        .unwrap_or_default();
+
+    if let Some(profile) = &profile {
+        let known_skill_keys: BTreeSet<String> = skills
+            .iter()
+            .flat_map(|skill| skill_lookup_keys(&skill.full))
+            .collect();
+        for skill in &profile.include_skills {
+            if !known_skill_keys.contains(&skill.to_ascii_lowercase()) {
+                diagnostics.push(
+                    Diagnostic::error(
+                        "CLI-AGENT-004",
+                        format!("agent profile references unknown skill '{skill}'"),
+                    )
+                    .with_field("includeSkills"),
+                );
+            }
+        }
+
+        let known_capabilities: BTreeSet<String> = skills
+            .iter()
+            .flat_map(|skill| capability_ids(&skill.full))
+            .collect();
+        for capability in profile
+            .include_capabilities
+            .iter()
+            .chain(profile.exclude_capabilities.iter())
+        {
+            if !known_capabilities.contains(capability) {
+                diagnostics.push(
+                    Diagnostic::error(
+                        "CLI-AGENT-005",
+                        format!("agent profile references unknown capability '{capability}'"),
+                    )
+                    .with_field("includeCapabilities/excludeCapabilities"),
+                );
+            }
+        }
+    }
+
+    let mut selected_skill_ids = BTreeSet::new();
+    let mut selected_capability_ids = BTreeSet::new();
+    let profile_provided = profile.is_some();
+
+    for skill in &skills {
+        let is_active = skill.summary.lifecycle_state.eq_ignore_ascii_case("active");
+        let skill_keys = skill_lookup_keys(&skill.full);
+        let skill_requested = !profile_provided
+            || (is_active
+                && skill_keys
+                    .iter()
+                    .any(|key| include_skills.contains(key.as_str())));
+        let router_requested = profile
+            .as_ref()
+            .is_some_and(|profile| profile.always_include_router)
+            && skill.summary.id == AGENT_ROUTER_SKILL_ID;
+
+        let mut selected_for_skill = false;
+        for capability_id in capability_ids(&skill.full) {
+            let capability_requested = skill_requested
+                || router_requested
+                || include_capabilities.contains(&capability_id);
+            if capability_requested && !exclude_capabilities.contains(&capability_id) {
+                selected_for_skill = true;
+                selected_capability_ids.insert(capability_id);
+            }
+        }
+        if selected_for_skill {
+            selected_skill_ids.insert(skill.summary.id.clone());
+        }
+    }
+
+    let mut selection = AgentProfileSelection {
+        profile_path,
+        profile,
+        selected_skill_ids,
+        selected_capability_ids,
+        total_skill_count,
+        total_capability_count,
+        diagnostics,
+    };
+
+    if profile_provided && selection.selected_capability_ids.is_empty() {
+        selection.diagnostics.push(
+            Diagnostic::error("CLI-AGENT-006", "agent profile selects no capabilities").with_hint(
+                "add includeSkills or includeCapabilities, or enable alwaysIncludeRouter",
+            ),
+        );
+    }
+    if profile_provided && !selection.router_available() {
+        selection.diagnostics.push(warning_diagnostic(
+            "CLI-AGENT-007",
+            "agent profile does not expose the skill router; progressive discovery may be limited",
+        ));
+    }
+    if profile_provided {
+        add_agent_risk_warnings(&mut selection);
+    }
+
+    selection
+}
+
+fn add_agent_risk_warnings(selection: &mut AgentProfileSelection) {
+    for skill in load_builtin_skills() {
+        if !selection.selected_skill_ids.contains(&skill.summary.id) {
+            continue;
+        }
+        let risk = skill
+            .full
+            .get("governance")
+            .and_then(|governance| governance.get("riskLevel"))
+            .and_then(|risk| risk.as_str());
+        if matches!(risk, Some("high" | "critical")) {
+            selection.diagnostics.push(warning_diagnostic(
+                "CLI-AGENT-008",
+                format!(
+                    "selected skill '{}' is marked {} risk; profile visibility is not side-effect approval",
+                    skill.summary.id,
+                    risk.unwrap_or("high")
+                ),
+            ));
+        }
+        if let Some(capabilities) = skill
+            .full
+            .get("capabilities")
+            .and_then(|capabilities| capabilities.as_array())
+        {
+            for capability in capabilities {
+                let Some(capability_id) = capability.get("id").and_then(|id| id.as_str()) else {
+                    continue;
+                };
+                if !selection.selected_capability_ids.contains(capability_id) {
+                    continue;
+                }
+                if capability
+                    .get("execution")
+                    .and_then(|execution| execution.get("hasSideEffects"))
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false)
+                {
+                    selection.diagnostics.push(warning_diagnostic(
+                        "CLI-AGENT-009",
+                        format!(
+                            "selected capability '{capability_id}' has side effects; host policy must approve execution"
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+}
+
+fn filtered_agent_skills(selection: &AgentProfileSelection) -> Vec<LoadedSkill> {
+    load_builtin_skills()
+        .into_iter()
+        .filter_map(|skill| {
+            if !selection.selected_skill_ids.contains(&skill.summary.id) {
+                return None;
+            }
+            let capabilities = skill
+                .full
+                .get("capabilities")
+                .and_then(|capabilities| capabilities.as_array())?
+                .iter()
+                .filter(|capability| {
+                    capability
+                        .get("id")
+                        .and_then(|id| id.as_str())
+                        .is_some_and(|id| selection.selected_capability_ids.contains(id))
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+            if capabilities.is_empty() {
+                return None;
+            }
+            let mut summary = skill.summary.clone();
+            summary.capabilities_count = capabilities.len();
+            let mut full = skill.full.clone();
+            if let Some(object) = full.as_object_mut() {
+                object.insert(
+                    "capabilities".to_string(),
+                    serde_json::Value::Array(capabilities),
+                );
+            }
+            Some(LoadedSkill { summary, full })
+        })
+        .collect()
+}
+
+fn agent_profile_data(selection: &AgentProfileSelection) -> serde_json::Value {
+    json!({
+        "profileProvided": selection.profile.is_some(),
+        "profilePath": selection.profile_path.as_ref().map(|path| path.display().to_string()),
+        "profileId": selection.profile.as_ref().map(|profile| profile.profile_id.clone()),
+        "schemaVersion": selection.profile.as_ref().map(|profile| profile.schema_version.clone()),
+        "alwaysIncludeRouter": selection.profile.as_ref().map(|profile| profile.always_include_router).unwrap_or(true),
+        "routerAvailable": selection.router_available(),
+        "selectedSkillCount": selection.selected_skill_ids.len(),
+        "selectedCapabilityCount": selection.selected_capability_ids.len(),
+        "totalSkillCount": selection.total_skill_count,
+        "totalCapabilityCount": selection.total_capability_count
+    })
+}
+
+fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
+    filtered_agent_skills(selection)
+        .into_iter()
+        .map(|skill| {
+            json!({
+                "id": skill.summary.id,
+                "name": skill.summary.name,
+                "category": skill.summary.category,
+                "capabilitiesCount": skill.summary.capabilities_count,
+                "lifecycleState": skill.summary.lifecycle_state
+            })
+        })
+        .collect()
+}
+
+fn agent_selected_capabilities_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
+    let mut capabilities = Vec::new();
+    for skill in filtered_agent_skills(selection) {
+        if let Some(caps) = skill
+            .full
+            .get("capabilities")
+            .and_then(|capabilities| capabilities.as_array())
+        {
+            for capability in caps {
+                let has_side_effects = capability
+                    .get("execution")
+                    .and_then(|execution| execution.get("hasSideEffects"))
+                    .and_then(|value| value.as_bool())
+                    .unwrap_or(false);
+                capabilities.push(json!({
+                    "id": capability.get("id").and_then(|id| id.as_str()).unwrap_or_default(),
+                    "skillId": skill.summary.id,
+                    "name": capability.get("name").and_then(|name| name.as_str()).unwrap_or_default(),
+                    "hasSideEffects": has_side_effects
+                }));
+            }
+        }
+    }
+    capabilities
+}
+
+fn agent_check_data(selection: &AgentProfileSelection) -> serde_json::Value {
+    json!({
+        "valid": !selection.has_errors(),
+        "integrationVersion": AGENT_INTEGRATION_VERSION,
+        "profile": agent_profile_data(selection),
+        "selected": {
+            "skills": agent_selected_skills_data(selection),
+            "capabilities": agent_selected_capabilities_data(selection)
+        }
+    })
+}
+
+fn agent_discovery_entry(
+    skill: &LoadedSkill,
+    detail: bool,
+    profile_path: Option<&Path>,
+    match_result: Option<&SkillMatchResult>,
+) -> serde_json::Value {
+    let mut expand_command_args = vec![
+        "agent".to_string(),
+        "discover".to_string(),
+        "--query".to_string(),
+        skill.summary.id.clone(),
+        "--detail".to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(profile_path) = profile_path {
+        expand_command_args.push("--profile".to_string());
+        expand_command_args.push(profile_path.display().to_string());
+    }
+    let expand_command = format!("elegy {}", expand_command_args.join(" "));
+
+    let mut entry = json!({
+        "id": skill.summary.id,
+        "name": skill.summary.name,
+        "description": skill.summary.description,
+        "category": skill.summary.category,
+        "capabilitiesCount": skill.summary.capabilities_count,
+        "lifecycleState": skill.summary.lifecycle_state,
+        "expandCommand": expand_command,
+        "expandCommandArgs": expand_command_args
+    });
+
+    if let Some(match_result) = match_result {
+        entry["matchedCapabilities"] = json!(match_result.matched_capabilities);
+        entry["matchReasons"] = json!(match_result.match_reasons);
+        entry["matchScore"] = json!(match_result.score);
+        entry["triggerKeywords"] = json!(extract_trigger_keywords(&skill.full));
+    }
+    if detail {
+        entry["capabilities"] = skill
+            .full
+            .get("capabilities")
+            .cloned()
+            .unwrap_or_else(|| json!([]));
+    }
+    entry
+}
+
 fn skill_matches_id(summary: &SkillSummary, full: &serde_json::Value, skill_id: &str) -> bool {
     if summary.id == skill_id {
         return true;
@@ -3607,6 +4159,239 @@ fn execute_skills_search_command(
                 Some("elegy://schemas/skill-search"),
             ))?;
         }
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_agent_manifest_command(
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "manifest"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    if selection.has_errors() {
+        return emit_diagnostics(
+            format,
+            vec!["agent", "manifest"],
+            selection.error_diagnostics(),
+            agent_check_data(&selection),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    let diagnostics = selection.diagnostics.clone();
+    let summary = summarize(&diagnostics);
+    let data = json!({
+        "integrationVersion": AGENT_INTEGRATION_VERSION,
+        "elegyVersion": env!("CARGO_PKG_VERSION"),
+        "cliSchemaVersion": CLI_SCHEMA_VERSION,
+        "profile": agent_profile_data(&selection),
+        "contracts": {
+            "skillDefinition": "2.0.0",
+            "agentCapabilityProfile": AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+            "machineEnvelope": CLI_SCHEMA_VERSION
+        },
+        "discovery": {
+            "authority": "governed skill definitions",
+            "defaultCommand": "elegy agent discover --json",
+            "queryCommand": "elegy agent discover --query <task> --json",
+            "detailCommand": "elegy agent discover --query <task> --detail --json",
+            "profileFlag": "--profile <path>"
+        },
+        "invocation": {
+            "defaultPath": "cli",
+            "templateSource": "agent discover --detail data.results[].capabilities[].implementation.arguments",
+            "sideEffectPolicy": "profile selection makes capabilities visible; hosts still approve side-effecting execution"
+        },
+        "mcp": {
+            "optional": true,
+            "startupCommand": profile.as_ref().map(|path| format!("elegy run --profile {}", path.display())).unwrap_or_else(|| "elegy run".to_string()),
+            "role": "optional projection for MCP-native clients"
+        },
+        "selected": {
+            "skills": agent_selected_skills_data(&selection),
+            "capabilities": agent_selected_capabilities_data(&selection)
+        }
+    });
+
+    match format {
+        OutputFormat::Text => {
+            println!("Elegy agent integration manifest");
+            println!("version: {}", env!("CARGO_PKG_VERSION"));
+            println!(
+                "selected: {} skill(s), {} capability(ies)",
+                selection.selected_skill_ids.len(),
+                selection.selected_capability_ids.len()
+            );
+            println!("discover: elegy agent discover --query <task> --json");
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "manifest"],
+            "ok",
+            summary,
+            data,
+            diagnostics,
+            Some("elegy://schemas/agent-manifest"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_agent_check_command(
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "check"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    let status = if selection.has_errors() {
+        "invalid"
+    } else {
+        "ok"
+    };
+    let exit_code = if selection.has_errors() {
+        exit_invalid()
+    } else {
+        ExitCode::SUCCESS
+    };
+
+    match format {
+        OutputFormat::Text => {
+            if selection.diagnostics.is_empty() {
+                println!("agent integration profile is valid");
+            } else {
+                print_diagnostics_text(&selection.diagnostics);
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "check"],
+            status,
+            summarize(&selection.diagnostics),
+            agent_check_data(&selection),
+            selection.diagnostics,
+            Some("elegy://schemas/agent-check"),
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn execute_agent_discover_command(
+    query: Option<String>,
+    detail: bool,
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "discover"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    if selection.has_errors() {
+        return emit_diagnostics(
+            format,
+            vec!["agent", "discover"],
+            selection.error_diagnostics(),
+            agent_check_data(&selection),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    let mut entries = Vec::new();
+    let filtered_skills = filtered_agent_skills(&selection);
+    if let Some(query) = &query {
+        let query_lower = query.to_lowercase();
+        for skill in &filtered_skills {
+            let match_result = score_skill_match(&skill.summary, &skill.full, &query_lower);
+            if match_result.matched {
+                entries.push(agent_discovery_entry(
+                    skill,
+                    detail,
+                    profile.as_deref(),
+                    Some(&match_result),
+                ));
+            }
+        }
+        entries.sort_by(|a, b| {
+            let a_score = a
+                .get("matchScore")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.0);
+            let b_score = b
+                .get("matchScore")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.0);
+            b_score
+                .partial_cmp(&a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+    } else {
+        entries.extend(
+            filtered_skills
+                .iter()
+                .map(|skill| agent_discovery_entry(skill, detail, profile.as_deref(), None)),
+        );
+    }
+
+    let diagnostics = selection.diagnostics.clone();
+    let total_results = entries.len();
+    let data = json!({
+        "query": query,
+        "disclosureLevel": if detail { "detail" } else { "index" },
+        "profile": agent_profile_data(&selection),
+        "results": entries,
+        "totalResults": total_results
+    });
+
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "{} result(s) at {} disclosure",
+                total_results,
+                if detail { "detail" } else { "index" }
+            );
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "discover"],
+            "ok",
+            summarize(&diagnostics),
+            data,
+            diagnostics,
+            Some("elegy://schemas/agent-discovery"),
+        ))?,
     }
 
     Ok(ExitCode::SUCCESS)

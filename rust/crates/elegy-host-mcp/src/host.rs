@@ -9,6 +9,7 @@ use rmcp::{
     model::*, transport::stdio, ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
 };
 use serde_json::json;
+use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use tokio::task;
@@ -21,6 +22,13 @@ fn cached_tools() -> Vec<Tool> {
     TOOLS
         .get_or_init(build_tools_from_skill_definitions)
         .clone()
+}
+
+fn tools_for_allowed_ids(allowed_tool_ids: Option<&BTreeSet<String>>) -> Vec<Tool> {
+    cached_tools()
+        .into_iter()
+        .filter(|tool| allowed_tool_ids.is_none_or(|allowed| allowed.contains(tool.name.as_ref())))
+        .collect()
 }
 
 /// Parse every embedded v2 skill-definition JSON and convert each capability
@@ -347,11 +355,12 @@ fn which_executable(name: &str) -> String {
     name.to_string()
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct HostOptions {
     pub allow_side_effects: bool,
     pub default_tool_timeout_seconds: u64,
     pub max_tool_output_bytes: usize,
+    pub allowed_tool_ids: Option<BTreeSet<String>>,
 }
 
 impl Default for HostOptions {
@@ -360,6 +369,7 @@ impl Default for HostOptions {
             allow_side_effects: false,
             default_tool_timeout_seconds: 30,
             max_tool_output_bytes: 1_048_576,
+            allowed_tool_ids: None,
         }
     }
 }
@@ -379,6 +389,13 @@ impl ElegyMcpHost {
             state: Arc::new(state),
             options,
         }
+    }
+
+    fn tool_allowed(&self, tool_name: &str) -> bool {
+        self.options
+            .allowed_tool_ids
+            .as_ref()
+            .is_none_or(|allowed| allowed.contains(tool_name))
     }
 }
 
@@ -470,7 +487,7 @@ impl ServerHandler for ElegyMcpHost {
         _request: Option<PaginatedRequestParams>,
         _context: rmcp::service::RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, McpError> {
-        let tools = cached_tools();
+        let tools = tools_for_allowed_ids(self.options.allowed_tool_ids.as_ref());
         Ok(ListToolsResult {
             tools,
             next_cursor: None,
@@ -485,6 +502,13 @@ impl ServerHandler for ElegyMcpHost {
     ) -> Result<CallToolResult, McpError> {
         let tool_name = request.name.as_ref();
         let mut arguments = request.arguments.unwrap_or_default();
+
+        if !self.tool_allowed(tool_name) {
+            return Err(McpError::invalid_params(
+                format!("tool is not enabled by the active Elegy agent profile: {tool_name}"),
+                Some(json!({ "tool": tool_name })),
+            ));
+        }
 
         // 1. Find the matching capability
         let (capability, _def) = find_capability(tool_name).ok_or_else(|| {
@@ -1039,6 +1063,19 @@ mod tests {
         let ann = patch.annotations.as_ref().expect("should have annotations");
         assert_eq!(ann.read_only_hint, Some(false));
         assert_eq!(ann.idempotent_hint, Some(true));
+    }
+
+    #[test]
+    fn tools_for_allowed_ids_filters_profile_projection() {
+        let allowed =
+            BTreeSet::from(["router-skill-search".to_string(), "repo-status".to_string()]);
+        let tools = tools_for_allowed_ids(Some(&allowed));
+        let names: Vec<&str> = tools.iter().map(|tool| tool.name.as_ref()).collect();
+
+        assert_eq!(names.len(), 2);
+        assert!(names.contains(&"router-skill-search"));
+        assert!(names.contains(&"repo-status"));
+        assert!(!names.contains(&"memory-add"));
     }
 
     #[test]

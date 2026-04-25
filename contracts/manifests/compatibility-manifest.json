@@ -109,6 +109,32 @@
       ]
     },
     {
+      "name": "agent-capability-profile",
+      "schemaVersion": "1.0.0",
+      "file": "agent-capability-profile.schema.json",
+      "fixtures": [
+        "fixtures/agent-capability-profile.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-manifest",
+      "schemaVersion": "1.0.0",
+      "file": "agent-manifest.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "agent-check",
+      "schemaVersion": "1.0.0",
+      "file": "agent-check.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "agent-discovery",
+      "schemaVersion": "1.0.0",
+      "file": "agent-discovery.schema.json",
+      "fixtures": []
+    },
+    {
       "name": "structured-failure",
       "schemaVersion": "1.0.0",
       "file": "structured-failure.schema.json",

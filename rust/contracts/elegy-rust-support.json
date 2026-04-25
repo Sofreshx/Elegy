@@ -96,6 +96,10 @@
   ],
   "schemas": {
     "agent-event-envelope": "1.0.0",
+    "agent-capability-profile": "1.0.0",
+    "agent-check": "1.0.0",
+    "agent-discovery": "1.0.0",
+    "agent-manifest": "1.0.0",
     "agent-request-envelope": "1.0.0",
     "agent-response-envelope": "1.0.0",
     "capability-definition": "1.0.0",

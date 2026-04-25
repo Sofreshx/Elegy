@@ -10,8 +10,8 @@
   },
   "metadata": {
     "displayName": "Elegy Skill Router",
-    "description": "Search and discover Elegy capabilities on demand. Use this instead of loading all skill definitions into context. Start with skill-search to find relevant capabilities, then use skill-describe to get full invocation details.",
-    "summary": "On-demand skill discovery and routing — search, list, and describe Elegy capabilities without loading all definitions into context.",
+    "description": "Search and discover profile-filtered Elegy capabilities on demand through the host-facing agent surface. Use this instead of loading all skill definitions into context. Start with agent discover to find relevant capabilities, then expand with detail when the host chooses to disclose implementation metadata.",
+    "summary": "On-demand host-facing discovery and routing through `elegy agent discover` without loading all definitions into context.",
     "category": "meta",
     "author": "Elegy Contributors",
     "license": "Apache-2.0",
@@ -22,12 +22,12 @@
   "capabilities": [
     {
       "id": "router-skill-search",
-      "name": "Search Skills",
-      "description": "Find relevant skills by keyword or task description. Returns compact index-level results by default. Use --detail for capability-level information.",
+      "name": "Discover Capabilities",
+      "description": "Find relevant profile-filtered skills and capabilities by keyword or task description. Returns compact index-level results by default. Detail and profile flags are controlled by the host invocation context.",
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["skills", "search", "--query", "${query}", "--json"]
+        "arguments": ["agent", "discover", "--query", "${query}", "--json"]
       },
       "input": {
         "parameters": [
@@ -36,18 +36,11 @@
             "type": "string",
             "description": "Free-text search query matched against skill names, keywords, triggers, and capability descriptions.",
             "required": true
-          },
-          {
-            "name": "detail",
-            "type": "boolean",
-            "description": "When true, returns capability-level detail including parameters and execution metadata.",
-            "required": false,
-            "default": false
           }
         ]
       },
       "output": {
-        "description": "Array of matching skills with match scores, matched capabilities, and match reasons. Includes expandCommand hint for full details."
+        "description": "Profile-filtered discovery envelope with match scores, matched capabilities, match reasons, and expandCommandArgs for machine-safe detail expansion. Hosts preserve their active profile when expanding."
       },
       "execution": {
         "mode": "requestResponse",
@@ -57,25 +50,25 @@
     },
     {
       "id": "router-skill-describe",
-      "name": "Describe Skill",
-      "description": "Get the complete v2 skill definition for a specific skill, including all capabilities with full implementation details, governance, and constraints.",
+      "name": "Expand Discovery Detail",
+      "description": "Get detail-level profile-filtered discovery for a specific skill or alias. The host should preserve its active profile when invoking this capability.",
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["skills", "describe", "--skill-id", "${skillId}", "--json"]
+        "arguments": ["agent", "discover", "--query", "${skillId}", "--detail", "--json"]
       },
       "input": {
         "parameters": [
           {
             "name": "skillId",
             "type": "string",
-            "description": "The skill identifier (e.g. 'diagram', 'skill-router').",
+            "description": "The skill identifier or alias to expand (e.g. 'diagram', 'skill-router').",
             "required": true
           }
         ]
       },
       "output": {
-        "description": "Complete v2 skill definition JSON with all capabilities, implementation blocks, governance, and constraints."
+        "description": "Detail-level profile-filtered discovery envelope including allowed capabilities with implementation blocks."
       },
       "execution": {
         "mode": "requestResponse",
@@ -85,38 +78,18 @@
     },
     {
       "id": "router-skill-list",
-      "name": "List All Skills",
-      "description": "List all available skills with compact index-level metadata. Use --detail for capability-level information.",
+      "name": "List Discoverable Capabilities",
+      "description": "List profile-filtered discoverable skills with compact index-level metadata. Detail and profile flags are controlled by the host invocation context.",
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy",
-        "arguments": ["skills", "list", "--json"]
+        "arguments": ["agent", "discover", "--json"]
       },
       "input": {
-        "parameters": [
-          {
-            "name": "category",
-            "type": "string",
-            "description": "Filter by category (e.g. 'design', 'memory', 'meta').",
-            "required": false
-          },
-          {
-            "name": "lifecycle",
-            "type": "string",
-            "description": "Filter by lifecycle state (e.g. 'active', 'draft').",
-            "required": false
-          },
-          {
-            "name": "detail",
-            "type": "boolean",
-            "description": "When true, includes capability-level detail for each skill.",
-            "required": false,
-            "default": false
-          }
-        ]
+        "parameters": []
       },
       "output": {
-        "description": "Array of skills with id, name, description, category, capability count, and lifecycle state."
+        "description": "Profile-filtered discovery envelope with skill id, name, description, category, capability count, lifecycle state, and expansion hints."
       },
       "execution": {
         "mode": "requestResponse",
@@ -128,7 +101,7 @@
   "constraints": [
     {
       "constraintId": "progressive-disclosure",
-      "description": "Discovery responses use progressive disclosure: index (default) is compact, --detail adds capabilities, elegy skills describe returns full definitions. This minimizes context token usage.",
+      "description": "Discovery responses use progressive disclosure: index output is compact, and host-controlled --detail adds allowed capabilities and implementation metadata. This minimizes context token usage.",
       "required": true
     }
   ],

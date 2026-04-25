@@ -73,6 +73,87 @@ pub struct ConsumerSupportManifest {
     pub schemas: BTreeMap<String, String>,
 }
 
+pub const AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION: &str = "agent-capability-profile/v1";
+
+fn default_agent_profile_always_include_router() -> bool {
+    true
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct AgentCapabilityProfile {
+    pub schema_version: String,
+    pub profile_id: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include_skills: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub include_capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub exclude_capabilities: Vec<String>,
+    #[serde(default = "default_agent_profile_always_include_router")]
+    pub always_include_router: bool,
+}
+
+impl Default for AgentCapabilityProfile {
+    fn default() -> Self {
+        Self {
+            schema_version: AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION.to_string(),
+            profile_id: String::new(),
+            include_skills: Vec::new(),
+            include_capabilities: Vec::new(),
+            exclude_capabilities: Vec::new(),
+            always_include_router: true,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct AgentCapabilityProfileValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl AgentCapabilityProfileValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+pub fn validate_agent_capability_profile(
+    profile: &AgentCapabilityProfile,
+) -> AgentCapabilityProfileValidationResult {
+    let mut issues = Vec::new();
+
+    if profile.schema_version != AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION}'."
+        ));
+    }
+    if profile.profile_id.trim().is_empty() {
+        issues.push("profileId must not be empty.".to_string());
+    }
+
+    for (field, values) in [
+        ("includeSkills", &profile.include_skills),
+        ("includeCapabilities", &profile.include_capabilities),
+        ("excludeCapabilities", &profile.exclude_capabilities),
+    ] {
+        let mut seen = BTreeSet::new();
+        for value in values {
+            if value.trim().is_empty() {
+                issues.push(format!("{field} entries must not be empty."));
+            }
+            let normalized = value.to_ascii_lowercase();
+            if !seen.insert(normalized) {
+                issues.push(format!(
+                    "{field} must not contain duplicate entry '{value}'."
+                ));
+            }
+        }
+    }
+
+    AgentCapabilityProfileValidationResult { issues }
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum AgentMessageRole {
@@ -1583,6 +1664,15 @@ pub fn load_capability_definition_fixture_from_dir(
     load_json_file(
         &dir.join("fixtures")
             .join("capability-definition.minimal.json"),
+    )
+}
+
+pub fn load_agent_capability_profile_fixture_from_dir(
+    dir: &Path,
+) -> Result<AgentCapabilityProfile, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-capability-profile.minimal.json"),
     )
 }
 

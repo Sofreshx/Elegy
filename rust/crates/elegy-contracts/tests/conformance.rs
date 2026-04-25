@@ -1,11 +1,12 @@
 use elegy_contracts::{
     default_support_manifest_path, export_contract_bundle,
-    load_capability_definition_fixture_from_dir, load_compatibility_manifest_from_dir,
-    load_consumer_support_manifest, load_execution_event_fixture_from_dir,
-    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
-    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
-    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
-    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
+    load_agent_capability_profile_fixture_from_dir, load_capability_definition_fixture_from_dir,
+    load_compatibility_manifest_from_dir, load_consumer_support_manifest,
+    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
+    load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
+    load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
+    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
+    resolve_upstream_contracts_dir, validate_agent_capability_profile,
     validate_capability_definition, validate_execution_event, validate_invocation_request,
     validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
     validate_skill_definition_v2, validate_structured_failure,
@@ -46,10 +47,31 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("mcp-server-descriptor"));
     assert!(schema_names.contains("mcp-analysis-result"));
     assert!(schema_names.contains("capability-definition"));
+    assert!(schema_names.contains("agent-capability-profile"));
+    assert!(schema_names.contains("agent-manifest"));
+    assert!(schema_names.contains("agent-check"));
+    assert!(schema_names.contains("agent-discovery"));
     assert!(schema_names.contains("structured-failure"));
     assert!(schema_names.contains("invocation-request"));
     assert!(schema_names.contains("invocation-response"));
     assert!(schema_names.contains("execution-event"));
+}
+
+#[test]
+fn upstream_agent_capability_profile_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let profile = load_agent_capability_profile_fixture_from_dir(&contracts_dir)
+        .expect("load upstream agent-capability-profile fixture");
+
+    let validation = validate_agent_capability_profile(&profile);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(profile.profile_id, "generic-agent-host");
+    assert!(profile.always_include_router);
 }
 
 #[test]
@@ -487,6 +509,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path.join("compatibility-manifest.json").is_file());
     assert!(output_path.join("compatibility-matrix.json").is_file());
     assert!(output_path.join("canonical-workflow.schema.json").is_file());
+    assert!(output_path.join("agent-manifest.schema.json").is_file());
+    assert!(output_path.join("agent-check.schema.json").is_file());
+    assert!(output_path.join("agent-discovery.schema.json").is_file());
     assert!(output_path
         .join("capability-definition.schema.json")
         .is_file());
@@ -525,6 +550,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
         let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
         assert!(archive.by_name("compatibility-manifest.json").is_ok());
+        assert!(archive.by_name("agent-manifest.schema.json").is_ok());
+        assert!(archive.by_name("agent-check.schema.json").is_ok());
+        assert!(archive.by_name("agent-discovery.schema.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive.by_name("invocation-request.schema.json").is_ok());

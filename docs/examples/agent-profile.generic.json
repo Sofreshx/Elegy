@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "generic-local-agent",
+  "includeSkills": ["repo", "data", "web"],
+  "includeCapabilities": ["memory-search"],
+  "excludeCapabilities": [],
+  "alwaysIncludeRouter": true
+}
