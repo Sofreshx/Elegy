@@ -1,10 +1,10 @@
 # elegy-memory-mcp deployment
 
-This guide covers a minimal Windows deployment behind Cloudflare Tunnel for `https://elegy-memory.holon.it.com/mcp`.
+This guide covers the HTTP/OAuth binary; local stdio consumers use subprocess config instead of tunnel deployment.
 
 ## What you are deploying
 
-The server exposes public OAuth metadata and auth endpoints, but keeps `/mcp` behind bearer auth.
+`elegy-memory-mcp-http` exposes public OAuth metadata and auth endpoints, but keeps `/mcp` behind bearer auth.
 
 - Public:
   - `/.well-known/oauth-protected-resource`
@@ -41,7 +41,7 @@ cloudflared tunnel route dns elegy-memory elegy-memory.holon.it.com
 
 ## Tunnel config
 
-Point the public hostname at the local MCP server on port `8765`.
+Point the public hostname at the local HTTP MCP server on port `8765`.
 
 File: `C:\Users\<you>\.cloudflared\config.yml`
 
@@ -72,20 +72,20 @@ Open a new PowerShell session after `setx` so new processes inherit the values.
 
 ## Manual run
 
-Start the local server and tunnel in separate terminals.
+Start the local HTTP server and tunnel in separate terminals.
 
 ```powershell
 cloudflared tunnel run elegy-memory
 ```
 
 ```powershell
-elegy-memory-mcp.exe
+elegy-memory-mcp-http.exe
 ```
 
 If the binary is not on `PATH`, run it by full path, for example:
 
 ```powershell
-C:\Elegy\bin\elegy-memory-mcp.exe
+C:\Elegy\bin\elegy-memory-mcp-http.exe
 ```
 
 ## Recommended Windows services
@@ -100,12 +100,12 @@ Install the Cloudflare Tunnel service after `config.yml` is in place.
 cloudflared service install
 ```
 
-### `elegy-memory-mcp.exe`
+### `elegy-memory-mcp-http.exe`
 
 Use NSSM for the MCP binary.
 
 ```powershell
-nssm install ElegyMemoryMcp "C:\Elegy\bin\elegy-memory-mcp.exe"
+nssm install ElegyMemoryMcp "C:\Elegy\bin\elegy-memory-mcp-http.exe"
 nssm set ElegyMemoryMcp AppDirectory "C:\Elegy\bin"
 nssm set ElegyMemoryMcp Start SERVICE_AUTO_START
 nssm start ElegyMemoryMcp
@@ -136,11 +136,21 @@ The first connect opens the browser consent flow.
 
 ## Claude Desktop
 
-Claude Desktop uses the same connector URL and the same OAuth/password flow.
+Claude Desktop can use the remote HTTP connector, but local stdio is now the simpler desktop path.
 
 - URL: `https://elegy-memory.holon.it.com/mcp`
 - Client secret: none
 - Consent flow: same browser round-trip
+- Local stdio example: [claude-desktop-config.example.json](claude-desktop-config.example.json)
+
+## Local stdio consumers
+
+Claude Desktop and future Holon hosting can spawn `elegy-memory-mcp-stdio` directly instead of going through Cloudflare Tunnel.
+
+| Consumer | Example |
+|---|---|
+| Claude Desktop | [claude-desktop-config.example.json](claude-desktop-config.example.json) |
+| Holon DesktopHost (planned) | [holon-mcp-config.example.json](holon-mcp-config.example.json) |
 
 ## Kill switch
 

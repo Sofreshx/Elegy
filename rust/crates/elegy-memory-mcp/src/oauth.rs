@@ -28,8 +28,7 @@ use time::OffsetDateTime;
 use url::Url;
 use uuid::Uuid;
 
-use crate::config::Config;
-use crate::memory_tools::ClaudeRemoteMemoryRepository;
+use elegy_memory_mcp::config::Config;
 
 pub const ACCESS_TOKEN_TTL_SECONDS: i64 = 60 * 60;
 pub const AUTHORIZATION_CODE_TTL_SECONDS: i64 = 60;
@@ -49,7 +48,6 @@ type NowFn = Arc<dyn Fn() -> i64 + Send + Sync>;
 #[derive(Clone)]
 pub struct AppState {
     pub oauth: Arc<OAuthService>,
-    pub memory_repository: Arc<ClaudeRemoteMemoryRepository>,
 }
 
 pub struct OAuthService {

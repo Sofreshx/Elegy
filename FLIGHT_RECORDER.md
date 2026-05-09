@@ -2360,3 +2360,12 @@ cargo clippy -p elegy-memory --color never -- -D warnings
 - Rollout was committed directly on dev / is being finalized directly on dev because branch-per-WU flow was not forced in the shared dirty worktree.
 - WU1-WU9 implementation/docs are complete in this lane.
 
+## STATE_SNAPSHOT — WU10-stdio Phase 7 — 2026-05-09 13:29
+- Phase: Wrap-up
+- Status: BLOCKED
+- Artifacts: `rust/Cargo.lock`; `rust/crates/elegy-memory-mcp/Cargo.toml`; `rust/crates/elegy-memory-mcp/README.md`; `rust/crates/elegy-memory-mcp/docs/{AUTH.md,CONFIG.md,DEPLOYMENT.md,PENDING.md,TRANSPORT.md,architecture/overview.md,claude-desktop-config.example.json,holon-mcp-config.example.json}`; `rust/crates/elegy-memory-mcp/src/{lib.rs,main.rs,memory_tools.rs,oauth.rs,server.rs,stdio_main.rs,tests.rs}`; `FLIGHT_RECORDER.md`
+- Validation: `cargo test -p elegy-memory-mcp` from `rust\` → PASS (2026-05-09 13:29); `cargo build -p elegy-memory-mcp --bins` from `rust\` → PASS; debug binaries confirmed at `D:\cargo-targets\elegy\debug\elegy-memory-mcp-http.exe` and `D:\cargo-targets\elegy\debug\elegy-memory-mcp-stdio.exe`
+- Tests: 33/33 passing (`src/lib.rs`: 7, `src/main.rs`: 25, `src/stdio_main.rs`: 1, doc-tests: 0); delta vs previously observed session state: `32/32` → `33/33`
+- Next: wait for a clean/safe git worktree before attempting any Phase 7 git-flow steps from `prompt.md`
+- Notes: in-worktree WU10 scope is satisfied: shared MCP lib extraction, dual binary setup (`elegy-memory-mcp-http` + `elegy-memory-mcp-stdio`), stdio transport with handshake/tool-list coverage, docs/examples for Claude Desktop + Holon, and Review B tracking in `rust/crates/elegy-memory-mcp/docs/PENDING.md`. Git workflow completion is intentionally blocked because `dev` is dirty with unrelated pre-existing changes (`CLAUDE.md`, `.claude\...`) alongside WU10 edits, so branch switching, pull, merge, push, and branch deletion are unsafe and were not attempted.
+
