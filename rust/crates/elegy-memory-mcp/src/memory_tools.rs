@@ -12,11 +12,13 @@ use rmcp::schemars;
 use rmcp::ErrorData;
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
+use thiserror::Error;
 use uuid::Uuid;
 
-pub(crate) const FIXED_NAMESPACE: &str = "claude-ai-remote";
-pub(crate) const SCOPE_OVERRIDE_ERROR_MESSAGE: &str =
-    "scope override not permitted — this connector is hardwired to 'claude-ai-remote'";
+pub const DEFAULT_NAMESPACE: &str = "claude-ai-remote";
+pub const DEFAULT_AGENT_ID: &str = DEFAULT_NAMESPACE;
+pub const SCOPE_OVERRIDE_ERROR_MESSAGE: &str =
+    "scope override not permitted — this connector is pinned to a configured agent namespace";
 
 const DEFAULT_SEARCH_LIMIT: usize = 10;
 const DEFAULT_LIST_LIMIT: usize = 20;
@@ -24,15 +26,33 @@ const DEFAULT_STORE_IMPORTANCE: f32 = 0.5;
 const PREVIEW_LIMIT: usize = 140;
 
 #[derive(Clone)]
-pub(crate) struct ClaudeRemoteMemoryRepository {
+pub struct MemoryRepository {
     store: SqliteMemoryStore,
+    binding: MemoryBinding,
 }
 
-impl ClaudeRemoteMemoryRepository {
-    pub(crate) fn new(path: impl AsRef<Path>) -> Result<Self, StoreError> {
+impl MemoryRepository {
+    pub fn new(path: impl AsRef<Path>, binding: MemoryBinding) -> Result<Self, StoreError> {
         Ok(Self {
             store: SqliteMemoryStore::new(path, MemoryScope::Agent)?,
+            binding,
         })
+    }
+
+    pub fn namespace(&self) -> &str {
+        self.binding.namespace()
+    }
+
+    pub fn agent_id(&self) -> &str {
+        self.binding.agent_id()
+    }
+
+    fn namespace_owned(&self) -> String {
+        self.namespace().to_string()
+    }
+
+    fn agent_id_owned(&self) -> String {
+        self.agent_id().to_string()
     }
 
     pub(crate) async fn search(
@@ -192,7 +212,7 @@ impl ClaudeRemoteMemoryRepository {
                     .await?;
                 let memory = self.require_visible_memory(&target_id).await?;
                 Ok(MemoryStoreResponse {
-                    namespace: FIXED_NAMESPACE,
+                    namespace: self.namespace_owned(),
                     action: "merged",
                     gate_result: "merge".to_string(),
                     memory: MemoryDetail::from(memory),
@@ -215,7 +235,7 @@ impl ClaudeRemoteMemoryRepository {
                 }
                 let memory = self.require_visible_memory(&id).await?;
                 Ok(MemoryStoreResponse {
-                    namespace: FIXED_NAMESPACE,
+                    namespace: self.namespace_owned(),
                     action: "added",
                     gate_result: format_contradiction_gate_result(conflicting_id),
                     memory: MemoryDetail::from(memory),
@@ -227,7 +247,7 @@ impl ClaudeRemoteMemoryRepository {
                 self.store.store(memory).await?;
                 let memory = self.require_visible_memory(&id).await?;
                 Ok(MemoryStoreResponse {
-                    namespace: FIXED_NAMESPACE,
+                    namespace: self.namespace_owned(),
                     action: "added",
                     gate_result: "archived".to_string(),
                     memory: MemoryDetail::from(memory),
@@ -242,7 +262,7 @@ impl ClaudeRemoteMemoryRepository {
                 self.store.store(memory).await?;
                 let memory = self.require_visible_memory(&id).await?;
                 Ok(MemoryStoreResponse {
-                    namespace: FIXED_NAMESPACE,
+                    namespace: self.namespace_owned(),
                     action: "added",
                     gate_result: format_gate_result(similar_to, similarity),
                     memory: MemoryDetail::from(memory),
@@ -267,7 +287,7 @@ impl ClaudeRemoteMemoryRepository {
             .await?;
         let memory = self.require_visible_memory(&id).await?;
         Ok(MemoryUpdateResponse {
-            namespace: FIXED_NAMESPACE,
+            namespace: self.namespace_owned(),
             updated: true,
             memory: MemoryDetail::from(memory),
         })
@@ -281,7 +301,7 @@ impl ClaudeRemoteMemoryRepository {
         let _existing = self.require_visible_memory(&id).await?;
         self.store.hard_delete(&id).await?;
         Ok(MemoryDeleteResponse {
-            namespace: FIXED_NAMESPACE,
+            namespace: self.namespace_owned(),
             id: id.to_string(),
             deleted: true,
         })
@@ -309,7 +329,7 @@ impl ClaudeRemoteMemoryRepository {
             .correct_memory(&id, content, "mcp:memory_correct", reason)?;
         let memory = self.require_visible_memory(&id).await?;
         Ok(MemoryCorrectResponse {
-            namespace: FIXED_NAMESPACE,
+            namespace: self.namespace_owned(),
             correction: MemoryCorrectionSummary::from(correction),
             memory: MemoryDetail::from(memory),
         })
@@ -332,7 +352,7 @@ impl ClaudeRemoteMemoryRepository {
                 status: None,
                 tenant_id: None,
                 user_id: None,
-                agent_id: Some(FIXED_NAMESPACE.to_string()),
+                agent_id: Some(self.agent_id_owned()),
                 limit,
             })
             .await?;
@@ -342,7 +362,7 @@ impl ClaudeRemoteMemoryRepository {
 
     fn is_visible_memory(&self, memory: &Memory) -> bool {
         memory.scope == MemoryScope::Agent
-            && memory.agent_id.as_deref() == Some(FIXED_NAMESPACE)
+            && memory.agent_id.as_deref() == Some(self.agent_id())
             && memory.state != MemoryState::Deleted
     }
 
@@ -379,7 +399,7 @@ impl ClaudeRemoteMemoryRepository {
             last_accessed_at: None,
             tenant_id: None,
             user_id: None,
-            agent_id: Some(FIXED_NAMESPACE.to_string()),
+            agent_id: Some(self.agent_id_owned()),
         }
     }
 
@@ -399,7 +419,7 @@ impl ClaudeRemoteMemoryRepository {
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryStoreArgs {
+pub struct MemoryStoreArgs {
     pub(crate) content: String,
     #[serde(default)]
     pub(crate) summary: Option<String>,
@@ -439,7 +459,7 @@ impl MemoryStoreArgs {
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryUpdateArgs {
+pub struct MemoryUpdateArgs {
     pub(crate) id: String,
     pub(crate) content: String,
     #[serde(default)]
@@ -448,7 +468,7 @@ pub(crate) struct MemoryUpdateArgs {
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryCorrectArgs {
+pub struct MemoryCorrectArgs {
     pub(crate) id: String,
     pub(crate) content: String,
     #[serde(default)]
@@ -457,13 +477,13 @@ pub(crate) struct MemoryCorrectArgs {
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryDeleteArgs {
+pub struct MemoryDeleteArgs {
     pub(crate) id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemorySearchArgs {
+pub struct MemorySearchArgs {
     pub(crate) query: String,
     #[serde(default = "default_search_limit")]
     pub(crate) limit: usize,
@@ -485,13 +505,13 @@ impl MemorySearchArgs {
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryRecallArgs {
+pub struct MemoryRecallArgs {
     pub(crate) id: String,
 }
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryListArgs {
+pub struct MemoryListArgs {
     #[serde(default = "default_list_limit")]
     pub(crate) limit: usize,
     #[serde(default)]
@@ -516,11 +536,11 @@ impl MemoryListArgs {
 
 #[derive(Debug, Clone, Default, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub(crate) struct MemoryStatsArgs {}
+pub struct MemoryStatsArgs {}
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum ToolMemoryState {
+pub enum ToolMemoryState {
     Active,
     Dormant,
 }
@@ -536,7 +556,7 @@ impl From<ToolMemoryState> for MemoryState {
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum ToolMemoryType {
+pub enum ToolMemoryType {
     Fact,
     Preference,
     Decision,
@@ -558,7 +578,7 @@ impl From<ToolMemoryType> for MemoryType {
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "kebab-case")]
-pub(crate) enum ToolProvenance {
+pub enum ToolProvenance {
     UserStated,
     AgentObserved,
     Consolidated,
@@ -580,7 +600,7 @@ impl From<ToolProvenance> for ProvenanceLevel {
 
 #[derive(Debug, Clone, Copy, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
-pub(crate) enum ToolSensitivity {
+pub enum ToolSensitivity {
     Low,
     Medium,
     High,
@@ -600,18 +620,22 @@ impl From<ToolSensitivity> for SensitivityLevel {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemorySearchResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) count: usize,
-    pub(crate) query: String,
-    pub(crate) include_dormant: bool,
-    pub(crate) results: Vec<SearchResultRow>,
+pub struct MemorySearchResponse {
+    pub namespace: String,
+    pub count: usize,
+    pub query: String,
+    pub include_dormant: bool,
+    pub results: Vec<SearchResultRow>,
 }
 
 impl MemorySearchResponse {
-    pub(crate) fn new(args: &MemorySearchArgs, matches: Vec<MemorySearchMatch>) -> Self {
+    pub fn new(
+        repository: &MemoryRepository,
+        args: &MemorySearchArgs,
+        matches: Vec<MemorySearchMatch>,
+    ) -> Self {
         Self {
-            namespace: FIXED_NAMESPACE,
+            namespace: repository.namespace_owned(),
             count: matches.len(),
             query: args.query.clone(),
             include_dormant: args.include_dormant,
@@ -622,13 +646,13 @@ impl MemorySearchResponse {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct SearchResultRow {
-    pub(crate) id: String,
-    pub(crate) score: f32,
-    pub(crate) similarity: f32,
-    pub(crate) state: String,
-    pub(crate) memory_type: String,
-    pub(crate) preview: String,
+pub struct SearchResultRow {
+    pub id: String,
+    pub score: f32,
+    pub similarity: f32,
+    pub state: String,
+    pub memory_type: String,
+    pub preview: String,
 }
 
 impl From<MemorySearchMatch> for SearchResultRow {
@@ -646,17 +670,17 @@ impl From<MemorySearchMatch> for SearchResultRow {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryRecallResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) found: bool,
+pub struct MemoryRecallResponse {
+    pub namespace: String,
+    pub found: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) memory: Option<MemoryDetail>,
+    pub memory: Option<MemoryDetail>,
 }
 
 impl MemoryRecallResponse {
-    pub(crate) fn from_memory(memory: Option<Memory>) -> Self {
+    pub fn from_memory(repository: &MemoryRepository, memory: Option<Memory>) -> Self {
         Self {
-            namespace: FIXED_NAMESPACE,
+            namespace: repository.namespace_owned(),
             found: memory.is_some(),
             memory: memory.map(MemoryDetail::from),
         }
@@ -665,17 +689,21 @@ impl MemoryRecallResponse {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryListResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) count: usize,
-    pub(crate) include_dormant: bool,
-    pub(crate) memories: Vec<ListRow>,
+pub struct MemoryListResponse {
+    pub namespace: String,
+    pub count: usize,
+    pub include_dormant: bool,
+    pub memories: Vec<ListRow>,
 }
 
 impl MemoryListResponse {
-    pub(crate) fn new(args: &MemoryListArgs, memories: Vec<Memory>) -> Self {
+    pub fn new(
+        repository: &MemoryRepository,
+        args: &MemoryListArgs,
+        memories: Vec<Memory>,
+    ) -> Self {
         Self {
-            namespace: FIXED_NAMESPACE,
+            namespace: repository.namespace_owned(),
             count: memories.len(),
             include_dormant: args.include_dormant,
             memories: memories.into_iter().map(ListRow::from).collect(),
@@ -685,14 +713,14 @@ impl MemoryListResponse {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct ListRow {
-    pub(crate) id: String,
-    pub(crate) state: String,
-    pub(crate) memory_type: String,
-    pub(crate) provenance: String,
-    pub(crate) importance: f32,
-    pub(crate) updated_at: String,
-    pub(crate) preview: String,
+pub struct ListRow {
+    pub id: String,
+    pub state: String,
+    pub memory_type: String,
+    pub provenance: String,
+    pub importance: f32,
+    pub updated_at: String,
+    pub preview: String,
 }
 
 impl From<Memory> for ListRow {
@@ -711,23 +739,23 @@ impl From<Memory> for ListRow {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryDetail {
-    pub(crate) id: String,
-    pub(crate) content: String,
+pub struct MemoryDetail {
+    pub id: String,
+    pub content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) summary: Option<String>,
-    pub(crate) state: String,
-    pub(crate) memory_type: String,
-    pub(crate) provenance: String,
-    pub(crate) importance: f32,
-    pub(crate) reliability: f32,
-    pub(crate) tags: Vec<String>,
+    pub summary: Option<String>,
+    pub state: String,
+    pub memory_type: String,
+    pub provenance: String,
+    pub importance: f32,
+    pub reliability: f32,
+    pub tags: Vec<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) status: Option<String>,
-    pub(crate) created_at: String,
-    pub(crate) updated_at: String,
+    pub status: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) last_accessed_at: Option<String>,
+    pub last_accessed_at: Option<String>,
 }
 
 impl From<Memory> for MemoryDetail {
@@ -752,56 +780,56 @@ impl From<Memory> for MemoryDetail {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryStatsResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) scope: &'static str,
-    pub(crate) agent_id: &'static str,
-    pub(crate) total_count: u64,
-    pub(crate) active_count: u64,
-    pub(crate) dormant_count: u64,
-    pub(crate) stale_embeddings_count: u64,
-    pub(crate) unresolved_contradictions: u64,
-    pub(crate) type_counts: BTreeMap<String, u64>,
+pub struct MemoryStatsResponse {
+    pub namespace: String,
+    pub scope: &'static str,
+    pub agent_id: String,
+    pub total_count: u64,
+    pub active_count: u64,
+    pub dormant_count: u64,
+    pub stale_embeddings_count: u64,
+    pub unresolved_contradictions: u64,
+    pub type_counts: BTreeMap<String, u64>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) oldest_active_memory: Option<String>,
+    pub oldest_active_memory: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) newest_memory: Option<String>,
+    pub newest_memory: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryStoreResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) action: &'static str,
-    pub(crate) gate_result: String,
-    pub(crate) memory: MemoryDetail,
+pub struct MemoryStoreResponse {
+    pub namespace: String,
+    pub action: &'static str,
+    pub gate_result: String,
+    pub memory: MemoryDetail,
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryUpdateResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) updated: bool,
-    pub(crate) memory: MemoryDetail,
+pub struct MemoryUpdateResponse {
+    pub namespace: String,
+    pub updated: bool,
+    pub memory: MemoryDetail,
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryCorrectResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) correction: MemoryCorrectionSummary,
-    pub(crate) memory: MemoryDetail,
+pub struct MemoryCorrectResponse {
+    pub namespace: String,
+    pub correction: MemoryCorrectionSummary,
+    pub memory: MemoryDetail,
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryCorrectionSummary {
-    pub(crate) id: String,
-    pub(crate) memory_id: String,
-    pub(crate) disposition: String,
+pub struct MemoryCorrectionSummary {
+    pub id: String,
+    pub memory_id: String,
+    pub disposition: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) related_memory_id: Option<String>,
-    pub(crate) corrected_at: String,
+    pub related_memory_id: Option<String>,
+    pub corrected_at: String,
 }
 
 impl From<CorrectionRecord> for MemoryCorrectionSummary {
@@ -818,18 +846,18 @@ impl From<CorrectionRecord> for MemoryCorrectionSummary {
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
-pub(crate) struct MemoryDeleteResponse {
-    pub(crate) namespace: &'static str,
-    pub(crate) id: String,
-    pub(crate) deleted: bool,
+pub struct MemoryDeleteResponse {
+    pub namespace: String,
+    pub id: String,
+    pub deleted: bool,
 }
 
-impl From<MemoryStatsSnapshot> for MemoryStatsResponse {
-    fn from(value: MemoryStatsSnapshot) -> Self {
+impl MemoryStatsResponse {
+    pub fn from_repository(repository: &MemoryRepository, value: MemoryStatsSnapshot) -> Self {
         Self {
-            namespace: FIXED_NAMESPACE,
+            namespace: repository.namespace_owned(),
             scope: "agent",
-            agent_id: FIXED_NAMESPACE,
+            agent_id: repository.agent_id_owned(),
             total_count: value.total_count,
             active_count: value.active_count,
             dormant_count: value.dormant_count,
@@ -843,22 +871,22 @@ impl From<MemoryStatsSnapshot> for MemoryStatsResponse {
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MemorySearchMatch {
-    pub(crate) memory: Memory,
-    pub(crate) score: f32,
-    pub(crate) similarity: f32,
+pub struct MemorySearchMatch {
+    pub memory: Memory,
+    pub score: f32,
+    pub similarity: f32,
 }
 
 #[derive(Debug, Clone)]
-pub(crate) struct MemoryStatsSnapshot {
-    pub(crate) total_count: u64,
-    pub(crate) active_count: u64,
-    pub(crate) dormant_count: u64,
-    pub(crate) stale_embeddings_count: u64,
-    pub(crate) unresolved_contradictions: u64,
-    pub(crate) oldest_active_memory: Option<String>,
-    pub(crate) newest_memory: Option<String>,
-    pub(crate) type_counts: BTreeMap<String, u64>,
+pub struct MemoryStatsSnapshot {
+    pub total_count: u64,
+    pub active_count: u64,
+    pub dormant_count: u64,
+    pub stale_embeddings_count: u64,
+    pub unresolved_contradictions: u64,
+    pub oldest_active_memory: Option<String>,
+    pub newest_memory: Option<String>,
+    pub type_counts: BTreeMap<String, u64>,
 }
 
 pub(crate) fn parse_tool_arguments<T: DeserializeOwned>(
@@ -874,7 +902,7 @@ pub(crate) fn parse_tool_arguments<T: DeserializeOwned>(
 pub(crate) fn map_store_error(error: StoreError) -> ErrorData {
     match error {
         StoreError::NotFound(id) => ErrorData::invalid_params(
-            format!("memory `{id}` was not found in the fixed claude-ai-remote namespace"),
+            format!("memory `{id}` was not found in the configured agent namespace"),
             None,
         ),
         StoreError::Validation(message) => ErrorData::invalid_params(message, None),
@@ -1125,4 +1153,57 @@ fn map_gate_error(error: GateError) -> StoreError {
             StoreError::Validation(format!("gate embedding evaluation failed: {error}"))
         }
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MemoryBinding {
+    namespace: String,
+    agent_id: String,
+}
+
+impl Default for MemoryBinding {
+    fn default() -> Self {
+        Self {
+            namespace: DEFAULT_NAMESPACE.to_string(),
+            agent_id: DEFAULT_AGENT_ID.to_string(),
+        }
+    }
+}
+
+impl MemoryBinding {
+    pub fn new(
+        namespace: impl Into<String>,
+        agent_id: impl Into<String>,
+    ) -> Result<Self, MemoryBindingError> {
+        let namespace = namespace.into();
+        let agent_id = agent_id.into();
+
+        if namespace.trim().is_empty() {
+            return Err(MemoryBindingError::EmptyNamespace);
+        }
+        if agent_id.trim().is_empty() {
+            return Err(MemoryBindingError::EmptyAgentId);
+        }
+
+        Ok(Self {
+            namespace: namespace.trim().to_string(),
+            agent_id: agent_id.trim().to_string(),
+        })
+    }
+
+    pub fn namespace(&self) -> &str {
+        &self.namespace
+    }
+
+    pub fn agent_id(&self) -> &str {
+        &self.agent_id
+    }
+}
+
+#[derive(Debug, Error, PartialEq, Eq)]
+pub enum MemoryBindingError {
+    #[error("memory namespace must not be empty")]
+    EmptyNamespace,
+    #[error("memory agent_id must not be empty")]
+    EmptyAgentId,
 }

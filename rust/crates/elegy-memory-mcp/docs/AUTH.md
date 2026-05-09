@@ -1,6 +1,6 @@
 # elegy-memory-mcp OAuth 2.1 + MCP Bearer Enforcement (WU4/WU5)
 
-WU4 adds the authorization server and resource metadata required for Claude remote MCP connectors. WU5 makes `/mcp` private while keeping OAuth and `/.well-known/*` routes public.
+This auth model applies to `elegy-memory-mcp-http` only; `elegy-memory-mcp-stdio` does not use OAuth or JWT.
 
 ## Fixed behavior
 

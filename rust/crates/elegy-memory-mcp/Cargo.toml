@@ -6,10 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 authors.workspace = true
 repository.workspace = true
+autobins = false
 
 [[bin]]
-name = "elegy-memory-mcp"
+name = "elegy-memory-mcp-http"
 path = "src/main.rs"
+
+[[bin]]
+name = "elegy-memory-mcp-stdio"
+path = "src/stdio_main.rs"
 
 [dependencies]
 anyhow = "1.0.98"
@@ -27,12 +32,13 @@ thiserror.workspace = true
 time.workspace = true
 tokio = { workspace = true, features = ["net"] }
 tracing = "0.1.41"
-tracing-subscriber = { version = "0.3.19", features = ["fmt", "json"] }
+tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "json"] }
 url.workspace = true
 uuid = { version = "1.15.1", features = ["serde", "v4"] }
 base64.workspace = true
 
 [dev-dependencies]
+rmcp = { workspace = true, features = ["client", "server", "transport-io"] }
 reqwest.workspace = true
 tempfile = "3.19.1"
 

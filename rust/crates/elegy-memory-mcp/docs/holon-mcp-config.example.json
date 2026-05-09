@@ -1,0 +1,12 @@
+{
+  "name": "elegy-memory",
+  "transport": "stdio",
+  "command": "<absolute-path-to>\\elegy-memory-mcp-stdio.exe",
+  "args": [],
+  "env": {
+    "ELEGY_DB_PATH": "C:\\Users\\Romain\\.elegy\\memory.db",
+    "ELEGY_MCP_AGENT_ID": "holon",
+    "OLLAMA_URL": "http://localhost:11434",
+    "RUST_LOG": "info"
+  }
+}

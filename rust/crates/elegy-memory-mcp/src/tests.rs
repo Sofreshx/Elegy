@@ -5,6 +5,10 @@ use std::{
     sync::{Arc, Mutex, OnceLock},
 };
 
+use argon2::{
+    password_hash::{rand_core::OsRng, SaltString},
+    Argon2, PasswordHasher,
+};
 use axum::http::StatusCode;
 use axum::response::IntoResponse;
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine as _};
@@ -22,15 +26,18 @@ use tokio::{net::TcpListener, task::JoinHandle};
 use tracing_subscriber::fmt::MakeWriter;
 use uuid::Uuid;
 
-use crate::{
-    config::{derive_admin_password_verifier, Config},
-    memory_tools::{FIXED_NAMESPACE, SCOPE_OVERRIDE_ERROR_MESSAGE},
-    oauth::{AccessTokenClaims, AppState, OAuthService, OAUTH_SCOPE},
+use crate::oauth::{AccessTokenClaims, AppState, OAuthService, OAUTH_SCOPE};
+use elegy_memory_mcp::{
+    config::Config,
+    memory_tools::{
+        MemoryBinding, MemoryRepository, DEFAULT_NAMESPACE, SCOPE_OVERRIDE_ERROR_MESSAGE,
+    },
 };
 
 const TEST_PASSWORD: &str = "correct horse battery staple";
 const TEST_PUBLIC_URL: &str = "https://elegy-memory.holon.it.com";
 const INITIALIZE_REQUEST: &str = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"wu4-test-client","version":"1.0.0"}}}"#;
+const FIXED_NAMESPACE: &str = DEFAULT_NAMESPACE;
 
 #[derive(Clone)]
 struct TestClock {
@@ -153,12 +160,11 @@ impl TestHarness {
                 .unwrap_or_else(|_| panic!("oauth service should initialize")),
         );
         let memory_repository = Arc::new(
-            crate::memory_tools::ClaudeRemoteMemoryRepository::new(&db_path)
+            MemoryRepository::new(&db_path, MemoryBinding::default())
                 .unwrap_or_else(|_| panic!("memory repository should initialize")),
         );
         let state = AppState {
             oauth: Arc::clone(&oauth),
-            memory_repository,
         };
 
         let transport_config = StreamableHttpServerConfig {
@@ -173,10 +179,11 @@ impl TestHarness {
         let address = listener
             .local_addr()
             .unwrap_or_else(|_| panic!("listener should expose local address"));
+        let server_oauth = Arc::clone(&oauth);
         let server = tokio::spawn(async move {
             axum::serve(
                 listener,
-                crate::build_router(state, transport_config)
+                crate::build_router(state, memory_repository, server_oauth, transport_config)
                     .into_make_service_with_connect_info::<std::net::SocketAddr>(),
             )
             .await
@@ -209,10 +216,17 @@ impl Drop for TestHarness {
     }
 }
 
+fn derive_admin_password_verifier(value: &str) -> String {
+    let salt = SaltString::generate(&mut OsRng);
+    Argon2::default()
+        .hash_password(value.as_bytes(), &salt)
+        .unwrap_or_else(|_| panic!("test password verifier should generate"))
+        .to_string()
+}
+
 fn test_config(data_dir: &std::path::Path, db_path: &std::path::Path) -> Config {
     Config {
-        admin_password_verifier: derive_admin_password_verifier(TEST_PASSWORD)
-            .unwrap_or_else(|_| panic!("test password verifier should generate")),
+        admin_password_verifier: derive_admin_password_verifier(TEST_PASSWORD),
         db_path: db_path.to_path_buf(),
         public_url: url::Url::parse("https://elegy-memory.holon.it.com")
             .unwrap_or_else(|_| panic!("test public url should parse")),
@@ -633,8 +647,8 @@ async fn full_code_flow_issues_hs256_tokens() {
 #[tokio::test]
 async fn nominal_end_to_end_flow_exercises_oauth_and_all_memory_tools() {
     let harness = TestHarness::new().await;
-    let base_url = url::Url::parse(&harness.base_url)
-        .unwrap_or_else(|_| panic!("test base url should parse"));
+    let base_url =
+        url::Url::parse(&harness.base_url).unwrap_or_else(|_| panic!("test base url should parse"));
     assert_eq!(base_url.host_str(), Some("127.0.0.1"));
     assert!(base_url.port().unwrap_or_default() != 0);
     assert!(harness.db_path.exists());
