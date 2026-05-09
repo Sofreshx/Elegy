@@ -1280,6 +1280,39 @@ pub fn validate_skill_definition_v2(def: &SkillDefinitionV2) -> Result<(), Contr
     Ok(())
 }
 
+/// Strict validation for v2 skill definitions that additionally enforces
+/// output.schemaRef on every subprocess machine-invokable capability.
+///
+/// Policy: every subprocess machine-invokable capability MUST declare
+/// output.schemaRef. Capabilities without it are rejected.
+///
+/// See `contracts/schemas/skill-definition-v2.schema.json` comment and
+/// `contracts/fixtures/skill-definition-v2.negative-no-output-schema.json`.
+pub fn validate_skill_definition_v2_strict(def: &SkillDefinitionV2) -> Result<(), ContractsError> {
+    validate_skill_definition_v2(def)?;
+
+    for cap in &def.capabilities {
+        if let Some(implementation) = &cap.implementation {
+            if implementation.execution_type == "subprocess" {
+                let has_schema_ref = cap
+                    .output
+                    .as_ref()
+                    .and_then(|o| o.schema_ref.as_deref())
+                    .map(|s| !s.trim().is_empty())
+                    .unwrap_or(false);
+                if !has_schema_ref {
+                    return Err(ContractsError::Compatibility(format!(
+                        "capability '{}' is a subprocess machine-invokable capability and must declare output.schemaRef",
+                        cap.id
+                    )));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// One built-in skill definition compiled into Elegy binaries.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct BuiltinSkillDefinition {
@@ -1349,6 +1382,10 @@ pub fn builtin_skill_definitions() -> &'static [BuiltinSkillDefinition] {
 }
 
 /// Parse and validate every built-in v2 skill definition.
+///
+/// Uses strict validation that enforces output.schemaRef on every
+/// subprocess machine-invokable capability. See
+/// `validate_skill_definition_v2_strict` for the enforced policy.
 pub fn parse_builtin_skill_definitions() -> Result<Vec<SkillDefinitionV2>, ContractsError> {
     BUILTIN_SKILL_DEFINITIONS
         .iter()
@@ -1360,7 +1397,7 @@ pub fn parse_builtin_skill_definitions() -> Result<Vec<SkillDefinitionV2>, Contr
                         entry.id
                     ))
                 })?;
-            validate_skill_definition_v2(&definition)?;
+            validate_skill_definition_v2_strict(&definition)?;
             Ok(definition)
         })
         .collect()
@@ -2646,5 +2683,28 @@ mod tests {
             ..Default::default()
         };
         assert!(validate_skill_definition_v2(&def).is_err());
+    }
+
+    #[test]
+    fn strict_validation_rejects_subprocess_capability_without_output_schema_ref() {
+        let json = include_str!(
+            "../../../../contracts/fixtures/skill-definition-v2.negative-no-output-schema.json"
+        );
+        let def: SkillDefinitionV2 =
+            serde_json::from_str(json).expect("negative fixture should parse");
+        // Base validation should pass (it doesn't enforce output.schemaRef)
+        validate_skill_definition_v2(&def)
+            .expect("base validation should accept fixture with missing output.schemaRef");
+        // Strict validation MUST reject subprocess capability without output.schemaRef
+        let strict_result = validate_skill_definition_v2_strict(&def);
+        assert!(
+            strict_result.is_err(),
+            "strict validation must reject subprocess capability without output.schemaRef"
+        );
+        let err_msg = strict_result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("must declare output.schemaRef"),
+            "error message must mention output.schemaRef, got: {err_msg}"
+        );
     }
 }

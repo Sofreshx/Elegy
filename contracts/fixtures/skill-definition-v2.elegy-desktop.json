@@ -60,6 +60,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "ClickResult with coordinates, button, dry-run flag, target window evidence, and UTC timestamp."
       },
       "execution": {
@@ -95,6 +97,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "TypeResult with typed text, character count, dry-run flag, target window evidence, and UTC timestamp."
       },
       "execution": {
@@ -130,6 +134,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "KeyResult with combo, parsed keys, dry-run flag, target window evidence, and UTC timestamp."
       },
       "execution": {
@@ -171,6 +177,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
       },
       "execution": {
@@ -236,6 +244,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
       },
       "execution": {
@@ -277,6 +287,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
       },
       "execution": {
@@ -318,6 +330,8 @@
         ]
       },
       "output": {
+        "resultType": "DesktopResult",
+        "schemaRef": "https://elegy/contracts/schemas/desktop-result.schema.json",
         "description": "WindowActionResult with resolved title, hwnd, dry-run flag, and UTC timestamp."
       },
       "execution": {

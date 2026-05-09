@@ -53,6 +53,8 @@
         ]
       },
       "output": {
+        "resultType": "SkillGenerationResult",
+        "schemaRef": "https://elegy/contracts/schemas/skill-generation-result.schema.json",
         "description": "Skill-generation report including generated v2 skills, skipped tools, and written files."
       },
       "execution": {

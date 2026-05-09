@@ -46,6 +46,8 @@
         ]
       },
       "output": {
+        "resultType": "NotifyResult",
+        "schemaRef": "https://elegy/contracts/schemas/notify-result.schema.json",
         "description": "ToastResult with title, body, delivery flag, and platform."
       },
       "execution": {
@@ -80,6 +82,8 @@
         ]
       },
       "output": {
+        "resultType": "NotifyResult",
+        "schemaRef": "https://elegy/contracts/schemas/notify-result.schema.json",
         "description": "WebhookResult with target URL, HTTP status, success flag, and optional response text."
       },
       "execution": {

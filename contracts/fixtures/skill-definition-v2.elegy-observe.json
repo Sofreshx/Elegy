@@ -40,6 +40,8 @@
         ]
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "ProcessSnapshot with processes array and UTC timestamp."
       },
       "execution": {
@@ -61,6 +63,8 @@
         "parameters": []
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "WindowInfo with hwnd, title, process_id, and bounds rectangle."
       },
       "execution": {
@@ -89,6 +93,8 @@
         ]
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "Array of WindowInfo objects with count."
       },
       "execution": {
@@ -124,6 +130,8 @@
         ]
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "ScreenCaptureResult with dimensions, monitor index, output path or base64 PNG, and UTC timestamp."
       },
       "execution": {
@@ -145,6 +153,8 @@
         "parameters": []
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "ClipboardContents with optional text, image flag, and UTC timestamp."
       },
       "execution": {
@@ -180,6 +190,8 @@
         ]
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "FsDiffResult with watched path, duration, changes array, and start/end UTC timestamps."
       },
       "execution": {
@@ -201,6 +213,8 @@
         "parameters": []
       },
       "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
         "description": "SystemSnapshot with OS details, hostname, memory stats, CPU count, and UTC timestamp."
       },
       "execution": {

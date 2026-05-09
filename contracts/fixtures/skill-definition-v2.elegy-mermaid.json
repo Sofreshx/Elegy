@@ -41,6 +41,8 @@
         "stdinFormat": "json"
       },
       "output": {
+        "resultType": "MermaidResult",
+        "schemaRef": "https://elegy/contracts/schemas/mermaid-result.schema.json",
         "description": "Mermaid flowchart projection derived from the governed workflow input."
       },
       "execution": {
@@ -70,6 +72,8 @@
         "stdinFormat": "text"
       },
       "output": {
+        "resultType": "MermaidResult",
+        "schemaRef": "https://elegy/contracts/schemas/mermaid-result.schema.json",
         "description": "Bounded workflow graph semantics derived from Mermaid node IDs, labels, and edges."
       },
       "execution": {
@@ -99,6 +103,8 @@
         "stdinFormat": "text"
       },
       "output": {
+        "resultType": "MermaidResult",
+        "schemaRef": "https://elegy/contracts/schemas/mermaid-result.schema.json",
         "description": "Concise narrative explanation of the workflow or Mermaid graph."
       },
       "execution": {

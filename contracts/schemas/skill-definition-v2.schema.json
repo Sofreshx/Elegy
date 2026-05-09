@@ -87,6 +87,7 @@
             }
           },
           "output": {
+            "$comment": "Policy: every subprocess machine-invokable capability MUST declare output.schemaRef. Capabilities without it should be rejected or marked non-executable by validators. See skill-definition-v2.negative-no-output-schema.json for the negative test fixture.",
             "type": "object",
             "additionalProperties": false,
             "properties": {

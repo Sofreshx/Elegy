@@ -47,6 +47,8 @@
         "stdinFormat": "text"
       },
       "output": {
+        "resultType": "DataResult",
+        "schemaRef": "https://elegy/contracts/schemas/data-result.schema.json",
         "description": "Structured conversion result including normalized format metadata, JSON intermediate value, and rendered output text."
       },
       "execution": {
@@ -76,6 +78,8 @@
         "stdinFormat": "json"
       },
       "output": {
+        "resultType": "DataResult",
+        "schemaRef": "https://elegy/contracts/schemas/data-result.schema.json",
         "description": "Structured extraction result with the extracted JSON value and normalized query kind metadata."
       },
       "execution": {
@@ -105,6 +109,8 @@
         "stdinFormat": "json"
       },
       "output": {
+        "resultType": "DataResult",
+        "schemaRef": "https://elegy/contracts/schemas/data-result.schema.json",
         "description": "ValidateResult JSON containing a boolean valid flag and zero or more validation error messages."
       },
       "execution": {

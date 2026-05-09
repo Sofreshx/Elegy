@@ -66,6 +66,8 @@
         ]
       },
       "output": {
+        "resultType": "McpDescriptorResult",
+        "schemaRef": "https://elegy/contracts/schemas/mcp-descriptor-result.schema.json",
         "description": "Authored MCP descriptor path and descriptor contents."
       },
       "execution": {
@@ -94,7 +96,8 @@
         ]
       },
       "output": {
-        "schemaRef": "elegy://schemas/mcp-analysis-result",
+        "resultType": "McpAnalysisResult",
+        "schemaRef": "https://elegy/contracts/schemas/mcp-analysis-result.schema.json",
         "description": "MCP analysis result describing each tool and whether it has a valid schema."
       },
       "execution": {

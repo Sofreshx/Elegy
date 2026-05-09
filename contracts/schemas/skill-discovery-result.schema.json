@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
+  "title": "SkillDiscoveryResult",
+  "description": "Profile-filtered discovery envelope with match scores, matched capabilities, match reasons, and expansion hints for agent discovery operations.",
+  "type": "object"
+}

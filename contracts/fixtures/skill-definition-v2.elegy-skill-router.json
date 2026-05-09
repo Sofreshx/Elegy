@@ -40,6 +40,8 @@
         ]
       },
       "output": {
+        "resultType": "SkillDiscoveryResult",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
         "description": "Profile-filtered discovery envelope with match scores, matched capabilities, match reasons, and expandCommandArgs for machine-safe detail expansion. Hosts preserve their active profile when expanding."
       },
       "execution": {
@@ -68,6 +70,8 @@
         ]
       },
       "output": {
+        "resultType": "SkillDiscoveryResult",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
         "description": "Detail-level profile-filtered discovery envelope including allowed capabilities with implementation blocks."
       },
       "execution": {
@@ -89,6 +93,8 @@
         "parameters": []
       },
       "output": {
+        "resultType": "SkillDiscoveryResult",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
         "description": "Profile-filtered discovery envelope with skill id, name, description, category, capability count, lifecycle state, and expansion hints."
       },
       "execution": {

@@ -309,6 +309,162 @@
       "fixtures": [
         "fixtures/mcp-analysis-result.minimal.json"
       ]
+    },
+    {
+      "name": "repo-status",
+      "schemaVersion": "1.0.0",
+      "file": "repo-status.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-diff-summary",
+      "schemaVersion": "1.0.0",
+      "file": "repo-diff-summary.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-branches",
+      "schemaVersion": "1.0.0",
+      "file": "repo-branches.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-log",
+      "schemaVersion": "1.0.0",
+      "file": "repo-log.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-search-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-search-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-list-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-list-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-inspect-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-inspect-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-health-report",
+      "schemaVersion": "1.0.0",
+      "file": "memory-health-report.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-add-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-add-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-purge-report",
+      "schemaVersion": "1.0.0",
+      "file": "memory-purge-report.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-export-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-export-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-reembed-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-reembed-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-contradictions-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-contradictions-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-search-input",
+      "schemaVersion": "1.0.0",
+      "file": "memory-search-input.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-add-input",
+      "schemaVersion": "1.0.0",
+      "file": "memory-add-input.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "tool-projection",
+      "schemaVersion": "1.0.0",
+      "file": "tool-projection.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "diagram-result",
+      "schemaVersion": "1.0.0",
+      "file": "diagram-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "skill-discovery-result",
+      "schemaVersion": "1.0.0",
+      "file": "skill-discovery-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "mcp-descriptor-result",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-descriptor-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "skill-generation-result",
+      "schemaVersion": "1.0.0",
+      "file": "skill-generation-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "mermaid-result",
+      "schemaVersion": "1.0.0",
+      "file": "mermaid-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "observe-result",
+      "schemaVersion": "1.0.0",
+      "file": "observe-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "desktop-result",
+      "schemaVersion": "1.0.0",
+      "file": "desktop-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "web-result",
+      "schemaVersion": "1.0.0",
+      "file": "web-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "data-result",
+      "schemaVersion": "1.0.0",
+      "file": "data-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "notify-result",
+      "schemaVersion": "1.0.0",
+      "file": "notify-result.schema.json",
+      "fixtures": []
     }
   ]
 }

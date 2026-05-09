@@ -65,6 +65,8 @@
         ]
       },
       "output": {
+        "resultType": "WebResult",
+        "schemaRef": "https://elegy/contracts/schemas/web-result.schema.json",
         "description": "FetchResponse with final URL, method, status, headers, content type, optional body text, optional parsed JSON body, and optional extracted JSON value."
       },
       "execution": {
@@ -101,6 +103,8 @@
         ]
       },
       "output": {
+        "resultType": "WebResult",
+        "schemaRef": "https://elegy/contracts/schemas/web-result.schema.json",
         "description": "PingResult with final URL, reachability flag, optional HTTP status code, and elapsed milliseconds."
       },
       "execution": {

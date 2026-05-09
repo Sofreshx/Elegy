@@ -41,6 +41,8 @@
         ]
       },
       "output": {
+        "resultType": "DiagramResult",
+        "schemaRef": "https://elegy/contracts/schemas/diagram-result.schema.json",
         "description": "A new empty CanonicalDiagram JSON object with the specified type."
       },
       "execution": {
@@ -84,6 +86,8 @@
         "schemaRef": "elegy://schemas/diagram-patch"
       },
       "output": {
+        "resultType": "DiagramResult",
+        "schemaRef": "https://elegy/contracts/schemas/diagram-result.schema.json",
         "description": "The patched CanonicalDiagram JSON object. Also written to --output path if specified."
       },
       "execution": {
@@ -117,6 +121,8 @@
         ]
       },
       "output": {
+        "resultType": "DiagramResult",
+        "schemaRef": "https://elegy/contracts/schemas/diagram-result.schema.json",
         "description": "A human-readable narrative describing the diagram's nodes, edges, and structure."
       },
       "execution": {
@@ -152,6 +158,8 @@
         ]
       },
       "output": {
+        "resultType": "DiagramResult",
+        "schemaRef": "https://elegy/contracts/schemas/diagram-result.schema.json",
         "description": "The diagram rendered in the specified format (default: Mermaid flowchart)."
       },
       "execution": {

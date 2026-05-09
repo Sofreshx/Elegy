@@ -74,6 +74,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryAddResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-add-result.schema.json",
         "description": "Created memory record and salience gate result."
       },
       "execution": {
@@ -135,6 +137,8 @@
         ]
       },
       "output": {
+        "resultType": "MemorySearchResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-search-result.schema.json",
         "description": "Search results with scores and memory previews."
       },
       "execution": {
@@ -189,6 +193,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryListResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-list-result.schema.json",
         "description": "Memory rows matching the requested filters."
       },
       "execution": {
@@ -230,6 +236,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryInspectResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-inspect-result.schema.json",
         "description": "Memory record and version history."
       },
       "execution": {
@@ -272,6 +280,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryPurgeReport",
+        "schemaRef": "https://elegy/contracts/schemas/memory-purge-report.schema.json",
         "description": "Purge report with deleted record counts."
       },
       "execution": {
@@ -307,6 +317,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryHealthReport",
+        "schemaRef": "https://elegy/contracts/schemas/memory-health-report.schema.json",
         "description": "Memory health report and type counts."
       },
       "execution": {
@@ -348,6 +360,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryExportResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-export-result.schema.json",
         "description": "Exported memories or export destination metadata."
       },
       "execution": {
@@ -396,6 +410,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryReembedResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-reembed-result.schema.json",
         "description": "Re-embed preview report."
       },
       "execution": {
@@ -431,6 +447,8 @@
         ]
       },
       "output": {
+        "resultType": "MemoryContradictionsResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-contradictions-result.schema.json",
         "description": "Unresolved contradiction records."
       },
       "execution": {
