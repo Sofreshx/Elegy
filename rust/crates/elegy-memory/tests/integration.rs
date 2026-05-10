@@ -68,6 +68,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search active memories");
@@ -86,6 +87,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search active memories after archival");
@@ -101,6 +103,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search dormant memories");
@@ -425,6 +428,7 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("run provider-backed semantic search");
@@ -440,6 +444,65 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
             semantic_query.to_string(),
         ]
     );
+}
+
+#[tokio::test]
+async fn agent_scoped_search_can_filter_to_a_single_agent_id() {
+    let temp_dir = TempDir::new().expect("create temp directory");
+    let db_path = temp_dir.path().join("agent-filter.sqlite3");
+    let store = SqliteMemoryStore::new(&db_path, MemoryScope::Agent).expect("create agent store");
+    let now = Utc::now();
+
+    let mut visible = sample_memory(
+        "Visible semantic memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        now,
+    );
+    visible.scope = MemoryScope::Agent;
+    visible.agent_id = Some("agent-a".to_string());
+    let visible_id = visible.id;
+
+    let mut hidden = sample_memory(
+        "Hidden semantic memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        now,
+    );
+    hidden.scope = MemoryScope::Agent;
+    hidden.agent_id = Some("agent-b".to_string());
+    let hidden_id = hidden.id;
+
+    store.store(visible).await.expect("store visible memory");
+    store.store(hidden).await.expect("store hidden memory");
+    store
+        .store_embedding(&visible_id, &axis_embedding())
+        .await
+        .expect("store visible embedding");
+    store
+        .store_embedding(&hidden_id, &axis_embedding())
+        .await
+        .expect("store hidden embedding");
+
+    let results = store
+        .search(SearchQuery {
+            text: String::new(),
+            embedding: Some(axis_embedding()),
+            scope: MemoryScope::Agent,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+            agent_id: Some("agent-a".to_string()),
+        })
+        .await
+        .expect("search filtered agent memories");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, visible_id);
 }
 
 #[tokio::test]
@@ -466,6 +529,7 @@ async fn text_only_search_without_provider_remains_keyword_driven() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search without provider");
@@ -511,6 +575,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search compound word memory");
@@ -542,6 +607,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search for removed compound token");
@@ -557,6 +623,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search updated compound token");
@@ -633,6 +700,7 @@ async fn gate_merge_preserves_searchable_compound_enrichment_for_keyword_search(
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search merged memory");
@@ -815,6 +883,7 @@ async fn search_orders_results_by_combined_scoring_signals() {
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search by vector similarity");

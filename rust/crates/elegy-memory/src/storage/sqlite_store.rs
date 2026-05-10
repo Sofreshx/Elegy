@@ -642,6 +642,7 @@ impl SqliteMemoryStore {
                 self.scope.visible_scopes(),
                 MemoryState::Active,
                 None,
+                None,
             )?;
             memories.sort_by(|left, right| {
                 right
@@ -687,7 +688,8 @@ impl SqliteMemoryStore {
         limit: Option<usize>,
     ) -> Result<Vec<crate::ConsolidationCandidate>, StoreError> {
         self.with_connection(|connection| {
-            let mut memories = load_search_memories(connection, scopes, MemoryState::Active, None)?;
+            let mut memories =
+                load_search_memories(connection, scopes, MemoryState::Active, None, None)?;
             memories.sort_by(|left, right| {
                 right
                     .updated_at
@@ -1047,8 +1049,13 @@ impl SqliteMemoryStore {
                     let active_u64 = active_count as u64;
                     if active_u64 > budget_active_max {
                         let excess = active_u64 - budget_active_max;
-                        let mut active_memories =
-                            load_search_memories(connection, &[scope], MemoryState::Active, None)?;
+                        let mut active_memories = load_search_memories(
+                            connection,
+                            &[scope],
+                            MemoryState::Active,
+                            None,
+                            None,
+                        )?;
                         // Sort ascending by composite score (lowest first = eviction candidates)
                         active_memories.sort_by(|a, b| {
                             let score_a = a.importance_score * a.reliability_score;
@@ -1088,7 +1095,7 @@ impl SqliteMemoryStore {
 
             if current_bytes > cap_bytes {
                 let mut dormant_memories =
-                    load_search_memories(connection, &[scope], MemoryState::Dormant, None)?;
+                    load_search_memories(connection, &[scope], MemoryState::Dormant, None, None)?;
                 // Sort ascending by composite score (lowest first = deletion candidates)
                 dormant_memories.sort_by(|a, b| {
                     let score_a = a.importance_score * a.reliability_score;
@@ -1931,8 +1938,13 @@ impl SqliteMemoryStore {
     pub fn export_for_sharing(&self, config: &ShareConfig) -> Result<Vec<Memory>, StoreError> {
         self.with_connection(|connection| {
             let type_filter = config.type_filter.as_deref();
-            let all =
-                load_search_memories(connection, &[self.scope], MemoryState::Active, type_filter)?;
+            let all = load_search_memories(
+                connection,
+                &[self.scope],
+                MemoryState::Active,
+                type_filter,
+                None,
+            )?;
             let max_ord = sensitivity_ord(config.max_sensitivity);
             let shared: Vec<Memory> = all
                 .into_iter()
@@ -2341,6 +2353,7 @@ impl MemoryStore for SqliteMemoryStore {
                     visible_scopes,
                     requested_state,
                     query.type_filter.as_deref(),
+                    query.agent_id.as_deref(),
                     &trimmed_text,
                 )?
             };
@@ -2351,6 +2364,7 @@ impl MemoryStore for SqliteMemoryStore {
                     visible_scopes,
                     requested_state,
                     query.type_filter.as_deref(),
+                    query.agent_id.as_deref(),
                     embedding,
                     0.0,
                 )?,
@@ -2371,6 +2385,7 @@ impl MemoryStore for SqliteMemoryStore {
                 visible_scopes,
                 requested_state,
                 query.type_filter.as_deref(),
+                query.agent_id.as_deref(),
             )?;
             let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
                 .into_iter()
@@ -2443,6 +2458,7 @@ impl MemoryStore for SqliteMemoryStore {
                 visible_scopes,
                 MemoryState::Active,
                 None,
+                None,
                 embedding,
                 threshold,
             )?;
@@ -2451,7 +2467,7 @@ impl MemoryStore for SqliteMemoryStore {
             }
 
             let memories_by_id: HashMap<MemoryId, Memory> =
-                load_search_memories(connection, visible_scopes, MemoryState::Active, None)?
+                load_search_memories(connection, visible_scopes, MemoryState::Active, None, None)?
                     .into_iter()
                     .filter_map(|memory| {
                         similarity_scores
@@ -3034,7 +3050,7 @@ impl MemoryObservability for SqliteMemoryStore {
             ExportFormat::Json => {
                 let memories = self
                     .with_connection(|connection| {
-                        load_search_memories(connection, &[scope], MemoryState::Active, None)
+                        load_search_memories(connection, &[scope], MemoryState::Active, None, None)
                     })
                     .map_err(ObservabilityError::Store)?;
                 serde_json::to_vec(&memories).map_err(|error| {
@@ -4466,6 +4482,7 @@ fn load_search_memories(
     scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
 ) -> Result<Vec<Memory>, StoreError> {
     if scopes.is_empty() {
         return Ok(Vec::new());
@@ -4497,6 +4514,12 @@ fn load_search_memories(
         sql.push(')');
     }
 
+    if let Some(agent_id) = agent_id_filter {
+        sql.push_str(" AND agent_id = ?");
+        sql.push_str(&(params.len() + 1).to_string());
+        params.push(rusqlite::types::Value::from(agent_id.to_string()));
+    }
+
     sql.push_str(" ORDER BY updated_at DESC, rowid DESC");
 
     let mut statement = connection.prepare(&sql)?;
@@ -4513,6 +4536,7 @@ fn load_keyword_scores(
     scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
     text: &str,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
     let Some(fts_query) = build_fts_query(text) else {
@@ -4554,6 +4578,12 @@ fn load_keyword_scores(
             ));
         }
         sql.push(')');
+    }
+
+    if let Some(agent_id) = agent_id_filter {
+        sql.push_str(" AND m.agent_id = ?");
+        sql.push_str(&(params.len() + 1).to_string());
+        params.push(rusqlite::types::Value::from(agent_id.to_string()));
     }
 
     sql.push_str(" ORDER BY bm25_score ASC, m.updated_at DESC");
@@ -4614,6 +4644,7 @@ fn load_vector_similarity_scores(
     scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
     query_embedding: &[f32],
     threshold: f32,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
@@ -4656,6 +4687,12 @@ fn load_vector_similarity_scores(
             ));
         }
         sql.push(')');
+    }
+
+    if let Some(agent_id) = agent_id_filter {
+        sql.push_str(" AND m.agent_id = ?");
+        sql.push_str(&(params.len() + 1).to_string());
+        params.push(rusqlite::types::Value::from(agent_id.to_string()));
     }
 
     let mut statement = connection.prepare(&sql)?;
@@ -5447,6 +5484,7 @@ fn exact_shared_import_duplicate_decision(
             store.scope.visible_scopes(),
             MemoryState::Active,
             None,
+            None,
         )?;
         Ok(visible
             .into_iter()
@@ -5490,6 +5528,7 @@ fn exact_correction_duplicate_decision(
             connection,
             store.scope.visible_scopes(),
             MemoryState::Active,
+            None,
             None,
         )?;
         Ok(visible
@@ -5792,11 +5831,12 @@ fn load_export_payload(
     connection: &Connection,
     scope: MemoryScope,
 ) -> Result<ExportPayload, StoreError> {
-    let mut memories = load_search_memories(connection, &[scope], MemoryState::Active, None)?;
+    let mut memories = load_search_memories(connection, &[scope], MemoryState::Active, None, None)?;
     memories.extend(load_search_memories(
         connection,
         &[scope],
         MemoryState::Dormant,
+        None,
         None,
     )?);
 
@@ -6383,6 +6423,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run keyword search");
@@ -6532,6 +6573,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run hybrid search");
@@ -6609,6 +6651,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run similarity-priority ordering search");
@@ -6685,6 +6728,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run recency-focused search");
@@ -6743,6 +6787,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run active decision search");
@@ -6760,6 +6805,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run dormant decision search");
@@ -6983,6 +7029,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run provider-backed semantic search");
@@ -7059,6 +7106,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("run keyword fallback search");
@@ -7186,6 +7234,7 @@ mod tests {
                 max_results: 10,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search visible scopes");
@@ -7268,6 +7317,7 @@ mod tests {
                     max_results: 5,
                     context_config: None,
                     session_id: Some(session_id.to_string()),
+                    agent_id: None,
                 })
                 .await
                 .expect("search session memory");
@@ -8293,6 +8343,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("baseline search");
@@ -8361,6 +8412,7 @@ mod tests {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search after learning");

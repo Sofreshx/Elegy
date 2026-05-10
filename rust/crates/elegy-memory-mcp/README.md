@@ -43,7 +43,7 @@ The stdio binary is the local transport for desktop MCP clients.
 - Expects `ELEGY_DB_PATH`.
 - Uses `ELEGY_MCP_AGENT_ID` for the fixed agent scope.
 - Warns and falls back to `default-agent` when `ELEGY_MCP_AGENT_ID` is unset.
-- Defaults `OLLAMA_URL` to `http://localhost:11434`.
+- Uses the configured `OLLAMA_URL` directly for write-time embeddings and semantic search; defaults to `http://localhost:11434`.
 - Logs to `stderr` so `stdout` stays reserved for the MCP protocol.
 
 ## Environment variables
