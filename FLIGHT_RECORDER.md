@@ -2369,3 +2369,45 @@ cargo clippy -p elegy-memory --color never -- -D warnings
 - Next: wait for a clean/safe git worktree before attempting any Phase 7 git-flow steps from `prompt.md`
 - Notes: in-worktree WU10 scope is satisfied: shared MCP lib extraction, dual binary setup (`elegy-memory-mcp-http` + `elegy-memory-mcp-stdio`), stdio transport with handshake/tool-list coverage, docs/examples for Claude Desktop + Holon, and Review B tracking in `rust/crates/elegy-memory-mcp/docs/PENDING.md`. Git workflow completion is intentionally blocked because `dev` is dirty with unrelated pre-existing changes (`CLAUDE.md`, `.claude\...`) alongside WU10 edits, so branch switching, pull, merge, push, and branch deletion are unsafe and were not attempted.
 
+
+## STATE_SNAPSHOT — WU11 Phase 0 — 2026-05-09 17:44
+- Phase: Pre-flight et reproduction des bugs
+- Status: DONE
+- Artifacts: ust/crates/elegy-memory-mcp/tests/phase0_stdio_repro.ps1; FLIGHT_RECORDER.md
+- Validation: git status --porcelain=v1 --branch → clean on dev; git pull origin dev → already up to date at  1805489be04f08d67da9676c52e31526f76aea8; cargo test -p elegy-memory-mcp from ust\ → PASS; cargo build -p elegy-memory-mcp --bin elegy-memory-mcp-stdio from ust\ → PASS; ./rust/crates/elegy-memory-mcp/tests/phase0_stdio_repro.ps1 → Bug A reproduced (-32602 invalid type null), Bug B reproduced (staleEmbeddingsCount=1 after store); Invoke-WebRequest http://localhost:11434/api/embeddings → 200 with 768-float embedding
+- Tests: 33/33 passing baseline before Phase 1 changes; delta vs previous recorded state: unchanged
+- Findings: Bug A reproduces in isolation against legy-memory-mcp-stdio.exe with explicit 
+ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation with a valid memory_store request returning ction=added / gateResult=accepted followed immediately by memory_stats.staleEmbeddingsCount=1 while Ollama embeddings responds 200/768
+- Next: Phase 1 — Fix Bug A
+- Notes: created branch eat/elegy-mcp-bugfixes from clean dev; gent-lifecycle-start.ps1 was not present in the repo or PATH, so it could not be executed during this phase
+
+
+## STATE_SNAPSHOT — WU11 Phase 0 — 2026-05-09 17:44
+- Phase: Pre-flight et reproduction des bugs
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/tests/phase0_stdio_repro.ps1; FLIGHT_RECORDER.md
+- Validation: git status --porcelain=v1 --branch -> clean on dev; git pull origin dev -> already up to date at 01805489be04f08d67da9676c52e31526f76aea8; cargo test -p elegy-memory-mcp from rust\\ -> PASS; cargo build -p elegy-memory-mcp --bin elegy-memory-mcp-stdio from rust\\ -> PASS; .\rust\crates\elegy-memory-mcp\tests\phase0_stdio_repro.ps1 -> Bug A reproduced (-32602 invalid type null), Bug B reproduced (staleEmbeddingsCount=1 after store); Invoke-WebRequest http://localhost:11434/api/embeddings -> 200 with 768-float embedding
+- Tests: 33/33 passing baseline before Phase 1 changes; delta vs previous recorded state: unchanged
+- Findings: Bug A reproduces in isolation against elegy-memory-mcp-stdio.exe with explicit null for memoryType, provenance, and sensitivity; Bug B reproduces in isolation with a valid memory_store request returning action=added / gateResult=accepted followed immediately by memory_stats.staleEmbeddingsCount=1 while Ollama embeddings responds 200/768
+- Next: Phase 1 — Fix Bug A
+- Notes: this snapshot supersedes the immediately preceding malformed append for the same phase caused by PowerShell backtick escaping; branch feat/elegy-mcp-bugfixes was created from clean dev; agent-lifecycle-start.ps1 was not present in the repo or PATH, so it could not be executed during this phase
+
+## STATE_SNAPSHOT — WU11 Phase 1 — 2026-05-09 18:20
+- Phase: Fix Bug A
+- Status: BLOCKED
+- Artifacts: FLIGHT_RECORDER.md
+- Validation: serde audit in rust/crates/elegy-memory-mcp/src/memory_tools.rs -> MemoryStoreArgs.summary (line 425), MemoryUpdateArgs.reason (line 466), MemoryCorrectArgs.reason (line 475), MemorySearchArgs.memory_types (line 493), MemoryListArgs.state (line 520), and MemoryListArgs.memory_types (line 522) are already Option<T> + #[serde(default)]; Bug A repro fields MemoryStoreArgs.memory_type (line 427), importance (line 429), provenance (line 431), sensitivity (line 433), tags (line 435), and custom_metadata (line 437) are omission-valid defaulted non-Option fields, so explicit JSON null fails during deserialization before tool logic
+- Tests: not run; blocked before implementation because the audited root cause contradicted the expected Option<T>/serde-null handling shape
+- Findings: explicit null rejection is not coming from the existing Option<T> fields; it is coming from defaulted non-Option tool inputs that are optional by omission but not nullable by schema/deserializer shape today
+- Next: waiting for human confirmation whether Phase 1 should be re-scoped to accept null for omission-valid defaulted fields (and update the generated MCP input schemas accordingly) despite the prompt's doc-override stop condition
+- Notes: stopped instead of improvising a fix because WU11 explicitly says to stop when the serde audit shows the Option-field hypothesis was wrong; no source changes or validation commands were executed beyond the audit
+
+## STATE_SNAPSHOT — WU11 Phase 1 — 2026-05-10 11:10
+- Phase: Fix Bug A
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/src/memory_tools.rs; rust/crates/elegy-memory-mcp/src/tests.rs; FLIGHT_RECORDER.md
+- Validation: user approved broadening the Phase 1 fix to omission-valid defaulted non-Option MCP fields; cargo check -p elegy-memory-mcp --tests from rust\\ -> PASS; cargo clippy -p elegy-memory-mcp -- -D warnings from rust\\ -> PASS; cargo build -p elegy-memory-mcp --bin elegy-memory-mcp-stdio from rust\\ -> PASS; .\\rust\\crates\\elegy-memory-mcp\\tests\\phase0_stdio_repro.ps1 -> Bug A payload now succeeds with action=added / gateResult=accepted and defaults applied, while Bug B remains reproduced with staleEmbeddingsCount=2
+- Tests: full cargo test -p elegy-memory-mcp not run in-lane per testing governance; permanent regression coverage added in rust/crates/elegy-memory-mcp/src/tests.rs for explicit null across memory_store, memory_search, memory_list, plus schema nullability assertions for the affected tool inputs
+- Findings: omission-valid defaulted MCP inputs now treat explicit null the same as omission for memory_store (memoryType, importance, provenance, sensitivity, tags, customMetadata) and equivalent defaulted search/list fields (limit, includeDormant); generated tool schemas now describe those fields as nullable by virtue of Option-backed arg shapes
+- Next: stop after Phase 1 per current instruction set; Phase 2 not started
+- Notes: this snapshot supersedes the blocked Phase 1 state because the user explicitly approved the broader fix after the serde audit disproved the original Option-only hypothesis

@@ -65,7 +65,7 @@ impl MemoryRepository {
                 "query must not be empty".to_string(),
             ));
         }
-        if args.limit == 0 {
+        if args.limit() == 0 {
             return Ok(Vec::new());
         }
 
@@ -100,7 +100,7 @@ impl MemoryRepository {
                 .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
                 .then_with(|| right.memory.id.cmp(&left.memory.id))
         });
-        matches.truncate(args.limit);
+        matches.truncate(args.limit());
         Ok(matches)
     }
 
@@ -122,7 +122,7 @@ impl MemoryRepository {
         self.list_visible_memories(
             args.state_filter(),
             args.memory_types.clone().map(tool_memory_types),
-            Some(args.limit),
+            Some(args.limit()),
         )
         .await
     }
@@ -423,18 +423,18 @@ pub struct MemoryStoreArgs {
     pub(crate) content: String,
     #[serde(default)]
     pub(crate) summary: Option<String>,
-    #[serde(default = "default_store_memory_type")]
-    pub(crate) memory_type: ToolMemoryType,
-    #[serde(default = "default_store_importance")]
-    pub(crate) importance: f32,
-    #[serde(default = "default_store_provenance")]
-    pub(crate) provenance: ToolProvenance,
-    #[serde(default = "default_store_sensitivity")]
-    pub(crate) sensitivity: ToolSensitivity,
     #[serde(default)]
-    pub(crate) tags: Vec<String>,
+    pub(crate) memory_type: Option<ToolMemoryType>,
     #[serde(default)]
-    pub(crate) custom_metadata: BTreeMap<String, String>,
+    pub(crate) importance: Option<f32>,
+    #[serde(default)]
+    pub(crate) provenance: Option<ToolProvenance>,
+    #[serde(default)]
+    pub(crate) sensitivity: Option<ToolSensitivity>,
+    #[serde(default)]
+    pub(crate) tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub(crate) custom_metadata: Option<BTreeMap<String, String>>,
 }
 
 impl MemoryStoreArgs {
@@ -442,16 +442,34 @@ impl MemoryStoreArgs {
         Ok(MemoryCandidate {
             content: require_non_empty_text("content", &self.content)?.to_string(),
             summary: normalized_optional_text(self.summary.as_deref()),
-            memory_type: self.memory_type.into(),
-            provenance: self.provenance.into(),
-            importance_score: validate_importance(self.importance)?,
-            sensitivity: self.sensitivity.into(),
+            memory_type: self
+                .memory_type
+                .unwrap_or_else(default_store_memory_type)
+                .into(),
+            provenance: self
+                .provenance
+                .unwrap_or_else(default_store_provenance)
+                .into(),
+            importance_score: validate_importance(
+                self.importance.unwrap_or_else(default_store_importance),
+            )?,
+            sensitivity: self
+                .sensitivity
+                .unwrap_or_else(default_store_sensitivity)
+                .into(),
             tags: self
                 .tags
+                .as_deref()
+                .unwrap_or(&[])
                 .iter()
                 .filter_map(|tag| normalized_optional_text(Some(tag.as_str())))
                 .collect(),
-            custom_metadata: self.custom_metadata.clone().into_iter().collect(),
+            custom_metadata: self
+                .custom_metadata
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .collect(),
             embedding: None,
         })
     }
@@ -485,17 +503,25 @@ pub struct MemoryDeleteArgs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MemorySearchArgs {
     pub(crate) query: String,
-    #[serde(default = "default_search_limit")]
-    pub(crate) limit: usize,
     #[serde(default)]
-    pub(crate) include_dormant: bool,
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) include_dormant: Option<bool>,
     #[serde(default)]
     pub(crate) memory_types: Option<Vec<ToolMemoryType>>,
 }
 
 impl MemorySearchArgs {
+    fn limit(&self) -> usize {
+        self.limit.unwrap_or_else(default_search_limit)
+    }
+
+    fn include_dormant(&self) -> bool {
+        self.include_dormant.unwrap_or(false)
+    }
+
     fn state_filter(&self) -> Option<MemoryState> {
-        if self.include_dormant {
+        if self.include_dormant() {
             None
         } else {
             Some(MemoryState::Active)
@@ -512,10 +538,10 @@ pub struct MemoryRecallArgs {
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MemoryListArgs {
-    #[serde(default = "default_list_limit")]
-    pub(crate) limit: usize,
     #[serde(default)]
-    pub(crate) include_dormant: bool,
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) include_dormant: Option<bool>,
     #[serde(default)]
     pub(crate) state: Option<ToolMemoryState>,
     #[serde(default)]
@@ -523,10 +549,18 @@ pub struct MemoryListArgs {
 }
 
 impl MemoryListArgs {
+    fn limit(&self) -> usize {
+        self.limit.unwrap_or_else(default_list_limit)
+    }
+
+    fn include_dormant(&self) -> bool {
+        self.include_dormant.unwrap_or(false)
+    }
+
     fn state_filter(&self) -> Option<MemoryState> {
         if let Some(state) = self.state {
             Some(state.into())
-        } else if self.include_dormant {
+        } else if self.include_dormant() {
             None
         } else {
             Some(MemoryState::Active)
@@ -638,7 +672,7 @@ impl MemorySearchResponse {
             namespace: repository.namespace_owned(),
             count: matches.len(),
             query: args.query.clone(),
-            include_dormant: args.include_dormant,
+            include_dormant: args.include_dormant(),
             results: matches.into_iter().map(SearchResultRow::from).collect(),
         }
     }
@@ -705,7 +739,7 @@ impl MemoryListResponse {
         Self {
             namespace: repository.namespace_owned(),
             count: memories.len(),
-            include_dormant: args.include_dormant,
+            include_dormant: args.include_dormant(),
             memories: memories.into_iter().map(ListRow::from).collect(),
         }
     }
