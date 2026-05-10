@@ -437,6 +437,9 @@ pub struct SearchQuery {
     /// Optional session identifier used to record cross-session access.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// Optional agent identifier filter for agent-scoped searches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
 }
 
 /// Export encoding supported by observability and portability flows.

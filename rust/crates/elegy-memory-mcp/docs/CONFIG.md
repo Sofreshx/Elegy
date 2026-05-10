@@ -54,7 +54,7 @@ The stdio binary is local-only and does not read the HTTP/OAuth variables.
 | Variable | Default | Notes |
 |---|---|---|
 | `ELEGY_MCP_AGENT_ID` | `default-agent` | Startup warns on `stderr` if unset before using the fallback. |
-| `OLLAMA_URL` | `http://localhost:11434` | Local embedding endpoint expected by the current memory stack. |
+| `OLLAMA_URL` | `http://localhost:11434` | Local Ollama base URL used directly for write-time embeddings and semantic search. |
 | `RUST_LOG` | implementation default | Use `info` for normal local startup and increase only for debugging. |
 
 ## Logging

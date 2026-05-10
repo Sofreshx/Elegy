@@ -1,6 +1,7 @@
 use std::{env, path::PathBuf, sync::Arc};
 
 use anyhow::{bail, Context};
+use elegy_memory::{EmbeddingProvider, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
 use elegy_memory_mcp::{
     memory_tools::{MemoryBinding, MemoryRepository, DEFAULT_NAMESPACE},
     server::{ElegyMemoryMcpServer, NoopWriteAuditor, WriteAuditor},
@@ -40,7 +41,6 @@ async fn main() {
 
 async fn run() -> anyhow::Result<()> {
     let config = StdioConfig::from_env().context("loading stdio configuration")?;
-    env::set_var(OLLAMA_URL, &config.ollama_url);
     let runtime = build_stdio_runtime(&config).context("building stdio MCP server")?;
 
     info!(
@@ -71,10 +71,31 @@ struct StdioServerRuntime {
 }
 
 fn build_stdio_runtime(config: &StdioConfig) -> anyhow::Result<StdioServerRuntime> {
+    let embedding_provider = build_embedding_provider(config)?;
+    build_stdio_runtime_with_embedding_provider(config, embedding_provider)
+}
+
+fn build_embedding_provider(config: &StdioConfig) -> anyhow::Result<Arc<dyn EmbeddingProvider>> {
+    Ok(Arc::new(
+        OllamaEmbeddingProvider::new(&config.ollama_url, DEFAULT_OLLAMA_MODEL).with_context(
+            || {
+                format!(
+                    "configuring Ollama embedding provider for {}",
+                    config.ollama_url
+                )
+            },
+        )?,
+    ))
+}
+
+fn build_stdio_runtime_with_embedding_provider(
+    config: &StdioConfig,
+    embedding_provider: Arc<dyn EmbeddingProvider>,
+) -> anyhow::Result<StdioServerRuntime> {
     let binding = MemoryBinding::new(DEFAULT_NAMESPACE, &config.agent_id)
         .context("configuring stdio memory binding")?;
     let memory_repository = Arc::new(
-        MemoryRepository::new(&config.db_path, binding)
+        MemoryRepository::new_with_embedding_provider(&config.db_path, binding, embedding_provider)
             .context("initializing stdio memory repository")?,
     );
     let write_auditor: Arc<dyn WriteAuditor> = Arc::new(NoopWriteAuditor);

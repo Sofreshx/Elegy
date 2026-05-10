@@ -2594,6 +2594,7 @@ fn build_search_response(
         max_results: limit,
         context_config: None,
         session_id: ctx.session_id.clone(),
+        agent_id: None,
     }))?;
 
     if include_dormant {
@@ -2606,6 +2607,7 @@ fn build_search_response(
             max_results: limit,
             context_config: None,
             session_id: ctx.session_id.clone(),
+            agent_id: None,
         }))?);
         sort_scored_memories(&mut results);
         results.truncate(limit);

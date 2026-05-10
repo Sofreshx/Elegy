@@ -1,11 +1,12 @@
-use std::collections::{BTreeMap, HashSet};
+use std::collections::BTreeMap;
 use std::path::Path;
+use std::sync::Arc;
 
 use elegy_memory::{
-    CorrectionDisposition, CorrectionRecord, DefaultSalienceGate, GateDecision, GateError, Memory,
-    MemoryCandidate, MemoryFilter, MemoryScope, MemoryState, MemoryStore, MemoryType,
-    ProvenanceLevel, ResolutionStatus, SalienceGate, SensitivityLevel, SqliteMemoryStore,
-    StoreError,
+    CorrectionDisposition, CorrectionRecord, DefaultSalienceGate, EmbeddingProvider, GateDecision,
+    GateError, Memory, MemoryCandidate, MemoryFilter, MemoryScope, MemoryState, MemoryStore,
+    MemoryType, ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery,
+    SensitivityLevel, SqliteMemoryStore, StoreError,
 };
 use rmcp::model::JsonObject;
 use rmcp::schemars;
@@ -33,8 +34,28 @@ pub struct MemoryRepository {
 
 impl MemoryRepository {
     pub fn new(path: impl AsRef<Path>, binding: MemoryBinding) -> Result<Self, StoreError> {
+        Self::new_with_optional_embedding_provider(path, binding, None)
+    }
+
+    pub fn new_with_embedding_provider(
+        path: impl AsRef<Path>,
+        binding: MemoryBinding,
+        embedding_provider: Arc<dyn EmbeddingProvider>,
+    ) -> Result<Self, StoreError> {
+        Self::new_with_optional_embedding_provider(path, binding, Some(embedding_provider))
+    }
+
+    fn new_with_optional_embedding_provider(
+        path: impl AsRef<Path>,
+        binding: MemoryBinding,
+        embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
+    ) -> Result<Self, StoreError> {
         Ok(Self {
-            store: SqliteMemoryStore::new(path, MemoryScope::Agent)?,
+            store: SqliteMemoryStore::new_with_optional_embedding_provider(
+                path,
+                MemoryScope::Agent,
+                embedding_provider,
+            )?,
             binding,
         })
     }
@@ -65,43 +86,42 @@ impl MemoryRepository {
                 "query must not be empty".to_string(),
             ));
         }
-        if args.limit == 0 {
+        if args.limit() == 0 {
             return Ok(Vec::new());
         }
 
-        let memories = self
-            .list_visible_memories(
-                args.state_filter(),
-                args.memory_types.clone().map(tool_memory_types),
-                None,
-            )
+        let matches = self
+            .store
+            .search(SearchQuery {
+                text: query.to_string(),
+                embedding: None,
+                scope: MemoryScope::Agent,
+                state_filter: args.state_filter(),
+                type_filter: args.memory_types.clone().map(tool_memory_types),
+                max_results: args.limit(),
+                context_config: None,
+                session_id: None,
+                agent_id: Some(self.agent_id_owned()),
+            })
             .await?;
-        let normalized_query = normalize_text(query);
-        let tokens = query_tokens(&normalized_query);
 
-        let mut matches = memories
+        Ok(matches
             .into_iter()
-            .filter_map(|memory| {
-                score_memory(&memory, &normalized_query, &tokens).map(|(score, similarity)| {
+            .filter(|result| self.is_visible_memory(&result.memory))
+            .map(
+                |ScoredMemory {
+                     memory,
+                     score,
+                     similarity,
+                 }| {
                     MemorySearchMatch {
                         memory,
                         score,
                         similarity,
                     }
-                })
-            })
-            .collect::<Vec<_>>();
-
-        matches.sort_by(|left, right| {
-            right
-                .score
-                .total_cmp(&left.score)
-                .then_with(|| right.similarity.total_cmp(&left.similarity))
-                .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
-                .then_with(|| right.memory.id.cmp(&left.memory.id))
-        });
-        matches.truncate(args.limit);
-        Ok(matches)
+                },
+            )
+            .collect())
     }
 
     pub(crate) async fn recall(&self, id: &str) -> Result<Option<Memory>, StoreError> {
@@ -122,7 +142,7 @@ impl MemoryRepository {
         self.list_visible_memories(
             args.state_filter(),
             args.memory_types.clone().map(tool_memory_types),
-            Some(args.limit),
+            Some(args.limit()),
         )
         .await
     }
@@ -423,18 +443,18 @@ pub struct MemoryStoreArgs {
     pub(crate) content: String,
     #[serde(default)]
     pub(crate) summary: Option<String>,
-    #[serde(default = "default_store_memory_type")]
-    pub(crate) memory_type: ToolMemoryType,
-    #[serde(default = "default_store_importance")]
-    pub(crate) importance: f32,
-    #[serde(default = "default_store_provenance")]
-    pub(crate) provenance: ToolProvenance,
-    #[serde(default = "default_store_sensitivity")]
-    pub(crate) sensitivity: ToolSensitivity,
     #[serde(default)]
-    pub(crate) tags: Vec<String>,
+    pub(crate) memory_type: Option<ToolMemoryType>,
     #[serde(default)]
-    pub(crate) custom_metadata: BTreeMap<String, String>,
+    pub(crate) importance: Option<f32>,
+    #[serde(default)]
+    pub(crate) provenance: Option<ToolProvenance>,
+    #[serde(default)]
+    pub(crate) sensitivity: Option<ToolSensitivity>,
+    #[serde(default)]
+    pub(crate) tags: Option<Vec<String>>,
+    #[serde(default)]
+    pub(crate) custom_metadata: Option<BTreeMap<String, String>>,
 }
 
 impl MemoryStoreArgs {
@@ -442,16 +462,34 @@ impl MemoryStoreArgs {
         Ok(MemoryCandidate {
             content: require_non_empty_text("content", &self.content)?.to_string(),
             summary: normalized_optional_text(self.summary.as_deref()),
-            memory_type: self.memory_type.into(),
-            provenance: self.provenance.into(),
-            importance_score: validate_importance(self.importance)?,
-            sensitivity: self.sensitivity.into(),
+            memory_type: self
+                .memory_type
+                .unwrap_or_else(default_store_memory_type)
+                .into(),
+            provenance: self
+                .provenance
+                .unwrap_or_else(default_store_provenance)
+                .into(),
+            importance_score: validate_importance(
+                self.importance.unwrap_or_else(default_store_importance),
+            )?,
+            sensitivity: self
+                .sensitivity
+                .unwrap_or_else(default_store_sensitivity)
+                .into(),
             tags: self
                 .tags
+                .as_deref()
+                .unwrap_or(&[])
                 .iter()
                 .filter_map(|tag| normalized_optional_text(Some(tag.as_str())))
                 .collect(),
-            custom_metadata: self.custom_metadata.clone().into_iter().collect(),
+            custom_metadata: self
+                .custom_metadata
+                .clone()
+                .unwrap_or_default()
+                .into_iter()
+                .collect(),
             embedding: None,
         })
     }
@@ -485,17 +523,25 @@ pub struct MemoryDeleteArgs {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MemorySearchArgs {
     pub(crate) query: String,
-    #[serde(default = "default_search_limit")]
-    pub(crate) limit: usize,
     #[serde(default)]
-    pub(crate) include_dormant: bool,
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) include_dormant: Option<bool>,
     #[serde(default)]
     pub(crate) memory_types: Option<Vec<ToolMemoryType>>,
 }
 
 impl MemorySearchArgs {
+    fn limit(&self) -> usize {
+        self.limit.unwrap_or_else(default_search_limit)
+    }
+
+    fn include_dormant(&self) -> bool {
+        self.include_dormant.unwrap_or(false)
+    }
+
     fn state_filter(&self) -> Option<MemoryState> {
-        if self.include_dormant {
+        if self.include_dormant() {
             None
         } else {
             Some(MemoryState::Active)
@@ -512,10 +558,10 @@ pub struct MemoryRecallArgs {
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct MemoryListArgs {
-    #[serde(default = "default_list_limit")]
-    pub(crate) limit: usize,
     #[serde(default)]
-    pub(crate) include_dormant: bool,
+    pub(crate) limit: Option<usize>,
+    #[serde(default)]
+    pub(crate) include_dormant: Option<bool>,
     #[serde(default)]
     pub(crate) state: Option<ToolMemoryState>,
     #[serde(default)]
@@ -523,10 +569,18 @@ pub struct MemoryListArgs {
 }
 
 impl MemoryListArgs {
+    fn limit(&self) -> usize {
+        self.limit.unwrap_or_else(default_list_limit)
+    }
+
+    fn include_dormant(&self) -> bool {
+        self.include_dormant.unwrap_or(false)
+    }
+
     fn state_filter(&self) -> Option<MemoryState> {
         if let Some(state) = self.state {
             Some(state.into())
-        } else if self.include_dormant {
+        } else if self.include_dormant() {
             None
         } else {
             Some(MemoryState::Active)
@@ -638,7 +692,7 @@ impl MemorySearchResponse {
             namespace: repository.namespace_owned(),
             count: matches.len(),
             query: args.query.clone(),
-            include_dormant: args.include_dormant,
+            include_dormant: args.include_dormant(),
             results: matches.into_iter().map(SearchResultRow::from).collect(),
         }
     }
@@ -705,7 +759,7 @@ impl MemoryListResponse {
         Self {
             namespace: repository.namespace_owned(),
             count: memories.len(),
-            include_dormant: args.include_dormant,
+            include_dormant: args.include_dormant(),
             memories: memories.into_iter().map(ListRow::from).collect(),
         }
     }
@@ -973,70 +1027,6 @@ fn tool_memory_types(memory_types: Vec<ToolMemoryType>) -> Vec<MemoryType> {
     memory_types.into_iter().map(Into::into).collect()
 }
 
-fn normalize_text(value: &str) -> String {
-    value.to_lowercase()
-}
-
-fn query_tokens(query: &str) -> Vec<String> {
-    let mut seen = HashSet::new();
-    query
-        .split(|character: char| !character.is_alphanumeric())
-        .filter(|token| !token.is_empty())
-        .filter_map(|token| {
-            let token = token.to_string();
-            seen.insert(token.clone()).then_some(token)
-        })
-        .collect()
-}
-
-fn score_memory(memory: &Memory, query: &str, tokens: &[String]) -> Option<(f32, f32)> {
-    let haystacks = [
-        normalize_text(&memory.content),
-        memory
-            .summary
-            .as_deref()
-            .map(normalize_text)
-            .unwrap_or_default(),
-        normalize_text(&memory.tags.join(" ")),
-    ];
-
-    let exact_match = haystacks.iter().any(|haystack| haystack == query);
-    let phrase_match =
-        !query.is_empty() && haystacks.iter().any(|haystack| haystack.contains(query));
-    let token_hits = tokens
-        .iter()
-        .filter(|token| {
-            haystacks
-                .iter()
-                .any(|haystack| haystack.contains(token.as_str()))
-        })
-        .count();
-
-    if !exact_match && !phrase_match && token_hits == 0 {
-        return None;
-    }
-
-    let token_ratio = if tokens.is_empty() {
-        if phrase_match || exact_match {
-            1.0
-        } else {
-            0.0
-        }
-    } else {
-        token_hits as f32 / tokens.len() as f32
-    };
-    let similarity = if exact_match {
-        1.0
-    } else {
-        ((if phrase_match { 0.45 } else { 0.0 }) + (token_ratio * 0.55)).min(1.0)
-    };
-    let score = similarity
-        + (memory.importance_score.clamp(0.0, 1.0) * 0.05)
-        + (((memory.access_count as f32) + 1.0).ln() * 0.01);
-
-    Some((score, similarity))
-}
-
 fn preview(content: &str) -> String {
     let mut preview = String::new();
     let mut characters = content.chars().peekable();
@@ -1206,4 +1196,235 @@ pub enum MemoryBindingError {
     EmptyNamespace,
     #[error("memory agent_id must not be empty")]
     EmptyAgentId,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{collections::HashMap, sync::Mutex};
+
+    use async_trait::async_trait;
+    use elegy_memory::{EmbeddingError, EmbeddingProvider};
+    use tempfile::TempDir;
+
+    #[tokio::test]
+    async fn store_memory_clears_stale_embeddings_when_provider_succeeds() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let content = "Store-time embeddings should be fresh immediately.";
+        let provider = Arc::new(StubEmbeddingProvider::new([(content, axis_embedding())]));
+        let repository = test_repository(&db_path, "test-agent", provider.clone());
+
+        let response = repository
+            .store_memory(&MemoryStoreArgs {
+                content: content.to_string(),
+                summary: None,
+                memory_type: None,
+                importance: Some(0.7),
+                provenance: None,
+                sensitivity: None,
+                tags: None,
+                custom_metadata: None,
+            })
+            .await
+            .expect("memory store should succeed");
+        let stats = repository.stats().await.expect("stats should load");
+
+        assert_eq!(response.action, "added");
+        assert_eq!(stats.stale_embeddings_count, 0);
+        assert_eq!(provider.calls(), vec![content.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn semantic_search_recalls_concept_only_matches() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let content = "Arabica espresso with chocolate finish.";
+        let query = "fragrant hot drink";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (content, axis_embedding()),
+            (query, axis_embedding()),
+        ]));
+        let repository = test_repository(&db_path, "semantic-agent", provider);
+
+        let stored = repository
+            .store_memory(&MemoryStoreArgs {
+                content: content.to_string(),
+                summary: None,
+                memory_type: Some(ToolMemoryType::Fact),
+                importance: Some(0.8),
+                provenance: None,
+                sensitivity: None,
+                tags: None,
+                custom_metadata: None,
+            })
+            .await
+            .expect("semantic memory should store");
+        let matches = repository
+            .search(&MemorySearchArgs {
+                query: query.to_string(),
+                limit: Some(5),
+                include_dormant: None,
+                memory_types: None,
+            })
+            .await
+            .expect("semantic search should succeed");
+
+        assert!(!matches.is_empty());
+        assert_eq!(matches[0].memory.id.to_string(), stored.memory.id);
+    }
+
+    #[tokio::test]
+    async fn semantic_search_preserves_agent_isolation() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let visible_content = "Visible arabica memory for configured agent.";
+        let hidden_content = "Hidden arabica memory for another agent.";
+        let query = "fragrant hot drink";
+        let provider = Arc::new(StubEmbeddingProvider::new([
+            (visible_content, axis_embedding()),
+            (query, axis_embedding()),
+        ]));
+        let repository = test_repository(&db_path, "visible-agent", provider);
+
+        let visible = repository
+            .store_memory(&MemoryStoreArgs {
+                content: visible_content.to_string(),
+                summary: None,
+                memory_type: Some(ToolMemoryType::Fact),
+                importance: Some(0.8),
+                provenance: None,
+                sensitivity: None,
+                tags: None,
+                custom_metadata: None,
+            })
+            .await
+            .expect("visible memory should store");
+
+        let hidden_store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Agent).expect("hidden store should open");
+        let hidden_memory = test_agent_memory(hidden_content, "other-agent");
+        let hidden_id = hidden_memory.id;
+        hidden_store
+            .store(hidden_memory)
+            .await
+            .expect("hidden memory should store");
+        hidden_store
+            .store_embedding(&hidden_id, &axis_embedding())
+            .await
+            .expect("hidden embedding should store");
+
+        let matches = repository
+            .search(&MemorySearchArgs {
+                query: query.to_string(),
+                limit: Some(5),
+                include_dormant: None,
+                memory_types: None,
+            })
+            .await
+            .expect("semantic search should succeed");
+
+        let result_ids = matches
+            .into_iter()
+            .map(|result| result.memory.id.to_string())
+            .collect::<Vec<_>>();
+        assert_eq!(result_ids, vec![visible.memory.id]);
+    }
+
+    fn test_repository(
+        db_path: &Path,
+        agent_id: &str,
+        provider: Arc<dyn EmbeddingProvider>,
+    ) -> MemoryRepository {
+        MemoryRepository::new_with_embedding_provider(
+            db_path,
+            MemoryBinding::new(DEFAULT_NAMESPACE, agent_id).expect("binding should build"),
+            provider,
+        )
+        .expect("repository should build")
+    }
+
+    fn test_agent_memory(content: &str, agent_id: &str) -> Memory {
+        let now = "2026-05-10T12:00:00Z"
+            .parse()
+            .expect("fixture timestamp should parse");
+        Memory {
+            id: Uuid::new_v4(),
+            content: content.to_string(),
+            summary: None,
+            scope: MemoryScope::Agent,
+            memory_type: MemoryType::Fact,
+            provenance: ProvenanceLevel::UserStated,
+            importance_score: 0.8,
+            reliability_score: ProvenanceLevel::UserStated.base_reliability(),
+            sensitivity: SensitivityLevel::Low,
+            state: MemoryState::Active,
+            tags: Vec::new(),
+            status: None,
+            custom_metadata: HashMap::new(),
+            access_count: 0,
+            corroboration_count: 0,
+            embedding_stale: false,
+            created_at: now,
+            updated_at: now,
+            last_accessed_at: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: Some(agent_id.to_string()),
+        }
+    }
+
+    fn axis_embedding() -> Vec<f32> {
+        let mut embedding = vec![0.0; 768];
+        embedding[0] = 1.0;
+        embedding
+    }
+
+    #[derive(Debug)]
+    struct StubEmbeddingProvider {
+        responses: HashMap<String, Vec<f32>>,
+        calls: Mutex<Vec<String>>,
+    }
+
+    impl StubEmbeddingProvider {
+        fn new<I, S>(responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, Vec<f32>)>,
+            S: Into<String>,
+        {
+            Self {
+                responses: responses
+                    .into_iter()
+                    .map(|(text, embedding)| (text.into(), embedding))
+                    .collect(),
+                calls: Mutex::new(Vec::new()),
+            }
+        }
+
+        fn calls(&self) -> Vec<String> {
+            self.calls.lock().expect("stub calls lock").clone()
+        }
+    }
+
+    #[async_trait]
+    impl EmbeddingProvider for StubEmbeddingProvider {
+        async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError> {
+            let trimmed = text.trim().to_string();
+            self.calls
+                .lock()
+                .expect("stub calls lock")
+                .push(trimmed.clone());
+            self.responses.get(&trimmed).cloned().ok_or_else(|| {
+                EmbeddingError::Provider(format!("missing stub embedding for `{trimmed}`"))
+            })
+        }
+
+        fn dimensions(&self) -> usize {
+            768
+        }
+
+        fn model_id(&self) -> &str {
+            "mcp-test-stub"
+        }
+    }
 }

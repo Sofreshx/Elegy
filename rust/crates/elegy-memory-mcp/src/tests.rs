@@ -1497,6 +1497,36 @@ fn test_memory(spec: TestMemorySpec<'_>) -> Memory {
     }
 }
 
+fn find_tool<'a>(tools: &'a [Value], name: &str) -> &'a Value {
+    tools
+        .iter()
+        .find(|tool| tool["name"] == json!(name))
+        .unwrap_or_else(|| panic!("tool `{name}` should exist"))
+}
+
+fn tool_property_schema<'a>(tool: &'a Value, property: &str) -> &'a Value {
+    tool["inputSchema"]["properties"]
+        .get(property)
+        .unwrap_or_else(|| panic!("tool schema should expose property `{property}`"))
+}
+
+fn schema_allows_null(schema: &Value) -> bool {
+    match schema {
+        Value::Object(map) => {
+            map.get("type").is_some_and(|value| match value {
+                Value::String(kind) => kind == "null",
+                Value::Array(kinds) => kinds.iter().any(|kind| kind == "null"),
+                _ => false,
+            }) || ["anyOf", "oneOf", "allOf"]
+                .iter()
+                .filter_map(|key| map.get(*key))
+                .any(schema_allows_null)
+        }
+        Value::Array(items) => items.iter().any(schema_allows_null),
+        _ => false,
+    }
+}
+
 #[tokio::test]
 async fn memory_search_and_tool_schema_stay_namespace_bound() {
     let harness = TestHarness::new().await;
@@ -1533,6 +1563,34 @@ async fn memory_search_and_tool_schema_stay_namespace_bound() {
         assert!(
             !schema.to_string().contains("namespace"),
             "tool schema leaked namespace field: {schema}"
+        );
+    }
+    let memory_store = find_tool(tools, "memory_store");
+    for property in [
+        "memoryType",
+        "importance",
+        "provenance",
+        "sensitivity",
+        "tags",
+        "customMetadata",
+    ] {
+        assert!(
+            schema_allows_null(tool_property_schema(memory_store, property)),
+            "memory_store schema should allow explicit null for `{property}`"
+        );
+    }
+    let memory_search = find_tool(tools, "memory_search");
+    for property in ["limit", "includeDormant", "memoryTypes"] {
+        assert!(
+            schema_allows_null(tool_property_schema(memory_search, property)),
+            "memory_search schema should allow explicit null for `{property}`"
+        );
+    }
+    let memory_list = find_tool(tools, "memory_list");
+    for property in ["limit", "includeDormant", "state", "memoryTypes"] {
+        assert!(
+            schema_allows_null(tool_property_schema(memory_list, property)),
+            "memory_list schema should allow explicit null for `{property}`"
         );
     }
 
@@ -1812,6 +1870,111 @@ async fn memory_store_then_read_back_and_list_are_visible() {
         .map(|memory| memory["id"].as_str().unwrap_or_default().to_string())
         .collect::<Vec<_>>();
     assert!(listed_ids.contains(&stored_memory["id"].as_str().unwrap_or_default().to_string()));
+}
+
+#[tokio::test]
+async fn defaulted_memory_tool_fields_accept_explicit_null() {
+    let harness = TestHarness::new().await;
+    let session = authenticated_mcp_session(&harness).await;
+
+    let stored = mcp_json_request(
+        &harness,
+        &session,
+        json!({
+            "jsonrpc":"2.0",
+            "id":65,
+            "method":"tools/call",
+            "params":{
+                "name":"memory_store",
+                "arguments":{
+                    "content":"Explicit null defaults now deserialize across MCP memory tools.",
+                    "summary":null,
+                    "memoryType":null,
+                    "importance":null,
+                    "provenance":null,
+                    "sensitivity":null,
+                    "tags":null,
+                    "customMetadata":null
+                }
+            }
+        }),
+    )
+    .await;
+    let stored_memory = &stored["result"]["structuredContent"]["memory"];
+    let stored_id = stored_memory["id"]
+        .as_str()
+        .unwrap_or_else(|| panic!("stored memory id should exist"))
+        .to_owned();
+    assert_eq!(
+        stored["result"]["structuredContent"]["action"],
+        json!("added")
+    );
+    assert_eq!(stored_memory["memoryType"], json!("observation"));
+    assert_eq!(stored_memory["provenance"], json!("user-stated"));
+    assert_eq!(stored_memory["importance"], json!(0.5));
+    assert_eq!(stored_memory["tags"], json!([]));
+    assert!(
+        stored_memory.get("summary").is_none(),
+        "null summary should normalize to omission"
+    );
+
+    let search = mcp_json_request(
+        &harness,
+        &session,
+        json!({
+            "jsonrpc":"2.0",
+            "id":66,
+            "method":"tools/call",
+            "params":{
+                "name":"memory_search",
+                "arguments":{
+                    "query":"deserialize across MCP",
+                    "limit":null,
+                    "includeDormant":null,
+                    "memoryTypes":null
+                }
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        search["result"]["structuredContent"]["includeDormant"],
+        json!(false)
+    );
+    let search_results = search["result"]["structuredContent"]["results"]
+        .as_array()
+        .unwrap_or_else(|| panic!("search results should be an array"));
+    assert_eq!(search["result"]["structuredContent"]["count"], json!(1));
+    assert_eq!(search_results[0]["id"], json!(stored_id.clone()));
+
+    let listed = mcp_json_request(
+        &harness,
+        &session,
+        json!({
+            "jsonrpc":"2.0",
+            "id":67,
+            "method":"tools/call",
+            "params":{
+                "name":"memory_list",
+                "arguments":{
+                    "limit":null,
+                    "includeDormant":null,
+                    "state":null,
+                    "memoryTypes":null
+                }
+            }
+        }),
+    )
+    .await;
+    assert_eq!(
+        listed["result"]["structuredContent"]["includeDormant"],
+        json!(false)
+    );
+    let memories = listed["result"]["structuredContent"]["memories"]
+        .as_array()
+        .unwrap_or_else(|| panic!("listed memories should be an array"));
+    assert_eq!(listed["result"]["structuredContent"]["count"], json!(1));
+    assert_eq!(memories[0]["id"], json!(stored_id));
 }
 
 #[tokio::test]
