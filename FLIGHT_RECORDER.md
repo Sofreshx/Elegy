@@ -2431,3 +2431,13 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: stdio_main.rs now wires a configured Ollama embedding provider directly into an additive MemoryRepository embedding-aware constructor instead of mutating OLLAMA_URL process state; memory_store now exercises the existing store-time embedding path so successful writes persist vectors and clear embedding_stale immediately; MCP memory_search now routes through the crate hybrid search API; SearchQuery plus SQLite search helpers now accept an optional agent_id filter so MCP can preserve agent isolation before ranking/truncation; the approved Phase 3 lib-scope expansion stayed additive and did not break the existing HTTP MemoryRepository::new() path
 - Next: stop after Phase 3 per instruction; Phase 4 not started
 - Notes: this snapshot includes the explicitly approved small rust/crates/elegy-memory/ expansion required to thread agent isolation through store.search() safely
+
+## STATE_SNAPSHOT — WU11 Phase 4 — 2026-05-10 12:30
+- Phase: Tests E2E consolidés
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/tests/phase4_regressions.rs; rust/crates/elegy-memory-mcp/tests/phase0_stdio_repro.ps1 (removed); FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp --color never -> PASS (39 passed; 0 failed); cargo clippy --all-targets -p elegy-memory-mcp --color never -- -D warnings -> PASS; cargo build -p elegy-memory-mcp --release --bins --color never -> PASS
+- Tests: 39/39 passing (`src/lib.rs`: 10, `src/main.rs`: 26, `src/stdio_main.rs`: 1, `tests/phase4_regressions.rs`: 2, doc-tests: 0); delta vs Phase 3 recorded state: `37/37` -> `39/39`
+- Findings: added deterministic in-process MCP regression coverage under `rust/crates/elegy-memory-mcp/tests/` using duplex transport plus stub embedding providers, so null-deserialization and concept-only semantic-recall behavior stay covered without a live Ollama dependency; removed the temporary Phase 0 stdio repro script because its scenarios are now permanently covered in Rust tests
+- Next: stop after Phase 4 per instruction; Phase 5 not started
+- Notes: new Phase 4 tests exercise the MCP tool surface directly (`tools/call`) rather than only repository internals, keeping the regression proof stable in CI while preserving the live Phase 3 behavior
