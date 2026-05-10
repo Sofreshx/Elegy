@@ -2441,3 +2441,13 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: added deterministic in-process MCP regression coverage under `rust/crates/elegy-memory-mcp/tests/` using duplex transport plus stub embedding providers, so null-deserialization and concept-only semantic-recall behavior stay covered without a live Ollama dependency; removed the temporary Phase 0 stdio repro script because its scenarios are now permanently covered in Rust tests
 - Next: stop after Phase 4 per instruction; Phase 5 not started
 - Notes: new Phase 4 tests exercise the MCP tool surface directly (`tools/call`) rather than only repository internals, keeping the regression proof stable in CI while preserving the live Phase 3 behavior
+
+## STATE_SNAPSHOT — WU11 Phase 5 — 2026-05-10 12:48
+- Phase: Wrap-up
+- Status: DONE
+- Artifacts: FLIGHT_RECORDER.md
+- Validation: live stdio MCP smoke on rebuilt `D:\cargo-targets\elegy\debug\elegy-memory-mcp-stdio.exe` -> PASS (`staleEmbeddingsCount=0`, concept-only `memory_search` returned 1 result, top similarity `0.6190177202224731`); feature branch is ready for push/merge cleanup
+- Tests: final recorded MCP crate status remains 39/39 passing after Phase 4; live stdio smoke also passed after rebuilding the updated stdio binary
+- Findings: Bug A is fixed by normalizing explicit `null` to omission/default semantics across omission-valid MCP tool inputs; Bug B is fixed by wiring the stdio Ollama embedding provider at store time and routing MCP `memory_search` through the semantic/hybrid crate search path with agent-filtered ranking; final key commits on the feature branch are `a61ae35`, `2cf7c43`, and `f0fb93d`
+- Next: push `feat/elegy-mcp-bugfixes`, merge `--no-ff` into `dev`, push `dev`, and delete the feature branch locally and remotely
+- Notes: recorded on the feature branch immediately before merge so the append-only snapshot reaches `dev` through the merge commit without requiring a direct follow-up commit on `dev`; `agent-lifecycle-start.ps1` and `agent-lifecycle-end.ps1` were not present in the repo or PATH
