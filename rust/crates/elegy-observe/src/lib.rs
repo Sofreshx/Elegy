@@ -16,9 +16,16 @@ use std::time::Duration;
 #[cfg(windows)]
 use std::io::Cursor;
 
+use elegy_contracts::{
+    ObservationBounds, ObservationEvent, ObservationKind, ObservationRecorderKind,
+    ObservationRepresentation, ObservationSalientEvent, ObservationScope, ObservationSession,
+    ObservationSummary, ObservationTimeRange, ObservationTokenEstimate, ObservationWindow,
+};
 use serde::Serialize;
 use time::format_description::well_known::Rfc3339;
 use time::OffsetDateTime;
+
+const DEFAULT_RECORD_PREVIEW_LIMIT: usize = 8;
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -42,6 +49,9 @@ pub enum ObserveError {
     /// Filesystem operation failed.
     #[error("filesystem error: {0}")]
     Filesystem(#[from] std::io::Error),
+    /// Invalid recorder arguments.
+    #[error("invalid recording request: {0}")]
+    InvalidRecord(String),
 }
 
 #[cfg(windows)]
@@ -464,6 +474,77 @@ fn snapshot_directory(path: &Path) -> Result<HashMap<PathBuf, FileSnapshot>, std
 }
 
 // ---------------------------------------------------------------------------
+// Bounded observation recording
+// ---------------------------------------------------------------------------
+
+/// Request for a bounded focus-recording session.
+#[derive(Debug, Clone)]
+pub struct ObservationRecordRequest {
+    pub duration: Duration,
+    pub poll_interval: Duration,
+}
+
+impl ObservationRecordRequest {
+    pub fn new(duration: Duration, poll_interval: Duration) -> Result<Self, ObserveError> {
+        if duration.is_zero() {
+            return Err(ObserveError::InvalidRecord(
+                "duration must be greater than zero".to_string(),
+            ));
+        }
+        if poll_interval.is_zero() {
+            return Err(ObserveError::InvalidRecord(
+                "poll interval must be greater than zero".to_string(),
+            ));
+        }
+        Ok(Self {
+            duration,
+            poll_interval,
+        })
+    }
+}
+
+/// Record a bounded foreground-window session using polling.
+pub fn record_observation_session(
+    request: &ObservationRecordRequest,
+) -> Result<ObservationSession, ObserveError> {
+    let opened_at = utc_now_rfc3339();
+    let session_id = format!("obs-session-{}", session_timestamp_nanos());
+    let mut events = Vec::new();
+    let started_at = std::time::Instant::now();
+    let deadline = started_at + request.duration;
+    let mut last_window_key: Option<(u64, String, u32)> = None;
+    let mut sequence = 1u64;
+
+    loop {
+        let window = foreground_window()?;
+        let current_key = (window.hwnd, window.title.clone(), window.process_id);
+        if last_window_key.as_ref() != Some(&current_key) {
+            events.push(build_foreground_window_event(
+                &session_id,
+                sequence,
+                &window,
+                current_process_name(window.process_id).as_deref(),
+            ));
+            sequence += 1;
+            last_window_key = Some(current_key);
+        }
+
+        let now = std::time::Instant::now();
+        if now >= deadline {
+            break;
+        }
+
+        let remaining = deadline.saturating_duration_since(now);
+        std::thread::sleep(std::cmp::min(request.poll_interval, remaining));
+    }
+
+    let closed_at = utc_now_rfc3339();
+    Ok(build_observation_session(
+        session_id, opened_at, closed_at, request, events,
+    ))
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -471,6 +552,170 @@ fn utc_now_rfc3339() -> String {
     OffsetDateTime::now_utc()
         .format(&Rfc3339)
         .unwrap_or_default()
+}
+
+fn session_timestamp_nanos() -> i128 {
+    OffsetDateTime::now_utc().unix_timestamp_nanos()
+}
+
+fn current_process_name(process_id: u32) -> Option<String> {
+    use sysinfo::System;
+
+    let mut sys = System::new();
+    sys.refresh_processes(sysinfo::ProcessesToUpdate::All, true);
+    sys.processes().values().find_map(|process| {
+        if process.pid().as_u32() == process_id {
+            Some(process.name().to_string_lossy().to_string())
+        } else {
+            None
+        }
+    })
+}
+
+fn build_foreground_window_event(
+    session_id: &str,
+    sequence: u64,
+    window: &WindowInfo,
+    process_name: Option<&str>,
+) -> ObservationEvent {
+    let mut metadata = std::collections::BTreeMap::new();
+    if let Some(name) = process_name {
+        metadata.insert("processName".to_string(), name.to_string());
+    }
+
+    ObservationEvent {
+        event_id: format!("{}-event-{}", session_id, sequence),
+        session_id: session_id.to_string(),
+        sequence,
+        observed_at_utc: utc_now_rfc3339(),
+        observation_kind: ObservationKind::ForegroundWindowChanged,
+        summary: summarize_window(window),
+        window: Some(ObservationWindow {
+            hwnd: window.hwnd,
+            title: window.title.clone(),
+            process_id: window.process_id,
+            bounds: ObservationBounds {
+                x: window.bounds.x,
+                y: window.bounds.y,
+                width: window.bounds.width,
+                height: window.bounds.height,
+            },
+        }),
+        metadata,
+    }
+}
+
+fn summarize_window(window: &WindowInfo) -> String {
+    let title = if window.title.trim().is_empty() {
+        "(untitled)"
+    } else {
+        window.title.trim()
+    };
+    let summary = format!("Foreground window changed to {title}.");
+    truncate_chars(&summary, 280)
+}
+
+fn build_observation_session(
+    session_id: String,
+    opened_at_utc: String,
+    closed_at_utc: String,
+    request: &ObservationRecordRequest,
+    events: Vec<ObservationEvent>,
+) -> ObservationSession {
+    let event_count = events.len() as u64;
+    let preview = events
+        .iter()
+        .take(DEFAULT_RECORD_PREVIEW_LIMIT)
+        .cloned()
+        .collect::<Vec<_>>();
+
+    let mut observation_kinds = std::collections::BTreeMap::new();
+    for event in &events {
+        let key = observation_kind_label(event.observation_kind);
+        *observation_kinds.entry(key.to_string()).or_insert(0) += 1;
+    }
+
+    let salient_events = observation_kinds
+        .iter()
+        .map(|(kind, count)| ObservationSalientEvent {
+            kind: kind.clone(),
+            summary: truncate_chars(
+                &format!("Observed {count} {kind} event(s) during the bounded recorder session."),
+                280,
+            ),
+            count: Some(*count),
+        })
+        .take(8)
+        .collect::<Vec<_>>();
+
+    let summary_text = if let Some(first_event) = events.first() {
+        truncate_chars(
+            &format!(
+                "Recorded {event_count} foreground window transition(s) over {} second(s). First change: {}",
+                request.duration.as_secs(),
+                first_event.summary
+            ),
+            4000,
+        )
+    } else {
+        truncate_chars(
+            &format!(
+                "Recorded no foreground window transitions over {} second(s).",
+                request.duration.as_secs()
+            ),
+            4000,
+        )
+    };
+
+    let salient_char_count = salient_events
+        .iter()
+        .map(|item| item.summary.chars().count() as u64)
+        .sum();
+
+    ObservationSession {
+        artifact_kind: "observation-session".to_string(),
+        session_id,
+        scope: ObservationScope::Session,
+        recorder_kind: ObservationRecorderKind::ForegroundWindowPolling,
+        opened_at_utc: opened_at_utc.clone(),
+        closed_at_utc: closed_at_utc.clone(),
+        duration_seconds: Some(request.duration.as_secs()),
+        poll_interval_ms: Some(request.poll_interval.as_millis() as u64),
+        event_count,
+        events_preview: preview,
+        summary: ObservationSummary {
+            scope: ObservationScope::Session,
+            representation: ObservationRepresentation::ObservationSummary,
+            summary: summary_text.clone(),
+            observation_count: event_count,
+            observation_kinds,
+            salient_events,
+            time_range: Some(ObservationTimeRange {
+                started_at_utc: opened_at_utc,
+                ended_at_utc: closed_at_utc,
+            }),
+            token_estimate: Some(ObservationTokenEstimate {
+                summary_chars: summary_text.chars().count() as u64,
+                salient_event_chars: salient_char_count,
+                total: summary_text.chars().count() as u64 + salient_char_count,
+            }),
+            raw_events_persisted: false,
+        },
+        metadata: std::collections::BTreeMap::new(),
+    }
+}
+
+fn observation_kind_label(kind: ObservationKind) -> &'static str {
+    match kind {
+        ObservationKind::ForegroundWindowChanged => "foregroundWindowChanged",
+        ObservationKind::VisibleWindowSnapshot => "visibleWindowSnapshot",
+        ObservationKind::ClipboardChanged => "clipboardChanged",
+        ObservationKind::ProcessSnapshot => "processSnapshot",
+    }
+}
+
+fn truncate_chars(value: &str, max_chars: usize) -> String {
+    value.chars().take(max_chars).collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -523,6 +768,31 @@ mod tests {
         let diff = result.unwrap();
         assert!(!diff.started_at_utc.is_empty());
         assert!(!diff.ended_at_utc.is_empty());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn observation_record_request_rejects_zero_values() {
+        assert!(ObservationRecordRequest::new(Duration::ZERO, Duration::from_millis(1)).is_err());
+        assert!(ObservationRecordRequest::new(Duration::from_secs(1), Duration::ZERO).is_err());
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn record_observation_session_returns_bounded_session() {
+        let request =
+            ObservationRecordRequest::new(Duration::from_millis(50), Duration::from_millis(10))
+                .expect("request should be valid");
+
+        let session = record_observation_session(&request).expect("recording should succeed");
+        assert_eq!(session.artifact_kind, "observation-session");
+        assert_eq!(
+            session.recorder_kind,
+            ObservationRecorderKind::ForegroundWindowPolling
+        );
+        assert!(session.poll_interval_ms.is_some());
+        assert!(session.summary.summary.len() <= 4000);
+        assert!(session.events_preview.len() <= DEFAULT_RECORD_PREVIEW_LIMIT);
     }
 
     #[cfg(windows)]

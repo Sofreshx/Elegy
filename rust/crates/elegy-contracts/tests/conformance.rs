@@ -4,12 +4,14 @@ use elegy_contracts::{
     load_compatibility_manifest_from_dir, load_consumer_support_manifest,
     load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
     load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
-    load_mcp_server_descriptor_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
-    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
-    resolve_upstream_contracts_dir, validate_agent_capability_profile,
-    validate_capability_definition, validate_execution_event, validate_invocation_request,
-    validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
-    validate_skill_definition_v2, validate_structured_failure,
+    load_mcp_server_descriptor_fixture_from_dir, load_observation_event_fixture_from_dir,
+    load_observation_session_fixture_from_dir, load_observation_summary_fixture_from_dir,
+    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
+    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
+    validate_agent_capability_profile, validate_capability_definition, validate_execution_event,
+    validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
+    validate_mcp_server_descriptor, validate_observation_event, validate_observation_session,
+    validate_observation_summary, validate_skill_definition_v2, validate_structured_failure,
     validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
     CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
     ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationRequest,
@@ -55,6 +57,9 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("invocation-request"));
     assert!(schema_names.contains("invocation-response"));
     assert!(schema_names.contains("execution-event"));
+    assert!(schema_names.contains("observation-event"));
+    assert!(schema_names.contains("observation-session"));
+    assert!(schema_names.contains("observation-summary"));
 }
 
 #[test]
@@ -141,6 +146,54 @@ fn upstream_execution_event_fixture_is_semantically_valid() {
     assert_eq!(event.event_id, "exec-event-1");
     assert_eq!(event.event_type, ExecutionEventType::Accepted);
     assert_eq!(event.status, ExecutionEventStatus::Pending);
+}
+
+#[test]
+fn upstream_observation_event_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let event = load_observation_event_fixture_from_dir(&contracts_dir)
+        .expect("load upstream observation-event fixture");
+
+    let validation = validate_observation_event(&event);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(event.event_id, "obs-event-1");
+}
+
+#[test]
+fn upstream_observation_summary_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let summary = load_observation_summary_fixture_from_dir(&contracts_dir)
+        .expect("load upstream observation-summary fixture");
+
+    let validation = validate_observation_summary(&summary);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(summary.observation_count, 1);
+}
+
+#[test]
+fn upstream_observation_session_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let session = load_observation_session_fixture_from_dir(&contracts_dir)
+        .expect("load upstream observation-session fixture");
+
+    let validation = validate_observation_session(&session);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(session.artifact_kind, "observation-session");
 }
 
 #[test]
@@ -521,6 +574,13 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("invocation-response.schema.json")
         .is_file());
     assert!(output_path.join("execution-event.schema.json").is_file());
+    assert!(output_path.join("observation-event.schema.json").is_file());
+    assert!(output_path
+        .join("observation-session.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("observation-summary.schema.json")
+        .is_file());
     assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
@@ -543,6 +603,18 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .is_file());
     assert!(output_path
         .join("fixtures")
+        .join("observation-event.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("observation-session.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("observation-summary.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
         .join("mcp-parity-expected.json")
         .is_file());
 
@@ -558,6 +630,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("invocation-request.schema.json").is_ok());
         assert!(archive.by_name("invocation-response.schema.json").is_ok());
         assert!(archive.by_name("execution-event.schema.json").is_ok());
+        assert!(archive.by_name("observation-event.schema.json").is_ok());
+        assert!(archive.by_name("observation-session.schema.json").is_ok());
+        assert!(archive.by_name("observation-summary.schema.json").is_ok());
         assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
@@ -572,6 +647,15 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
             .is_ok());
         assert!(archive
             .by_name("fixtures/execution-event.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/observation-event.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/observation-session.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/observation-summary.minimal.json")
             .is_ok());
         assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }

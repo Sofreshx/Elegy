@@ -709,6 +709,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
+ "elegy-contracts",
  "elegy-observe-win32",
  "png 0.17.16",
  "serde",

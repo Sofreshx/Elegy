@@ -411,6 +411,135 @@ pub struct ExecutionEvent {
     pub metadata: BTreeMap<String, String>,
 }
 
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationSummary {
+    #[serde(default)]
+    pub scope: ObservationScope,
+    #[serde(default)]
+    pub representation: ObservationRepresentation,
+    pub summary: String,
+    pub observation_count: u64,
+    #[serde(default)]
+    pub observation_kinds: BTreeMap<String, u64>,
+    #[serde(default)]
+    pub salient_events: Vec<ObservationSalientEvent>,
+    pub time_range: Option<ObservationTimeRange>,
+    pub token_estimate: Option<ObservationTokenEstimate>,
+    pub raw_events_persisted: bool,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ObservationScope {
+    Run,
+    #[default]
+    Session,
+    Workspace,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ObservationRepresentation {
+    #[default]
+    ObservationSummary,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationSalientEvent {
+    pub kind: String,
+    pub summary: String,
+    pub count: Option<u64>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationTimeRange {
+    pub started_at_utc: String,
+    pub ended_at_utc: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationTokenEstimate {
+    pub summary_chars: u64,
+    pub salient_event_chars: u64,
+    pub total: u64,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationBounds {
+    pub x: i32,
+    pub y: i32,
+    pub width: i32,
+    pub height: i32,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationWindow {
+    pub hwnd: u64,
+    pub title: String,
+    pub process_id: u32,
+    pub bounds: ObservationBounds,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationEvent {
+    pub event_id: String,
+    pub session_id: String,
+    pub sequence: u64,
+    pub observed_at_utc: String,
+    #[serde(default)]
+    pub observation_kind: ObservationKind,
+    pub summary: String,
+    pub window: Option<ObservationWindow>,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ObservationKind {
+    #[default]
+    ForegroundWindowChanged,
+    VisibleWindowSnapshot,
+    ClipboardChanged,
+    ProcessSnapshot,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ObservationSession {
+    pub artifact_kind: String,
+    pub session_id: String,
+    #[serde(default)]
+    pub scope: ObservationScope,
+    #[serde(default)]
+    pub recorder_kind: ObservationRecorderKind,
+    pub opened_at_utc: String,
+    pub closed_at_utc: String,
+    pub duration_seconds: Option<u64>,
+    pub poll_interval_ms: Option<u64>,
+    pub event_count: u64,
+    #[serde(default)]
+    pub events_preview: Vec<ObservationEvent>,
+    #[serde(default)]
+    pub summary: ObservationSummary,
+    #[serde(default)]
+    pub metadata: BTreeMap<String, String>,
+}
+
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub enum ObservationRecorderKind {
+    #[default]
+    ForegroundWindowPolling,
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum ExecutionEventType {
@@ -838,6 +967,17 @@ pub struct ExecutionEventValidationResult {
 }
 
 impl ExecutionEventValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ObservationValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl ObservationValidationResult {
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
     }
@@ -1493,6 +1633,7 @@ pub fn export_contract_bundle(
 ) -> Result<ContractsBundleExport, ContractsError> {
     let repo_root = resolve_repo_root();
     let contracts_source_dir = resolve_contracts_source_dir();
+    let schema_version_path = repo_root.join("schemas").join("schema-version.json");
     let version_policy_path = repo_root.join("governance").join("version-policy.json");
     let support_manifest_path = default_support_manifest_path();
     let compatibility_manifest_path = contracts_source_dir
@@ -1506,6 +1647,7 @@ pub fn export_contract_bundle(
         &support_manifest_path,
         &compatibility_manifest_path,
         &compatibility_matrix_path,
+        &schema_version_path,
         &version_policy_path,
     ] {
         require_file(required_path)?;
@@ -1515,6 +1657,7 @@ pub fn export_contract_bundle(
     let bundle_version = version_policy.bundle_version.clone();
     let package_version = version_policy.manifest_package.version.clone();
     let schema_version = version_policy.schema_version.clone();
+    let schema_version_document: Value = load_json_file(&schema_version_path)?;
     let compatibility_manifest = load_compatibility_manifest_from_dir(&contracts_source_dir)?;
     let compatibility_matrix: Value = load_json_file(&compatibility_matrix_path)?;
 
@@ -1532,20 +1675,19 @@ pub fn export_contract_bundle(
         )));
     }
 
-    let canonical_schema_manifest = compatibility_manifest
-        .schemas
-        .iter()
-        .find(|entry| entry.name == "canonical-workflow")
+    let declared_schema_version = schema_version_document
+        .get("schemaVersion")
+        .and_then(Value::as_str)
         .ok_or_else(|| {
             ContractsError::Compatibility(
-                "compatibility manifest is missing the canonical-workflow entry".to_string(),
+                "schemas/schema-version.json is missing schemaVersion".to_string(),
             )
         })?;
 
-    if canonical_schema_manifest.schema_version != schema_version {
+    if declared_schema_version != schema_version {
         return Err(ContractsError::Compatibility(format!(
-            "compatibility manifest schema version '{}' does not match governance/version-policy.json schemaVersion '{}'",
-            canonical_schema_manifest.schema_version, schema_version
+            "schemas/schema-version.json schemaVersion '{}' does not match governance/version-policy.json schemaVersion '{}'",
+            declared_schema_version, schema_version
         )));
     }
 
@@ -1693,6 +1835,30 @@ pub fn load_invocation_response_fixture_from_dir(
 
 pub fn load_execution_event_fixture_from_dir(dir: &Path) -> Result<ExecutionEvent, ContractsError> {
     load_json_file(&dir.join("fixtures").join("execution-event.minimal.json"))
+}
+
+pub fn load_observation_event_fixture_from_dir(
+    dir: &Path,
+) -> Result<ObservationEvent, ContractsError> {
+    load_json_file(&dir.join("fixtures").join("observation-event.minimal.json"))
+}
+
+pub fn load_observation_session_fixture_from_dir(
+    dir: &Path,
+) -> Result<ObservationSession, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("observation-session.minimal.json"),
+    )
+}
+
+pub fn load_observation_summary_fixture_from_dir(
+    dir: &Path,
+) -> Result<ObservationSummary, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("observation-summary.minimal.json"),
+    )
 }
 
 pub fn load_capability_definition_fixture_from_dir(
@@ -2036,6 +2202,128 @@ pub fn validate_execution_event(event: &ExecutionEvent) -> ExecutionEventValidat
     }
 
     ExecutionEventValidationResult { issues }
+}
+
+pub fn validate_observation_event(event: &ObservationEvent) -> ObservationValidationResult {
+    let mut issues = Vec::new();
+
+    if event.event_id.trim().is_empty() {
+        issues.push("Observation event must declare an eventId.".to_string());
+    }
+    if event.session_id.trim().is_empty() {
+        issues.push("Observation event must declare a sessionId.".to_string());
+    }
+    if event.sequence == 0 {
+        issues.push("Observation event sequence must be greater than zero.".to_string());
+    }
+    if event.observed_at_utc.trim().is_empty() {
+        issues.push("Observation event must declare observedAtUtc.".to_string());
+    }
+    if event.summary.trim().is_empty() {
+        issues.push("Observation event summary must not be blank.".to_string());
+    }
+    if event.summary.chars().count() > 280 {
+        issues.push("Observation event summary must not exceed 280 characters.".to_string());
+    }
+    if has_blank_metadata_entries(&event.metadata) {
+        issues
+            .push("Observation event metadata must not contain blank keys or values.".to_string());
+    }
+    if let Some(window) = &event.window {
+        if window.title.trim().is_empty() {
+            issues.push(
+                "Observation event window title must not be blank when provided.".to_string(),
+            );
+        }
+        if window.bounds.width < 0 || window.bounds.height < 0 {
+            issues.push("Observation event window bounds must not be negative.".to_string());
+        }
+    }
+
+    ObservationValidationResult { issues }
+}
+
+pub fn validate_observation_summary(summary: &ObservationSummary) -> ObservationValidationResult {
+    let mut issues = Vec::new();
+
+    if summary.summary.trim().is_empty() {
+        issues.push("Observation summary text must not be blank.".to_string());
+    }
+    if summary.summary.chars().count() > 4000 {
+        issues.push("Observation summary text must not exceed 4000 characters.".to_string());
+    }
+    if summary.observation_kinds.len() > 16 {
+        issues.push("Observation summary observationKinds must not exceed 16 entries.".to_string());
+    }
+    if summary.salient_events.len() > 8 {
+        issues.push("Observation summary salientEvents must not exceed 8 entries.".to_string());
+    }
+    for event in &summary.salient_events {
+        if event.kind.trim().is_empty() {
+            issues.push("Observation summary salientEvents kinds must not be blank.".to_string());
+        }
+        if event.summary.trim().is_empty() {
+            issues
+                .push("Observation summary salientEvents summaries must not be blank.".to_string());
+        }
+        if event.summary.chars().count() > 280 {
+            issues.push(
+                "Observation summary salientEvents summaries must not exceed 280 characters."
+                    .to_string(),
+            );
+        }
+    }
+    if summary.raw_events_persisted {
+        issues.push("Observation summary rawEventsPersisted must remain false.".to_string());
+    }
+    if let Some(time_range) = &summary.time_range {
+        if time_range.started_at_utc.trim().is_empty() || time_range.ended_at_utc.trim().is_empty()
+        {
+            issues.push("Observation summary timeRange timestamps must not be blank.".to_string());
+        }
+    }
+
+    ObservationValidationResult { issues }
+}
+
+pub fn validate_observation_session(session: &ObservationSession) -> ObservationValidationResult {
+    let mut issues = Vec::new();
+
+    if session.artifact_kind != "observation-session" {
+        issues.push("Observation session artifactKind must be 'observation-session'.".to_string());
+    }
+    if session.session_id.trim().is_empty() {
+        issues.push("Observation session must declare a sessionId.".to_string());
+    }
+    if session.opened_at_utc.trim().is_empty() || session.closed_at_utc.trim().is_empty() {
+        issues.push("Observation session timestamps must not be blank.".to_string());
+    }
+    if session.events_preview.len() > 8 {
+        issues.push("Observation session eventsPreview must not exceed 8 entries.".to_string());
+    }
+    if session.event_count < session.events_preview.len() as u64 {
+        issues.push(
+            "Observation session eventCount must be greater than or equal to preview length."
+                .to_string(),
+        );
+    }
+    if let Some(poll_interval_ms) = session.poll_interval_ms {
+        if poll_interval_ms == 0 {
+            issues
+                .push("Observation session pollIntervalMs must be greater than zero.".to_string());
+        }
+    }
+    if has_blank_metadata_entries(&session.metadata) {
+        issues.push(
+            "Observation session metadata must not contain blank keys or values.".to_string(),
+        );
+    }
+    for event in &session.events_preview {
+        issues.extend(validate_observation_event(event).issues);
+    }
+    issues.extend(validate_observation_summary(&session.summary).issues);
+
+    ObservationValidationResult { issues }
 }
 
 pub fn validate_capability_definition(

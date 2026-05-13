@@ -879,8 +879,8 @@ mod tests {
         // The diagram skill definition has 4 capabilities
         assert_eq!(
             tools.len(),
-            47,
-            "expected 47 tools from the built-in v2 skill registry"
+            48,
+            "expected 48 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -933,6 +933,7 @@ mod tests {
             "missing observe-filesystem"
         );
         assert!(names.contains(&"observe-system"), "missing observe-system");
+        assert!(names.contains(&"observe-record"), "missing observe-record");
         assert!(names.contains(&"desktop-click"), "missing desktop-click");
         assert!(names.contains(&"desktop-type"), "missing desktop-type");
         assert!(names.contains(&"desktop-key"), "missing desktop-key");
@@ -1273,8 +1274,8 @@ mod tests {
 
         assert_eq!(
             tools.len(),
-            47,
-            "expected 47 tools from the built-in v2 skill registry"
+            48,
+            "expected 48 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -1297,6 +1298,7 @@ mod tests {
         assert!(names.contains(&"observe-clipboard"));
         assert!(names.contains(&"observe-filesystem"));
         assert!(names.contains(&"observe-system"));
+        assert!(names.contains(&"observe-record"));
         assert!(names.contains(&"desktop-click"));
         assert!(names.contains(&"desktop-type"));
         assert!(names.contains(&"desktop-key"));

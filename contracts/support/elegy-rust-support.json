@@ -3,7 +3,7 @@
   "consumerVersion": "0.1.0",
   "upstreamPackage": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.3.2"
+    "version": "1.4.0"
   },
   "authority": {
     "sourceOfTruth": "contracts/support/elegy-rust-support.json",
@@ -20,7 +20,7 @@
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.3.2",
+      "targetUpstreamPackageVersion": "1.4.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -47,7 +47,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.3.2",
+      "targetUpstreamPackageVersion": "1.4.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -72,7 +72,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.3.2",
+      "targetUpstreamPackageVersion": "1.4.0",
       "scope": "Dedicated MCP-to-skill generation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -114,6 +114,9 @@
     "mcp-tool-definition": "1.0.0",
     "mcp-server-descriptor": "1.0.0",
     "mcp-analysis-result": "1.0.0",
+    "observation-event": "1.1.0",
+    "observation-session": "1.1.0",
+    "observation-summary": "1.1.0",
     "structured-failure": "1.0.0"
   }
 }

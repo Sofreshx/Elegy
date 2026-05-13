@@ -6,7 +6,7 @@
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.3.2 <2.0.0",
+      "targetPackageVersionRange": ">=1.4.0 <2.0.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -33,7 +33,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.3.2 <2.0.0",
+      "targetPackageVersionRange": ">=1.4.0 <2.0.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -58,7 +58,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.3.2 <2.0.0",
+      "targetPackageVersionRange": ">=1.4.0 <2.0.0",
       "scope": "Dedicated MCP-to-skill generation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -84,11 +84,11 @@
     {
       "holonVersionRange": ">=0.1.0 <0.2.0",
       "instructionEngineVersionRange": ">=0.1.0 <0.2.0",
-      "elegyPackageVersionRange": ">=1.3.2 <2.0.0",
-      "elegySchemaVersionRange": ">=1.0.0 <2.0.0",
+      "elegyPackageVersionRange": ">=1.4.0 <2.0.0",
+      "elegySchemaVersionRange": ">=1.1.0 <2.0.0",
       "policySchemaVersionRange": null,
       "supportLevel": "supported",
-      "notes": "Publishes bundle 1.3.2 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, the capability-definition, structured-failure, invocation-request, invocation-response, and execution-event contract families establish governed reusable capability-level execution shapes for later registry and invocation work without replacing the existing agent conversation envelopes, Elegy-memory V1 remains bounded and non-authoritative, the shipped elegy-mcp plus elegy-skills surfaces add thin dedicated CLI wrappers over existing descriptor authoring, descriptor analysis, and MCP-to-skill generation flows without claiming unsupported REST/OpenAPI execution or autonomous runtime registration, and wrapper archives now stage install.ps1 plus the matching surface-local skills/<surface>/SKILL.md bridge alongside the dedicated CLI surface when consumers request wrapper assets."
+      "notes": "Publishes bundle 1.4.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, the capability-definition, structured-failure, invocation-request, invocation-response, and execution-event contract families establish governed reusable capability-level execution shapes for later registry and invocation work without replacing the existing agent conversation envelopes, the new observation-event, observation-session, and observation-summary families add bounded reusable desktop-observation recording contracts without moving host-local consent or evidence semantics into Elegy, Elegy-memory V1 remains bounded and non-authoritative, and the shipped elegy-mcp plus elegy-skills surfaces add thin dedicated CLI wrappers over existing descriptor authoring, descriptor analysis, and MCP-to-skill generation flows without claiming unsupported REST/OpenAPI execution or autonomous runtime registration."
     }
   ]
 }

@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use elegy_contracts::{
     builtin_skill_definitions, export_contract_bundle, validate_agent_capability_profile,
-    AgentCapabilityProfile, ContractsBundleExport, ContractsError,
+    AgentCapabilityProfile, ContractsBundleExport, ContractsError, ObservationSession,
     AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_core::{
@@ -31,7 +31,7 @@ use elegy_mermaid::{
 };
 use elegy_observe::{
     capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
-    snapshot_processes, system_info,
+    record_observation_session, snapshot_processes, system_info, ObservationRecordRequest,
 };
 use elegy_tooling::{
     generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
@@ -424,6 +424,15 @@ enum ObserveCommand {
     },
     /// System hardware and OS information snapshot
     System,
+    /// Record bounded foreground-window activity for a short session
+    Record {
+        /// Recorder duration in seconds (default: 5)
+        #[arg(long, default_value = "5")]
+        duration_seconds: u64,
+        /// Foreground-window polling interval in milliseconds (default: 250)
+        #[arg(long, default_value = "250")]
+        poll_interval_ms: u64,
+    },
 }
 
 /// Desktop input automation commands for agentic workflows.
@@ -1272,6 +1281,13 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Observe {
             command: ObserveCommand::System,
         } => execute_observe_system_command(format),
+        Command::Observe {
+            command:
+                ObserveCommand::Record {
+                    duration_seconds,
+                    poll_interval_ms,
+                },
+        } => execute_observe_record_command(duration_seconds, poll_interval_ms, format),
         Command::Desktop {
             command:
                 DesktopCommand::Click {
@@ -5948,6 +5964,88 @@ fn execute_observe_system_command(format: OutputFormat) -> Result<ExitCode, serd
         }
     }
     Ok(ExitCode::SUCCESS)
+}
+
+fn execute_observe_record_command(
+    duration_seconds: u64,
+    poll_interval_ms: u64,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let request = match ObservationRecordRequest::new(
+        std::time::Duration::from_secs(duration_seconds),
+        std::time::Duration::from_millis(poll_interval_ms),
+    ) {
+        Ok(request) => request,
+        Err(error) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {error}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "record"],
+                        "invalid",
+                        Summary {
+                            errors: 1,
+                            ..Summary::default()
+                        },
+                        json!({ "error": error.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_invalid());
+        }
+    };
+
+    match record_observation_session(&request) {
+        Ok(session) => {
+            match format {
+                OutputFormat::Text => print_observation_session_text(&session),
+                OutputFormat::Json => {
+                    print_json(&build_envelope_with_schema(
+                        ["observe", "record"],
+                        "ok",
+                        Summary::default(),
+                        &session,
+                        Vec::new(),
+                        Some("https://elegy/contracts/schemas/observation-session.schema.json"),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {error}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "record"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            ..Summary::default()
+                        },
+                        json!({ "error": error.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn print_observation_session_text(session: &ObservationSession) {
+    println!(
+        "Observation session {} recorded {} event(s)",
+        session.session_id, session.event_count
+    );
+    if let Some(duration_seconds) = session.duration_seconds {
+        println!("  Duration: {duration_seconds}s");
+    }
+    if let Some(poll_interval_ms) = session.poll_interval_ms {
+        println!("  Poll interval: {poll_interval_ms}ms");
+    }
+    println!("  Summary: {}", session.summary.summary);
 }
 
 fn execute_desktop_click_command(
