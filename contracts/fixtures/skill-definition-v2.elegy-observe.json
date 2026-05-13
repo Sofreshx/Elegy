@@ -17,7 +17,7 @@
     "license": "Apache-2.0",
     "tags": ["observation", "desktop", "os", "processes", "windows", "screen", "clipboard", "filesystem", "system"],
     "owners": ["elegy"],
-    "documentationUri": null
+    "documentationUri": "docs/architecture/observe-cli.md"
   },
   "capabilities": [
     {
@@ -222,12 +222,50 @@
         "isDeterministic": false,
         "hasSideEffects": false
       }
+    },
+    {
+      "id": "observe-record",
+      "name": "Bounded Observation Record",
+      "description": "Record bounded foreground-window activity for a short session and return a compact observation-session artifact with preview events and summary output.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "record", "--duration-seconds", "${duration_seconds}", "--poll-interval-ms", "${poll_interval_ms}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "duration_seconds",
+            "type": "integer",
+            "description": "Bounded recorder duration in seconds.",
+            "required": false,
+            "default": 5
+          },
+          {
+            "name": "poll_interval_ms",
+            "type": "integer",
+            "description": "Polling interval in milliseconds for foreground-window checks.",
+            "required": false,
+            "default": 250
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObservationSession",
+        "schemaRef": "https://elegy/contracts/schemas/observation-session.schema.json",
+        "description": "ObservationSession with compact summary, preview events, and bounded foreground-window recording metadata."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
     }
   ],
   "constraints": [
     {
       "constraintId": "windows-only-capabilities",
-      "description": "Window observation (observe-window, observe-windows) and screen capture (observe-screen) require Windows. They return an 'unsupported' error on other platforms. Process, clipboard, filesystem, and system commands are cross-platform.",
+      "description": "Window observation (observe-window, observe-windows), bounded foreground-window recording (observe-record), and screen capture (observe-screen) require Windows. They return an 'unsupported' error on other platforms. Process, clipboard, filesystem, and system commands are cross-platform.",
       "required": true
     },
     {
@@ -243,7 +281,7 @@
     "allowedContexts": ["contributor-routing", "local-cli", "desktop-observation"]
   },
   "discovery": {
-    "keywords": ["observe", "desktop", "processes", "window", "screen", "capture", "clipboard", "filesystem", "system", "monitor", "snapshot"],
+    "keywords": ["observe", "desktop", "processes", "window", "screen", "capture", "clipboard", "filesystem", "system", "monitor", "snapshot", "record", "timeline", "focus"],
     "triggers": [
       {
         "pattern": "what is running",
@@ -268,6 +306,10 @@
       {
         "pattern": "system info",
         "description": "When an agent needs hardware/OS information."
+      },
+      {
+        "pattern": "record desktop activity",
+        "description": "When an agent needs a bounded focus-recording session artifact."
       }
     ],
     "capabilityHints": [
@@ -277,7 +319,8 @@
       "screen-capture-png",
       "clipboard-read",
       "filesystem-diff",
-      "system-hardware-info"
+      "system-hardware-info",
+      "foreground-window-recording"
     ],
     "isHidden": false
   },

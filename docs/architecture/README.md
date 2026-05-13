@@ -13,6 +13,7 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Substrate governance](substrate-governance.md) - active artifact/runtime boundary and validation rules
 - [Skill Core V1](skill-core-v1.md) - current skill authority split between governed artifacts and Rust executable behavior
 - [Mermaid tooling](mermaid-tooling.md) - current Mermaid render, reverse, and narrative projection slice under the umbrella `elegy` CLI
+- [Observe CLI](observe-cli.md) - shipped read-only observation commands plus the bounded `elegy observe record` MVP contract
 - [Elegy-memory V1](elegy-memory-v1.md) - shipped local memory surface under `elegy-memory`, authority chain, and retention/removal semantics
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Terminology](terminology.md) - neutral vocabulary for artifact authority, projections, and runtime ownership

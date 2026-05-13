@@ -76,6 +76,15 @@ of Elegy instead of exposing every built-in tool.
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
 | `elegy-skills` | Dedicated MCP-to-v2-skill generation CLI. |
 
+Observation guide: [docs/architecture/observe-cli.md](docs/architecture/observe-cli.md)
+
+Example observe commands:
+
+```bash
+elegy observe system --json
+elegy observe record --duration-seconds 1 --poll-interval-ms 50 --json
+```
+
 ## Capability Profiles
 
 Profile schema: `contracts/schemas/agent-capability-profile.schema.json`.
