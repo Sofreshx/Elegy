@@ -9,15 +9,15 @@ The wrapper contract for this root lives in `wrapper-entrypoint.json`.
 Delegation stays one-way:
 
 - `contracts/` and `governance/` remain canonical for skill schemas, fixtures, discovery projections, and policy.
-- `rust/crates/elegy-skills` remains the implementation center for the dedicated skill-generation CLI surface.
+- `rust/crates/elegy-skills` remains the implementation center for the dedicated skill-registry CLI and reusable Rust registry API.
 - `.github/skills/elegy-skills/SKILL.md` remains the repo-local non-authoritative contributor-routing output for this surface.
 - `docs/architecture/skill-core-v1.md` and `docs/architecture/mcp-skill-tooling-placement.md` remain the canonical documentation entrypoints.
 
 This wrapper surface organizes its helper lanes like this:
 
 - `docs/` maps this surface to its canonical documentation entrypoints.
-- `agents/` captures wrapper-level agent handoff guidance for the bounded generation surface.
-- `skills/` explains how this surface delegates repo-local skill routing output and ships a surface-local bridge in `skills/elegy-skills/SKILL.md`.
+- `agents/` captures wrapper-level agent handoff guidance for the dedicated registry surface.
+- `skills/` explains how this surface delegates repo-local registry routing output and ships a surface-local bridge in `skills/elegy-skills/SKILL.md`.
 
 Published release archives and install flows remain produced from the Rust workspace and repo-root distribution scripts, including the platform-neutral `elegy-skills-wrapper-<bundleVersion>.zip` wrapper archive.
 

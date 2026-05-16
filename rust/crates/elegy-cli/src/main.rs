@@ -1,8 +1,7 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
 use elegy_contracts::{
-    builtin_skill_definitions, export_contract_bundle, validate_agent_capability_profile,
-    AgentCapabilityProfile, ContractsBundleExport, ContractsError, ObservationSession,
-    AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+    export_contract_bundle, AgentCapabilityProfile, ContractsBundleExport, ContractsError,
+    ObservationSession, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
@@ -32,6 +31,10 @@ use elegy_mermaid::{
 use elegy_observe::{
     capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
     record_observation_session, snapshot_processes, system_info, ObservationRecordRequest,
+};
+use elegy_skills::{
+    AgentCapabilityProfile as RegistryAgentCapabilityProfile, RegistryCapabilityCard,
+    RegistrySkillEntry, SkillRegistry, SkillRegistryQuery,
 };
 use elegy_tooling::{
     generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
@@ -353,6 +356,30 @@ enum SkillsCommand {
         /// Show capability-level detail (parameters, execution metadata)
         #[arg(long)]
         detail: bool,
+    },
+    /// Resolve the best matching skill and capability for a task
+    Resolve {
+        #[arg(long)]
+        query: String,
+        #[arg(long)]
+        detail: bool,
+    },
+    /// Return the full governed skill definition for one skill
+    Get {
+        #[arg(long)]
+        skill_id: String,
+    },
+    /// Return a projected capability card for one capability
+    Capability {
+        #[arg(long)]
+        capability_id: String,
+    },
+    /// Validate one skill file or a directory of skill files
+    Validate {
+        #[arg(long)]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        dir: Option<PathBuf>,
     },
 }
 
@@ -847,125 +874,6 @@ struct MermaidNarrateReport {
     input_path: Option<String>,
 }
 
-/// A loaded skill definition summary for listing and search output.
-#[derive(Clone, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SkillSummary {
-    /// Unique skill identifier derived from `identity.name`.
-    id: String,
-    /// Human-readable display name.
-    name: String,
-    /// Short description text.
-    description: String,
-    /// Skill category (e.g. "design", "memory").
-    category: String,
-    /// Number of capabilities declared in the definition.
-    capabilities_count: usize,
-    /// Lifecycle state (e.g. "active", "draft", "deprecated").
-    lifecycle_state: String,
-}
-
-/// A capability summary for detail-level disclosure.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct CapabilityDetail {
-    /// Capability identifier.
-    id: String,
-    /// Human-readable name.
-    name: String,
-    /// Short description.
-    description: String,
-    /// Input parameters (if any).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    parameters: Vec<ParameterDetail>,
-    /// Execution metadata.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    execution: Option<ExecutionDetail>,
-}
-
-/// A parameter summary for detail-level disclosure.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ParameterDetail {
-    name: String,
-    #[serde(rename = "type")]
-    param_type: String,
-    description: String,
-    required: bool,
-}
-
-/// Execution metadata for a capability.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ExecutionDetail {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    mode: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    has_side_effects: Option<bool>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    is_deterministic: Option<bool>,
-}
-
-/// A search result with match metadata for progressive disclosure.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SkillSearchResult {
-    /// Skill summary (always included).
-    #[serde(flatten)]
-    summary: SkillSummary,
-    /// Which capabilities matched the query (IDs only).
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    matched_capabilities: Vec<String>,
-    /// Which fields caused the match.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    match_reasons: Vec<String>,
-    /// Match relevance score (0.0 - 1.0).
-    match_score: f64,
-    /// Discovery trigger keywords from the skill definition.
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    trigger_keywords: Vec<String>,
-    /// Command to get full details.
-    expand_command: String,
-    /// Estimated context cost at each disclosure level (in tokens).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    context_cost_estimate: Option<ContextCostEstimate>,
-    /// Capabilities detail (only when --detail is set).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    capabilities: Option<Vec<CapabilityDetail>>,
-}
-
-/// Token cost estimates for progressive disclosure levels.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct ContextCostEstimate {
-    /// Tokens for index-level (compact) representation.
-    index_tokens: usize,
-    /// Tokens for detail-level representation.
-    detail_tokens: usize,
-    /// Tokens for full v2 skill definition.
-    full_tokens: usize,
-}
-
-/// Extended skill summary with detail-level information for list output.
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct SkillListEntry {
-    /// Skill summary (always included).
-    #[serde(flatten)]
-    summary: SkillSummary,
-    /// Estimated context cost.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    context_cost_estimate: Option<ContextCostEstimate>,
-    /// Capabilities detail (only when --detail is set).
-    #[serde(skip_serializing_if = "Option::is_none")]
-    capabilities: Option<Vec<CapabilityDetail>>,
-}
-
-struct LoadedSkill {
-    summary: SkillSummary,
-    full: serde_json::Value,
-}
-
 struct AgentProfileSelection {
     profile_path: Option<PathBuf>,
     profile: Option<AgentCapabilityProfile>,
@@ -1242,6 +1150,18 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Skills {
             command: SkillsCommand::Search { query, detail },
         } => execute_skills_search_command(query, detail, format),
+        Command::Skills {
+            command: SkillsCommand::Resolve { query, detail },
+        } => execute_skills_resolve_command(query, detail, format),
+        Command::Skills {
+            command: SkillsCommand::Get { skill_id },
+        } => execute_skills_get_command(skill_id, format),
+        Command::Skills {
+            command: SkillsCommand::Capability { capability_id },
+        } => execute_skills_capability_command(capability_id, format),
+        Command::Skills {
+            command: SkillsCommand::Validate { file, dir },
+        } => execute_skills_validate_command(file, dir, format),
         Command::Agent {
             command: AgentCommand::Manifest { profile },
         } => execute_agent_manifest_command(profile, format),
@@ -3356,197 +3276,6 @@ impl From<CliTransport> for McpTransportKind {
     }
 }
 
-/// Parse an embedded skill definition JSON string into a summary and full value.
-///
-/// Returns `None` when the JSON is malformed or lacks required fields.
-fn parse_skill_summary(json_str: &str) -> Option<(SkillSummary, serde_json::Value)> {
-    let val: serde_json::Value = serde_json::from_str(json_str).ok()?;
-    let identity = val.get("identity")?;
-    let metadata = val.get("metadata");
-    let capabilities = val.get("capabilities")?.as_array()?;
-
-    let summary = SkillSummary {
-        id: identity.get("name")?.as_str()?.to_string(),
-        name: metadata
-            .and_then(|m| m.get("displayName"))
-            .and_then(|v| v.as_str())
-            .or_else(|| identity.get("name").and_then(|v| v.as_str()))
-            .unwrap_or("unknown")
-            .to_string(),
-        description: metadata
-            .and_then(|m| m.get("summary"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        category: metadata
-            .and_then(|m| m.get("category"))
-            .and_then(|v| v.as_str())
-            .unwrap_or("")
-            .to_string(),
-        capabilities_count: capabilities.len(),
-        lifecycle_state: val.get("lifecycleState")?.as_str()?.to_string(),
-    };
-
-    Some((summary, val))
-}
-
-/// Extract capability details from a parsed skill definition.
-fn extract_capabilities(full: &serde_json::Value) -> Vec<CapabilityDetail> {
-    let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) else {
-        return Vec::new();
-    };
-
-    caps.iter()
-        .filter_map(|cap| {
-            let id = cap.get("id")?.as_str()?.to_string();
-            let name = cap
-                .get("name")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-            let description = cap
-                .get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
-
-            let parameters = cap
-                .get("input")
-                .and_then(|i| i.get("parameters"))
-                .and_then(|p| p.as_array())
-                .map(|params| {
-                    params
-                        .iter()
-                        .filter_map(|p| {
-                            Some(ParameterDetail {
-                                name: p.get("name")?.as_str()?.to_string(),
-                                param_type: p
-                                    .get("type")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("string")
-                                    .to_string(),
-                                description: p
-                                    .get("description")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("")
-                                    .to_string(),
-                                required: p
-                                    .get("required")
-                                    .and_then(|v| v.as_bool())
-                                    .unwrap_or(false),
-                            })
-                        })
-                        .collect()
-                })
-                .unwrap_or_default();
-
-            let execution = cap.get("execution").map(|e| ExecutionDetail {
-                mode: e.get("mode").and_then(|v| v.as_str()).map(String::from),
-                has_side_effects: e.get("hasSideEffects").and_then(|v| v.as_bool()),
-                is_deterministic: e.get("isDeterministic").and_then(|v| v.as_bool()),
-            });
-
-            Some(CapabilityDetail {
-                id,
-                name,
-                description,
-                parameters,
-                execution,
-            })
-        })
-        .collect()
-}
-
-/// Estimate context cost at each disclosure level for a skill definition.
-///
-/// Uses serialized byte length / 4 as a rough token proxy. The estimate is
-/// computed from the actual shaped output at each level, not the raw source JSON.
-fn estimate_context_cost(
-    summary: &SkillSummary,
-    capabilities: &[CapabilityDetail],
-    full: &serde_json::Value,
-) -> ContextCostEstimate {
-    let index_bytes = serde_json::to_vec(summary).map(|v| v.len()).unwrap_or(0);
-    let detail_bytes = index_bytes
-        + serde_json::to_vec(capabilities)
-            .map(|v| v.len())
-            .unwrap_or(0);
-    let full_bytes = serde_json::to_vec(full).map(|v| v.len()).unwrap_or(0);
-
-    ContextCostEstimate {
-        index_tokens: index_bytes.div_ceil(4),
-        detail_tokens: detail_bytes.div_ceil(4),
-        full_tokens: full_bytes.div_ceil(4),
-    }
-}
-
-/// Extract trigger keywords from a skill definition's discovery block.
-fn extract_trigger_keywords(full: &serde_json::Value) -> Vec<String> {
-    let Some(discovery) = full.get("discovery") else {
-        return Vec::new();
-    };
-
-    let mut keywords = Vec::new();
-    if let Some(kws) = discovery.get("keywords").and_then(|v| v.as_array()) {
-        for kw in kws {
-            if let Some(s) = kw.as_str() {
-                keywords.push(s.to_string());
-            }
-        }
-    }
-    keywords
-}
-
-fn warning_diagnostic(code: impl Into<String>, message: impl Into<String>) -> Diagnostic {
-    let mut diagnostic = Diagnostic::error(code, message);
-    diagnostic.severity = Severity::Warning;
-    diagnostic
-}
-
-fn load_builtin_skills() -> Vec<LoadedSkill> {
-    builtin_skill_definitions()
-        .iter()
-        .filter_map(|definition| {
-            let (summary, full) = parse_skill_summary(definition.json)?;
-            Some(LoadedSkill { summary, full })
-        })
-        .collect()
-}
-
-fn skill_lookup_keys(full: &serde_json::Value) -> BTreeSet<String> {
-    let mut keys = BTreeSet::new();
-    if let Some(name) = full
-        .get("identity")
-        .and_then(|identity| identity.get("name"))
-        .and_then(|name| name.as_str())
-    {
-        keys.insert(name.to_ascii_lowercase());
-    }
-    if let Some(aliases) = full
-        .get("identity")
-        .and_then(|identity| identity.get("aliases"))
-        .and_then(|aliases| aliases.as_array())
-    {
-        for alias in aliases.iter().filter_map(|alias| alias.as_str()) {
-            keys.insert(alias.to_ascii_lowercase());
-        }
-    }
-    keys
-}
-
-fn capability_ids(full: &serde_json::Value) -> BTreeSet<String> {
-    full.get("capabilities")
-        .and_then(|capabilities| capabilities.as_array())
-        .map(|capabilities| {
-            capabilities
-                .iter()
-                .filter_map(|capability| capability.get("id").and_then(|id| id.as_str()))
-                .map(str::to_string)
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
 fn load_agent_profile_selection(
     profile_path: Option<&Path>,
 ) -> Result<AgentProfileSelection, Vec<Diagnostic>> {
@@ -3560,249 +3289,50 @@ fn load_agent_profile_selection(
                 .with_path(path.display().to_string())]
             })?;
             Some(
-                serde_json::from_str::<AgentCapabilityProfile>(&contents).map_err(|source| {
-                    vec![Diagnostic::error(
-                        "CLI-AGENT-002",
-                        format!("invalid agent capability profile JSON: {source}"),
-                    )
-                    .with_path(path.display().to_string())]
-                })?,
+                serde_json::from_str::<RegistryAgentCapabilityProfile>(&contents).map_err(
+                    |source| {
+                        vec![Diagnostic::error(
+                            "CLI-AGENT-002",
+                            format!("invalid agent capability profile JSON: {source}"),
+                        )
+                        .with_path(path.display().to_string())]
+                    },
+                )?,
             )
         }
         None => None,
     };
 
-    Ok(build_agent_profile_selection(
-        profile_path.map(Path::to_path_buf),
-        profile,
-    ))
-}
+    let registry = load_builtin_registry().map_err(|error| {
+        vec![Diagnostic::error(
+            "CLI-AGENT-010",
+            format!("failed to load built-in skill registry: {error}"),
+        )]
+    })?;
+    let selection = registry.profile_selection(profile.as_ref());
 
-fn build_agent_profile_selection(
-    profile_path: Option<PathBuf>,
-    profile: Option<AgentCapabilityProfile>,
-) -> AgentProfileSelection {
-    let skills = load_builtin_skills();
-    let total_skill_count = skills.len();
-    let total_capability_count = skills
+    let diagnostics = selection
+        .issues
         .iter()
-        .map(|skill| capability_ids(&skill.full).len())
-        .sum();
-    let mut diagnostics = Vec::new();
+        .map(registry_issue_to_diagnostic)
+        .collect::<Vec<_>>();
 
-    if let Some(profile) = &profile {
-        for issue in validate_agent_capability_profile(profile).issues {
-            diagnostics.push(
-                Diagnostic::error("CLI-AGENT-003", issue)
-                    .with_hint("use schemaVersion agent-capability-profile/v1"),
-            );
-        }
-    }
-
-    let include_skills: BTreeSet<String> = profile
-        .as_ref()
-        .map(|profile| {
-            profile
-                .include_skills
-                .iter()
-                .map(|skill| skill.to_ascii_lowercase())
-                .collect()
-        })
-        .unwrap_or_default();
-    let include_capabilities: BTreeSet<String> = profile
-        .as_ref()
-        .map(|profile| profile.include_capabilities.iter().cloned().collect())
-        .unwrap_or_default();
-    let exclude_capabilities: BTreeSet<String> = profile
-        .as_ref()
-        .map(|profile| profile.exclude_capabilities.iter().cloned().collect())
-        .unwrap_or_default();
-
-    if let Some(profile) = &profile {
-        let known_skill_keys: BTreeSet<String> = skills
-            .iter()
-            .flat_map(|skill| skill_lookup_keys(&skill.full))
-            .collect();
-        for skill in &profile.include_skills {
-            if !known_skill_keys.contains(&skill.to_ascii_lowercase()) {
-                diagnostics.push(
-                    Diagnostic::error(
-                        "CLI-AGENT-004",
-                        format!("agent profile references unknown skill '{skill}'"),
-                    )
-                    .with_field("includeSkills"),
-                );
-            }
-        }
-
-        let known_capabilities: BTreeSet<String> = skills
-            .iter()
-            .flat_map(|skill| capability_ids(&skill.full))
-            .collect();
-        for capability in profile
-            .include_capabilities
-            .iter()
-            .chain(profile.exclude_capabilities.iter())
-        {
-            if !known_capabilities.contains(capability) {
-                diagnostics.push(
-                    Diagnostic::error(
-                        "CLI-AGENT-005",
-                        format!("agent profile references unknown capability '{capability}'"),
-                    )
-                    .with_field("includeCapabilities/excludeCapabilities"),
-                );
-            }
-        }
-    }
-
-    let mut selected_skill_ids = BTreeSet::new();
-    let mut selected_capability_ids = BTreeSet::new();
-    let profile_provided = profile.is_some();
-
-    for skill in &skills {
-        let is_active = skill.summary.lifecycle_state.eq_ignore_ascii_case("active");
-        let skill_keys = skill_lookup_keys(&skill.full);
-        let skill_requested = !profile_provided
-            || (is_active
-                && skill_keys
-                    .iter()
-                    .any(|key| include_skills.contains(key.as_str())));
-        let router_requested = profile
-            .as_ref()
-            .is_some_and(|profile| profile.always_include_router)
-            && skill.summary.id == AGENT_ROUTER_SKILL_ID;
-
-        let mut selected_for_skill = false;
-        for capability_id in capability_ids(&skill.full) {
-            let capability_requested = skill_requested
-                || router_requested
-                || include_capabilities.contains(&capability_id);
-            if capability_requested && !exclude_capabilities.contains(&capability_id) {
-                selected_for_skill = true;
-                selected_capability_ids.insert(capability_id);
-            }
-        }
-        if selected_for_skill {
-            selected_skill_ids.insert(skill.summary.id.clone());
-        }
-    }
-
-    let mut selection = AgentProfileSelection {
-        profile_path,
-        profile,
-        selected_skill_ids,
-        selected_capability_ids,
-        total_skill_count,
-        total_capability_count,
+    Ok(AgentProfileSelection {
+        profile_path: profile_path.map(Path::to_path_buf),
+        profile: profile.map(|profile| AgentCapabilityProfile {
+            schema_version: profile.schema_version,
+            profile_id: profile.profile_id,
+            include_skills: profile.include_skills,
+            include_capabilities: profile.include_capabilities,
+            exclude_capabilities: profile.exclude_capabilities,
+            always_include_router: profile.always_include_router,
+        }),
+        selected_skill_ids: selection.selected_skill_ids,
+        selected_capability_ids: selection.selected_capability_ids,
+        total_skill_count: selection.total_skill_count,
+        total_capability_count: selection.total_capability_count,
         diagnostics,
-    };
-
-    if profile_provided && selection.selected_capability_ids.is_empty() {
-        selection.diagnostics.push(
-            Diagnostic::error("CLI-AGENT-006", "agent profile selects no capabilities").with_hint(
-                "add includeSkills or includeCapabilities, or enable alwaysIncludeRouter",
-            ),
-        );
-    }
-    if profile_provided && !selection.router_available() {
-        selection.diagnostics.push(warning_diagnostic(
-            "CLI-AGENT-007",
-            "agent profile does not expose the skill router; progressive discovery may be limited",
-        ));
-    }
-    if profile_provided {
-        add_agent_risk_warnings(&mut selection);
-    }
-
-    selection
-}
-
-fn add_agent_risk_warnings(selection: &mut AgentProfileSelection) {
-    for skill in load_builtin_skills() {
-        if !selection.selected_skill_ids.contains(&skill.summary.id) {
-            continue;
-        }
-        let risk = skill
-            .full
-            .get("governance")
-            .and_then(|governance| governance.get("riskLevel"))
-            .and_then(|risk| risk.as_str());
-        if matches!(risk, Some("high" | "critical")) {
-            selection.diagnostics.push(warning_diagnostic(
-                "CLI-AGENT-008",
-                format!(
-                    "selected skill '{}' is marked {} risk; profile visibility is not side-effect approval",
-                    skill.summary.id,
-                    risk.unwrap_or("high")
-                ),
-            ));
-        }
-        if let Some(capabilities) = skill
-            .full
-            .get("capabilities")
-            .and_then(|capabilities| capabilities.as_array())
-        {
-            for capability in capabilities {
-                let Some(capability_id) = capability.get("id").and_then(|id| id.as_str()) else {
-                    continue;
-                };
-                if !selection.selected_capability_ids.contains(capability_id) {
-                    continue;
-                }
-                if capability
-                    .get("execution")
-                    .and_then(|execution| execution.get("hasSideEffects"))
-                    .and_then(|value| value.as_bool())
-                    .unwrap_or(false)
-                {
-                    selection.diagnostics.push(warning_diagnostic(
-                        "CLI-AGENT-009",
-                        format!(
-                            "selected capability '{capability_id}' has side effects; host policy must approve execution"
-                        ),
-                    ));
-                }
-            }
-        }
-    }
-}
-
-fn filtered_agent_skills(selection: &AgentProfileSelection) -> Vec<LoadedSkill> {
-    load_builtin_skills()
-        .into_iter()
-        .filter_map(|skill| {
-            if !selection.selected_skill_ids.contains(&skill.summary.id) {
-                return None;
-            }
-            let capabilities = skill
-                .full
-                .get("capabilities")
-                .and_then(|capabilities| capabilities.as_array())?
-                .iter()
-                .filter(|capability| {
-                    capability
-                        .get("id")
-                        .and_then(|id| id.as_str())
-                        .is_some_and(|id| selection.selected_capability_ids.contains(id))
-                })
-                .cloned()
-                .collect::<Vec<_>>();
-            if capabilities.is_empty() {
-                return None;
-            }
-            let mut summary = skill.summary.clone();
-            summary.capabilities_count = capabilities.len();
-            let mut full = skill.full.clone();
-            if let Some(object) = full.as_object_mut() {
-                object.insert(
-                    "capabilities".to_string(),
-                    serde_json::Value::Array(capabilities),
-                );
-            }
-            Some(LoadedSkill { summary, full })
-        })
-        .collect()
+    })
 }
 
 fn agent_profile_data(selection: &AgentProfileSelection) -> serde_json::Value {
@@ -3821,7 +3351,7 @@ fn agent_profile_data(selection: &AgentProfileSelection) -> serde_json::Value {
 }
 
 fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
-    filtered_agent_skills(selection)
+    filtered_agent_skill_entries(selection)
         .into_iter()
         .map(|skill| {
             json!({
@@ -3837,23 +3367,14 @@ fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_js
 
 fn agent_selected_capabilities_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
     let mut capabilities = Vec::new();
-    for skill in filtered_agent_skills(selection) {
-        if let Some(caps) = skill
-            .full
-            .get("capabilities")
-            .and_then(|capabilities| capabilities.as_array())
-        {
+    for skill in filtered_agent_skill_entries(selection) {
+        if let Some(caps) = skill.capabilities {
             for capability in caps {
-                let has_side_effects = capability
-                    .get("execution")
-                    .and_then(|execution| execution.get("hasSideEffects"))
-                    .and_then(|value| value.as_bool())
-                    .unwrap_or(false);
                 capabilities.push(json!({
-                    "id": capability.get("id").and_then(|id| id.as_str()).unwrap_or_default(),
+                    "id": capability.id,
                     "skillId": skill.summary.id,
-                    "name": capability.get("name").and_then(|name| name.as_str()).unwrap_or_default(),
-                    "hasSideEffects": has_side_effects
+                    "name": capability.name,
+                    "hasSideEffects": capability.execution.as_ref().and_then(|execution| execution.has_side_effects).unwrap_or(false)
                 }));
             }
         }
@@ -3873,11 +3394,183 @@ fn agent_check_data(selection: &AgentProfileSelection) -> serde_json::Value {
     })
 }
 
+fn filtered_agent_skill_entries(selection: &AgentProfileSelection) -> Vec<RegistrySkillEntry> {
+    let registry = match load_builtin_registry() {
+        Ok(registry) => registry,
+        Err(_) => return Vec::new(),
+    };
+    let profile = selection.profile.as_ref().map(|profile| RegistryAgentCapabilityProfile {
+        schema_version: profile.schema_version.clone(),
+        profile_id: profile.profile_id.clone(),
+        include_skills: profile.include_skills.clone(),
+        include_capabilities: profile.include_capabilities.clone(),
+        exclude_capabilities: profile.exclude_capabilities.clone(),
+        always_include_router: profile.always_include_router,
+    });
+    let selection = registry.profile_selection(profile.as_ref());
+    registry.filtered_by_profile(&selection)
+}
+
+fn filtered_agent_skill_definitions(selection: &AgentProfileSelection) -> Vec<elegy_skills::SkillDefinitionV2> {
+    let registry = match load_builtin_registry() {
+        Ok(registry) => registry,
+        Err(_) => return Vec::new(),
+    };
+    let profile = selection.profile.as_ref().map(|profile| RegistryAgentCapabilityProfile {
+        schema_version: profile.schema_version.clone(),
+        profile_id: profile.profile_id.clone(),
+        include_skills: profile.include_skills.clone(),
+        include_capabilities: profile.include_capabilities.clone(),
+        exclude_capabilities: profile.exclude_capabilities.clone(),
+        always_include_router: profile.always_include_router,
+    });
+    let selection = registry.profile_selection(profile.as_ref());
+    registry
+        .filtered_by_profile(&selection)
+        .into_iter()
+        .filter_map(|skill| registry.skill_definition(&skill.summary.id))
+        .map(|mut definition| {
+            definition.capabilities.retain(|capability| {
+                selection.selected_capability_ids.contains(&capability.id)
+            });
+            definition
+        })
+        .collect()
+}
+
+fn local_match_result(
+    skill: &RegistrySkillEntry,
+    query_lower: &str,
+) -> elegy_skills::RegistrySearchMatch {
+    let mut score = 0.0;
+    let mut matched_capabilities = Vec::new();
+    let mut match_reasons = Vec::new();
+    let mut field_hits = 0u32;
+    let total_possible_fields = 5u32;
+
+    let id_lower = skill.summary.id.to_ascii_lowercase();
+    let name_lower = skill.summary.name.to_ascii_lowercase();
+    let desc_lower = skill.summary.description.to_ascii_lowercase();
+    let category_lower = skill.summary.category.to_ascii_lowercase();
+
+    if id_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-id".to_string());
+        field_hits += 1;
+    }
+    if name_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-name".to_string());
+        field_hits += 1;
+    }
+    if category_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.iter().any(|reason| reason == "category") {
+            match_reasons.push("category".to_string());
+        }
+    }
+    if desc_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.iter().any(|reason| reason == "description") {
+            match_reasons.push("description".to_string());
+        }
+    }
+
+    let mut keyword_phrase_hit = false;
+    for keyword in &skill.trigger_keywords {
+        if keyword.to_ascii_lowercase().contains(query_lower) {
+            score += 0.8;
+            keyword_phrase_hit = true;
+            if !match_reasons.iter().any(|reason| reason == "discovery-keyword") {
+                match_reasons.push("discovery-keyword".to_string());
+                field_hits += 1;
+            }
+            break;
+        }
+    }
+
+    if let Some(capabilities) = &skill.capabilities {
+        for capability in capabilities {
+            let capability_id = capability.id.to_ascii_lowercase();
+            let capability_name = capability.name.to_ascii_lowercase();
+            let capability_description = capability.description.to_ascii_lowercase();
+
+            let matched = capability_id.contains(query_lower)
+                || capability_name.contains(query_lower)
+                || capability_description.contains(query_lower);
+            if matched {
+                matched_capabilities.push(capability.id.clone());
+                score += if capability_id.contains(query_lower)
+                    || capability_name.contains(query_lower)
+                {
+                    1.0
+                } else {
+                    0.5
+                };
+                if !match_reasons.iter().any(|reason| reason == "capability") {
+                    match_reasons.push("capability".to_string());
+                    field_hits += 1;
+                }
+            }
+        }
+    }
+
+    let query_tokens = query_lower.split_whitespace().collect::<Vec<_>>();
+    if query_tokens.len() > 1 {
+        let mut token_hits = 0u32;
+        for token in &query_tokens {
+            if id_lower.contains(token) || name_lower.contains(token) {
+                token_hits += 1;
+            } else if keyword_phrase_hit {
+            } else if desc_lower.contains(token) || category_lower.contains(token) {
+                token_hits += 1;
+            }
+        }
+        score += (token_hits as f64 / query_tokens.len() as f64) * 0.3;
+    }
+
+    let normalized = if score > 0.0 {
+        let field_coverage = field_hits as f64 / total_possible_fields as f64;
+        let raw = (score / 3.0).min(1.0);
+        (raw * 0.7 + field_coverage * 0.3).min(1.0)
+    } else {
+        0.0
+    };
+
+    elegy_skills::RegistrySearchMatch {
+        matched: score > 0.0,
+        score: (normalized * 100.0).round() / 100.0,
+        matched_capabilities,
+        match_reasons,
+    }
+}
+
+fn registry_issue_to_diagnostic(issue: &elegy_skills::RegistryValidationIssue) -> Diagnostic {
+    let code = match issue.code.as_str() {
+        "REGISTRY-PROFILE-E001" => "CLI-AGENT-003",
+        "REGISTRY-PROFILE-E002" => "CLI-AGENT-004",
+        "REGISTRY-PROFILE-E003" => "CLI-AGENT-005",
+        "REGISTRY-PROFILE-E004" => "CLI-AGENT-006",
+        "REGISTRY-PROFILE-W001" => "CLI-AGENT-007",
+        _ => issue.code.as_str(),
+    };
+    let mut diagnostic = Diagnostic::error(code, issue.message.clone());
+    if issue.code.contains("-W") {
+        diagnostic.severity = Severity::Warning;
+    }
+    if let Some(path) = &issue.path {
+        diagnostic = diagnostic.with_path(path.clone());
+    }
+    if let Some(skill_id) = &issue.skill_id {
+        diagnostic = diagnostic.with_field(skill_id.clone());
+    }
+    diagnostic
+}
+
 fn agent_discovery_entry(
-    skill: &LoadedSkill,
+    skill: &RegistrySkillEntry,
     detail: bool,
     profile_path: Option<&Path>,
-    match_result: Option<&SkillMatchResult>,
 ) -> serde_json::Value {
     let mut expand_command_args = vec![
         "agent".to_string(),
@@ -3904,36 +3597,72 @@ fn agent_discovery_entry(
         "expandCommandArgs": expand_command_args
     });
 
-    if let Some(match_result) = match_result {
+    if let Some(match_result) = &skill.match_result {
         entry["matchedCapabilities"] = json!(match_result.matched_capabilities);
         entry["matchReasons"] = json!(match_result.match_reasons);
         entry["matchScore"] = json!(match_result.score);
-        entry["triggerKeywords"] = json!(extract_trigger_keywords(&skill.full));
+        entry["triggerKeywords"] = json!(skill.trigger_keywords);
     }
     if detail {
-        entry["capabilities"] = skill
-            .full
-            .get("capabilities")
-            .cloned()
-            .unwrap_or_else(|| json!([]));
+        entry["capabilities"] = json!(skill.capabilities.clone().unwrap_or_default());
     }
     entry
 }
 
-fn skill_matches_id(summary: &SkillSummary, full: &serde_json::Value, skill_id: &str) -> bool {
-    if summary.id == skill_id {
-        return true;
-    }
-
-    full.get("identity")
-        .and_then(|identity| identity.get("aliases"))
-        .and_then(|aliases| aliases.as_array())
-        .is_some_and(|aliases| {
-            aliases
-                .iter()
-                .filter_map(|alias| alias.as_str())
-                .any(|alias| alias == skill_id)
-        })
+fn agent_discovery_detail_entry_from_definition(
+    definition: &elegy_skills::SkillDefinitionV2,
+    profile_path: Option<&Path>,
+    match_result: Option<&elegy_skills::RegistrySearchMatch>,
+) -> serde_json::Value {
+    let summary = json!({
+        "id": definition.identity.name,
+        "name": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.display_name.as_deref())
+            .or(definition.identity.display_name.as_deref())
+            .unwrap_or(definition.identity.name.as_str()),
+        "description": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.summary.as_deref())
+            .or(definition.metadata.as_ref().and_then(|metadata| metadata.description.as_deref()))
+            .unwrap_or(""),
+        "category": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.category.as_deref())
+            .unwrap_or(""),
+        "capabilitiesCount": definition.capabilities.len(),
+        "lifecycleState": definition.lifecycle_state,
+    });
+    let skill = RegistrySkillEntry {
+        summary: elegy_skills::RegistrySkillSummary {
+            id: definition.identity.name.clone(),
+            name: summary["name"].as_str().unwrap_or_default().to_string(),
+            description: summary["description"].as_str().unwrap_or_default().to_string(),
+            category: summary["category"].as_str().unwrap_or_default().to_string(),
+            aliases: definition.identity.aliases.clone(),
+            capabilities_count: definition.capabilities.len(),
+            lifecycle_state: definition.lifecycle_state.clone(),
+        },
+        trigger_keywords: definition
+            .discovery
+            .as_ref()
+            .map(|discovery| discovery.keywords.clone())
+            .unwrap_or_default(),
+        capability_hints: definition
+            .discovery
+            .as_ref()
+            .map(|discovery| discovery.capability_hints.clone())
+            .unwrap_or_default(),
+        context_cost_estimate: None,
+        capabilities: None,
+        match_result: match_result.cloned(),
+    };
+    let mut entry = agent_discovery_entry(&skill, false, profile_path);
+    entry["capabilities"] = serde_json::to_value(&definition.capabilities).unwrap_or_else(|_| json!([]));
+    entry
 }
 
 /// Execute `elegy skills list`.
@@ -3943,64 +3672,15 @@ fn execute_skills_list_command(
     detail: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let mut entries = Vec::new();
-
-    for definition in builtin_skill_definitions() {
-        if let Some((summary, full)) = parse_skill_summary(definition.json) {
-            let cat_match = category
-                .as_ref()
-                .is_none_or(|c| summary.category.eq_ignore_ascii_case(c));
-            let lc_match = lifecycle
-                .as_ref()
-                .is_none_or(|l| summary.lifecycle_state.eq_ignore_ascii_case(l));
-            if cat_match && lc_match {
-                let capabilities = extract_capabilities(&full);
-                let context_cost = estimate_context_cost(&summary, &capabilities, &full);
-
-                let entry = SkillListEntry {
-                    summary,
-                    context_cost_estimate: Some(context_cost),
-                    capabilities: if detail { Some(capabilities) } else { None },
-                };
-                entries.push(entry);
-            }
-        }
-    }
+    let registry = load_builtin_registry()?;
+    let entries = registry.list(&SkillRegistryQuery {
+        category,
+        lifecycle,
+        include_detail: detail,
+    });
 
     match format {
-        OutputFormat::Text => {
-            if entries.is_empty() {
-                println!("No skills found matching the given filters.");
-            } else {
-                println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
-                println!("{}", "-".repeat(70));
-                for e in &entries {
-                    println!(
-                        "{:<16} {:<32} {:<6} {}",
-                        e.summary.id,
-                        e.summary.name,
-                        e.summary.capabilities_count,
-                        e.summary.lifecycle_state
-                    );
-                    if detail {
-                        if let Some(ref caps) = e.capabilities {
-                            for cap in caps {
-                                println!("  └─ {} ({})", cap.name, cap.id);
-                                if !cap.parameters.is_empty() {
-                                    for p in &cap.parameters {
-                                        let req = if p.required { "required" } else { "optional" };
-                                        println!(
-                                            "     {} ({}, {}): {}",
-                                            p.name, p.param_type, req, p.description
-                                        );
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        OutputFormat::Text => print_skill_list_text(&entries),
         OutputFormat::Json => {
             let disclosure = if detail { "detail" } else { "index" };
             print_json(&build_envelope_with_schema(
@@ -4026,42 +3706,20 @@ fn execute_skills_describe_command(
     skill_id: String,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    for definition in builtin_skill_definitions() {
-        if let Some((summary, full)) = parse_skill_summary(definition.json) {
-            if skill_matches_id(&summary, &full, &skill_id) {
-                match format {
-                    OutputFormat::Text => {
-                        println!("Skill: {} ({})", summary.name, summary.id);
-                        println!("Category: {}", summary.category);
-                        println!("State: {}", summary.lifecycle_state);
-                        println!("Description: {}", summary.description);
-                        println!();
-                        if let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) {
-                            println!("Capabilities ({}):", caps.len());
-                            for cap in caps {
-                                let cap_id = cap.get("id").and_then(|v| v.as_str()).unwrap_or("?");
-                                let cap_name =
-                                    cap.get("name").and_then(|v| v.as_str()).unwrap_or("?");
-                                let cap_desc = cap
-                                    .get("description")
-                                    .and_then(|v| v.as_str())
-                                    .unwrap_or("");
-                                println!("  - {cap_name} ({cap_id}): {cap_desc}");
-                            }
-                        }
-                    }
-                    OutputFormat::Json => print_json(&build_envelope_with_schema(
-                        ["skills", "describe"],
-                        "ok",
-                        Summary::default(),
-                        &full,
-                        Vec::new(),
-                        Some("elegy://schemas/skill-definition-v2"),
-                    ))?,
-                }
-                return Ok(ExitCode::SUCCESS);
-            }
+    let registry = load_builtin_registry()?;
+    if let Some(definition) = registry.skill_definition(&skill_id) {
+        match format {
+            OutputFormat::Text => print_skill_definition_text(&definition),
+            OutputFormat::Json => print_json(&build_envelope_with_schema(
+                ["skills", "describe"],
+                "ok",
+                Summary::default(),
+                &definition,
+                Vec::new(),
+                Some("elegy://schemas/skill-definition-v2"),
+            ))?,
         }
+        return Ok(ExitCode::SUCCESS);
     }
 
     emit_diagnostics(
@@ -4083,82 +3741,11 @@ fn execute_skills_search_command(
     detail: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let query_lower = query.to_lowercase();
-    let mut results: Vec<SkillSearchResult> = Vec::new();
-
-    for definition in builtin_skill_definitions() {
-        if let Some((summary, full)) = parse_skill_summary(definition.json) {
-            let match_result = score_skill_match(&summary, &full, &query_lower);
-            if match_result.matched {
-                let capabilities_detail = extract_capabilities(&full);
-                let context_cost = estimate_context_cost(&summary, &capabilities_detail, &full);
-                let trigger_keywords = extract_trigger_keywords(&full);
-
-                let result = SkillSearchResult {
-                    expand_command: format!(
-                        "elegy skills describe --skill-id {} --json",
-                        summary.id
-                    ),
-                    summary,
-                    matched_capabilities: match_result.matched_capabilities,
-                    match_reasons: match_result.match_reasons,
-                    match_score: match_result.score,
-                    trigger_keywords,
-                    context_cost_estimate: Some(context_cost),
-                    capabilities: if detail {
-                        Some(capabilities_detail)
-                    } else {
-                        None
-                    },
-                };
-                results.push(result);
-            }
-        }
-    }
-
-    // Sort by match score descending
-    results.sort_by(|a, b| {
-        b.match_score
-            .partial_cmp(&a.match_score)
-            .unwrap_or(std::cmp::Ordering::Equal)
-    });
+    let registry = load_builtin_registry()?;
+    let results = registry.search(&query, detail);
 
     match format {
-        OutputFormat::Text => {
-            if results.is_empty() {
-                println!("No skills matched query: \"{query}\"");
-            } else {
-                println!("Skills matching \"{query}\":");
-                println!();
-                println!(
-                    "{:<16} {:<32} {:<6} {:<6} MATCHED",
-                    "ID", "NAME", "SCORE", "CAPS"
-                );
-                println!("{}", "-".repeat(80));
-                for r in &results {
-                    println!(
-                        "{:<16} {:<32} {:<6.2} {:<6} {}",
-                        r.summary.id,
-                        r.summary.name,
-                        r.match_score,
-                        r.summary.capabilities_count,
-                        r.match_reasons.join(", ")
-                    );
-                    if detail {
-                        if let Some(ref caps) = r.capabilities {
-                            for cap in caps {
-                                let marker = if r.matched_capabilities.contains(&cap.id) {
-                                    "→"
-                                } else {
-                                    " "
-                                };
-                                println!("  {marker} {} ({})", cap.name, cap.id);
-                            }
-                        }
-                    }
-                }
-            }
-        }
+        OutputFormat::Text => print_skill_search_text(&query, &results),
         OutputFormat::Json => {
             let disclosure = if detail { "detail" } else { "index" };
             print_json(&build_envelope_with_schema(
@@ -4178,6 +3765,242 @@ fn execute_skills_search_command(
     }
 
     Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_resolve_command(
+    query: String,
+    detail: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let result = registry.resolve(&query, detail);
+
+    match format {
+        OutputFormat::Text => print_skill_resolve_text(&result.top_skill, &result.top_capability),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "resolve"],
+            "ok",
+            Summary::default(),
+            &result,
+            Vec::new(),
+            Some("elegy://schemas/skill-search"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_get_command(
+    skill_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    execute_skills_describe_command(skill_id, format)
+}
+
+fn execute_skills_capability_command(
+    capability_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let Some(capability) = registry.capability(&capability_id) else {
+        return emit_diagnostics(
+            format,
+            vec!["skills", "capability"],
+            vec![Diagnostic::error(
+                "CLI-SKILLS-002",
+                format!("capability '{capability_id}' not found"),
+            )],
+            json!({}),
+            "not_found",
+            exit_invalid(),
+        );
+    };
+
+    match format {
+        OutputFormat::Text => print_capability_card_text(&capability),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "capability"],
+            "ok",
+            Summary::default(),
+            &capability,
+            Vec::new(),
+            Some("elegy://schemas/capability-definition"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_validate_command(
+    file: Option<PathBuf>,
+    dir: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let report = match (file, dir) {
+        (Some(file), None) => elegy_skills::validate_skill_file(&file)
+            .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))?,
+        (None, Some(dir)) => elegy_skills::validate_skill_directory(&dir)
+            .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))?,
+        _ => {
+            return emit_diagnostics(
+                format,
+                vec!["skills", "validate"],
+                vec![Diagnostic::error(
+                    "CLI-SKILLS-003",
+                    "pass exactly one of --file or --dir",
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            )
+        }
+    };
+
+    let status = if report.valid { "ok" } else { "invalid" };
+    let exit_code = if report.valid {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+
+    match format {
+        OutputFormat::Text => {
+            if report.valid {
+                println!("skill registry input is valid");
+            } else {
+                println!("skill registry input is invalid");
+                for issue in &report.issues {
+                    println!("- {}", issue.message);
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "validate"],
+            status,
+            Summary::default(),
+            report,
+            Vec::new(),
+            Some("elegy://schemas/skill-discovery-result"),
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn load_builtin_registry() -> Result<SkillRegistry, serde_json::Error> {
+    SkillRegistry::builtin()
+        .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))
+}
+
+fn print_skill_list_text(entries: &[RegistrySkillEntry]) {
+    if entries.is_empty() {
+        println!("No skills found matching the given filters.");
+        return;
+    }
+
+    println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
+    println!("{}", "-".repeat(70));
+    for entry in entries {
+        println!(
+            "{:<16} {:<32} {:<6} {}",
+            entry.summary.id,
+            entry.summary.name,
+            entry.summary.capabilities_count,
+            entry.summary.lifecycle_state
+        );
+    }
+}
+
+fn print_skill_definition_text(definition: &elegy_skills::SkillDefinitionV2) {
+    let name = definition
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.display_name.as_deref())
+        .or(definition.identity.display_name.as_deref())
+        .unwrap_or(definition.identity.name.as_str());
+    println!("Skill: {} ({})", name, definition.identity.name);
+    println!(
+        "Category: {}",
+        definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.category.as_deref())
+            .unwrap_or("")
+    );
+    println!("State: {}", definition.lifecycle_state);
+    println!(
+        "Description: {}",
+        definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.summary.as_deref())
+            .or(definition
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.description.as_deref()))
+            .unwrap_or("")
+    );
+    println!();
+    println!("Capabilities ({}):", definition.capabilities.len());
+    for capability in &definition.capabilities {
+        println!(
+            "  - {} ({}): {}",
+            capability.name, capability.id, capability.description
+        );
+    }
+}
+
+fn print_skill_search_text(query: &str, results: &[RegistrySkillEntry]) {
+    if results.is_empty() {
+        println!("No skills matched query: \"{query}\"");
+        return;
+    }
+
+    println!("Skills matching \"{query}\":");
+    println!();
+    println!("{:<16} {:<32} {:<6} MATCHED", "ID", "NAME", "SCORE");
+    println!("{}", "-".repeat(72));
+    for result in results {
+        let match_result = result.match_result.as_ref();
+        println!(
+            "{:<16} {:<32} {:<6.2} {}",
+            result.summary.id,
+            result.summary.name,
+            match_result.map(|match_result| match_result.score).unwrap_or(0.0),
+            match_result
+                .map(|match_result| match_result.match_reasons.join(", "))
+                .unwrap_or_default()
+        );
+    }
+}
+
+fn print_skill_resolve_text(
+    top_skill: &Option<RegistrySkillEntry>,
+    top_capability: &Option<RegistryCapabilityCard>,
+) {
+    let Some(skill) = top_skill else {
+        println!("No matching skills found.");
+        return;
+    };
+
+    println!("Top skill: {} ({})", skill.summary.name, skill.summary.id);
+    if let Some(capability) = top_capability {
+        println!(
+            "Top capability: {} ({})",
+            capability.capability_name, capability.capability_id
+        );
+    }
+}
+
+fn print_capability_card_text(capability: &RegistryCapabilityCard) {
+    println!(
+        "Capability: {} ({})",
+        capability.capability_name, capability.capability_id
+    );
+    println!("Skill: {} ({})", capability.skill_name, capability.skill_id);
+    println!("Side effects: {}", capability.has_side_effects);
+    println!("Deterministic: {}", capability.is_deterministic);
+    println!("Approval: {}", capability.approval_requirement);
 }
 
 fn execute_agent_manifest_command(
@@ -4346,22 +4169,38 @@ fn execute_agent_discover_command(
         );
     }
 
-    let mut entries = Vec::new();
-    let filtered_skills = filtered_agent_skills(&selection);
-    if let Some(query) = &query {
-        let query_lower = query.to_lowercase();
-        for skill in &filtered_skills {
-            let match_result = score_skill_match(&skill.summary, &skill.full, &query_lower);
-            if match_result.matched {
-                entries.push(agent_discovery_entry(
-                    skill,
-                    detail,
-                    profile.as_deref(),
-                    Some(&match_result),
-                ));
-            }
-        }
-        entries.sort_by(|a, b| {
+    let filtered_skills = filtered_agent_skill_entries(&selection);
+    let filtered_definitions = filtered_agent_skill_definitions(&selection);
+    let entries = if let Some(query) = &query {
+        let query_lower = query.to_ascii_lowercase();
+        let mut ranked = filtered_skills
+            .into_iter()
+            .filter_map(|mut skill| {
+                let match_result = local_match_result(&skill, &query_lower);
+                if match_result.matched {
+                    let definition = filtered_definitions
+                        .iter()
+                        .find(|definition| definition.identity.name == skill.summary.id);
+                    skill.match_result = Some(match_result.clone());
+                    Some(if detail {
+                        definition
+                            .map(|definition| {
+                                agent_discovery_detail_entry_from_definition(
+                                    definition,
+                                    profile.as_deref(),
+                                    Some(&match_result),
+                                )
+                            })
+                            .unwrap_or_else(|| agent_discovery_entry(&skill, detail, profile.as_deref()))
+                    } else {
+                        agent_discovery_entry(&skill, detail, profile.as_deref())
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        ranked.sort_by(|a, b| {
             let a_score = a
                 .get("matchScore")
                 .and_then(|value| value.as_f64())
@@ -4374,13 +4213,29 @@ fn execute_agent_discover_command(
                 .partial_cmp(&a_score)
                 .unwrap_or(std::cmp::Ordering::Equal)
         });
+        ranked
     } else {
-        entries.extend(
-            filtered_skills
-                .iter()
-                .map(|skill| agent_discovery_entry(skill, detail, profile.as_deref(), None)),
-        );
-    }
+        filtered_skills
+            .iter()
+            .map(|skill| {
+                if detail {
+                    filtered_definitions
+                        .iter()
+                        .find(|definition| definition.identity.name == skill.summary.id)
+                        .map(|definition| {
+                            agent_discovery_detail_entry_from_definition(
+                                definition,
+                                profile.as_deref(),
+                                skill.match_result.as_ref(),
+                            )
+                        })
+                        .unwrap_or_else(|| agent_discovery_entry(skill, detail, profile.as_deref()))
+                } else {
+                    agent_discovery_entry(skill, detail, profile.as_deref())
+                }
+            })
+            .collect::<Vec<_>>()
+    };
 
     let diagnostics = selection.diagnostics.clone();
     let total_results = entries.len();
@@ -4411,179 +4266,6 @@ fn execute_agent_discover_command(
     }
 
     Ok(ExitCode::SUCCESS)
-}
-
-/// Match result with scoring and field tracking.
-struct SkillMatchResult {
-    /// Whether the skill matched at all.
-    matched: bool,
-    /// Relevance score (0.0 - 1.0).
-    score: f64,
-    /// Capability IDs that matched.
-    matched_capabilities: Vec<String>,
-    /// Which fields caused the match.
-    match_reasons: Vec<String>,
-}
-
-/// Score a skill against a free-text query with two-stage ranking.
-///
-/// Stage 1: Exact/phrase match boost — if the full query string appears in a
-/// field, that field gets a high-weight contribution.
-/// Stage 2: Token overlap — individual query words are matched against fields
-/// with tiered weights.
-///
-/// Field weight tiers:
-///   - Capability ID/name: 1.0
-///   - Skill ID/name: 0.9
-///   - Discovery keywords: 0.8
-///   - Discovery triggers: 0.7
-///   - Descriptions: 0.5
-fn score_skill_match(
-    summary: &SkillSummary,
-    full: &serde_json::Value,
-    query_lower: &str,
-) -> SkillMatchResult {
-    let mut score: f64 = 0.0;
-    let mut matched_capabilities = Vec::new();
-    let mut match_reasons = Vec::new();
-    let mut field_hits = 0u32;
-    let total_possible_fields = 5u32; // id, name, keywords, triggers, capabilities
-
-    // --- Stage 1: phrase/exact match boost ---
-
-    let id_lower = summary.id.to_lowercase();
-    let name_lower = summary.name.to_lowercase();
-    let desc_lower = summary.description.to_lowercase();
-    let cat_lower = summary.category.to_lowercase();
-
-    if id_lower.contains(query_lower) {
-        score += 0.9;
-        match_reasons.push("skill-id".to_string());
-        field_hits += 1;
-    }
-    if name_lower.contains(query_lower) {
-        score += 0.9;
-        match_reasons.push("skill-name".to_string());
-        field_hits += 1;
-    }
-    if cat_lower.contains(query_lower) {
-        score += 0.5;
-        if !match_reasons.contains(&"category".to_string()) {
-            match_reasons.push("category".to_string());
-        }
-    }
-    if desc_lower.contains(query_lower) {
-        score += 0.5;
-        if !match_reasons.contains(&"description".to_string()) {
-            match_reasons.push("description".to_string());
-        }
-    }
-
-    // Keywords phrase match
-    let mut keyword_phrase_hit = false;
-    if let Some(discovery) = full.get("discovery") {
-        if let Some(keywords) = discovery.get("keywords").and_then(|v| v.as_array()) {
-            for kw in keywords {
-                if let Some(s) = kw.as_str() {
-                    if s.to_lowercase().contains(query_lower) {
-                        score += 0.8;
-                        keyword_phrase_hit = true;
-                        if !match_reasons.contains(&"discovery-keyword".to_string()) {
-                            match_reasons.push("discovery-keyword".to_string());
-                            field_hits += 1;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-
-        // Trigger phrase match
-        if let Some(triggers) = discovery.get("triggers").and_then(|v| v.as_array()) {
-            for trigger in triggers {
-                if let Some(pattern) = trigger.get("pattern").and_then(|v| v.as_str()) {
-                    if pattern.to_lowercase().contains(query_lower) {
-                        score += 0.7;
-                        if !match_reasons.contains(&"discovery-trigger".to_string()) {
-                            match_reasons.push("discovery-trigger".to_string());
-                            field_hits += 1;
-                        }
-                        break;
-                    }
-                }
-            }
-        }
-    }
-
-    // Capability phrase match
-    if let Some(caps) = full.get("capabilities").and_then(|v| v.as_array()) {
-        for cap in caps {
-            let cap_id = cap.get("id").and_then(|v| v.as_str()).unwrap_or("");
-            let cap_name = cap.get("name").and_then(|v| v.as_str()).unwrap_or("");
-            let cap_desc = cap
-                .get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or("");
-
-            let mut cap_matched = false;
-            if cap_id.to_lowercase().contains(query_lower)
-                || cap_name.to_lowercase().contains(query_lower)
-            {
-                score += 1.0;
-                cap_matched = true;
-            } else if cap_desc.to_lowercase().contains(query_lower) {
-                score += 0.5;
-                cap_matched = true;
-            }
-
-            if cap_matched {
-                matched_capabilities.push(cap_id.to_string());
-                if !match_reasons.contains(&"capability".to_string()) {
-                    match_reasons.push("capability".to_string());
-                    field_hits += 1;
-                }
-            }
-        }
-    }
-
-    // --- Stage 2: token overlap (additive) ---
-    // Split query into words and check each against all fields
-    let query_tokens: Vec<&str> = query_lower.split_whitespace().collect();
-    if query_tokens.len() > 1 {
-        let mut token_hits = 0u32;
-
-        for token in &query_tokens {
-            if id_lower.contains(token) || name_lower.contains(token) {
-                token_hits += 1;
-            } else if keyword_phrase_hit {
-                // Already counted above
-            } else if desc_lower.contains(token) || cat_lower.contains(token) {
-                token_hits += 1;
-            }
-        }
-
-        // Bonus for multi-token overlap (up to 0.3)
-        let token_ratio = token_hits as f64 / query_tokens.len() as f64;
-        score += token_ratio * 0.3;
-    }
-
-    // Normalize: cap at 1.0
-    let normalized = if score > 0.0 {
-        // Use field coverage as part of normalization
-        let field_coverage = field_hits as f64 / total_possible_fields as f64;
-        let raw = (score / 3.0).min(1.0); // 3.0 is roughly max possible score
-                                          // Blend raw score with field coverage
-        (raw * 0.7 + field_coverage * 0.3).min(1.0)
-    } else {
-        0.0
-    };
-
-    SkillMatchResult {
-        matched: score > 0.0,
-        score: (normalized * 100.0).round() / 100.0, // round to 2 decimal places
-        matched_capabilities,
-        match_reasons,
-    }
 }
 
 fn execute_diagram_create_command(

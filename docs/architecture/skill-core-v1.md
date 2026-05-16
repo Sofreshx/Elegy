@@ -25,28 +25,41 @@ The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skil
 
 The Rust workspace owns the reusable executable path around those governed skill artifacts.
 
-- `rust/crates/elegy-tooling` owns reusable authoring, analysis, and skill-generation behavior over governed descriptors and skill projections
-- `rust/crates/elegy-cli` exposes the current contributor-facing commands: `author mcp`, `analyze mcp`, and `generate skills`
-- `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` expose the current dedicated MCP and skill-generation flows as thin CLI surfaces
+- `rust/crates/elegy-tooling` owns reusable authoring, analysis, and MCP-to-skill generation behavior over governed descriptors and skill projections
+- `rust/crates/elegy-cli` exposes the general/compatibility skills commands: `skills list/search/resolve/get/capability/validate`
+- `rust/crates/elegy-skills` owns the reusable registry API plus the dedicated `elegy-skills` registry CLI surface
+- `rust/crates/elegy-mcp` exposes the current dedicated MCP descriptor authoring and analysis flow
 - `rust/crates/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
 - consuming applications keep host-specific registration, auth, persistence, and orchestration local
 
-## Current self-authoring scope
+## Current registry scope
 
 What the repo proves today:
 
-- skill generation from analyzed MCP descriptor inputs through the Rust CLI and tooling path
-- dedicated `elegy-mcp` and `elegy-skills` binaries for the current MCP descriptor and skill-generation commands
+- governed built-in skill registry loading with strict validation
+- dedicated `elegy-skills` search, resolve, inspect, and validation commands over the governed registry
+- direct Rust skill-registry access for downstream Rust hosts that should avoid CLI subprocess overhead
+- MCP and umbrella CLI reuse over the same registry metadata instead of re-parsing unrelated ad hoc shapes
+- skill generation from analyzed MCP descriptor inputs through the general CLI/tooling path when contributor tooling still needs it
 - deterministic export of governed skill artifacts for downstream consumers
 - a clean split between neutral artifact authority and Rust executable ownership
 - the current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`
 
 What the repo does not yet prove as a finished product surface:
 
-- a built-in MCP-native self-authoring loop
-- a skill-driven autonomous authoring surface baked into the runtime by default
+- a built-in remote skill package or install ecosystem
+- runtime-owned autonomous registration or hosted skill orchestration
 - license to describe all future skill-hosting ideas as already implemented
-- license to describe autonomous registration or runtime-owned skill hosting as already implemented
+
+## Current skill tools
+
+The high-level skills model is now:
+
+- `elegy-skills` is the dedicated skill registry tool
+- `elegy skills ...` is the umbrella compatibility surface for the same registry features
+- `elegy agent discover` is the host/profile-filtered router over that same registry
+- built-in validation is part of the registry surface, not an afterthought
+- MCP-to-skill generation remains lower-level contributor tooling, not the main skills product story
 
 ## Verification posture
 

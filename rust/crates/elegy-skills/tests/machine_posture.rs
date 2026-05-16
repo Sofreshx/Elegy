@@ -14,42 +14,17 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 }
 
 #[test]
-fn generate_command_supports_machine_flags_and_correlation_id() {
-    let temp_dir = unique_temp_dir("elegy-skills-machine");
-    let descriptor_path = temp_dir.join("descriptor.json");
-    let output_dir = temp_dir.join("skills");
-
-    fs::write(
-        &descriptor_path,
-        r#"{
-  "serverName": "weather-server",
-  "transport": "stdio",
-  "tools": [
-    {
-      "name": "get-weather",
-      "description": "Look up a weather report",
-      "inputSchema": { "type": "object" }
-    }
-  ]
-}
-"#,
-    )
-    .expect("write descriptor fixture");
-
+fn list_command_supports_machine_flags_and_correlation_id() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
         .args([
             "--json",
             "--non-interactive",
             "--correlation-id",
             "corr-skills-1",
-            "generate",
-            "--descriptor",
-            descriptor_path.to_str().expect("utf-8 descriptor path"),
-            "--output-dir",
-            output_dir.to_str().expect("utf-8 output dir"),
+            "list",
         ])
         .output()
-        .expect("run elegy-skills generate");
+        .expect("run elegy-skills list");
 
     assert!(
         output.status.success(),
@@ -61,11 +36,11 @@ fn generate_command_supports_machine_flags_and_correlation_id() {
     assert!(stdout.contains("\"status\": \"ok\""));
     assert!(stdout.contains("\"correlationId\": \"corr-skills-1\""));
     assert!(stdout.contains("\"nonInteractive\": true"));
-    assert!(stdout.contains("mcp-weather-server-get-weather"));
+    assert!(stdout.contains("\"skills\""));
 }
 
 #[test]
-fn generate_command_emits_structured_error_with_machine_flags() {
+fn validate_command_emits_structured_error_with_machine_flags() {
     let temp_dir = unique_temp_dir("elegy-skills-machine-error");
     let missing_path = temp_dir.join("missing.json");
 
@@ -75,12 +50,12 @@ fn generate_command_emits_structured_error_with_machine_flags() {
             "--non-interactive",
             "--correlation-id",
             "corr-skills-err-1",
-            "generate",
-            "--descriptor",
+            "validate",
+            "--file",
             missing_path.to_str().expect("utf-8 descriptor path"),
         ])
         .output()
-        .expect("run elegy-skills generate missing descriptor");
+        .expect("run elegy-skills validate missing file");
 
     assert!(!output.status.success());
     assert!(output.stderr.is_empty());
@@ -89,4 +64,42 @@ fn generate_command_emits_structured_error_with_machine_flags() {
     assert!(stdout.contains("\"status\": \"error\""));
     assert!(stdout.contains("\"correlationId\": \"corr-skills-err-1\""));
     assert!(stdout.contains("\"nonInteractive\": true"));
+}
+
+#[test]
+fn invalid_profile_emits_structured_error_with_machine_flags() {
+    let temp_dir = unique_temp_dir("elegy-skills-machine-profile-error");
+    let profile_path = temp_dir.join("bad-profile.json");
+    fs::write(
+        &profile_path,
+        r#"{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "bad-profile",
+  "includeSkills": ["not-a-skill"],
+  "alwaysIncludeRouter": false
+}"#,
+    )
+    .expect("write bad profile");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-skills-profile-err-1",
+            "--profile",
+            profile_path.to_str().expect("utf-8 profile path"),
+            "list",
+        ])
+        .output()
+        .expect("run elegy-skills list with invalid profile");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("\"correlationId\": \"corr-skills-profile-err-1\""));
+    assert!(stdout.contains("\"nonInteractive\": true"));
+    assert!(stdout.contains("unknown skill 'not-a-skill'"));
 }

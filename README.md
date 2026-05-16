@@ -62,7 +62,7 @@ of Elegy instead of exposing every built-in tool.
 | Surface | Purpose |
 | --- | --- |
 | `elegy agent manifest/check/discover` | Host onboarding, profile validation, and profile-filtered discovery. |
-| `elegy skills list/search/describe` | Raw runtime discovery over the built-in v2 skill registry. |
+| `elegy skills list/search/resolve/get/capability/validate` | Umbrella compatibility surface over the built-in governed skill registry. |
 | `elegy run` | Optional MCP stdio host over the same capability registry. |
 | `elegy diagram ...` | Semantic diagram creation, mutation, explanation, and rendering. |
 | `elegy mermaid ...` | Mermaid rendering, reverse projection, and narration. |
@@ -74,7 +74,7 @@ of Elegy instead of exposing every built-in tool.
 | `elegy notify ...` | Local toast and webhook notification helpers. |
 | `elegy-memory` | Dedicated local memory CLI. |
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
-| `elegy-skills` | Dedicated MCP-to-v2-skill generation CLI. |
+| `elegy-skills` | Dedicated skill registry CLI with search, resolve, inspect, and built-in format validation, backed by the same reusable Rust registry API. |
 
 Observation guide: [docs/architecture/observe-cli.md](docs/architecture/observe-cli.md)
 
@@ -83,6 +83,24 @@ Example observe commands:
 ```bash
 elegy observe system --json
 elegy observe record --duration-seconds 1 --poll-interval-ms 50 --json
+```
+
+## Skill Tools
+
+Elegy's skills product is registry-first:
+
+- governed v2 skill definitions under `contracts/fixtures/skill-definition-v2.*.json` remain the discovery authority
+- `elegy-skills` is the dedicated registry surface for searching, resolving, inspecting, and validating those governed skills
+- `elegy skills ...` mirrors that functionality on the umbrella CLI as a compatibility surface
+- Rust hosts can avoid shelling out and call the shared `rust/crates/elegy-skills` library directly for registry loading, profile filtering, search, resolve, capability inspection, and validation
+
+Dedicated registry examples:
+
+```bash
+elegy-skills list --json
+elegy-skills search --query "repo status" --json
+elegy-skills resolve --query "repo status" --json
+elegy-skills validate --file ./contracts/fixtures/skill-definition-v2.elegy-repo.json --json
 ```
 
 ## Capability Profiles

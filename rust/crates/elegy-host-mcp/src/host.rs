@@ -1,10 +1,11 @@
 use crate::HostError;
 use base64::Engine as _;
-use elegy_contracts::{builtin_skill_definitions, find_builtin_skill_capability};
+use elegy_contracts::find_builtin_skill_capability;
 use elegy_core::{
     compose_runtime_state, CatalogResource, ProjectLocator, ReadResourceError, ResourceReadResult,
     RuntimeState,
 };
+use elegy_skills::SkillRegistry;
 use rmcp::{
     model::*, transport::stdio, ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
 };
@@ -34,149 +35,29 @@ fn tools_for_allowed_ids(allowed_tool_ids: Option<&BTreeSet<String>>) -> Vec<Too
 /// Parse every embedded v2 skill-definition JSON and convert each capability
 /// entry into an rmcp `Tool`.
 fn build_tools_from_skill_definitions() -> Vec<Tool> {
-    let mut tools = Vec::new();
+    let registry = match SkillRegistry::builtin() {
+        Ok(registry) => registry,
+        Err(_) => return Vec::new(),
+    };
 
-    for definition in builtin_skill_definitions() {
-        let def: serde_json::Value = match serde_json::from_str(definition.json) {
-            Ok(v) => v,
-            Err(_) => continue,
-        };
-
-        let capabilities = match def.get("capabilities").and_then(|c| c.as_array()) {
-            Some(arr) => arr,
-            None => continue,
-        };
-
-        for cap in capabilities {
-            let id = match cap.get("id").and_then(|v| v.as_str()) {
-                Some(s) => s.to_string(),
-                None => continue,
-            };
-            let description = cap
-                .get("description")
-                .and_then(|v| v.as_str())
-                .unwrap_or_default()
-                .to_string();
-
-            // Build JSON-Schema input_schema from parameters
-            let input_schema = build_input_schema(cap);
-
-            // Build annotations from execution metadata
-            let annotations = build_annotations(cap);
-
-            let mut tool = Tool::new(id, description, input_schema);
-            tool.annotations = Some(annotations);
-            tools.push(tool);
-        }
-    }
-
-    tools
-}
-
-/// Construct a JSON-Schema `{ "type": "object", "properties": {...}, "required": [...] }`
-/// from the capability's `input.parameters` array.
-fn build_input_schema(
-    capability: &serde_json::Value,
-) -> serde_json::Map<String, serde_json::Value> {
-    let mut properties = serde_json::Map::new();
-    let mut required: Vec<serde_json::Value> = Vec::new();
-
-    if let Some(params) = capability
-        .get("input")
-        .and_then(|i| i.get("parameters"))
-        .and_then(|p| p.as_array())
-    {
-        for param in params {
-            let name = match param.get("name").and_then(|n| n.as_str()) {
-                Some(n) => n.to_string(),
-                None => continue,
-            };
-
-            let mut prop = serde_json::Map::new();
-
-            // Map skill-definition type strings to JSON-Schema types
-            let param_type = param
-                .get("type")
-                .and_then(|t| t.as_str())
-                .unwrap_or("string");
-            let schema_type = match param_type {
-                "boolean" => "boolean",
-                "integer" | "number" => param_type,
-                "array" => "array",
-                // path, path-or-stdin, string, and anything else map to string
-                _ => "string",
-            };
-            prop.insert("type".to_string(), json!(schema_type));
-            if param_type == "array" {
-                prop.insert("items".to_string(), json!({ "type": "string" }));
-            }
-
-            if let Some(desc) = param.get("description").and_then(|d| d.as_str()) {
-                prop.insert("description".to_string(), json!(desc));
-            }
-            if let Some(default) = param.get("default") {
-                prop.insert("default".to_string(), default.clone());
-            }
-
-            if param
-                .get("required")
-                .and_then(|r| r.as_bool())
-                .unwrap_or(false)
-            {
-                required.push(json!(name));
-            }
-
-            properties.insert(name, serde_json::Value::Object(prop));
-        }
-    }
-
-    // Also expose a synthetic `stdin` parameter when the capability declares stdinFormat
-    if let Some(stdin_fmt) = capability
-        .get("input")
-        .and_then(|i| i.get("stdinFormat"))
-        .and_then(|f| f.as_str())
-    {
-        let mut prop = serde_json::Map::new();
-        prop.insert("type".to_string(), json!("string"));
-        prop.insert(
-            "description".to_string(),
-            json!(format!(
-                "Data to pipe to the process via stdin (format: {stdin_fmt})."
-            )),
-        );
-        properties.insert("stdin".to_string(), serde_json::Value::Object(prop));
-    }
-
-    let mut schema = serde_json::Map::new();
-    schema.insert("type".to_string(), json!("object"));
-    schema.insert(
-        "properties".to_string(),
-        serde_json::Value::Object(properties),
-    );
-    if !required.is_empty() {
-        schema.insert("required".to_string(), serde_json::Value::Array(required));
-    }
-    schema
-}
-
-/// Derive `ToolAnnotations` from the capability's `execution` block.
-fn build_annotations(capability: &serde_json::Value) -> ToolAnnotations {
-    let exec = capability.get("execution");
-
-    let has_side_effects = exec
-        .and_then(|e| e.get("hasSideEffects"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-    let is_deterministic = exec
-        .and_then(|e| e.get("isDeterministic"))
-        .and_then(|v| v.as_bool())
-        .unwrap_or(false);
-
-    ToolAnnotations::new()
-        .read_only(!has_side_effects)
-        .destructive(false)
-        .idempotent(is_deterministic)
-        .open_world(false)
+    registry
+        .build_mcp_tools()
+        .into_iter()
+        .map(|tool| {
+            let mut mcp_tool = Tool::new(tool.capability_id, tool.description, match tool.input_schema {
+                serde_json::Value::Object(map) => map,
+                _ => serde_json::Map::new(),
+            });
+            mcp_tool.annotations = Some(
+                ToolAnnotations::new()
+                    .read_only(tool.read_only_hint.unwrap_or(false))
+                    .destructive(false)
+                    .idempotent(tool.idempotent_hint.unwrap_or(false))
+                    .open_world(false),
+            );
+            mcp_tool
+        })
+        .collect()
 }
 
 // ---------------------------------------------------------------------------
@@ -879,8 +760,8 @@ mod tests {
         // The diagram skill definition has 4 capabilities
         assert_eq!(
             tools.len(),
-            48,
-            "expected 48 tools from the built-in v2 skill registry"
+            50,
+            "expected 50 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -891,10 +772,9 @@ mod tests {
             names.contains(&"mcp-analyze-descriptor"),
             "missing mcp-analyze-descriptor"
         );
-        assert!(
-            names.contains(&"skills-generate-from-mcp"),
-            "missing skills-generate-from-mcp"
-        );
+        assert!(names.contains(&"skills-registry-search"), "missing skills-registry-search");
+        assert!(names.contains(&"skills-registry-resolve"), "missing skills-registry-resolve");
+        assert!(names.contains(&"skills-registry-validate"), "missing skills-registry-validate");
         assert!(names.contains(&"mermaid-render"), "missing mermaid-render");
         assert!(names.contains(&"diagram-patch"), "missing diagram-patch");
         assert!(
@@ -1274,8 +1154,8 @@ mod tests {
 
         assert_eq!(
             tools.len(),
-            48,
-            "expected 48 tools from the built-in v2 skill registry"
+            50,
+            "expected 50 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -1283,7 +1163,9 @@ mod tests {
         assert!(names.contains(&"memory-add"));
         assert!(names.contains(&"memory-search"));
         assert!(names.contains(&"mcp-analyze-descriptor"));
-        assert!(names.contains(&"skills-generate-from-mcp"));
+        assert!(names.contains(&"skills-registry-search"));
+        assert!(names.contains(&"skills-registry-resolve"));
+        assert!(names.contains(&"skills-registry-validate"));
         assert!(names.contains(&"mermaid-render"));
         assert!(names.contains(&"diagram-patch"));
         assert!(names.contains(&"diagram-narrate"));

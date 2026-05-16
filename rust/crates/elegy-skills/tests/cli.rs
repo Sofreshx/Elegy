@@ -13,45 +13,19 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
     dir
 }
 
-#[test]
-fn direct_skills_binary_generates_expected_skill_artifacts() {
-    let temp_dir = unique_temp_dir("elegy-skills-cli");
-    let descriptor_path = temp_dir.join("weather-mcp.json");
-    let output_dir = temp_dir.join("generated-skills");
-
-    fs::write(
-        &descriptor_path,
-        r#"{
-  "serverName": "weather-server",
-  "transport": "stdio",
-  "tools": [
-    {
-      "name": "get-weather",
-      "description": "Look up a weather report",
-      "inputSchema": { "type": "object" }
-    },
-    {
-      "name": "list-alerts",
-      "description": "List active weather alerts"
-    }
-  ]
+fn write_profile(name: &str, body: &str) -> PathBuf {
+    let dir = unique_temp_dir("elegy-skills-profile");
+    let path = dir.join(name);
+    fs::write(&path, body).expect("write profile");
+    path
 }
-"#,
-    )
-    .expect("write descriptor fixture");
 
+#[test]
+fn direct_skills_binary_lists_builtin_registry() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
-        .args([
-            "--format",
-            "json",
-            "generate",
-            "--descriptor",
-            descriptor_path.to_str().expect("utf-8 descriptor path"),
-            "--output-dir",
-            output_dir.to_str().expect("utf-8 output dir"),
-        ])
+        .args(["--format", "json", "list"])
         .output()
-        .expect("run elegy-skills generate");
+        .expect("run elegy-skills list");
 
     assert!(
         output.status.success(),
@@ -60,24 +34,214 @@ fn direct_skills_binary_generates_expected_skill_artifacts() {
     );
 
     let stdout: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("generate stdout should be valid json");
+        serde_json::from_slice(&output.stdout).expect("list stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
-    assert_eq!(
-        stdout["data"]["generated_skills"].as_array().map(Vec::len),
-        Some(1)
+    let skills = stdout["data"]["skills"]
+        .as_array()
+        .expect("skills array");
+    assert!(skills.iter().any(|skill| skill["id"] == "repo"));
+    assert!(skills.iter().any(|skill| skill["id"] == "skills"));
+}
+
+#[test]
+fn direct_skills_binary_resolves_repo_status() {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args(["--format", "json", "resolve", "--query", "repo status"])
+        .output()
+        .expect("run elegy-skills resolve");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
     );
-    assert_eq!(
-        stdout["data"]["skipped_tools"].as_array().map(Vec::len),
-        Some(1)
+
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
+    assert_eq!(stdout["status"], "ok");
+    assert_eq!(stdout["data"]["topSkill"]["id"], "repo");
+    assert!(stdout["data"]["results"]
+        .as_array()
+        .expect("results array")
+        .first()
+        .is_some());
+}
+
+#[test]
+fn profile_search_detail_excludes_removed_capabilities() {
+    let profile = write_profile(
+        "repo-no-diff.json",
+        r#"{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "repo-no-diff",
+  "includeSkills": ["repo"],
+  "excludeCapabilities": ["repo-diff"],
+  "alwaysIncludeRouter": false
+}"#,
     );
 
-    let generated_skill_path = output_dir.join("mcp-weather-server-get-weather.json");
-    assert!(generated_skill_path.is_file());
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--format",
+            "json",
+            "--profile",
+            profile.to_str().expect("utf-8 profile path"),
+            "search",
+            "--query",
+            "repo diff",
+            "--detail",
+        ])
+        .output()
+        .expect("run elegy-skills profile search");
 
-    let generated_skill =
-        fs::read_to_string(&generated_skill_path).expect("read generated skill definition");
-    assert!(generated_skill.contains("mcp-weather-server-get-weather"));
-    assert!(generated_skill.contains("get-weather"));
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
 
-    fs::remove_dir_all(temp_dir).expect("cleanup temp directory");
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("search stdout should be valid json");
+    let results = stdout["data"]["results"]
+        .as_array()
+        .expect("results array");
+    let repo = results
+        .iter()
+        .find(|result| result["id"] == "repo")
+        .expect("repo result");
+    assert!(!repo["capabilities"]
+        .as_array()
+        .expect("capabilities array")
+        .iter()
+        .any(|capability| capability["id"] == "repo-diff"));
+    assert!(repo["matchResult"]["matchedCapabilities"]
+        .as_array()
+        .is_none_or(|matched| !matched.iter().any(|capability| capability == "repo-diff")));
+}
+
+#[test]
+fn profile_resolve_detail_excludes_removed_capabilities() {
+    let profile = write_profile(
+        "repo-no-diff.json",
+        r#"{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "repo-no-diff",
+  "includeSkills": ["repo"],
+  "excludeCapabilities": ["repo-diff"],
+  "alwaysIncludeRouter": false
+}"#,
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--format",
+            "json",
+            "--profile",
+            profile.to_str().expect("utf-8 profile path"),
+            "resolve",
+            "--query",
+            "repo diff",
+            "--detail",
+        ])
+        .output()
+        .expect("run elegy-skills profile resolve");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
+    assert_eq!(stdout["data"]["topSkill"]["id"], "repo");
+    assert_eq!(stdout["data"]["topCapability"], serde_json::Value::Null);
+    let results = stdout["data"]["results"]
+        .as_array()
+        .expect("results array");
+    let repo = results.first().expect("top result");
+    assert!(!repo["capabilities"]
+        .as_array()
+        .expect("capabilities array")
+        .iter()
+        .any(|capability| capability["id"] == "repo-diff"));
+    assert!(repo["matchResult"]["matchedCapabilities"]
+        .as_array()
+        .is_none_or(|matched| !matched.iter().any(|capability| capability == "repo-diff")));
+}
+
+#[test]
+fn profile_get_filters_excluded_capabilities() {
+    let profile = write_profile(
+        "repo-no-diff.json",
+        r#"{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "repo-no-diff",
+  "includeSkills": ["repo"],
+  "excludeCapabilities": ["repo-diff"],
+  "alwaysIncludeRouter": false
+}"#,
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--format",
+            "json",
+            "--profile",
+            profile.to_str().expect("utf-8 profile path"),
+            "get",
+            "--skill-id",
+            "repo",
+        ])
+        .output()
+        .expect("run elegy-skills profile get");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("get stdout should be valid json");
+    let capabilities = stdout["data"]["capabilities"]
+        .as_array()
+        .expect("capabilities array");
+    assert!(!capabilities.is_empty());
+    assert!(!capabilities.iter().any(|capability| capability["id"] == "repo-diff"));
+}
+
+#[test]
+fn invalid_profile_is_rejected() {
+    let profile = write_profile(
+        "bad-profile.json",
+        r#"{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "bad-profile",
+  "includeSkills": ["not-a-skill"],
+  "alwaysIncludeRouter": false
+}"#,
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--format",
+            "json",
+            "--profile",
+            profile.to_str().expect("utf-8 profile path"),
+            "list",
+        ])
+        .output()
+        .expect("run elegy-skills invalid profile list");
+
+    assert!(!output.status.success());
+
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("list stdout should be valid json");
+    assert_eq!(stdout["status"], "invalid");
+    assert!(stdout["error"]
+        .as_str()
+        .expect("error string")
+        .contains("unknown skill 'not-a-skill'"));
+    assert_eq!(stdout["data"]["profileProvided"], true);
 }

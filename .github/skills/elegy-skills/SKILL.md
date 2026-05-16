@@ -1,6 +1,6 @@
 ---
 name: elegy-skills
-description: "Repo-local non-authoritative contributor-routing file for Elegy's current dedicated skill-generation surface. Use for governed MCP-to-skill generation through the dedicated elegy-skills CLI."
+description: "Repo-local non-authoritative contributor-routing file for Elegy's current dedicated skill-registry surface. Use for governed skill search, resolve, inspect, and validation through the dedicated elegy-skills CLI."
 ---
 
 # Elegy Skills
@@ -15,10 +15,9 @@ The authority chain is one-way:
 
 ## When to use
 
-- Prefer the dedicated `elegy-skills` binary for the current implemented in-repo MCP-to-skill generation flow.
-- Generate governed skill-definition artifacts from an MCP descriptor with `elegy-skills generate --descriptor <path>`.
-- Use `--output-dir <path>` when generated skill-definition files should be written to disk.
-- Treat `elegy generate skills` as a general-surface compatibility command, not the preferred dedicated path.
+- Prefer the dedicated `elegy-skills` binary for registry-first skill work: searching, resolving, inspecting, and validating governed v2 skills.
+- Use the same crate directly from Rust when a host such as Holon should avoid CLI subprocess overhead for registry access.
+- Treat `elegy skills ...` as the umbrella compatibility surface for the same registry features.
 
 ## Do not use
 
@@ -29,13 +28,19 @@ The authority chain is one-way:
 ## Current commands
 
 ```text
-elegy-skills generate --descriptor <path> [--output-dir <path>] [--force]
+elegy-skills list [--category <name>] [--lifecycle <state>] [--detail]
+elegy-skills search --query <task>
+elegy-skills resolve --query <task>
+elegy-skills get --skill-id <id-or-alias>
+elegy-skills capability --capability-id <id>
+elegy-skills validate --file <path>
+elegy-skills validate --dir <path>
 ```
 
 `--format json` is available on the CLI when structured output is needed.
 
 ## Surface posture
 
-- This CLI is a thin wrapper over the existing governed skill-generation functions in `rust/crates/elegy-tooling`.
-- The dedicated surface is intentionally bounded to generation from governed MCP descriptor inputs.
+- This CLI is the dedicated registry surface over the governed v2 skill catalog plus a reusable Rust API for in-process hosts.
+- The dedicated surface is intentionally bounded to discovery, resolution, inspection, and validation over governed skill artifacts.
 - Governed skill artifacts remain rooted in `contracts/` and versioned through `governance/`.

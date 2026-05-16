@@ -25,6 +25,7 @@ elegy-memory = { version = "0.1.0", path = "../elegy-memory" }
 elegy-notify = { version = "0.1.0", path = "../elegy-notify" }
 elegy-observe = { version = "0.1.0", path = "../elegy-observe" }
 elegy-repo = { version = "0.1.0", path = "../elegy-repo" }
+elegy-skills = { version = "0.1.0", path = "../elegy-skills" }
 elegy-tooling = { version = "0.1.0", path = "../elegy-tooling" }
 elegy-web = { version = "0.1.0", path = "../elegy-web" }
 serde.workspace = true

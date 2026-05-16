@@ -59,7 +59,7 @@
       "status": "published",
       "targetReleaseType": "minor",
       "targetPackageVersionRange": ">=1.4.0 <2.0.0",
-      "scope": "Dedicated MCP-to-skill generation commands only.",
+      "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
         "entrypoint": "src/Elegy-skills/wrapper-entrypoint.json",
@@ -88,7 +88,7 @@
       "elegySchemaVersionRange": ">=1.1.0 <2.0.0",
       "policySchemaVersionRange": null,
       "supportLevel": "supported",
-      "notes": "Publishes bundle 1.4.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, the capability-definition, structured-failure, invocation-request, invocation-response, and execution-event contract families establish governed reusable capability-level execution shapes for later registry and invocation work without replacing the existing agent conversation envelopes, the new observation-event, observation-session, and observation-summary families add bounded reusable desktop-observation recording contracts without moving host-local consent or evidence semantics into Elegy, Elegy-memory V1 remains bounded and non-authoritative, and the shipped elegy-mcp plus elegy-skills surfaces add thin dedicated CLI wrappers over existing descriptor authoring, descriptor analysis, and MCP-to-skill generation flows without claiming unsupported REST/OpenAPI execution or autonomous runtime registration."
+      "notes": "Publishes bundle 1.4.0 as an additive update on the existing 1.x line: agent-response-envelope remains backward compatible, the dedicated summary-only-session-context-envelope durable artifact remains unchanged, the capability-definition, structured-failure, invocation-request, invocation-response, and execution-event contract families establish governed reusable capability-level execution shapes for later registry and invocation work without replacing the existing agent conversation envelopes, the new observation-event, observation-session, and observation-summary families add bounded reusable desktop-observation recording contracts without moving host-local consent or evidence semantics into Elegy, Elegy-memory V1 remains bounded and non-authoritative, and the shipped elegy-mcp plus elegy-skills surfaces add thin dedicated CLI wrappers over descriptor authoring/analysis and governed skill-registry access while keeping lower-level MCP-to-skill generation on the umbrella/tooling path without claiming unsupported REST/OpenAPI execution or autonomous runtime registration."
     }
   ]
 }

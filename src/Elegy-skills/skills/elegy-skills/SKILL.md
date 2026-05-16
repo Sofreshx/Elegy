@@ -22,7 +22,19 @@ Authority stays one-way:
 ## Current commands
 
 ```text
-elegy-skills generate --descriptor <path> [--output-dir <path>] [--force]
+elegy-skills list [--category <name>] [--lifecycle <state>] [--detail]
+elegy-skills search --query <task>
+elegy-skills resolve --query <task>
+elegy-skills get --skill-id <id-or-alias>
+elegy-skills capability --capability-id <id>
+elegy-skills validate --file <path>
+elegy-skills validate --dir <path>
 ```
 
 `--format json` is available when structured output is needed.
+
+## Surface posture
+
+- This dedicated surface is registry-first: search, resolve, inspect, and validate governed v2 skills.
+- The same registry behavior is also available on the umbrella `elegy skills ...` commands.
+- Downstream Rust hosts can prefer the reusable `rust/crates/elegy-skills` API over shelling out when direct in-process integration is a better fit.

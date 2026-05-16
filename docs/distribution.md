@@ -4,7 +4,7 @@ Elegy is intended to be consumed through versioned release assets, not through s
 
 The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the three dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
-The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and MCP-to-skill generation. The shared `elegy` CLI remains the general and compatibility surface.
+The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
 Mermaid tooling stays on that umbrella surface. `elegy mermaid render`, `elegy mermaid reverse`, and `elegy mermaid narrate` do not introduce a dedicated Mermaid binary, wrapper archive, or separate distribution lane.
 
@@ -49,7 +49,7 @@ GitHub Releases are the primary downstream distribution lane. The standalone ins
 
 Downloadable archives are self-describing. Packaging stages `PACKAGE_README.md` into every downloadable zip as archive-root `README.md`, and manifest validation treats that README as a required payload entry for the CLI, wrapper, and installer archive families.
 
-Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills discovery, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
+Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
 
 - `x86_64-pc-windows-msvc`
 - `x86_64-unknown-linux-gnu`
@@ -146,7 +146,7 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills discovery, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
 
 ## Wrapper archive
 

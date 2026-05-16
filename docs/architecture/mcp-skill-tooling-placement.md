@@ -88,7 +88,7 @@ Recommended split:
 
 This keeps neutral artifacts as the source of truth for what a valid skill is, while Rust owns the reusable execution path that derives those skills from MCP inputs.
 
-`elegy-skills` is now a shipped thin dedicated CLI surface for MCP-to-skill generation, and it is the preferred bounded CLI path for that work. That does not imply autonomous authoring or runtime-side registration beyond the implemented generation path.
+`elegy-skills` is now a shipped thin dedicated CLI surface for governed skill-registry search, resolve, inspect, and validation. Lower-level MCP-to-skill generation remains on the shared tooling path rather than as the main `elegy-skills` product story. That does not imply autonomous authoring or runtime-side registration.
 
 ## Dynamic CLI tools
 

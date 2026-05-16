@@ -4,25 +4,27 @@
   "entries": [
     {
       "skillId": "elegy-skills",
-      "name": "Elegy Skills",
-      "description": "Derived projection of the governed Elegy skills definition for loading the repo-local non-authoritative contributor-routing skill-generation markdown.",
+      "name": "Elegy Skill Registry",
+      "description": "Derived projection of the governed Elegy skill-registry definition for loading the repo-local non-authoritative contributor-routing registry markdown.",
       "lifecycleState": "active",
       "triggersOn": [
         "skills",
-        "generate skills",
-        "mcp to skill",
-        "skill generation"
+        "find skill",
+        "resolve skill",
+        "validate skill format"
       ],
       "keywords": [
         "skills",
-        "generate",
-        "mcp",
-        "descriptor",
+        "registry",
+        "search",
+        "resolve",
+        "validate",
         "governed"
       ],
       "capabilityHints": [
-        "mcp-to-skill-generation",
-        "governed-skill-output"
+        "skill-registry-search",
+        "skill-registry-resolve",
+        "skill-format-validation"
       ],
       "manifest": {
         "id": "elegy-skills",

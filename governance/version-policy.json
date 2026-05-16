@@ -41,7 +41,7 @@
       "targetReleaseType": "minor",
       "targetBundleVersion": "1.4.0",
       "targetSchemaLine": "1.x",
-      "releaseStory": "Publish a dedicated MCP-to-skill generation CLI surface plus governed skill-generation fixtures while keeping autonomous authoring and host registration out of scope.",
+      "releaseStory": "Publish a dedicated governed skill-registry CLI surface plus governed skill fixtures while keeping autonomous authoring and host registration out of scope.",
       "authorityReservations": [
         "contracts owns governed skill artifact authority",
         "governance owns release and compatibility metadata",

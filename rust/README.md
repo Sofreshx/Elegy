@@ -28,15 +28,15 @@ These crates currently provide:
 - semantic validators that mirror the contract authority owned by `contracts/` and `governance/`
 - in-repo conformance checks against the exported contract bundle under `artifacts/contracts`
 - reusable policy validation for filesystem and HTTP runtime boundaries
-- parity-first Rust implementations of MCP analyzer, generator, and discovery behavior
-- internal Rust tooling for MCP descriptor authoring and MCP-to-skill generation from governed descriptor inputs
+- parity-first Rust implementations of MCP analyzer, governed skill registry, lower-level generation, and discovery behavior
+- internal Rust tooling for MCP descriptor authoring and lower-level MCP-to-skill generation from governed descriptor inputs
 - normalized project, descriptor, and resource loading for the imported runtime stack
 - policy-bounded filesystem resource composition and read behavior for static and filesystem families
 - policy-bounded HTTP resource composition and bounded GET execution with redirect, timeout, and size-limit normalization
 - family-neutral runtime composition and a caller-facing core facade over descriptor, policy, adapters, and MCP consumers
 - a thin stdio MCP host that serves runtime-composed resources from the imported core/runtime layers
-- a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, MCP-to-skill generation, and stdio host startup
-- dedicated thin CLIs for bounded local memory, dedicated MCP descriptor authoring/analysis, and dedicated MCP-to-skill generation
+- a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, governed skill-registry access/validation, lower-level skill generation, and stdio host startup
+- dedicated thin CLIs for bounded local memory, dedicated MCP descriptor authoring/analysis, and dedicated governed skill-registry access/validation
 
 ## Current posture
 

@@ -62,7 +62,7 @@
       "status": "published",
       "targetReleaseType": "minor",
       "targetPackageVersion": "1.4.0",
-      "scope": "Dedicated MCP-to-skill generation commands only.",
+      "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
         "entrypoint": "src/Elegy-skills/wrapper-entrypoint.json",

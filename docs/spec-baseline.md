@@ -38,7 +38,7 @@ This means:
 
 The currently implemented slice is still intentionally narrower than the full spec:
 
-- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and `elegy-skills generate`; `elegy` exposes the same author/analyze/generate flow as the general/compatibility surface
+- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and use `elegy generate skills` for lower-level skill generation; `elegy` remains the general/compatibility surface while `elegy-skills` is the dedicated registry/search/validate surface
 - `elegy-host-mcp` exists as a thin stdio host over runtime-composed resources
 - resources-first behavior remains the current live runtime posture
 - no implied support for prompts, sampling, autonomous MCP-native self-authoring, or built-in skill-driven orchestration unless documentation and implementation are updated together

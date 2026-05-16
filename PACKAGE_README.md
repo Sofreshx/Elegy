@@ -16,7 +16,7 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
 
 - `elegy-cli-<cliVersion>-<target>.zip`
   - Ships the umbrella `elegy` binary.
-  - Carries the umbrella feature families: mermaid, diagram, skills discovery (`skills list|describe|search`), `run`, observe, desktop, repo, web, data, and notify.
+  - Carries the umbrella feature families: mermaid, diagram, skills registry (`skills list|describe|get|search|resolve|capability|validate`), lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify.
 - `elegy-memory-<cliVersion>-<target>.zip`
   - Dedicated `elegy-memory` binary.
 - `elegy-mcp-<cliVersion>-<target>.zip`
