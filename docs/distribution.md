@@ -2,9 +2,9 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the three dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the three dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
-The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp` and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
+The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp`, `rust/crates/elegy-planning`, and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis, durable planning authority, and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
 Mermaid tooling stays on that umbrella surface. `elegy mermaid render`, `elegy mermaid reverse`, and `elegy mermaid narrate` do not introduce a dedicated Mermaid binary, wrapper archive, or separate distribution lane.
 
@@ -29,7 +29,7 @@ Most users do not need every asset in the release:
 
 ## Asset model
 
-Tagged releases are configured to publish eleven neutral assets across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
+Tagged releases are configured to publish neutral asset families across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
 
 - governed contracts bundle: `elegy-contracts-<bundleVersion>.zip`
 - standalone installer bootstrap: `elegy-installer-<bundleVersion>.zip`
@@ -38,6 +38,7 @@ Tagged releases are configured to publish eleven neutral assets across the contr
 - umbrella CLI archive: `elegy-cli-<cliVersion>-<target>.zip`
 - local memory CLI archive: `elegy-memory-<cliVersion>-<target>.zip`
 - MCP CLI archive: `elegy-mcp-<cliVersion>-<target>.zip`
+- planning CLI archive: `elegy-planning-<cliVersion>-<target>.zip`
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
@@ -120,6 +121,7 @@ Current governed dedicated-surface skill artifacts in that bundle include:
 - `fixtures/skill-discovery-index.elegy-memory.json`
 - `fixtures/skill-definition-v2.elegy-mcp.json`
 - `fixtures/skill-discovery-index.elegy-mcp.json`
+- `fixtures/skill-definition-v2.elegy-planning.json`
 - `fixtures/skill-definition-v2.elegy-skills.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
 - `fixtures/skill-definition-v2.elegy-mermaid.json`
@@ -135,6 +137,7 @@ Build and package a current-host CLI surface with:
 pwsh ./scripts/package-cli.ps1 -Surface elegy-cli
 pwsh ./scripts/package-cli.ps1 -Surface elegy-memory
 pwsh ./scripts/package-cli.ps1 -Surface elegy-mcp
+pwsh ./scripts/package-cli.ps1 -Surface elegy-planning
 pwsh ./scripts/package-cli.ps1 -Surface elegy-skills
 ```
 
@@ -178,13 +181,13 @@ For Holon or any other downstream host that wants the simplest supported consump
 Example using the standalone installer asset after extraction into `./tools/elegy-bootstrap`:
 
 ```powershell
-pwsh ./tools/elegy-bootstrap/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
+pwsh ./tools/elegy-bootstrap/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
 ```
 
 Example using a checked-out or vendored installer helper against release assets:
 
 ```powershell
-pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
+pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
 ```
 
 Example using local artifacts only:
@@ -215,7 +218,7 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 
 1. Update bundle and manifest package metadata/version in `governance/version-policy.json` when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
-3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
+3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
 4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
 5. Run `pwsh ./scripts/package-installer.ps1`.
 6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.

@@ -82,6 +82,9 @@ jobs:
             surface: elegy-mcp
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
+            surface: elegy-planning
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
             surface: elegy-skills
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
@@ -94,6 +97,9 @@ jobs:
             surface: elegy-mcp
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
+            surface: elegy-planning
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
             surface: elegy-skills
           - runner: macos-14
             target: aarch64-apple-darwin
@@ -104,6 +110,9 @@ jobs:
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-mcp
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-planning
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-skills

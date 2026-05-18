@@ -39,7 +39,7 @@ The Rust workspace is the first-party home for:
 
 - governed-contract consumption in executable form
 - MCP descriptor authoring, analysis, and skill generation tooling
-- the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries
+- the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries
 - runtime composition and bounded adapter behavior
 - the thin stdio MCP host
 - the human-facing `elegy` CLI

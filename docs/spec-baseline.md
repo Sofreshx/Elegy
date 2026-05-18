@@ -22,7 +22,7 @@ Elegy is currently centered on two implementation anchors:
 Protocol-baseline drift would now affect:
 
 - published schemas, fixtures, compatibility manifests, and bundle exports
-- Rust contract consumers and operator crates such as `elegy-tooling`, `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-skills`, and `elegy-host-mcp`
+- Rust contract consumers and operator crates such as `elegy-tooling`, `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, and `elegy-host-mcp`
 - downstream consumers that rely on the exported contract bundle or Rust executable surfaces
 
 ## Baseline
@@ -62,7 +62,7 @@ Until that happens, the repository baseline remains `2025-11-25`.
 
 - contract authority: `contracts/` and `governance/`
 - exported machine-readable handoff: `artifacts/contracts`
-- current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
+- current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
 - current operator slice: Rust CLI author/analyze/generate with narrow validation and inspection flows under `rust/`
 - runtime model: runtime composition with a resources-first posture
 - future target: broader MCP-hosted or skill-driven self-authoring only after it is implemented and validated in-repo

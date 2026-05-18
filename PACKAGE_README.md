@@ -21,6 +21,8 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
   - Dedicated `elegy-memory` binary.
 - `elegy-mcp-<cliVersion>-<target>.zip`
   - Dedicated `elegy-mcp` binary.
+- `elegy-planning-<cliVersion>-<target>.zip`
+  - Dedicated `elegy-planning` binary.
 - `elegy-skills-<cliVersion>-<target>.zip`
   - Dedicated `elegy-skills` binary.
 - `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`

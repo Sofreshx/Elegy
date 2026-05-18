@@ -4,6 +4,7 @@ members = [
     "crates/elegy-mermaid",
     "crates/elegy-contracts",
     "crates/elegy-memory",
+    "crates/elegy-planning",
     "crates/elegy-policy",
     "crates/elegy-mcp",
     "crates/elegy-skills",

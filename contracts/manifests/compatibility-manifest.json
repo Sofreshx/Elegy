@@ -276,6 +276,7 @@
         "fixtures/skill-definition-v2.elegy-mermaid.json",
         "fixtures/skill-definition-v2.elegy-notify.json",
         "fixtures/skill-definition-v2.elegy-observe.json",
+        "fixtures/skill-definition-v2.elegy-planning.json",
         "fixtures/skill-definition-v2.elegy-repo.json",
         "fixtures/skill-definition-v2.elegy-skill-router.json",
         "fixtures/skill-definition-v2.elegy-skills.json",
@@ -464,6 +465,12 @@
       "name": "observe-result",
       "schemaVersion": "1.0.0",
       "file": "observe-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "planning-result",
+      "schemaVersion": "1.0.0",
+      "file": "planning-result.schema.json",
       "fixtures": []
     },
     {

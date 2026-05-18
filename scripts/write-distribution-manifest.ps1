@@ -52,6 +52,11 @@ function Get-CliSurfaceMetadata {
             AssetPrefix = 'elegy-mcp'
             Binary = 'elegy-mcp'
         }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning'
+            Binary = 'elegy-planning'
+        }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills'

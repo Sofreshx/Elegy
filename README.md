@@ -73,6 +73,7 @@ of Elegy instead of exposing every built-in tool.
 | `elegy data ...` | JSON/YAML/TOML/CSV conversion, extraction, and schema validation. |
 | `elegy notify ...` | Local toast and webhook notification helpers. |
 | `elegy-memory` | Dedicated local memory CLI. |
+| `elegy-planning` | Dedicated durable planning CLI for goals, roadmaps, plans, todos, issues, validation, and projections. |
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
 | `elegy-skills` | Dedicated skill registry CLI with search, resolve, inspect, and built-in format validation, backed by the same reusable Rust registry API. |
 

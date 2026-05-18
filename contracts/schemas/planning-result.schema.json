@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/planning-result.schema.json",
+  "title": "PlanningResult",
+  "description": "Planning CLI result data for durable goals, roadmaps, plans, todos, issues, review points, validation, health, and projection rendering.",
+  "type": "object"
+}

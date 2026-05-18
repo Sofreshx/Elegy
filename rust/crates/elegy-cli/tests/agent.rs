@@ -195,6 +195,25 @@ fn agent_discover_filters_query_results_by_profile() {
 }
 
 #[test]
+fn agent_discover_returns_planning_for_roadmap_queries() {
+    let output = elegy()
+        .args(["--json", "agent", "discover", "--query", "roadmap planning"])
+        .output()
+        .expect("run agent discover for planning");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body = parse_stdout(&output);
+    let results = body["data"]["results"].as_array().expect("results array");
+    assert!(!results.is_empty());
+    assert_eq!(results[0]["id"], "planning");
+}
+
+#[test]
 fn agent_discover_detail_includes_only_allowed_capability_implementations() {
     let profile = write_profile(
         "repo-capability-profile.json",

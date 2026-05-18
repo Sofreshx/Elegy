@@ -1495,6 +1495,12 @@ pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
         json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
     },
     BuiltinSkillDefinition {
+        id: "planning",
+        json: include_str!(
+            "../../../../contracts/fixtures/skill-definition-v2.elegy-planning.json"
+        ),
+    },
+    BuiltinSkillDefinition {
         id: "desktop",
         json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
     },
@@ -2899,13 +2905,16 @@ mod tests {
     fn builtin_registry_contains_only_valid_v2_definitions() {
         let definitions =
             parse_builtin_skill_definitions().expect("built-in skill registry should parse");
-        assert_eq!(definitions.len(), 12);
+        assert_eq!(definitions.len(), 13);
         assert!(definitions
             .iter()
             .any(|definition| definition.identity.name == "memory"));
         assert!(definitions
             .iter()
             .any(|definition| definition.identity.name == "mermaid"));
+        assert!(definitions
+            .iter()
+            .any(|definition| definition.identity.name == "planning"));
         assert!(definitions.iter().all(|definition| definition
             .capabilities
             .iter()

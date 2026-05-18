@@ -731,6 +731,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "elegy-planning"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
+ "time",
+ "uuid",
+]
+
+[[package]]
 name = "elegy-policy"
 version = "0.1.0"
 dependencies = [
