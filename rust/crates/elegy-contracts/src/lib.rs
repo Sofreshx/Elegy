@@ -154,6 +154,335 @@ pub fn validate_agent_capability_profile(
     AgentCapabilityProfileValidationResult { issues }
 }
 
+pub const ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackage {
+    pub schema_version: String,
+    pub identity: ElegyPluginPackageIdentity,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub metadata: Option<ElegyPluginPackageMetadata>,
+    pub components: ElegyPluginPackageComponents,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_policy_hints: Option<ElegyPluginPackagePolicyHints>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageIdentity {
+    pub package_id: String,
+    pub name: String,
+    pub version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tags: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub documentation_uri: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageComponents {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skill_definitions: Vec<ElegyPluginPackageSkillDefinitionComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub instruction_skills: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub mcp_projections: Vec<ElegyPluginPackageMcpProjectionComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_projections: Vec<ElegyPluginPackageCapabilityProjectionComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub docs: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub assets: Vec<ElegyPluginPackagePathComponent>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageSkillDefinitionComponent {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub definition: Option<SkillDefinitionV2>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackagePathComponent {
+    pub id: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageMcpProjectionComponent {
+    pub id: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub descriptor_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub server_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_refs: Vec<ElegyPluginPackageCapabilityRef>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageCapabilityProjectionComponent {
+    pub id: String,
+    pub skill: String,
+    pub capability: String,
+    pub lane: String,
+    pub supports_dry_run: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_schema: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_effect_class: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub projection: Option<ElegyPluginPackageProjectionMetadata>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageProjectionMetadata {
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projections: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub function_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_tool_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageCapabilityRef {
+    pub skill: String,
+    pub capability: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackagePolicyHints {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_effect_class: Option<String>,
+    #[serde(default)]
+    pub requires_approval: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub policy_tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ElegyPluginPackageValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl ElegyPluginPackageValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+pub fn validate_elegy_plugin_package(
+    package: &ElegyPluginPackage,
+) -> ElegyPluginPackageValidationResult {
+    let mut issues = Vec::new();
+
+    if package.schema_version != ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION}'."
+        ));
+    }
+    if !is_package_id(&package.identity.package_id) {
+        issues.push(
+            "identity.packageId must contain only ASCII letters, digits, '.', '_' or '-'."
+                .to_string(),
+        );
+    }
+    if package.identity.name.trim().is_empty() {
+        issues.push("identity.name must not be empty.".to_string());
+    }
+    if package.identity.version.trim().is_empty() {
+        issues.push("identity.version must not be empty.".to_string());
+    }
+
+    validate_component_ids(
+        "components.skillDefinitions",
+        package
+            .components
+            .skill_definitions
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.instructionSkills",
+        package
+            .components
+            .instruction_skills
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.mcpProjections",
+        package
+            .components
+            .mcp_projections
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.capabilityProjections",
+        package
+            .components
+            .capability_projections
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.docs",
+        package
+            .components
+            .docs
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.assets",
+        package
+            .components
+            .assets
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+
+    let mut capability_refs = BTreeSet::new();
+    for component in &package.components.skill_definitions {
+        if component.definition_ref.is_none() && component.definition.is_none() {
+            issues.push(format!(
+                "components.skillDefinitions entry '{}' must declare definitionRef or definition.",
+                component.id
+            ));
+        }
+        if let Some(definition_ref) = &component.definition_ref {
+            validate_portable_relative_path(
+                &format!(
+                    "components.skillDefinitions['{}'].definitionRef",
+                    component.id
+                ),
+                definition_ref,
+                &mut issues,
+            );
+        }
+        if let Some(definition) = &component.definition {
+            if let Err(error) = validate_skill_definition_v2(definition) {
+                issues.push(format!(
+                    "components.skillDefinitions entry '{}' contains invalid skill definition: {error}",
+                    component.id
+                ));
+            }
+            let skill_ref = format!(
+                "{}.{}",
+                definition.identity.namespace, definition.identity.name
+            );
+            for capability in &definition.capabilities {
+                capability_refs.insert((skill_ref.clone(), capability.id.clone()));
+            }
+        }
+    }
+
+    for component in package
+        .components
+        .instruction_skills
+        .iter()
+        .chain(package.components.docs.iter())
+        .chain(package.components.assets.iter())
+    {
+        validate_portable_relative_path(
+            &format!("component path '{}'", component.id),
+            &component.path,
+            &mut issues,
+        );
+    }
+
+    for projection in &package.components.mcp_projections {
+        if projection.descriptor_ref.is_none()
+            && projection
+                .server_name
+                .as_deref()
+                .is_none_or(|server_name| server_name.trim().is_empty())
+        {
+            issues.push(format!(
+                "components.mcpProjections entry '{}' must declare descriptorRef or serverName.",
+                projection.id
+            ));
+        }
+        if let Some(descriptor_ref) = &projection.descriptor_ref {
+            validate_portable_relative_path(
+                &format!(
+                    "components.mcpProjections['{}'].descriptorRef",
+                    projection.id
+                ),
+                descriptor_ref,
+                &mut issues,
+            );
+        }
+        for capability_ref in &projection.capability_refs {
+            validate_package_capability_ref(
+                "components.mcpProjections",
+                capability_ref,
+                &capability_refs,
+                &mut issues,
+            );
+        }
+    }
+
+    for projection in &package.components.capability_projections {
+        if !matches!(
+            projection.lane.as_str(),
+            "api" | "mcp" | "plugin" | "cli" | "subprocess"
+        ) {
+            issues.push(format!(
+                "components.capabilityProjections entry '{}' uses unsupported lane '{}'.",
+                projection.id, projection.lane
+            ));
+        }
+        let capability_ref = ElegyPluginPackageCapabilityRef {
+            skill: projection.skill.clone(),
+            capability: projection.capability.clone(),
+        };
+        validate_package_capability_ref(
+            "components.capabilityProjections",
+            &capability_ref,
+            &capability_refs,
+            &mut issues,
+        );
+    }
+
+    ElegyPluginPackageValidationResult { issues }
+}
+
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum AgentMessageRole {
@@ -1894,6 +2223,15 @@ pub fn load_skill_definition_v2_fixture_from_dir(
     )
 }
 
+pub fn load_elegy_plugin_package_fixture_from_dir(
+    dir: &Path,
+) -> Result<ElegyPluginPackage, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("elegy-plugin-package-v1.minimal.json"),
+    )
+}
+
 pub fn load_skill_discovery_index_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDiscoveryIndex, ContractsError> {
@@ -2821,6 +3159,72 @@ fn has_duplicate_values<'a>(values: impl Iterator<Item = &'a str>) -> bool {
     }
 
     false
+}
+
+fn is_package_id(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '.' | '_' | '-'))
+}
+
+fn validate_component_ids<'a>(
+    field: &str,
+    ids: impl Iterator<Item = &'a str>,
+    issues: &mut Vec<String>,
+) {
+    let mut seen = BTreeSet::new();
+    for id in ids {
+        if id.trim().is_empty() {
+            issues.push(format!("{field} ids must not be empty."));
+            continue;
+        }
+
+        let normalized = id.trim().to_ascii_lowercase();
+        if !seen.insert(normalized) {
+            issues.push(format!("{field} must not contain duplicate id '{id}'."));
+        }
+    }
+}
+
+fn validate_portable_relative_path(field: &str, value: &str, issues: &mut Vec<String>) {
+    let value = value.trim();
+    if value.is_empty()
+        || value.starts_with('/')
+        || value.starts_with('\\')
+        || value.contains(':')
+        || value
+            .split(['/', '\\'])
+            .any(|segment| segment.is_empty() || segment == "." || segment == "..")
+    {
+        issues.push(format!(
+            "{field} must be a portable relative package path without traversal."
+        ));
+    }
+}
+
+fn validate_package_capability_ref(
+    field: &str,
+    capability_ref: &ElegyPluginPackageCapabilityRef,
+    capability_refs: &BTreeSet<(String, String)>,
+    issues: &mut Vec<String>,
+) {
+    if capability_ref.skill.trim().is_empty() || capability_ref.capability.trim().is_empty() {
+        issues.push(format!("{field} capability references must not be blank."));
+        return;
+    }
+    if !capability_refs.is_empty()
+        && !capability_refs.contains(&(
+            capability_ref.skill.clone(),
+            capability_ref.capability.clone(),
+        ))
+    {
+        issues.push(format!(
+            "{field} references unknown capability '{}.{}'",
+            capability_ref.skill, capability_ref.capability
+        ));
+    }
 }
 
 fn validate_agent_messages(messages: &[AgentMessage], label: &str, issues: &mut Vec<String>) {

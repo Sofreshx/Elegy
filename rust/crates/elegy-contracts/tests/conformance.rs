@@ -2,13 +2,14 @@ use elegy_contracts::{
     default_support_manifest_path, export_contract_bundle,
     load_agent_capability_profile_fixture_from_dir, load_capability_definition_fixture_from_dir,
     load_compatibility_manifest_from_dir, load_consumer_support_manifest,
-    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
-    load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
-    load_mcp_server_descriptor_fixture_from_dir, load_observation_event_fixture_from_dir,
-    load_observation_session_fixture_from_dir, load_observation_summary_fixture_from_dir,
-    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
-    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
-    validate_agent_capability_profile, validate_capability_definition, validate_execution_event,
+    load_elegy_plugin_package_fixture_from_dir, load_execution_event_fixture_from_dir,
+    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
+    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
+    load_observation_event_fixture_from_dir, load_observation_session_fixture_from_dir,
+    load_observation_summary_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
+    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
+    resolve_upstream_contracts_dir, validate_agent_capability_profile,
+    validate_capability_definition, validate_elegy_plugin_package, validate_execution_event,
     validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
     validate_mcp_server_descriptor, validate_observation_event, validate_observation_session,
     validate_observation_summary, validate_skill_definition_v2, validate_structured_failure,
@@ -44,6 +45,7 @@ fn upstream_bundle_contains_supported_schema_entries() {
         .collect::<BTreeSet<_>>();
 
     assert!(schema_names.contains("skill-definition-v2"));
+    assert!(schema_names.contains("elegy-plugin-package-v1"));
     assert!(schema_names.contains("skill-discovery-index"));
     assert!(schema_names.contains("mcp-tool-definition"));
     assert!(schema_names.contains("mcp-server-descriptor"));
@@ -220,6 +222,25 @@ fn upstream_skill_definition_fixture_is_semantically_valid() {
         .expect("load upstream skill-definition-v2 fixture");
 
     validate_skill_definition_v2(&definition).expect("fixture should validate");
+}
+
+#[test]
+fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
+        .expect("load upstream elegy-plugin-package fixture");
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(package.identity.package_id, "elegy.demo-plugin");
+    assert_eq!(package.components.skill_definitions.len(), 1);
+    assert_eq!(package.components.capability_projections.len(), 1);
 }
 
 #[test]
@@ -568,6 +589,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path
         .join("capability-definition.schema.json")
         .is_file());
+    assert!(output_path
+        .join("elegy-plugin-package-v1.schema.json")
+        .is_file());
     assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path.join("invocation-request.schema.json").is_file());
     assert!(output_path
@@ -584,6 +608,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("elegy-plugin-package-v1.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -626,6 +654,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("agent-check.schema.json").is_ok());
         assert!(archive.by_name("agent-discovery.schema.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
+        assert!(archive
+            .by_name("elegy-plugin-package-v1.schema.json")
+            .is_ok());
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive.by_name("invocation-request.schema.json").is_ok());
         assert!(archive.by_name("invocation-response.schema.json").is_ok());
@@ -635,6 +666,9 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("observation-summary.schema.json").is_ok());
         assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/elegy-plugin-package-v1.minimal.json")
             .is_ok());
         assert!(archive
             .by_name("fixtures/structured-failure.minimal.json")

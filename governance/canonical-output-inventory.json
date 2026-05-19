@@ -87,6 +87,10 @@
       "generated": "artifacts/contracts/skill-definition-v2.schema.json"
     },
     {
+      "source": "contracts/schemas/elegy-plugin-package-v1.schema.json",
+      "generated": "artifacts/contracts/elegy-plugin-package-v1.schema.json"
+    },
+    {
       "source": "contracts/schemas/skill-discovery-index.schema.json",
       "generated": "artifacts/contracts/skill-discovery-index.schema.json"
     },
@@ -237,6 +241,10 @@
     {
       "source": "contracts/fixtures/skill-definition-v2.elegy-web.json",
       "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-web.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v1.minimal.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.minimal.json"
     },
     {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",

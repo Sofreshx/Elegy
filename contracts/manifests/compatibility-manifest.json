@@ -284,6 +284,14 @@
       ]
     },
     {
+      "name": "elegy-plugin-package-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-plugin-package-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-plugin-package-v1.minimal.json"
+      ]
+    },
+    {
       "name": "skill-forge-request",
       "schemaVersion": "1.0.0",
       "file": "skill-forge-request.schema.json",

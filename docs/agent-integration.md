@@ -104,6 +104,22 @@ The skill definitions in `contracts/fixtures/skill-definition-v2.*.json` remain
 the discovery authority. The contract schemas under `contracts/schemas/` remain
 the durable authority.
 
+## Portable Plugin Packages
+
+`elegy-plugin-package/v1` is a portable package metadata contract for hosts that
+want one governed package surface over multiple components. A package can bundle
+or reference `skill-definition-v2` definitions, instruction skill files, MCP
+projection metadata, docs, and assets.
+
+The package contract is not a runtime. It must not contain host workspace ids,
+approval state, secret refs, runtime sessions, adapter handles, or local trust
+decisions. Hosts such as Holon import the portable package, then apply local
+policy, readiness, approvals, secrets, evidence, and execution rules.
+
+`SKILL.md` files, MCP descriptors, wrapper folders, and generated discovery
+indexes remain derived or adapter surfaces. The governed package and skill
+schemas under `contracts/schemas/` remain the authority roots.
+
 ## Optional MCP Adapter
 
 MCP-native clients can start the stdio host:

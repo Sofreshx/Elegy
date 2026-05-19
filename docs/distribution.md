@@ -115,6 +115,13 @@ Current governed workflow artifacts in that bundle include both the portable wor
 - `fixtures/canonical-workflow.minimal.json`
 - `fixtures/canonical-workflow-graph.minimal.json`
 
+Current governed package artifacts in that bundle include the portable plugin
+package contract. This is metadata and validation support for consuming hosts,
+not an Elegy plugin runtime:
+
+- `elegy-plugin-package-v1.schema.json`
+- `fixtures/elegy-plugin-package-v1.minimal.json`
+
 Current governed dedicated-surface skill artifacts in that bundle include:
 
 - `fixtures/skill-definition-v2.elegy-memory.json`
