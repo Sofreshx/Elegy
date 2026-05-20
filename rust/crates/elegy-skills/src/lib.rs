@@ -1,12 +1,11 @@
 pub use elegy_contracts::{
     parse_builtin_skill_definitions, AgentCapabilityProfile, CapabilityApprovalRequirement,
     CapabilityAuthMode, CapabilityCostHint, CapabilityDefinition, CapabilityExecutionContract,
-    CapabilityFamily, CapabilityGovernance, CapabilityIdempotenceHint,
-    CapabilityLatencyHint, CapabilityLifecycleState, CapabilityObservability,
-    CapabilitySchemaReference, CapabilitySideEffectClass, CapabilitySource,
-    CapabilitySourceKind, CapabilityTrustLevel, ContractsError, SkillCapability,
-    SkillCapabilityExecution, SkillCapabilityInput, SkillDefinitionV2,
-    AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+    CapabilityFamily, CapabilityGovernance, CapabilityIdempotenceHint, CapabilityLatencyHint,
+    CapabilityLifecycleState, CapabilityObservability, CapabilitySchemaReference,
+    CapabilitySideEffectClass, CapabilitySource, CapabilitySourceKind, CapabilityTrustLevel,
+    ContractsError, SkillCapability, SkillCapabilityExecution, SkillCapabilityInput,
+    SkillDefinitionV2, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_contracts::{validate_agent_capability_profile, validate_skill_definition_v2_strict};
 use serde::Serialize;
@@ -274,7 +273,8 @@ impl SkillRegistry {
 
     pub fn capability(&self, capability_id: &str) -> Option<RegistryCapabilityCard> {
         self.skills.iter().find_map(|skill| {
-            skill.definition
+            skill
+                .definition
                 .capabilities
                 .iter()
                 .find(|capability| capability.id == capability_id)
@@ -371,13 +371,17 @@ impl SkillRegistry {
         self.skills
             .iter()
             .flat_map(|skill| {
-                skill.definition.capabilities.iter().map(|capability| RegistryMcpTool {
-                    capability_id: capability.id.clone(),
-                    description: capability.description.clone(),
-                    input_schema: capability_input_schema(capability),
-                    read_only_hint: Some(!capability_has_side_effects(capability)),
-                    idempotent_hint: Some(capability_is_deterministic(capability)),
-                })
+                skill
+                    .definition
+                    .capabilities
+                    .iter()
+                    .map(|capability| RegistryMcpTool {
+                        capability_id: capability.id.clone(),
+                        description: capability.description.clone(),
+                        input_schema: capability_input_schema(capability),
+                        read_only_hint: Some(!capability_has_side_effects(capability)),
+                        idempotent_hint: Some(capability_is_deterministic(capability)),
+                    })
             })
             .collect()
     }
@@ -411,7 +415,9 @@ pub struct RegistryMcpTool {
 
 impl RegistryProfileSelection {
     pub fn has_errors(&self) -> bool {
-        self.issues.iter().any(|issue| issue.code.starts_with("REGISTRY-PROFILE-E"))
+        self.issues
+            .iter()
+            .any(|issue| issue.code.starts_with("REGISTRY-PROFILE-E"))
     }
 }
 
@@ -578,7 +584,9 @@ fn skills_from_definitions(
         .collect::<Result<Vec<_>, _>>()
 }
 
-fn load_skill_definitions_from_dir(path: &Path) -> Result<Vec<SkillDefinitionV2>, SkillsSurfaceError> {
+fn load_skill_definitions_from_dir(
+    path: &Path,
+) -> Result<Vec<SkillDefinitionV2>, SkillsSurfaceError> {
     let mut definitions = Vec::new();
     for entry in fs::read_dir(path).map_err(|source| SkillsSurfaceError::Io {
         path: path.to_path_buf(),
@@ -652,10 +660,12 @@ fn matches_query(skill: &LoadedSkill, query: &SkillRegistryQuery) -> bool {
         .category
         .as_ref()
         .is_none_or(|category| skill.summary.category.eq_ignore_ascii_case(category));
-    let lifecycle_ok = query
-        .lifecycle
-        .as_ref()
-        .is_none_or(|lifecycle| skill.summary.lifecycle_state.eq_ignore_ascii_case(lifecycle));
+    let lifecycle_ok = query.lifecycle.as_ref().is_none_or(|lifecycle| {
+        skill
+            .summary
+            .lifecycle_state
+            .eq_ignore_ascii_case(lifecycle)
+    });
     category_ok && lifecycle_ok
 }
 
@@ -665,7 +675,11 @@ fn skill_entry(
     match_result: Option<RegistrySearchMatch>,
 ) -> RegistrySkillEntry {
     let capabilities = capability_details(skill);
-    let context_cost_estimate = Some(estimate_context_cost(&skill.summary, &capabilities, &skill.raw));
+    let context_cost_estimate = Some(estimate_context_cost(
+        &skill.summary,
+        &capabilities,
+        &skill.raw,
+    ));
     RegistrySkillEntry {
         summary: skill.summary.clone(),
         trigger_keywords: trigger_keywords(skill),
@@ -682,7 +696,8 @@ fn skill_entry(
 }
 
 fn capability_details(skill: &LoadedSkill) -> Vec<RegistryCapabilityDetail> {
-    skill.definition
+    skill
+        .definition
         .capabilities
         .iter()
         .map(|capability| RegistryCapabilityDetail {
@@ -705,11 +720,14 @@ fn capability_details(skill: &LoadedSkill) -> Vec<RegistryCapabilityDetail> {
                         .collect()
                 })
                 .unwrap_or_default(),
-            execution: capability.execution.as_ref().map(|execution| RegistryExecutionDetail {
-                mode: execution.mode.clone(),
-                has_side_effects: Some(execution.has_side_effects),
-                is_deterministic: Some(execution.is_deterministic),
-            }),
+            execution: capability
+                .execution
+                .as_ref()
+                .map(|execution| RegistryExecutionDetail {
+                    mode: execution.mode.clone(),
+                    has_side_effects: Some(execution.has_side_effects),
+                    is_deterministic: Some(execution.is_deterministic),
+                }),
             typical_next: capability
                 .composes_well
                 .as_ref()
@@ -730,7 +748,8 @@ fn capability_details(skill: &LoadedSkill) -> Vec<RegistryCapabilityDetail> {
 }
 
 fn trigger_keywords(skill: &LoadedSkill) -> Vec<String> {
-    skill.definition
+    skill
+        .definition
         .discovery
         .as_ref()
         .map(|discovery| discovery.keywords.clone())
@@ -742,12 +761,16 @@ fn estimate_context_cost(
     capabilities: &[RegistryCapabilityDetail],
     raw: &Value,
 ) -> RegistryContextCostEstimate {
-    let index_bytes = serde_json::to_vec(summary).map(|value| value.len()).unwrap_or(0);
+    let index_bytes = serde_json::to_vec(summary)
+        .map(|value| value.len())
+        .unwrap_or(0);
     let detail_bytes = index_bytes
         + serde_json::to_vec(capabilities)
             .map(|value| value.len())
             .unwrap_or(0);
-    let full_bytes = serde_json::to_vec(raw).map(|value| value.len()).unwrap_or(0);
+    let full_bytes = serde_json::to_vec(raw)
+        .map(|value| value.len())
+        .unwrap_or(0);
 
     RegistryContextCostEstimate {
         index_tokens: index_bytes.div_ceil(4),
@@ -806,7 +829,10 @@ fn score_skill_match(skill: &LoadedSkill, query_lower: &str) -> RegistrySearchMa
             if keyword.to_ascii_lowercase().contains(query_lower) {
                 score += 0.8;
                 keyword_phrase_hit = true;
-                if !match_reasons.iter().any(|reason| reason == "discovery-keyword") {
+                if !match_reasons
+                    .iter()
+                    .any(|reason| reason == "discovery-keyword")
+                {
                     match_reasons.push("discovery-keyword".to_string());
                     field_hits += 1;
                 }
@@ -817,7 +843,10 @@ fn score_skill_match(skill: &LoadedSkill, query_lower: &str) -> RegistrySearchMa
         for trigger in &discovery.triggers {
             if trigger.pattern.to_ascii_lowercase().contains(query_lower) {
                 score += 0.7;
-                if !match_reasons.iter().any(|reason| reason == "discovery-trigger") {
+                if !match_reasons
+                    .iter()
+                    .any(|reason| reason == "discovery-trigger")
+                {
                     match_reasons.push("discovery-trigger".to_string());
                     field_hits += 1;
                 }
@@ -896,7 +925,10 @@ fn compare_match_score(a: &RegistrySkillEntry, b: &RegistrySkillEntry) -> std::c
         .unwrap_or(std::cmp::Ordering::Equal)
 }
 
-fn score_filtered_skill_match(skill: &RegistrySkillEntry, query_lower: &str) -> RegistrySearchMatch {
+fn score_filtered_skill_match(
+    skill: &RegistrySkillEntry,
+    query_lower: &str,
+) -> RegistrySearchMatch {
     let mut score = 0.0;
     let mut matched_capabilities = Vec::new();
     let mut match_reasons = Vec::new();
@@ -936,7 +968,10 @@ fn score_filtered_skill_match(skill: &RegistrySkillEntry, query_lower: &str) -> 
         if keyword.to_ascii_lowercase().contains(query_lower) {
             score += 0.8;
             keyword_phrase_hit = true;
-            if !match_reasons.iter().any(|reason| reason == "discovery-keyword") {
+            if !match_reasons
+                .iter()
+                .any(|reason| reason == "discovery-keyword")
+            {
                 match_reasons.push("discovery-keyword".to_string());
                 field_hits += 1;
             }
@@ -1051,7 +1086,10 @@ fn project_capability_definition(
                 .input
                 .as_ref()
                 .and_then(|input| input.schema_ref.clone()),
-            description: capability.input.as_ref().map(|_| capability.description.clone()),
+            description: capability
+                .input
+                .as_ref()
+                .map(|_| capability.description.clone()),
         },
         output: CapabilitySchemaReference {
             schema: None,
@@ -1059,7 +1097,10 @@ fn project_capability_definition(
                 .output
                 .as_ref()
                 .and_then(|output| output.schema_ref.clone()),
-            description: capability.output.as_ref().and_then(|output| output.description.clone()),
+            description: capability
+                .output
+                .as_ref()
+                .and_then(|output| output.description.clone()),
         },
         execution: CapabilityExecutionContract {
             side_effect_class: if capability_has_side_effects(capability) {
@@ -1153,24 +1194,47 @@ fn build_profile_selection(
         })
         .unwrap_or_default();
     let include_capabilities = profile
-        .map(|profile| profile.include_capabilities.iter().cloned().collect::<BTreeSet<_>>())
+        .map(|profile| {
+            profile
+                .include_capabilities
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+        })
         .unwrap_or_default();
     let exclude_capabilities = profile
-        .map(|profile| profile.exclude_capabilities.iter().cloned().collect::<BTreeSet<_>>())
+        .map(|profile| {
+            profile
+                .exclude_capabilities
+                .iter()
+                .cloned()
+                .collect::<BTreeSet<_>>()
+        })
         .unwrap_or_default();
 
     let known_skill_keys = registry
         .skills
         .iter()
         .flat_map(|skill| {
-            std::iter::once(skill.summary.id.to_ascii_lowercase())
-                .chain(skill.summary.aliases.iter().map(|alias| alias.to_ascii_lowercase()))
+            std::iter::once(skill.summary.id.to_ascii_lowercase()).chain(
+                skill
+                    .summary
+                    .aliases
+                    .iter()
+                    .map(|alias| alias.to_ascii_lowercase()),
+            )
         })
         .collect::<BTreeSet<_>>();
     let known_capabilities = registry
         .skills
         .iter()
-        .flat_map(|skill| skill.definition.capabilities.iter().map(|capability| capability.id.clone()))
+        .flat_map(|skill| {
+            skill
+                .definition
+                .capabilities
+                .iter()
+                .map(|capability| capability.id.clone())
+        })
         .collect::<BTreeSet<_>>();
 
     if let Some(profile) = profile {
@@ -1213,8 +1277,7 @@ fn build_profile_selection(
                 && std::iter::once(skill.summary.id.as_str())
                     .chain(skill.summary.aliases.iter().map(String::as_str))
                     .any(|key| include_skills.contains(&key.to_ascii_lowercase())));
-        let router_requested = profile
-            .is_some_and(|profile| profile.always_include_router)
+        let router_requested = profile.is_some_and(|profile| profile.always_include_router)
             && skill.summary.id == "skill-router";
 
         let mut selected_for_skill = false;
@@ -1244,7 +1307,9 @@ fn build_profile_selection(
     }
 
     let router_available = selected_skill_ids.contains("skill-router")
-        && selected_capability_ids.iter().any(|capability| capability.starts_with("router-"));
+        && selected_capability_ids
+            .iter()
+            .any(|capability| capability.starts_with("router-"));
     if profile_provided && !router_available {
         issues.push(RegistryValidationIssue {
             code: "REGISTRY-PROFILE-W001".to_string(),
@@ -1259,7 +1324,9 @@ fn build_profile_selection(
         profile_provided,
         profile_id: profile.map(|profile| profile.profile_id.clone()),
         schema_version: profile.map(|profile| profile.schema_version.clone()),
-        always_include_router: profile.map(|profile| profile.always_include_router).unwrap_or(true),
+        always_include_router: profile
+            .map(|profile| profile.always_include_router)
+            .unwrap_or(true),
         router_available,
         selected_skill_ids,
         selected_capability_ids,
@@ -1289,13 +1356,13 @@ fn capability_input_schema(capability: &SkillCapability) -> Value {
             let mut property = serde_json::Map::new();
             property.insert("type".to_string(), Value::String(schema_type.to_string()));
             if schema_type == "array" {
-                property.insert(
-                    "items".to_string(),
-                    serde_json::json!({ "type": "string" }),
-                );
+                property.insert("items".to_string(), serde_json::json!({ "type": "string" }));
             }
             if let Some(description) = &parameter.description {
-                property.insert("description".to_string(), Value::String(description.clone()));
+                property.insert(
+                    "description".to_string(),
+                    Value::String(description.clone()),
+                );
             }
             if let Some(default) = &parameter.default {
                 property.insert("default".to_string(), default.clone());
@@ -1360,12 +1427,14 @@ mod tests {
         let results = registry.search("repo status", false);
         assert!(!results.is_empty());
         assert_eq!(results[0].summary.id, "repo");
-        assert!(results[0]
-            .match_result
-            .as_ref()
-            .expect("match result")
-            .score
-            > 0.0);
+        assert!(
+            results[0]
+                .match_result
+                .as_ref()
+                .expect("match result")
+                .score
+                > 0.0
+        );
     }
 
     #[test]
@@ -1375,7 +1444,10 @@ mod tests {
             .capability("diagram-create")
             .expect("diagram-create capability should exist");
         assert_eq!(capability.capability_definition.id, "diagram-create");
-        assert_eq!(capability.capability_definition.family, CapabilityFamily::Skill);
+        assert_eq!(
+            capability.capability_definition.family,
+            CapabilityFamily::Skill
+        );
     }
 
     #[test]
@@ -1392,6 +1464,8 @@ mod tests {
         let selection = registry.profile_selection(Some(&profile));
         assert!(selection.selected_skill_ids.contains("repo"));
         assert!(selection.selected_skill_ids.contains("skill-router"));
-        assert!(selection.selected_capability_ids.contains("router-skill-search"));
+        assert!(selection
+            .selected_capability_ids
+            .contains("router-skill-search"));
     }
 }

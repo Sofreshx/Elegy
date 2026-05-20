@@ -442,7 +442,12 @@ fn handle_parse_error(error: clap::Error, raw_args: &[OsString]) -> Result<ExitC
     let correlation_id = parse_flag_argument_value(raw_args, "--correlation-id");
     let command = parse_command_path(raw_args);
 
-    if format == OutputFormat::Json && !matches!(error.kind(), ErrorKind::DisplayHelp | ErrorKind::DisplayVersion) {
+    if format == OutputFormat::Json
+        && !matches!(
+            error.kind(),
+            ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
+        )
+    {
         print_json(&MachineEnvelope::<serde_json::Value> {
             correlation_id,
             non_interactive,
@@ -887,7 +892,10 @@ fn parse_command_path(raw_args: &[OsString]) -> Vec<String> {
         }
 
         if path.is_empty() {
-            if command_names.iter().any(|candidate| candidate == normalized) {
+            if command_names
+                .iter()
+                .any(|candidate| candidate == normalized)
+            {
                 path.push(normalized.to_string());
             }
             index += 1;

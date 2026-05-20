@@ -189,7 +189,14 @@ fn run() -> Result<ExitCode, serde_json::Error> {
             category,
             lifecycle,
             detail,
-        } => execute_list(category, lifecycle, detail, cli.profile, cli.registry, &context),
+        } => execute_list(
+            category,
+            lifecycle,
+            detail,
+            cli.profile,
+            cli.registry,
+            &context,
+        ),
         Command::Search { query, detail } => {
             execute_search(query, detail, cli.profile, cli.registry, &context)
         }
@@ -280,7 +287,11 @@ fn execute_search(
                         "{:<16} {:<32} {:<6.2} {}",
                         skill.summary.id,
                         skill.summary.name,
-                        skill.match_result.as_ref().map(|match_result| match_result.score).unwrap_or(0.0),
+                        skill
+                            .match_result
+                            .as_ref()
+                            .map(|match_result| match_result.score)
+                            .unwrap_or(0.0),
                         skill
                             .match_result
                             .as_ref()
@@ -331,9 +342,7 @@ fn execute_resolve(
                 println!("No matching skills found.");
             }
         }
-        OutputFormat::Json => {
-            print_json(&build_success_envelope(context, ["resolve"], result))?
-        }
+        OutputFormat::Json => print_json(&build_success_envelope(context, ["resolve"], result))?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -350,7 +359,11 @@ fn execute_get(
         Err(error) => return emit_registry_load_error(context, error),
     };
     let Some(skill) = registry.skill_definition(&skill_id) else {
-        return emit_error(context, format!("skill '{skill_id}' not found"), exit_invalid());
+        return emit_error(
+            context,
+            format!("skill '{skill_id}' not found"),
+            exit_invalid(),
+        );
     };
 
     match context.format {
@@ -464,12 +477,14 @@ fn load_registry(
                     path.display()
                 ))
             })?;
-            Some(serde_json::from_str::<AgentCapabilityProfile>(&contents).map_err(|error| {
-                RegistryLoadError::InvalidInput(format!(
-                    "invalid agent capability profile JSON in {}: {error}",
-                    path.display()
-                ))
-            })?)
+            Some(
+                serde_json::from_str::<AgentCapabilityProfile>(&contents).map_err(|error| {
+                    RegistryLoadError::InvalidInput(format!(
+                        "invalid agent capability profile JSON in {}: {error}",
+                        path.display()
+                    ))
+                })?,
+            )
         }
         None => None,
     };
@@ -508,7 +523,10 @@ impl SkillRegistryWithProfile {
                     query.category.as_ref().is_none_or(|category| {
                         skill.summary.category.eq_ignore_ascii_case(category)
                     }) && query.lifecycle.as_ref().is_none_or(|lifecycle| {
-                        skill.summary.lifecycle_state.eq_ignore_ascii_case(lifecycle)
+                        skill
+                            .summary
+                            .lifecycle_state
+                            .eq_ignore_ascii_case(lifecycle)
                     })
                 })
                 .map(|mut skill| {
@@ -526,20 +544,18 @@ impl SkillRegistryWithProfile {
     fn search(&self, query: &str, include_detail: bool) -> Vec<elegy_skills::RegistrySkillEntry> {
         if self.selection.profile_provided {
             let filtered = self.filtered_skills();
-            self.registry.search_filtered(&filtered, query, include_detail)
+            self.registry
+                .search_filtered(&filtered, query, include_detail)
         } else {
             self.registry.search(query, include_detail)
         }
     }
 
-    fn resolve(
-        &self,
-        query: &str,
-        include_detail: bool,
-    ) -> elegy_skills::RegistryResolveResult {
+    fn resolve(&self, query: &str, include_detail: bool) -> elegy_skills::RegistryResolveResult {
         if self.selection.profile_provided {
             let filtered = self.filtered_skills();
-            self.registry.resolve_filtered(&filtered, query, include_detail)
+            self.registry
+                .resolve_filtered(&filtered, query, include_detail)
         } else {
             self.registry.resolve(query, include_detail)
         }
@@ -558,7 +574,9 @@ impl SkillRegistryWithProfile {
             })?;
             let mut definition = self.registry.skill_definition(&skill.summary.id)?;
             definition.capabilities.retain(|capability| {
-                self.selection.selected_capability_ids.contains(&capability.id)
+                self.selection
+                    .selected_capability_ids
+                    .contains(&capability.id)
             });
             return Some(definition);
         }
@@ -567,7 +585,10 @@ impl SkillRegistryWithProfile {
 
     fn capability(&self, capability_id: &str) -> Option<elegy_skills::RegistryCapabilityCard> {
         if self.selection.profile_provided
-            && !self.selection.selected_capability_ids.contains(capability_id)
+            && !self
+                .selection
+                .selected_capability_ids
+                .contains(capability_id)
         {
             return None;
         }

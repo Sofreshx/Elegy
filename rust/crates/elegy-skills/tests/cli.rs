@@ -36,9 +36,7 @@ fn direct_skills_binary_lists_builtin_registry() {
     let stdout: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("list stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
-    let skills = stdout["data"]["skills"]
-        .as_array()
-        .expect("skills array");
+    let skills = stdout["data"]["skills"].as_array().expect("skills array");
     assert!(skills.iter().any(|skill| skill["id"] == "repo"));
     assert!(skills.iter().any(|skill| skill["id"] == "skills"));
 }
@@ -102,9 +100,7 @@ fn profile_search_detail_excludes_removed_capabilities() {
 
     let stdout: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("search stdout should be valid json");
-    let results = stdout["data"]["results"]
-        .as_array()
-        .expect("results array");
+    let results = stdout["data"]["results"].as_array().expect("results array");
     let repo = results
         .iter()
         .find(|result| result["id"] == "repo")
@@ -156,9 +152,7 @@ fn profile_resolve_detail_excludes_removed_capabilities() {
         serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
     assert_eq!(stdout["data"]["topSkill"]["id"], "repo");
     assert_eq!(stdout["data"]["topCapability"], serde_json::Value::Null);
-    let results = stdout["data"]["results"]
-        .as_array()
-        .expect("results array");
+    let results = stdout["data"]["results"].as_array().expect("results array");
     let repo = results.first().expect("top result");
     assert!(!repo["capabilities"]
         .as_array()
@@ -208,7 +202,9 @@ fn profile_get_filters_excluded_capabilities() {
         .as_array()
         .expect("capabilities array");
     assert!(!capabilities.is_empty());
-    assert!(!capabilities.iter().any(|capability| capability["id"] == "repo-diff"));
+    assert!(!capabilities
+        .iter()
+        .any(|capability| capability["id"] == "repo-diff"));
 }
 
 #[test]

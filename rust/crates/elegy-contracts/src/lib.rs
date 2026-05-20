@@ -2878,27 +2878,25 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
     }
 
     match event.event_type {
-        AgentEventType::MessageDelta | AgentEventType::ReasoningDelta => {
+        AgentEventType::MessageDelta | AgentEventType::ReasoningDelta
             if event
                 .payload
                 .delta_content
                 .as_ref()
-                .is_none_or(|delta| delta.trim().is_empty())
-            {
-                issues.push("Delta agent events must include non-empty delta content.".to_string());
-            }
+                .is_none_or(|delta| delta.trim().is_empty()) =>
+        {
+            issues.push("Delta agent events must include non-empty delta content.".to_string());
         }
-        AgentEventType::MessageCompleted | AgentEventType::ReasoningCompleted => {
+        AgentEventType::MessageCompleted | AgentEventType::ReasoningCompleted
             if event
                 .payload
                 .content
                 .as_ref()
-                .is_none_or(|content| content.trim().is_empty())
-            {
-                issues.push("Completed message events must include non-empty content.".to_string());
-            }
+                .is_none_or(|content| content.trim().is_empty()) =>
+        {
+            issues.push("Completed message events must include non-empty content.".to_string());
         }
-        AgentEventType::ToolCallStarted => {
+        AgentEventType::ToolCallStarted
             if event
                 .payload
                 .tool_call_id
@@ -2908,25 +2906,22 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                     .payload
                     .tool_name
                     .as_ref()
-                    .is_none_or(|tool_name| tool_name.trim().is_empty())
-            {
-                issues.push(
-                    "Tool call started events must include a tool call ID and tool name."
-                        .to_string(),
-                );
-            }
+                    .is_none_or(|tool_name| tool_name.trim().is_empty()) =>
+        {
+            issues.push(
+                "Tool call started events must include a tool call ID and tool name.".to_string(),
+            );
         }
-        AgentEventType::ToolCallCompleted => {
+        AgentEventType::ToolCallCompleted
             if event
                 .payload
                 .tool_call_id
                 .as_ref()
-                .is_none_or(|tool_call_id| tool_call_id.trim().is_empty())
-            {
-                issues.push("Tool call completed events must include a tool call ID.".to_string());
-            }
+                .is_none_or(|tool_call_id| tool_call_id.trim().is_empty()) =>
+        {
+            issues.push("Tool call completed events must include a tool call ID.".to_string());
         }
-        AgentEventType::Error | AgentEventType::RunFailed => {
+        AgentEventType::Error | AgentEventType::RunFailed
             if event
                 .payload
                 .error_message
@@ -2936,12 +2931,11 @@ pub fn validate_agent_event_envelope(event: &AgentEventEnvelope) -> AgentEnvelop
                     .payload
                     .error_code
                     .as_ref()
-                    .is_none_or(|code| code.trim().is_empty())
-            {
-                issues.push(
-                    "Error agent events must include an error code or error message.".to_string(),
-                );
-            }
+                    .is_none_or(|code| code.trim().is_empty()) =>
+        {
+            issues.push(
+                "Error agent events must include an error code or error message.".to_string(),
+            );
         }
         _ => {}
     }
@@ -3402,7 +3396,11 @@ mod tests {
             strict_result.is_err(),
             "strict validation must reject subprocess capability without output.schemaRef"
         );
-        let err_msg = strict_result.unwrap_err().to_string();
+        let err_msg = strict_result
+            .expect_err(
+                "strict validation must reject subprocess capability without output.schemaRef",
+            )
+            .to_string();
         assert!(
             err_msg.contains("must declare output.schemaRef"),
             "error message must mention output.schemaRef, got: {err_msg}"

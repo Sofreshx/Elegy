@@ -44,10 +44,14 @@ fn build_tools_from_skill_definitions() -> Vec<Tool> {
         .build_mcp_tools()
         .into_iter()
         .map(|tool| {
-            let mut mcp_tool = Tool::new(tool.capability_id, tool.description, match tool.input_schema {
-                serde_json::Value::Object(map) => map,
-                _ => serde_json::Map::new(),
-            });
+            let mut mcp_tool = Tool::new(
+                tool.capability_id,
+                tool.description,
+                match tool.input_schema {
+                    serde_json::Value::Object(map) => map,
+                    _ => serde_json::Map::new(),
+                },
+            );
             mcp_tool.annotations = Some(
                 ToolAnnotations::new()
                     .read_only(tool.read_only_hint.unwrap_or(false))
@@ -757,11 +761,11 @@ mod tests {
     fn build_tools_parses_expected_capabilities() {
         let tools = build_tools_from_skill_definitions();
 
-        // The diagram skill definition has 4 capabilities
+        // The governed registry currently exposes 63 MCP tools.
         assert_eq!(
             tools.len(),
-            50,
-            "expected 50 tools from the built-in v2 skill registry"
+            63,
+            "expected 63 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -772,9 +776,18 @@ mod tests {
             names.contains(&"mcp-analyze-descriptor"),
             "missing mcp-analyze-descriptor"
         );
-        assert!(names.contains(&"skills-registry-search"), "missing skills-registry-search");
-        assert!(names.contains(&"skills-registry-resolve"), "missing skills-registry-resolve");
-        assert!(names.contains(&"skills-registry-validate"), "missing skills-registry-validate");
+        assert!(
+            names.contains(&"skills-registry-search"),
+            "missing skills-registry-search"
+        );
+        assert!(
+            names.contains(&"skills-registry-resolve"),
+            "missing skills-registry-resolve"
+        );
+        assert!(
+            names.contains(&"skills-registry-validate"),
+            "missing skills-registry-validate"
+        );
         assert!(names.contains(&"mermaid-render"), "missing mermaid-render");
         assert!(names.contains(&"diagram-patch"), "missing diagram-patch");
         assert!(
@@ -1154,8 +1167,8 @@ mod tests {
 
         assert_eq!(
             tools.len(),
-            50,
-            "expected 50 tools from the built-in v2 skill registry"
+            63,
+            "expected 63 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();

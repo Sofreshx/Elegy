@@ -3399,40 +3399,48 @@ fn filtered_agent_skill_entries(selection: &AgentProfileSelection) -> Vec<Regist
         Ok(registry) => registry,
         Err(_) => return Vec::new(),
     };
-    let profile = selection.profile.as_ref().map(|profile| RegistryAgentCapabilityProfile {
-        schema_version: profile.schema_version.clone(),
-        profile_id: profile.profile_id.clone(),
-        include_skills: profile.include_skills.clone(),
-        include_capabilities: profile.include_capabilities.clone(),
-        exclude_capabilities: profile.exclude_capabilities.clone(),
-        always_include_router: profile.always_include_router,
-    });
+    let profile = selection
+        .profile
+        .as_ref()
+        .map(|profile| RegistryAgentCapabilityProfile {
+            schema_version: profile.schema_version.clone(),
+            profile_id: profile.profile_id.clone(),
+            include_skills: profile.include_skills.clone(),
+            include_capabilities: profile.include_capabilities.clone(),
+            exclude_capabilities: profile.exclude_capabilities.clone(),
+            always_include_router: profile.always_include_router,
+        });
     let selection = registry.profile_selection(profile.as_ref());
     registry.filtered_by_profile(&selection)
 }
 
-fn filtered_agent_skill_definitions(selection: &AgentProfileSelection) -> Vec<elegy_skills::SkillDefinitionV2> {
+fn filtered_agent_skill_definitions(
+    selection: &AgentProfileSelection,
+) -> Vec<elegy_skills::SkillDefinitionV2> {
     let registry = match load_builtin_registry() {
         Ok(registry) => registry,
         Err(_) => return Vec::new(),
     };
-    let profile = selection.profile.as_ref().map(|profile| RegistryAgentCapabilityProfile {
-        schema_version: profile.schema_version.clone(),
-        profile_id: profile.profile_id.clone(),
-        include_skills: profile.include_skills.clone(),
-        include_capabilities: profile.include_capabilities.clone(),
-        exclude_capabilities: profile.exclude_capabilities.clone(),
-        always_include_router: profile.always_include_router,
-    });
+    let profile = selection
+        .profile
+        .as_ref()
+        .map(|profile| RegistryAgentCapabilityProfile {
+            schema_version: profile.schema_version.clone(),
+            profile_id: profile.profile_id.clone(),
+            include_skills: profile.include_skills.clone(),
+            include_capabilities: profile.include_capabilities.clone(),
+            exclude_capabilities: profile.exclude_capabilities.clone(),
+            always_include_router: profile.always_include_router,
+        });
     let selection = registry.profile_selection(profile.as_ref());
     registry
         .filtered_by_profile(&selection)
         .into_iter()
         .filter_map(|skill| registry.skill_definition(&skill.summary.id))
         .map(|mut definition| {
-            definition.capabilities.retain(|capability| {
-                selection.selected_capability_ids.contains(&capability.id)
-            });
+            definition
+                .capabilities
+                .retain(|capability| selection.selected_capability_ids.contains(&capability.id));
             definition
         })
         .collect()
@@ -3481,7 +3489,10 @@ fn local_match_result(
         if keyword.to_ascii_lowercase().contains(query_lower) {
             score += 0.8;
             keyword_phrase_hit = true;
-            if !match_reasons.iter().any(|reason| reason == "discovery-keyword") {
+            if !match_reasons
+                .iter()
+                .any(|reason| reason == "discovery-keyword")
+            {
                 match_reasons.push("discovery-keyword".to_string());
                 field_hits += 1;
             }
@@ -3640,7 +3651,10 @@ fn agent_discovery_detail_entry_from_definition(
         summary: elegy_skills::RegistrySkillSummary {
             id: definition.identity.name.clone(),
             name: summary["name"].as_str().unwrap_or_default().to_string(),
-            description: summary["description"].as_str().unwrap_or_default().to_string(),
+            description: summary["description"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
             category: summary["category"].as_str().unwrap_or_default().to_string(),
             aliases: definition.identity.aliases.clone(),
             capabilities_count: definition.capabilities.len(),
@@ -3661,7 +3675,8 @@ fn agent_discovery_detail_entry_from_definition(
         match_result: match_result.cloned(),
     };
     let mut entry = agent_discovery_entry(&skill, false, profile_path);
-    entry["capabilities"] = serde_json::to_value(&definition.capabilities).unwrap_or_else(|_| json!([]));
+    entry["capabilities"] =
+        serde_json::to_value(&definition.capabilities).unwrap_or_else(|_| json!([]));
     entry
 }
 
@@ -3966,7 +3981,9 @@ fn print_skill_search_text(query: &str, results: &[RegistrySkillEntry]) {
             "{:<16} {:<32} {:<6.2} {}",
             result.summary.id,
             result.summary.name,
-            match_result.map(|match_result| match_result.score).unwrap_or(0.0),
+            match_result
+                .map(|match_result| match_result.score)
+                .unwrap_or(0.0),
             match_result
                 .map(|match_result| match_result.match_reasons.join(", "))
                 .unwrap_or_default()
@@ -4191,7 +4208,9 @@ fn execute_agent_discover_command(
                                     Some(&match_result),
                                 )
                             })
-                            .unwrap_or_else(|| agent_discovery_entry(&skill, detail, profile.as_deref()))
+                            .unwrap_or_else(|| {
+                                agent_discovery_entry(&skill, detail, profile.as_deref())
+                            })
                     } else {
                         agent_discovery_entry(&skill, detail, profile.as_deref())
                     })
