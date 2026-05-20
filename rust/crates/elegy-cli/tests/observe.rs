@@ -1,6 +1,9 @@
+#[cfg(windows)]
 use serde_json::Value;
+#[cfg(windows)]
 use std::process::Command;
 
+#[cfg(windows)]
 fn elegy() -> Command {
     Command::new(env!("CARGO_BIN_EXE_elegy"))
 }
