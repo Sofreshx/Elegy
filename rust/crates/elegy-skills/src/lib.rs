@@ -236,7 +236,7 @@ impl SkillRegistry {
                 }
             })
             .collect::<Vec<_>>();
-        results.sort_by(|a, b| compare_match_score(a, b));
+        results.sort_by(compare_match_score);
         results
     }
 

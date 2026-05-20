@@ -78,11 +78,10 @@ fn skills_resolve_returns_registry_match_data() {
     assert_eq!(body["status"], "ok");
     assert_eq!(body["data"]["query"], "repo status");
     assert_eq!(body["data"]["topSkill"]["id"], "repo");
-    assert!(body["data"]["results"]
+    assert!(!body["data"]["results"]
         .as_array()
         .expect("results array")
-        .first()
-        .is_some());
+        .is_empty());
 }
 
 #[test]

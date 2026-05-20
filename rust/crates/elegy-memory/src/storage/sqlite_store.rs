@@ -1757,7 +1757,7 @@ fn upsert_encoded_embedding(
 }
 
 fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>, StoreError> {
-    if bytes.len() % std::mem::size_of::<f32>() != 0 {
+    if !bytes.len().is_multiple_of(std::mem::size_of::<f32>()) {
         return Err(StoreError::Serialization(format!(
             "embedding blob length {} is not aligned to f32 components",
             bytes.len()

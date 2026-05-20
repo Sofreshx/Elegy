@@ -1305,6 +1305,7 @@ fn append_event(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_event(
     connection: &Transaction<'_>,
     entity_type: EntityType,

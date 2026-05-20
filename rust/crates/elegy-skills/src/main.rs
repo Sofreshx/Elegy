@@ -71,7 +71,7 @@ struct MachineContext {
 enum RegistryLoadError {
     Runtime(String),
     InvalidInput(String),
-    InvalidProfile(RegistryProfileSelection),
+    InvalidProfile(Box<RegistryProfileSelection>),
 }
 
 impl RegistryLoadError {
@@ -96,14 +96,16 @@ impl RegistryLoadError {
             RegistryLoadError::Runtime(message) | RegistryLoadError::InvalidInput(message) => {
                 message.clone()
             }
-            RegistryLoadError::InvalidProfile(selection) => selection_error_message(selection),
+            RegistryLoadError::InvalidProfile(selection) => {
+                selection_error_message(selection.as_ref())
+            }
         }
     }
 
     fn data(&self) -> Option<serde_json::Value> {
         match self {
             RegistryLoadError::InvalidProfile(selection) => Some(
-                serde_json::to_value(selection)
+                serde_json::to_value(selection.as_ref())
                     .unwrap_or_else(|_| json!({ "issues": selection.issues.clone() })),
             ),
             RegistryLoadError::Runtime(_) | RegistryLoadError::InvalidInput(_) => None,
@@ -490,7 +492,7 @@ fn load_registry(
     };
     let selection = registry.profile_selection(profile.as_ref());
     if selection.has_errors() {
-        return Err(RegistryLoadError::InvalidProfile(selection));
+        return Err(RegistryLoadError::InvalidProfile(Box::new(selection)));
     }
     Ok(SkillRegistryWithProfile {
         registry,
@@ -625,6 +627,7 @@ fn emit_registry_load_error(
             RegistryLoadError::InvalidProfile(selection) => {
                 eprintln!("{}", error.message());
                 for issue in selection
+                    .as_ref()
                     .issues
                     .iter()
                     .filter(|issue| issue.code.starts_with("REGISTRY-PROFILE-E"))

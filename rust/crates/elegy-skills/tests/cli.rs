@@ -58,11 +58,10 @@ fn direct_skills_binary_resolves_repo_status() {
         serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
     assert_eq!(stdout["data"]["topSkill"]["id"], "repo");
-    assert!(stdout["data"]["results"]
+    assert!(!stdout["data"]["results"]
         .as_array()
         .expect("results array")
-        .first()
-        .is_some());
+        .is_empty());
 }
 
 #[test]

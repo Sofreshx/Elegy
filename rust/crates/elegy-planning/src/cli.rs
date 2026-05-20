@@ -105,6 +105,7 @@ enum RoadmapCommand {
     Show(RoadmapShowArgs),
 }
 
+#[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 enum PlanCommand {
     Create(PlanCreateArgs),
@@ -825,9 +826,9 @@ fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
 }
 
 fn resolve_parse_error_format(raw_args: &[OsString]) -> OutputFormat {
-    if parse_flag_value(raw_args, "--json") {
-        OutputFormat::Json
-    } else if parse_flag_argument_value(raw_args, "--format").as_deref() == Some("json") {
+    if parse_flag_value(raw_args, "--json")
+        || parse_flag_argument_value(raw_args, "--format").as_deref() == Some("json")
+    {
         OutputFormat::Json
     } else {
         OutputFormat::Text
