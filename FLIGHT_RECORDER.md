@@ -2511,3 +2511,13 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: docs now call out the normal-mode Ollama prerequisite, the new `ELEGY_EMBEDDING_MODEL` and `ELEGY_ALLOW_NO_EMBEDDINGS` env vars, boot failure troubleshooting, degraded-mode semantics, and the new `embeddingStatus` signal exposed to clients.
 - Next: Phase 6
 - Notes: example stdio configs now show the new env surface explicitly instead of hiding degraded mode behind prose only
+
+## STATE_SNAPSHOT — WU12 Phase 6 — 2026-05-21 16:29
+- Phase: Wrap-up
+- Status: DONE
+- Artifacts: FLIGHT_RECORDER.md
+- Validation: local merge `git merge --no-ff feat/elegy-mcp-hardening` on `dev` -> PASS; final code validation remained `cargo test -p elegy-memory-mcp` PASS (48 passed; 0 failed), `cargo clippy --all-targets -p elegy-memory-mcp -- -D warnings` PASS, `cargo build -p elegy-memory-mcp --release --bins` PASS
+- Tests: final MCP crate status is 48/48 passing with the split regression inventory (`src/lib.rs`: 12, `src/main.rs`: 26, `src/stdio_main.rs`: 3, `tests/phase4_regressions.rs`: 4, `tests/stdio_bootstrap.rs`: 3, doc-tests: 0)
+- Findings: Objective B is complete through structured `embeddingStatus` reporting and Objective C is complete through fail-fast stdio bootstrap plus explicit degraded mode. Objective A was intentionally skipped on current dev after source audit disproved the stale binary/null-enum hypothesis and identified provider timeout as the only credible live hang source.
+- Next: remote sync blocked by repository permissions (`git push origin feat/elegy-mcp-hardening` returned HTTP 403 for user `TheHaricover`); local `dev` now contains the no-ff merge commit and is ready for a human-authorized push
+- Notes: merge commit message is `Merge hardening WU12: embeddingStatus and Ollama detection`; feature branch was not deleted yet because remote deletion cannot succeed while push permissions are blocked
