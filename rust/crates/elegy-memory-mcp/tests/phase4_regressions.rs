@@ -34,8 +34,24 @@ impl TestSession {
             MemoryRepository::new_with_embedding_provider(&db_path, binding, provider)
                 .expect("repository should build"),
         );
-        let server =
-            ElegyMemoryMcpServer::new(repository, Arc::new(NoopWriteAuditor));
+        Self::from_repository(temp_dir, repository).await
+    }
+
+    async fn new_without_provider(agent_id: &str) -> Self {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let binding =
+            MemoryBinding::new(DEFAULT_NAMESPACE, agent_id).expect("binding should build");
+        let repository =
+            Arc::new(MemoryRepository::new(&db_path, binding).expect("repository should build"));
+        Self::from_repository(temp_dir, repository).await
+    }
+
+    async fn from_repository(
+        temp_dir: TempDir,
+        repository: Arc<MemoryRepository>,
+    ) -> Self {
+        let server = ElegyMemoryMcpServer::new(repository, Arc::new(NoopWriteAuditor));
         let (server_transport, client_transport) = tokio::io::duplex(4096);
         let server_task = tokio::spawn(async move {
             let service = server
@@ -133,6 +149,26 @@ fn axis_embedding(axis: usize) -> Vec<f32> {
     embedding
 }
 
+#[derive(Debug)]
+struct FailingEmbeddingProvider;
+
+#[async_trait]
+impl EmbeddingProvider for FailingEmbeddingProvider {
+    async fn embed(&self, _text: &str) -> Result<Vec<f32>, EmbeddingError> {
+        Err(EmbeddingError::Provider(
+            "simulated embedding outage".to_string(),
+        ))
+    }
+
+    fn dimensions(&self) -> usize {
+        768
+    }
+
+    fn model_id(&self) -> &str {
+        "phase4-failing-provider"
+    }
+}
+
 #[tokio::test]
 async fn memory_store_accepts_explicit_null_defaulted_fields() {
     let content = "Explicit null defaults now deserialize across MCP memory tools.";
@@ -160,6 +196,7 @@ async fn memory_store_accepts_explicit_null_defaulted_fields() {
 
     assert_eq!(stored["action"], json!("added"));
     assert_eq!(stored["gateResult"], json!("accepted"));
+    assert_eq!(stored["embeddingStatus"], json!("ready"));
     assert_eq!(stored["memory"]["memoryType"], json!("observation"));
     assert_eq!(stored["memory"]["provenance"], json!("user-stated"));
     assert_eq!(stored["memory"]["importance"], json!(0.5));
@@ -239,6 +276,52 @@ async fn concept_only_semantic_search_recalls_stored_memory_in_top_results() {
     let stats = session.call_tool("memory_stats").await;
     assert_eq!(stats["totalCount"], json!(2));
     assert_eq!(stats["staleEmbeddingsCount"], json!(0));
+
+    session.shutdown().await;
+}
+
+#[tokio::test]
+async fn memory_store_reports_failed_embedding_status_when_provider_errors() {
+    let session = TestSession::new(
+        Arc::new(FailingEmbeddingProvider),
+        "phase4-failed-embedding-agent",
+    )
+    .await;
+
+    let stored = session
+        .call_tool_with_arguments(
+            "memory_store",
+            json!({
+                "content": "Embedding failures should still surface as structured MCP responses."
+            }),
+        )
+        .await;
+
+    assert_eq!(stored["action"], json!("added"));
+    assert_eq!(stored["embeddingStatus"], json!("failed"));
+    let stats = session.call_tool("memory_stats").await;
+    assert_eq!(stats["staleEmbeddingsCount"], json!(1));
+
+    session.shutdown().await;
+}
+
+#[tokio::test]
+async fn memory_store_reports_skipped_no_provider_when_embeddings_are_disabled() {
+    let session = TestSession::new_without_provider("phase4-no-provider-agent").await;
+
+    let stored = session
+        .call_tool_with_arguments(
+            "memory_store",
+            json!({
+                "content": "Disabled embeddings should be explicit to MCP clients."
+            }),
+        )
+        .await;
+
+    assert_eq!(stored["action"], json!("added"));
+    assert_eq!(stored["embeddingStatus"], json!("skipped_no_provider"));
+    let stats = session.call_tool("memory_stats").await;
+    assert_eq!(stats["staleEmbeddingsCount"], json!(1));
 
     session.shutdown().await;
 }
