@@ -25,12 +25,13 @@ elegy-memory = { version = "0.1.0", path = "../elegy-memory" }
 jsonwebtoken = "9.3.1"
 rand = "0.8.5"
 rmcp = { workspace = true, features = ["macros"] }
+reqwest.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 sha2 = "0.10.8"
 thiserror.workspace = true
 time.workspace = true
-tokio = { workspace = true, features = ["net"] }
+tokio = { workspace = true, features = ["net", "process"] }
 tracing = "0.1.41"
 tracing-subscriber = { version = "0.3.19", features = ["env-filter", "fmt", "json"] }
 url.workspace = true
@@ -39,8 +40,7 @@ base64.workspace = true
 
 [dev-dependencies]
 async-trait.workspace = true
-rmcp = { workspace = true, features = ["client", "server", "transport-io"] }
-reqwest.workspace = true
+rmcp = { workspace = true, features = ["client", "server", "transport-child-process", "transport-io"] }
 tempfile = "3.19.1"
 
 [lints]
