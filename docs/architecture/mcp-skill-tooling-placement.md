@@ -32,7 +32,7 @@ Use the following order when deciding where a feature belongs:
 | MCP analysis | Governed descriptor and analysis-result artifacts under `contracts/`, plus documented projection semantics | Rust crates such as `elegy-mcp`, `elegy-runtime`, and the Rust CLI | Host-specific UX or transport wrappers stay local | Analysis execution is Rust-first; neutral artifacts keep the stable shape. |
 | Dynamic MCP creation | Descriptor fragments, manifests, or other stable serialized shapes under governed artifacts when they need to cross runtime boundaries | Rust tooling or CLI when creation is reusable and self-contained | Product-local server wiring, transport, or auth stays local | Dynamic creation should not become a broad shared runtime surface in Elegy. |
 | Skill creation from an MCP slice | Governed skill artifacts such as `skill-definition` and related discovery outputs | Rust generation from analyzed MCP slices, typically through `elegy-tooling`, `elegy-skills`, and the general `elegy` compatibility surface | App-local post-processing or host-specific registration stays local | The slice-to-skill executable path is Rust-first; only the stable artifacts stay authoritative. |
-| Portable plugin package | `elegy-plugin-package/v1` schema and fixtures under `contracts/` | Validation and export support only in Rust | Install state, policy, approvals, secrets, runtime execution, and evidence stay local to the host | The package is a governed bundle contract, not an Elegy plugin runtime. |
+| Portable plugin package | `elegy-plugin-package/v1` schema and fixtures under `contracts/` | Validation and derived projection export support in Rust | Install state, policy, approvals, secrets, runtime execution, and evidence stay local to the host | The package is a governed bundle contract, not an Elegy plugin runtime. |
 | Dynamic CLI tools | Optional manifest/descriptor contract only if cross-runtime interoperability requires one | Rust CLI or future Rust tooling crate | App-local invocation policies stay local | Treat as a Rust tooling problem, not a neutral authority artifact. |
 
 ## MCP analysis
@@ -104,8 +104,15 @@ The package contract remains portable. It must not include host workspace ids,
 approval decisions, secret refs, runtime sessions, adapter handles, or local
 trust state. A consuming host owns those concerns after import.
 
-Elegy V1 support is contract and validation support only. Do not add a broad
-Elegy plugin runtime for this lane without a separate placement decision.
+Elegy V1 support currently includes contract validation plus conservative
+derived projection export such as `elegy generate codex-plugin`. Do not add a
+broad Elegy plugin runtime for this lane without a separate placement decision.
+
+Current Codex projection support is intentionally narrow: generated
+`.codex-plugin/plugin.json` and `skills/` remain derived outputs, while
+`.app.json`, `.mcp.json`, connector auth/state, hooks policy, and install UX
+remain outside the current portable-package projection slice unless the
+governed package contract grows the required neutral metadata.
 
 ## Dynamic CLI tools
 

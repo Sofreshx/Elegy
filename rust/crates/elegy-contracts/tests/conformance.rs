@@ -23,6 +23,7 @@ use elegy_contracts::{
 use std::collections::BTreeSet;
 use std::env;
 use std::fs;
+use std::path::Path;
 use std::process;
 use std::time::{SystemTime, UNIX_EPOCH};
 use zip::ZipArchive;
@@ -258,6 +259,53 @@ fn upstream_skill_discovery_fixture_round_trips_as_projection() {
     let reparsed = serde_json::from_str(&json).expect("deserialize discovery index");
 
     assert_eq!(index, reparsed);
+}
+
+#[test]
+fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
+    let repo_root = resolve_upstream_contracts_dir()
+        .parent()
+        .expect("repo root from contracts dir")
+        .to_path_buf();
+    let fixtures = [
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-memory.json",
+            ".agents/skills/elegy-memory/SKILL.md",
+        ),
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-mcp.json",
+            ".agents/skills/elegy-mcp/SKILL.md",
+        ),
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-skills.json",
+            ".agents/skills/elegy-skills/SKILL.md",
+        ),
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
+            ".agents/skills/elegy-mermaid/SKILL.md",
+        ),
+    ];
+
+    for (fixture_path, expected_vault_ref) in fixtures {
+        let path = repo_root.join(fixture_path);
+        let index = serde_json::from_str::<elegy_contracts::SkillDiscoveryIndex>(
+            &fs::read_to_string(&path).expect("read dedicated skill discovery fixture"),
+        )
+        .expect("parse dedicated skill discovery fixture");
+
+        assert_eq!(
+            index.entries.len(),
+            1,
+            "fixture {fixture_path} should have one entry"
+        );
+        let manifest = &index.entries[0].manifest;
+        assert_eq!(manifest.vault_ref.as_deref(), Some(expected_vault_ref));
+        assert_eq!(
+            manifest.source_kind,
+            elegy_contracts::SkillSourceKind::Generated
+        );
+        assert!(repo_root.join(Path::new(expected_vault_ref)).is_file());
+    }
 }
 
 #[test]

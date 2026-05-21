@@ -29,8 +29,8 @@
       "manifest": {
         "id": "elegy-skills",
         "loadMode": "onDemand",
-        "vaultRef": ".github/skills/elegy-skills/SKILL.md",
-        "sourceKind": "manual",
+        "vaultRef": ".agents/skills/elegy-skills/SKILL.md",
+        "sourceKind": "generated",
         "materializationKind": "declared"
       }
     }

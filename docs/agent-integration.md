@@ -116,9 +116,14 @@ approval state, secret refs, runtime sessions, adapter handles, or local trust
 decisions. Hosts such as Holon import the portable package, then apply local
 policy, readiness, approvals, secrets, evidence, and execution rules.
 
-`SKILL.md` files, MCP descriptors, wrapper folders, and generated discovery
-indexes remain derived or adapter surfaces. The governed package and skill
-schemas under `contracts/schemas/` remain the authority roots.
+`SKILL.md` files, including the repo-local `.agents/skills/**` and
+`.github/skills/**` mirrors, MCP descriptors, wrapper folders, and generated
+discovery indexes remain derived or adapter surfaces. The governed package and
+skill schemas under `contracts/schemas/` remain the authority roots.
+
+Portable packages may also be projected into conservative Codex plugin folders
+through `elegy generate codex-plugin`, but those generated `.codex-plugin/`
+and `skills/` outputs remain derived adapter surfaces rather than authority.
 
 ## Optional MCP Adapter
 

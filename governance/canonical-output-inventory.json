@@ -267,6 +267,22 @@
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-mermaid.json"
     },
     {
+      "source": ".agents/skills/elegy-memory/SKILL.md",
+      "generated": ".github/skills/elegy-memory/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-mcp/SKILL.md",
+      "generated": ".github/skills/elegy-mcp/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-skills/SKILL.md",
+      "generated": ".github/skills/elegy-skills/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-mermaid/SKILL.md",
+      "generated": ".github/skills/elegy-mermaid/SKILL.md"
+    },
+    {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-forge-request.minimal.json"
     },

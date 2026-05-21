@@ -63,6 +63,7 @@ of Elegy instead of exposing every built-in tool.
 | --- | --- |
 | `elegy agent manifest/check/discover` | Host onboarding, profile validation, and profile-filtered discovery. |
 | `elegy skills list/search/resolve/get/capability/validate` | Umbrella compatibility surface over the built-in governed skill registry. |
+| `elegy generate skills/codex-plugin` | Lower-level contributor tooling for MCP-to-skill generation and conservative Codex plugin projection from portable package metadata. |
 | `elegy run` | Optional MCP stdio host over the same capability registry. |
 | `elegy diagram ...` | Semantic diagram creation, mutation, explanation, and rendering. |
 | `elegy mermaid ...` | Mermaid rendering, reverse projection, and narration. |
@@ -103,6 +104,21 @@ elegy-skills search --query "repo status" --json
 elegy-skills resolve --query "repo status" --json
 elegy-skills validate --file ./contracts/fixtures/skill-definition-v2.elegy-repo.json --json
 ```
+
+## Package Projection Tools
+
+Portable package metadata can also be projected into conservative derived Codex
+plugin bundles:
+
+```bash
+elegy generate codex-plugin --package ./contracts/fixtures/elegy-plugin-package-v1.minimal.json --output-dir ./artifacts/codex
+```
+
+Current scope:
+
+- generates `.codex-plugin/plugin.json` and `skills/`
+- treats Codex files as derived outputs only
+- does not yet generate `.mcp.json`, `.app.json`, hooks, or marketplace metadata
 
 ## Capability Profiles
 

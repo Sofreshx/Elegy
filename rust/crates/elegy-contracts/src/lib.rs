@@ -317,6 +317,11 @@ pub fn validate_elegy_plugin_package(
     }
     if package.identity.name.trim().is_empty() {
         issues.push("identity.name must not be empty.".to_string());
+    } else if !is_codex_plugin_slug(&package.identity.name) {
+        issues.push(
+            "identity.name must be a Codex plugin slug containing only lowercase ASCII letters, digits, or '-'."
+                .to_string(),
+        );
     }
     if package.identity.version.trim().is_empty() {
         issues.push("identity.version must not be empty.".to_string());
@@ -3198,6 +3203,14 @@ fn validate_portable_relative_path(field: &str, value: &str, issues: &mut Vec<St
     }
 }
 
+fn is_codex_plugin_slug(value: &str) -> bool {
+    let value = value.trim();
+    !value.is_empty()
+        && value
+            .chars()
+            .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+}
+
 fn validate_package_capability_ref(
     field: &str,
     capability_ref: &ElegyPluginPackageCapabilityRef,
@@ -3273,6 +3286,69 @@ fn usage_total_is_inconsistent(usage: &AgentUsage) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn validate_elegy_plugin_package_rejects_unsafe_plugin_output_names() {
+        for invalid_name in [
+            "../target",
+            "nested/name",
+            r"nested\\name",
+            "foo:bar",
+            "DemoPlugin",
+        ] {
+            let package = ElegyPluginPackage {
+                schema_version: ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION.to_string(),
+                identity: ElegyPluginPackageIdentity {
+                    package_id: "elegy.demo-plugin".to_string(),
+                    name: invalid_name.to_string(),
+                    version: "0.1.0".to_string(),
+                    display_name: None,
+                },
+                metadata: None,
+                components: ElegyPluginPackageComponents {
+                    skill_definitions: vec![ElegyPluginPackageSkillDefinitionComponent {
+                        id: "demo-skill".to_string(),
+                        definition_ref: None,
+                        definition: Some(SkillDefinitionV2 {
+                            skill_format: "elegy-skill-definition".to_string(),
+                            skill_version: 2,
+                            identity: SkillIdentityV2 {
+                                namespace: "elegy".to_string(),
+                                name: "demo-plugin".to_string(),
+                                version: "0.1.0".to_string(),
+                                ..Default::default()
+                            },
+                            capabilities: vec![SkillCapability {
+                                id: "demo-cap".to_string(),
+                                name: "Demo Cap".to_string(),
+                                description: "Demo capability".to_string(),
+                                implementation: Some(SkillImplementation {
+                                    execution_type: "subprocess".to_string(),
+                                    executable_name: "demo".to_string(),
+                                    arguments: Vec::new(),
+                                }),
+                                ..Default::default()
+                            }],
+                            lifecycle_state: "active".to_string(),
+                            ..Default::default()
+                        }),
+                    }],
+                    ..Default::default()
+                },
+                host_policy_hints: None,
+            };
+
+            let validation = validate_elegy_plugin_package(&package);
+            assert!(
+                validation
+                    .issues
+                    .iter()
+                    .any(|issue| issue.contains("identity.name must be a Codex plugin slug")),
+                "expected invalid plugin slug issue for {invalid_name:?}, got {:?}",
+                validation.issues
+            );
+        }
+    }
 
     #[test]
     fn parse_v2_minimal_fixture() {

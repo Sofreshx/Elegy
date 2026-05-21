@@ -117,7 +117,7 @@ Current governed workflow artifacts in that bundle include both the portable wor
 
 Current governed package artifacts in that bundle include the portable plugin
 package contract. This is metadata and validation support for consuming hosts,
-not an Elegy plugin runtime:
+plus conservative derived projection tooling support, not an Elegy plugin runtime:
 
 - `elegy-plugin-package-v1.schema.json`
 - `fixtures/elegy-plugin-package-v1.minimal.json`
@@ -134,7 +134,9 @@ Current governed dedicated-surface skill artifacts in that bundle include:
 - `fixtures/skill-definition-v2.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-mermaid.json`
 
-The repo carries `.github/skills/elegy-memory/SKILL.md`, `.github/skills/elegy-mcp/SKILL.md`, `.github/skills/elegy-skills/SKILL.md`, and `.github/skills/elegy-mermaid/SKILL.md` as repo-local non-authoritative contributor-routing files for those surfaces. Those markdown files are not part of the governed contracts bundle.
+The repo carries `.agents/skills/elegy-memory/SKILL.md`, `.agents/skills/elegy-mcp/SKILL.md`, `.agents/skills/elegy-skills/SKILL.md`, and `.agents/skills/elegy-mermaid/SKILL.md` as repo-local host-facing derived mirrors for those surfaces. The repo also carries matching `.github/skills/.../SKILL.md` files as repo-local non-authoritative contributor-routing mirrors. Those markdown files are not part of the governed contracts bundle.
+
+The current lower-level contributor tooling also includes `elegy generate codex-plugin`, which projects a portable package into a conservative local Codex plugin folder containing `.codex-plugin/plugin.json` and `skills/`. That generated plugin folder is a derived local output and is not currently a release asset family.
 
 ## CLI archive
 
@@ -156,7 +158,7 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, lower-level `generate codex-plugin`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
 
 ## Wrapper archive
 

@@ -313,6 +313,247 @@ fn analyze_and_generate_commands_use_same_descriptor_input() {
 }
 
 #[test]
+fn generate_codex_plugin_command_writes_projected_plugin_bundle() {
+    let temp_dir = unique_temp_dir("elegy-cli-generate-codex-plugin");
+    let package_path = temp_dir.join("demo-plugin-package.json");
+    let output_dir = temp_dir.join("generated-codex-plugin");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.demo-plugin",
+    "name": "demo-plugin",
+    "version": "0.1.0",
+    "displayName": "Elegy Demo Plugin"
+  },
+  "metadata": {
+    "description": "Portable package fixture for a governed skill definition and optional MCP projection metadata.",
+    "tags": ["plugin", "demo"],
+    "license": "MIT",
+    "homepage": "https://example.com/demo-plugin"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "demo-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "demo-plugin",
+            "version": "0.1.0",
+            "displayName": "Demo Plugin Skill"
+          },
+          "metadata": {
+            "displayName": "Demo Plugin Skill",
+            "description": "Demonstrates portable plugin package capability metadata.",
+            "category": "demo",
+            "author": "Elegy",
+            "tags": ["plugin", "demo"],
+            "documentationUri": "docs/architecture/codex-plugin-projection.md"
+          },
+          "capabilities": [
+            {
+              "id": "demo-search",
+              "name": "Demo Search",
+              "description": "Search demo package data.",
+              "implementation": {
+                "executionType": "mcp",
+                "executableName": "elegy-demo-mcp",
+                "arguments": ["search", "--query", "${query}", "--json"]
+              },
+              "input": {
+                "parameters": [
+                  {
+                    "name": "query",
+                    "type": "string",
+                    "description": "Search query.",
+                    "required": true
+                  }
+                ]
+              },
+              "execution": {
+                "mode": "requestResponse",
+                "isDeterministic": true,
+                "hasSideEffects": false,
+                "timeoutSeconds": 30
+              }
+            }
+          ],
+          "governance": {
+            "riskLevel": "low",
+            "approvalRequirement": "none",
+            "policyRefs": []
+          },
+          "origin": {
+            "materializationKind": "declared",
+            "sourceKind": "manual",
+            "sourceRef": "contracts/fixtures/elegy-plugin-package-v1.minimal.json"
+          },
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "instructionSkills": [
+      {
+        "id": "demo-instructions",
+        "path": "skills/demo/SKILL.md",
+        "description": "Optional instruction surface derived from the governed skill definition."
+      }
+    ],
+    "mcpProjections": [
+      {
+        "id": "demo-mcp",
+        "serverName": "elegy-demo-mcp",
+        "capabilityRefs": [
+          {
+            "skill": "elegy.demo-plugin",
+            "capability": "demo-search"
+          }
+        ]
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "demo-search-mcp",
+        "skill": "elegy.demo-plugin",
+        "capability": "demo-search",
+        "lane": "mcp",
+        "supportsDryRun": true,
+        "sideEffectClass": "none",
+        "projection": {
+          "projections": ["function_calling", "mcp"],
+          "functionName": "demo_search",
+          "mcpToolName": "demo.search"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write package fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "generate",
+            "codex-plugin",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--output-dir",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy generate codex-plugin");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let plugin_root = output_dir.join("demo-plugin");
+    assert!(plugin_root
+        .join(".codex-plugin")
+        .join("plugin.json")
+        .is_file());
+    assert!(plugin_root
+        .join("skills")
+        .join("skill-elegy_2edemo-plugin")
+        .join("SKILL.md")
+        .is_file());
+    assert!(plugin_root
+        .join("skills")
+        .join("instruction-demo")
+        .join("SKILL.md")
+        .is_file());
+    assert!(!plugin_root.join(".mcp.json").exists());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"ok\""));
+    assert!(stdout.contains("\"command\": [\n    \"generate\",\n    \"codex-plugin\"\n  ]"));
+    assert!(stdout.contains("\"pluginName\": \"demo-plugin\""));
+    assert!(stdout.contains("\"mcpServersEmitted\": false"));
+}
+
+#[test]
+fn generate_codex_plugin_command_rejects_unsafe_plugin_output_name() {
+    let temp_dir = unique_temp_dir("elegy-cli-generate-codex-plugin-invalid-name");
+    let package_path = temp_dir.join("demo-plugin-package.json");
+    let output_dir = temp_dir.join("generated-codex-plugin");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.demo-plugin",
+    "name": "nested/name",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "demo-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "demo-plugin",
+            "version": "0.1.0"
+          },
+          "capabilities": [
+            {
+              "id": "demo-cap",
+              "name": "Demo Cap",
+              "description": "Demo capability",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "demo",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write invalid package fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "generate",
+            "codex-plugin",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--output-dir",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--format",
+            "json",
+        ])
+        .output()
+        .expect("run elegy generate codex-plugin invalid package");
+
+    assert!(!output.status.success());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("CLI-PLUGIN-001"));
+    assert!(stdout.contains("identity.name must be a Codex plugin slug"));
+    assert!(!output_dir.exists());
+}
+
+#[test]
 fn run_dry_run_command_matches_http_example_catalog() {
     let example = rust_workspace_root().join("examples/http-minimal");
     let expected: serde_json::Value = serde_json::from_str(

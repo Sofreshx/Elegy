@@ -17,7 +17,7 @@ That means:
 - `SKILL.md` materialization is an output format, not the source of truth
 - Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
 
-The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition-v2.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and `.github/skills/elegy-memory/SKILL.md` is a repo-local non-authoritative contributor-routing output only.
+The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill-definition-v2.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and the repo-local `SKILL.md` lanes remain non-authoritative rendered mirrors only.
 
 The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skills` do not change that authority split. They are pointer shells only, not skill authority surfaces, implementation centers, or release surfaces.
 
@@ -70,3 +70,5 @@ Current confidence comes from the surviving validation and export flows:
 - Rust CI for formatting, linting, and tests in `.github/workflows/rust-ci.yml`
 
 Future work should build on this split rather than reopening skill authority. New reusable execution logic belongs in Rust, and new durable skill truth belongs in governed artifacts.
+
+See [Agent Skill Bridge Mirrors](agent-skill-bridge-mirrors.md) for the current repo-local `.agents/skills/**` and `.github/skills/**` mirror split.

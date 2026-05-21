@@ -37,8 +37,8 @@ use elegy_skills::{
     RegistrySkillEntry, SkillRegistry, SkillRegistryQuery,
 };
 use elegy_tooling::{
-    generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
-    ToolingError as SkillsSurfaceError,
+    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
+    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, ToolingError as ToolingSurfaceError,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -226,6 +226,15 @@ enum GenerateCommand {
         descriptor: PathBuf,
         #[arg(long)]
         output_dir: Option<PathBuf>,
+        #[arg(long)]
+        force: bool,
+    },
+    #[command(name = "codex-plugin")]
+    CodexPlugin {
+        #[arg(long)]
+        package: PathBuf,
+        #[arg(long)]
+        output_dir: PathBuf,
         #[arg(long)]
         force: bool,
     },
@@ -990,6 +999,14 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     force,
                 },
         } => execute_generate_skills_command(descriptor, output_dir, force, format),
+        Command::Generate {
+            command:
+                GenerateCommand::CodexPlugin {
+                    package,
+                    output_dir,
+                    force,
+                },
+        } => execute_generate_codex_plugin_command(package, output_dir, force, format),
         Command::Validate {
             command: ValidateCommand::Config,
         } => execute_config_command(locator, format, vec!["validate", "config"]),
@@ -1786,7 +1803,33 @@ fn execute_generate_skills_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_skills_error(error, format, vec!["generate", "skills"], json!({})),
+        Err(error) => emit_tooling_error(error, format, vec!["generate", "skills"], json!({})),
+    }
+}
+
+fn execute_generate_codex_plugin_command(
+    package: PathBuf,
+    output_dir: PathBuf,
+    force: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match generate_codex_plugin_from_package_file(&package, &output_dir, force) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generate", "codex-plugin"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["generate", "codex-plugin"], json!({}))
+        }
     }
 }
 
@@ -2360,8 +2403,8 @@ fn emit_mcp_error<T: Serialize>(
     )
 }
 
-fn emit_skills_error<T: Serialize>(
-    error: SkillsSurfaceError,
+fn emit_tooling_error<T: Serialize>(
+    error: ToolingSurfaceError,
     format: OutputFormat,
     command: Vec<&str>,
     data: T,
@@ -2369,7 +2412,7 @@ fn emit_skills_error<T: Serialize>(
     emit_diagnostics(
         format,
         command,
-        skills_error_diagnostics(error),
+        tooling_error_diagnostics(error),
         data,
         "invalid",
         exit_invalid(),
@@ -2779,6 +2822,24 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     }
 }
 
+fn print_generated_codex_plugin_text(result: &GeneratedCodexPluginArtifacts) {
+    println!("generated Codex plugin projection");
+    println!("source: {}", result.source_package);
+    println!("plugin: {} {}", result.plugin_name, result.plugin_version);
+    println!("manifest: {}", result.emitted_components.plugin_manifest);
+    println!("skills dir: {}", result.emitted_components.skills_dir);
+    println!("skills: {}", result.emitted_components.skills_count);
+    println!("apps emitted: {}", result.emitted_components.apps_emitted);
+    println!(
+        "mcp servers emitted: {}",
+        result.emitted_components.mcp_servers_emitted
+    );
+    println!("hooks emitted: {}", result.emitted_components.hooks_emitted);
+    for path in &result.written_files {
+        println!("written: {path}");
+    }
+}
+
 fn print_contracts_export_text(result: &ContractsBundleExport) {
     println!("contracts bundle exported");
     println!("output: {}", result.output_path.display());
@@ -2980,9 +3041,9 @@ fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
     }
 }
 
-fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
+fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
     match error {
-        SkillsSurfaceError::Io {
+        ToolingSurfaceError::Io {
             operation,
             path,
             source,
@@ -2991,12 +3052,12 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
             format!("failed to {operation} {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        SkillsSurfaceError::Json { path, source } => vec![Diagnostic::error(
+        ToolingSurfaceError::Json { path, source } => vec![Diagnostic::error(
             "CLI-TOOLING-002",
             format!("failed to parse JSON in {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        SkillsSurfaceError::InvalidMcpDescriptor { path, issues } => issues
+        ToolingSurfaceError::InvalidMcpDescriptor { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-001", issue)
@@ -3006,7 +3067,7 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        SkillsSurfaceError::InvalidMcpAnalysis { path, issues } => issues
+        ToolingSurfaceError::InvalidMcpAnalysis { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-002", issue)
@@ -3016,7 +3077,7 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        SkillsSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
+        ToolingSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-SKILL-001", issue)
@@ -3024,11 +3085,21 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     .with_hint("generated skill definitions must remain valid governed artifacts")
             })
             .collect(),
-        SkillsSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
+        ToolingSurfaceError::InvalidPluginPackage { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-PLUGIN-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint(
+                        "ensure the portable package matches the governed elegy-plugin-package contract",
+                    )
+            })
+            .collect(),
+        ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
         )],
-        SkillsSurfaceError::OutputExists { path } => vec![Diagnostic::error(
+        ToolingSurfaceError::OutputExists { path } => vec![Diagnostic::error(
             "CLI-OUTPUT-001",
             format!("output already exists: {}", path.display()),
         )

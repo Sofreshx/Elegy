@@ -62,7 +62,7 @@ The current shipped operator surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, 
 
 What the repo proves today:
 
-- the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, umbrella `skills ...`, and lower-level `generate skills`
+- the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, umbrella `skills ...`, and lower-level `generate skills` / `generate codex-plugin`
 - the in-repo `elegy-memory` surface is shipped as a bounded local operator surface
 - the in-repo `elegy-mcp` surface is shipped as a thin dedicated wrapper over descriptor authoring and descriptor analysis
 - the in-repo `elegy-skills` surface is shipped as a thin dedicated wrapper over governed skill-registry access and validation

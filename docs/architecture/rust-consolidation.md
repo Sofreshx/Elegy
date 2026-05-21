@@ -49,6 +49,7 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `author mcp`
 - `analyze mcp`
 - `generate skills`
+- `generate codex-plugin`
 
 Those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
 
