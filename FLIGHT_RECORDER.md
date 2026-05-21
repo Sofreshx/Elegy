@@ -2451,3 +2451,63 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: Bug A is fixed by normalizing explicit `null` to omission/default semantics across omission-valid MCP tool inputs; Bug B is fixed by wiring the stdio Ollama embedding provider at store time and routing MCP `memory_search` through the semantic/hybrid crate search path with agent-filtered ranking; final key commits on the feature branch are `a61ae35`, `2cf7c43`, and `f0fb93d`
 - Next: push `feat/elegy-mcp-bugfixes`, merge `--no-ff` into `dev`, push `dev`, and delete the feature branch locally and remotely
 - Notes: recorded on the feature branch immediately before merge so the append-only snapshot reaches `dev` through the merge commit without requiring a direct follow-up commit on `dev`; `agent-lifecycle-start.ps1` and `agent-lifecycle-end.ps1` were not present in the repo or PATH
+
+## STATE_SNAPSHOT — WU12 Phase 0 — 2026-05-21 15:40
+- Phase: Pre-flight et reproduction des 3 symptômes
+- Status: BLOCKED
+- Artifacts: C:\Users\Romain\.copilot\session-state\df155a09-da5c-4ace-b77b-6f0deb9dbac3\plan.md; FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp -> PASS (39 passed; 0 failed); cargo clippy --all-targets -p elegy-memory-mcp -- -D warnings -> PASS
+- Tests: baseline crate status is 39/39 passing before any WU12 change
+- Findings: live source does not match the Phase 0 Bug A premise. `rust/crates/elegy-memory-mcp/src/memory_tools.rs` currently models `memoryType`, `provenance`, and `sensitivity` as `Option<...>` with `#[serde(default)]`, and checked-in regression coverage asserts explicit null is accepted successfully (`src/tests.rs` test `defaulted_memory_tool_fields_accept_explicit_null`; `tests/phase4_regressions.rs` test `memory_store_accepts_explicit_null_defaulted_fields`). This means the requested non-Option-enum timeout bug is not reproducible from the current branch state and the requested fix would be a contract reversal, not a direct hardening patch against an observed local failure.
+- Next: WAITING_HUMAN — clarify whether WU12 should intentionally reverse the current explicit-null-as-default contract in `elegy-memory-mcp`, or whether the pasted work order targeted a different code state than current `dev`
+- Notes: no code changes were applied because the work order explicitly requires stopping when Phase 0 reproduction diverges from the expected symptom; `agent-lifecycle-start.ps1` was not present in PATH or repo
+
+## STATE_SNAPSHOT — WU12 Phase 1 — 2026-05-21 16:12
+- Phase: Audit Bug A v2 et décision de skip
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/src/memory_tools.rs; rust/crates/elegy-memory-mcp/src/server.rs; rust/crates/elegy-memory-mcp/src/tests.rs; rust/crates/elegy-memory-mcp/tests/phase4_regressions.rs; rust/crates/elegy-memory/src/gate.rs; rust/crates/elegy-memory/src/embedding/ollama.rs; rust/crates/elegy-memory/src/storage/sqlite_store.rs; FLIGHT_RECORDER.md
+- Validation: source audit only; no code change in this phase
+- Tests: current explicit-null acceptance remains covered by `src/tests.rs::defaulted_memory_tool_fields_accept_explicit_null` and `tests/phase4_regressions.rs::memory_store_accepts_explicit_null_defaulted_fields`
+- Findings: current dev HEAD is factual and consistent: `memoryType`, `provenance`, and `sensitivity` are Option-wrapped MCP args with `#[serde(default)]`, so explicit null deserializes immediately and normalizes to defaults. The `memory_store` handler has no channel hop or deadlock path: `parse_tool_arguments()` is synchronous serde, then the only awaited operations are `DefaultSalienceGate::evaluate()` and `SqliteMemoryStore::store()`. Both can hit Ollama in provider-backed mode; gate novelty embedding can wait up to the Ollama request timeout and store-time embedding can wait again, so an unavailable provider is the only credible current-source explanation for multi-minute client-visible hangs or retries.
+- Next: Phase 2
+- Notes: per user clarification, Bug A v2 is skipped on current dev because the stale-binary/null-enum hypothesis was not reproducible from source; hardening continues on embeddingStatus and boot detection
+
+## STATE_SNAPSHOT — WU12 Phase 2 — 2026-05-21 16:13
+- Phase: Add `embeddingStatus` to `memory_store`
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/src/memory_tools.rs; rust/crates/elegy-memory-mcp/src/tests.rs; rust/crates/elegy-memory-mcp/tests/phase4_regressions.rs; FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp --color never -> PASS (48 passed; 0 failed)
+- Tests: added provider-backed status coverage for `ready`, `failed`, and `skipped_no_provider`; updated MCP null-default regression to assert the new structured field
+- Findings: `memory_store` now returns a structured `embeddingStatus` field. Status is derived from the resulting memory freshness plus repository mode: fresh vectors -> `ready`, stale vectors with a configured provider -> `failed`, stale vectors without a provider -> `skipped_no_provider`.
+- Next: Phase 3
+- Notes: no `elegy-memory` public API or schema changes were required; the response change stayed inside `elegy-memory-mcp`
+
+## STATE_SNAPSHOT — WU12 Phase 3 — 2026-05-21 16:14
+- Phase: Détection Ollama au boot + mode dégradé
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/Cargo.toml; rust/crates/elegy-memory-mcp/src/stdio_main.rs; rust/crates/elegy-memory-mcp/tests/phase4_regressions.rs; rust/Cargo.lock; FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp --color never -> PASS (48 passed; 0 failed)
+- Tests: added stdio child-process regressions for Ollama unreachable, embedding model missing, and degraded startup with `ELEGY_ALLOW_NO_EMBEDDINGS=true`
+- Findings: stdio startup now validates `OLLAMA_URL/api/tags` with a 5-second timeout, requires the configured `ELEGY_EMBEDDING_MODEL`, and exits 1 with explicit remediation when boot prerequisites are missing. `ELEGY_ALLOW_NO_EMBEDDINGS=true` bypasses provider wiring intentionally, emits a loud warning on stderr, and routes stores to `embeddingStatus: skipped_no_provider`.
+- Next: Phase 4
+- Notes: the hardening stays scoped to the stdio binary; HTTP transport remains provider-less and now surfaces `skipped_no_provider` when it stores memories
+
+## STATE_SNAPSHOT — WU12 Phase 4 — 2026-05-21 16:15
+- Phase: Tests E2E consolidés
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/tests/phase4_regressions.rs; rust/crates/elegy-memory-mcp/src/stdio_main.rs; rust/crates/elegy-memory-mcp/src/memory_tools.rs; FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp --color never -> PASS (48 passed; 0 failed); cargo clippy --all-targets -p elegy-memory-mcp -- -D warnings -> PASS; cargo build -p elegy-memory-mcp --release --bins -> PASS
+- Tests: final MCP crate count is 48/48 passing (`src/lib.rs`: 12, `src/main.rs`: 26, `src/stdio_main.rs`: 3, `tests/phase4_regressions.rs`: 7, doc-tests: 0); delta vs baseline: 39 -> 48
+- Findings: live child-process coverage now proves fail-fast boot on dead Ollama, fail-fast boot on missing model, degraded startup without provider, and structured embedding-status reporting across provider success/failure/no-provider paths.
+- Next: Phase 5
+- Notes: because Phase 1 was intentionally skipped, the new regression set is centered on Objectives B and C plus the preserved explicit-null contract
+
+## STATE_SNAPSHOT — WU12 Phase 5 — 2026-05-21 16:16
+- Phase: Documentation
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/README.md; rust/crates/elegy-memory-mcp/docs/CONFIG.md; rust/crates/elegy-memory-mcp/docs/claude-desktop-config.example.json; rust/crates/elegy-memory-mcp/docs/holon-mcp-config.example.json; FLIGHT_RECORDER.md
+- Validation: Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo test -p elegy-memory-mcp --color never -> PASS (48 passed; 0 failed); cargo clippy --all-targets -p elegy-memory-mcp -- -D warnings -> PASS; cargo build -p elegy-memory-mcp --release --bins -> PASS
+- Tests: unchanged from Phase 4 (48/48 passing)
+- Findings: docs now call out the normal-mode Ollama prerequisite, the new `ELEGY_EMBEDDING_MODEL` and `ELEGY_ALLOW_NO_EMBEDDINGS` env vars, boot failure troubleshooting, degraded-mode semantics, and the new `embeddingStatus` signal exposed to clients.
+- Next: Phase 6
+- Notes: example stdio configs now show the new env surface explicitly instead of hiding degraded mode behind prose only

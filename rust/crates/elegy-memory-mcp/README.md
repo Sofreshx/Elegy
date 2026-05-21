@@ -43,8 +43,18 @@ The stdio binary is the local transport for desktop MCP clients.
 - Expects `ELEGY_DB_PATH`.
 - Uses `ELEGY_MCP_AGENT_ID` for the fixed agent scope.
 - Warns and falls back to `default-agent` when `ELEGY_MCP_AGENT_ID` is unset.
-- Uses the configured `OLLAMA_URL` directly for write-time embeddings and semantic search; defaults to `http://localhost:11434`.
+- Fails fast at boot unless Ollama is reachable and the configured embedding model is available.
+- Supports explicit degraded mode via `ELEGY_ALLOW_NO_EMBEDDINGS=true`; in that mode semantic search is unavailable and `memory_store` responses report `embeddingStatus: "skipped_no_provider"`.
 - Logs to `stderr` so `stdout` stays reserved for the MCP protocol.
+
+## Prerequisites
+
+For the stdio binary in normal mode, Ollama must be running and the embedding model must be present before startup.
+
+```powershell
+ollama list | findstr nomic-embed-text
+ollama pull nomic-embed-text
+```
 
 ## Environment variables
 
@@ -61,6 +71,8 @@ The binaries intentionally do not use the same env surface.
 | `ELEGY_DB_PATH` | Not used | Required | SQLite path for the local stdio server. |
 | `ELEGY_MCP_AGENT_ID` | Not used | Optional | Warns and falls back to `default-agent` when unset. |
 | `OLLAMA_URL` | Not used | Optional | Defaults to `http://localhost:11434`. |
+| `ELEGY_EMBEDDING_MODEL` | Not used | Optional | Defaults to `nomic-embed-text`. Boot verifies that the model exists in `OLLAMA_URL/api/tags`. |
+| `ELEGY_ALLOW_NO_EMBEDDINGS` | Not used | Optional | Defaults to `false`. Set to `true` to start in degraded mode without an embedding provider. |
 | `RUST_LOG` | Optional | Optional | Typical local default is `info`. |
 
 ## Consumer configs
@@ -78,3 +90,12 @@ Use the provided examples as copy-and-edit starting points.
 - [Deployment](docs/DEPLOYMENT.md)
 - [Pending follow-ups](docs/PENDING.md)
 - [Architecture overview](docs/architecture/overview.md)
+
+## Troubleshooting
+
+| Symptom | Meaning | Fix |
+|---|---|---|
+| stdio binary exits immediately with `Ollama not reachable ...` | Ollama was unavailable during boot. | Start Ollama (`ollama serve` or Ollama Desktop), then restart the MCP binary. |
+| stdio binary exits immediately with `Model <name> not pulled` | The configured embedding model is missing. | Run `ollama pull <name>` and restart. |
+| `memory_store` returns `"embeddingStatus": "failed"` | The memory stored, but embedding generation or indexing did not complete, so semantic recall may miss it. | Check Ollama health/logs and retry or re-embed later. |
+| `memory_store` returns `"embeddingStatus": "skipped_no_provider"` | The server is running without an embedding provider. | Disable degraded mode or restore Ollama/model availability if semantic search is required. |

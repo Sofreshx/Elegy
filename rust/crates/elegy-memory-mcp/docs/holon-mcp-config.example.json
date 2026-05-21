@@ -7,6 +7,8 @@
     "ELEGY_DB_PATH": "C:\\Users\\Romain\\.elegy\\memory.db",
     "ELEGY_MCP_AGENT_ID": "holon",
     "OLLAMA_URL": "http://localhost:11434",
+    "ELEGY_EMBEDDING_MODEL": "nomic-embed-text",
+    "ELEGY_ALLOW_NO_EMBEDDINGS": "false",
     "RUST_LOG": "info"
   }
 }
