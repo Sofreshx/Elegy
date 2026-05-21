@@ -17,6 +17,8 @@ Use the transport-specific variables below instead of assuming one shared startu
 | `ELEGY_DB_PATH` | Not used | Required | SQLite path used by the stdio binary. |
 | `ELEGY_MCP_AGENT_ID` | Not used | Optional | Warns and falls back to `default-agent` when unset. |
 | `OLLAMA_URL` | Not used | Optional | Defaults to `http://localhost:11434`. |
+| `ELEGY_EMBEDDING_MODEL` | Not used | Optional | Defaults to `nomic-embed-text`. Verified at boot through `OLLAMA_URL/api/tags`. |
+| `ELEGY_ALLOW_NO_EMBEDDINGS` | Not used | Optional | Defaults to `false`. Set to `true` to force degraded mode without an embedding provider. |
 | `RUST_LOG` | Optional | Optional | Common local default is `info`. |
 
 ## HTTP binary
@@ -54,8 +56,20 @@ The stdio binary is local-only and does not read the HTTP/OAuth variables.
 | Variable | Default | Notes |
 |---|---|---|
 | `ELEGY_MCP_AGENT_ID` | `default-agent` | Startup warns on `stderr` if unset before using the fallback. |
-| `OLLAMA_URL` | `http://localhost:11434` | Local Ollama base URL used directly for write-time embeddings and semantic search. |
+| `OLLAMA_URL` | `http://localhost:11434` | Local Ollama base URL used for boot verification, write-time embeddings, and semantic search. |
+| `ELEGY_EMBEDDING_MODEL` | `nomic-embed-text` | Boot fails if this model is absent from `OLLAMA_URL/api/tags` unless degraded mode is enabled. |
+| `ELEGY_ALLOW_NO_EMBEDDINGS` | `false` | When `true`, startup skips Ollama checks, semantic search is disabled, and `memory_store` returns `embeddingStatus: "skipped_no_provider"`. |
 | `RUST_LOG` | implementation default | Use `info` for normal local startup and increase only for debugging. |
+
+### Boot behavior
+
+Normal mode validates the embedding provider before the MCP transport starts:
+
+1. `GET <OLLAMA_URL>/api/tags` with a 5-second timeout
+2. verify that `ELEGY_EMBEDDING_MODEL` is present
+3. start normally only when both checks pass
+
+If either check fails, the stdio binary exits with code `1` and prints a remediation message on `stderr`.
 
 ## Logging
 

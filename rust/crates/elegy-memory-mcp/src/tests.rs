@@ -1909,6 +1909,10 @@ async fn defaulted_memory_tool_fields_accept_explicit_null() {
         stored["result"]["structuredContent"]["action"],
         json!("added")
     );
+    assert_eq!(
+        stored["result"]["structuredContent"]["embeddingStatus"],
+        json!("skipped_no_provider")
+    );
     assert_eq!(stored_memory["memoryType"], json!("observation"));
     assert_eq!(stored_memory["provenance"], json!("user-stated"));
     assert_eq!(stored_memory["importance"], json!(0.5));

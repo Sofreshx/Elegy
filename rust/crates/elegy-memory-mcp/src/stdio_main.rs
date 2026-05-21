@@ -1,4 +1,4 @@
-use std::{env, path::PathBuf, sync::Arc};
+use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context};
 use elegy_memory::{EmbeddingProvider, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
@@ -6,16 +6,21 @@ use elegy_memory_mcp::{
     memory_tools::{MemoryBinding, MemoryRepository, DEFAULT_NAMESPACE},
     server::{ElegyMemoryMcpServer, NoopWriteAuditor, WriteAuditor},
 };
+use reqwest::Client;
 use rmcp::ServiceExt;
+use serde::Deserialize;
 use tracing::{error, info, warn};
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 const ELEGY_DB_PATH: &str = "ELEGY_DB_PATH";
 const ELEGY_MCP_AGENT_ID: &str = "ELEGY_MCP_AGENT_ID";
+const ELEGY_EMBEDDING_MODEL: &str = "ELEGY_EMBEDDING_MODEL";
+const ELEGY_ALLOW_NO_EMBEDDINGS: &str = "ELEGY_ALLOW_NO_EMBEDDINGS";
 const OLLAMA_URL: &str = "OLLAMA_URL";
 const RUST_LOG: &str = "RUST_LOG";
 const DEFAULT_AGENT_ID: &str = "default-agent";
 const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
+const OLLAMA_BOOT_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(test)]
 const EXPECTED_TOOL_NAMES: [&str; 8] = [
     "memory_correct",
@@ -41,11 +46,15 @@ async fn main() {
 
 async fn run() -> anyhow::Result<()> {
     let config = StdioConfig::from_env().context("loading stdio configuration")?;
-    let runtime = build_stdio_runtime(&config).context("building stdio MCP server")?;
+    let runtime = build_stdio_runtime(&config)
+        .await
+        .context("building stdio MCP server")?;
 
     info!(
         db_path = %config.db_path.display(),
         ollama_url = %config.ollama_url,
+        embedding_model = %config.embedding_model,
+        allow_no_embeddings = config.allow_no_embeddings,
         memory_namespace = runtime.memory_repository.namespace(),
         memory_agent_id = runtime.memory_repository.agent_id(),
         "elegy-memory-mcp stdio starting"
@@ -70,34 +79,65 @@ struct StdioServerRuntime {
     server: ElegyMemoryMcpServer,
 }
 
-fn build_stdio_runtime(config: &StdioConfig) -> anyhow::Result<StdioServerRuntime> {
-    let embedding_provider = build_embedding_provider(config)?;
-    build_stdio_runtime_with_embedding_provider(config, embedding_provider)
+enum StdioEmbeddingBootstrap {
+    ProviderBacked(Arc<dyn EmbeddingProvider>),
+    DisabledNoProvider,
+}
+
+async fn build_stdio_runtime(config: &StdioConfig) -> anyhow::Result<StdioServerRuntime> {
+    let embedding_bootstrap = resolve_embedding_bootstrap(config).await?;
+    build_stdio_runtime_with_bootstrap(config, embedding_bootstrap)
 }
 
 fn build_embedding_provider(config: &StdioConfig) -> anyhow::Result<Arc<dyn EmbeddingProvider>> {
     Ok(Arc::new(
-        OllamaEmbeddingProvider::new(&config.ollama_url, DEFAULT_OLLAMA_MODEL).with_context(
+        OllamaEmbeddingProvider::new(&config.ollama_url, &config.embedding_model).with_context(
             || {
                 format!(
-                    "configuring Ollama embedding provider for {}",
-                    config.ollama_url
+                    "configuring Ollama embedding provider for {} with model {}",
+                    config.ollama_url, config.embedding_model
                 )
             },
         )?,
     ))
 }
 
-fn build_stdio_runtime_with_embedding_provider(
+async fn resolve_embedding_bootstrap(
     config: &StdioConfig,
-    embedding_provider: Arc<dyn EmbeddingProvider>,
+) -> anyhow::Result<StdioEmbeddingBootstrap> {
+    if config.allow_no_embeddings {
+        warn!(
+            "WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider."
+        );
+        return Ok(StdioEmbeddingBootstrap::DisabledNoProvider);
+    }
+
+    verify_ollama_bootstrap(config).await?;
+    Ok(StdioEmbeddingBootstrap::ProviderBacked(
+        build_embedding_provider(config)?,
+    ))
+}
+
+fn build_stdio_runtime_with_bootstrap(
+    config: &StdioConfig,
+    embedding_bootstrap: StdioEmbeddingBootstrap,
 ) -> anyhow::Result<StdioServerRuntime> {
     let binding = MemoryBinding::new(DEFAULT_NAMESPACE, &config.agent_id)
         .context("configuring stdio memory binding")?;
-    let memory_repository = Arc::new(
-        MemoryRepository::new_with_embedding_provider(&config.db_path, binding, embedding_provider)
-            .context("initializing stdio memory repository")?,
-    );
+    let memory_repository = Arc::new(match embedding_bootstrap {
+        StdioEmbeddingBootstrap::ProviderBacked(embedding_provider) => {
+            MemoryRepository::new_with_embedding_provider(
+                &config.db_path,
+                binding,
+                embedding_provider,
+            )
+            .context("initializing stdio memory repository")?
+        }
+        StdioEmbeddingBootstrap::DisabledNoProvider => {
+            MemoryRepository::new(&config.db_path, binding)
+                .context("initializing stdio memory repository")?
+        }
+    });
     let write_auditor: Arc<dyn WriteAuditor> = Arc::new(NoopWriteAuditor);
 
     Ok(StdioServerRuntime {
@@ -111,6 +151,8 @@ struct StdioConfig {
     db_path: PathBuf,
     agent_id: String,
     ollama_url: String,
+    embedding_model: String,
+    allow_no_embeddings: bool,
 }
 
 impl StdioConfig {
@@ -119,6 +161,8 @@ impl StdioConfig {
             db_path: required_path_env(ELEGY_DB_PATH)?,
             agent_id: configured_agent_id()?,
             ollama_url: optional_string_env(OLLAMA_URL, DEFAULT_OLLAMA_URL)?,
+            embedding_model: optional_string_env(ELEGY_EMBEDDING_MODEL, DEFAULT_OLLAMA_MODEL)?,
+            allow_no_embeddings: optional_bool_env(ELEGY_ALLOW_NO_EMBEDDINGS, false)?,
         })
     }
 }
@@ -211,11 +255,108 @@ fn optional_string_env(name: &'static str, default_value: &'static str) -> anyho
     }
 }
 
+fn optional_bool_env(name: &'static str, default_value: bool) -> anyhow::Result<bool> {
+    match env::var(name) {
+        Ok(value) => parse_bool_env(name, &value),
+        Err(env::VarError::NotPresent) => Ok(default_value),
+        Err(env::VarError::NotUnicode(_)) => bail!("{name} must be valid Unicode"),
+    }
+}
+
+fn parse_bool_env(name: &'static str, value: &str) -> anyhow::Result<bool> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "1" | "true" | "yes" | "on" => Ok(true),
+        "0" | "false" | "no" | "off" => Ok(false),
+        _ => bail!("{name} must be one of 0, 1, true, false, yes, no, on, off"),
+    }
+}
+
+async fn verify_ollama_bootstrap(config: &StdioConfig) -> anyhow::Result<()> {
+    let tags_url = format!("{}/api/tags", config.ollama_url.trim_end_matches('/'));
+    let client = Client::builder()
+        .connect_timeout(OLLAMA_BOOT_TIMEOUT)
+        .timeout(OLLAMA_BOOT_TIMEOUT)
+        .build()
+        .context("building Ollama bootstrap HTTP client")?;
+    let response = client
+        .get(&tags_url)
+        .send()
+        .await
+        .with_context(|| {
+            format!(
+                "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true.",
+                config.ollama_url, config.embedding_model
+            )
+        })?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        bail!(
+            "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true. /api/tags returned {}.",
+            config.ollama_url,
+            config.embedding_model,
+            status
+        );
+    }
+
+    let payload: OllamaTagsResponse = response
+        .json()
+        .await
+        .context("decoding Ollama /api/tags response")?;
+    if !payload
+        .models
+        .iter()
+        .any(|model| ollama_model_matches(&model.name, &config.embedding_model))
+    {
+        bail!(
+            "Model {} not pulled. Run: 'ollama pull {}'. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true.",
+            config.embedding_model,
+            config.embedding_model
+        );
+    }
+
+    info!(
+        ollama_url = %config.ollama_url,
+        embedding_model = %config.embedding_model,
+        "Ollama reachable and embedding model available"
+    );
+    Ok(())
+}
+
+fn ollama_model_matches(available_model: &str, required_model: &str) -> bool {
+    let available_model = available_model.trim();
+    let required_model = required_model.trim();
+    if available_model == required_model {
+        return true;
+    }
+    if required_model.contains(':') {
+        return false;
+    }
+
+    available_model
+        .split(':')
+        .next()
+        .is_some_and(|model_name| model_name == required_model)
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaTagsResponse {
+    #[serde(default)]
+    models: Vec<OllamaModelEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+struct OllamaModelEntry {
+    name: String,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use axum::{routing::get, Json, Router};
     use rmcp::{ClientHandler, ServiceExt};
     use tempfile::TempDir;
+    use tokio::net::TcpListener;
 
     #[derive(Default, Clone)]
     struct TestClient;
@@ -231,8 +372,16 @@ mod tests {
             db_path,
             agent_id: "stdio-test-agent".to_string(),
             ollama_url: DEFAULT_OLLAMA_URL.to_string(),
+            embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
+            allow_no_embeddings: false,
         };
-        let runtime = build_stdio_runtime(&config).expect("stdio runtime should build");
+        let runtime = build_stdio_runtime_with_bootstrap(
+            &config,
+            StdioEmbeddingBootstrap::ProviderBacked(
+                build_embedding_provider(&config).expect("embedding provider should build"),
+            ),
+        )
+        .expect("stdio runtime should build");
 
         assert_eq!(runtime.memory_repository.namespace(), DEFAULT_NAMESPACE);
         assert_eq!(runtime.memory_repository.agent_id(), "stdio-test-agent");
@@ -269,5 +418,54 @@ mod tests {
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");
+    }
+
+    #[test]
+    fn ollama_model_match_accepts_tagged_default_model() {
+        assert!(ollama_model_matches(
+            "nomic-embed-text:latest",
+            DEFAULT_OLLAMA_MODEL,
+        ));
+        assert!(ollama_model_matches("nomic-embed-text:v1", DEFAULT_OLLAMA_MODEL));
+        assert!(!ollama_model_matches("other-model:latest", DEFAULT_OLLAMA_MODEL));
+    }
+
+    #[tokio::test]
+    async fn verify_ollama_bootstrap_accepts_available_model() {
+        let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
+            .await
+            .expect("listener should bind");
+        let address = listener
+            .local_addr()
+            .expect("listener should expose address");
+        let app = Router::new().route(
+            "/api/tags",
+            get(|| async {
+                Json(serde_json::json!({
+                    "models": [
+                        {"name": "nomic-embed-text:latest"},
+                        {"name": "other-model:latest"}
+                    ]
+                }))
+            }),
+        );
+        let server = tokio::spawn(async move {
+            axum::serve(listener, app)
+                .await
+                .expect("tag server should run");
+        });
+
+        let config = StdioConfig {
+            db_path: PathBuf::from("unused.db"),
+            agent_id: "stdio-test-agent".to_string(),
+            ollama_url: format!("http://{address}"),
+            embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
+            allow_no_embeddings: false,
+        };
+
+        verify_ollama_bootstrap(&config)
+            .await
+            .expect("bootstrap should accept available model");
+        server.abort();
     }
 }

@@ -30,6 +30,13 @@ const PREVIEW_LIMIT: usize = 140;
 pub struct MemoryRepository {
     store: SqliteMemoryStore,
     binding: MemoryBinding,
+    embedding_mode: RepositoryEmbeddingMode,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RepositoryEmbeddingMode {
+    ProviderBacked,
+    NoProvider,
 }
 
 impl MemoryRepository {
@@ -54,9 +61,14 @@ impl MemoryRepository {
             store: SqliteMemoryStore::new_with_optional_embedding_provider(
                 path,
                 MemoryScope::Agent,
-                embedding_provider,
+                embedding_provider.clone(),
             )?,
             binding,
+            embedding_mode: if embedding_provider.is_some() {
+                RepositoryEmbeddingMode::ProviderBacked
+            } else {
+                RepositoryEmbeddingMode::NoProvider
+            },
         })
     }
 
@@ -74,6 +86,17 @@ impl MemoryRepository {
 
     fn agent_id_owned(&self) -> String {
         self.agent_id().to_string()
+    }
+
+    fn embedding_status(&self, memory: &Memory) -> EmbeddingStatus {
+        if !memory.embedding_stale {
+            EmbeddingStatus::Ready
+        } else {
+            match self.embedding_mode {
+                RepositoryEmbeddingMode::ProviderBacked => EmbeddingStatus::Failed,
+                RepositoryEmbeddingMode::NoProvider => EmbeddingStatus::SkippedNoProvider,
+            }
+        }
     }
 
     pub(crate) async fn search(
@@ -231,12 +254,12 @@ impl MemoryRepository {
                     )
                     .await?;
                 let memory = self.require_visible_memory(&target_id).await?;
-                Ok(MemoryStoreResponse {
-                    namespace: self.namespace_owned(),
-                    action: "merged",
-                    gate_result: "merge".to_string(),
-                    memory: MemoryDetail::from(memory),
-                })
+                Ok(MemoryStoreResponse::new(
+                    self,
+                    "merged",
+                    "merge".to_string(),
+                    memory,
+                ))
             }
             GateDecision::Contradiction {
                 conflicting_id,
@@ -254,24 +277,24 @@ impl MemoryRepository {
                     return Err(error);
                 }
                 let memory = self.require_visible_memory(&id).await?;
-                Ok(MemoryStoreResponse {
-                    namespace: self.namespace_owned(),
-                    action: "added",
-                    gate_result: format_contradiction_gate_result(conflicting_id),
-                    memory: MemoryDetail::from(memory),
-                })
+                Ok(MemoryStoreResponse::new(
+                    self,
+                    "added",
+                    format_contradiction_gate_result(conflicting_id),
+                    memory,
+                ))
             }
             GateDecision::Archive => {
                 let memory = self.build_memory_from_candidate(&candidate, MemoryState::Dormant);
                 let id = memory.id;
                 self.store.store(memory).await?;
                 let memory = self.require_visible_memory(&id).await?;
-                Ok(MemoryStoreResponse {
-                    namespace: self.namespace_owned(),
-                    action: "added",
-                    gate_result: "archived".to_string(),
-                    memory: MemoryDetail::from(memory),
-                })
+                Ok(MemoryStoreResponse::new(
+                    self,
+                    "added",
+                    "archived".to_string(),
+                    memory,
+                ))
             }
             GateDecision::Accept {
                 similar_to,
@@ -281,12 +304,12 @@ impl MemoryRepository {
                 let id = memory.id;
                 self.store.store(memory).await?;
                 let memory = self.require_visible_memory(&id).await?;
-                Ok(MemoryStoreResponse {
-                    namespace: self.namespace_owned(),
-                    action: "added",
-                    gate_result: format_gate_result(similar_to, similarity),
-                    memory: MemoryDetail::from(memory),
-                })
+                Ok(MemoryStoreResponse::new(
+                    self,
+                    "added",
+                    format_gate_result(similar_to, similarity),
+                    memory,
+                ))
             }
             GateDecision::Reject { reason } => Err(StoreError::Validation(format!(
                 "memory rejected by safety gate: {reason}"
@@ -856,7 +879,26 @@ pub struct MemoryStoreResponse {
     pub namespace: String,
     pub action: &'static str,
     pub gate_result: String,
+    pub embedding_status: EmbeddingStatus,
     pub memory: MemoryDetail,
+}
+
+impl MemoryStoreResponse {
+    fn new(
+        repository: &MemoryRepository,
+        action: &'static str,
+        gate_result: String,
+        memory: Memory,
+    ) -> Self {
+        let embedding_status = repository.embedding_status(&memory);
+        Self {
+            namespace: repository.namespace_owned(),
+            action,
+            gate_result,
+            embedding_status,
+            memory: MemoryDetail::from(memory),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
@@ -904,6 +946,15 @@ pub struct MemoryDeleteResponse {
     pub namespace: String,
     pub id: String,
     pub deleted: bool,
+}
+
+/// Reports whether the stored memory has a usable embedding immediately after the write path.
+#[derive(Debug, Clone, Copy, Serialize, schemars::JsonSchema, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum EmbeddingStatus {
+    Ready,
+    Failed,
+    SkippedNoProvider,
 }
 
 impl MemoryStatsResponse {
@@ -1231,8 +1282,70 @@ mod tests {
         let stats = repository.stats().await.expect("stats should load");
 
         assert_eq!(response.action, "added");
+        assert_eq!(response.embedding_status, EmbeddingStatus::Ready);
         assert_eq!(stats.stale_embeddings_count, 0);
         assert_eq!(provider.calls(), vec![content.to_string()]);
+    }
+
+    #[tokio::test]
+    async fn store_memory_reports_failed_embeddings_when_provider_errors() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let repository = test_repository(
+            &db_path,
+            "failed-embedding-agent",
+            Arc::new(StubEmbeddingProvider::new(std::iter::empty::<(&str, Vec<f32>)>())),
+        );
+
+        let response = repository
+            .store_memory(&MemoryStoreArgs {
+                content: "Provider failures should surface as failed embedding status.".to_string(),
+                summary: None,
+                memory_type: None,
+                importance: Some(0.7),
+                provenance: None,
+                sensitivity: None,
+                tags: None,
+                custom_metadata: None,
+            })
+            .await
+            .expect("memory store should still succeed when embeddings fail");
+        let stats = repository.stats().await.expect("stats should load");
+
+        assert_eq!(response.action, "added");
+        assert_eq!(response.embedding_status, EmbeddingStatus::Failed);
+        assert_eq!(stats.stale_embeddings_count, 1);
+    }
+
+    #[tokio::test]
+    async fn store_memory_reports_skipped_no_provider_without_embedding_provider() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let repository = MemoryRepository::new(
+            &db_path,
+            MemoryBinding::new(DEFAULT_NAMESPACE, "no-provider-agent")
+                .expect("binding should build"),
+        )
+        .expect("repository should build");
+
+        let response = repository
+            .store_memory(&MemoryStoreArgs {
+                content: "No provider should surface skipped embedding status.".to_string(),
+                summary: None,
+                memory_type: None,
+                importance: Some(0.7),
+                provenance: None,
+                sensitivity: None,
+                tags: None,
+                custom_metadata: None,
+            })
+            .await
+            .expect("memory store should succeed without provider");
+        let stats = repository.stats().await.expect("stats should load");
+
+        assert_eq!(response.action, "added");
+        assert_eq!(response.embedding_status, EmbeddingStatus::SkippedNoProvider);
+        assert_eq!(stats.stale_embeddings_count, 1);
     }
 
     #[tokio::test]
