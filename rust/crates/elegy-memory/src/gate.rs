@@ -7,6 +7,7 @@ use std::{
 use async_trait::async_trait;
 
 use crate::{
+    embedding::{prepare_embedding_input, EmbeddingTask},
     EmbeddingProvider, GateDecision, GateError, LlmProvider, MemoryCandidate, MemoryId,
     MemoryScope, MemoryStore, ProvenanceLevel, SalienceGate, ScopeConfig,
 };
@@ -206,7 +207,9 @@ impl DefaultSalienceGate {
         }
 
         let provider = self.embedding_provider.as_ref()?;
-        match provider.embed(trimmed_content).await {
+        let prepared_input =
+            prepare_embedding_input(provider.as_ref(), EmbeddingTask::Document, trimmed_content);
+        match provider.embed(prepared_input.as_ref()).await {
             Ok(embedding) if !embedding.is_empty() => Some(Cow::Owned(embedding)),
             Ok(_) | Err(_) => None,
         }

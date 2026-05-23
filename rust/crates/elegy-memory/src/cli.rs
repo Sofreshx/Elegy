@@ -16,6 +16,7 @@ use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
+    embedding::{prepare_embedding_input, EmbeddingTask},
     storage::{LearnedWeightValues, LearnedWeightsReport},
     ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
     EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
@@ -2645,11 +2646,13 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
                 .ok_or_else(|| {
                     CliError::Validation(format!("failed to load memory {id}: not found"))
                 })?;
-            let embedding = provider.embed(&memory.content).await.map_err(|error| {
-                CliError::Validation(format!(
-                    "failed to generate embedding for memory {id}: {error}"
-                ))
-            })?;
+            let embedding = generate_document_embedding(provider.as_ref(), &memory.content)
+                .await
+                .map_err(|error| {
+                    CliError::Validation(format!(
+                        "failed to generate embedding for memory {id}: {error}"
+                    ))
+                })?;
             ctx.store
                 .store_embedding(id, &embedding)
                 .await
@@ -2671,6 +2674,14 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
             reembedded_ids,
         })
     })
+}
+
+async fn generate_document_embedding(
+    provider: &dyn EmbeddingProvider,
+    content: &str,
+) -> Result<Vec<f32>, EmbeddingError> {
+    let prepared_input = prepare_embedding_input(provider, EmbeddingTask::Document, content);
+    provider.embed(prepared_input.as_ref()).await
 }
 
 fn parse_memory_id(raw: &str) -> Result<MemoryId, CliError> {
@@ -3822,9 +3833,9 @@ mod tests {
 
     use super::{
         build_search_response, execute_add_command, execute_import_command,
-        format_contradiction_gate_result, format_gate_result, open_store, reembed_stale_memories,
-        run_async, Cli, CliEmbeddingProvider, CliLlmProvider, CliScope, Command, OutputFormat,
-        StoreArgs, StoreContext,
+        format_contradiction_gate_result, format_gate_result, generate_document_embedding,
+        open_store, reembed_stale_memories, run_async, Cli, CliEmbeddingProvider, CliLlmProvider,
+        CliScope, Command, OutputFormat, StoreArgs, StoreContext,
     };
     use crate::{
         EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
@@ -3843,6 +3854,7 @@ mod tests {
 
     #[derive(Debug)]
     struct StubEmbeddingProvider {
+        model_id: &'static str,
         responses: HashMap<String, StubEmbeddingResponse>,
         calls: Mutex<Vec<String>>,
     }
@@ -3853,7 +3865,16 @@ mod tests {
             I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
             S: Into<String>,
         {
+            Self::new_with_model("stub-embedding-provider", responses)
+        }
+
+        fn new_with_model<I, S>(model_id: &'static str, responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
+            S: Into<String>,
+        {
             Self {
+                model_id,
                 responses: responses
                     .into_iter()
                     .map(|(text, response)| (text.into(), response))
@@ -3891,8 +3912,29 @@ mod tests {
         }
 
         fn model_id(&self) -> &str {
-            "stub-embedding-provider"
+            self.model_id
         }
+    }
+
+    #[tokio::test]
+    async fn reembed_path_uses_document_prefix_for_nomic_models() {
+        let provider = StubEmbeddingProvider::new_with_model(
+            "nomic-embed-text:latest",
+            [(
+                "search_document: Semantic document body",
+                StubEmbeddingResponse::Embedding(vec![0.42; 768]),
+            )],
+        );
+
+        let embedding = generate_document_embedding(&provider, "  Semantic document body  ")
+            .await
+            .expect("document embedding should succeed");
+
+        assert_eq!(embedding.len(), 768);
+        assert_eq!(
+            provider.calls(),
+            vec!["search_document: Semantic document body".to_string()]
+        );
     }
 
     #[test]
