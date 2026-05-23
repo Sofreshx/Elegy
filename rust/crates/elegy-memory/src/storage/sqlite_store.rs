@@ -15,6 +15,7 @@ use uuid::Uuid;
 use super::schema::init_database;
 use crate::{
     decay,
+    embedding::{prepare_embedding_input, EmbeddingTask},
     gate::DefaultSalienceGate,
     similarity::cosine_similarity,
     traits::{EmbeddingProvider, MemoryObservability, MemoryStore, SalienceGate},
@@ -722,7 +723,11 @@ impl SqliteMemoryStore {
         })
     }
 
-    async fn generate_embedding(&self, text: &str) -> Result<Option<Vec<f32>>, EmbeddingError> {
+    async fn generate_embedding(
+        &self,
+        text: &str,
+        task: EmbeddingTask,
+    ) -> Result<Option<Vec<f32>>, EmbeddingError> {
         let trimmed_text = text.trim();
         if trimmed_text.is_empty() {
             return Ok(None);
@@ -732,7 +737,12 @@ impl SqliteMemoryStore {
             return Ok(None);
         };
 
-        embedding_provider.embed(trimmed_text).await.map(Some)
+        let prepared_input =
+            prepare_embedding_input(embedding_provider.as_ref(), task, trimmed_text);
+        embedding_provider
+            .embed(prepared_input.as_ref())
+            .await
+            .map(Some)
     }
 
     async fn reuse_cached_embedding(
@@ -1840,7 +1850,10 @@ impl SqliteMemoryStore {
                     return Ok(());
                 }
 
-                let embedding = match store.generate_embedding(&content).await {
+                let embedding = match store
+                    .generate_embedding(&content, EmbeddingTask::Document)
+                    .await
+                {
                     Ok(Some(embedding)) => embedding,
                     Ok(None) => return Ok(()),
                     Err(error) => {
@@ -2053,7 +2066,10 @@ impl MemoryStore for SqliteMemoryStore {
             }
         }
 
-        let embedding: Vec<f32> = match self.generate_embedding(&memory.content).await {
+        let embedding: Vec<f32> = match self
+            .generate_embedding(&memory.content, EmbeddingTask::Document)
+            .await
+        {
             Ok(Some(embedding)) => embedding,
             Ok(None) => return Ok(id),
             Err(error) => {
@@ -2316,7 +2332,7 @@ impl MemoryStore for SqliteMemoryStore {
         }
 
         let derived_query_embedding = if query.embedding.is_none() {
-            self.generate_embedding(&trimmed_text)
+            self.generate_embedding(&trimmed_text, EmbeddingTask::Query)
                 .await
                 .unwrap_or_default()
         } else {

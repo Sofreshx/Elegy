@@ -2521,3 +2521,43 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: Objective B is complete through structured `embeddingStatus` reporting and Objective C is complete through fail-fast stdio bootstrap plus explicit degraded mode. Objective A was intentionally skipped on current dev after source audit disproved the stale binary/null-enum hypothesis and identified provider timeout as the only credible live hang source.
 - Next: remote sync blocked by repository permissions (`git push origin feat/elegy-mcp-hardening` returned HTTP 403 for user `TheHaricover`); local `dev` now contains the no-ff merge commit and is ready for a human-authorized push
 - Notes: merge commit message is `Merge hardening WU12: embeddingStatus and Ollama detection`; feature branch was not deleted yet because remote deletion cannot succeed while push permissions are blocked
+
+## STATE_SNAPSHOT — WU13 Phase 0 — 2026-05-23 15:10
+- Phase: Pre-flight et reproduction
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory-mcp/tests/wu13_repro.rs; FLIGHT_RECORDER.md
+- Validation: local git identity remained `RomainROCH` / `roch.romain@live.fr`; the local Ollama embeddings endpoint returned HTTP 200 with a 768-dim vector; child-process stdio repro stayed responsive after both the original ~9-call pattern and a higher 45-call embedding load
+- Tests: added a real stdio child-process harness (`wu13_repro.rs`) that stores/searches against a fresh temp DB, then probes `memory_stats` and `memory_delete`
+- Findings: Bug A did not reproduce in isolation on current `dev`, even under a 45-embedding-call stress pass. Bug B root-cause audit confirmed that no `search_document:` / `search_query:` task prefixes existed anywhere in `rust/**` before the fix.
+- Next: Phase 1
+- Notes: the non-reproduction means the Claude Desktop hang could be transport- or environment-specific; no fix was applied at this stage
+
+## STATE_SNAPSHOT — WU13 Phase 1 — 2026-05-23 15:10
+- Phase: Investigation Bug A
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory/src/storage/sqlite_store.rs; rust/crates/elegy-memory/src/embedding/ollama.rs; rust/crates/elegy-memory-mcp/src/stdio_main.rs; FLIGHT_RECORDER.md
+- Validation: targeted concurrency audit via repo search found no `.lock().await`, `.read().await`, or `.write().await` usages in the `elegy-memory` / `elegy-memory-mcp` stdio memory path; current Ollama embedding requests remain bounded by `connect_timeout=5s` and `request_timeout=30s`
+- Tests: no new tests in this phase beyond the Phase 0 stress harness
+- Findings: `SqliteMemoryStore` still uses `Arc<Mutex<Connection>>`, but the main `store()` / `search()` paths scope DB access inside synchronous `with_connection()` closures and perform embedding awaits only after the lock scope ends. No concrete Elegy deadlock, panic, or executor-starvation bug was isolated from current source plus local repro.
+- Next: Phase 3
+- Notes: because the reported server hang was not reproducible and no exact root cause was isolated, this phase ended as investigation-only rather than a targeted Bug A code fix
+
+## STATE_SNAPSHOT — WU13 Phase 3-4 — 2026-05-23 15:10
+- Phase: Fix préfixes nomic + régressions
+- Status: DONE
+- Artifacts: rust/crates/elegy-memory/src/embedding/mod.rs; rust/crates/elegy-memory/src/storage/sqlite_store.rs; rust/crates/elegy-memory/src/gate.rs; rust/crates/elegy-memory/src/consolidator.rs; rust/crates/elegy-memory/src/cli.rs; rust/crates/elegy-memory/tests/integration.rs; rust/crates/elegy-memory-mcp/tests/wu13_repro.rs; rust/crates/elegy-memory/docs/architecture/memory-model.md; rust/crates/elegy-memory-mcp/README.md; FLIGHT_RECORDER.md
+- Validation: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; cargo fmt --all && cargo test -p elegy-memory && cargo test -p elegy-memory-mcp && cargo clippy --all-targets -- -D warnings && cargo build -p elegy-memory --release --bins && cargo build -p elegy-memory-mcp --release --bins` -> PASS
+- Tests: `elegy-memory` finished at 245/245 passing (`src/lib.rs`: 169, `src/main.rs`: 0, `tests/cli.rs`: 39, `tests/governed_memory.rs`: 15, `tests/integration.rs`: 18, `tests/local_store.rs`: 4); `elegy-memory-mcp` finished at 50/50 passing (`src/lib.rs`: 12, `src/main.rs`: 26, `src/stdio_main.rs`: 3, `tests/phase4_regressions.rs`: 4, `tests/stdio_bootstrap.rs`: 3, `tests/wu13_repro.rs`: 2)
+- Findings: all shared `nomic-embed-text` document embeddings now flow through `search_document: ` and search-derived query embeddings now flow through `search_query: ` without changing the public `EmbeddingProvider` trait. The CLI stale re-embed path now uses the same document-prefix helper, and the real-Ollama stdio regression recorded clear concept margins on a fresh DB (`coffee`: 0.112115, `rust`: 0.215768, `climbing`: 0.095335, `soup`: 0.103818) while the 45-call stress test kept `memory_stats` and `memory_delete` under the 5-second bound.
+- Next: Phase 6
+- Notes: this fix changes vector generation for existing `nomic-embed-text` rows; docs now explicitly require re-embedding or rebuilding any database whose vectors were generated before the task-prefix rule
+
+## STATE_SNAPSHOT — WU13 Phase 6 — 2026-05-23 15:10
+- Phase: Wrap-up
+- Status: WAITING_HUMAN
+- Artifacts: FLIGHT_RECORDER.md
+- Validation: the requested code/test/doc changes for Bug B are complete and fully validated locally; Bug A remains non-reproducible on the current workspace despite the higher-load child-process stress pass
+- Tests: unchanged from Phase 3-4
+- Findings: I do not have an evidence-based Bug A fix to commit because the server hang never reproduced here and the current code audit did not isolate a deadlock or runtime failure in Elegy itself. Proceeding to a WU13 commit/merge as if Bug A were fixed would overstate the outcome.
+- Next: human decision required on whether to (a) ship Bug B + the new regressions as a partial WU13 result, or (b) continue with a Claude-Desktop-specific Bug A investigation lane
+- Notes: current worktree also contains earlier WU12-era modifications in `rust/crates/elegy-memory-mcp/src/memory_tools.rs`, `src/stdio_main.rs`, and `tests/phase4_regressions.rs`; they were not rewritten in this WU13 continuation

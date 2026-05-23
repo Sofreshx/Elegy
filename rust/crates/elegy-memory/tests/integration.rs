@@ -447,6 +447,81 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
 }
 
 #[tokio::test]
+async fn nomic_embeddings_apply_document_and_query_task_prefixes() {
+    let semantic_query = "orbital prep semantic probe";
+    let semantic_match_content = "release readiness checklist";
+    let non_match_content = "garden watering schedule";
+    let provider = Arc::new(StubEmbeddingProvider::new_with_model(
+        "nomic-embed-text:latest",
+        [
+            (
+                "search_document: release readiness checklist",
+                axis_embedding(),
+            ),
+            (
+                "search_document: garden watering schedule",
+                negative_axis_embedding(),
+            ),
+            (
+                "search_query: orbital prep semantic probe",
+                axis_embedding(),
+            ),
+        ],
+    ));
+    let (_temp_dir, store) =
+        test_store_with_provider("nomic-provider-search-derived", provider.clone());
+
+    let semantic_match = sample_memory(
+        semantic_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        Utc::now(),
+    );
+    let semantic_match_id = semantic_match.id;
+    let non_match = sample_memory(
+        non_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::Imported,
+        0.8,
+        Utc::now(),
+    );
+
+    store
+        .store(semantic_match)
+        .await
+        .expect("store semantic match");
+    store.store(non_match).await.expect("store non-match");
+
+    let results = store
+        .search(SearchQuery {
+            text: semantic_query.to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+            agent_id: None,
+        })
+        .await
+        .expect("run provider-backed semantic search");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, semantic_match_id);
+    assert!(results[0].similarity > 0.0);
+    assert_eq!(
+        provider.calls(),
+        vec![
+            "search_document: release readiness checklist".to_string(),
+            "search_document: garden watering schedule".to_string(),
+            "search_query: orbital prep semantic probe".to_string(),
+        ]
+    );
+}
+
+#[tokio::test]
 async fn agent_scoped_search_can_filter_to_a_single_agent_id() {
     let temp_dir = TempDir::new().expect("create temp directory");
     let db_path = temp_dir.path().join("agent-filter.sqlite3");
@@ -1203,6 +1278,7 @@ async fn reembed_stale_memories(
 
 #[derive(Debug)]
 struct StubEmbeddingProvider {
+    model_id: &'static str,
     responses: HashMap<String, Vec<f32>>,
     calls: Mutex<Vec<String>>,
 }
@@ -1213,7 +1289,16 @@ impl StubEmbeddingProvider {
         I: IntoIterator<Item = (S, Vec<f32>)>,
         S: Into<String>,
     {
+        Self::new_with_model("integration-stub", responses)
+    }
+
+    fn new_with_model<I, S>(model_id: &'static str, responses: I) -> Self
+    where
+        I: IntoIterator<Item = (S, Vec<f32>)>,
+        S: Into<String>,
+    {
         Self {
+            model_id,
             responses: responses
                 .into_iter()
                 .map(|(text, embedding)| (text.into(), embedding))
@@ -1246,6 +1331,6 @@ impl EmbeddingProvider for StubEmbeddingProvider {
     }
 
     fn model_id(&self) -> &str {
-        "integration-stub"
+        self.model_id
     }
 }
