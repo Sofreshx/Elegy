@@ -250,6 +250,13 @@ When the gate decides to merge:
 
 `update_content()` versions the old text before replacement and marks embeddings stale for re-embedding.
 
+For `nomic-embed-text`, Elegy now applies task-aware prefixes at embedding time:
+
+- document / stored-memory embeddings use `search_document: <content>`
+- search-query embeddings use `search_query: <query>`
+
+This keeps the query/document spaces aligned for semantic retrieval. Rows embedded before this rule changed are not directly comparable with freshly generated vectors; mark them stale and re-embed (or rebuild the database) before relying on mixed old/new semantic rankings.
+
 ## Contradiction Journal
 
 Contradiction auto-detection is now implemented at write time, and the same journal is also reused by LLM-backed consolidation when the model flags a contradictory pair instead of returning merged text.
@@ -384,4 +391,3 @@ Dormant → Deleted  (hard_delete / purge)
 
 - knowledge-graph-native storage and retrieval beyond today's link graph + BFS traversal
 - PostgreSQL backend / multi-tenant runtime hardening beyond the current SQLite implementation
-
