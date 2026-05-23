@@ -56,6 +56,13 @@ ollama list | findstr nomic-embed-text
 ollama pull nomic-embed-text
 ```
 
+When the embedding model is `nomic-embed-text`, Elegy prefixes embedding inputs with the model's task markers:
+
+- stored memory content is embedded as `search_document: <content>`
+- search queries are embedded as `search_query: <query>`
+
+Existing databases whose embeddings were generated before this change should be re-embedded before you trust semantic ranking again. Fresh stores are unaffected; older rows should be purged and re-stored or marked stale and re-embedded.
+
 ## Environment variables
 
 The binaries intentionally do not use the same env surface.
@@ -99,3 +106,4 @@ Use the provided examples as copy-and-edit starting points.
 | stdio binary exits immediately with `Model <name> not pulled` | The configured embedding model is missing. | Run `ollama pull <name>` and restart. |
 | `memory_store` returns `"embeddingStatus": "failed"` | The memory stored, but embedding generation or indexing did not complete, so semantic recall may miss it. | Check Ollama health/logs and retry or re-embed later. |
 | `memory_store` returns `"embeddingStatus": "skipped_no_provider"` | The server is running without an embedding provider. | Disable degraded mode or restore Ollama/model availability if semantic search is required. |
+| Semantic ranking looks noisy after upgrading `nomic-embed-text` handling | The database still contains embeddings produced before Elegy started sending `search_document:` / `search_query:` task prefixes. | Re-embed existing rows (or rebuild the test DB) so all vectors are generated with the same task-prefix contract. |

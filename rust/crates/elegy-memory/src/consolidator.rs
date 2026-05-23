@@ -3,8 +3,10 @@ use std::sync::Arc;
 use async_trait::async_trait;
 
 use crate::{
-    similarity::cosine_similarity, ConsolidationAction, ConsolidationCandidate, ConsolidationError,
-    EmbeddingProvider, LlmProvider, MemoryConsolidator, MemoryState, ScopeConfig,
+    embedding::{prepare_embedding_input, EmbeddingTask},
+    similarity::cosine_similarity,
+    ConsolidationAction, ConsolidationCandidate, ConsolidationError, EmbeddingProvider,
+    LlmProvider, MemoryConsolidator, MemoryState, ScopeConfig,
 };
 
 /// Simple consolidator that reports high-similarity active-memory dedup actions.
@@ -144,7 +146,12 @@ impl LlmConsolidator {
         }
 
         let provider = self.embedding_provider.as_ref()?;
-        match provider.embed(&candidate.memory.content).await {
+        let prepared_input = prepare_embedding_input(
+            provider.as_ref(),
+            EmbeddingTask::Document,
+            &candidate.memory.content,
+        );
+        match provider.embed(prepared_input.as_ref()).await {
             Ok(embedding) if !embedding.is_empty() => Some(embedding),
             Ok(_) => {
                 eprintln!(
