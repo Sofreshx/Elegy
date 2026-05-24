@@ -2,7 +2,7 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the three dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the four dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp`, `rust/crates/elegy-planning`, and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis, durable planning authority, and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
@@ -42,6 +42,7 @@ Tagged releases are configured to publish neutral asset families across the cont
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
+- planning wrapper archive: `elegy-planning-wrapper-<bundleVersion>.zip`
 - skills wrapper archive: `elegy-skills-wrapper-<bundleVersion>.zip`
 
 The contracts bundle remains the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
@@ -172,6 +173,7 @@ Outputs:
 
 - `artifacts/distribution/elegy-memory-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-mcp-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-planning-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-skills-wrapper-<bundleVersion>.zip`
 
 Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.

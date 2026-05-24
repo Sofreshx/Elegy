@@ -7,13 +7,15 @@ use thiserror::Error;
 
 use crate::{
     AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalStatus,
-    IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat, ReviewPointStatus,
-    RoadmapStatus, Severity, TodoStatus, WorkPointStatus,
+    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EntityType,
+    GoalStatus, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat,
+    RevisePlanInput, ReviewPointStatus, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput,
+    WorkPointStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
+const RESULT_SCHEMA_VERSION: &str = "planning-result/v1";
 
 static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
 
@@ -39,6 +41,8 @@ struct Cli {
     non_interactive: bool,
     #[arg(long, global = true)]
     correlation_id: Option<String>,
+    #[arg(long, global = true, default_value = "default")]
+    scope: String,
     #[arg(long, global = true)]
     db: Option<PathBuf>,
     #[command(subcommand)]
@@ -53,6 +57,10 @@ enum OutputFormat {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    Scope {
+        #[command(subcommand)]
+        command: ScopeCommand,
+    },
     Goal {
         #[command(subcommand)]
         command: GoalCommand,
@@ -60,6 +68,10 @@ enum Command {
     Roadmap {
         #[command(subcommand)]
         command: RoadmapCommand,
+    },
+    WorkPoint {
+        #[command(subcommand)]
+        command: WorkPointCommand,
     },
     Plan {
         #[command(subcommand)]
@@ -92,6 +104,7 @@ enum Command {
 #[derive(Subcommand, Debug)]
 enum GoalCommand {
     Create(GoalCreateArgs),
+    UpdateStatus(GoalUpdateStatusArgs),
     List,
     Show(GoalShowArgs),
 }
@@ -99,16 +112,26 @@ enum GoalCommand {
 #[derive(Subcommand, Debug)]
 enum RoadmapCommand {
     Create(RoadmapCreateArgs),
+    UpdateStatus(RoadmapUpdateStatusArgs),
     AddSection(RoadmapAddSectionArgs),
     AddWorkPoint(RoadmapAddWorkPointArgs),
     List,
     Show(RoadmapShowArgs),
 }
 
+#[derive(Subcommand, Debug)]
+enum WorkPointCommand {
+    List,
+    Show(WorkPointShowArgs),
+    UpdateStatus(WorkPointUpdateStatusArgs),
+}
+
 #[allow(clippy::large_enum_variant)]
 #[derive(Subcommand, Debug)]
 enum PlanCommand {
     Create(PlanCreateArgs),
+    Revise(PlanReviseArgs),
+    UpdateStatus(PlanUpdateStatusArgs),
     List,
     Show(PlanShowArgs),
 }
@@ -116,12 +139,14 @@ enum PlanCommand {
 #[derive(Subcommand, Debug)]
 enum TodoCommand {
     Create(TodoCreateArgs),
+    UpdateStatus(TodoUpdateStatusArgs),
     List,
 }
 
 #[derive(Subcommand, Debug)]
 enum IssueCommand {
     Record(IssueRecordArgs),
+    UpdateStatus(IssueUpdateStatusArgs),
     List,
     Show(IssueShowArgs),
 }
@@ -129,6 +154,7 @@ enum IssueCommand {
 #[derive(Subcommand, Debug)]
 enum ReviewPointCommand {
     Record(ReviewPointRecordArgs),
+    UpdateStatus(ReviewPointUpdateStatusArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -138,7 +164,35 @@ enum ValidateCommand {
 
 #[derive(Subcommand, Debug)]
 enum ProjectCommand {
+    Export(ProjectRenderArgs),
     Render(ProjectRenderArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum ScopeCommand {
+    Create(ScopeCreateArgs),
+    List,
+    Show(ScopeShowArgs),
+}
+
+#[derive(Args, Debug)]
+struct ScopeCreateArgs {
+    #[arg(long = "scope-key")]
+    scope_key: String,
+    #[arg(long = "scope-type")]
+    scope_type: Option<String>,
+    #[arg(long = "parent-scope-key")]
+    parent_scope_key: Option<String>,
+    #[arg(long = "metadata-json")]
+    metadata_json: Option<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct ScopeShowArgs {
+    #[arg(long = "scope-key")]
+    scope_key: String,
 }
 
 #[derive(Args, Debug)]
@@ -159,6 +213,14 @@ struct GoalCreateArgs {
     status: GoalStatus,
     #[arg(long = "tag")]
     tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct GoalUpdateStatusArgs {
+    #[arg(long = "goal-id")]
+    goal_id: String,
+    #[arg(long, value_enum)]
+    status: GoalStatus,
 }
 
 #[derive(Args, Debug)]
@@ -232,6 +294,14 @@ struct RoadmapShowArgs {
 }
 
 #[derive(Args, Debug)]
+struct RoadmapUpdateStatusArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+    #[arg(long, value_enum)]
+    status: RoadmapStatus,
+}
+
+#[derive(Args, Debug)]
 struct PlanCreateArgs {
     #[arg(long)]
     id: Option<String>,
@@ -245,8 +315,8 @@ struct PlanCreateArgs {
     title: String,
     #[arg(long)]
     summary: String,
-    #[arg(long)]
-    scope: String,
+    #[arg(long = "plan-scope")]
+    plan_scope: String,
     #[arg(long = "assumption")]
     assumptions: Vec<String>,
     #[arg(long = "stop-condition")]
@@ -265,6 +335,32 @@ struct PlanCreateArgs {
 struct PlanShowArgs {
     #[arg(long = "plan-id")]
     plan_id: String,
+}
+
+#[derive(Args, Debug)]
+struct PlanReviseArgs {
+    #[arg(long = "plan-id")]
+    plan_id: String,
+    #[arg(long = "scope-key")]
+    scope_key: Option<String>,
+    #[arg(long = "assumption")]
+    assumptions: Vec<String>,
+    #[arg(long = "stop-condition")]
+    stop_conditions: Vec<String>,
+    #[arg(long = "validation-step")]
+    validation_steps: Vec<String>,
+    #[arg(long = "target-work-point-id")]
+    targeted_work_point_ids: Vec<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct PlanUpdateStatusArgs {
+    #[arg(long = "plan-id")]
+    plan_id: String,
+    #[arg(long, value_enum)]
+    status: PlanStatus,
 }
 
 #[derive(Args, Debug)]
@@ -289,6 +385,16 @@ struct TodoCreateArgs {
     tags: Vec<String>,
     #[arg(long)]
     ordering: Option<i64>,
+}
+
+#[derive(Args, Debug)]
+struct TodoUpdateStatusArgs {
+    #[arg(long = "todo-id")]
+    todo_id: String,
+    #[arg(long, value_enum)]
+    status: TodoStatus,
+    #[arg(long = "evidence-ref")]
+    evidence_refs: Vec<String>,
 }
 
 #[derive(Args, Debug)]
@@ -320,6 +426,14 @@ struct IssueShowArgs {
 }
 
 #[derive(Args, Debug)]
+struct IssueUpdateStatusArgs {
+    #[arg(long = "issue-id")]
+    issue_id: String,
+    #[arg(long, value_enum)]
+    status: IssueStatus,
+}
+
+#[derive(Args, Debug)]
 struct ReviewPointRecordArgs {
     #[arg(long)]
     id: Option<String>,
@@ -335,6 +449,28 @@ struct ReviewPointRecordArgs {
     status: ReviewPointStatus,
     #[arg(long, value_enum, default_value_t = Severity::Medium)]
     severity: Severity,
+}
+
+#[derive(Args, Debug)]
+struct ReviewPointUpdateStatusArgs {
+    #[arg(long = "review-point-id")]
+    review_point_id: String,
+    #[arg(long, value_enum)]
+    status: ReviewPointStatus,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointShowArgs {
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointUpdateStatusArgs {
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+    #[arg(long, value_enum)]
+    status: WorkPointStatus,
 }
 
 #[derive(Args, Debug)]
@@ -355,6 +491,7 @@ struct MachineEnvelope<T>
 where
     T: Serialize,
 {
+    schema_version: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     correlation_id: Option<String>,
     #[serde(skip_serializing_if = "is_false")]
@@ -372,6 +509,7 @@ struct MachineContext {
     format: OutputFormat,
     non_interactive: bool,
     correlation_id: Option<String>,
+    scope_key: String,
     db_path: PathBuf,
     command: Vec<String>,
 }
@@ -383,6 +521,7 @@ pub fn run_from_env() -> ExitCode {
             if let Some(context) = CLI_MACHINE_CONTEXT.get() {
                 if context.format == OutputFormat::Json
                     && print_json(&MachineEnvelope::<serde_json::Value> {
+                        schema_version: RESULT_SCHEMA_VERSION,
                         correlation_id: context.correlation_id.clone(),
                         non_interactive: context.non_interactive,
                         command: context.command.clone(),
@@ -416,6 +555,7 @@ where
         format: resolve_output_format(cli.json, cli.format),
         non_interactive: cli.non_interactive,
         correlation_id: cli.correlation_id,
+        scope_key: cli.scope,
         db_path: cli.db.unwrap_or_else(default_db_path),
         command: command_path(&cli.command),
     };
@@ -424,8 +564,10 @@ where
     store.init()?;
 
     match cli.command {
+        Command::Scope { command } => execute_scope(command, &store, &context),
         Command::Goal { command } => execute_goal(command, &store, &context),
         Command::Roadmap { command } => execute_roadmap(command, &store, &context),
+        Command::WorkPoint { command } => execute_work_point(command, &store, &context),
         Command::Plan { command } => execute_plan(command, &store, &context),
         Command::Todo { command } => execute_todo(command, &store, &context),
         Command::Issue { command } => execute_issue(command, &store, &context),
@@ -450,6 +592,7 @@ fn handle_parse_error(error: clap::Error, raw_args: &[OsString]) -> Result<ExitC
         )
     {
         print_json(&MachineEnvelope::<serde_json::Value> {
+            schema_version: RESULT_SCHEMA_VERSION,
             correlation_id,
             non_interactive,
             command,
@@ -483,6 +626,37 @@ impl CliError {
     }
 }
 
+fn execute_scope(
+    command: ScopeCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        ScopeCommand::Create(args) => emit_success(
+            context,
+            vec!["scope", "create"],
+            store.create_scope(CreateScopeInput {
+                scope_key: args.scope_key,
+                scope_type: args.scope_type,
+                parent_scope_key: args.parent_scope_key,
+                metadata: parse_optional_json_object(args.metadata_json)?,
+                tags: args.tags,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
+        ScopeCommand::List => emit_success(
+            context,
+            vec!["scope", "list"],
+            json!({ "scopes": store.list_scopes()? }),
+        ),
+        ScopeCommand::Show(args) => emit_success(
+            context,
+            vec!["scope", "show"],
+            json!({ "scope": store.scope(&args.scope_key)? }),
+        ),
+    }
+}
+
 fn execute_goal(
     command: GoalCommand,
     store: &PlanningStore,
@@ -496,6 +670,7 @@ fn execute_goal(
             };
             let result = store.create_goal(CreateGoalInput {
                 id: args.id,
+                scope_key: Some(context.scope_key.clone()),
                 correlation_id,
                 title: args.title,
                 description: args.description,
@@ -507,13 +682,36 @@ fn execute_goal(
             })?;
             emit_success(context, vec!["goal", "create"], result)
         }
+        GoalCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["goal", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Goal,
+                entity_id: args.goal_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         GoalCommand::List => emit_success(
             context,
             vec!["goal", "list"],
-            json!({ "goals": store.list_goals()? }),
+            json!({ "goals": store.list_goals_in_scope(&context.scope_key)? }),
         ),
         GoalCommand::Show(args) => {
-            emit_success(context, vec!["goal", "show"], store.goal(&args.goal_id)?)
+            let view = store.goal(&args.goal_id)?;
+            if view.goal.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["goal", "show"],
+                    format!(
+                        "goal `{}` is in scope `{}`, not `{}`",
+                        args.goal_id, view.goal.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["goal", "show"], view)
         }
     }
 }
@@ -536,6 +734,7 @@ fn execute_roadmap(
                 vec!["roadmap", "create"],
                 store.create_roadmap(CreateRoadmapInput {
                     id: args.id,
+                    scope_key: Some(context.scope_key.clone()),
                     goal_id: args.goal_id,
                     correlation_id,
                     title: args.title,
@@ -546,11 +745,23 @@ fn execute_roadmap(
                 })?,
             )
         }
+        RoadmapCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["roadmap", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Roadmap,
+                entity_id: args.roadmap_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         RoadmapCommand::AddSection(args) => emit_success(
             context,
             vec!["roadmap", "add-section"],
             store.add_roadmap_section(AddRoadmapSectionInput {
                 id: args.id,
+                scope_key: Some(context.scope_key.clone()),
                 roadmap_id: args.roadmap_id,
                 slug: args.slug,
                 title: args.title,
@@ -564,6 +775,7 @@ fn execute_roadmap(
             vec!["roadmap", "add-work-point"],
             store.add_work_point(AddWorkPointInput {
                 id: args.id,
+                scope_key: Some(context.scope_key.clone()),
                 roadmap_id: args.roadmap_id,
                 section_id: args.section_id,
                 title: args.title,
@@ -579,12 +791,62 @@ fn execute_roadmap(
         RoadmapCommand::List => emit_success(
             context,
             vec!["roadmap", "list"],
-            json!({ "roadmaps": store.list_roadmaps()? }),
+            json!({ "roadmaps": store.list_roadmaps_in_scope(&context.scope_key)? }),
         ),
-        RoadmapCommand::Show(args) => emit_success(
+        RoadmapCommand::Show(args) => {
+            let view = store.roadmap(&args.roadmap_id)?;
+            if view.roadmap.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["roadmap", "show"],
+                    format!(
+                        "roadmap `{}` is in scope `{}`, not `{}`",
+                        args.roadmap_id, view.roadmap.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["roadmap", "show"], view)
+        }
+    }
+}
+
+fn execute_work_point(
+    command: WorkPointCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        WorkPointCommand::List => emit_success(
             context,
-            vec!["roadmap", "show"],
-            store.roadmap(&args.roadmap_id)?,
+            vec!["work-point", "list"],
+            json!({ "workPoints": store.list_work_points_in_scope(&context.scope_key)? }),
+        ),
+        WorkPointCommand::Show(args) => {
+            let view = store.work_point(&args.work_point_id)?;
+            if view.work_point.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["work-point", "show"],
+                    format!(
+                        "work point `{}` is in scope `{}`, not `{}`",
+                        args.work_point_id, view.work_point.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["work-point", "show"], view)
+        }
+        WorkPointCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["work-point", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::WorkPoint,
+                entity_id: args.work_point_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                run_id: context.correlation_id.clone(),
+            })?,
         ),
     }
 }
@@ -605,12 +867,13 @@ fn execute_plan(
                 vec!["plan", "create"],
                 store.create_plan(CreatePlanInput {
                     id: args.id,
+                    scope_key: Some(context.scope_key.clone()),
                     goal_id: args.goal_id,
                     roadmap_id: args.roadmap_id,
                     correlation_id,
                     title: args.title,
                     summary: args.summary,
-                    scope: args.scope,
+                    scope: args.plan_scope,
                     assumptions: args.assumptions,
                     stop_conditions: args.stop_conditions,
                     validation_steps: args.validation_steps,
@@ -621,13 +884,50 @@ fn execute_plan(
                 })?,
             )
         }
+        PlanCommand::Revise(args) => emit_success(
+            context,
+            vec!["plan", "revise"],
+            store.revise_plan(RevisePlanInput {
+                plan_id: args.plan_id,
+                scope_key: args.scope_key,
+                assumptions: optional_vec(args.assumptions),
+                stop_conditions: optional_vec(args.stop_conditions),
+                validation_steps: optional_vec(args.validation_steps),
+                targeted_work_point_ids: optional_vec(args.targeted_work_point_ids),
+                tags: optional_vec(args.tags),
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
+        PlanCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["plan", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Plan,
+                entity_id: args.plan_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         PlanCommand::List => emit_success(
             context,
             vec!["plan", "list"],
-            json!({ "plans": store.list_plans()? }),
+            json!({ "plans": store.list_plans_in_scope(&context.scope_key)? }),
         ),
         PlanCommand::Show(args) => {
-            emit_success(context, vec!["plan", "show"], store.plan(&args.plan_id)?)
+            let view = store.plan(&args.plan_id)?;
+            if view.plan.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["plan", "show"],
+                    format!(
+                        "plan `{}` is in scope `{}`, not `{}`",
+                        args.plan_id, view.plan.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["plan", "show"], view)
         }
     }
 }
@@ -643,6 +943,7 @@ fn execute_todo(
             vec!["todo", "create"],
             store.create_todo(CreateTodoInput {
                 id: args.id,
+                scope_key: Some(context.scope_key.clone()),
                 plan_id: args.plan_id,
                 work_point_id: args.work_point_id,
                 title: args.title,
@@ -655,10 +956,21 @@ fn execute_todo(
                 run_id: context.correlation_id.clone(),
             })?,
         ),
+        TodoCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["todo", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Todo,
+                entity_id: args.todo_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: optional_vec(args.evidence_refs),
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         TodoCommand::List => emit_success(
             context,
             vec!["todo", "list"],
-            json!({ "todos": store.list_todos()? }),
+            json!({ "todos": store.list_todos_in_scope(&context.scope_key)? }),
         ),
     }
 }
@@ -679,6 +991,7 @@ fn execute_issue(
                 vec!["issue", "record"],
                 store.create_issue(CreateIssueInput {
                     id: args.id,
+                    scope_key: Some(context.scope_key.clone()),
                     correlation_id,
                     title: args.title,
                     summary: args.summary,
@@ -691,13 +1004,36 @@ fn execute_issue(
                 })?,
             )
         }
+        IssueCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["issue", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Issue,
+                entity_id: args.issue_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         IssueCommand::List => emit_success(
             context,
             vec!["issue", "list"],
-            json!({ "issues": store.list_issues()? }),
+            json!({ "issues": store.list_issues_in_scope(&context.scope_key)? }),
         ),
         IssueCommand::Show(args) => {
-            emit_success(context, vec!["issue", "show"], store.issue(&args.issue_id)?)
+            let view = store.issue(&args.issue_id)?;
+            if view.issue.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["issue", "show"],
+                    format!(
+                        "issue `{}` is in scope `{}`, not `{}`",
+                        args.issue_id, view.issue.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["issue", "show"], view)
         }
     }
 }
@@ -713,12 +1049,24 @@ fn execute_review_point(
             vec!["review-point", "record"],
             store.create_review_point(CreateReviewPointInput {
                 id: args.id,
+                scope_key: Some(context.scope_key.clone()),
                 attached_entity_type: args.attached_entity_type,
                 attached_entity_id: args.attached_entity_id,
                 title: args.title,
                 summary: args.summary,
                 status: args.status,
                 severity: args.severity,
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
+        ReviewPointCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["review-point", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::ReviewPoint,
+                entity_id: args.review_point_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -755,6 +1103,16 @@ fn execute_project(
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
+        ProjectCommand::Export(args) => emit_success(
+            context,
+            vec!["project", "export"],
+            store.render_projection(
+                args.entity_type,
+                &args.entity_id,
+                args.projection_format,
+                &args.output,
+            )?,
+        ),
         ProjectCommand::Render(args) => emit_success(
             context,
             vec!["project", "render"],
@@ -782,6 +1140,7 @@ where
             println!("{text}");
         }
         OutputFormat::Json => print_json(&MachineEnvelope {
+            schema_version: RESULT_SCHEMA_VERSION,
             correlation_id: context.correlation_id.clone(),
             non_interactive: context.non_interactive,
             command: command.iter().map(|item| (*item).to_string()).collect(),
@@ -802,6 +1161,7 @@ fn emit_error(
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
         OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
+            schema_version: RESULT_SCHEMA_VERSION,
             correlation_id: context.correlation_id.clone(),
             non_interactive: context.non_interactive,
             command: command.iter().map(|item| (*item).to_string()).collect(),
@@ -877,7 +1237,7 @@ fn parse_command_path(raw_args: &[OsString]) -> Vec<String> {
         .collect::<Vec<_>>();
     let command_names = command_names();
     let mut path = Vec::new();
-    let value_flags = ["--db", "--correlation-id", "--format"];
+    let value_flags = ["--db", "--correlation-id", "--format", "--scope"];
 
     let mut index = 0;
     while index < values.len() {
@@ -926,6 +1286,9 @@ fn command_names() -> Vec<String> {
 
 fn command_path(command: &Command) -> Vec<String> {
     match command {
+        Command::Scope { command } => {
+            vec!["scope".to_string(), scope_command_name(command).to_string()]
+        }
         Command::Goal { command } => {
             vec!["goal".to_string(), goal_command_name(command).to_string()]
         }
@@ -935,6 +1298,10 @@ fn command_path(command: &Command) -> Vec<String> {
                 roadmap_command_name(command).to_string(),
             ]
         }
+        Command::WorkPoint { command } => vec![
+            "work-point".to_string(),
+            work_point_command_name(command).to_string(),
+        ],
         Command::Plan { command } => {
             vec!["plan".to_string(), plan_command_name(command).to_string()]
         }
@@ -961,9 +1328,18 @@ fn command_path(command: &Command) -> Vec<String> {
     }
 }
 
+fn scope_command_name(command: &ScopeCommand) -> &'static str {
+    match command {
+        ScopeCommand::Create(_) => "create",
+        ScopeCommand::List => "list",
+        ScopeCommand::Show(_) => "show",
+    }
+}
+
 fn goal_command_name(command: &GoalCommand) -> &'static str {
     match command {
         GoalCommand::Create(_) => "create",
+        GoalCommand::UpdateStatus(_) => "update-status",
         GoalCommand::List => "list",
         GoalCommand::Show(_) => "show",
     }
@@ -972,6 +1348,7 @@ fn goal_command_name(command: &GoalCommand) -> &'static str {
 fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
     match command {
         RoadmapCommand::Create(_) => "create",
+        RoadmapCommand::UpdateStatus(_) => "update-status",
         RoadmapCommand::AddSection(_) => "add-section",
         RoadmapCommand::AddWorkPoint(_) => "add-work-point",
         RoadmapCommand::List => "list",
@@ -979,9 +1356,19 @@ fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
     }
 }
 
+fn work_point_command_name(command: &WorkPointCommand) -> &'static str {
+    match command {
+        WorkPointCommand::List => "list",
+        WorkPointCommand::Show(_) => "show",
+        WorkPointCommand::UpdateStatus(_) => "update-status",
+    }
+}
+
 fn plan_command_name(command: &PlanCommand) -> &'static str {
     match command {
         PlanCommand::Create(_) => "create",
+        PlanCommand::Revise(_) => "revise",
+        PlanCommand::UpdateStatus(_) => "update-status",
         PlanCommand::List => "list",
         PlanCommand::Show(_) => "show",
     }
@@ -990,6 +1377,7 @@ fn plan_command_name(command: &PlanCommand) -> &'static str {
 fn todo_command_name(command: &TodoCommand) -> &'static str {
     match command {
         TodoCommand::Create(_) => "create",
+        TodoCommand::UpdateStatus(_) => "update-status",
         TodoCommand::List => "list",
     }
 }
@@ -997,6 +1385,7 @@ fn todo_command_name(command: &TodoCommand) -> &'static str {
 fn issue_command_name(command: &IssueCommand) -> &'static str {
     match command {
         IssueCommand::Record(_) => "record",
+        IssueCommand::UpdateStatus(_) => "update-status",
         IssueCommand::List => "list",
         IssueCommand::Show(_) => "show",
     }
@@ -1005,6 +1394,7 @@ fn issue_command_name(command: &IssueCommand) -> &'static str {
 fn review_point_command_name(command: &ReviewPointCommand) -> &'static str {
     match command {
         ReviewPointCommand::Record(_) => "record",
+        ReviewPointCommand::UpdateStatus(_) => "update-status",
     }
 }
 
@@ -1016,6 +1406,7 @@ fn validate_command_name(command: &ValidateCommand) -> &'static str {
 
 fn project_command_name(command: &ProjectCommand) -> &'static str {
     match command {
+        ProjectCommand::Export(_) => "export",
         ProjectCommand::Render(_) => "render",
     }
 }
@@ -1032,6 +1423,29 @@ fn resolve_correlation_id(
             "correlation id is required; pass --correlation-id globally or on the command"
                 .to_string()
         })
+}
+
+fn optional_vec(values: Vec<String>) -> Option<Vec<String>> {
+    if values.is_empty() {
+        None
+    } else {
+        Some(values)
+    }
+}
+
+fn parse_optional_json_object(
+    value: Option<String>,
+) -> Result<Option<serde_json::Value>, CliError> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let parsed: serde_json::Value = serde_json::from_str(value.trim())?;
+    if !parsed.is_object() {
+        return Err(CliError::Store(crate::PlanningStoreError::InvalidInput(
+            "metadataJson must be a JSON object".to_string(),
+        )));
+    }
+    Ok(Some(parsed))
 }
 
 fn default_db_path() -> PathBuf {

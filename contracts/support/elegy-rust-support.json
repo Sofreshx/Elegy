@@ -69,6 +69,32 @@
       ]
     },
     {
+      "name": "elegy-planning-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetUpstreamPackageVersion": "1.4.0",
+      "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
+      "wrapperSurface": {
+        "root": "src/Elegy-planning",
+        "entrypoint": "src/Elegy-planning/wrapper-entrypoint.json",
+        "installer": "src/Elegy-planning/install.ps1",
+        "skillBridge": "src/Elegy-planning/skills/elegy-planning/SKILL.md",
+        "releaseAssetPrefix": "elegy-planning-wrapper",
+        "archivePattern": "elegy-planning-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-planning/, and the wrapper surface under wrappers/elegy-planning/."
+      },
+      "existingSchemasUnchanged": [
+        "planning-result",
+        "skill-definition-v2",
+        "skill-discovery-index"
+      ],
+      "authorityReservations": [
+        "contracts planning skill authority",
+        "rust/crates/elegy-planning durable state authority",
+        "downstream host-local policy and side-effect gating"
+      ]
+    },
+    {
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",

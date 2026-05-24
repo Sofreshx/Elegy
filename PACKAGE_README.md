@@ -25,7 +25,7 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
   - Dedicated `elegy-planning` binary.
 - `elegy-skills-<cliVersion>-<target>.zip`
   - Dedicated `elegy-skills` binary.
-- `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`
+- `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-planning-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`
   - Dedicated wrapper surfaces with wrapper metadata, local install entrypoint, skill bridge, bundled installer helper, and this README.
 - `elegy-installer-<bundleVersion>.zip`
   - Standalone installer bootstrap with `install-distribution.ps1` and this README.

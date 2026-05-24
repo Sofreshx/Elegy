@@ -15,12 +15,14 @@ use crate::{
     IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEvent,
     PlanningHealthReport, PlanningStoreError, Priority, ProjectionFormat, RenderedProjection,
     ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord, RoadmapStatus,
-    RoadmapView, Severity, TodoRecord, TodoStatus, ValidationFinding, ValidationReport,
-    ValidationRunReport, ValidationSeverity, WorkPointRecord, WorkPointStatus,
+    RoadmapView, ScopeRecord, Severity, TodoRecord, TodoStatus, ValidationFinding,
+    ValidationReport, ValidationRunReport, ValidationSeverity, WorkPointRecord, WorkPointStatus,
+    WorkPointView,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "1";
+pub const CURRENT_SCHEMA_VERSION: &str = "2";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
+const DEFAULT_SCOPE_KEY: &str = "default";
 
 #[derive(Clone, Debug)]
 pub struct PlanningStore {
@@ -30,6 +32,7 @@ pub struct PlanningStore {
 #[derive(Clone, Debug)]
 pub struct CreateGoalInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub correlation_id: String,
     pub title: String,
     pub description: String,
@@ -43,6 +46,7 @@ pub struct CreateGoalInput {
 #[derive(Clone, Debug)]
 pub struct CreateRoadmapInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub goal_id: String,
     pub correlation_id: String,
     pub title: String,
@@ -55,6 +59,7 @@ pub struct CreateRoadmapInput {
 #[derive(Clone, Debug)]
 pub struct AddRoadmapSectionInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub roadmap_id: String,
     pub slug: String,
     pub title: String,
@@ -66,6 +71,7 @@ pub struct AddRoadmapSectionInput {
 #[derive(Clone, Debug)]
 pub struct AddWorkPointInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub roadmap_id: String,
     pub section_id: Option<String>,
     pub title: String,
@@ -81,6 +87,7 @@ pub struct AddWorkPointInput {
 #[derive(Clone, Debug)]
 pub struct CreatePlanInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub goal_id: String,
     pub roadmap_id: String,
     pub correlation_id: String,
@@ -99,6 +106,7 @@ pub struct CreatePlanInput {
 #[derive(Clone, Debug)]
 pub struct CreateTodoInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub plan_id: Option<String>,
     pub work_point_id: Option<String>,
     pub title: String,
@@ -114,6 +122,7 @@ pub struct CreateTodoInput {
 #[derive(Clone, Debug)]
 pub struct CreateIssueInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub correlation_id: String,
     pub title: String,
     pub summary: String,
@@ -128,12 +137,44 @@ pub struct CreateIssueInput {
 #[derive(Clone, Debug)]
 pub struct CreateReviewPointInput {
     pub id: Option<String>,
+    pub scope_key: Option<String>,
     pub attached_entity_type: EntityType,
     pub attached_entity_id: String,
     pub title: String,
     pub summary: String,
     pub status: ReviewPointStatus,
     pub severity: Severity,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateScopeInput {
+    pub scope_key: String,
+    pub scope_type: Option<String>,
+    pub parent_scope_key: Option<String>,
+    pub metadata: Option<Value>,
+    pub tags: Vec<String>,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct UpdateStatusInput {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub status: String,
+    pub evidence_refs: Option<Vec<String>>,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct RevisePlanInput {
+    pub plan_id: String,
+    pub scope_key: Option<String>,
+    pub assumptions: Option<Vec<String>>,
+    pub stop_conditions: Option<Vec<String>>,
+    pub validation_steps: Option<Vec<String>>,
+    pub targeted_work_point_ids: Option<Vec<String>>,
+    pub tags: Option<Vec<String>>,
     pub run_id: Option<String>,
 }
 
@@ -163,10 +204,13 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        ensure_scope_exists(&transaction, &scope_key)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = GoalRecord {
             id: id.clone(),
+            scope_key,
             correlation_id: input.correlation_id,
             title: input.title.trim().to_string(),
             description: input.description.trim().to_string(),
@@ -182,12 +226,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO goals (
-                id, correlation_id, title, description, acceptance_criteria_json,
+                id, scope_key, correlation_id, title, description, acceptance_criteria_json,
                 rejection_criteria_json, status, tags_json, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.correlation_id,
                 record.title,
                 record.description,
@@ -233,10 +278,12 @@ impl PlanningStore {
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
         ensure_entity_exists(&transaction, EntityType::Goal, &input.goal_id, "goalId")?;
+        let inherited_scope_key = scope_key_for_entity(&transaction, EntityType::Goal, &input.goal_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = RoadmapRecord {
             id: id.clone(),
+            scope_key: inherited_scope_key,
             goal_id: input.goal_id,
             correlation_id: input.correlation_id,
             title: input.title.trim().to_string(),
@@ -251,12 +298,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO roadmaps (
-                id, goal_id, correlation_id, title, summary, status, tags_json, revision,
-                created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                id, scope_key, goal_id, correlation_id, title, summary, status, tags_json,
+                revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.goal_id,
                 record.correlation_id,
                 record.title,
@@ -306,6 +354,8 @@ impl PlanningStore {
             &input.roadmap_id,
             "roadmapId",
         )?;
+        let inherited_scope_key =
+            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let ordering = input.ordering.unwrap_or(next_ordering(
@@ -316,6 +366,7 @@ impl PlanningStore {
         )?);
         let record = RoadmapSectionRecord {
             id: id.clone(),
+            scope_key: inherited_scope_key,
             roadmap_id: input.roadmap_id,
             slug: input.slug.trim().to_string(),
             title: input.title.trim().to_string(),
@@ -329,11 +380,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO roadmap_sections (
-                id, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
+                id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.roadmap_id,
                 record.slug,
                 record.title,
@@ -384,6 +437,8 @@ impl PlanningStore {
             &input.roadmap_id,
             "roadmapId",
         )?;
+        let inherited_scope_key =
+            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         if let Some(section_id) = &input.section_id {
             ensure_entity_exists(
                 &transaction,
@@ -403,6 +458,7 @@ impl PlanningStore {
         )?);
         let record = WorkPointRecord {
             id: id.clone(),
+            scope_key: inherited_scope_key,
             roadmap_id: input.roadmap_id,
             section_id: input.section_id,
             title: input.title.trim().to_string(),
@@ -420,13 +476,14 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO work_points (
-                id, roadmap_id, section_id, title, summary, status, ordering_index,
-                dependency_ids_json, validation_expectations_json, tags_json, revision,
-                created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+                id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index,
+                dependency_ids_json, validation_expectations_json, tags_json, revision, created_at,
+                updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.roadmap_id,
                 record.section_id,
                 record.title,
@@ -499,10 +556,13 @@ impl PlanningStore {
             &input.roadmap_id,
             "roadmapId",
         )?;
+        let inherited_scope_key =
+            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = PlanRecord {
             id: id.clone(),
+            scope_key: inherited_scope_key,
             goal_id: input.goal_id,
             roadmap_id: input.roadmap_id,
             correlation_id: input.correlation_id,
@@ -523,13 +583,14 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO plans (
-                id, goal_id, roadmap_id, correlation_id, title, summary, scope,
+                id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope,
                 assumptions_json, stop_conditions_json, validation_steps_json,
                 targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.goal_id,
                 record.roadmap_id,
                 record.correlation_id,
@@ -587,6 +648,15 @@ impl PlanningStore {
                 "workPointId",
             )?;
         }
+        let scope_key = if let Some(plan_id) = &input.plan_id {
+            scope_key_for_entity(&transaction, EntityType::Plan, plan_id)?
+        } else if let Some(work_point_id) = &input.work_point_id {
+            scope_key_for_entity(&transaction, EntityType::WorkPoint, work_point_id)?
+        } else {
+            let resolved = normalized_scope_key(input.scope_key);
+            ensure_scope_exists(&transaction, &resolved)?;
+            resolved
+        };
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let ordering_group_key = input
@@ -598,6 +668,7 @@ impl PlanningStore {
             .unwrap_or(next_todo_ordering(&transaction, ordering_group_key)?);
         let record = TodoRecord {
             id: id.clone(),
+            scope_key,
             plan_id: input.plan_id,
             work_point_id: input.work_point_id,
             title: input.title.trim().to_string(),
@@ -615,12 +686,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO todos (
-                id, plan_id, work_point_id, title, summary, status, priority,
+                id, scope_key, plan_id, work_point_id, title, summary, status, priority,
                 evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.plan_id,
                 record.work_point_id,
                 record.title,
@@ -685,10 +757,20 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
+        let scope_key = if let (Some(entity_type), Some(entity_id)) =
+            (input.related_entity_type, input.related_entity_id.as_ref())
+        {
+            scope_key_for_entity(&transaction, entity_type, entity_id)?
+        } else {
+            let resolved = normalized_scope_key(input.scope_key);
+            ensure_scope_exists(&transaction, &resolved)?;
+            resolved
+        };
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = IssueRecord {
             id: id.clone(),
+            scope_key,
             correlation_id: input.correlation_id,
             title: input.title.trim().to_string(),
             summary: input.summary.trim().to_string(),
@@ -707,12 +789,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO issues (
-                id, correlation_id, title, summary, status, severity,
+                id, scope_key, correlation_id, title, summary, status, severity,
                 related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.correlation_id,
                 record.title,
                 record.summary,
@@ -771,10 +854,16 @@ impl PlanningStore {
             &input.attached_entity_id,
             "attachedEntityId",
         )?;
+        let inherited_scope_key = scope_key_for_entity(
+            &transaction,
+            input.attached_entity_type,
+            &input.attached_entity_id,
+        )?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = ReviewPointRecord {
             id: id.clone(),
+            scope_key: inherited_scope_key,
             attached_entity_type: input.attached_entity_type,
             attached_entity_id: input.attached_entity_id,
             title: input.title.trim().to_string(),
@@ -789,12 +878,13 @@ impl PlanningStore {
         transaction.execute(
             r#"
             INSERT INTO review_points (
-                id, attached_entity_type, attached_entity_id, title, summary, status, severity,
-                revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+                id, scope_key, attached_entity_type, attached_entity_id, title, summary, status,
+                severity, revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
             "#,
             params![
                 record.id,
+                record.scope_key,
                 record.attached_entity_type.as_str(),
                 record.attached_entity_id,
                 record.title,
@@ -833,6 +923,436 @@ impl PlanningStore {
             record.attached_entity_type,
             &record.attached_entity_id,
         )?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn create_scope(
+        &self,
+        input: CreateScopeInput,
+    ) -> Result<MutationResult<ScopeRecord>, PlanningStoreError> {
+        require_non_empty("scopeKey", &input.scope_key)?;
+        let scope_key = normalize_scope_key_value(&input.scope_key);
+        let parent_scope_key = input
+            .parent_scope_key
+            .map(|value| normalize_scope_key_value(&value));
+        if let Some(parent) = parent_scope_key.as_ref() {
+            if parent == &scope_key {
+                return Err(PlanningStoreError::InvalidInput(
+                    "parentScopeKey cannot be the same as scopeKey".to_string(),
+                ));
+            }
+        }
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        if let Some(parent) = parent_scope_key.as_ref() {
+            ensure_scope_exists(&transaction, parent)?;
+        }
+
+        let now = now_string()?;
+        let record = ScopeRecord {
+            scope_key: scope_key.clone(),
+            scope_type: input.scope_type.map(|value| value.trim().to_string()),
+            parent_scope_key,
+            metadata: input.metadata.unwrap_or_else(|| serde_json::json!({})),
+            tags: normalize_string_list(input.tags),
+            revision: 1,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        transaction.execute(
+            r#"
+            INSERT INTO scopes (
+                scope_key, scope_type, parent_scope_key, metadata_json, tags_json, revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+            "#,
+            params![
+                record.scope_key,
+                record.scope_type,
+                record.parent_scope_key,
+                record.metadata.to_string(),
+                to_json_text(&record.tags)?,
+                record.revision,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::Scope,
+                &scope_key,
+                EntityType::Scope,
+                &scope_key,
+                &format!("corr-scope-{scope_key}"),
+                input.run_id,
+                "scope.created",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        transaction.commit()?;
+        Ok(MutationResult {
+            record,
+            validation: ValidationReport::from_findings(Vec::new()),
+        })
+    }
+
+    pub fn scope(&self, scope_key: &str) -> Result<ScopeRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        load_scope(&connection, scope_key)
+    }
+
+    pub fn list_scopes(&self) -> Result<Vec<ScopeRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT scope_key, scope_type, parent_scope_key, metadata_json, tags_json, revision, created_at, updated_at FROM scopes ORDER BY scope_key ASC",
+        )?;
+        let rows = statement.query_map([], row_to_scope)?;
+        collect_rows(rows)
+    }
+
+    pub fn update_status(
+        &self,
+        input: UpdateStatusInput,
+    ) -> Result<serde_json::Value, PlanningStoreError> {
+        require_non_empty("entityId", &input.entity_id)?;
+        require_non_empty("status", &input.status)?;
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let now = now_string()?;
+
+        let result = match input.entity_type {
+            EntityType::Goal => {
+                let status = parse_goal_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "goals",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_goal(&transaction, &input.entity_id)?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::Goal,
+                        &record.id,
+                        EntityType::Goal,
+                        &record.id,
+                        &record.correlation_id,
+                        input.run_id.clone(),
+                        "goal.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation = refresh_validation_target(&transaction, EntityType::Goal, &record.id)?;
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::Roadmap => {
+                let status = parse_roadmap_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "roadmaps",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_roadmap(&transaction, &input.entity_id)?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::Roadmap,
+                        &record.id,
+                        EntityType::Roadmap,
+                        &record.id,
+                        &record.correlation_id,
+                        input.run_id.clone(),
+                        "roadmap.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::Roadmap, &record.id)?;
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::WorkPoint => {
+                let status = parse_work_point_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "work_points",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_work_point(&transaction, &input.entity_id)?;
+                let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::WorkPoint,
+                        &record.id,
+                        EntityType::Roadmap,
+                        &record.roadmap_id,
+                        &correlation_id,
+                        input.run_id.clone(),
+                        "work-point.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::WorkPoint, &record.id)?;
+                let _ =
+                    refresh_validation_target(&transaction, EntityType::Roadmap, &record.roadmap_id)?;
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::Plan => {
+                let status = parse_plan_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "plans",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_plan(&transaction, &input.entity_id)?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::Plan,
+                        &record.id,
+                        EntityType::Plan,
+                        &record.id,
+                        &record.correlation_id,
+                        input.run_id.clone(),
+                        "plan.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation = refresh_validation_target(&transaction, EntityType::Plan, &record.id)?;
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::Todo => {
+                let status = parse_todo_status(input.status.clone())?;
+                update_todo_status_row(
+                    &transaction,
+                    &input.entity_id,
+                    status.as_str(),
+                    input.evidence_refs.unwrap_or_default(),
+                    &now,
+                )?;
+                let record = load_todo(&transaction, &input.entity_id)?;
+                let correlation_id = if let Some(plan_id) = &record.plan_id {
+                    plan_correlation_id(&transaction, plan_id)?
+                } else if let Some(work_point_id) = &record.work_point_id {
+                    work_point_correlation_id(&transaction, work_point_id)?
+                } else {
+                    format!("corr-{}", record.id)
+                };
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::Todo,
+                        &record.id,
+                        EntityType::Todo,
+                        &record.id,
+                        &correlation_id,
+                        input.run_id.clone(),
+                        "todo.status-updated",
+                        serde_json::json!({
+                            "status": record.status.as_str(),
+                            "evidenceRefs": record.evidence_refs,
+                            "revision": record.revision
+                        }),
+                    )?,
+                )?;
+                let validation = refresh_validation_target(&transaction, EntityType::Todo, &record.id)?;
+                if let Some(plan_id) = &record.plan_id {
+                    let _ = refresh_validation_target(&transaction, EntityType::Plan, plan_id)?;
+                }
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::Issue => {
+                let status = parse_issue_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "issues",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_issue(&transaction, &input.entity_id)?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::Issue,
+                        &record.id,
+                        EntityType::Issue,
+                        &record.id,
+                        &record.correlation_id,
+                        input.run_id.clone(),
+                        "issue.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation = refresh_validation_target(&transaction, EntityType::Issue, &record.id)?;
+                if record.related_entity_type == Some(EntityType::Plan) {
+                    if let Some(related_entity_id) = &record.related_entity_id {
+                        let _ =
+                            refresh_validation_target(&transaction, EntityType::Plan, related_entity_id)?;
+                    }
+                }
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::ReviewPoint => {
+                let status = parse_review_point_status(input.status.clone())?;
+                update_status_row(
+                    &transaction,
+                    "review_points",
+                    &input.entity_id,
+                    status.as_str(),
+                    &now,
+                )?;
+                let record = load_review_point(&transaction, &input.entity_id)?;
+                let correlation_id = attached_entity_correlation_id(
+                    &transaction,
+                    record.attached_entity_type,
+                    &record.attached_entity_id,
+                )?;
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::ReviewPoint,
+                        &record.id,
+                        record.attached_entity_type,
+                        &record.attached_entity_id,
+                        &correlation_id,
+                        input.run_id.clone(),
+                        "review-point.status-updated",
+                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                    )?,
+                )?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::ReviewPoint, &record.id)?;
+                let _ = refresh_validation_target(
+                    &transaction,
+                    record.attached_entity_type,
+                    &record.attached_entity_id,
+                )?;
+                serde_json::json!({ "record": record, "validation": validation })
+            }
+            EntityType::RoadmapSection | EntityType::Scope => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "status transitions are not supported for {}",
+                    input.entity_type.as_str()
+                )));
+            }
+        };
+
+        transaction.commit()?;
+        Ok(result)
+    }
+
+    pub fn revise_plan(
+        &self,
+        input: RevisePlanInput,
+    ) -> Result<MutationResult<PlanRecord>, PlanningStoreError> {
+        require_non_empty("planId", &input.plan_id)?;
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let existing = load_plan(&transaction, &input.plan_id)?;
+
+        let scope_key = input
+            .scope_key
+            .map(|value| normalize_scope_key_value(&value))
+            .unwrap_or_else(|| existing.scope_key.clone());
+        ensure_scope_exists(&transaction, &scope_key)?;
+        if scope_key != existing.scope_key {
+            return Err(PlanningStoreError::InvalidInput(
+                "plan scopeKey cannot diverge from inherited roadmap scope".to_string(),
+            ));
+        }
+
+        let assumptions = input
+            .assumptions
+            .map(normalize_string_list)
+            .unwrap_or(existing.assumptions.clone());
+        let stop_conditions = input
+            .stop_conditions
+            .map(normalize_string_list)
+            .unwrap_or(existing.stop_conditions.clone());
+        let validation_steps = input
+            .validation_steps
+            .map(normalize_string_list)
+            .unwrap_or(existing.validation_steps.clone());
+        let targeted_work_point_ids = input
+            .targeted_work_point_ids
+            .map(normalize_string_list)
+            .unwrap_or(existing.targeted_work_point_ids.clone());
+        let tags = input
+            .tags
+            .map(normalize_string_list)
+            .unwrap_or(existing.tags.clone());
+        let now = now_string()?;
+
+        transaction.execute(
+            r#"
+            UPDATE plans
+               SET assumptions_json = ?2,
+                   stop_conditions_json = ?3,
+                   validation_steps_json = ?4,
+                   targeted_work_point_ids_json = ?5,
+                   tags_json = ?6,
+                   revision = revision + 1,
+                   updated_at = ?7
+             WHERE id = ?1
+            "#,
+            params![
+                input.plan_id,
+                to_json_text(&assumptions)?,
+                to_json_text(&stop_conditions)?,
+                to_json_text(&validation_steps)?,
+                to_json_text(&targeted_work_point_ids)?,
+                to_json_text(&tags)?,
+                now,
+            ],
+        )?;
+
+        let record = load_plan(&transaction, &input.plan_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::Plan,
+                &record.id,
+                EntityType::Plan,
+                &record.id,
+                &record.correlation_id,
+                input.run_id,
+                "plan.revised",
+                serde_json::json!({
+                    "assumptions": record.assumptions,
+                    "stopConditions": record.stop_conditions,
+                    "validationSteps": record.validation_steps,
+                    "targetedWorkPointIds": record.targeted_work_point_ids,
+                    "tags": record.tags,
+                    "revision": record.revision
+                }),
+            )?,
+        )?;
+
+        let validation = refresh_validation_target(&transaction, EntityType::Plan, &record.id)?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -884,48 +1404,144 @@ impl PlanningStore {
         Ok(IssueView { issue, validation })
     }
 
+    pub fn work_point(&self, id: &str) -> Result<WorkPointView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let work_point = load_work_point(&connection, id)?;
+        let validation = load_validation_report(&connection, EntityType::WorkPoint, id)?;
+        Ok(WorkPointView {
+            work_point,
+            validation,
+        })
+    }
+
     pub fn list_goals(&self) -> Result<Vec<GoalRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_goal)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_goals_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<GoalRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_goal)?;
         collect_rows(rows)
     }
 
     pub fn list_roadmaps(&self) -> Result<Vec<RoadmapRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_roadmap)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_roadmaps_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<RoadmapRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_roadmap)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_work_points(&self) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map([], row_to_work_point)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_work_points_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map(
+            params![normalize_scope_key_value(scope_key)],
+            row_to_work_point,
+        )?;
         collect_rows(rows)
     }
 
     pub fn list_plans(&self) -> Result<Vec<PlanRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_plan)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_plans_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<PlanRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_plan)?;
         collect_rows(rows)
     }
 
     pub fn list_todos(&self) -> Result<Vec<TodoRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos ORDER BY status ASC, ordering_index ASC, id ASC",
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos ORDER BY status ASC, ordering_index ASC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_todo)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_todos_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<TodoRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE scope_key = ?1 ORDER BY status ASC, ordering_index ASC, id ASC",
+        )?;
+        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_todo)?;
         collect_rows(rows)
     }
 
     pub fn list_issues(&self) -> Result<Vec<IssueRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_issue)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_issues_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<IssueRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_issue)?;
         collect_rows(rows)
     }
 
@@ -942,8 +1558,10 @@ impl PlanningStore {
         let connection = self.open_connection()?;
         Ok(PlanningHealthReport {
             db_path: self.db_path.display().to_string(),
+            schema_version: CURRENT_SCHEMA_VERSION.to_string(),
             event_count: count_table(&connection, "planning_events")?,
             active_validation_finding_count: count_table(&connection, "validation_findings")?,
+            scope_count: count_table(&connection, "scopes")?,
             goal_count: count_table(&connection, "goals")?,
             roadmap_count: count_table(&connection, "roadmaps")?,
             roadmap_section_count: count_table(&connection, "roadmap_sections")?,
@@ -1080,8 +1698,21 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             value TEXT NOT NULL
         );
 
+        CREATE TABLE IF NOT EXISTS scopes (
+            scope_key TEXT PRIMARY KEY,
+            scope_type TEXT,
+            parent_scope_key TEXT REFERENCES scopes(scope_key) ON DELETE SET NULL,
+            metadata_json TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_scopes_parent ON scopes(parent_scope_key);
+
         CREATE TABLE IF NOT EXISTS goals (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             correlation_id TEXT NOT NULL,
             title TEXT NOT NULL,
             description TEXT NOT NULL,
@@ -1098,6 +1729,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS roadmaps (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
             correlation_id TEXT NOT NULL,
             title TEXT NOT NULL,
@@ -1113,6 +1745,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS roadmap_sections (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             roadmap_id TEXT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
             slug TEXT NOT NULL,
             title TEXT NOT NULL,
@@ -1127,6 +1760,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS work_points (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             roadmap_id TEXT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
             section_id TEXT REFERENCES roadmap_sections(id) ON DELETE SET NULL,
             title TEXT NOT NULL,
@@ -1144,6 +1778,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS plans (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
             roadmap_id TEXT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
             correlation_id TEXT NOT NULL,
@@ -1166,6 +1801,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS todos (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             plan_id TEXT REFERENCES plans(id) ON DELETE CASCADE,
             work_point_id TEXT REFERENCES work_points(id) ON DELETE SET NULL,
             title TEXT NOT NULL,
@@ -1185,6 +1821,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS issues (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             correlation_id TEXT NOT NULL,
             title TEXT NOT NULL,
             summary TEXT NOT NULL,
@@ -1202,6 +1839,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS review_points (
             id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             attached_entity_type TEXT NOT NULL,
             attached_entity_id TEXT NOT NULL,
             title TEXT NOT NULL,
@@ -1251,7 +1889,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
     connection.execute(
         "INSERT OR IGNORE INTO planning_config (key, value) VALUES (?1, ?2)",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        params![SCHEMA_VERSION_KEY, "1"],
     )?;
     let version: Option<String> = connection
         .query_row(
@@ -1261,7 +1899,12 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
         )
         .optional()?;
     match version.as_deref() {
-        Some(CURRENT_SCHEMA_VERSION) => Ok(()),
+        Some(CURRENT_SCHEMA_VERSION) => {
+            ensure_default_scope(connection)?;
+            create_scope_indexes(connection)?;
+            Ok(())
+        }
+        Some("1") => migrate_v1_to_v2(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -1269,6 +1912,88 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             "planning schema version is missing".to_string(),
         )),
     }
+}
+
+fn migrate_v1_to_v2(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    ensure_default_scope(connection)?;
+    for (table, column) in [
+        ("goals", "scope_key"),
+        ("roadmaps", "scope_key"),
+        ("roadmap_sections", "scope_key"),
+        ("work_points", "scope_key"),
+        ("plans", "scope_key"),
+        ("todos", "scope_key"),
+        ("issues", "scope_key"),
+        ("review_points", "scope_key"),
+    ] {
+        if !table_has_column(connection, table, column)? {
+            connection.execute(
+                &format!(
+                    "ALTER TABLE {table} ADD COLUMN {column} TEXT NOT NULL DEFAULT '{DEFAULT_SCOPE_KEY}'"
+                ),
+                [],
+            )?;
+        }
+        connection.execute(
+            &format!(
+                "UPDATE {table} SET {column} = '{DEFAULT_SCOPE_KEY}' WHERE {column} IS NULL OR TRIM({column}) = ''"
+            ),
+            [],
+        )?;
+    }
+
+    connection.execute(
+        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+    )?;
+    create_scope_indexes(connection)?;
+    Ok(())
+}
+
+fn table_has_column(
+    connection: &Transaction<'_>,
+    table: &str,
+    column: &str,
+) -> Result<bool, PlanningStoreError> {
+    let mut statement = connection.prepare(&format!("PRAGMA table_info({table})"))?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = collect_rows(rows)?;
+    Ok(columns.iter().any(|name| name == column))
+}
+
+fn ensure_default_scope(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    let now = now_string()?;
+    connection.execute(
+        r#"
+        INSERT OR IGNORE INTO scopes (
+            scope_key, scope_type, parent_scope_key, metadata_json, tags_json, revision, created_at, updated_at
+        ) VALUES (?1, ?2, NULL, ?3, ?4, 1, ?5, ?5)
+        "#,
+        params![
+            DEFAULT_SCOPE_KEY,
+            "default",
+            "{}",
+            "[]",
+            now,
+        ],
+    )?;
+    Ok(())
+}
+
+fn create_scope_indexes(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_goals_scope ON goals(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_roadmaps_scope ON roadmaps(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_roadmap_sections_scope ON roadmap_sections(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_work_points_scope ON work_points(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_plans_scope ON plans(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_todos_scope ON todos(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_issues_scope ON issues(scope_key);
+        CREATE INDEX IF NOT EXISTS idx_review_points_scope ON review_points(scope_key);
+        "#,
+    )?;
+    Ok(())
 }
 
 fn append_event(
@@ -1369,6 +2094,7 @@ fn ensure_entity_exists(
     field_name: &str,
 ) -> Result<(), PlanningStoreError> {
     let lookup = match entity_type {
+        EntityType::Scope => load_scope(connection, entity_id).map(|_| ()),
         EntityType::Goal => load_goal(connection, entity_id).map(|_| ()),
         EntityType::Roadmap => load_roadmap(connection, entity_id).map(|_| ()),
         EntityType::RoadmapSection => connection
@@ -1426,12 +2152,66 @@ fn ensure_section_belongs_to_roadmap(
     Ok(())
 }
 
+fn normalized_scope_key(scope_key: Option<String>) -> String {
+    scope_key
+        .as_deref()
+        .map(normalize_scope_key_value)
+        .unwrap_or_else(|| DEFAULT_SCOPE_KEY.to_string())
+}
+
+fn normalize_scope_key_value(value: &str) -> String {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        DEFAULT_SCOPE_KEY.to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn ensure_scope_exists(connection: &Connection, scope_key: &str) -> Result<(), PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT scope_key FROM scopes WHERE scope_key = ?1",
+            params![scope_key],
+            |row| row.get::<_, String>(0),
+        )
+        .map(|_| ())
+        .map_err(|error| match error {
+            rusqlite::Error::QueryReturnedNoRows => PlanningStoreError::InvalidInput(format!(
+                "scopeKey references missing scope `{scope_key}`"
+            )),
+            other => PlanningStoreError::Sqlite(other),
+        })
+}
+
+fn scope_key_for_entity(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+) -> Result<String, PlanningStoreError> {
+    let sql = match entity_type {
+        EntityType::Scope => "SELECT scope_key FROM scopes WHERE scope_key = ?1",
+        EntityType::Goal => "SELECT scope_key FROM goals WHERE id = ?1",
+        EntityType::Roadmap => "SELECT scope_key FROM roadmaps WHERE id = ?1",
+        EntityType::RoadmapSection => "SELECT scope_key FROM roadmap_sections WHERE id = ?1",
+        EntityType::WorkPoint => "SELECT scope_key FROM work_points WHERE id = ?1",
+        EntityType::Plan => "SELECT scope_key FROM plans WHERE id = ?1",
+        EntityType::Todo => "SELECT scope_key FROM todos WHERE id = ?1",
+        EntityType::Issue => "SELECT scope_key FROM issues WHERE id = ?1",
+        EntityType::ReviewPoint => "SELECT scope_key FROM review_points WHERE id = ?1",
+    };
+
+    connection
+        .query_row(sql, params![entity_id], |row| row.get::<_, String>(0))
+        .map_err(|error| map_not_found(error, entity_type, entity_id))
+}
+
 fn list_work_point_dependents(
     connection: &Connection,
     dependency_id: &str,
 ) -> Result<Vec<String>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points ORDER BY id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points ORDER BY id ASC",
     )?;
     let rows = statement.query_map([], row_to_work_point)?;
     let work_points = collect_rows(rows)?;
@@ -1452,7 +2232,7 @@ fn list_plans_targeting_work_point(
     work_point_id: &str,
 ) -> Result<Vec<String>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY id ASC",
+        "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY id ASC",
     )?;
     let rows = statement.query_map([], row_to_plan)?;
     let plans = collect_rows(rows)?;
@@ -1519,7 +2299,7 @@ pub(crate) fn load_goal(
 ) -> Result<GoalRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals WHERE id = ?1",
+            "SELECT id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals WHERE id = ?1",
             params![id],
             row_to_goal,
         )
@@ -1532,7 +2312,7 @@ pub(crate) fn load_roadmap(
 ) -> Result<RoadmapRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE id = ?1",
+            "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE id = ?1",
             params![id],
             row_to_roadmap,
         )
@@ -1545,7 +2325,7 @@ pub(crate) fn load_plan(
 ) -> Result<PlanRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE id = ?1",
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE id = ?1",
             params![id],
             row_to_plan,
         )
@@ -1558,7 +2338,7 @@ pub(crate) fn load_issue(
 ) -> Result<IssueRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues WHERE id = ?1",
+            "SELECT id, scope_key, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues WHERE id = ?1",
             params![id],
             row_to_issue,
         )
@@ -1571,7 +2351,7 @@ pub(crate) fn load_work_point(
 ) -> Result<WorkPointRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
             params![id],
             row_to_work_point,
         )
@@ -1584,11 +2364,37 @@ pub(crate) fn load_todo(
 ) -> Result<TodoRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE id = ?1",
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE id = ?1",
             params![id],
             row_to_todo,
         )
         .map_err(|error| map_not_found(error, EntityType::Todo, id))
+}
+
+pub(crate) fn load_review_point(
+    connection: &Connection,
+    id: &str,
+) -> Result<ReviewPointRecord, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT id, scope_key, attached_entity_type, attached_entity_id, title, summary, status, severity, revision, created_at, updated_at FROM review_points WHERE id = ?1",
+            params![id],
+            row_to_review_point,
+        )
+        .map_err(|error| map_not_found(error, EntityType::ReviewPoint, id))
+}
+
+pub(crate) fn load_scope(
+    connection: &Connection,
+    scope_key: &str,
+) -> Result<ScopeRecord, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT scope_key, scope_type, parent_scope_key, metadata_json, tags_json, revision, created_at, updated_at FROM scopes WHERE scope_key = ?1",
+            params![normalize_scope_key_value(scope_key)],
+            row_to_scope,
+        )
+        .map_err(|error| map_not_found(error, EntityType::Scope, scope_key))
 }
 
 pub(crate) fn list_roadmaps_for_goal(
@@ -1596,7 +2402,7 @@ pub(crate) fn list_roadmaps_for_goal(
     goal_id: &str,
 ) -> Result<Vec<RoadmapRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE goal_id = ?1 ORDER BY updated_at DESC, id ASC",
+        "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE goal_id = ?1 ORDER BY updated_at DESC, id ASC",
     )?;
     let rows = statement.query_map(params![goal_id], row_to_roadmap)?;
     let items = collect_rows(rows)?;
@@ -1608,7 +2414,7 @@ pub(crate) fn list_sections_for_roadmap(
     roadmap_id: &str,
 ) -> Result<Vec<RoadmapSectionRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id], row_to_section)?;
     let items = collect_rows(rows)?;
@@ -1620,7 +2426,7 @@ pub(crate) fn list_work_points_for_roadmap(
     roadmap_id: &str,
 ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id], row_to_work_point)?;
     let items = collect_rows(rows)?;
@@ -1632,7 +2438,7 @@ pub(crate) fn list_todos_for_plan(
     plan_id: &str,
 ) -> Result<Vec<TodoRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![plan_id], row_to_todo)?;
     let items = collect_rows(rows)?;
@@ -1645,7 +2451,7 @@ pub(crate) fn list_review_points_for_entity(
     entity_id: &str,
 ) -> Result<Vec<ReviewPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, attached_entity_type, attached_entity_id, title, summary, status, severity, revision, created_at, updated_at FROM review_points WHERE attached_entity_type = ?1 AND attached_entity_id = ?2 ORDER BY created_at ASC, id ASC",
+        "SELECT id, scope_key, attached_entity_type, attached_entity_id, title, summary, status, severity, revision, created_at, updated_at FROM review_points WHERE attached_entity_type = ?1 AND attached_entity_id = ?2 ORDER BY created_at ASC, id ASC",
     )?;
     let rows = statement.query_map(
         params![entity_type.as_str(), entity_id],
@@ -1721,6 +2527,7 @@ pub(crate) fn attached_entity_correlation_id(
     entity_id: &str,
 ) -> Result<String, PlanningStoreError> {
     match entity_type {
+        EntityType::Scope => Ok(format!("corr-scope-{entity_id}")),
         EntityType::Goal => Ok(load_goal(connection, entity_id)?.correlation_id),
         EntityType::Roadmap => Ok(load_roadmap(connection, entity_id)?.correlation_id),
         EntityType::WorkPoint => work_point_correlation_id(connection, entity_id),
@@ -1791,12 +2598,62 @@ fn next_todo_ordering(
     )?)
 }
 
+fn update_status_row(
+    connection: &Transaction<'_>,
+    table: &str,
+    entity_id: &str,
+    status: &str,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    let affected = connection.execute(
+        &format!(
+            "UPDATE {table} SET status = ?2, revision = revision + 1, updated_at = ?3 WHERE id = ?1"
+        ),
+        params![entity_id, status, now],
+    )?;
+    if affected == 0 {
+        return Err(PlanningStoreError::NotFound {
+            entity_type: table.trim_end_matches('s').to_string(),
+            entity_id: entity_id.to_string(),
+        });
+    }
+    Ok(())
+}
+
+fn update_todo_status_row(
+    connection: &Transaction<'_>,
+    entity_id: &str,
+    status: &str,
+    evidence_refs: Vec<String>,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    let affected = connection.execute(
+        r#"
+        UPDATE todos
+           SET status = ?2,
+               evidence_refs_json = ?3,
+               revision = revision + 1,
+               updated_at = ?4
+         WHERE id = ?1
+        "#,
+        params![entity_id, status, to_json_text(&evidence_refs)?, now],
+    )?;
+    if affected == 0 {
+        return Err(PlanningStoreError::NotFound {
+            entity_type: EntityType::Todo.as_str().to_string(),
+            entity_id: entity_id.to_string(),
+        });
+    }
+    Ok(())
+}
+
 fn entity_revision(
     connection: &Connection,
     entity_type: EntityType,
     entity_id: &str,
 ) -> Result<i64, PlanningStoreError> {
     let (table, id_column) = match entity_type {
+        EntityType::Scope => ("scopes", "scope_key"),
         EntityType::Goal => ("goals", "id"),
         EntityType::Roadmap => ("roadmaps", "id"),
         EntityType::RoadmapSection => ("roadmap_sections", "id"),
@@ -1820,118 +2677,13 @@ fn count_table(connection: &Connection, table: &str) -> Result<i64, PlanningStor
 fn row_to_goal(row: &Row<'_>) -> Result<GoalRecord, rusqlite::Error> {
     Ok(GoalRecord {
         id: row.get(0)?,
-        correlation_id: row.get(1)?,
-        title: row.get(2)?,
-        description: row.get(3)?,
-        acceptance_criteria: parse_json_column(row.get::<_, String>(4)?)?,
-        rejection_criteria: parse_json_column(row.get::<_, String>(5)?)?,
-        status: parse_goal_status(row.get::<_, String>(6)?)?,
-        tags: parse_json_column(row.get::<_, String>(7)?)?,
-        revision: row.get(8)?,
-        created_at: row.get(9)?,
-        updated_at: row.get(10)?,
-    })
-}
-
-fn row_to_roadmap(row: &Row<'_>) -> Result<RoadmapRecord, rusqlite::Error> {
-    Ok(RoadmapRecord {
-        id: row.get(0)?,
-        goal_id: row.get(1)?,
+        scope_key: row.get(1)?,
         correlation_id: row.get(2)?,
         title: row.get(3)?,
-        summary: row.get(4)?,
-        status: parse_roadmap_status(row.get::<_, String>(5)?)?,
-        tags: parse_json_column(row.get::<_, String>(6)?)?,
-        revision: row.get(7)?,
-        created_at: row.get(8)?,
-        updated_at: row.get(9)?,
-    })
-}
-
-fn row_to_section(row: &Row<'_>) -> Result<RoadmapSectionRecord, rusqlite::Error> {
-    Ok(RoadmapSectionRecord {
-        id: row.get(0)?,
-        roadmap_id: row.get(1)?,
-        slug: row.get(2)?,
-        title: row.get(3)?,
-        summary: row.get(4)?,
-        ordering: row.get(5)?,
-        revision: row.get(6)?,
-        created_at: row.get(7)?,
-        updated_at: row.get(8)?,
-    })
-}
-
-fn row_to_work_point(row: &Row<'_>) -> Result<WorkPointRecord, rusqlite::Error> {
-    Ok(WorkPointRecord {
-        id: row.get(0)?,
-        roadmap_id: row.get(1)?,
-        section_id: row.get(2)?,
-        title: row.get(3)?,
-        summary: row.get(4)?,
-        status: parse_work_point_status(row.get::<_, String>(5)?)?,
-        ordering: row.get(6)?,
-        dependency_ids: parse_json_column(row.get::<_, String>(7)?)?,
-        validation_expectations: parse_json_column(row.get::<_, String>(8)?)?,
-        tags: parse_json_column(row.get::<_, String>(9)?)?,
-        revision: row.get(10)?,
-        created_at: row.get(11)?,
-        updated_at: row.get(12)?,
-    })
-}
-
-fn row_to_plan(row: &Row<'_>) -> Result<PlanRecord, rusqlite::Error> {
-    Ok(PlanRecord {
-        id: row.get(0)?,
-        goal_id: row.get(1)?,
-        roadmap_id: row.get(2)?,
-        correlation_id: row.get(3)?,
-        title: row.get(4)?,
-        summary: row.get(5)?,
-        scope: row.get(6)?,
-        assumptions: parse_json_column(row.get::<_, String>(7)?)?,
-        stop_conditions: parse_json_column(row.get::<_, String>(8)?)?,
-        validation_steps: parse_json_column(row.get::<_, String>(9)?)?,
-        targeted_work_point_ids: parse_json_column(row.get::<_, String>(10)?)?,
-        status: parse_plan_status(row.get::<_, String>(11)?)?,
-        tags: parse_json_column(row.get::<_, String>(12)?)?,
-        revision: row.get(13)?,
-        created_at: row.get(14)?,
-        updated_at: row.get(15)?,
-    })
-}
-
-fn row_to_todo(row: &Row<'_>) -> Result<TodoRecord, rusqlite::Error> {
-    Ok(TodoRecord {
-        id: row.get(0)?,
-        plan_id: row.get(1)?,
-        work_point_id: row.get(2)?,
-        title: row.get(3)?,
-        summary: row.get(4)?,
-        status: parse_todo_status(row.get::<_, String>(5)?)?,
-        priority: parse_priority(row.get::<_, String>(6)?)?,
-        evidence_refs: parse_json_column(row.get::<_, String>(7)?)?,
-        tags: parse_json_column(row.get::<_, String>(8)?)?,
-        ordering: row.get(9)?,
-        revision: row.get(10)?,
-        created_at: row.get(11)?,
-        updated_at: row.get(12)?,
-    })
-}
-
-fn row_to_issue(row: &Row<'_>) -> Result<IssueRecord, rusqlite::Error> {
-    Ok(IssueRecord {
-        id: row.get(0)?,
-        correlation_id: row.get(1)?,
-        title: row.get(2)?,
-        summary: row.get(3)?,
-        status: parse_issue_status(row.get::<_, String>(4)?)?,
-        severity: parse_severity(row.get::<_, String>(5)?)?,
-        related_entity_type: row
-            .get::<_, Option<String>>(6)?
-            .map(parse_entity_type)
-            .transpose()?,
-        related_entity_id: row.get(7)?,
+        description: row.get(4)?,
+        acceptance_criteria: parse_json_column(row.get::<_, String>(5)?)?,
+        rejection_criteria: parse_json_column(row.get::<_, String>(6)?)?,
+        status: parse_goal_status(row.get::<_, String>(7)?)?,
         tags: parse_json_column(row.get::<_, String>(8)?)?,
         revision: row.get(9)?,
         created_at: row.get(10)?,
@@ -1939,18 +2691,144 @@ fn row_to_issue(row: &Row<'_>) -> Result<IssueRecord, rusqlite::Error> {
     })
 }
 
-fn row_to_review_point(row: &Row<'_>) -> Result<ReviewPointRecord, rusqlite::Error> {
-    Ok(ReviewPointRecord {
+fn row_to_roadmap(row: &Row<'_>) -> Result<RoadmapRecord, rusqlite::Error> {
+    Ok(RoadmapRecord {
         id: row.get(0)?,
-        attached_entity_type: parse_entity_type(row.get::<_, String>(1)?)?,
-        attached_entity_id: row.get(2)?,
-        title: row.get(3)?,
-        summary: row.get(4)?,
-        status: parse_review_point_status(row.get::<_, String>(5)?)?,
-        severity: parse_severity(row.get::<_, String>(6)?)?,
+        scope_key: row.get(1)?,
+        goal_id: row.get(2)?,
+        correlation_id: row.get(3)?,
+        title: row.get(4)?,
+        summary: row.get(5)?,
+        status: parse_roadmap_status(row.get::<_, String>(6)?)?,
+        tags: parse_json_column(row.get::<_, String>(7)?)?,
+        revision: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+fn row_to_section(row: &Row<'_>) -> Result<RoadmapSectionRecord, rusqlite::Error> {
+    Ok(RoadmapSectionRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        roadmap_id: row.get(2)?,
+        slug: row.get(3)?,
+        title: row.get(4)?,
+        summary: row.get(5)?,
+        ordering: row.get(6)?,
         revision: row.get(7)?,
         created_at: row.get(8)?,
         updated_at: row.get(9)?,
+    })
+}
+
+fn row_to_work_point(row: &Row<'_>) -> Result<WorkPointRecord, rusqlite::Error> {
+    Ok(WorkPointRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        roadmap_id: row.get(2)?,
+        section_id: row.get(3)?,
+        title: row.get(4)?,
+        summary: row.get(5)?,
+        status: parse_work_point_status(row.get::<_, String>(6)?)?,
+        ordering: row.get(7)?,
+        dependency_ids: parse_json_column(row.get::<_, String>(8)?)?,
+        validation_expectations: parse_json_column(row.get::<_, String>(9)?)?,
+        tags: parse_json_column(row.get::<_, String>(10)?)?,
+        revision: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn row_to_plan(row: &Row<'_>) -> Result<PlanRecord, rusqlite::Error> {
+    Ok(PlanRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        goal_id: row.get(2)?,
+        roadmap_id: row.get(3)?,
+        correlation_id: row.get(4)?,
+        title: row.get(5)?,
+        summary: row.get(6)?,
+        scope: row.get(7)?,
+        assumptions: parse_json_column(row.get::<_, String>(8)?)?,
+        stop_conditions: parse_json_column(row.get::<_, String>(9)?)?,
+        validation_steps: parse_json_column(row.get::<_, String>(10)?)?,
+        targeted_work_point_ids: parse_json_column(row.get::<_, String>(11)?)?,
+        status: parse_plan_status(row.get::<_, String>(12)?)?,
+        tags: parse_json_column(row.get::<_, String>(13)?)?,
+        revision: row.get(14)?,
+        created_at: row.get(15)?,
+        updated_at: row.get(16)?,
+    })
+}
+
+fn row_to_todo(row: &Row<'_>) -> Result<TodoRecord, rusqlite::Error> {
+    Ok(TodoRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        plan_id: row.get(2)?,
+        work_point_id: row.get(3)?,
+        title: row.get(4)?,
+        summary: row.get(5)?,
+        status: parse_todo_status(row.get::<_, String>(6)?)?,
+        priority: parse_priority(row.get::<_, String>(7)?)?,
+        evidence_refs: parse_json_column(row.get::<_, String>(8)?)?,
+        tags: parse_json_column(row.get::<_, String>(9)?)?,
+        ordering: row.get(10)?,
+        revision: row.get(11)?,
+        created_at: row.get(12)?,
+        updated_at: row.get(13)?,
+    })
+}
+
+fn row_to_issue(row: &Row<'_>) -> Result<IssueRecord, rusqlite::Error> {
+    Ok(IssueRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        correlation_id: row.get(2)?,
+        title: row.get(3)?,
+        summary: row.get(4)?,
+        status: parse_issue_status(row.get::<_, String>(5)?)?,
+        severity: parse_severity(row.get::<_, String>(6)?)?,
+        related_entity_type: row
+            .get::<_, Option<String>>(7)?
+            .map(parse_entity_type)
+            .transpose()?,
+        related_entity_id: row.get(8)?,
+        tags: parse_json_column(row.get::<_, String>(9)?)?,
+        revision: row.get(10)?,
+        created_at: row.get(11)?,
+        updated_at: row.get(12)?,
+    })
+}
+
+fn row_to_review_point(row: &Row<'_>) -> Result<ReviewPointRecord, rusqlite::Error> {
+    Ok(ReviewPointRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        attached_entity_type: parse_entity_type(row.get::<_, String>(2)?)?,
+        attached_entity_id: row.get(3)?,
+        title: row.get(4)?,
+        summary: row.get(5)?,
+        status: parse_review_point_status(row.get::<_, String>(6)?)?,
+        severity: parse_severity(row.get::<_, String>(7)?)?,
+        revision: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+fn row_to_scope(row: &Row<'_>) -> Result<ScopeRecord, rusqlite::Error> {
+    Ok(ScopeRecord {
+        scope_key: row.get(0)?,
+        scope_type: row.get(1)?,
+        parent_scope_key: row.get(2)?,
+        metadata: serde_json::from_str(&row.get::<_, String>(3)?).map_err(to_sql_error)?,
+        tags: parse_json_column(row.get::<_, String>(4)?)?,
+        revision: row.get(5)?,
+        created_at: row.get(6)?,
+        updated_at: row.get(7)?,
     })
 }
 
@@ -2256,6 +3134,7 @@ fn text_parse_error(message: String) -> rusqlite::Error {
 
 #[cfg(test)]
 mod tests {
+    use rusqlite::params;
     use tempfile::tempdir;
 
     use super::*;
@@ -2271,6 +3150,7 @@ mod tests {
         let goal = store
             .create_goal(CreateGoalInput {
                 id: Some("goal-1".to_string()),
+                scope_key: None,
                 correlation_id: "corr-1".to_string(),
                 title: "Ship planning subsystem".to_string(),
                 description: "Create a dedicated planning system.".to_string(),
@@ -2286,6 +3166,7 @@ mod tests {
         let roadmap = store
             .create_roadmap(CreateRoadmapInput {
                 id: Some("roadmap-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-1".to_string(),
                 correlation_id: "corr-1".to_string(),
                 title: "Planning MVP".to_string(),
@@ -2305,6 +3186,7 @@ mod tests {
         store
             .add_work_point(AddWorkPointInput {
                 id: Some("wp-1".to_string()),
+                scope_key: None,
                 roadmap_id: "roadmap-1".to_string(),
                 section_id: None,
                 title: "Implement store".to_string(),
@@ -2324,6 +3206,7 @@ mod tests {
         let plan = store
             .create_plan(CreatePlanInput {
                 id: Some("plan-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-1".to_string(),
                 roadmap_id: "roadmap-1".to_string(),
                 correlation_id: "corr-1".to_string(),
@@ -2349,6 +3232,7 @@ mod tests {
         store
             .create_todo(CreateTodoInput {
                 id: Some("todo-2".to_string()),
+                scope_key: None,
                 plan_id: Some("plan-1".to_string()),
                 work_point_id: Some("wp-1".to_string()),
                 title: "Finish MVP implementation".to_string(),
@@ -2382,6 +3266,7 @@ mod tests {
         let todo = store
             .create_todo(CreateTodoInput {
                 id: Some("todo-1".to_string()),
+                scope_key: None,
                 plan_id: None,
                 work_point_id: None,
                 title: "Loose todo".to_string(),
@@ -2413,6 +3298,7 @@ mod tests {
         let goal = store
             .create_goal(CreateGoalInput {
                 id: Some("goal-refresh-1".to_string()),
+                scope_key: None,
                 correlation_id: "corr-refresh-1".to_string(),
                 title: "Validated goal".to_string(),
                 description: "Goal starts validated before roadmap exists.".to_string(),
@@ -2433,6 +3319,7 @@ mod tests {
         store
             .create_roadmap(CreateRoadmapInput {
                 id: Some("roadmap-refresh-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-refresh-1".to_string(),
                 correlation_id: "corr-refresh-1".to_string(),
                 title: "Linked roadmap".to_string(),
@@ -2457,6 +3344,7 @@ mod tests {
         store
             .create_goal(CreateGoalInput {
                 id: Some("goal-issue-1".to_string()),
+                scope_key: None,
                 correlation_id: "corr-issue-1".to_string(),
                 title: "Goal".to_string(),
                 description: "Desc".to_string(),
@@ -2470,6 +3358,7 @@ mod tests {
         store
             .create_roadmap(CreateRoadmapInput {
                 id: Some("roadmap-issue-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-issue-1".to_string(),
                 correlation_id: "corr-issue-1".to_string(),
                 title: "Roadmap".to_string(),
@@ -2482,6 +3371,7 @@ mod tests {
         store
             .add_work_point(AddWorkPointInput {
                 id: Some("wp-issue-1".to_string()),
+                scope_key: None,
                 roadmap_id: "roadmap-issue-1".to_string(),
                 section_id: None,
                 title: "WP".to_string(),
@@ -2497,6 +3387,7 @@ mod tests {
         store
             .create_plan(CreatePlanInput {
                 id: Some("plan-issue-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-issue-1".to_string(),
                 roadmap_id: "roadmap-issue-1".to_string(),
                 correlation_id: "corr-issue-1".to_string(),
@@ -2515,6 +3406,7 @@ mod tests {
         store
             .create_todo(CreateTodoInput {
                 id: Some("todo-issue-1".to_string()),
+                scope_key: None,
                 plan_id: Some("plan-issue-1".to_string()),
                 work_point_id: Some("wp-issue-1".to_string()),
                 title: "Todo".to_string(),
@@ -2534,6 +3426,7 @@ mod tests {
         store
             .create_issue(CreateIssueInput {
                 id: Some("issue-issue-1".to_string()),
+                scope_key: None,
                 correlation_id: "corr-issue-1".to_string(),
                 title: "Blocking issue".to_string(),
                 summary: "Blocks plan completion.".to_string(),
@@ -2568,6 +3461,7 @@ mod tests {
         store
             .create_goal(CreateGoalInput {
                 id: Some("goal-events-1".to_string()),
+                scope_key: None,
                 correlation_id: "corr-events-1".to_string(),
                 title: "Goal".to_string(),
                 description: "Desc".to_string(),
@@ -2581,6 +3475,7 @@ mod tests {
         store
             .create_roadmap(CreateRoadmapInput {
                 id: Some("roadmap-events-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-events-1".to_string(),
                 correlation_id: "corr-events-1".to_string(),
                 title: "Roadmap".to_string(),
@@ -2593,6 +3488,7 @@ mod tests {
         store
             .create_plan(CreatePlanInput {
                 id: Some("plan-events-1".to_string()),
+                scope_key: None,
                 goal_id: "goal-events-1".to_string(),
                 roadmap_id: "roadmap-events-1".to_string(),
                 correlation_id: "corr-events-1".to_string(),
@@ -2618,5 +3514,249 @@ mod tests {
             event_types,
             vec!["goal.created", "roadmap.created", "plan.created"]
         );
+    }
+
+    #[test]
+    fn scoped_lists_are_isolated_and_default_scope_is_applied() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "workspace-a".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec!["alpha".to_string()],
+                run_id: None,
+            })
+            .expect("create custom scope");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-default".to_string()),
+                scope_key: None,
+                correlation_id: "corr-default".to_string(),
+                title: "Default".to_string(),
+                description: "Default scope goal".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Draft,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create default scope goal");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-custom".to_string()),
+                scope_key: Some("workspace-a".to_string()),
+                correlation_id: "corr-custom".to_string(),
+                title: "Custom".to_string(),
+                description: "Custom scope goal".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Draft,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create custom scope goal");
+
+        let default_goals = store
+            .list_goals_in_scope("default")
+            .expect("list default scope goals");
+        let custom_goals = store
+            .list_goals_in_scope("workspace-a")
+            .expect("list custom scope goals");
+        assert_eq!(default_goals.len(), 1);
+        assert_eq!(default_goals[0].id, "goal-default");
+        assert_eq!(custom_goals.len(), 1);
+        assert_eq!(custom_goals[0].id, "goal-custom");
+    }
+
+    #[test]
+    fn init_migrates_v1_schema_and_assigns_default_scope() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning-v1.db");
+
+        {
+            let connection = rusqlite::Connection::open(&db_path).expect("open sqlite");
+            connection
+                .execute_batch(
+                    r#"
+                    CREATE TABLE planning_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                    INSERT INTO planning_config (key, value) VALUES ('schema_version', '1');
+                    CREATE TABLE goals (
+                        id TEXT PRIMARY KEY,
+                        correlation_id TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        acceptance_criteria_json TEXT NOT NULL,
+                        rejection_criteria_json TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        tags_json TEXT NOT NULL,
+                        revision INTEGER NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                    "#,
+                )
+                .expect("create v1 schema");
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO goals (
+                        id, correlation_id, title, description, acceptance_criteria_json,
+                        rejection_criteria_json, status, tags_json, revision, created_at, updated_at
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)
+                    "#,
+                    params![
+                        "goal-v1",
+                        "corr-v1",
+                        "Goal v1",
+                        "Goal created before scope migration",
+                        "[\"ok\"]",
+                        "[\"no\"]",
+                        "draft",
+                        "[]",
+                        "2026-05-24T00:00:00Z"
+                    ],
+                )
+                .expect("insert v1 goal");
+        }
+
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("migrate schema");
+
+        let goals = store.list_goals().expect("list goals");
+        assert_eq!(goals.len(), 1);
+        assert_eq!(goals[0].scope_key, "default");
+        let health = store.health().expect("health");
+        assert_eq!(health.schema_version, "2");
+        assert_eq!(health.scope_count, 1);
+    }
+
+    #[test]
+    fn lifecycle_transitions_and_plan_revise_append_events() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning-lifecycle.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-life".to_string()),
+                scope_key: None,
+                correlation_id: "corr-life".to_string(),
+                title: "Goal".to_string(),
+                description: "Desc".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create goal");
+        store
+            .create_roadmap(CreateRoadmapInput {
+                id: Some("roadmap-life".to_string()),
+                scope_key: None,
+                goal_id: "goal-life".to_string(),
+                correlation_id: "corr-life".to_string(),
+                title: "Roadmap".to_string(),
+                summary: "Summary".to_string(),
+                status: RoadmapStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create roadmap");
+        store
+            .add_work_point(AddWorkPointInput {
+                id: Some("wp-life".to_string()),
+                scope_key: None,
+                roadmap_id: "roadmap-life".to_string(),
+                section_id: None,
+                title: "WP".to_string(),
+                summary: "Summary".to_string(),
+                status: WorkPointStatus::Active,
+                ordering: None,
+                dependency_ids: Vec::new(),
+                validation_expectations: vec!["proof".to_string()],
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create work point");
+        store
+            .create_plan(CreatePlanInput {
+                id: Some("plan-life".to_string()),
+                scope_key: None,
+                goal_id: "goal-life".to_string(),
+                roadmap_id: "roadmap-life".to_string(),
+                correlation_id: "corr-life".to_string(),
+                title: "Plan".to_string(),
+                summary: "Summary".to_string(),
+                scope: "implementation".to_string(),
+                assumptions: vec!["a1".to_string()],
+                stop_conditions: Vec::new(),
+                validation_steps: vec!["validate".to_string()],
+                targeted_work_point_ids: vec!["wp-life".to_string()],
+                status: PlanStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create plan");
+        store
+            .create_todo(CreateTodoInput {
+                id: Some("todo-life".to_string()),
+                scope_key: None,
+                plan_id: Some("plan-life".to_string()),
+                work_point_id: Some("wp-life".to_string()),
+                title: "Todo".to_string(),
+                summary: "Summary".to_string(),
+                status: TodoStatus::InProgress,
+                priority: Priority::High,
+                evidence_refs: Vec::new(),
+                tags: Vec::new(),
+                ordering: None,
+                run_id: None,
+            })
+            .expect("create todo");
+
+        store
+            .update_status(UpdateStatusInput {
+                entity_type: EntityType::Todo,
+                entity_id: "todo-life".to_string(),
+                status: "completed".to_string(),
+                evidence_refs: Some(vec!["proof://ci".to_string()]),
+                run_id: Some("run-life".to_string()),
+            })
+            .expect("complete todo");
+        let revise = store
+            .revise_plan(RevisePlanInput {
+                plan_id: "plan-life".to_string(),
+                scope_key: None,
+                assumptions: Some(vec!["a1".to_string(), "a2".to_string()]),
+                stop_conditions: Some(vec!["stop".to_string()]),
+                validation_steps: None,
+                targeted_work_point_ids: None,
+                tags: Some(vec!["rev-1".to_string()]),
+                run_id: Some("run-life".to_string()),
+            })
+            .expect("revise plan");
+
+        assert!(revise.record.revision >= 2);
+        assert!(revise
+            .record
+            .assumptions
+            .iter()
+            .any(|assumption| assumption == "a2"));
+        let todo = store.list_todos().expect("list todos");
+        assert_eq!(todo[0].status, TodoStatus::Completed);
+        assert_eq!(todo[0].evidence_refs, vec!["proof://ci".to_string()]);
+        let events = store.list_events().expect("list events");
+        assert!(events.iter().any(|event| event.event_type == "todo.status-updated"));
+        assert!(events.iter().any(|event| event.event_type == "plan.revised"));
     }
 }

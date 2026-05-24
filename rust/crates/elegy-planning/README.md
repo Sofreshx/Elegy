@@ -118,22 +118,25 @@ The event log is paired with current-state projection tables for simpler CLI rea
 Global flags:
 
 - `--db`
+- `--scope`
 - `--json`
 - `--non-interactive`
 - `--correlation-id`
 
 Implemented commands:
 
-- `goal create|list|show`
-- `roadmap create|add-section|add-work-point|list|show`
-- `plan create|list|show`
-- `todo create|list`
-- `issue record|list|show`
-- `review-point record`
+- `scope create|list|show`
+- `goal create|list|show|update-status`
+- `roadmap create|add-section|add-work-point|list|show|update-status`
+- `work-point list|show|update-status`
+- `plan create|list|show|revise|update-status`
+- `todo create|list|update-status`
+- `issue record|list|show|update-status`
+- `review-point record|update-status`
 - `validate all`
 - `events`
 - `health`
-- `project render`
+- `project render|export`
 
 Examples:
 

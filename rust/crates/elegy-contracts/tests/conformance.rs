@@ -281,6 +281,10 @@ fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
             ".agents/skills/elegy-skills/SKILL.md",
         ),
         (
+            "contracts/fixtures/skill-discovery-index.elegy-planning.json",
+            ".agents/skills/elegy-planning/SKILL.md",
+        ),
+        (
             "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
             ".agents/skills/elegy-mermaid/SKILL.md",
         ),

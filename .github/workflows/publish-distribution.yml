@@ -151,7 +151,7 @@ jobs:
       - name: Package wrapper archives
         shell: pwsh
         run: |
-          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-skills
+          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills
 
       - name: Validate wrapper archives
         shell: pwsh
@@ -166,6 +166,7 @@ jobs:
           path: |
             artifacts/distribution/elegy-memory-wrapper-*.zip
             artifacts/distribution/elegy-mcp-wrapper-*.zip
+            artifacts/distribution/elegy-planning-wrapper-*.zip
             artifacts/distribution/elegy-skills-wrapper-*.zip
 
   package-installer:

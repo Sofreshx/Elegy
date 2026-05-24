@@ -18,6 +18,7 @@ pub(crate) fn validate_entity(
     entity_id: &str,
 ) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
     match entity_type {
+        EntityType::Scope => Ok(Vec::new()),
         EntityType::Goal => validate_goal(connection, entity_id),
         EntityType::Roadmap => validate_roadmap(connection, entity_id),
         EntityType::RoadmapSection => validate_roadmap_section(connection, entity_id),

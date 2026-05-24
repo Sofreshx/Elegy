@@ -91,6 +91,12 @@ function Get-WrapperSurfaceMetadata {
             Installer = 'install.ps1'
             SkillBridge = 'skills/elegy-mcp/SKILL.md'
         }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-planning/SKILL.md'
+        }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills-wrapper'

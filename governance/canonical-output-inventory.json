@@ -227,6 +227,10 @@
       "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-observe.json"
     },
     {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-planning.json"
+    },
+    {
       "source": "contracts/fixtures/skill-definition-v2.elegy-repo.json",
       "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-repo.json"
     },
@@ -247,6 +251,10 @@
       "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.minimal.json"
     },
     {
+      "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.minimal.json"
     },
@@ -263,6 +271,10 @@
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-skills.json"
     },
     {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-planning.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-mermaid.json"
     },
@@ -277,6 +289,10 @@
     {
       "source": ".agents/skills/elegy-skills/SKILL.md",
       "generated": ".github/skills/elegy-skills/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-planning/SKILL.md",
+      "generated": ".github/skills/elegy-planning/SKILL.md"
     },
     {
       "source": ".agents/skills/elegy-mermaid/SKILL.md",
@@ -309,6 +325,7 @@
   "wrapperArchivePatterns": [
     "artifacts/distribution/elegy-memory-wrapper-*.zip",
     "artifacts/distribution/elegy-mcp-wrapper-*.zip",
+    "artifacts/distribution/elegy-planning-wrapper-*.zip",
     "artifacts/distribution/elegy-skills-wrapper-*.zip"
   ],
   "installerArchivePatterns": [
@@ -334,6 +351,9 @@
     ],
     "artifacts/distribution/elegy-mcp-wrapper-*.zip": [
       "skills/elegy-mcp/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-planning-wrapper-*.zip": [
+      "skills/elegy-planning/SKILL.md"
     ],
     "artifacts/distribution/elegy-skills-wrapper-*.zip": [
       "skills/elegy-skills/SKILL.md"

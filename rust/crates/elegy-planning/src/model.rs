@@ -37,6 +37,7 @@ macro_rules! string_enum {
 }
 
 string_enum!(EntityType {
+    Scope => "scope",
     Goal => "goal",
     Roadmap => "roadmap",
     RoadmapSection => "roadmap-section",
@@ -140,8 +141,22 @@ string_enum!(ProjectionFormat {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct ScopeRecord {
+    pub scope_key: String,
+    pub scope_type: Option<String>,
+    pub parent_scope_key: Option<String>,
+    pub metadata: serde_json::Value,
+    pub tags: Vec<String>,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct GoalRecord {
     pub id: String,
+    pub scope_key: String,
     pub correlation_id: String,
     pub title: String,
     pub description: String,
@@ -158,6 +173,7 @@ pub struct GoalRecord {
 #[serde(rename_all = "camelCase")]
 pub struct RoadmapRecord {
     pub id: String,
+    pub scope_key: String,
     pub goal_id: String,
     pub correlation_id: String,
     pub title: String,
@@ -173,6 +189,7 @@ pub struct RoadmapRecord {
 #[serde(rename_all = "camelCase")]
 pub struct RoadmapSectionRecord {
     pub id: String,
+    pub scope_key: String,
     pub roadmap_id: String,
     pub slug: String,
     pub title: String,
@@ -187,6 +204,7 @@ pub struct RoadmapSectionRecord {
 #[serde(rename_all = "camelCase")]
 pub struct WorkPointRecord {
     pub id: String,
+    pub scope_key: String,
     pub roadmap_id: String,
     pub section_id: Option<String>,
     pub title: String,
@@ -205,6 +223,7 @@ pub struct WorkPointRecord {
 #[serde(rename_all = "camelCase")]
 pub struct PlanRecord {
     pub id: String,
+    pub scope_key: String,
     pub goal_id: String,
     pub roadmap_id: String,
     pub correlation_id: String,
@@ -226,6 +245,7 @@ pub struct PlanRecord {
 #[serde(rename_all = "camelCase")]
 pub struct TodoRecord {
     pub id: String,
+    pub scope_key: String,
     pub plan_id: Option<String>,
     pub work_point_id: Option<String>,
     pub title: String,
@@ -244,6 +264,7 @@ pub struct TodoRecord {
 #[serde(rename_all = "camelCase")]
 pub struct IssueRecord {
     pub id: String,
+    pub scope_key: String,
     pub correlation_id: String,
     pub title: String,
     pub summary: String,
@@ -261,6 +282,7 @@ pub struct IssueRecord {
 #[serde(rename_all = "camelCase")]
 pub struct ReviewPointRecord {
     pub id: String,
+    pub scope_key: String,
     pub attached_entity_type: EntityType,
     pub attached_entity_id: String,
     pub title: String,
@@ -364,6 +386,13 @@ pub struct RoadmapView {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct WorkPointView {
+    pub work_point: WorkPointRecord,
+    pub validation: ValidationReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanView {
     pub plan: PlanRecord,
     pub todos: Vec<TodoRecord>,
@@ -398,8 +427,10 @@ pub struct ValidationRunReport {
 #[serde(rename_all = "camelCase")]
 pub struct PlanningHealthReport {
     pub db_path: String,
+    pub schema_version: String,
     pub event_count: i64,
     pub active_validation_finding_count: i64,
+    pub scope_count: i64,
     pub goal_count: i64,
     pub roadmap_count: i64,
     pub roadmap_section_count: i64,

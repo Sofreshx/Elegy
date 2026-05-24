@@ -21,6 +21,11 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-mcp-wrapper'
             SurfaceRoot = 'src/Elegy-mcp'
         }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning-wrapper'
+            SurfaceRoot = 'src/Elegy-planning'
+        }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills-wrapper'

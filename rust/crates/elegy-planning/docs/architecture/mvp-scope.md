@@ -79,7 +79,7 @@
 | Internal planning authority independent from memory | **MVP** | Implemented by separate crate |
 | Import from instruction-engine workflow artifacts | **v1** | Not yet implemented |
 | Export to repo-backed planning docs | **v1** | Not yet implemented |
-| Skill and capability registry wiring | **MVP** | Governed skill fixture is exposed through the built-in registry; dedicated wrapper projection remains out of scope |
+| Skill and capability registry wiring | **MVP** | Governed skill fixture is exposed through the built-in registry and packaged wrapper bridge surfaces |
 
 ## MVP Summary
 
