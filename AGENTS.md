@@ -46,6 +46,13 @@
 - Prefer returning `Result<T, E>` over panicking.
 - Group imports: std → external crates → internal modules, separated by blank lines.
 
+## Git Workflow
+
+- Keep `dev` clean and fast-forwardable to `origin/dev`.
+- Do day-to-day work on a personal branch (for example `roro` or `roro/<topic>`), not directly on `dev`.
+- Merge to `dev` only after the relevant validation passes and the work is ready.
+- Never force-push or rewrite history on `dev`.
+
 ## Crate Structure
 
 ```
@@ -68,4 +75,3 @@ rust/crates/elegy-memory/
     ├── governed_memory.rs
     └── local_store.rs
 ```
-
