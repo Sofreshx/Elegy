@@ -1294,7 +1294,10 @@ mod tests {
         let repository = test_repository(
             &db_path,
             "failed-embedding-agent",
-            Arc::new(StubEmbeddingProvider::new(std::iter::empty::<(&str, Vec<f32>)>())),
+            Arc::new(StubEmbeddingProvider::new(std::iter::empty::<(
+                &str,
+                Vec<f32>,
+            )>())),
         );
 
         let response = repository
@@ -1344,7 +1347,10 @@ mod tests {
         let stats = repository.stats().await.expect("stats should load");
 
         assert_eq!(response.action, "added");
-        assert_eq!(response.embedding_status, EmbeddingStatus::SkippedNoProvider);
+        assert_eq!(
+            response.embedding_status,
+            EmbeddingStatus::SkippedNoProvider
+        );
         assert_eq!(stats.stale_embeddings_count, 1);
     }
 
