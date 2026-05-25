@@ -21,7 +21,7 @@ use tokio::{io::AsyncReadExt, process::Command, task::JoinHandle, time::Instant}
 const TOOL_TIMEOUT: Duration = Duration::from_secs(30);
 const FIXTURE_RELATIVE_PATH: &str = "tests/fixtures/retrieval_benchmark.v1.json";
 const ENGLISH_SUITE_KEY: &str = "en-expanded-v1";
-const FRENCH_SUITE_KEY: &str = "fr-short-v1";
+const FRENCH_SUITE_KEY: &str = "fr-short-v1.1";
 
 #[derive(Default, Clone)]
 struct TestClient;
@@ -303,8 +303,8 @@ fn validate_benchmark_fixture(fixture: &RetrievalBenchmarkFixture) -> anyhow::Re
 
     let french = fixture.suite(FRENCH_SUITE_KEY)?;
     ensure!(
-        french.memories.len() == 12,
-        "suite `{FRENCH_SUITE_KEY}` should contain exactly 12 memories, found {}",
+        french.memories.len() == 30,
+        "suite `{FRENCH_SUITE_KEY}` should contain exactly 30 memories, found {}",
         french.memories.len()
     );
     ensure!(

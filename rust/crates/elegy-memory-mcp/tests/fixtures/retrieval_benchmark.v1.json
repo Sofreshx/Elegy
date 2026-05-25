@@ -1,5 +1,5 @@
 {
-  "version": "wu14-retrieval-benchmark-v1",
+  "version": "wu14-retrieval-benchmark-v1.1",
   "suites": [
     {
       "key": "en-expanded-v1",
@@ -60,9 +60,9 @@
       ]
     },
     {
-      "key": "fr-short-v1",
+      "key": "fr-short-v1.1",
       "language": "fr",
-      "description": "Short French retrieval corpus with realistic compact queries.",
+      "description": "Short French retrieval corpus with realistic compact queries and close distractors by domain.",
       "agentId": "wu14-bench-fr-agent",
       "memories": [
         { "key": "fr_espresso_crema", "content": "Le cafe du matin sort en espresso court avec une crema noisette.", "memoryType": "fact", "importance": 0.8 },
@@ -76,7 +76,25 @@
         { "key": "fr_graphql_curseur", "content": "La pagination par curseur evite les doublons entre deux pages GraphQL.", "memoryType": "fact", "importance": 0.8 },
         { "key": "fr_levain_matin", "content": "Le levain maison mange meme poids de farine et d'eau chaque matin.", "memoryType": "fact", "importance": 0.8 },
         { "key": "fr_escalade_degaine", "content": "En escalade, la degaine passe dans le point avant la prochaine prise.", "memoryType": "fact", "importance": 0.8 },
-        { "key": "fr_basilic_fleurs", "content": "Je coupe les fleurs du basilic pour garder des feuilles tendres.", "memoryType": "fact", "importance": 0.8 }
+        { "key": "fr_basilic_fleurs", "content": "Je coupe les fleurs du basilic pour garder des feuilles tendres.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_cafe_filtre_v60", "content": "Le cafe filtre V60 coule lentement a travers un papier rince.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_the_vert_sencha", "content": "Le the vert sencha infuse une minute pour rester vegetal et doux.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_chocolat_chaud_epais", "content": "Le chocolat chaud epais melange lait, cacao et une pointe de cannelle.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_rust_lifetimes", "content": "Les lifetimes de Rust precisent combien de temps une reference reste valide.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_rust_traits", "content": "Les traits Rust definissent des comportements partages entre plusieurs types.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_rust_ownership", "content": "L'ownership de Rust transfere la possession d'une valeur lors d'un move.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_velo_freins_pluie", "content": "Je controle les freins du velo apres une sortie humide pour garder du mordant.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_velo_pression_pneus", "content": "Je baisse un peu la pression des pneus sur les paves mouilles.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_velo_reglage_derailleur", "content": "Le derailleur arriere se regle avec la tension du cable et la vis de butee.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_ramen_bouillon", "content": "Le ramen cuit dans un bouillon long avec gingembre, os et cebette.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_epargne_urgence", "content": "Je vire une part du salaire vers l'epargne de secours chaque mois.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_bus_perturbe", "content": "En cas de greve, le bus de remplacement met plus de temps que le train.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_metro_retard_signal", "content": "Le metro annonce dix minutes de retard apres une panne de signalisation.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_photo_85mm_portrait", "content": "Le 85 mm isole le sujet pour un portrait flatteur.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_compost_aere", "content": "Je retourne le compost pour garder de l'air entre les dechets verts.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_pagination_offset", "content": "La pagination offset est simple mais saute des lignes quand la liste bouge.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_api_webhook_retry", "content": "Un webhook recommence avec un backoff exponentiel apres une erreur 500.", "memoryType": "fact", "importance": 0.8 },
+        { "key": "fr_pain_four_buhee", "content": "Un peu de buhee dans le four aide la miche a bien s'ouvrir.", "memoryType": "fact", "importance": 0.8 }
       ],
       "queries": [
         { "key": "fr_q01", "query": "espresso matin", "targetMemoryKey": "fr_espresso_crema" },
