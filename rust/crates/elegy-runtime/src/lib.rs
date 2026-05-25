@@ -836,7 +836,7 @@ mod tests {
             .expect("descriptor resource should generate skills");
         assert_eq!(generated.generated_skills.len(), 1);
         assert_eq!(
-            generated.generated_skills[0].effective_id(),
+            generated.generated_skills[0].identity.name,
             "mcp-weather-server-get-weather"
         );
         assert_eq!(generated.skipped_tools.len(), 1);

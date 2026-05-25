@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-skills')]
+    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills')]
     [string]$Surface = 'elegy-cli',
     [string]$Target = '',
     [string]$OutputDirectory = '',
@@ -11,6 +11,7 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $rustRoot = Join-Path $repoRoot 'rust'
+$packageReadmePath = Join-Path $repoRoot 'PACKAGE_README.md'
 
 function Get-DistributionSurfaceMetadata {
     param(
@@ -40,6 +41,14 @@ function Get-DistributionSurfaceMetadata {
                 Package = 'elegy-mcp'
                 Binary = 'elegy-mcp'
                 AssetPrefix = 'elegy-mcp'
+            }
+        }
+        'elegy-planning' {
+            return @{
+                Surface = 'elegy-planning'
+                Package = 'elegy-planning'
+                Binary = 'elegy-planning'
+                AssetPrefix = 'elegy-planning'
             }
         }
         'elegy-skills' {
@@ -124,6 +133,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts\distribution'
 }
 
+if (-not (Test-Path $packageReadmePath)) {
+    throw "Missing package README source: $packageReadmePath"
+}
+
 $surfaceMetadata = Get-DistributionSurfaceMetadata -SurfaceName $Surface
 
 $resolvedTarget = if ([string]::IsNullOrWhiteSpace($Target)) {
@@ -181,6 +194,7 @@ if (Test-Path $archivePath) {
 
 New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
 Copy-Item -Path $binaryPath -Destination (Join-Path $stagingDirectory $binaryFileName) -Force
+Copy-Item -Path $packageReadmePath -Destination (Join-Path $stagingDirectory 'README.md') -Force
 Compress-Archive -Path (Join-Path $stagingDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
 Remove-Item -Path $stagingDirectory -Recurse -Force
 

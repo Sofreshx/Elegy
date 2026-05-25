@@ -52,6 +52,11 @@ function Get-CliSurfaceMetadata {
             AssetPrefix = 'elegy-mcp'
             Binary = 'elegy-mcp'
         }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning'
+            Binary = 'elegy-planning'
+        }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills'
@@ -71,6 +76,11 @@ function Get-WrapperSurfaceMetadata {
             Surface = 'elegy-mcp'
             AssetPrefix = 'elegy-mcp-wrapper'
             SkillBridge = 'skills/elegy-mcp/SKILL.md'
+        }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning-wrapper'
+            SkillBridge = 'skills/elegy-planning/SKILL.md'
         }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
@@ -165,8 +175,10 @@ function New-DistributionAssetRecord {
                 }
 
                 $version = $assetName.Substring($prefix.Length, $versionLength)
+                $executableEntry = Get-ExecutableFileName -BinaryName $metadata.Binary -TargetTriple $target
                 $requiredEntries = @(
-                    Get-ExecutableFileName -BinaryName $metadata.Binary -TargetTriple $target
+                    $executableEntry,
+                    'README.md'
                 )
                 Assert-ArchiveRequiredEntries -ArchivePath $File.FullName -RequiredEntries $requiredEntries
 
@@ -195,6 +207,7 @@ function New-DistributionAssetRecord {
             }
 
             $requiredEntries = @(
+                'README.md',
                 'install.ps1',
                 'wrapper-entrypoint.json',
                 'scripts/install-distribution.ps1',
@@ -245,7 +258,10 @@ function New-DistributionAssetRecord {
             return $null
         }
 
-        $requiredEntries = @('install-distribution.ps1')
+        $requiredEntries = @(
+            'install-distribution.ps1',
+            'README.md'
+        )
         Assert-ArchiveRequiredEntries -ArchivePath $File.FullName -RequiredEntries $requiredEntries
 
         return [ordered]@{

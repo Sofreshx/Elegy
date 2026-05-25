@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/memory-inspect-result.schema.json",
+  "title": "MemoryInspectResult",
+  "description": "Inspected memory record and its version history.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["memory", "versions"],
+  "properties": {
+    "memory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "content", "scope", "memoryType", "provenance", "importanceScore", "reliabilityScore", "sensitivity", "state", "accessCount", "corroborationCount", "embeddingStale", "createdAt", "updatedAt"],
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "content": { "type": "string" },
+        "summary": { "type": ["string", "null"] },
+        "scope": { "type": "string" },
+        "memoryType": { "type": "string" },
+        "provenance": { "type": "string" },
+        "importanceScore": { "type": "number" },
+        "reliabilityScore": { "type": "number" },
+        "sensitivity": { "type": "string" },
+        "state": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
+        "status": { "type": ["string", "null"] },
+        "customMetadata": { "type": "object" },
+        "accessCount": { "type": "integer", "minimum": 0 },
+        "corroborationCount": { "type": "integer", "minimum": 0 },
+        "embeddingStale": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" },
+        "lastAccessedAt": { "type": ["string", "null"], "format": "date-time" },
+        "tenantId": { "type": ["string", "null"] },
+        "userId": { "type": ["string", "null"] },
+        "agentId": { "type": ["string", "null"] }
+      }
+    },
+    "versions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "memoryId", "versionNumber", "content", "changedBy", "changeReason", "changedAt"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "memoryId": { "type": "string", "minLength": 1 },
+          "versionNumber": { "type": "integer", "minimum": 0 },
+          "content": { "type": "string" },
+          "changedBy": { "type": "string" },
+          "changeReason": { "type": "string" },
+          "changedAt": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

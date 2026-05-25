@@ -1,0 +1,64 @@
+{
+  "artifactKind": "observation-session",
+  "sessionId": "obs-session-1",
+  "scope": "session",
+  "recorderKind": "foregroundWindowPolling",
+  "openedAtUtc": "2026-05-13T00:00:00Z",
+  "closedAtUtc": "2026-05-13T00:00:05Z",
+  "durationSeconds": 5,
+  "pollIntervalMs": 250,
+  "eventCount": 1,
+  "eventsPreview": [
+    {
+      "eventId": "obs-event-1",
+      "sessionId": "obs-session-1",
+      "sequence": 1,
+      "observedAtUtc": "2026-05-13T00:00:01Z",
+      "observationKind": "foregroundWindowChanged",
+      "summary": "Foreground window changed to Notepad.",
+      "window": {
+        "hwnd": 1234,
+        "title": "Untitled - Notepad",
+        "processId": 5678,
+        "bounds": {
+          "x": 100,
+          "y": 100,
+          "width": 800,
+          "height": 600
+        }
+      },
+      "metadata": {
+        "processName": "notepad.exe"
+      }
+    }
+  ],
+  "summary": {
+    "scope": "session",
+    "representation": "observation-summary",
+    "summary": "Observed one foreground window transition during a bounded focus-recording session.",
+    "observationCount": 1,
+    "observationKinds": {
+      "foregroundWindowChanged": 1
+    },
+    "salientEvents": [
+      {
+        "kind": "foregroundWindowChanged",
+        "summary": "Focus moved to a new foreground window.",
+        "count": 1
+      }
+    ],
+    "timeRange": {
+      "startedAtUtc": "2026-05-13T00:00:00Z",
+      "endedAtUtc": "2026-05-13T00:00:05Z"
+    },
+    "tokenEstimate": {
+      "summaryChars": 78,
+      "salientEventChars": 35,
+      "total": 113
+    },
+    "rawEventsPersisted": false
+  },
+  "metadata": {
+    "host": "windows"
+  }
+}

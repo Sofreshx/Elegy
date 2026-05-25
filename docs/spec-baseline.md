@@ -22,7 +22,7 @@ Elegy is currently centered on two implementation anchors:
 Protocol-baseline drift would now affect:
 
 - published schemas, fixtures, compatibility manifests, and bundle exports
-- Rust contract consumers and operator crates such as `elegy-tooling`, `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-skills`, and `elegy-host-mcp`
+- Rust contract consumers and operator crates such as `elegy-tooling`, `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, and `elegy-host-mcp`
 - downstream consumers that rely on the exported contract bundle or Rust executable surfaces
 
 ## Baseline
@@ -38,7 +38,7 @@ This means:
 
 The currently implemented slice is still intentionally narrower than the full spec:
 
-- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and `elegy-skills generate`; `elegy` exposes the same author/analyze/generate flow as the general/compatibility surface
+- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and use `elegy generate skills` for lower-level skill generation and `elegy generate codex-plugin` for conservative Codex package projection; `elegy` remains the general/compatibility surface while `elegy-skills` is the dedicated registry/search/validate surface
 - `elegy-host-mcp` exists as a thin stdio host over runtime-composed resources
 - resources-first behavior remains the current live runtime posture
 - no implied support for prompts, sampling, autonomous MCP-native self-authoring, or built-in skill-driven orchestration unless documentation and implementation are updated together
@@ -62,7 +62,7 @@ Until that happens, the repository baseline remains `2025-11-25`.
 
 - contract authority: `contracts/` and `governance/`
 - exported machine-readable handoff: `artifacts/contracts`
-- current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
+- current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
 - current operator slice: Rust CLI author/analyze/generate with narrow validation and inspection flows under `rust/`
 - runtime model: runtime composition with a resources-first posture
 - future target: broader MCP-hosted or skill-driven self-authoring only after it is implemented and validated in-repo
