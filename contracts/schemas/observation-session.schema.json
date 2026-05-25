@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/observation-session.schema.json",
+  "title": "ObservationSession",
+  "description": "Bounded observation session artifact with compact summary and preview events.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifactKind",
+    "sessionId",
+    "scope",
+    "recorderKind",
+    "openedAtUtc",
+    "closedAtUtc",
+    "eventCount",
+    "eventsPreview",
+    "summary"
+  ],
+  "properties": {
+    "artifactKind": {
+      "const": "observation-session"
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "scope": {
+      "type": "string",
+      "enum": ["run", "session", "workspace"]
+    },
+    "recorderKind": {
+      "type": "string",
+      "enum": ["foregroundWindowPolling"]
+    },
+    "openedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "closedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "durationSeconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "pollIntervalMs": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "eventCount": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "eventsPreview": {
+      "type": "array",
+      "maxItems": 8,
+      "items": {
+        "$ref": "observation-event.schema.json"
+      }
+    },
+    "summary": {
+      "$ref": "observation-summary.schema.json"
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

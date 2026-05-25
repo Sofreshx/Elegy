@@ -5,6 +5,7 @@ members = [
     "crates/elegy-contracts",
     "crates/elegy-memory",
     "crates/elegy-memory-mcp",
+    "crates/elegy-planning",
     "crates/elegy-policy",
     "crates/elegy-mcp",
     "crates/elegy-skills",
@@ -16,6 +17,15 @@ members = [
     "crates/elegy-core",
     "crates/elegy-host-mcp",
     "crates/elegy-cli",
+    "crates/elegy-diagram",
+    "crates/elegy-observe-win32",
+    "crates/elegy-observe",
+    "crates/elegy-desktop-win32",
+    "crates/elegy-desktop",
+    "crates/elegy-repo",
+    "crates/elegy-web",
+    "crates/elegy-data",
+    "crates/elegy-notify",
 ]
 resolver = "2"
 
@@ -41,10 +51,13 @@ serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 thiserror = "2.0.11"
 time = { version = "0.3.41", features = ["formatting"] }
-tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "time"] }
+tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "time", "process"] }
 toml = "0.8.20"
 url = { version = "2.5.4", features = ["serde"] }
 zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+arboard = "3.4"
+png = "0.17"
+sysinfo = "0.33"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

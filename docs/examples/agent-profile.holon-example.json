@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "agent-capability-profile/v1",
+  "profileId": "holon-desktop-example",
+  "includeSkills": ["observe", "repo", "data", "planning"],
+  "includeCapabilities": ["desktop-click", "desktop-type", "desktop-key"],
+  "excludeCapabilities": ["notify-webhook"],
+  "alwaysIncludeRouter": true
+}

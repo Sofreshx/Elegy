@@ -234,7 +234,7 @@ fn compose_runtime_state_exposes_runtime_mcp_consumers_through_core() {
     assert_eq!(analysis.analyses.len(), 2);
     assert_eq!(generated.generated_skills.len(), 1);
     assert_eq!(
-        generated.generated_skills[0].effective_id(),
+        generated.generated_skills[0].identity.name,
         "mcp-weather-server-get-weather"
     );
     assert_eq!(generated.skipped_tools.len(), 1);

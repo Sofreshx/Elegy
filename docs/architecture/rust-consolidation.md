@@ -39,7 +39,7 @@ The Rust workspace is the first-party home for:
 
 - governed-contract consumption in executable form
 - MCP descriptor authoring, analysis, and skill generation tooling
-- the dedicated `elegy-memory`, `elegy-mcp`, and `elegy-skills` binaries
+- the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries
 - runtime composition and bounded adapter behavior
 - the thin stdio MCP host
 - the human-facing `elegy` CLI
@@ -49,6 +49,7 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `author mcp`
 - `analyze mcp`
 - `generate skills`
+- `generate codex-plugin`
 
 Those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
 

@@ -27,8 +27,8 @@
       "manifest": {
         "id": "elegy-mcp",
         "loadMode": "onDemand",
-        "vaultRef": ".github/skills/elegy-mcp/SKILL.md",
-        "sourceKind": "manual",
+        "vaultRef": ".agents/skills/elegy-mcp/SKILL.md",
+        "sourceKind": "generated",
         "materializationKind": "declared"
       }
     }

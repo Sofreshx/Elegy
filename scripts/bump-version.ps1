@@ -18,6 +18,9 @@ $ErrorActionPreference = 'Stop'
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $versionPolicyPath = Join-Path $repoRoot 'governance\version-policy.json'
 $schemaPath = Join-Path $repoRoot 'schemas\schema-version.json'
+$compatibilityManifestPath = Join-Path $repoRoot 'contracts\manifests\compatibility-manifest.json'
+$compatibilityMatrixPath = Join-Path $repoRoot 'contracts\manifests\compatibility-matrix.json'
+$rustSupportPath = Join-Path $repoRoot 'contracts\support\elegy-rust-support.json'
 $semVerRegex = '^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$'
 
 # Compatibility note: the Package* parameter names remain for CLI stability, but the
@@ -63,12 +66,31 @@ function Get-Major {
     return [int]($Version.Split('-', 2)[0].Split('+', 2)[0].Split('.')[0])
 }
 
+function New-CompatibleVersionRange {
+    param([string]$Version)
+    Assert-SemVer -Value $Version -Name 'Version'
+    $nextMajor = (Get-Major -Version $Version) + 1
+    return ">=$Version <$nextMajor.0.0"
+}
+
 if (-not (Test-Path $versionPolicyPath)) {
     throw "Missing file: $versionPolicyPath"
 }
 
 if (-not (Test-Path $schemaPath)) {
     throw "Missing file: $schemaPath"
+}
+
+if (-not (Test-Path $compatibilityManifestPath)) {
+    throw "Missing file: $compatibilityManifestPath"
+}
+
+if (-not (Test-Path $compatibilityMatrixPath)) {
+    throw "Missing file: $compatibilityMatrixPath"
+}
+
+if (-not (Test-Path $rustSupportPath)) {
+    throw "Missing file: $rustSupportPath"
 }
 
 [pscustomobject]$versionPolicy = Get-Content -Raw -Path $versionPolicyPath | ConvertFrom-Json
@@ -88,6 +110,10 @@ if (-not $schemaJson.schemaVersion) {
 }
 $currentSchemaVersion = [string]$schemaJson.schemaVersion
 Assert-SemVer -Value $currentSchemaVersion -Name 'Current schema version'
+
+[pscustomobject]$compatibilityManifest = Get-Content -Raw -Path $compatibilityManifestPath | ConvertFrom-Json
+[pscustomobject]$compatibilityMatrix = Get-Content -Raw -Path $compatibilityMatrixPath | ConvertFrom-Json
+[pscustomobject]$rustSupport = Get-Content -Raw -Path $rustSupportPath | ConvertFrom-Json
 
 $nextPackageVersion = if ($PackageVersion) {
     Assert-SemVer -Value $PackageVersion -Name 'PackageVersion'
@@ -124,9 +150,46 @@ if ($DryRun) {
 $versionPolicy.bundleVersion = $nextPackageVersion
 $versionPolicy.manifestPackage.version = $nextPackageVersion
 $versionPolicy.schemaVersion = $nextSchemaVersion
+$versionPolicy.plannedFamilies | ForEach-Object {
+    $_.targetBundleVersion = $nextPackageVersion
+}
 $versionPolicy | ConvertTo-Json -Depth 10 | Set-Content -Path $versionPolicyPath
 
 $schemaJson.schemaVersion = $nextSchemaVersion
 $schemaJson | ConvertTo-Json -Depth 10 | Set-Content -Path $schemaPath
 
-Write-Host 'Updated version-policy and schema-version files successfully.'
+$compatibilityManifest.package.version = $nextPackageVersion
+$compatibilityManifest.plannedFamilies | ForEach-Object {
+    $_.targetPackageVersion = $nextPackageVersion
+}
+$compatibilityManifest.schemas | ForEach-Object {
+    $_.schemaVersion = $nextSchemaVersion
+}
+$compatibilityManifest | ConvertTo-Json -Depth 10 | Set-Content -Path $compatibilityManifestPath
+
+$packageVersionRange = New-CompatibleVersionRange -Version $nextPackageVersion
+$schemaVersionRange = New-CompatibleVersionRange -Version $nextSchemaVersion
+$compatibilityMatrix.plannedFamilies | ForEach-Object {
+    $_.targetPackageVersionRange = $packageVersionRange
+}
+$compatibilityMatrix.entries | ForEach-Object {
+    $_.elegyPackageVersionRange = $packageVersionRange
+    $_.elegySchemaVersionRange = $schemaVersionRange
+    if (-not [string]::IsNullOrWhiteSpace([string]$_.notes)) {
+        $_.notes = ([string]$_.notes) -replace 'bundle\s+\d+\.\d+\.\d+', "bundle $nextPackageVersion"
+    }
+}
+$compatibilityMatrix | ConvertTo-Json -Depth 10 | Set-Content -Path $compatibilityMatrixPath
+
+$rustSupport.upstreamPackage.version = $nextPackageVersion
+$rustSupport.plannedFamilies | ForEach-Object {
+    $_.targetUpstreamPackageVersion = $nextPackageVersion
+}
+if ($rustSupport.schemas) {
+    foreach ($property in $rustSupport.schemas.PSObject.Properties) {
+        $property.Value = $nextSchemaVersion
+    }
+}
+$rustSupport | ConvertTo-Json -Depth 10 | Set-Content -Path $rustSupportPath
+
+Write-Host 'Updated governed version metadata successfully.'

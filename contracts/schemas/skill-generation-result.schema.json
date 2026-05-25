@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/skill-generation-result.schema.json",
+  "title": "SkillGenerationResult",
+  "description": "Skill-generation report including generated v2 skills, skipped tools, and written files produced by the lower-level `elegy generate skills` flow.",
+  "type": "object"
+}
