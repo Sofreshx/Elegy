@@ -7,11 +7,9 @@ description: "Surface-local non-authoritative bridge shipped with the Elegy-skil
 
 This file is a surface-local, non-authoritative skill bridge shipped with the `src/Elegy-skills` wrapper surface and the `elegy-skills-wrapper-<bundleVersion>.zip` archive.
 
-External agents outside Elegy can use this associated skill bridge to locate the dedicated `elegy-skills` CLI handoff, then invoke that CLI directly. `src/Elegy-skills` remains a thin wrapper surface, not an implementation center, and this bridge does not imply an in-repo Elegy agent runtime.
-
 Authority stays one-way:
 
-1. `contracts/fixtures/skill-definition.elegy-skills.json` is the governed source of truth.
+1. `contracts/fixtures/skill-definition-v2.elegy-skills.json` is the governed source of truth.
 2. `contracts/fixtures/skill-discovery-index.elegy-skills.json` is the governed discovery projection.
 3. `.github/skills/elegy-skills/SKILL.md` remains the repo-local contributor-routing output.
 4. This file mirrors the install and CLI handoff needed by wrapper consumers.
@@ -24,9 +22,19 @@ Authority stays one-way:
 ## Current commands
 
 ```text
-elegy-skills generate --descriptor <path> [--output-dir <path>] [--force]
+elegy-skills list [--category <name>] [--lifecycle <state>] [--detail]
+elegy-skills search --query <task>
+elegy-skills resolve --query <task>
+elegy-skills get --skill-id <id-or-alias>
+elegy-skills capability --capability-id <id>
+elegy-skills validate --file <path>
+elegy-skills validate --dir <path>
 ```
 
 `--format json` is available when structured output is needed.
 
-Use `elegy-skills` as the preferred dedicated surface. Treat umbrella `elegy generate skills` only as the general/compatibility path when needed.
+## Surface posture
+
+- This dedicated surface is registry-first: search, resolve, inspect, and validate governed v2 skills.
+- The same registry behavior is also available on the umbrella `elegy skills ...` commands.
+- Downstream Rust hosts can prefer the reusable `rust/crates/elegy-skills` API over shelling out when direct in-process integration is a better fit.

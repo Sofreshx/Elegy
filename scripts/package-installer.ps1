@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$packageReadmePath = Join-Path $repoRoot 'PACKAGE_README.md'
 
 function Get-BundleVersion {
     param(
@@ -34,6 +35,10 @@ if (-not (Test-Path $installerScriptPath)) {
     throw "Missing installer source: $installerScriptPath"
 }
 
+if (-not (Test-Path $packageReadmePath)) {
+    throw "Missing package README source: $packageReadmePath"
+}
+
 $bundleVersion = Get-BundleVersion -RepositoryRoot $repoRoot
 
 New-Item -ItemType Directory -Path $OutputDirectory -Force | Out-Null
@@ -52,6 +57,7 @@ if (Test-Path $archivePath) {
 
 New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
 Copy-Item -Path $installerScriptPath -Destination (Join-Path $stagingDirectory 'install-distribution.ps1') -Force
+Copy-Item -Path $packageReadmePath -Destination (Join-Path $stagingDirectory 'README.md') -Force
 
 Compress-Archive -Path (Join-Path $stagingDirectory '*') -DestinationPath $archivePath -CompressionLevel Optimal
 Remove-Item -Path $stagingDirectory -Recurse -Force

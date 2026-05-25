@@ -4,20 +4,15 @@ This file is for Claude Code. For universal instructions, see AGENTS.md.
 
 ## Context
 
-Elegy is a Rust workspace building modular AI agent infrastructure. Each crate is a standalone tool that agents can use independently or compose together.
-
-Active crates:
-- `rust/crates/elegy-memory/` — standalone memory engine (SQLite + sqlite-vec + FTS5)
-- `rust/crates/elegy-memory-mcp/` — remote MCP server exposing elegy-memory (axum, JWT, OAuth 2.1)
-
-Future crates may include: MCP generation tools, user observation/skill crystallization, agent workflow capture, and others. Each follows the same pattern: standalone, trait-first, well-documented.
+Elegy is a Rust project building modular AI agent infrastructure: governed contracts, CLI tools, v2 skill definitions, and an MCP host for runtime discovery and tool invocation. `elegy-memory` remains an important MVP subsystem, and `elegy-memory-mcp` remains an important integration surface, but current agent-facing work spans the umbrella CLI, contracts, skill generation, and MCP host.
 
 ## Before Coding
 
-1. Identify which crate you're working on
-2. Read its `docs/architecture/ARCHITECTURE.md` first
-3. Read `mvp-scope.md` to know what's in scope vs deferred
-4. Read the specific doc for whatever you're implementing
+Read these docs in order:
+1. `docs/agent-integration.md` — agent discovery and invocation model
+2. The specific doc for whatever you're implementing
+3. For memory work, `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md`
+4. For memory scope decisions, `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`
 
 For elegy-memory specifically:
 @rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md
@@ -25,6 +20,13 @@ For elegy-memory specifically:
 @rust/crates/elegy-memory/docs/architecture/traits-and-interfaces.md
 @rust/crates/elegy-memory/docs/architecture/storage-schema.md
 @rust/crates/elegy-memory/docs/architecture/mvp-scope.md
+
+## Discovery Surface
+
+- Use `elegy skills list/search/describe --json` as the first stop for agent-facing capability discovery.
+- V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are authoritative. Do not add v1 skill-definition files.
+- `elegy run` serves MCP resources and tool calls from the same built-in v2 registry.
+- Side-effecting MCP tool calls require dry-run input or a host started with `--allow-side-effects`.
 
 ## Key Constraints
 
@@ -68,8 +70,8 @@ Include: date, what changed, test status, decisions made.
 
 - Promotion chain: `roro/<topic>` -> `roro` -> `dev` -> `main`
 - Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
-- Do normal feature work on `roro/<topic>`, not directly on `roro`, `dev`, or `main`
-- Merge `roro/<topic>` into `roro` only when the work and validation are clean
+- Do normal feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
+- Merge a topic branch into `roro` only when the work and validation are clean
 - Merge `roro` into `dev` only when `roro` is clean, validated, and reconciled with newer `main` changes
 - Merge `dev` into `main` only when `dev` is clean and validated
 - If a hotfix lands on `main`, propagate it back through `dev`, then `roro`, before continuing feature work

@@ -2,12 +2,13 @@
 
 ## Project Overview
 
-Elegy is a modular AI agent infrastructure project written in **Rust**. It is composed of independent systems (crates) that can be used standalone or together. The primary system under active development is **elegy-memory**.
+Elegy is a modular AI agent infrastructure project written in **Rust**. It combines governed contracts, CLI tools, v2 skill definitions, and an MCP host so agentic harnesses can discover and invoke local capabilities safely.
 
 ## Architecture Documentation
 
 Before writing any code, read the relevant architecture docs:
 
+- `docs/agent-integration.md` — Agent-facing discovery, invocation, JSON envelopes, and MCP tool dispatch.
 - `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` — Start here. Overview of all systems, design philosophy, and navigation guide.
 - `rust/crates/elegy-memory/docs/architecture/memory-model.md` — Memory types, scopes, scoring formulas, and behavioral rules.
 - `rust/crates/elegy-memory/docs/architecture/storage-schema.md` — SQLite schema, tables, indexes, and migration strategy.
@@ -23,6 +24,13 @@ Before writing any code, read the relevant architecture docs:
 - Testing: Every public function must have at least one unit test. Integration tests live in `rust/crates/elegy-memory/tests/`.
 - Dependencies: Minimize external dependencies. Prefer `rusqlite` (bundled feature), `sqlite-vec`, `serde`, `chrono`, `uuid`, `clap` for CLI.
 - No `unsafe` code without explicit justification in a comment.
+
+## Agent Tool Discovery
+
+- Prefer `elegy skills list/search/describe --json` when you need the current capability surface.
+- V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are the supported skill contract.
+- Do not reintroduce v1 `skill-definition.*.json` files.
+- `elegy run` exposes the same v2 registry as MCP tools. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.
 
 ## Architecture Rules — Critical
 

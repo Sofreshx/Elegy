@@ -1,5 +1,17 @@
 # FLIGHT_RECORDER
 
+## 2026-05-25 Targeted main reconciliation
+- What changed:
+  - Reconciled `origin/main` into a dedicated `roro` reconciliation branch instead of merging blindly into `dev`.
+  - Kept the active `elegy-memory` and `elegy-memory-mcp` implementations from the `dev` line, adopted the newer governed skill/docs/workflow surface from `main`, and manually unioned the Rust workspace so `elegy-memory-mcp` and the newer `main` crates coexist.
+- Test status:
+  - `cargo check --workspace` passed from `rust/`.
+  - `cargo test -p elegy-memory -p elegy-memory-mcp` passed from `rust/`.
+- Decisions:
+  - Prefer a full ancestry-preserving merge over cherry-picking because `main` brings a large, interdependent governed-surface update.
+  - Resolve `rust/Cargo.toml` as a workspace union and regenerate `rust/Cargo.lock` from the merged workspace instead of hand-merging the lockfile.
+  - Preserve the `dev` branch's `elegy-memory` and `elegy-memory-mcp` code where `main` only carried stale-ancestor edits on those files.
+
 ## 2026-05-25 Branch workflow guardrail
 - What changed:
   - Synced local `dev` with `origin/dev`, then moved ongoing work to a dedicated personal branch named `roro`.

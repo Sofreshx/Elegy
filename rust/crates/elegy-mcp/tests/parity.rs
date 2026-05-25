@@ -3,7 +3,7 @@ use std::path::{Path, PathBuf};
 
 use elegy_contracts::{
     resolve_upstream_contracts_dir, McpAnalysisResult, McpServerDescriptor, McpToolDefinition,
-    SkillDefinition,
+    SkillDefinitionV2,
 };
 use elegy_mcp::{McpSkillGenerator, McpToolAnalyzer, McpToolResolveService, McpToolSearchService};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
@@ -12,7 +12,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 #[serde(rename_all = "camelCase")]
 struct McpParityExpectation {
     #[serde(default)]
-    generated_skills: Vec<SkillDefinition>,
+    generated_skills: Vec<SkillDefinitionV2>,
     #[serde(default)]
     skipped_tool_names: Vec<String>,
     #[serde(default)]

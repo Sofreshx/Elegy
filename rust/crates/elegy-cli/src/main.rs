@@ -1,11 +1,15 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use elegy_contracts::{export_contract_bundle, ContractsBundleExport, ContractsError};
+use elegy_contracts::{
+    export_contract_bundle, AgentCapabilityProfile, ContractsBundleExport, ContractsError,
+    ObservationSession, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+};
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
     McpAnalysisResult, McpTransportKind, ProjectLocator, ResourceFamily, Severity,
     CLI_SCHEMA_VERSION,
 };
-use elegy_host_mcp::{serve_stdio, HostError};
+use elegy_diagram::{CanonicalDiagram, DiagramEdge, DiagramNode, DiagramPatch};
+use elegy_host_mcp::{serve_stdio_with_options, HostError, HostOptions};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
     AuthorMcpToolRequest, AuthoredMcpDescriptor, McpSurfaceError,
@@ -24,17 +28,28 @@ use elegy_mermaid::{
     MermaidProjectionNodeRole, MermaidProjectionSourceKind, MermaidToolError,
     MermaidWorkflowProjection,
 };
+use elegy_observe::{
+    capture_screen, foreground_window, list_windows, observe_filesystem, read_clipboard,
+    record_observation_session, snapshot_processes, system_info, ObservationRecordRequest,
+};
+use elegy_skills::{
+    AgentCapabilityProfile as RegistryAgentCapabilityProfile, RegistryCapabilityCard,
+    RegistrySkillEntry, SkillRegistry, SkillRegistryQuery,
+};
 use elegy_tooling::{
-    generate_skills_from_descriptor_file, GeneratedSkillArtifacts,
-    ToolingError as SkillsSurfaceError,
+    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
+    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, ToolingError as ToolingSurfaceError,
 };
 use serde::Serialize;
 use serde_json::json;
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Read};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
 const LOCAL_DEFAULT_ROOT_DIR: &str = ".elegy-local-memory";
@@ -47,23 +62,45 @@ const SESSION_CONTEXT_AUTHORITY_POSTURE: &str =
 const SESSION_CONTEXT_ADAPTER_POSTURE: &str =
     "mirror-or-inspect-only; adapters cannot promote, invalidate, or override host-owned truth";
 const SESSION_CONTEXT_HOST_OWNER: &str = "SAASTools";
+const EXIT_CODE_INVALID_INPUT: u8 = 1;
+const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
+const AGENT_INTEGRATION_VERSION: &str = "elegy.agent/v1";
+const AGENT_ROUTER_SKILL_ID: &str = "skill-router";
+
+static CLI_MACHINE_CONTEXT: OnceLock<CliMachineContext> = OnceLock::new();
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy")]
 #[command(about = "Bootstrap CLI for Elegy runtime and MCP authoring")]
 struct Cli {
+    /// Print version and capability information, then exit
+    #[arg(long)]
+    version: bool,
     #[arg(long)]
     project: Option<PathBuf>,
     #[arg(long, value_enum, default_value_t = OutputFormat::Text, global = true)]
     format: OutputFormat,
+    #[arg(long, global = true)]
+    json: bool,
+    #[arg(long, global = true)]
+    non_interactive: bool,
+    #[arg(long, global = true)]
+    correlation_id: Option<String>,
     #[command(subcommand)]
-    command: Command,
+    command: Option<Command>,
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
 enum OutputFormat {
     Text,
     Json,
+}
+
+#[derive(Clone, Debug)]
+struct CliMachineContext {
+    format: OutputFormat,
+    non_interactive: bool,
+    correlation_id: String,
 }
 
 #[derive(Subcommand, Debug)]
@@ -96,13 +133,65 @@ enum Command {
         #[command(subcommand)]
         command: MermaidCommand,
     },
+    Diagram {
+        #[command(subcommand)]
+        command: DiagramCommand,
+    },
     Run {
         #[arg(long)]
         dry_run: bool,
+        /// Allow MCP tools with side effects to execute without per-call dry-run protection.
+        #[arg(long)]
+        allow_side_effects: bool,
+        /// Host-owned profile limiting the capabilities exposed by optional MCP projection.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+        /// Default timeout for MCP tool subprocess calls.
+        #[arg(long, default_value_t = 30)]
+        tool_timeout_seconds: u64,
+        /// Maximum stdout/stderr bytes returned by one MCP tool call.
+        #[arg(long, default_value_t = 1_048_576)]
+        max_tool_output_bytes: usize,
     },
     Contracts {
         #[command(subcommand)]
         command: ContractsCommand,
+    },
+    /// Discover available skill definitions
+    Skills {
+        #[command(subcommand)]
+        command: SkillsCommand,
+    },
+    /// Agent host onboarding, profile checks, and filtered discovery
+    Agent {
+        #[command(subcommand)]
+        command: AgentCommand,
+    },
+    /// Desktop and OS observation commands
+    Observe {
+        #[command(subcommand)]
+        command: ObserveCommand,
+    },
+    /// Desktop input automation commands
+    Desktop {
+        #[command(subcommand)]
+        command: DesktopCommand,
+    },
+    Repo {
+        #[command(subcommand)]
+        command: RepoCommand,
+    },
+    Web {
+        #[command(subcommand)]
+        command: WebCommand,
+    },
+    Data {
+        #[command(subcommand)]
+        command: DataCommand,
+    },
+    Notify {
+        #[command(subcommand)]
+        command: NotifyCommand,
     },
 }
 
@@ -137,6 +226,15 @@ enum GenerateCommand {
         descriptor: PathBuf,
         #[arg(long)]
         output_dir: Option<PathBuf>,
+        #[arg(long)]
+        force: bool,
+    },
+    #[command(name = "codex-plugin")]
+    CodexPlugin {
+        #[arg(long)]
+        package: PathBuf,
+        #[arg(long)]
+        output_dir: PathBuf,
         #[arg(long)]
         force: bool,
     },
@@ -238,6 +336,328 @@ enum ContractsCommand {
     },
 }
 
+/// Runtime skill discovery commands for agents.
+#[derive(Subcommand, Debug)]
+enum SkillsCommand {
+    /// List all available skill definitions
+    List {
+        /// Filter by category (e.g. "design", "memory", "projection")
+        #[arg(long)]
+        category: Option<String>,
+        /// Filter by lifecycle state (e.g. "active", "draft", "deprecated")
+        #[arg(long)]
+        lifecycle: Option<String>,
+        /// Show capability-level detail (parameters, execution metadata)
+        #[arg(long)]
+        detail: bool,
+    },
+    /// Show full detail for a specific skill
+    Describe {
+        /// Skill identifier (e.g. "diagram", "memory", "mermaid")
+        #[arg(long)]
+        skill_id: String,
+    },
+    /// Search skills by keyword or trigger pattern
+    Search {
+        /// Free-text query matched against keywords, triggers, and descriptions
+        #[arg(long)]
+        query: String,
+        /// Show capability-level detail (parameters, execution metadata)
+        #[arg(long)]
+        detail: bool,
+    },
+    /// Resolve the best matching skill and capability for a task
+    Resolve {
+        #[arg(long)]
+        query: String,
+        #[arg(long)]
+        detail: bool,
+    },
+    /// Return the full governed skill definition for one skill
+    Get {
+        #[arg(long)]
+        skill_id: String,
+    },
+    /// Return a projected capability card for one capability
+    Capability {
+        #[arg(long)]
+        capability_id: String,
+    },
+    /// Validate one skill file or a directory of skill files
+    Validate {
+        #[arg(long)]
+        file: Option<PathBuf>,
+        #[arg(long)]
+        dir: Option<PathBuf>,
+    },
+}
+
+/// Host-facing agent integration commands.
+#[derive(Subcommand, Debug)]
+enum AgentCommand {
+    /// Emit the canonical host integration packet.
+    Manifest {
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
+    /// Validate a host integration profile and built-in registry selection.
+    Check {
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
+    /// Discover profile-filtered skills and capabilities for an agent task.
+    Discover {
+        /// Free-text query matched against allowed skills and capabilities.
+        #[arg(long)]
+        query: Option<String>,
+        /// Include allowed capability implementation blocks.
+        #[arg(long)]
+        detail: bool,
+        /// Optional host-owned capability profile.
+        #[arg(long)]
+        profile: Option<PathBuf>,
+    },
+}
+
+/// Desktop and OS observation commands for agentic workflows.
+#[derive(Subcommand, Debug)]
+enum ObserveCommand {
+    /// Snapshot of running processes
+    Processes {
+        /// Filter processes by name pattern (case-insensitive substring match)
+        #[arg(long)]
+        filter: Option<String>,
+    },
+    /// Current foreground (active) window info (Windows only)
+    Window,
+    /// List all visible windows, optionally filtered by title
+    Windows {
+        /// Filter windows by title pattern (case-insensitive substring match)
+        #[arg(long)]
+        filter: Option<String>,
+    },
+    /// Capture the current screen as PNG
+    Screen {
+        /// Monitor index (0 = primary, default)
+        #[arg(long)]
+        monitor: Option<u32>,
+        /// Save PNG to file instead of returning base64 in JSON
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Read current clipboard contents
+    Clipboard,
+    /// Observe a filesystem path for changes over a bounded time window
+    Filesystem {
+        /// Directory path to observe
+        #[arg(long)]
+        path: PathBuf,
+        /// Observation duration in seconds (default: 5)
+        #[arg(long, default_value = "5")]
+        timeout_seconds: u64,
+    },
+    /// System hardware and OS information snapshot
+    System,
+    /// Record bounded foreground-window activity for a short session
+    Record {
+        /// Recorder duration in seconds (default: 5)
+        #[arg(long, default_value = "5")]
+        duration_seconds: u64,
+        /// Foreground-window polling interval in milliseconds (default: 250)
+        #[arg(long, default_value = "250")]
+        poll_interval_ms: u64,
+    },
+}
+
+/// Desktop input automation commands for agentic workflows.
+///
+/// All mutation commands support `--dry-run` to preview the action without executing.
+/// Window commands accept `--title` (substring match, must be unambiguous) or `--hwnd` (precise).
+#[derive(Subcommand, Debug)]
+enum DesktopCommand {
+    /// Simulate a mouse click at pixel coordinates
+    Click {
+        /// X coordinate in screen pixels
+        #[arg(long)]
+        x: i32,
+        /// Y coordinate in screen pixels
+        #[arg(long)]
+        y: i32,
+        /// Mouse button: left, right, or middle
+        #[arg(long, default_value = "left")]
+        button: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Simulate keyboard text input
+    Type {
+        /// Text to type (Unicode supported)
+        #[arg(long)]
+        text: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Simulate a key combination (e.g., "ctrl+s", "alt+tab")
+    Key {
+        /// Key combo string (e.g., "ctrl+s", "alt+tab", "enter", "ctrl+shift+f5")
+        #[arg(long)]
+        combo: String,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Focus a window by title pattern or HWND
+    Focus {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Move and optionally resize a window
+    Move {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Target X position in screen pixels
+        #[arg(long)]
+        x: i32,
+        /// Target Y position in screen pixels
+        #[arg(long)]
+        y: i32,
+        /// New width in pixels (preserves current if omitted)
+        #[arg(long)]
+        width: Option<u32>,
+        /// New height in pixels (preserves current if omitted)
+        #[arg(long)]
+        height: Option<u32>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Minimize a window
+    Minimize {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+    /// Maximize a window
+    Maximize {
+        /// Window title pattern (case-insensitive substring; must match exactly one window)
+        #[arg(long)]
+        title: Option<String>,
+        /// Raw window handle (takes priority over --title)
+        #[arg(long)]
+        hwnd: Option<u64>,
+        /// Preview the action without executing
+        #[arg(long)]
+        dry_run: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum RepoCommand {
+    Status {
+        #[arg(long)]
+        repo: Option<PathBuf>,
+    },
+    Diff {
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        #[arg(long)]
+        base: Option<String>,
+    },
+    Branches {
+        #[arg(long)]
+        repo: Option<PathBuf>,
+    },
+    Log {
+        #[arg(long)]
+        repo: Option<PathBuf>,
+        #[arg(long, default_value = "10")]
+        count: u32,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum WebCommand {
+    Fetch {
+        #[arg(long)]
+        url: String,
+        #[arg(long, default_value = "GET")]
+        method: String,
+        #[arg(long)]
+        header: Vec<String>,
+        #[arg(long)]
+        body: Option<String>,
+        #[arg(long)]
+        extract: Option<String>,
+    },
+    Ping {
+        #[arg(long)]
+        url: String,
+        #[arg(long, default_value = "5")]
+        timeout_seconds: u64,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DataCommand {
+    Convert {
+        #[arg(long)]
+        from: String,
+        #[arg(long)]
+        to: String,
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+    Extract {
+        #[arg(long)]
+        query: String,
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+    Validate {
+        #[arg(long)]
+        schema: PathBuf,
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum NotifyCommand {
+    Toast {
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        body: String,
+    },
+    Webhook {
+        #[arg(long)]
+        url: String,
+        #[arg(long)]
+        payload: Option<String>,
+    },
+}
+
 #[derive(Subcommand, Debug)]
 enum MermaidCommand {
     Render {
@@ -251,6 +671,50 @@ enum MermaidCommand {
     Narrate {
         #[arg(long)]
         input: Option<PathBuf>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum DiagramCommand {
+    Create {
+        #[arg(long, default_value = "concept")]
+        diagram_type: String,
+    },
+    Patch {
+        #[arg(long)]
+        input: PathBuf,
+        /// Read a JSON DiagramPatch from stdin instead of using legacy positional args
+        #[arg(long)]
+        patch_stdin: bool,
+        /// [Legacy] Add node as "id,label[,conceptType]"
+        #[arg(long)]
+        add_node: Option<String>,
+        /// [Legacy] Add edge as "id,sourceId,targetId[,label]"
+        #[arg(long)]
+        add_edge: Option<String>,
+        /// [Legacy] Remove node by ID
+        #[arg(long)]
+        remove_node: Option<String>,
+        /// [Legacy] Remove edge by ID
+        #[arg(long)]
+        remove_edge: Option<String>,
+        /// Write patched diagram to file instead of stdout
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// Narrate a diagram from file or stdin
+    Narrate {
+        /// Diagram JSON file path; reads from stdin when omitted
+        #[arg(long)]
+        input: Option<PathBuf>,
+    },
+    /// Render a diagram to a visual format
+    Render {
+        /// Diagram JSON file path; reads from stdin when omitted
+        #[arg(long)]
+        input: Option<PathBuf>,
+        #[arg(long, default_value = "mermaid")]
+        render_format: String,
     },
 }
 
@@ -283,9 +747,16 @@ where
     T: Serialize,
 {
     schema_version: &'static str,
+    #[serde(rename = "correlationId")]
+    correlation_id: String,
+    #[serde(rename = "nonInteractive", skip_serializing_if = "is_false")]
+    non_interactive: bool,
     command: Vec<String>,
     status: &'static str,
     summary: Summary,
+    /// Optional schema URI identifying the type of the `data` field.
+    #[serde(rename = "dataSchema", skip_serializing_if = "Option::is_none")]
+    data_schema: Option<&'static str>,
     data: T,
     diagnostics: Vec<Diagnostic>,
 }
@@ -294,6 +765,8 @@ where
 struct Summary {
     errors: usize,
     warnings: usize,
+    #[serde(skip_serializing_if = "String::is_empty")]
+    text: String,
 }
 
 #[derive(Serialize)]
@@ -410,6 +883,46 @@ struct MermaidNarrateReport {
     input_path: Option<String>,
 }
 
+struct AgentProfileSelection {
+    profile_path: Option<PathBuf>,
+    profile: Option<AgentCapabilityProfile>,
+    selected_skill_ids: BTreeSet<String>,
+    selected_capability_ids: BTreeSet<String>,
+    total_skill_count: usize,
+    total_capability_count: usize,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl AgentProfileSelection {
+    fn has_errors(&self) -> bool {
+        self.diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.severity == Severity::Error)
+    }
+
+    fn error_diagnostics(&self) -> Vec<Diagnostic> {
+        self.diagnostics
+            .iter()
+            .filter(|diagnostic| diagnostic.severity == Severity::Error)
+            .cloned()
+            .collect()
+    }
+
+    fn allowed_tool_ids(&self) -> Option<BTreeSet<String>> {
+        self.profile
+            .as_ref()
+            .map(|_| self.selected_capability_ids.clone())
+    }
+
+    fn router_available(&self) -> bool {
+        self.selected_skill_ids.contains(AGENT_ROUTER_SKILL_ID)
+            && self
+                .selected_capability_ids
+                .iter()
+                .any(|id| id.starts_with("router-"))
+    }
+}
+
 enum MermaidInputSource {
     File(PathBuf),
     Stdin,
@@ -432,18 +945,39 @@ async fn main() -> ExitCode {
         Ok(code) => code,
         Err(error) => {
             eprintln!("unexpected CLI failure: {error}");
-            ExitCode::from(2)
+            exit_runtime()
         }
     }
 }
 
 async fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
+    let format = resolve_output_format(cli.json, cli.format);
+    let _ = CLI_MACHINE_CONTEXT.set(CliMachineContext {
+        format,
+        non_interactive: cli.non_interactive,
+        correlation_id: resolve_correlation_id(cli.correlation_id),
+    });
+    if cli.version {
+        return execute_version_command(format);
+    }
+
+    let command = match cli.command {
+        Some(cmd) => cmd,
+        None => {
+            // No command and no --version: show help
+            use clap::CommandFactory;
+            Cli::command().print_help().ok();
+            println!();
+            return Ok(ExitCode::SUCCESS);
+        }
+    };
+
     let locator = cli
         .project
         .map_or(ProjectLocator::Auto, ProjectLocator::Path);
 
-    match cli.command {
+    match command {
         Command::Author {
             command:
                 AuthorCommand::Mcp {
@@ -453,10 +987,10 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     tools,
                     force,
                 },
-        } => execute_author_mcp_command(server_name, output, transport, tools, force, cli.format),
+        } => execute_author_mcp_command(server_name, output, transport, tools, force, format),
         Command::Analyze {
             command: AnalyzeCommand::Mcp { descriptor },
-        } => execute_analyze_mcp_command(descriptor, cli.format),
+        } => execute_analyze_mcp_command(descriptor, format),
         Command::Generate {
             command:
                 GenerateCommand::Skills {
@@ -464,25 +998,33 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     output_dir,
                     force,
                 },
-        } => execute_generate_skills_command(descriptor, output_dir, force, cli.format),
+        } => execute_generate_skills_command(descriptor, output_dir, force, format),
+        Command::Generate {
+            command:
+                GenerateCommand::CodexPlugin {
+                    package,
+                    output_dir,
+                    force,
+                },
+        } => execute_generate_codex_plugin_command(package, output_dir, force, format),
         Command::Validate {
             command: ValidateCommand::Config,
-        } => execute_config_command(locator, cli.format, vec!["validate", "config"]),
+        } => execute_config_command(locator, format, vec!["validate", "config"]),
         Command::Validate {
             command: ValidateCommand::Runtime,
-        } => execute_runtime_command(locator, cli.format, vec!["validate", "runtime"]),
+        } => execute_runtime_command(locator, format, vec!["validate", "runtime"]),
         Command::Validate {
             command: ValidateCommand::SessionContext { input },
-        } => execute_validate_session_context_command(input, cli.format),
+        } => execute_validate_session_context_command(input, format),
         Command::Inspect {
             command: InspectCommand::Resources,
-        } => execute_runtime_command(locator, cli.format, vec!["inspect", "resources"]),
+        } => execute_runtime_command(locator, format, vec!["inspect", "resources"]),
         Command::Inspect {
             command: InspectCommand::SessionContext,
-        } => execute_session_context_command(cli.format),
+        } => execute_session_context_command(format),
         Command::Local {
             command: LocalCommand::Init { root },
-        } => execute_local_init_command(root.root, cli.format),
+        } => execute_local_init_command(root.root, format),
         Command::Local {
             command:
                 LocalCommand::Import {
@@ -491,10 +1033,10 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     imported_at_utc,
                 },
-        } => execute_local_import_command(root.root, input, record_id, imported_at_utc, cli.format),
+        } => execute_local_import_command(root.root, input, record_id, imported_at_utc, format),
         Command::Local {
             command: LocalCommand::List { root, visibility },
-        } => execute_local_list_command(root.root, visibility.query_options(), cli.format),
+        } => execute_local_list_command(root.root, visibility.query_options(), format),
         Command::Local {
             command:
                 LocalCommand::Show {
@@ -502,9 +1044,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     visibility,
                 },
-        } => {
-            execute_local_show_command(root.root, record_id, visibility.query_options(), cli.format)
-        }
+        } => execute_local_show_command(root.root, record_id, visibility.query_options(), format),
         Command::Local {
             command:
                 LocalCommand::Export {
@@ -518,7 +1058,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             record_id,
             output_path,
             visibility.query_options(),
-            cli.format,
+            format,
         ),
         Command::Local {
             command:
@@ -527,12 +1067,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     record_id,
                     superseded_by_record_id,
                 },
-        } => execute_local_supersede_command(
-            root.root,
-            record_id,
-            superseded_by_record_id,
-            cli.format,
-        ),
+        } => execute_local_supersede_command(root.root, record_id, superseded_by_record_id, format),
         Command::Local {
             command:
                 LocalCommand::Tombstone {
@@ -541,23 +1076,70 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     tombstoned_at_utc,
                     reason,
                 },
-        } => execute_local_tombstone_command(
-            root.root,
-            record_id,
-            tombstoned_at_utc,
-            reason,
-            cli.format,
-        ),
+        } => {
+            execute_local_tombstone_command(root.root, record_id, tombstoned_at_utc, reason, format)
+        }
         Command::Mermaid {
             command: MermaidCommand::Render { input },
-        } => execute_mermaid_render_command(input, cli.format),
+        } => execute_mermaid_render_command(input, format),
         Command::Mermaid {
             command: MermaidCommand::Reverse { input },
-        } => execute_mermaid_reverse_command(input, cli.format),
+        } => execute_mermaid_reverse_command(input, format),
         Command::Mermaid {
             command: MermaidCommand::Narrate { input },
-        } => execute_mermaid_narrate_command(input, cli.format),
-        Command::Run { dry_run } => execute_run_command(locator, dry_run, cli.format).await,
+        } => execute_mermaid_narrate_command(input, format),
+        Command::Diagram {
+            command: DiagramCommand::Create { diagram_type },
+        } => execute_diagram_create_command(diagram_type, format),
+        Command::Diagram {
+            command:
+                DiagramCommand::Patch {
+                    input,
+                    patch_stdin,
+                    add_node,
+                    add_edge,
+                    remove_node,
+                    remove_edge,
+                    output,
+                },
+        } => execute_diagram_patch_command(
+            input,
+            patch_stdin,
+            add_node,
+            add_edge,
+            remove_node,
+            remove_edge,
+            output,
+            format,
+        ),
+        Command::Diagram {
+            command: DiagramCommand::Narrate { input },
+        } => execute_diagram_narrate_command(input, format),
+        Command::Diagram {
+            command:
+                DiagramCommand::Render {
+                    input,
+                    render_format,
+                },
+        } => execute_diagram_render_command(input, render_format, format),
+        Command::Run {
+            dry_run,
+            allow_side_effects,
+            profile,
+            tool_timeout_seconds,
+            max_tool_output_bytes,
+        } => {
+            execute_run_command(
+                locator,
+                dry_run,
+                allow_side_effects,
+                profile,
+                tool_timeout_seconds,
+                max_tool_output_bytes,
+                format,
+            )
+            .await
+        }
         Command::Contracts {
             command:
                 ContractsCommand::Export {
@@ -569,23 +1151,225 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             output_path,
             create_archive,
             archive_output_path,
-            cli.format,
+            format,
         ),
+        Command::Skills {
+            command:
+                SkillsCommand::List {
+                    category,
+                    lifecycle,
+                    detail,
+                },
+        } => execute_skills_list_command(category, lifecycle, detail, format),
+        Command::Skills {
+            command: SkillsCommand::Describe { skill_id },
+        } => execute_skills_describe_command(skill_id, format),
+        Command::Skills {
+            command: SkillsCommand::Search { query, detail },
+        } => execute_skills_search_command(query, detail, format),
+        Command::Skills {
+            command: SkillsCommand::Resolve { query, detail },
+        } => execute_skills_resolve_command(query, detail, format),
+        Command::Skills {
+            command: SkillsCommand::Get { skill_id },
+        } => execute_skills_get_command(skill_id, format),
+        Command::Skills {
+            command: SkillsCommand::Capability { capability_id },
+        } => execute_skills_capability_command(capability_id, format),
+        Command::Skills {
+            command: SkillsCommand::Validate { file, dir },
+        } => execute_skills_validate_command(file, dir, format),
+        Command::Agent {
+            command: AgentCommand::Manifest { profile },
+        } => execute_agent_manifest_command(profile, format),
+        Command::Agent {
+            command: AgentCommand::Check { profile },
+        } => execute_agent_check_command(profile, format),
+        Command::Agent {
+            command:
+                AgentCommand::Discover {
+                    query,
+                    detail,
+                    profile,
+                },
+        } => execute_agent_discover_command(query, detail, profile, format),
+        Command::Observe {
+            command: ObserveCommand::Processes { filter },
+        } => execute_observe_processes_command(filter, format),
+        Command::Observe {
+            command: ObserveCommand::Window,
+        } => execute_observe_window_command(format),
+        Command::Observe {
+            command: ObserveCommand::Windows { filter },
+        } => execute_observe_windows_command(filter, format),
+        Command::Observe {
+            command: ObserveCommand::Screen { monitor, output },
+        } => execute_observe_screen_command(monitor, output, format),
+        Command::Observe {
+            command: ObserveCommand::Clipboard,
+        } => execute_observe_clipboard_command(format),
+        Command::Observe {
+            command:
+                ObserveCommand::Filesystem {
+                    path,
+                    timeout_seconds,
+                },
+        } => execute_observe_filesystem_command(path, timeout_seconds, format),
+        Command::Observe {
+            command: ObserveCommand::System,
+        } => execute_observe_system_command(format),
+        Command::Observe {
+            command:
+                ObserveCommand::Record {
+                    duration_seconds,
+                    poll_interval_ms,
+                },
+        } => execute_observe_record_command(duration_seconds, poll_interval_ms, format),
+        Command::Desktop {
+            command:
+                DesktopCommand::Click {
+                    x,
+                    y,
+                    button,
+                    dry_run,
+                },
+        } => execute_desktop_click_command(x, y, button, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Type { text, dry_run },
+        } => execute_desktop_type_command(text, dry_run, format),
+        Command::Desktop {
+            command: DesktopCommand::Key { combo, dry_run },
+        } => execute_desktop_key_command(combo, dry_run, format),
+        Command::Desktop {
+            command:
+                DesktopCommand::Focus {
+                    title,
+                    hwnd,
+                    dry_run,
+                },
+        } => execute_desktop_focus_command(title, hwnd, dry_run, format),
+        Command::Desktop {
+            command:
+                DesktopCommand::Move {
+                    title,
+                    hwnd,
+                    x,
+                    y,
+                    width,
+                    height,
+                    dry_run,
+                },
+        } => execute_desktop_move_command(title, hwnd, x, y, width, height, dry_run, format),
+        Command::Desktop {
+            command:
+                DesktopCommand::Minimize {
+                    title,
+                    hwnd,
+                    dry_run,
+                },
+        } => execute_desktop_minimize_command(title, hwnd, dry_run, format),
+        Command::Desktop {
+            command:
+                DesktopCommand::Maximize {
+                    title,
+                    hwnd,
+                    dry_run,
+                },
+        } => execute_desktop_maximize_command(title, hwnd, dry_run, format),
+        Command::Repo {
+            command: RepoCommand::Status { repo },
+        } => execute_repo_status_command(repo, format),
+        Command::Repo {
+            command: RepoCommand::Diff { repo, base },
+        } => execute_repo_diff_command(repo, base, format),
+        Command::Repo {
+            command: RepoCommand::Branches { repo },
+        } => execute_repo_branches_command(repo, format),
+        Command::Repo {
+            command: RepoCommand::Log { repo, count },
+        } => execute_repo_log_command(repo, count, format),
+        Command::Web {
+            command:
+                WebCommand::Fetch {
+                    url,
+                    method,
+                    header,
+                    body,
+                    extract,
+                },
+        } => execute_web_fetch_command(url, method, header, body, extract, format),
+        Command::Web {
+            command:
+                WebCommand::Ping {
+                    url,
+                    timeout_seconds,
+                },
+        } => execute_web_ping_command(url, timeout_seconds, format),
+        Command::Data {
+            command: DataCommand::Convert { from, to, input },
+        } => execute_data_convert_command(from, to, input, format),
+        Command::Data {
+            command: DataCommand::Extract { query, input },
+        } => execute_data_extract_command(query, input, format),
+        Command::Data {
+            command: DataCommand::Validate { schema, input },
+        } => execute_data_validate_command(schema, input, format),
+        Command::Notify {
+            command: NotifyCommand::Toast { title, body },
+        } => execute_notify_toast_command(title, body, format),
+        Command::Notify {
+            command: NotifyCommand::Webhook { url, payload },
+        } => execute_notify_webhook_command(url, payload, format),
     }
+}
+
+/// Execute `elegy --version`.
+///
+/// In JSON mode emits a structured envelope with version, available commands,
+/// and capability metadata for agent consumption. In text mode emits a simple
+/// version string.
+fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    let version = env!("CARGO_PKG_VERSION");
+
+    match format {
+        OutputFormat::Text => {
+            println!("elegy {version}");
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["version"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "version": version,
+                    "cliSchemaVersion": CLI_SCHEMA_VERSION,
+                    "availableCommands": [
+                        "author", "analyze", "generate", "validate", "inspect",
+                        "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
+                        "observe", "desktop", "repo", "web", "data", "notify"
+                    ],
+                    "skillDefinitionFormat": 2,
+                    "mcpHostCapable": true
+                }),
+                Vec::new(),
+            ))?;
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
 }
 
 fn execute_session_context_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
     let inspection = session_context_inspection();
     match format {
         OutputFormat::Text => print_session_context_text(&inspection),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: vec!["inspect".to_string(), "session-context".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: inspection,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Json => print_json(&build_envelope(
+            ["inspect", "session-context"],
+            "ok",
+            Summary::default(),
+            inspection,
+            Vec::new(),
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -603,7 +1387,7 @@ fn execute_validate_session_context_command(
                 diagnostics,
                 json!({ "inputPath": input.display().to_string() }),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -611,14 +1395,13 @@ fn execute_validate_session_context_command(
     let report = build_session_context_validation_report(&input, &artifact);
     match format {
         OutputFormat::Text => print_validated_session_context_text(&report),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: vec!["validate".to_string(), "session-context".to_string()],
-            status: "ok",
-            summary: Summary::default(),
-            data: report,
-            diagnostics: Vec::new(),
-        })?,
+        OutputFormat::Json => print_json(&build_envelope(
+            ["validate", "session-context"],
+            "ok",
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -634,14 +1417,13 @@ fn execute_local_init_command(
             let report = build_local_init_report(&result.paths);
             match format {
                 OutputFormat::Text => print_local_init_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "init".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "init"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -675,7 +1457,7 @@ fn execute_local_import_command(
                     "inputPath": input.display().to_string(),
                 }),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -695,14 +1477,13 @@ fn execute_local_import_command(
                     "imported local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "import".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "import"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -730,14 +1511,13 @@ fn execute_local_list_command(
             let report = build_local_list_report(&root, &options, records);
             match format {
                 OutputFormat::Text => print_local_list_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "list".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "list"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -766,14 +1546,13 @@ fn execute_local_show_command(
                     "local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "show".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "show"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -803,14 +1582,13 @@ fn execute_local_export_command(
             let report = build_local_export_report(&root, &result, &options);
             match format {
                 OutputFormat::Text => print_local_export_text(&report),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "export".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "export"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -843,14 +1621,13 @@ fn execute_local_supersede_command(
                     "superseded local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "supersede".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "supersede"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -885,14 +1662,13 @@ fn execute_local_tombstone_command(
                     "tombstoned local non-authoritative summary-only artifact",
                     &report,
                 ),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["local".to_string(), "tombstone".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: report,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["local", "tombstone"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -954,7 +1730,7 @@ fn execute_author_mcp_command(
                 vec![Diagnostic::error("CLI-AUTHOR-001", message)],
                 json!({}),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -971,14 +1747,13 @@ fn execute_author_mcp_command(
         Ok(result) => {
             match format {
                 OutputFormat::Text => print_authored_mcp_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["author".to_string(), "mcp".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["author", "mcp"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -994,14 +1769,13 @@ fn execute_analyze_mcp_command(
         Ok(analysis) => {
             match format {
                 OutputFormat::Text => print_mcp_analysis_text(&analysis),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["analyze".to_string(), "mcp".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: analysis,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["analyze", "mcp"],
+                    "ok",
+                    Summary::default(),
+                    analysis,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1019,18 +1793,43 @@ fn execute_generate_skills_command(
         Ok(result) => {
             match format {
                 OutputFormat::Text => print_generated_skills_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["generate".to_string(), "skills".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generate", "skills"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_skills_error(error, format, vec!["generate", "skills"], json!({})),
+        Err(error) => emit_tooling_error(error, format, vec!["generate", "skills"], json!({})),
+    }
+}
+
+fn execute_generate_codex_plugin_command(
+    package: PathBuf,
+    output_dir: PathBuf,
+    force: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match generate_codex_plugin_from_package_file(&package, &output_dir, force) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generate", "codex-plugin"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["generate", "codex-plugin"], json!({}))
+        }
     }
 }
 
@@ -1049,7 +1848,7 @@ fn execute_mermaid_render_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1058,14 +1857,13 @@ fn execute_mermaid_render_command(
         Ok(mermaid) => {
             match format {
                 OutputFormat::Text => println!("{mermaid}"),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "render".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_render_report(mermaid, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "render"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_render_report(mermaid, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1076,7 +1874,7 @@ fn execute_mermaid_render_command(
             mermaid_render_diagnostics(error, &input_source),
             json!({}),
             "invalid",
-            ExitCode::from(1),
+            exit_invalid(),
         ),
     }
 }
@@ -1096,7 +1894,7 @@ fn execute_mermaid_reverse_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1105,14 +1903,13 @@ fn execute_mermaid_reverse_command(
         Ok(projection) => {
             match format {
                 OutputFormat::Text => print_mermaid_projection_text(&projection),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "reverse".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_reverse_report(projection, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "reverse"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_reverse_report(projection, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1123,7 +1920,7 @@ fn execute_mermaid_reverse_command(
             mermaid_reverse_diagnostics(error, &input_source),
             json!({}),
             "invalid",
-            ExitCode::from(1),
+            exit_invalid(),
         ),
     }
 }
@@ -1143,7 +1940,7 @@ fn execute_mermaid_narrate_command(
                 mermaid_input_load_diagnostics(error),
                 json!({}),
                 "error",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     };
@@ -1158,14 +1955,13 @@ fn execute_mermaid_narrate_command(
         Ok((narrative, projection)) => {
             match format {
                 OutputFormat::Text => print_mermaid_narrative_text(&narrative),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["mermaid".to_string(), "narrate".to_string()],
-                    status: "ok",
-                    summary: Summary::default(),
-                    data: build_mermaid_narrate_report(narrative, projection, &input_source),
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["mermaid", "narrate"],
+                    "ok",
+                    Summary::default(),
+                    build_mermaid_narrate_report(narrative, projection, &input_source),
+                    Vec::new(),
+                ))?,
             }
 
             Ok(ExitCode::SUCCESS)
@@ -1186,7 +1982,7 @@ fn execute_mermaid_narrate_command(
                 diagnostics,
                 json!({}),
                 "invalid",
-                ExitCode::from(1),
+                exit_invalid(),
             )
         }
     }
@@ -1202,14 +1998,13 @@ fn execute_config_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_config_text(&inspection),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: command.into_iter().map(str::to_string).collect(),
-                    status: "ok",
+                OutputFormat::Json => print_json(&build_envelope(
+                    command,
+                    "ok",
                     summary,
-                    data: inspection,
-                    diagnostics: Vec::new(),
-                })?,
+                    inspection,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1227,14 +2022,9 @@ fn execute_runtime_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_catalog_text(&catalog),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: command.into_iter().map(str::to_string).collect(),
-                    status: "ok",
-                    summary,
-                    data: catalog,
-                    diagnostics: Vec::new(),
-                })?,
+                OutputFormat::Json => {
+                    print_json(&build_envelope(command, "ok", summary, catalog, Vec::new()))?
+                }
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1245,6 +2035,10 @@ fn execute_runtime_command(
 async fn execute_run_command(
     locator: ProjectLocator,
     dry_run: bool,
+    allow_side_effects: bool,
+    profile: Option<PathBuf>,
+    tool_timeout_seconds: u64,
+    max_tool_output_bytes: usize,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
     if !dry_run {
@@ -1259,11 +2053,42 @@ async fn execute_run_command(
                 vec![diagnostic],
                 json!({}),
                 "error",
-                ExitCode::from(2),
+                exit_runtime(),
             );
         }
 
-        return match serve_stdio(locator).await {
+        let selection = match load_agent_profile_selection(profile.as_deref()) {
+            Ok(selection) => selection,
+            Err(diagnostics) => {
+                return emit_diagnostics(
+                    format,
+                    vec!["run"],
+                    diagnostics,
+                    json!({}),
+                    "invalid",
+                    exit_invalid(),
+                );
+            }
+        };
+        if selection.has_errors() {
+            return emit_diagnostics(
+                format,
+                vec!["run"],
+                selection.error_diagnostics(),
+                json!(agent_check_data(&selection)),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+
+        let options = HostOptions {
+            allow_side_effects,
+            default_tool_timeout_seconds: tool_timeout_seconds,
+            max_tool_output_bytes,
+            allowed_tool_ids: selection.allowed_tool_ids(),
+        };
+
+        return match serve_stdio_with_options(locator, options).await {
             Ok(()) => Ok(ExitCode::SUCCESS),
             Err(HostError::Core(error)) => emit_error(error, format, vec!["run"], json!({})),
             Err(error) => emit_diagnostics(
@@ -1272,7 +2097,7 @@ async fn execute_run_command(
                 vec![Diagnostic::error("CLI-RUN-003", error.to_string())],
                 json!({}),
                 "error",
-                ExitCode::from(2),
+                exit_runtime(),
             ),
         };
     }
@@ -1295,14 +2120,13 @@ fn execute_contracts_export_command(
             let summary = Summary::default();
             match format {
                 OutputFormat::Text => print_contracts_export_text(&result),
-                OutputFormat::Json => print_json(&Envelope {
-                    schema_version: CLI_SCHEMA_VERSION,
-                    command: vec!["contracts".to_string(), "export".to_string()],
-                    status: "ok",
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["contracts", "export"],
+                    "ok",
                     summary,
-                    data: result,
-                    diagnostics: Vec::new(),
-                })?,
+                    result,
+                    Vec::new(),
+                ))?,
             }
             Ok(ExitCode::SUCCESS)
         }
@@ -1323,6 +2147,17 @@ fn load_mermaid_input(
                 .read_to_string(&mut contents)
                 .map_err(|source| MermaidInputLoadError::Stdin { source })?;
             Ok((contents, MermaidInputSource::Stdin))
+        }
+    }
+}
+
+fn read_text_input(input: Option<PathBuf>) -> std::io::Result<String> {
+    match input {
+        Some(path) => fs::read_to_string(path),
+        None => {
+            let mut contents = String::new();
+            io::stdin().read_to_string(&mut contents)?;
+            Ok(contents)
         }
     }
 }
@@ -1533,7 +2368,7 @@ fn emit_error<T: Serialize>(
         error.diagnostics().to_vec(),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1548,7 +2383,7 @@ fn emit_contracts_error(
         vec![Diagnostic::error("CLI-CONTRACTS-001", error.to_string())],
         json!({}),
         "error",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1564,12 +2399,12 @@ fn emit_mcp_error<T: Serialize>(
         mcp_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
-fn emit_skills_error<T: Serialize>(
-    error: SkillsSurfaceError,
+fn emit_tooling_error<T: Serialize>(
+    error: ToolingSurfaceError,
     format: OutputFormat,
     command: Vec<&str>,
     data: T,
@@ -1577,10 +2412,10 @@ fn emit_skills_error<T: Serialize>(
     emit_diagnostics(
         format,
         command,
-        skills_error_diagnostics(error),
+        tooling_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
 }
 
@@ -1595,14 +2430,9 @@ fn emit_diagnostics<T: Serialize>(
     let summary = summarize(&diagnostics);
     match format {
         OutputFormat::Text => print_diagnostics_text(&diagnostics),
-        OutputFormat::Json => print_json(&Envelope {
-            schema_version: CLI_SCHEMA_VERSION,
-            command: command.into_iter().map(str::to_string).collect(),
-            status,
-            summary,
-            data,
-            diagnostics,
-        })?,
+        OutputFormat::Json => {
+            print_json(&build_envelope(command, status, summary, data, diagnostics))?
+        }
     }
     Ok(exit_code)
 }
@@ -1617,6 +2447,7 @@ fn summarize(diagnostics: &[Diagnostic]) -> Summary {
             .iter()
             .filter(|diagnostic| diagnostic.severity == Severity::Warning)
             .count(),
+        ..Summary::default()
     }
 }
 
@@ -1978,8 +2809,32 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     println!("generated skills: {}", result.generated_skills.len());
     println!("skipped tools: {}", result.skipped_tools.len());
     for skill in &result.generated_skills {
-        println!("- {} ({})", skill.effective_id(), skill.effective_name());
+        let name = skill
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.display_name.as_deref())
+            .or(skill.identity.display_name.as_deref())
+            .unwrap_or(skill.identity.name.as_str());
+        println!("- {} ({})", skill.identity.name, name);
     }
+    for path in &result.written_files {
+        println!("written: {path}");
+    }
+}
+
+fn print_generated_codex_plugin_text(result: &GeneratedCodexPluginArtifacts) {
+    println!("generated Codex plugin projection");
+    println!("source: {}", result.source_package);
+    println!("plugin: {} {}", result.plugin_name, result.plugin_version);
+    println!("manifest: {}", result.emitted_components.plugin_manifest);
+    println!("skills dir: {}", result.emitted_components.skills_dir);
+    println!("skills: {}", result.emitted_components.skills_count);
+    println!("apps emitted: {}", result.emitted_components.apps_emitted);
+    println!(
+        "mcp servers emitted: {}",
+        result.emitted_components.mcp_servers_emitted
+    );
+    println!("hooks emitted: {}", result.emitted_components.hooks_emitted);
     for path in &result.written_files {
         println!("written: {path}");
     }
@@ -2186,9 +3041,9 @@ fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
     }
 }
 
-fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
+fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
     match error {
-        SkillsSurfaceError::Io {
+        ToolingSurfaceError::Io {
             operation,
             path,
             source,
@@ -2197,12 +3052,12 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
             format!("failed to {operation} {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        SkillsSurfaceError::Json { path, source } => vec![Diagnostic::error(
+        ToolingSurfaceError::Json { path, source } => vec![Diagnostic::error(
             "CLI-TOOLING-002",
             format!("failed to parse JSON in {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
-        SkillsSurfaceError::InvalidMcpDescriptor { path, issues } => issues
+        ToolingSurfaceError::InvalidMcpDescriptor { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-001", issue)
@@ -2212,7 +3067,7 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        SkillsSurfaceError::InvalidMcpAnalysis { path, issues } => issues
+        ToolingSurfaceError::InvalidMcpAnalysis { path, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-MCP-002", issue)
@@ -2222,7 +3077,7 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
-        SkillsSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
+        ToolingSurfaceError::InvalidSkillDefinition { skill_id, issues } => issues
             .into_iter()
             .map(|issue| {
                 Diagnostic::error("CLI-SKILL-001", issue)
@@ -2230,11 +3085,21 @@ fn skills_error_diagnostics(error: SkillsSurfaceError) -> Vec<Diagnostic> {
                     .with_hint("generated skill definitions must remain valid governed artifacts")
             })
             .collect(),
-        SkillsSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
+        ToolingSurfaceError::InvalidPluginPackage { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-PLUGIN-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint(
+                        "ensure the portable package matches the governed elegy-plugin-package contract",
+                    )
+            })
+            .collect(),
+        ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
         )],
-        SkillsSurfaceError::OutputExists { path } => vec![Diagnostic::error(
+        ToolingSurfaceError::OutputExists { path } => vec![Diagnostic::error(
             "CLI-OUTPUT-001",
             format!("output already exists: {}", path.display()),
         )
@@ -2255,8 +3120,96 @@ fn emit_local_store_error<T: Serialize>(
         local_store_error_diagnostics(error),
         data,
         "invalid",
-        ExitCode::from(1),
+        exit_invalid(),
     )
+}
+
+fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
+    if json {
+        OutputFormat::Json
+    } else {
+        format
+    }
+}
+
+fn resolve_correlation_id(correlation_id: Option<String>) -> String {
+    if let Some(value) = correlation_id {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let timestamp_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+
+    format!("elegy-cli-{}-{timestamp_nanos}", std::process::id())
+}
+
+fn current_machine_context() -> &'static CliMachineContext {
+    CLI_MACHINE_CONTEXT
+        .get()
+        .expect("CLI machine context should be initialized during run")
+}
+
+fn build_envelope<T, S>(
+    command: impl IntoIterator<Item = S>,
+    status: &'static str,
+    summary: Summary,
+    data: T,
+    diagnostics: Vec<Diagnostic>,
+) -> Envelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
+    build_envelope_with_schema(command, status, summary, data, diagnostics, None)
+}
+
+/// Build a CLI envelope that includes a `data_schema` annotation.
+///
+/// Identical to [`build_envelope`] but attaches an optional schema URI to the
+/// `data_schema` field so consumers can identify the shape of the `data`
+/// payload at runtime.
+fn build_envelope_with_schema<T, S>(
+    command: impl IntoIterator<Item = S>,
+    status: &'static str,
+    summary: Summary,
+    data: T,
+    diagnostics: Vec<Diagnostic>,
+    data_schema: Option<&'static str>,
+) -> Envelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
+    let context = current_machine_context();
+    let _ = context.format;
+    Envelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: context.correlation_id.clone(),
+        non_interactive: context.non_interactive,
+        command: command.into_iter().map(Into::into).collect(),
+        status,
+        summary,
+        data_schema,
+        data,
+        diagnostics,
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+fn exit_invalid() -> ExitCode {
+    ExitCode::from(EXIT_CODE_INVALID_INPUT)
+}
+
+fn exit_runtime() -> ExitCode {
+    ExitCode::from(EXIT_CODE_RUNTIME_FAILURE)
 }
 
 fn local_store_error_diagnostics(error: LocalMemoryStoreError) -> Vec<Diagnostic> {
@@ -2390,6 +3343,2832 @@ impl From<CliTransport> for McpTransportKind {
         match value {
             CliTransport::Stdio => Self::Stdio,
             CliTransport::Http => Self::Http,
+        }
+    }
+}
+
+fn load_agent_profile_selection(
+    profile_path: Option<&Path>,
+) -> Result<AgentProfileSelection, Vec<Diagnostic>> {
+    let profile = match profile_path {
+        Some(path) => {
+            let contents = fs::read_to_string(path).map_err(|source| {
+                vec![Diagnostic::error(
+                    "CLI-AGENT-001",
+                    format!("failed to read agent capability profile: {source}"),
+                )
+                .with_path(path.display().to_string())]
+            })?;
+            Some(
+                serde_json::from_str::<RegistryAgentCapabilityProfile>(&contents).map_err(
+                    |source| {
+                        vec![Diagnostic::error(
+                            "CLI-AGENT-002",
+                            format!("invalid agent capability profile JSON: {source}"),
+                        )
+                        .with_path(path.display().to_string())]
+                    },
+                )?,
+            )
+        }
+        None => None,
+    };
+
+    let registry = load_builtin_registry().map_err(|error| {
+        vec![Diagnostic::error(
+            "CLI-AGENT-010",
+            format!("failed to load built-in skill registry: {error}"),
+        )]
+    })?;
+    let selection = registry.profile_selection(profile.as_ref());
+
+    let diagnostics = selection
+        .issues
+        .iter()
+        .map(registry_issue_to_diagnostic)
+        .collect::<Vec<_>>();
+
+    Ok(AgentProfileSelection {
+        profile_path: profile_path.map(Path::to_path_buf),
+        profile: profile.map(|profile| AgentCapabilityProfile {
+            schema_version: profile.schema_version,
+            profile_id: profile.profile_id,
+            include_skills: profile.include_skills,
+            include_capabilities: profile.include_capabilities,
+            exclude_capabilities: profile.exclude_capabilities,
+            always_include_router: profile.always_include_router,
+        }),
+        selected_skill_ids: selection.selected_skill_ids,
+        selected_capability_ids: selection.selected_capability_ids,
+        total_skill_count: selection.total_skill_count,
+        total_capability_count: selection.total_capability_count,
+        diagnostics,
+    })
+}
+
+fn agent_profile_data(selection: &AgentProfileSelection) -> serde_json::Value {
+    json!({
+        "profileProvided": selection.profile.is_some(),
+        "profilePath": selection.profile_path.as_ref().map(|path| path.display().to_string()),
+        "profileId": selection.profile.as_ref().map(|profile| profile.profile_id.clone()),
+        "schemaVersion": selection.profile.as_ref().map(|profile| profile.schema_version.clone()),
+        "alwaysIncludeRouter": selection.profile.as_ref().map(|profile| profile.always_include_router).unwrap_or(true),
+        "routerAvailable": selection.router_available(),
+        "selectedSkillCount": selection.selected_skill_ids.len(),
+        "selectedCapabilityCount": selection.selected_capability_ids.len(),
+        "totalSkillCount": selection.total_skill_count,
+        "totalCapabilityCount": selection.total_capability_count
+    })
+}
+
+fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
+    filtered_agent_skill_entries(selection)
+        .into_iter()
+        .map(|skill| {
+            json!({
+                "id": skill.summary.id,
+                "name": skill.summary.name,
+                "category": skill.summary.category,
+                "capabilitiesCount": skill.summary.capabilities_count,
+                "lifecycleState": skill.summary.lifecycle_state
+            })
+        })
+        .collect()
+}
+
+fn agent_selected_capabilities_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
+    let mut capabilities = Vec::new();
+    for skill in filtered_agent_skill_entries(selection) {
+        if let Some(caps) = skill.capabilities {
+            for capability in caps {
+                capabilities.push(json!({
+                    "id": capability.id,
+                    "skillId": skill.summary.id,
+                    "name": capability.name,
+                    "hasSideEffects": capability.execution.as_ref().and_then(|execution| execution.has_side_effects).unwrap_or(false)
+                }));
+            }
+        }
+    }
+    capabilities
+}
+
+fn agent_check_data(selection: &AgentProfileSelection) -> serde_json::Value {
+    json!({
+        "valid": !selection.has_errors(),
+        "integrationVersion": AGENT_INTEGRATION_VERSION,
+        "profile": agent_profile_data(selection),
+        "selected": {
+            "skills": agent_selected_skills_data(selection),
+            "capabilities": agent_selected_capabilities_data(selection)
+        }
+    })
+}
+
+fn filtered_agent_skill_entries(selection: &AgentProfileSelection) -> Vec<RegistrySkillEntry> {
+    let registry = match load_builtin_registry() {
+        Ok(registry) => registry,
+        Err(_) => return Vec::new(),
+    };
+    let profile = selection
+        .profile
+        .as_ref()
+        .map(|profile| RegistryAgentCapabilityProfile {
+            schema_version: profile.schema_version.clone(),
+            profile_id: profile.profile_id.clone(),
+            include_skills: profile.include_skills.clone(),
+            include_capabilities: profile.include_capabilities.clone(),
+            exclude_capabilities: profile.exclude_capabilities.clone(),
+            always_include_router: profile.always_include_router,
+        });
+    let selection = registry.profile_selection(profile.as_ref());
+    registry.filtered_by_profile(&selection)
+}
+
+fn filtered_agent_skill_definitions(
+    selection: &AgentProfileSelection,
+) -> Vec<elegy_skills::SkillDefinitionV2> {
+    let registry = match load_builtin_registry() {
+        Ok(registry) => registry,
+        Err(_) => return Vec::new(),
+    };
+    let profile = selection
+        .profile
+        .as_ref()
+        .map(|profile| RegistryAgentCapabilityProfile {
+            schema_version: profile.schema_version.clone(),
+            profile_id: profile.profile_id.clone(),
+            include_skills: profile.include_skills.clone(),
+            include_capabilities: profile.include_capabilities.clone(),
+            exclude_capabilities: profile.exclude_capabilities.clone(),
+            always_include_router: profile.always_include_router,
+        });
+    let selection = registry.profile_selection(profile.as_ref());
+    registry
+        .filtered_by_profile(&selection)
+        .into_iter()
+        .filter_map(|skill| registry.skill_definition(&skill.summary.id))
+        .map(|mut definition| {
+            definition
+                .capabilities
+                .retain(|capability| selection.selected_capability_ids.contains(&capability.id));
+            definition
+        })
+        .collect()
+}
+
+fn local_match_result(
+    skill: &RegistrySkillEntry,
+    query_lower: &str,
+) -> elegy_skills::RegistrySearchMatch {
+    let mut score = 0.0;
+    let mut matched_capabilities = Vec::new();
+    let mut match_reasons = Vec::new();
+    let mut field_hits = 0u32;
+    let total_possible_fields = 5u32;
+
+    let id_lower = skill.summary.id.to_ascii_lowercase();
+    let name_lower = skill.summary.name.to_ascii_lowercase();
+    let desc_lower = skill.summary.description.to_ascii_lowercase();
+    let category_lower = skill.summary.category.to_ascii_lowercase();
+
+    if id_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-id".to_string());
+        field_hits += 1;
+    }
+    if name_lower.contains(query_lower) {
+        score += 0.9;
+        match_reasons.push("skill-name".to_string());
+        field_hits += 1;
+    }
+    if category_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.iter().any(|reason| reason == "category") {
+            match_reasons.push("category".to_string());
+        }
+    }
+    if desc_lower.contains(query_lower) {
+        score += 0.5;
+        if !match_reasons.iter().any(|reason| reason == "description") {
+            match_reasons.push("description".to_string());
+        }
+    }
+
+    let mut keyword_phrase_hit = false;
+    for keyword in &skill.trigger_keywords {
+        if keyword.to_ascii_lowercase().contains(query_lower) {
+            score += 0.8;
+            keyword_phrase_hit = true;
+            if !match_reasons
+                .iter()
+                .any(|reason| reason == "discovery-keyword")
+            {
+                match_reasons.push("discovery-keyword".to_string());
+                field_hits += 1;
+            }
+            break;
+        }
+    }
+
+    if let Some(capabilities) = &skill.capabilities {
+        for capability in capabilities {
+            let capability_id = capability.id.to_ascii_lowercase();
+            let capability_name = capability.name.to_ascii_lowercase();
+            let capability_description = capability.description.to_ascii_lowercase();
+
+            let matched = capability_id.contains(query_lower)
+                || capability_name.contains(query_lower)
+                || capability_description.contains(query_lower);
+            if matched {
+                matched_capabilities.push(capability.id.clone());
+                score += if capability_id.contains(query_lower)
+                    || capability_name.contains(query_lower)
+                {
+                    1.0
+                } else {
+                    0.5
+                };
+                if !match_reasons.iter().any(|reason| reason == "capability") {
+                    match_reasons.push("capability".to_string());
+                    field_hits += 1;
+                }
+            }
+        }
+    }
+
+    let query_tokens = query_lower.split_whitespace().collect::<Vec<_>>();
+    if query_tokens.len() > 1 {
+        let mut token_hits = 0u32;
+        for token in &query_tokens {
+            if id_lower.contains(token) || name_lower.contains(token) {
+                token_hits += 1;
+            } else if keyword_phrase_hit {
+            } else if desc_lower.contains(token) || category_lower.contains(token) {
+                token_hits += 1;
+            }
+        }
+        score += (token_hits as f64 / query_tokens.len() as f64) * 0.3;
+    }
+
+    let normalized = if score > 0.0 {
+        let field_coverage = field_hits as f64 / total_possible_fields as f64;
+        let raw = (score / 3.0).min(1.0);
+        (raw * 0.7 + field_coverage * 0.3).min(1.0)
+    } else {
+        0.0
+    };
+
+    elegy_skills::RegistrySearchMatch {
+        matched: score > 0.0,
+        score: (normalized * 100.0).round() / 100.0,
+        matched_capabilities,
+        match_reasons,
+    }
+}
+
+fn registry_issue_to_diagnostic(issue: &elegy_skills::RegistryValidationIssue) -> Diagnostic {
+    let code = match issue.code.as_str() {
+        "REGISTRY-PROFILE-E001" => "CLI-AGENT-003",
+        "REGISTRY-PROFILE-E002" => "CLI-AGENT-004",
+        "REGISTRY-PROFILE-E003" => "CLI-AGENT-005",
+        "REGISTRY-PROFILE-E004" => "CLI-AGENT-006",
+        "REGISTRY-PROFILE-W001" => "CLI-AGENT-007",
+        _ => issue.code.as_str(),
+    };
+    let mut diagnostic = Diagnostic::error(code, issue.message.clone());
+    if issue.code.contains("-W") {
+        diagnostic.severity = Severity::Warning;
+    }
+    if let Some(path) = &issue.path {
+        diagnostic = diagnostic.with_path(path.clone());
+    }
+    if let Some(skill_id) = &issue.skill_id {
+        diagnostic = diagnostic.with_field(skill_id.clone());
+    }
+    diagnostic
+}
+
+fn agent_discovery_entry(
+    skill: &RegistrySkillEntry,
+    detail: bool,
+    profile_path: Option<&Path>,
+) -> serde_json::Value {
+    let mut expand_command_args = vec![
+        "agent".to_string(),
+        "discover".to_string(),
+        "--query".to_string(),
+        skill.summary.id.clone(),
+        "--detail".to_string(),
+        "--json".to_string(),
+    ];
+    if let Some(profile_path) = profile_path {
+        expand_command_args.push("--profile".to_string());
+        expand_command_args.push(profile_path.display().to_string());
+    }
+    let expand_command = format!("elegy {}", expand_command_args.join(" "));
+
+    let mut entry = json!({
+        "id": skill.summary.id,
+        "name": skill.summary.name,
+        "description": skill.summary.description,
+        "category": skill.summary.category,
+        "capabilitiesCount": skill.summary.capabilities_count,
+        "lifecycleState": skill.summary.lifecycle_state,
+        "expandCommand": expand_command,
+        "expandCommandArgs": expand_command_args
+    });
+
+    if let Some(match_result) = &skill.match_result {
+        entry["matchedCapabilities"] = json!(match_result.matched_capabilities);
+        entry["matchReasons"] = json!(match_result.match_reasons);
+        entry["matchScore"] = json!(match_result.score);
+        entry["triggerKeywords"] = json!(skill.trigger_keywords);
+    }
+    if detail {
+        entry["capabilities"] = json!(skill.capabilities.clone().unwrap_or_default());
+    }
+    entry
+}
+
+fn agent_discovery_detail_entry_from_definition(
+    definition: &elegy_skills::SkillDefinitionV2,
+    profile_path: Option<&Path>,
+    match_result: Option<&elegy_skills::RegistrySearchMatch>,
+) -> serde_json::Value {
+    let summary = json!({
+        "id": definition.identity.name,
+        "name": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.display_name.as_deref())
+            .or(definition.identity.display_name.as_deref())
+            .unwrap_or(definition.identity.name.as_str()),
+        "description": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.summary.as_deref())
+            .or(definition.metadata.as_ref().and_then(|metadata| metadata.description.as_deref()))
+            .unwrap_or(""),
+        "category": definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.category.as_deref())
+            .unwrap_or(""),
+        "capabilitiesCount": definition.capabilities.len(),
+        "lifecycleState": definition.lifecycle_state,
+    });
+    let skill = RegistrySkillEntry {
+        summary: elegy_skills::RegistrySkillSummary {
+            id: definition.identity.name.clone(),
+            name: summary["name"].as_str().unwrap_or_default().to_string(),
+            description: summary["description"]
+                .as_str()
+                .unwrap_or_default()
+                .to_string(),
+            category: summary["category"].as_str().unwrap_or_default().to_string(),
+            aliases: definition.identity.aliases.clone(),
+            capabilities_count: definition.capabilities.len(),
+            lifecycle_state: definition.lifecycle_state.clone(),
+        },
+        trigger_keywords: definition
+            .discovery
+            .as_ref()
+            .map(|discovery| discovery.keywords.clone())
+            .unwrap_or_default(),
+        capability_hints: definition
+            .discovery
+            .as_ref()
+            .map(|discovery| discovery.capability_hints.clone())
+            .unwrap_or_default(),
+        context_cost_estimate: None,
+        capabilities: None,
+        match_result: match_result.cloned(),
+    };
+    let mut entry = agent_discovery_entry(&skill, false, profile_path);
+    entry["capabilities"] =
+        serde_json::to_value(&definition.capabilities).unwrap_or_else(|_| json!([]));
+    entry
+}
+
+/// Execute `elegy skills list`.
+fn execute_skills_list_command(
+    category: Option<String>,
+    lifecycle: Option<String>,
+    detail: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let entries = registry.list(&SkillRegistryQuery {
+        category,
+        lifecycle,
+        include_detail: detail,
+    });
+
+    match format {
+        OutputFormat::Text => print_skill_list_text(&entries),
+        OutputFormat::Json => {
+            let disclosure = if detail { "detail" } else { "index" };
+            print_json(&build_envelope_with_schema(
+                ["skills", "list"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "skills": entries,
+                    "disclosureLevel": disclosure,
+                    "totalCount": entries.len()
+                }),
+                Vec::new(),
+                Some("elegy://schemas/skill-list"),
+            ))?;
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Execute `elegy skills describe`.
+fn execute_skills_describe_command(
+    skill_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    if let Some(definition) = registry.skill_definition(&skill_id) {
+        match format {
+            OutputFormat::Text => print_skill_definition_text(&definition),
+            OutputFormat::Json => print_json(&build_envelope_with_schema(
+                ["skills", "describe"],
+                "ok",
+                Summary::default(),
+                &definition,
+                Vec::new(),
+                Some("elegy://schemas/skill-definition-v2"),
+            ))?,
+        }
+        return Ok(ExitCode::SUCCESS);
+    }
+
+    emit_diagnostics(
+        format,
+        vec!["skills", "describe"],
+        vec![Diagnostic::error(
+            "CLI-SKILLS-001",
+            format!("skill '{skill_id}' not found"),
+        )],
+        json!({}),
+        "not_found",
+        exit_invalid(),
+    )
+}
+
+/// Execute `elegy skills search`.
+fn execute_skills_search_command(
+    query: String,
+    detail: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let results = registry.search(&query, detail);
+
+    match format {
+        OutputFormat::Text => print_skill_search_text(&query, &results),
+        OutputFormat::Json => {
+            let disclosure = if detail { "detail" } else { "index" };
+            print_json(&build_envelope_with_schema(
+                ["skills", "search"],
+                "ok",
+                Summary::default(),
+                json!({
+                    "query": query,
+                    "results": results,
+                    "disclosureLevel": disclosure,
+                    "totalResults": results.len()
+                }),
+                Vec::new(),
+                Some("elegy://schemas/skill-search"),
+            ))?;
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_resolve_command(
+    query: String,
+    detail: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let result = registry.resolve(&query, detail);
+
+    match format {
+        OutputFormat::Text => print_skill_resolve_text(&result.top_skill, &result.top_capability),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "resolve"],
+            "ok",
+            Summary::default(),
+            &result,
+            Vec::new(),
+            Some("elegy://schemas/skill-search"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_get_command(
+    skill_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    execute_skills_describe_command(skill_id, format)
+}
+
+fn execute_skills_capability_command(
+    capability_id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let registry = load_builtin_registry()?;
+    let Some(capability) = registry.capability(&capability_id) else {
+        return emit_diagnostics(
+            format,
+            vec!["skills", "capability"],
+            vec![Diagnostic::error(
+                "CLI-SKILLS-002",
+                format!("capability '{capability_id}' not found"),
+            )],
+            json!({}),
+            "not_found",
+            exit_invalid(),
+        );
+    };
+
+    match format {
+        OutputFormat::Text => print_capability_card_text(&capability),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "capability"],
+            "ok",
+            Summary::default(),
+            &capability,
+            Vec::new(),
+            Some("elegy://schemas/capability-definition"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_skills_validate_command(
+    file: Option<PathBuf>,
+    dir: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let report = match (file, dir) {
+        (Some(file), None) => elegy_skills::validate_skill_file(&file)
+            .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))?,
+        (None, Some(dir)) => elegy_skills::validate_skill_directory(&dir)
+            .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))?,
+        _ => {
+            return emit_diagnostics(
+                format,
+                vec!["skills", "validate"],
+                vec![Diagnostic::error(
+                    "CLI-SKILLS-003",
+                    "pass exactly one of --file or --dir",
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            )
+        }
+    };
+
+    let status = if report.valid { "ok" } else { "invalid" };
+    let exit_code = if report.valid {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+
+    match format {
+        OutputFormat::Text => {
+            if report.valid {
+                println!("skill registry input is valid");
+            } else {
+                println!("skill registry input is invalid");
+                for issue in &report.issues {
+                    println!("- {}", issue.message);
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["skills", "validate"],
+            status,
+            Summary::default(),
+            report,
+            Vec::new(),
+            Some("elegy://schemas/skill-discovery-result"),
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn load_builtin_registry() -> Result<SkillRegistry, serde_json::Error> {
+    SkillRegistry::builtin()
+        .map_err(|error| <serde_json::Error as serde::de::Error>::custom(error.to_string()))
+}
+
+fn print_skill_list_text(entries: &[RegistrySkillEntry]) {
+    if entries.is_empty() {
+        println!("No skills found matching the given filters.");
+        return;
+    }
+
+    println!("{:<16} {:<32} {:<6} STATE", "ID", "NAME", "CAPS");
+    println!("{}", "-".repeat(70));
+    for entry in entries {
+        println!(
+            "{:<16} {:<32} {:<6} {}",
+            entry.summary.id,
+            entry.summary.name,
+            entry.summary.capabilities_count,
+            entry.summary.lifecycle_state
+        );
+    }
+}
+
+fn print_skill_definition_text(definition: &elegy_skills::SkillDefinitionV2) {
+    let name = definition
+        .metadata
+        .as_ref()
+        .and_then(|metadata| metadata.display_name.as_deref())
+        .or(definition.identity.display_name.as_deref())
+        .unwrap_or(definition.identity.name.as_str());
+    println!("Skill: {} ({})", name, definition.identity.name);
+    println!(
+        "Category: {}",
+        definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.category.as_deref())
+            .unwrap_or("")
+    );
+    println!("State: {}", definition.lifecycle_state);
+    println!(
+        "Description: {}",
+        definition
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.summary.as_deref())
+            .or(definition
+                .metadata
+                .as_ref()
+                .and_then(|metadata| metadata.description.as_deref()))
+            .unwrap_or("")
+    );
+    println!();
+    println!("Capabilities ({}):", definition.capabilities.len());
+    for capability in &definition.capabilities {
+        println!(
+            "  - {} ({}): {}",
+            capability.name, capability.id, capability.description
+        );
+    }
+}
+
+fn print_skill_search_text(query: &str, results: &[RegistrySkillEntry]) {
+    if results.is_empty() {
+        println!("No skills matched query: \"{query}\"");
+        return;
+    }
+
+    println!("Skills matching \"{query}\":");
+    println!();
+    println!("{:<16} {:<32} {:<6} MATCHED", "ID", "NAME", "SCORE");
+    println!("{}", "-".repeat(72));
+    for result in results {
+        let match_result = result.match_result.as_ref();
+        println!(
+            "{:<16} {:<32} {:<6.2} {}",
+            result.summary.id,
+            result.summary.name,
+            match_result
+                .map(|match_result| match_result.score)
+                .unwrap_or(0.0),
+            match_result
+                .map(|match_result| match_result.match_reasons.join(", "))
+                .unwrap_or_default()
+        );
+    }
+}
+
+fn print_skill_resolve_text(
+    top_skill: &Option<RegistrySkillEntry>,
+    top_capability: &Option<RegistryCapabilityCard>,
+) {
+    let Some(skill) = top_skill else {
+        println!("No matching skills found.");
+        return;
+    };
+
+    println!("Top skill: {} ({})", skill.summary.name, skill.summary.id);
+    if let Some(capability) = top_capability {
+        println!(
+            "Top capability: {} ({})",
+            capability.capability_name, capability.capability_id
+        );
+    }
+}
+
+fn print_capability_card_text(capability: &RegistryCapabilityCard) {
+    println!(
+        "Capability: {} ({})",
+        capability.capability_name, capability.capability_id
+    );
+    println!("Skill: {} ({})", capability.skill_name, capability.skill_id);
+    println!("Side effects: {}", capability.has_side_effects);
+    println!("Deterministic: {}", capability.is_deterministic);
+    println!("Approval: {}", capability.approval_requirement);
+}
+
+fn execute_agent_manifest_command(
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "manifest"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    if selection.has_errors() {
+        return emit_diagnostics(
+            format,
+            vec!["agent", "manifest"],
+            selection.error_diagnostics(),
+            agent_check_data(&selection),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    let diagnostics = selection.diagnostics.clone();
+    let summary = summarize(&diagnostics);
+    let data = json!({
+        "integrationVersion": AGENT_INTEGRATION_VERSION,
+        "elegyVersion": env!("CARGO_PKG_VERSION"),
+        "cliSchemaVersion": CLI_SCHEMA_VERSION,
+        "profile": agent_profile_data(&selection),
+        "contracts": {
+            "skillDefinition": "2.0.0",
+            "agentCapabilityProfile": AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+            "machineEnvelope": CLI_SCHEMA_VERSION
+        },
+        "discovery": {
+            "authority": "governed skill definitions",
+            "defaultCommand": "elegy agent discover --json",
+            "queryCommand": "elegy agent discover --query <task> --json",
+            "detailCommand": "elegy agent discover --query <task> --detail --json",
+            "profileFlag": "--profile <path>"
+        },
+        "invocation": {
+            "defaultPath": "cli",
+            "templateSource": "agent discover --detail data.results[].capabilities[].implementation.arguments",
+            "sideEffectPolicy": "profile selection makes capabilities visible; hosts still approve side-effecting execution"
+        },
+        "mcp": {
+            "optional": true,
+            "startupCommand": profile.as_ref().map(|path| format!("elegy run --profile {}", path.display())).unwrap_or_else(|| "elegy run".to_string()),
+            "role": "optional projection for MCP-native clients"
+        },
+        "selected": {
+            "skills": agent_selected_skills_data(&selection),
+            "capabilities": agent_selected_capabilities_data(&selection)
+        }
+    });
+
+    match format {
+        OutputFormat::Text => {
+            println!("Elegy agent integration manifest");
+            println!("version: {}", env!("CARGO_PKG_VERSION"));
+            println!(
+                "selected: {} skill(s), {} capability(ies)",
+                selection.selected_skill_ids.len(),
+                selection.selected_capability_ids.len()
+            );
+            println!("discover: elegy agent discover --query <task> --json");
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "manifest"],
+            "ok",
+            summary,
+            data,
+            diagnostics,
+            Some("elegy://schemas/agent-manifest"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_agent_check_command(
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "check"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    let status = if selection.has_errors() {
+        "invalid"
+    } else {
+        "ok"
+    };
+    let exit_code = if selection.has_errors() {
+        exit_invalid()
+    } else {
+        ExitCode::SUCCESS
+    };
+
+    match format {
+        OutputFormat::Text => {
+            if selection.diagnostics.is_empty() {
+                println!("agent integration profile is valid");
+            } else {
+                print_diagnostics_text(&selection.diagnostics);
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "check"],
+            status,
+            summarize(&selection.diagnostics),
+            agent_check_data(&selection),
+            selection.diagnostics,
+            Some("elegy://schemas/agent-check"),
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn execute_agent_discover_command(
+    query: Option<String>,
+    detail: bool,
+    profile: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let selection = match load_agent_profile_selection(profile.as_deref()) {
+        Ok(selection) => selection,
+        Err(diagnostics) => {
+            return emit_diagnostics(
+                format,
+                vec!["agent", "discover"],
+                diagnostics,
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+    if selection.has_errors() {
+        return emit_diagnostics(
+            format,
+            vec!["agent", "discover"],
+            selection.error_diagnostics(),
+            agent_check_data(&selection),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    let filtered_skills = filtered_agent_skill_entries(&selection);
+    let filtered_definitions = filtered_agent_skill_definitions(&selection);
+    let entries = if let Some(query) = &query {
+        let query_lower = query.to_ascii_lowercase();
+        let mut ranked = filtered_skills
+            .into_iter()
+            .filter_map(|mut skill| {
+                let match_result = local_match_result(&skill, &query_lower);
+                if match_result.matched {
+                    let definition = filtered_definitions
+                        .iter()
+                        .find(|definition| definition.identity.name == skill.summary.id);
+                    skill.match_result = Some(match_result.clone());
+                    Some(if detail {
+                        definition
+                            .map(|definition| {
+                                agent_discovery_detail_entry_from_definition(
+                                    definition,
+                                    profile.as_deref(),
+                                    Some(&match_result),
+                                )
+                            })
+                            .unwrap_or_else(|| {
+                                agent_discovery_entry(&skill, detail, profile.as_deref())
+                            })
+                    } else {
+                        agent_discovery_entry(&skill, detail, profile.as_deref())
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        ranked.sort_by(|a, b| {
+            let a_score = a
+                .get("matchScore")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.0);
+            let b_score = b
+                .get("matchScore")
+                .and_then(|value| value.as_f64())
+                .unwrap_or(0.0);
+            b_score
+                .partial_cmp(&a_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        ranked
+    } else {
+        filtered_skills
+            .iter()
+            .map(|skill| {
+                if detail {
+                    filtered_definitions
+                        .iter()
+                        .find(|definition| definition.identity.name == skill.summary.id)
+                        .map(|definition| {
+                            agent_discovery_detail_entry_from_definition(
+                                definition,
+                                profile.as_deref(),
+                                skill.match_result.as_ref(),
+                            )
+                        })
+                        .unwrap_or_else(|| agent_discovery_entry(skill, detail, profile.as_deref()))
+                } else {
+                    agent_discovery_entry(skill, detail, profile.as_deref())
+                }
+            })
+            .collect::<Vec<_>>()
+    };
+
+    let diagnostics = selection.diagnostics.clone();
+    let total_results = entries.len();
+    let data = json!({
+        "query": query,
+        "disclosureLevel": if detail { "detail" } else { "index" },
+        "profile": agent_profile_data(&selection),
+        "results": entries,
+        "totalResults": total_results
+    });
+
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "{} result(s) at {} disclosure",
+                total_results,
+                if detail { "detail" } else { "index" }
+            );
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["agent", "discover"],
+            "ok",
+            summarize(&diagnostics),
+            data,
+            diagnostics,
+            Some("elegy://schemas/agent-discovery"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_diagram_create_command(
+    diagram_type: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let diagram = CanonicalDiagram {
+        diagram_type,
+        version: 1,
+        nodes: Vec::new(),
+        edges: Vec::new(),
+        groups: Vec::new(),
+    };
+
+    match format {
+        OutputFormat::Text => println!("Created empty diagram of type: {}", diagram.diagram_type),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["diagram", "create"],
+            "ok",
+            Summary::default(),
+            &diagram,
+            Vec::new(),
+            Some("elegy://schemas/canonical-diagram"),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Source of a diagram input: either a file path or stdin.
+#[allow(dead_code)]
+enum DiagramInputSource {
+    /// Diagram loaded from a file.
+    File(PathBuf),
+    /// Diagram loaded from stdin.
+    Stdin,
+}
+
+/// Load diagram JSON content from a file path or stdin.
+///
+/// Returns the raw content string and the source indicator on success,
+/// or a diagnostic vector and source indicator on failure.
+fn load_diagram_input(
+    input: Option<PathBuf>,
+) -> Result<(String, DiagramInputSource), (Vec<Diagnostic>, DiagramInputSource)> {
+    match input {
+        Some(path) => match fs::read_to_string(&path) {
+            Ok(contents) => Ok((contents, DiagramInputSource::File(path))),
+            Err(e) => Err((
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-001",
+                    format!("failed to read diagram file {}: {e}", path.display()),
+                )
+                .with_path(path.display().to_string())],
+                DiagramInputSource::File(path),
+            )),
+        },
+        None => {
+            let mut contents = String::new();
+            match io::stdin().read_to_string(&mut contents) {
+                Ok(_) => Ok((contents, DiagramInputSource::Stdin)),
+                Err(e) => Err((
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-001",
+                        format!("failed to read diagram from stdin: {e}"),
+                    )
+                    .with_path("<stdin>".to_string())],
+                    DiagramInputSource::Stdin,
+                )),
+            }
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_diagram_patch_command(
+    input: PathBuf,
+    patch_stdin: bool,
+    add_node: Option<String>,
+    add_edge: Option<String>,
+    remove_node: Option<String>,
+    remove_edge: Option<String>,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["diagram", "patch"];
+
+    let content = match std::fs::read_to_string(&input) {
+        Ok(c) => c,
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-001",
+                    format!("failed to read diagram file {}: {e}", input.display()),
+                )
+                .with_path(input.display().to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
+    };
+    let mut diagram: CanonicalDiagram = match serde_json::from_str(&content) {
+        Ok(d) => d,
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON from {}: {e}", input.display()),
+                )
+                .with_path(input.display().to_string())],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+
+    let patch = if patch_stdin {
+        let mut stdin_content = String::new();
+        if let Err(e) = io::stdin().read_to_string(&mut stdin_content) {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-003",
+                    format!("failed to read DiagramPatch from stdin: {e}"),
+                )
+                .with_path("<stdin>".to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
+        match serde_json::from_str::<DiagramPatch>(&stdin_content) {
+            Ok(p) => p,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-004",
+                        format!("failed to parse DiagramPatch JSON from stdin: {e}"),
+                    )
+                    .with_path("<stdin>".to_string())],
+                    json!({}),
+                    "invalid",
+                    exit_invalid(),
+                );
+            }
+        }
+    } else {
+        let mut patch = DiagramPatch::default();
+        if let Some(id) = remove_node {
+            patch.remove_node_ids.push(id);
+        }
+        if let Some(id) = remove_edge {
+            patch.remove_edge_ids.push(id);
+        }
+        if let Some(n) = add_node {
+            let parts: Vec<&str> = n.split(',').collect();
+            if parts.len() >= 2 {
+                patch.add_nodes.push(DiagramNode {
+                    id: parts[0].to_string(),
+                    label: parts[1].to_string(),
+                    concept_type: parts.get(2).map(|s| s.to_string()),
+                    properties: Default::default(),
+                });
+            }
+        }
+        if let Some(e) = add_edge {
+            let parts: Vec<&str> = e.split(',').collect();
+            if parts.len() >= 3 {
+                patch.add_edges.push(DiagramEdge {
+                    id: parts[0].to_string(),
+                    source_id: parts[1].to_string(),
+                    target_id: parts[2].to_string(),
+                    label: parts.get(3).map(|s| s.to_string()),
+                    relationship_type: None,
+                    properties: Default::default(),
+                });
+            }
+        }
+        patch
+    };
+
+    diagram.apply_patch(patch);
+
+    if let Err(e) = diagram.validate() {
+        return emit_diagnostics(
+            format,
+            command,
+            vec![Diagnostic::error(
+                "CLI-DIAGRAM-005",
+                format!("patch resulted in invalid diagram: {e}"),
+            )],
+            json!({}),
+            "invalid",
+            exit_invalid(),
+        );
+    }
+
+    // Write to output file if specified
+    if let Some(output_path) = &output {
+        let json_output = match serde_json::to_string_pretty(&diagram) {
+            Ok(s) => s,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-006",
+                        format!("failed to serialize patched diagram: {e}"),
+                    )],
+                    json!({}),
+                    "error",
+                    exit_invalid(),
+                );
+            }
+        };
+        if let Err(e) = std::fs::write(output_path, &json_output) {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-007",
+                    format!(
+                        "failed to write patched diagram to {}: {e}",
+                        output_path.display()
+                    ),
+                )
+                .with_path(output_path.display().to_string())],
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
+    }
+
+    match format {
+        OutputFormat::Text => {
+            if output.is_some() {
+                println!("Diagram patched and written to output file.");
+            } else {
+                println!("Diagram patched successfully.");
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["diagram", "patch"],
+            "ok",
+            Summary::default(),
+            &diagram,
+            Vec::new(),
+            Some("elegy://schemas/canonical-diagram"),
+        ))?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_diagram_narrate_command(
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["diagram", "narrate"];
+    let (content, _source) = match load_diagram_input(input) {
+        Ok(result) => result,
+        Err((diagnostics, _)) => {
+            return emit_diagnostics(
+                format,
+                command,
+                diagnostics,
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
+    };
+    let diagram: CanonicalDiagram = match serde_json::from_str(&content) {
+        Ok(d) => d,
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON: {e}"),
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+
+    let narrative = diagram.narrate_diagram();
+
+    match format {
+        OutputFormat::Text => println!("{narrative}"),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["diagram", "narrate"],
+            "ok",
+            Summary::default(),
+            json!({ "narrative": narrative }),
+            Vec::new(),
+            Some("elegy://schemas/diagram-narrative"),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_diagram_render_command(
+    input: Option<PathBuf>,
+    render_format: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let command = vec!["diagram", "render"];
+    let (content, _source) = match load_diagram_input(input) {
+        Ok(result) => result,
+        Err((diagnostics, _)) => {
+            return emit_diagnostics(
+                format,
+                command,
+                diagnostics,
+                json!({}),
+                "error",
+                exit_invalid(),
+            );
+        }
+    };
+    let diagram: CanonicalDiagram = match serde_json::from_str(&content) {
+        Ok(d) => d,
+        Err(e) => {
+            return emit_diagnostics(
+                format,
+                command,
+                vec![Diagnostic::error(
+                    "CLI-DIAGRAM-002",
+                    format!("failed to parse diagram JSON: {e}"),
+                )],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            );
+        }
+    };
+
+    let rendered = if render_format == "mermaid" {
+        diagram.render_mermaid()
+    } else {
+        match serde_json::to_string_pretty(&diagram) {
+            Ok(s) => s,
+            Err(e) => {
+                return emit_diagnostics(
+                    format,
+                    command,
+                    vec![Diagnostic::error(
+                        "CLI-DIAGRAM-008",
+                        format!("failed to serialize diagram: {e}"),
+                    )],
+                    json!({}),
+                    "error",
+                    exit_invalid(),
+                );
+            }
+        }
+    };
+
+    match format {
+        OutputFormat::Text => println!("{rendered}"),
+        OutputFormat::Json => print_json(&build_envelope_with_schema(
+            ["diagram", "render"],
+            "ok",
+            Summary::default(),
+            json!({ "rendered": rendered, "format": render_format }),
+            Vec::new(),
+            Some("elegy://schemas/diagram-render"),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+// ---------------------------------------------------------------------------
+// Repo/web/data/notify command executors
+// ---------------------------------------------------------------------------
+
+fn execute_repo_status_command(
+    repo: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_repo::status(repo.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Repository: {}", result.repo_root);
+                    println!(
+                        "Branch: {}",
+                        result.current_branch.as_deref().unwrap_or("(detached)")
+                    );
+                    if let Some(upstream) = &result.upstream {
+                        println!(
+                            "Upstream: {upstream} (ahead {}, behind {})",
+                            result.ahead, result.behind
+                        );
+                    }
+                    println!(
+                        "Changes: {} staged, {} unstaged, {} untracked",
+                        result.staged_count, result.unstaged_count, result.untracked_count
+                    );
+                    for entry in &result.entries {
+                        println!(
+                            "  {}{} {}",
+                            entry.index_status, entry.worktree_status, entry.path
+                        );
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "status"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "status"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_repo_diff_command(
+    repo: Option<PathBuf>,
+    base: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_repo::diff_summary(repo.as_deref(), base.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Diff against {}", result.compared_against);
+                    println!(
+                        "Files changed: {} (+{}, -{})",
+                        result.files_changed, result.insertions, result.deletions
+                    );
+                    for file in &result.files {
+                        println!(
+                            "  {} (+{}, -{})",
+                            file.path, file.insertions, file.deletions
+                        );
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "diff"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "diff"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_repo_branches_command(
+    repo: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_repo::branches(repo.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Current branch: {}",
+                        result.current_branch.as_deref().unwrap_or("(detached)")
+                    );
+                    for branch in &result.branches {
+                        let marker = if branch.is_current { "*" } else { " " };
+                        match &branch.upstream {
+                            Some(upstream) => println!("  {marker} {} -> {upstream}", branch.name),
+                            None => println!("  {marker} {}", branch.name),
+                        }
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "branches"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "branches"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_repo_log_command(
+    repo: Option<PathBuf>,
+    count: u32,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_repo::log(repo.as_deref(), count) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Commits returned: {}", result.commits.len());
+                    for commit in &result.commits {
+                        println!(
+                            "  {} {} ({}, {})",
+                            commit.short_hash,
+                            commit.subject,
+                            commit.author_name,
+                            commit.committed_at_utc
+                        );
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "log"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["repo", "log"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_web_fetch_command(
+    url: String,
+    method: String,
+    header: Vec<String>,
+    body: Option<String>,
+    extract: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let request = elegy_web::FetchRequest {
+        url,
+        method,
+        headers: header,
+        body,
+        extract,
+    };
+
+    match elegy_web::fetch(request) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("{} {} -> {}", result.method, result.url, result.status);
+                    if let Some(content_type) = &result.content_type {
+                        println!("Content-Type: {content_type}");
+                    }
+                    if let Some(extracted) = &result.extracted {
+                        println!("{}", serde_json::to_string_pretty(extracted)?);
+                    } else if let Some(body_text) = &result.body_text {
+                        println!("{}", truncate_for_preview(body_text));
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["web", "fetch"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["web", "fetch"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_web_ping_command(
+    url: String,
+    timeout_seconds: u64,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_web::ping(&url, timeout_seconds) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "{} is reachable in {} ms{}",
+                        result.url,
+                        result.elapsed_ms,
+                        result
+                            .status
+                            .map(|status| format!(" (status {status})"))
+                            .unwrap_or_default()
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["web", "ping"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["web", "ping"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_data_convert_command(
+    from: String,
+    to: String,
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let input_text = match read_text_input(input) {
+        Ok(contents) => contents,
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "convert"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_runtime());
+        }
+    };
+
+    match elegy_data::convert(&input_text, &from, &to) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Converted {from} -> {to}");
+                    println!("{}", result.output);
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "convert"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "convert"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_data_extract_command(
+    query: String,
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let input_text = match read_text_input(input) {
+        Ok(contents) => contents,
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "extract"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_runtime());
+        }
+    };
+
+    match elegy_data::extract(&input_text, &query) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Extracted {} ({:?})",
+                        result.normalized_query, result.query_kind
+                    );
+                    println!("{}", serde_json::to_string_pretty(&result.value)?);
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "extract"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "extract"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_data_validate_command(
+    schema: PathBuf,
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let schema_json = match fs::read_to_string(&schema) {
+        Ok(contents) => contents,
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "validate"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_runtime());
+        }
+    };
+    let input_json = match read_text_input(input) {
+        Ok(contents) => contents,
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "validate"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_runtime());
+        }
+    };
+
+    match elegy_data::validate(&schema_json, &input_json) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    if result.valid {
+                        println!("JSON is valid against {}", schema.display());
+                    } else {
+                        println!("JSON is invalid against {}", schema.display());
+                        for error in &result.errors {
+                            println!("  - {error}");
+                        }
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "validate"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["data", "validate"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_notify_toast_command(
+    title: String,
+    body: String,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_notify::toast(&title, &body) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Toast delivered on {}: {}", result.platform, result.title);
+                    println!("{}", result.body);
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["notify", "toast"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["notify", "toast"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn execute_notify_webhook_command(
+    url: String,
+    payload: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_notify::webhook(&url, payload.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Webhook {} -> {} (ok={})",
+                        result.url, result.status, result.ok
+                    );
+                    if let Some(response_text) = &result.response_text {
+                        println!("{}", truncate_for_preview(response_text));
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["notify", "webhook"],
+                        "ok",
+                        Summary::default(),
+                        result,
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["notify", "webhook"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Observe command executors
+// ---------------------------------------------------------------------------
+
+fn execute_observe_processes_command(
+    filter: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let snap = snapshot_processes(filter.as_deref());
+    match format {
+        OutputFormat::Text => {
+            println!("Processes snapshot ({} found):", snap.processes.len());
+            for p in &snap.processes {
+                println!(
+                    "  [{}] {} — {:.1} MB, {:.1}% CPU",
+                    p.pid, p.name, p.memory_mb, p.cpu_percent
+                );
+            }
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["observe", "processes"],
+                "ok",
+                Summary::default(),
+                json!(snap),
+                Vec::new(),
+            ))?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_observe_window_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    match foreground_window() {
+        Ok(info) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Foreground window: \"{}\" (PID {})",
+                        info.title, info.process_id
+                    );
+                    println!(
+                        "  Bounds: {}x{} at ({}, {})",
+                        info.bounds.width, info.bounds.height, info.bounds.x, info.bounds.y
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "window"],
+                        "ok",
+                        Summary::default(),
+                        json!({ "foregroundWindow": info }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "window"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_windows_command(
+    filter: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match list_windows(filter.as_deref()) {
+        Ok(windows) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Visible windows ({} found):", windows.len());
+                    for w in &windows {
+                        println!(
+                            "  [PID {}] \"{}\" — {}x{}",
+                            w.process_id, w.title, w.bounds.width, w.bounds.height
+                        );
+                    }
+                }
+                OutputFormat::Json => {
+                    let count = windows.len();
+                    print_json(&build_envelope(
+                        ["observe", "windows"],
+                        "ok",
+                        Summary::default(),
+                        json!({ "windows": windows, "count": count }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "windows"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_screen_command(
+    monitor: Option<u32>,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match capture_screen(monitor, output.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Screen captured: {}x{} (monitor {})",
+                        result.width, result.height, result.monitor
+                    );
+                    if let Some(ref path) = result.output_path {
+                        println!("  Saved to: {path}");
+                    } else {
+                        println!("  (base64 PNG in JSON output; use --json to retrieve)");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "screen"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "screen"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_clipboard_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    match read_clipboard() {
+        Ok(contents) => {
+            match format {
+                OutputFormat::Text => {
+                    if let Some(ref text) = contents.text {
+                        let preview = if text.len() > 200 {
+                            &text[..200]
+                        } else {
+                            text.as_str()
+                        };
+                        println!("Clipboard text: {preview}");
+                    } else {
+                        println!("Clipboard: (no text content)");
+                    }
+                    if contents.has_image {
+                        println!("  (clipboard also contains an image)");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "clipboard"],
+                        "ok",
+                        Summary::default(),
+                        json!(contents),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "clipboard"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_filesystem_command(
+    path: PathBuf,
+    timeout_seconds: u64,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let timeout = std::time::Duration::from_secs(timeout_seconds);
+    match observe_filesystem(&path, timeout) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Filesystem observation of \"{}\" for {}s:",
+                        result.watched_path, result.duration_seconds
+                    );
+                    if result.changes.is_empty() {
+                        println!("  No changes detected.");
+                    } else {
+                        for c in &result.changes {
+                            println!("  [{}] {}", c.change_type, c.path);
+                        }
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "filesystem"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => {
+                    eprintln!("Error: {e}");
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "filesystem"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            warnings: 0,
+                            ..Summary::default()
+                        },
+                        json!({ "error": e.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_observe_system_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    let info = system_info();
+    match format {
+        OutputFormat::Text => {
+            println!("System: {} {}", info.os_name, info.os_version);
+            println!("  Host: {}", info.hostname);
+            println!(
+                "  Memory: {} / {} MB",
+                info.used_memory_mb, info.total_memory_mb
+            );
+            println!("  CPUs: {}", info.cpu_count);
+        }
+        OutputFormat::Json => {
+            print_json(&build_envelope(
+                ["observe", "system"],
+                "ok",
+                Summary::default(),
+                json!(info),
+                Vec::new(),
+            ))?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_observe_record_command(
+    duration_seconds: u64,
+    poll_interval_ms: u64,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let request = match ObservationRecordRequest::new(
+        std::time::Duration::from_secs(duration_seconds),
+        std::time::Duration::from_millis(poll_interval_ms),
+    ) {
+        Ok(request) => request,
+        Err(error) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {error}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "record"],
+                        "invalid",
+                        Summary {
+                            errors: 1,
+                            ..Summary::default()
+                        },
+                        json!({ "error": error.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            return Ok(exit_invalid());
+        }
+    };
+
+    match record_observation_session(&request) {
+        Ok(session) => {
+            match format {
+                OutputFormat::Text => print_observation_session_text(&session),
+                OutputFormat::Json => {
+                    print_json(&build_envelope_with_schema(
+                        ["observe", "record"],
+                        "ok",
+                        Summary::default(),
+                        &session,
+                        Vec::new(),
+                        Some("https://elegy/contracts/schemas/observation-session.schema.json"),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {error}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["observe", "record"],
+                        "error",
+                        Summary {
+                            errors: 1,
+                            ..Summary::default()
+                        },
+                        json!({ "error": error.to_string() }),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(exit_runtime())
+        }
+    }
+}
+
+fn print_observation_session_text(session: &ObservationSession) {
+    println!(
+        "Observation session {} recorded {} event(s)",
+        session.session_id, session.event_count
+    );
+    if let Some(duration_seconds) = session.duration_seconds {
+        println!("  Duration: {duration_seconds}s");
+    }
+    if let Some(poll_interval_ms) = session.poll_interval_ms {
+        println!("  Poll interval: {poll_interval_ms}ms");
+    }
+    println!("  Summary: {}", session.summary.summary);
+}
+
+fn execute_desktop_click_command(
+    x: i32,
+    y: i32,
+    button: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::click(x, y, &button, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!("Click{mode}: ({x}, {y}) button={button}");
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "click"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "click"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_type_command(
+    text: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::type_text(&text, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Type{mode}: \"{}\" ({} chars)",
+                        text, result.character_count
+                    );
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "type"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "type"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_key_command(
+    combo: String,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::send_key(&combo, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!("Key{mode}: {combo}");
+                    if let Some(ref win) = result.target_window {
+                        println!("  Target window: {win}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "key"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "key"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_focus_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::focus_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Focus{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "focus"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "focus"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn execute_desktop_move_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    x: i32,
+    y: i32,
+    width: Option<u32>,
+    height: Option<u32>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::move_window(title.as_deref(), hwnd, x, y, width, height, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Move{mode}: {} → ({x}, {y})",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                    if let (Some(w), Some(h)) = (width, height) {
+                        println!("  Resize: {w}x{h}");
+                    }
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "move"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "move"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_minimize_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::minimize_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Minimize{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "minimize"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "minimize"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
+        }
+    }
+}
+
+fn execute_desktop_maximize_command(
+    title: Option<String>,
+    hwnd: Option<u64>,
+    dry_run: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match elegy_desktop::maximize_window(title.as_deref(), hwnd, dry_run) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => {
+                    let mode = if dry_run { " (dry-run)" } else { "" };
+                    println!(
+                        "Maximize{mode}: {}",
+                        result.matched_title.as_deref().unwrap_or("(unknown)")
+                    );
+                }
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "maximize"],
+                        "ok",
+                        Summary::default(),
+                        json!(result),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(e) => {
+            match format {
+                OutputFormat::Text => eprintln!("Error: {e}"),
+                OutputFormat::Json => {
+                    print_json(&build_envelope(
+                        ["desktop", "maximize"],
+                        "error",
+                        Summary {
+                            text: e.to_string(),
+                            ..Summary::default()
+                        },
+                        json!(null),
+                        Vec::new(),
+                    ))?;
+                }
+            }
+            Ok(ExitCode::from(EXIT_CODE_RUNTIME_FAILURE))
         }
     }
 }
