@@ -2574,3 +2574,15 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Decisions:
   - Treated the access term itself as the root cause rather than only lowering `access_weight`, because sequential retrieval was creating self-reinforcing hubness on fresh corpora.
   - Preserved the existing public API and config keys; only the internal access signal function changed.
+
+## STATE_SNAPSHOT — WU14 Phase 1 — 2026-05-25 15:46
+- Phase: Canonical benchmark fixture
+- Status: DONE
+- Artifacts: `rust/crates/elegy-memory-mcp/tests/wu13_repro.rs`; `rust/crates/elegy-memory-mcp/tests/fixtures/retrieval_benchmark.v1.json`; `FLIGHT_RECORDER.md`
+- Validation: `Set-Location 'C:\Users\Romain\Projects\Elegy\rust'; rustfmt --edition 2021 crates\elegy-memory-mcp\tests\wu13_repro.rs; cargo test --release -p elegy-memory-mcp --test wu13_repro versioned_retrieval_benchmark_fixture_runs_through_stdio -- --exact --nocapture` -> PASS
+- Findings:
+  - WU14 now has a versioned stdio-driven integration harness instead of a manual benchmark procedure. The new fixture lives in `tests/fixtures/retrieval_benchmark.v1.json` and is loaded by `tests/wu13_repro.rs`.
+  - The canonical English suite contains 36 memories and 12 verbatim queries. The canonical French suite contains 12 memories and 10 short verbatim queries.
+  - The harness validates fixture integrity, runs each suite on a fresh TempDir-backed SQLite DB through `elegy-memory-mcp-stdio`, asserts `action=added`, `gateResult=accepted`, and `embeddingStatus=ready` for every store, checks `staleEmbeddingsCount=0`, and emits a structured JSON benchmark report for later Phase 2 analysis.
+- Next: STOP before Phase 2; wait for human go
+- Notes: the CLI-integrated MCP disconnect was intentionally left untouched because the benchmark now uses the repo-versioned stdio client harness directly
