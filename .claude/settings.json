@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cargo clippy -p elegy-memory -- -D warnings"
+          }
+        ]
+      }
+    ]
+  }
+}

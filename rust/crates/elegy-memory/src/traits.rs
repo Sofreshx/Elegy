@@ -167,7 +167,20 @@ pub enum ConsolidationAction {
     },
 }
 
-/// Primary storage contract for memory CRUD, search, lifecycle, and health flows.
+/// Primary storage contract for the core memory CRUD, search, lifecycle, and contradiction flows.
+///
+/// This trait intentionally defines the stable store-wide baseline surface used by the
+/// gate, CLI, and other pluggable components. The current crate implements several
+/// additional advanced capabilities directly on [`crate::SqliteMemoryStore`] that are
+/// not yet promoted into public traits, including:
+///
+/// - correction application and correction-history queries
+/// - retrieval-feedback learning and learned-weight reporting
+/// - poisoning detection and quarantine remediation
+/// - cross-agent share export and share-import review workflows
+///
+/// Treat `MemoryStore` as the core contract, not as the complete capability surface of
+/// the current SQLite-backed implementation.
 #[async_trait]
 pub trait MemoryStore: Send + Sync {
     /// Return the explicit write scope bound to this store instance.

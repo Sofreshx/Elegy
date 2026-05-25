@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/repo-log.schema.json",
+  "title": "RepoLog",
+  "description": "Structured read-only commit log with bounded commit count and metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["commits"],
+  "properties": {
+    "commits": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["shortHash", "hash", "authorName", "authorEmail", "subject", "committedAtUtc"],
+        "properties": {
+          "shortHash": { "type": "string", "minLength": 1 },
+          "hash": { "type": "string", "minLength": 1 },
+          "authorName": { "type": "string", "minLength": 1 },
+          "authorEmail": { "type": "string", "format": "email" },
+          "subject": { "type": "string" },
+          "committedAtUtc": { "type": "string", "format": "date-time" }
+        }
+      }
+    }
+  }
+}

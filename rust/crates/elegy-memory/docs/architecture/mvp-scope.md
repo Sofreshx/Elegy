@@ -52,11 +52,11 @@
 |---------|-----------|-------|
 | Cosine similarity via stored embeddings | **MVP** | Core retrieval mechanism |
 | BM25 via FTS5 | **MVP** | Keyword fallback / blend |
-| Combined scoring formula | **MVP** | `α × similarity + β × recency + γ × ln(access + 1) + δ × (similarity × priority)` |
+| Combined scoring formula | **MVP** | `α × similarity + β × recency + γ × (access / (access + 8)) + δ × (similarity × priority)` |
 | Configurable weights (α, β, γ, δ) | **MVP** | Loaded from `scope_config` |
 | Recency decay (fixed λ) | **MVP** | Fixed base lambda, not adaptive |
-| Adaptive Decay Rate | **v1** | Still future |
-| Memory Type-Modulated Decay | **v1** | Still future |
+| Adaptive Decay Rate | **v1** | Implemented now with activity-rate scaling of lambda via `adaptive_retention()` |
+| Memory Type-Modulated Decay | **v1** | Implemented now with per-type multipliers via `type_decay_multiplier()` (Procedure 0.7×, Fact 0.8×, Decision 0.85×, Preference 0.9×, Observation 1.2×) |
 | Context window budget (ratio) | **MVP** | Implemented via `MemoryContextConfig` |
 
 ### Confidence Score
@@ -65,7 +65,7 @@
 |---------|-----------|-------|
 | Importance score (stored) | **MVP** | Provided at extraction/import time |
 | Reliability score (seeded from provenance) | **MVP** | Stored on write from `base_reliability()` |
-| Corroboration bonus | **v1** | Counter exists, bonus logic still future |
+| Corroboration bonus | **v1** | Implemented now; +0.05 reliability per corroboration, capped at base_reliability + 0.2 |
 | Contradiction penalty | **v1** | Implemented now when contradiction records are created |
 | Priority = importance × reliability | **MVP** | Used in retrieval scoring |
 
@@ -99,7 +99,7 @@
 | `memory_versions` table | **MVP** | Table created |
 | Auto-versioning on content update | **MVP** | Every `update_content()` creates a version |
 | Version history query | **MVP** | Exposed by `SqliteMemoryStore::list_versions()` |
-| Rollback to previous version | **v1** | Still future |
+| Rollback to previous version | **v1** | Implemented now via `rollback_to_version()` and CLI `rollback` command |
 
 ### Embedding
 
@@ -128,7 +128,7 @@
 | `health_report()` implementation | **MVP** | Core counts/sizes plus richer CLI-derived health output |
 | Contradiction listing | **MVP** | `list_contradictions()` implemented |
 | Export (JSON) | **MVP** | Full scope export |
-| Export (SQLite / `.elegy`) | **v1** | Still future |
+| Export (SQLite / `.elegy`) | **v1** | Implemented now; SQLite portable DB export and `.elegy` JSON archive with links + versions |
 | Import | **v1** | Implemented now for JSON export-shape and simplified JSON inputs |
 | Selective scope export | **v1** | Implemented now as exact-scope export by default plus `export --all-scopes` for aggregate export |
 
@@ -137,7 +137,7 @@
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | `purge_all()` | **MVP** | Implemented |
-| `purge_user(user_id)` | **v1** | Still an explicit stub |
+| `purge_user(user_id)` | **v1** | Implemented now; deletes all memories, versions, links, corrections, and feedback for a user |
 
 ### CLI
 
@@ -146,16 +146,27 @@
 | `add` | **MVP** | Gate-aware memory creation |
 | `search` | **MVP** | Hybrid search |
 | `list` | **MVP** | Filtered listing |
-| `inspect` | **MVP** | Memory + version history |
+| `inspect` | **MVP** | Memory + version history + correction history |
 | `purge` | **MVP** | Confirmation flow |
 | `health` | **MVP** | Base report plus average importance, stale previews, contradiction previews, oldest age, most-accessed memory, human-readable DB size |
-| `export` | **MVP** | JSON to stdout or file |
+| `export` | **MVP** | JSON to stdout or file; `--export-format sqlite|elegy` for portable exports |
 | `import` | **v1** | Implemented now for JSON file/stdin inputs; full export-shape imports preserve exported state and `--force` still bypasses the gate |
 | `reembed` | **MVP** | Batch re-embedding |
 | `contradictions` list | **MVP** | Shows unresolved contradictions |
 | `contradictions resolve` | **v1** | Implemented now; keep-one makes the losing memory dormant, keep-both leaves both active |
 | `consolidate` | **v1** | Implemented now with simple dedup; optional `--cross-scope` lifts results to the highest scope in the pair |
 | `promote` | **v1** | Implemented now for automatic and manual scope promotion |
+| `rollback` | **v1** | Implemented now; restores a memory to a specific version |
+| `corroborate` | **v1** | Implemented now; records corroboration and boosts reliability |
+| `budget` | **v1** | Implemented now; enforces active/dormant budget limits |
+| `correct` | **v2** | Implemented now; gate-aware user correction with version tracking, disposition reporting (`applied` / `archived` / `merged` / `contradiction`), related-memory details, contradiction journaling, and reliability bump |
+| `feedback` | **v2** | Implemented now; records retrieval relevance feedback and immediately refreshes the live `scope_config` scoring weights |
+| `weights` | **v2** | Implemented now; reports current live weight mode (`defaults` vs `learned`), sample counts, confidence, and effective `scope_config` values |
+| `traverse` | **v2** | Implemented now; BFS graph traversal with depth limit and relation filter |
+| `detect-poisoning` | **v2** | Implemented now; runs 4 scoped heuristic checks, surfaces alert IDs/timestamps plus implicated memory IDs, and can dormant/quarantine low-trust memories via `--quarantine` (`--remediate` alias) with per-row action reasons |
+| `delete-link` | **v1** | Implemented now; removes a link by ID |
+| `share-export` | **v2** | Implemented now; exports memories filtered by sensitivity and reliability for cross-agent sharing |
+| `share-import` | **v2** | Implemented now; shared memories are gate-reviewed, still exact-match checked across visible scopes without embeddings, never auto-merge into trusted existing memories, land as dormant review/quarantine entries, and report per-item dispositions/reasons in the CLI |
 
 ### Memory Links
 
@@ -163,16 +174,17 @@
 |---------|-----------|-------|
 | `memory_links` table | **MVP** | Table created |
 | `supersedes` links on update | **MVP** | Still the intended versioning relation |
-| Manual link creation | **v1** | Still future |
-| Graph traversal queries | **v2** | Still future |
+| Manual link creation | **v1** | Implemented now via `record_link()` and CLI `link create` |
+| Link deletion | **v1** | Implemented now via `delete_link()` and CLI `delete-link` |
+| Graph traversal queries | **v2** | Implemented now with BFS traversal, depth limit, and optional relation filter |
 
 ### Forgetting Budget
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | Budget config per scope | **MVP** | Present in configuration / health usage ratio |
-| Automatic dormant transition at budget | **v1** | Still future |
-| Hard delete at storage cap | **v1** | Still future |
+| Automatic dormant transition at budget | **v1** | Implemented now via `enforce_budget()` — lowest-scoring active memories transition to dormant |
+| Hard delete at storage cap | **v1** | Implemented now via `enforce_budget()` — lowest-scoring dormant memories hard-deleted when over cap |
 
 ### Security
 
@@ -180,34 +192,50 @@
 |---------|-----------|-------|
 | Input validation on writes | **MVP** | Implemented on candidates, store writes, import, and CLI args |
 | Row-level security (multi-tenant) | **v1** | Still future / PostgreSQL-oriented |
-| Memory poisoning detection | **v2** | Still future |
+| Memory poisoning detection | **v2** | Implemented now with scoped/configurable heuristics plus dormant quarantine remediation for implicated low-trust active memories |
 
 ### Advanced (v2)
 
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
-| Memory Portability Format (.elegy) | **v2** | Still future |
-| Cross-Agent Memory Sharing Protocol | **v2** | Still future |
-| User Correction Feedback Loop | **v2** | Still future |
-| Parameter Learning | **v2** | Still future |
-| Knowledge Graph migration | **v2** | Still future |
+| Memory Portability Format (.elegy) | **v2** | Implemented now as JSON archive with memories, links, and version history |
+| Cross-Agent Memory Sharing Protocol | **v2** | Implemented now with `export_for_sharing()` and conservative `import_shared()` review semantics that protect the active store |
+| User Correction Feedback Loop | **v2** | Implemented now with `correct_memory()`, version tracking, disposition + related-memory history, contradiction journaling when needed, automatic embedding refresh attempts, and stale-vector exclusion until re-embed completes |
+| Parameter Learning | **v2** | Implemented now with a live write-back loop: `record_feedback()` recalculates and persists the effective `similarity_weight` / `recency_weight` / `access_weight` / `priority_weight` keys that `search()` already uses |
+| Knowledge Graph migration | **v2** | Still future; proto-graph links and BFS traversal provide the foundation |
 
 ## Current Baseline Summary
 
-The codebase still has an MVP core: SQLite storage, hybrid search, working gate, versioning, export, re-embedding, and CLI flows. It now also includes several v1-tier features that were not present in the original MVP baseline:
+The codebase has a complete MVP core plus the full v1 and v2 feature set. Only Knowledge Graph migration and PostgreSQL backend remain as future work. Current implementation includes:
 
+**MVP baseline:**
+- SQLite storage, hybrid search (vector + FTS5), working gate, versioning, export, re-embedding, and CLI flows
+
+**v1 features (all implemented):**
 - OpenAI and Ollama embedding providers
 - OpenAI and Ollama LLM providers
-- JSON import
-- heuristic contradiction detection
-- optional LLM contradiction classification
-- manual contradiction resolution
-- richer health reporting
-- optional LLM-backed consolidation
-- automatic and manual scope promotion
-- exact-scope export plus `--all-scopes`
+- JSON import with gate bypass
+- Heuristic and optional LLM contradiction detection
+- Manual contradiction resolution (keep-one, keep-both)
+- Richer health reporting
+- Optional LLM-backed consolidation
+- Automatic and manual scope promotion
+- Exact-scope export plus `--all-scopes`
+- Adaptive decay rate and type-modulated decay
+- Corroboration bonus (+0.05 reliability, capped)
+- Version rollback
+- Budget enforcement (active→dormant, dormant→delete)
+- `purge_user` full implementation
+- SQLite and `.elegy` portable export formats
+- Manual link creation and deletion
 
-These are implemented now, but they should still be read as first-pass v1 behavior rather than fully expanded end-state platform features.
+**v2 features (all implemented except Knowledge Graph migration):**
+- Graph traversal (BFS with depth limit and relation filter)
+- Memory poisoning detection (4 heuristics)
+- User correction feedback loop with gate-aware dispositions, contradiction journaling, inspectable history, and vector refresh / stale exclusion
+- Parameter learning from retrieval relevance feedback with live `scope_config` write-back
+- Cross-agent memory sharing (export/import with sensitivity filtering)
+- 11 new CLI commands: rollback, corroborate, budget, correct, feedback, weights, traverse, detect-poisoning, delete-link, share-export, share-import
 
 ### Note on Thresholds
 
@@ -220,4 +248,3 @@ Current default gate thresholds are stored in `scope_config` and default to:
 - agent-inferred archive threshold: `0.50`
 
 Retrieval scoring weights remain configurable (`0.40 / 0.25 / 0.15 / 0.20` by default). Thresholds are architecture defaults, not a claim that all higher-order tuning work is finished.
-

@@ -1,6 +1,5 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('elegy-memory', 'elegy-mcp', 'elegy-skills', 'all')]
     [string[]]$Surface = @('all'),
     [string]$OutputDirectory = ''
 )
@@ -8,6 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
+$packageReadmePath = Join-Path $repoRoot 'PACKAGE_README.md'
 
 function Get-WrapperSurfaceMetadata {
     return [ordered]@{
@@ -21,6 +21,11 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-mcp-wrapper'
             SurfaceRoot = 'src/Elegy-mcp'
         }
+        'elegy-planning' = @{
+            Surface = 'elegy-planning'
+            AssetPrefix = 'elegy-planning-wrapper'
+            SurfaceRoot = 'src/Elegy-planning'
+        }
         'elegy-skills' = @{
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills-wrapper'
@@ -29,18 +34,39 @@ function Get-WrapperSurfaceMetadata {
     }
 }
 
+function Expand-SurfaceSelectors {
+    param(
+        [string[]]$Selectors
+    )
+
+    $expanded = [System.Collections.Generic.List[string]]::new()
+    foreach ($selector in @($Selectors)) {
+        foreach ($entry in @(([string]$selector) -split ',')) {
+            $trimmedEntry = $entry.Trim()
+            if ([string]::IsNullOrWhiteSpace($trimmedEntry)) {
+                continue
+            }
+
+            $expanded.Add($trimmedEntry) | Out-Null
+        }
+    }
+
+    return @($expanded)
+}
+
 function Resolve-WrapperSurfaces {
     param(
         [string[]]$RequestedSurfaces
     )
 
+    $expandedSurfaces = Expand-SurfaceSelectors -Selectors $RequestedSurfaces
     $surfaceMetadata = Get-WrapperSurfaceMetadata
-    if ($RequestedSurfaces -contains 'all') {
+    if ($expandedSurfaces -contains 'all') {
         return @($surfaceMetadata.Keys)
     }
 
     $resolved = [System.Collections.Generic.List[string]]::new()
-    foreach ($surfaceName in $RequestedSurfaces) {
+    foreach ($surfaceName in $expandedSurfaces) {
         if ($resolved.Contains($surfaceName)) {
             continue
         }
@@ -77,6 +103,10 @@ if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
     $OutputDirectory = Join-Path $repoRoot 'artifacts/distribution'
 }
 
+if (-not (Test-Path $packageReadmePath)) {
+    throw "Missing package README source: $packageReadmePath"
+}
+
 $surfaceMetadata = Get-WrapperSurfaceMetadata
 $resolvedSurfaces = Resolve-WrapperSurfaces -RequestedSurfaces $Surface
 $bundleVersion = Get-BundleVersion -RepositoryRoot $repoRoot
@@ -110,6 +140,7 @@ foreach ($surfaceName in $resolvedSurfaces) {
 
     New-Item -ItemType Directory -Path $stagingDirectory -Force | Out-Null
     Copy-Item -Path (Join-Path $surfaceRoot '*') -Destination $stagingDirectory -Recurse -Force
+    Copy-Item -Path $packageReadmePath -Destination (Join-Path $stagingDirectory 'README.md') -Force
 
     $stagedScriptsPath = Join-Path $stagingDirectory 'scripts'
     New-Item -ItemType Directory -Path $stagedScriptsPath -Force | Out-Null

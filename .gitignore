@@ -3,6 +3,12 @@
 **/[Oo]bj/
 rust/target/
 
+# Standalone crate outputs under rust/crates/
+rust/crates/**/target/
+
+# Standalone crate lockfiles under rust/crates/
+rust/crates/**/Cargo.lock
+
 # Test artifacts
 TestResults/
 *.trx
@@ -22,6 +28,7 @@ packages/
 .vs/
 .vscode/
 .idea/
+*.code-workspace
 *.user
 *.suo
 *.userosscache
@@ -45,5 +52,10 @@ elegy-memory-mvp-test-plan.md
 # Local agent session artifacts
 /.copilot/
 /target/agent-artifacts/
+
+# elegy-memory-mcp local auth state
+signing-key
+clients.json
+refresh-tokens.json
 
 .cargo/config.toml

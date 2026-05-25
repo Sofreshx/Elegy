@@ -13,8 +13,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-elegy-mcp = { version = "0.1.0", path = "../elegy-mcp" }
-elegy-tooling = { version = "0.1.0", path = "../elegy-tooling" }
+elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

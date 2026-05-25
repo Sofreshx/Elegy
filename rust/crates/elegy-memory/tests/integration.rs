@@ -68,6 +68,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search active memories");
@@ -86,6 +87,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search active memories after archival");
@@ -101,6 +103,7 @@ async fn full_lifecycle_covers_versioning_keyword_search_and_dormant_exclusion()
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search dormant memories");
@@ -425,6 +428,7 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("run provider-backed semantic search");
@@ -440,6 +444,140 @@ async fn provider_backed_search_derives_query_embedding_without_explicit_vector(
             semantic_query.to_string(),
         ]
     );
+}
+
+#[tokio::test]
+async fn nomic_embeddings_apply_document_and_query_task_prefixes() {
+    let semantic_query = "orbital prep semantic probe";
+    let semantic_match_content = "release readiness checklist";
+    let non_match_content = "garden watering schedule";
+    let provider = Arc::new(StubEmbeddingProvider::new_with_model(
+        "nomic-embed-text:latest",
+        [
+            (
+                "search_document: release readiness checklist",
+                axis_embedding(),
+            ),
+            (
+                "search_document: garden watering schedule",
+                negative_axis_embedding(),
+            ),
+            (
+                "search_query: orbital prep semantic probe",
+                axis_embedding(),
+            ),
+        ],
+    ));
+    let (_temp_dir, store) =
+        test_store_with_provider("nomic-provider-search-derived", provider.clone());
+
+    let semantic_match = sample_memory(
+        semantic_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        Utc::now(),
+    );
+    let semantic_match_id = semantic_match.id;
+    let non_match = sample_memory(
+        non_match_content,
+        MemoryType::Fact,
+        ProvenanceLevel::Imported,
+        0.8,
+        Utc::now(),
+    );
+
+    store
+        .store(semantic_match)
+        .await
+        .expect("store semantic match");
+    store.store(non_match).await.expect("store non-match");
+
+    let results = store
+        .search(SearchQuery {
+            text: semantic_query.to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+            agent_id: None,
+        })
+        .await
+        .expect("run provider-backed semantic search");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, semantic_match_id);
+    assert!(results[0].similarity > 0.0);
+    assert_eq!(
+        provider.calls(),
+        vec![
+            "search_document: release readiness checklist".to_string(),
+            "search_document: garden watering schedule".to_string(),
+            "search_query: orbital prep semantic probe".to_string(),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn agent_scoped_search_can_filter_to_a_single_agent_id() {
+    let temp_dir = TempDir::new().expect("create temp directory");
+    let db_path = temp_dir.path().join("agent-filter.sqlite3");
+    let store = SqliteMemoryStore::new(&db_path, MemoryScope::Agent).expect("create agent store");
+    let now = Utc::now();
+
+    let mut visible = sample_memory(
+        "Visible semantic memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        now,
+    );
+    visible.scope = MemoryScope::Agent;
+    visible.agent_id = Some("agent-a".to_string());
+    let visible_id = visible.id;
+
+    let mut hidden = sample_memory(
+        "Hidden semantic memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.8,
+        now,
+    );
+    hidden.scope = MemoryScope::Agent;
+    hidden.agent_id = Some("agent-b".to_string());
+    let hidden_id = hidden.id;
+
+    store.store(visible).await.expect("store visible memory");
+    store.store(hidden).await.expect("store hidden memory");
+    store
+        .store_embedding(&visible_id, &axis_embedding())
+        .await
+        .expect("store visible embedding");
+    store
+        .store_embedding(&hidden_id, &axis_embedding())
+        .await
+        .expect("store hidden embedding");
+
+    let results = store
+        .search(SearchQuery {
+            text: String::new(),
+            embedding: Some(axis_embedding()),
+            scope: MemoryScope::Agent,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+            agent_id: Some("agent-a".to_string()),
+        })
+        .await
+        .expect("search filtered agent memories");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, visible_id);
 }
 
 #[tokio::test]
@@ -466,6 +604,7 @@ async fn text_only_search_without_provider_remains_keyword_driven() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search without provider");
@@ -511,6 +650,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search compound word memory");
@@ -542,6 +682,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search for removed compound token");
@@ -557,6 +698,7 @@ async fn text_only_search_matches_compound_words_via_fts_index_expansion() {
             max_results: 5,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search updated compound token");
@@ -633,6 +775,7 @@ async fn gate_merge_preserves_searchable_compound_enrichment_for_keyword_search(
                 max_results: 5,
                 context_config: None,
                 session_id: None,
+                agent_id: None,
             })
             .await
             .expect("search merged memory");
@@ -815,6 +958,7 @@ async fn search_orders_results_by_combined_scoring_signals() {
             max_results: 10,
             context_config: None,
             session_id: None,
+            agent_id: None,
         })
         .await
         .expect("search by vector similarity");
@@ -886,6 +1030,126 @@ async fn decay_integration_uses_age_and_fixed_lambda_consistently() {
 
     assert!(recent_retention > older_retention);
     assert!((fact_retention - preference_retention).abs() < 1.0e-12);
+}
+
+#[tokio::test]
+async fn record_link_and_list_links_round_trip() {
+    let (_temp_dir, store) = test_store("link-round-trip");
+
+    let mem_a = sample_memory(
+        "Source memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+    let mem_b = sample_memory(
+        "Target memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+
+    let source_id = mem_a.id;
+    let target_id = mem_b.id;
+
+    store.store(mem_a).await.expect("store source memory");
+    store.store(mem_b).await.expect("store target memory");
+
+    store
+        .record_link(&source_id, &target_id, "supersedes")
+        .expect("record_link should succeed");
+
+    // list_links from source side
+    let links_from_source = store.list_links(&source_id).expect("list_links for source");
+    assert_eq!(
+        links_from_source.len(),
+        1,
+        "source should see exactly 1 link"
+    );
+    let link = &links_from_source[0];
+    assert_eq!(link.source_id, source_id);
+    assert_eq!(link.target_id, target_id);
+    assert_eq!(link.relation_type, "supersedes");
+    assert!(
+        (link.weight - 1.0).abs() < f32::EPSILON,
+        "default weight should be 1.0"
+    );
+
+    // list_links from target side — same link should appear
+    let links_from_target = store.list_links(&target_id).expect("list_links for target");
+    assert_eq!(
+        links_from_target.len(),
+        1,
+        "target should see exactly 1 link"
+    );
+    assert_eq!(links_from_target[0].source_id, source_id);
+    assert_eq!(links_from_target[0].target_id, target_id);
+}
+
+#[tokio::test]
+async fn record_link_rejects_self_link() {
+    let (_temp_dir, store) = test_store("link-self-reject");
+
+    let mem = sample_memory(
+        "Self-referencing memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+    let id = mem.id;
+
+    store.store(mem).await.expect("store memory");
+
+    let result = store.record_link(&id, &id, "supersedes");
+    assert!(
+        result.is_err(),
+        "self-link should be rejected with a validation error"
+    );
+}
+
+#[tokio::test]
+async fn record_link_ignores_duplicate_link() {
+    let (_temp_dir, store) = test_store("link-dup-ignore");
+
+    let mem_a = sample_memory(
+        "First memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+    let mem_b = sample_memory(
+        "Second memory",
+        MemoryType::Fact,
+        ProvenanceLevel::UserStated,
+        0.7,
+        Utc::now(),
+    );
+
+    let source_id = mem_a.id;
+    let target_id = mem_b.id;
+
+    store.store(mem_a).await.expect("store first memory");
+    store.store(mem_b).await.expect("store second memory");
+
+    store
+        .record_link(&source_id, &target_id, "related")
+        .expect("first record_link should succeed");
+    store
+        .record_link(&source_id, &target_id, "related")
+        .expect("duplicate record_link should succeed (INSERT OR IGNORE)");
+
+    let links = store
+        .list_links(&source_id)
+        .expect("list_links after duplicate insert");
+    assert_eq!(
+        links.len(),
+        1,
+        "duplicate link should be silently ignored, only 1 link expected"
+    );
 }
 
 fn test_store(prefix: &str) -> (TempDir, SqliteMemoryStore) {
@@ -1014,6 +1278,7 @@ async fn reembed_stale_memories(
 
 #[derive(Debug)]
 struct StubEmbeddingProvider {
+    model_id: &'static str,
     responses: HashMap<String, Vec<f32>>,
     calls: Mutex<Vec<String>>,
 }
@@ -1024,7 +1289,16 @@ impl StubEmbeddingProvider {
         I: IntoIterator<Item = (S, Vec<f32>)>,
         S: Into<String>,
     {
+        Self::new_with_model("integration-stub", responses)
+    }
+
+    fn new_with_model<I, S>(model_id: &'static str, responses: I) -> Self
+    where
+        I: IntoIterator<Item = (S, Vec<f32>)>,
+        S: Into<String>,
+    {
         Self {
+            model_id,
             responses: responses
                 .into_iter()
                 .map(|(text, embedding)| (text.into(), embedding))
@@ -1057,6 +1331,6 @@ impl EmbeddingProvider for StubEmbeddingProvider {
     }
 
     fn model_id(&self) -> &str {
-        "integration-stub"
+        self.model_id
     }
 }

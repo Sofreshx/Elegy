@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/observe-result.schema.json",
+  "title": "ObserveResult",
+  "description": "Observation result: a typed snapshot (ProcessSnapshot, WindowInfo, ScreenCaptureResult, ClipboardContents, FsDiffResult, or SystemSnapshot) with a UTC timestamp.",
+  "type": "object"
+}

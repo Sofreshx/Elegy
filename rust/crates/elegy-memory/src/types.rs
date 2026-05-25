@@ -437,6 +437,9 @@ pub struct SearchQuery {
     /// Optional session identifier used to record cross-session access.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub session_id: Option<String>,
+    /// Optional agent identifier filter for agent-scoped searches.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub agent_id: Option<String>,
 }
 
 /// Export encoding supported by observability and portability flows.
@@ -447,6 +450,8 @@ pub enum ExportFormat {
     Json,
     /// SQLite-backed portable export.
     Sqlite,
+    /// Portable `.elegy` archive (ZIP containing metadata + SQLite).
+    Elegy,
 }
 
 /// Scope-level tuning values persisted in the configuration table.
@@ -516,6 +521,184 @@ pub struct MemoryVersion {
     pub change_reason: String,
     /// Timestamp when the version row was recorded.
     pub changed_at: DateTime<Utc>,
+}
+
+/// A directional link between two memory records in the proto-graph.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryLink {
+    /// Stable link-row identifier.
+    pub id: String,
+    /// Origin memory of the relationship.
+    pub source_id: MemoryId,
+    /// Destination memory of the relationship.
+    pub target_id: MemoryId,
+    /// Kind of relationship (e.g. `supersedes`, `contradicts`, `corroborates`).
+    pub relation_type: String,
+    /// Strength or confidence of the link (default 1.0).
+    pub weight: f32,
+    /// Timestamp when the link was created.
+    pub created_at: DateTime<Utc>,
+}
+
+/// Alert raised when memory poisoning patterns are detected.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct PoisoningAlert {
+    /// Unique alert identifier.
+    pub id: String,
+    /// Type of poisoning pattern detected.
+    pub alert_type: PoisoningAlertType,
+    /// Human-readable description of the detected anomaly.
+    pub description: String,
+    /// Severity score in the inclusive range `0.0..=1.0`.
+    pub severity: f32,
+    /// Memory identifiers implicated in the alert.
+    pub memory_ids: Vec<MemoryId>,
+    /// Timestamp when the alert was generated.
+    pub detected_at: DateTime<Utc>,
+}
+
+/// Classification of poisoning detection heuristics.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
+pub enum PoisoningAlertType {
+    /// Abnormally high write frequency from a single source.
+    FrequencyAnomaly,
+    /// Provenance trust level does not match content confidence.
+    TrustMismatch,
+    /// Bulk overwrite of existing memories in a short window.
+    BulkOverwrite,
+    /// Content contradicts a large number of established memories.
+    MassContradiction,
+}
+
+/// Final safety disposition recorded for a user correction.
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum CorrectionDisposition {
+    /// The corrected content replaced the existing memory body and stayed in its current lane.
+    Applied,
+    /// The corrected content was accepted, but the write-time gate archived the memory.
+    Archived,
+    /// The corrected content merged into another existing memory.
+    Merged,
+    /// The corrected content was applied and journaled as a contradiction.
+    Contradiction,
+}
+
+/// Record of a user-initiated correction applied to a memory.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CorrectionRecord {
+    /// Unique correction identifier.
+    pub id: String,
+    /// Memory that was corrected.
+    pub memory_id: MemoryId,
+    /// Content before the correction.
+    pub previous_content: String,
+    /// Content after the correction.
+    pub corrected_content: String,
+    /// Actor who performed the correction.
+    pub corrected_by: String,
+    /// Human-readable reason for the correction.
+    pub reason: String,
+    /// Final safety disposition chosen for the correction.
+    pub disposition: CorrectionDisposition,
+    /// Related memory referenced by the correction outcome, when applicable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub related_memory_id: Option<MemoryId>,
+    /// Timestamp when the correction was applied.
+    pub corrected_at: DateTime<Utc>,
+}
+
+/// Feedback signal recorded after a memory is retrieved and evaluated for relevance.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct RetrievalFeedback {
+    /// Unique feedback identifier.
+    pub id: String,
+    /// Memory that was retrieved and evaluated.
+    pub memory_id: MemoryId,
+    /// Whether the memory was relevant to the query context.
+    pub relevant: bool,
+    /// Optional query text that produced the retrieval.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub query_text: Option<String>,
+    /// Timestamp when the feedback was recorded.
+    pub recorded_at: DateTime<Utc>,
+}
+
+/// Result of a graph traversal starting from a given memory.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphTraversalResult {
+    /// Starting memory of the traversal.
+    pub start_id: MemoryId,
+    /// Maximum traversal depth requested.
+    pub max_depth: u32,
+    /// Nodes discovered during traversal, ordered by depth.
+    pub nodes: Vec<GraphNode>,
+}
+
+/// A single node in a graph traversal result.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNode {
+    /// The memory at this graph position.
+    pub memory: Memory,
+    /// Depth at which this node was discovered (0 = start).
+    pub depth: u32,
+    /// Links that led to this node from the previous depth level.
+    pub incoming_links: Vec<MemoryLink>,
+}
+
+/// Selective export configuration for cross-agent memory sharing.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ShareConfig {
+    /// Maximum sensitivity level to include in the export.
+    pub max_sensitivity: SensitivityLevel,
+    /// Minimum reliability score to include.
+    pub min_reliability: f32,
+    /// Optional memory type filter.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub type_filter: Option<Vec<MemoryType>>,
+    /// Optional tag filter (all listed tags must be present).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tag_filter: Option<Vec<String>>,
+}
+
+impl Default for ShareConfig {
+    fn default() -> Self {
+        Self {
+            max_sensitivity: SensitivityLevel::Medium,
+            min_reliability: 0.5,
+            type_filter: None,
+            tag_filter: None,
+        }
+    }
+}
+
+/// Portable archive format for `.elegy` exports.
+///
+/// Contains a self-describing snapshot of memories, their relationships,
+/// and version history for a single scope.  The payload is serialized as
+/// JSON so that no additional compression dependency is required.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct ElegyArchive {
+    /// Format version for forward compatibility.
+    pub format_version: String,
+    /// ISO-8601 timestamp of when the export was created.
+    pub exported_at: DateTime<Utc>,
+    /// The scope that was exported.
+    pub scope: MemoryScope,
+    /// All active and dormant memories in the scope.
+    pub memories: Vec<Memory>,
+    /// Relationships between exported memories.
+    pub links: Vec<MemoryLink>,
+    /// Version history for exported memories.
+    pub versions: Vec<MemoryVersion>,
 }
 
 /// Prompt-compatibility alias for contradiction records.

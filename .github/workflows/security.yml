@@ -21,10 +21,10 @@ jobs:
     name: cargo-deny
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.95.0
       - uses: taiki-e/install-action@cargo-deny
       - name: cargo deny check
         working-directory: ./rust
@@ -34,10 +34,10 @@ jobs:
     name: cargo-audit
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.95.0
       - uses: taiki-e/install-action@cargo-audit
       - name: cargo audit
         working-directory: ./rust
@@ -47,7 +47,7 @@ jobs:
     name: gitleaks
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
         with:
           fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
@@ -62,10 +62,10 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.95.0
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:
