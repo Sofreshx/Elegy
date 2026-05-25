@@ -2561,3 +2561,16 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Findings: I do not have an evidence-based Bug A fix to commit because the server hang never reproduced here and the current code audit did not isolate a deadlock or runtime failure in Elegy itself. Proceeding to a WU13 commit/merge as if Bug A were fixed would overstate the outcome.
 - Next: human decision required on whether to (a) ship Bug B + the new regressions as a partial WU13 result, or (b) continue with a Claude-Desktop-specific Bug A investigation lane
 - Notes: current worktree also contains earlier WU12-era modifications in `rust/crates/elegy-memory-mcp/src/memory_tools.rs`, `src/stdio_main.rs`, and `tests/phase4_regressions.rs`; they were not rewritten in this WU13 continuation
+## 2026-05-24 Access-signal hubness fix
+- What changed:
+  - Replaced the unbounded retrieval access signal `ln(access_count + 1)` with a bounded saturating signal `access_count / (access_count + 8)` in `rust/crates/elegy-memory/src/storage/sqlite_store.rs`.
+  - Kept the change consistent between live search scoring and feedback-learning sample extraction so learned weights continue to reflect the same runtime signal family.
+  - Added a sequential search regression in `sqlite_store.rs` that warms up hub candidates across multiple searches and proves the semantically correct target still wins once access feedback is damped.
+  - Updated architecture/instruction docs in `rust/crates/elegy-memory/docs/architecture/memory-model.md`, `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`, and `.github/instructions/elegy-memory.instructions.md`.
+- Test status:
+  - `cargo fmt --all`
+  - `cargo test -p elegy-memory`
+  - `cargo clippy -p elegy-memory --tests -- -D warnings`
+- Decisions:
+  - Treated the access term itself as the root cause rather than only lowering `access_weight`, because sequential retrieval was creating self-reinforcing hubness on fresh corpora.
+  - Preserved the existing public API and config keys; only the internal access signal function changed.

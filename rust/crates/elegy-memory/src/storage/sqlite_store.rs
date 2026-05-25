@@ -62,6 +62,9 @@ const DEFAULT_USER_BUDGET: f32 = 1_000.0;
 const DEFAULT_AGENT_BUDGET: f32 = 200.0;
 const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
 const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
+const ACCESS_SIGNAL_HALF_SATURATION: f32 = 8.0;
+const RETRIEVAL_SCORING_MODE_ENV: &str = "ELEGY_RETRIEVAL_SCORING_MODE";
+const EXPLAIN_RETRIEVAL_SCORING_ENV: &str = "ELEGY_EXPLAIN_RETRIEVAL_SCORING";
 const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
 const BASE_MEMORY_TOKEN_OVERHEAD: u32 = 16;
 const QUARANTINED_STATUS: &str = "quarantined";
@@ -2338,104 +2341,31 @@ impl MemoryStore for SqliteMemoryStore {
         } else {
             None
         };
+        let scoring_mode = RetrievalScoringMode::from_env();
+        let explain_retrieval_scoring = explain_retrieval_scoring_enabled();
 
         self.with_connection(|connection| {
             let scope_config = load_scope_config(connection)?;
-            let visible_scopes = query.scope.visible_scopes();
-            let query_embedding = match query.embedding.as_deref() {
-                Some(embedding) => {
-                    let expected_dimensions = load_embedding_dimensions(connection)?;
-                    validate_query_embedding(embedding, expected_dimensions)?;
-                    Some(embedding)
-                }
-                None => match derived_query_embedding.as_deref() {
-                    Some(embedding) => {
-                        let expected_dimensions = load_embedding_dimensions(connection)?;
-                        match validate_query_embedding(embedding, expected_dimensions) {
-                            Ok(()) => Some(embedding),
-                            Err(StoreError::Validation(_)) => None,
-                            Err(error) => return Err(error),
-                        }
-                    }
-                    None => None,
-                },
-            };
-
-            let mut keyword_scores = if trimmed_text.is_empty() {
-                HashMap::new()
-            } else {
-                load_keyword_scores(
-                    connection,
-                    visible_scopes,
-                    requested_state,
-                    query.type_filter.as_deref(),
-                    query.agent_id.as_deref(),
-                    &trimmed_text,
-                )?
-            };
-
-            let mut vector_scores = match query_embedding {
-                Some(embedding) => load_vector_similarity_scores(
-                    connection,
-                    visible_scopes,
-                    requested_state,
-                    query.type_filter.as_deref(),
-                    query.agent_id.as_deref(),
-                    embedding,
-                    0.0,
-                )?,
-                None => HashMap::new(),
-            };
-
-            let candidate_ids: HashSet<MemoryId> = keyword_scores
-                .keys()
-                .copied()
-                .chain(vector_scores.keys().copied())
-                .collect();
-            if candidate_ids.is_empty() {
-                return Ok(Vec::new());
-            }
-
-            let candidate_memories = load_search_memories(
+            let ranked_candidates = rank_search_candidates(
                 connection,
-                visible_scopes,
-                requested_state,
-                query.type_filter.as_deref(),
-                query.agent_id.as_deref(),
+                &query,
+                &trimmed_text,
+                derived_query_embedding.as_deref(),
+                scoring_mode,
             )?;
-            let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
-                .into_iter()
-                .filter(|memory| candidate_ids.contains(&memory.id))
-                .map(|memory| (memory.id, memory))
-                .collect();
-
-            let scoring_now = Utc::now();
-            let mut results = Vec::with_capacity(candidate_memories_by_id.len());
-            for id in candidate_ids {
-                let Some(memory) = candidate_memories_by_id.get(&id).cloned() else {
-                    continue;
-                };
-
-                let keyword_similarity = keyword_scores.remove(&id);
-                let vector_similarity = vector_scores.remove(&id);
-                let similarity = combine_similarity_signals(vector_similarity, keyword_similarity);
-                let score =
-                    compute_retrieval_score(&memory, similarity, &scope_config, scoring_now);
-                results.push(ScoredMemory {
-                    memory,
-                    score,
-                    similarity,
-                });
+            if explain_retrieval_scoring {
+                emit_search_score_explanations(
+                    &trimmed_text,
+                    scoring_mode,
+                    &ranked_candidates,
+                    query.max_results,
+                );
             }
 
-            results.sort_by(|left, right| {
-                right
-                    .score
-                    .total_cmp(&left.score)
-                    .then_with(|| right.similarity.total_cmp(&left.similarity))
-                    .then_with(|| right.memory.updated_at.cmp(&left.memory.updated_at))
-                    .then_with(|| right.memory.id.cmp(&left.memory.id))
-            });
+            let mut results = ranked_candidates
+                .into_iter()
+                .map(|(scored_memory, _)| scored_memory)
+                .collect::<Vec<_>>();
             results.truncate(query.max_results);
             let mut results = trim_results_to_context_budget(
                 results,
@@ -4745,21 +4675,289 @@ fn combine_similarity_signals(
     }
 }
 
-fn compute_retrieval_score(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum RetrievalScoringMode {
+    Default,
+    SimilarityOnly,
+}
+
+impl RetrievalScoringMode {
+    fn from_env() -> Self {
+        match std::env::var(RETRIEVAL_SCORING_MODE_ENV) {
+            Ok(value)
+                if value.eq_ignore_ascii_case("similarity-only")
+                    || value.eq_ignore_ascii_case("similarity_only")
+                    || value.eq_ignore_ascii_case("similarityonly") =>
+            {
+                Self::SimilarityOnly
+            }
+            _ => Self::Default,
+        }
+    }
+
+    const fn as_str(self) -> &'static str {
+        match self {
+            Self::Default => "default",
+            Self::SimilarityOnly => "similarity-only",
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct RetrievalScoreBreakdown {
+    vector_similarity: Option<f32>,
+    keyword_similarity: Option<f32>,
+    blended_similarity: f32,
+    recency_signal: f32,
+    access_signal: f32,
+    priority_signal: f32,
+    weighted_similarity: f32,
+    weighted_recency: f32,
+    weighted_access: f32,
+    weighted_priority: f32,
+    total_score: f32,
+}
+
+type RankedSearchCandidate = (ScoredMemory, RetrievalScoreBreakdown);
+
+fn rank_search_candidates(
+    connection: &Connection,
+    query: &SearchQuery,
+    trimmed_text: &str,
+    derived_query_embedding: Option<&[f32]>,
+    scoring_mode: RetrievalScoringMode,
+) -> Result<Vec<RankedSearchCandidate>, StoreError> {
+    let scope_config = load_scope_config(connection)?;
+    let visible_scopes = query.scope.visible_scopes();
+    let requested_state = query.state_filter.unwrap_or(MemoryState::Active);
+    let query_embedding = match query.embedding.as_deref() {
+        Some(embedding) => {
+            let expected_dimensions = load_embedding_dimensions(connection)?;
+            validate_query_embedding(embedding, expected_dimensions)?;
+            Some(embedding)
+        }
+        None => match derived_query_embedding {
+            Some(embedding) => {
+                let expected_dimensions = load_embedding_dimensions(connection)?;
+                match validate_query_embedding(embedding, expected_dimensions) {
+                    Ok(()) => Some(embedding),
+                    Err(StoreError::Validation(_)) => None,
+                    Err(error) => return Err(error),
+                }
+            }
+            None => None,
+        },
+    };
+
+    let mut keyword_scores = if trimmed_text.is_empty() {
+        HashMap::new()
+    } else {
+        load_keyword_scores(
+            connection,
+            visible_scopes,
+            requested_state,
+            query.type_filter.as_deref(),
+            query.agent_id.as_deref(),
+            trimmed_text,
+        )?
+    };
+
+    let mut vector_scores = match query_embedding {
+        Some(embedding) => load_vector_similarity_scores(
+            connection,
+            visible_scopes,
+            requested_state,
+            query.type_filter.as_deref(),
+            query.agent_id.as_deref(),
+            embedding,
+            0.0,
+        )?,
+        None => HashMap::new(),
+    };
+
+    let candidate_ids: HashSet<MemoryId> = keyword_scores
+        .keys()
+        .copied()
+        .chain(vector_scores.keys().copied())
+        .collect();
+    if candidate_ids.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    let candidate_memories = load_search_memories(
+        connection,
+        visible_scopes,
+        requested_state,
+        query.type_filter.as_deref(),
+        query.agent_id.as_deref(),
+    )?;
+    let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
+        .into_iter()
+        .filter(|memory| candidate_ids.contains(&memory.id))
+        .map(|memory| (memory.id, memory))
+        .collect();
+
+    let scoring_now = Utc::now();
+    let mut ranked_candidates = Vec::with_capacity(candidate_memories_by_id.len());
+    for id in candidate_ids {
+        let Some(memory) = candidate_memories_by_id.get(&id).cloned() else {
+            continue;
+        };
+
+        let keyword_similarity = keyword_scores.remove(&id);
+        let vector_similarity = vector_scores.remove(&id);
+        let breakdown = compute_retrieval_score_breakdown_with_mode(
+            &memory,
+            vector_similarity,
+            keyword_similarity,
+            &scope_config,
+            scoring_now,
+            scoring_mode,
+        );
+        ranked_candidates.push((
+            ScoredMemory {
+                memory,
+                score: breakdown.total_score,
+                similarity: breakdown.blended_similarity,
+            },
+            breakdown,
+        ));
+    }
+
+    ranked_candidates.sort_by(|left, right| {
+        right
+            .0
+            .score
+            .total_cmp(&left.0.score)
+            .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
+            .then_with(|| right.0.memory.updated_at.cmp(&left.0.memory.updated_at))
+            .then_with(|| right.0.memory.id.cmp(&left.0.memory.id))
+    });
+
+    Ok(ranked_candidates)
+}
+
+fn compute_retrieval_score_breakdown_with_mode(
     memory: &Memory,
-    similarity: f32,
+    vector_similarity: Option<f32>,
+    keyword_similarity: Option<f32>,
     scope_config: &ScopeConfig,
     now: DateTime<Utc>,
-) -> f32 {
+    scoring_mode: RetrievalScoringMode,
+) -> RetrievalScoreBreakdown {
+    let blended_similarity = combine_similarity_signals(vector_similarity, keyword_similarity);
     let recency = decay::retention(memory, now, scope_config) as f32;
-    let access = ((memory.access_count as f32) + 1.0).ln();
-    let priority = memory.importance_score * memory.reliability_score;
-    let similarity_gated_priority = similarity * priority;
+    let access = compute_access_signal(memory.access_count);
+    let priority = blended_similarity * memory.importance_score * memory.reliability_score;
 
-    (scope_config.similarity_weight * similarity)
-        + (scope_config.recency_weight * recency)
-        + (scope_config.access_weight * access)
-        + (scope_config.priority_weight * similarity_gated_priority)
+    let (recency_weight, access_weight, priority_weight) = match scoring_mode {
+        RetrievalScoringMode::Default => (
+            scope_config.recency_weight,
+            scope_config.access_weight,
+            scope_config.priority_weight,
+        ),
+        RetrievalScoringMode::SimilarityOnly => (0.0, 0.0, 0.0),
+    };
+
+    let weighted_similarity = scope_config.similarity_weight * blended_similarity;
+    let weighted_recency = recency_weight * recency;
+    let weighted_access = access_weight * access;
+    let weighted_priority = priority_weight * priority;
+
+    RetrievalScoreBreakdown {
+        vector_similarity,
+        keyword_similarity,
+        blended_similarity,
+        recency_signal: recency,
+        access_signal: access,
+        priority_signal: priority,
+        weighted_similarity,
+        weighted_recency,
+        weighted_access,
+        weighted_priority,
+        total_score: weighted_similarity + weighted_recency + weighted_access + weighted_priority,
+    }
+}
+
+fn compute_access_signal(access_count: u32) -> f32 {
+    let access_count = access_count as f32;
+    if access_count <= 0.0 {
+        return 0.0;
+    }
+
+    access_count / (access_count + ACCESS_SIGNAL_HALF_SATURATION)
+}
+
+fn explain_retrieval_scoring_enabled() -> bool {
+    env_flag_enabled(EXPLAIN_RETRIEVAL_SCORING_ENV)
+}
+
+fn env_flag_enabled(key: &str) -> bool {
+    match std::env::var(key) {
+        Ok(value) => matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "1" | "true" | "yes" | "on"
+        ),
+        Err(_) => false,
+    }
+}
+
+fn emit_search_score_explanations(
+    query_text: &str,
+    scoring_mode: RetrievalScoringMode,
+    ranked_candidates: &[RankedSearchCandidate],
+    limit: usize,
+) {
+    let query_label = if query_text.is_empty() {
+        "<embedding-only>"
+    } else {
+        query_text
+    };
+    eprintln!(
+        "search scoring mode={} query=\"{}\" candidates={}",
+        scoring_mode.as_str(),
+        compact_retrieval_log_value(query_label, 120),
+        ranked_candidates.len()
+    );
+
+    for (rank, (scored_memory, breakdown)) in ranked_candidates.iter().take(limit).enumerate() {
+        eprintln!(
+            "  rank={} id={} score={:.3} similarity={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
+            rank + 1,
+            scored_memory.memory.id,
+            scored_memory.score,
+            scored_memory.similarity,
+            format_optional_retrieval_score(breakdown.vector_similarity),
+            format_optional_retrieval_score(breakdown.keyword_similarity),
+            breakdown.weighted_similarity,
+            breakdown.weighted_recency,
+            breakdown.weighted_access,
+            breakdown.weighted_priority,
+            breakdown.recency_signal,
+            breakdown.access_signal,
+            breakdown.priority_signal,
+            scored_memory.memory.importance_score,
+            scored_memory.memory.reliability_score,
+            compact_retrieval_log_value(&scored_memory.memory.content, 80),
+        );
+    }
+}
+
+fn format_optional_retrieval_score(value: Option<f32>) -> String {
+    value
+        .map(|score| format!("{score:.3}"))
+        .unwrap_or_else(|| "n/a".to_string())
+}
+
+fn compact_retrieval_log_value(value: &str, limit: usize) -> String {
+    let compacted = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut compacted_chars = compacted.chars();
+    let preview = compacted_chars.by_ref().take(limit).collect::<String>();
+    if compacted_chars.next().is_some() {
+        format!("{preview}...")
+    } else {
+        preview
+    }
 }
 
 fn compute_learned_weights_report(
@@ -4926,7 +5124,7 @@ fn load_feedback_learning_samples(
             recorded_at,
             scope_config,
         );
-        let access_signal = (f64::from(access_count) + 1.0).ln();
+        let access_signal = f64::from(compute_access_signal(access_count));
         let priority_signal =
             similarity_signal * f64::from(importance_score.max(0.0) * reliability_score.max(0.0));
 
@@ -6018,7 +6216,7 @@ mod tests {
         CorrectionDisposition, ElegyArchive, EmbeddingError, EmbeddingProvider, ExportFormat,
         Memory, MemoryFilter, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
         MetadataUpdate, OptionalFieldUpdate, PoisoningAlert, PoisoningAlertType, ProvenanceLevel,
-        ResolutionStatus, SearchQuery, SensitivityLevel, ShareConfig,
+        ResolutionStatus, ScopeConfig, SearchQuery, SensitivityLevel, ShareConfig,
     };
 
     #[derive(Debug, Clone)]
@@ -6678,6 +6876,214 @@ mod tests {
         assert!((results[0].similarity - 0.9).abs() < 1e-5);
         assert!((results[1].similarity - 0.5).abs() < 1e-5);
         assert!(results[0].score > results[1].score);
+    }
+
+    #[tokio::test]
+    async fn sequential_search_dampens_access_driven_hubness() {
+        let fixture = test_fixture();
+
+        let mut m02 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m02.content = "alternate Windows target path".to_string();
+        let m02_id = m02.id;
+
+        let mut m05 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m05.content = "audit JSONL log location".to_string();
+        let m05_id = m05.id;
+
+        let mut m07 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m07.content = "system docs authority".to_string();
+        let m07_id = m07.id;
+
+        let mut m08 = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        m08.content = "git identity hooks".to_string();
+        let m08_id = m08.id;
+
+        for memory in [m02, m05, m07, m08] {
+            fixture.store.store(memory).await.expect("store memory");
+        }
+
+        fixture
+            .store
+            .store_embedding(
+                &m02_id,
+                &embedding_with_query_similarities(&[0.65, 0.25, 0.40, 0.35]),
+            )
+            .await
+            .expect("store m02 embedding");
+        fixture
+            .store
+            .store_embedding(
+                &m05_id,
+                &embedding_with_query_similarities(&[0.25, 0.65, 0.40, 0.30]),
+            )
+            .await
+            .expect("store m05 embedding");
+        fixture
+            .store
+            .store_embedding(
+                &m07_id,
+                &embedding_with_query_similarities(&[0.20, 0.20, 0.75, 0.20]),
+            )
+            .await
+            .expect("store m07 embedding");
+        fixture
+            .store
+            .store_embedding(
+                &m08_id,
+                &embedding_with_query_similarities(&[0.20, 0.20, 0.20, 0.70]),
+            )
+            .await
+            .expect("store m08 embedding");
+
+        for query_index in 0..3 {
+            let results = fixture
+                .store
+                .search(SearchQuery {
+                    text: String::new(),
+                    embedding: Some(query_basis_embedding(query_index, 4)),
+                    scope: MemoryScope::Workspace,
+                    state_filter: None,
+                    type_filter: None,
+                    max_results: 3,
+                    context_config: None,
+                    session_id: None,
+                    agent_id: None,
+                })
+                .await
+                .expect("run warm-up search");
+            assert_eq!(results.len(), 3);
+        }
+
+        let final_results = fixture
+            .store
+            .search(SearchQuery {
+                text: String::new(),
+                embedding: Some(query_basis_embedding(3, 4)),
+                scope: MemoryScope::Workspace,
+                state_filter: None,
+                type_filter: None,
+                max_results: 4,
+                context_config: None,
+                session_id: None,
+                agent_id: None,
+            })
+            .await
+            .expect("run target search");
+
+        assert_eq!(final_results[0].memory.id, m08_id);
+        assert_eq!(final_results[1].memory.id, m02_id);
+        assert_eq!(final_results[2].memory.id, m05_id);
+        assert!(
+            final_results[0].score > final_results[1].score,
+            "semantic target should stay ahead of warmed-up hub candidates"
+        );
+
+        let warmed_hub = fixture
+            .store
+            .get_raw(&m02_id)
+            .await
+            .expect("reload m02")
+            .expect("m02 exists");
+        assert_eq!(warmed_hub.access_count, 4);
+    }
+
+    #[test]
+    fn retrieval_score_breakdown_can_neutralize_non_similarity_contributions() {
+        let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        let now = Utc::now();
+        memory.importance_score = 0.9;
+        memory.reliability_score = 0.95;
+        memory.access_count = 9;
+        memory.updated_at = now;
+        memory.last_accessed_at = Some(now);
+
+        let default_breakdown = super::compute_retrieval_score_breakdown_with_mode(
+            &memory,
+            Some(0.8),
+            Some(0.2),
+            &ScopeConfig::default(),
+            now,
+            super::RetrievalScoringMode::Default,
+        );
+        let similarity_only_breakdown = super::compute_retrieval_score_breakdown_with_mode(
+            &memory,
+            Some(0.8),
+            Some(0.2),
+            &ScopeConfig::default(),
+            now,
+            super::RetrievalScoringMode::SimilarityOnly,
+        );
+
+        assert!(default_breakdown.weighted_similarity > 0.0);
+        assert!(default_breakdown.weighted_recency > 0.0);
+        assert!(default_breakdown.weighted_access > 0.0);
+        assert!(default_breakdown.weighted_priority > 0.0);
+        assert_eq!(
+            similarity_only_breakdown.blended_similarity,
+            default_breakdown.blended_similarity
+        );
+        assert_eq!(
+            similarity_only_breakdown.weighted_similarity,
+            default_breakdown.weighted_similarity
+        );
+        assert_eq!(similarity_only_breakdown.weighted_recency, 0.0);
+        assert_eq!(similarity_only_breakdown.weighted_access, 0.0);
+        assert_eq!(similarity_only_breakdown.weighted_priority, 0.0);
+        assert_eq!(
+            similarity_only_breakdown.total_score,
+            similarity_only_breakdown.weighted_similarity
+        );
+    }
+
+    #[tokio::test]
+    async fn realistic_benchmark_similarity_only_mode_surfaces_expected_targets() {
+        for case in realistic_benchmark_query_cases() {
+            let fixture = test_fixture();
+            let labels_by_id = seed_realistic_benchmark_case(&fixture, case).await;
+
+            let default_results = rank_realistic_benchmark_case(
+                &fixture.store,
+                case.query,
+                super::RetrievalScoringMode::Default,
+            );
+            let similarity_only_results = rank_realistic_benchmark_case(
+                &fixture.store,
+                case.query,
+                super::RetrievalScoringMode::SimilarityOnly,
+            );
+
+            let similarity_only_top_label =
+                label_for_scored_memory(&labels_by_id, &similarity_only_results[0].0);
+
+            assert_eq!(
+                similarity_only_top_label, case.target_label,
+                "similarity-only mode should surface the target for {}",
+                case.label
+            );
+
+            let default_target_rank =
+                rank_for_label(&default_results, &labels_by_id, case.target_label);
+            let similarity_only_target_rank =
+                rank_for_label(&similarity_only_results, &labels_by_id, case.target_label);
+            assert!(
+                similarity_only_target_rank <= default_target_rank,
+                "expected target rank to improve or stay stable for {} (default={}, similarity-only={})",
+                case.label,
+                default_target_rank,
+                similarity_only_target_rank
+            );
+
+            if default_target_rank > 1 {
+                let default_top_similarity = default_results[0].0.similarity;
+                let target_similarity =
+                    similarity_for_label(&default_results, &labels_by_id, case.target_label);
+                assert!(
+                    target_similarity > default_top_similarity,
+                    "expected target similarity to beat the default top score for {}",
+                    case.label
+                );
+            }
+        }
     }
 
     #[tokio::test]
@@ -7494,6 +7900,281 @@ mod tests {
             .expect("update scope config");
     }
 
+    #[derive(Clone, Copy)]
+    struct BenchmarkMemorySpec {
+        label: &'static str,
+        content: &'static str,
+        importance: f32,
+        reliability: f32,
+        access_count: u32,
+    }
+
+    #[derive(Clone, Copy)]
+    struct BenchmarkQueryCase {
+        label: &'static str,
+        query: &'static str,
+        target_label: &'static str,
+    }
+
+    async fn seed_realistic_benchmark_case(
+        fixture: &TestFixture,
+        case: BenchmarkQueryCase,
+    ) -> HashMap<MemoryId, &'static str> {
+        let mut labels_by_id = HashMap::new();
+        let seeded_at = Utc::now();
+
+        for spec in realistic_benchmark_memory_specs() {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            memory.content = spec.content.to_string();
+            memory.summary = Some(format!("{} realistic benchmark note", spec.label));
+            memory.importance_score = spec.importance;
+            memory.reliability_score = spec.reliability;
+            memory.access_count = spec.access_count;
+            memory.updated_at = seeded_at;
+            memory.last_accessed_at = Some(seeded_at);
+            memory.tags = vec!["benchmark".to_string(), case.label.to_string()];
+
+            let id = memory.id;
+            fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store realistic benchmark memory");
+            fixture
+                .store
+                .store_embedding(
+                    &id,
+                    &embedding_with_similarity(realistic_benchmark_similarity(
+                        case.label, spec.label,
+                    )),
+                )
+                .await
+                .expect("store realistic benchmark embedding");
+            labels_by_id.insert(id, spec.label);
+        }
+
+        labels_by_id
+    }
+
+    fn rank_realistic_benchmark_case(
+        store: &SqliteMemoryStore,
+        query: &str,
+        scoring_mode: super::RetrievalScoringMode,
+    ) -> Vec<super::RankedSearchCandidate> {
+        let search_query = SearchQuery {
+            text: query.to_string(),
+            embedding: Some(query_embedding()),
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 13,
+            context_config: None,
+            session_id: None,
+            agent_id: None,
+        };
+
+        store
+            .with_connection(|connection| {
+                super::rank_search_candidates(connection, &search_query, query, None, scoring_mode)
+            })
+            .expect("rank realistic benchmark case")
+    }
+
+    fn label_for_scored_memory(
+        labels_by_id: &HashMap<MemoryId, &'static str>,
+        scored_memory: &crate::ScoredMemory,
+    ) -> &'static str {
+        labels_by_id
+            .get(&scored_memory.memory.id)
+            .copied()
+            .expect("label should exist for scored memory")
+    }
+
+    fn rank_for_label(
+        results: &[super::RankedSearchCandidate],
+        labels_by_id: &HashMap<MemoryId, &'static str>,
+        label: &str,
+    ) -> usize {
+        results
+            .iter()
+            .position(|(scored_memory, _)| {
+                label_for_scored_memory(labels_by_id, scored_memory) == label
+            })
+            .map(|index| index + 1)
+            .expect("label should appear in ranked results")
+    }
+
+    fn similarity_for_label(
+        results: &[super::RankedSearchCandidate],
+        labels_by_id: &HashMap<MemoryId, &'static str>,
+        label: &str,
+    ) -> f32 {
+        results
+            .iter()
+            .find_map(|(scored_memory, _)| {
+                (label_for_scored_memory(labels_by_id, scored_memory) == label)
+                    .then_some(scored_memory.similarity)
+            })
+            .expect("label should appear in ranked results")
+    }
+
+    fn realistic_benchmark_memory_specs() -> [BenchmarkMemorySpec; 13] {
+        [
+            BenchmarkMemorySpec {
+                label: "M01",
+                content: "Run cargo test -p elegy-memory-mcp --test wu13_repro -- --nocapture before opening the pull request when retrieval behavior changes.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M02",
+                content: "On Romain's Windows setup, release binaries may land in D:\\cargo-targets\\elegy\\release instead of rust\\target\\release.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M03",
+                content: "The local stdio MCP binary does not need OAuth; OAuth only applies to the remote HTTP server.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M04",
+                content: "During benchmarks, never wipe the whole namespace. Delete only the IDs created by the current run.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M05",
+                content: "Deterministic hook audit events are appended as JSONL under .instructions-output\\hooks\\*.jsonl.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M06",
+                content: "Retrieval ranking blends similarity, recency, access frequency, and similarity-weighted priority from scope_config.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M07",
+                content: "When docs disagree, docs/system/** is authoritative over README.md and local overlays.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M08",
+                content: "Git hooks enforce the correct RomainROCH identity for protected git and gh operations in this repository.",
+                importance: 1.0,
+                reliability: 1.0,
+                access_count: 20,
+            },
+            BenchmarkMemorySpec {
+                label: "M09",
+                content: "The dashboard development server listens on port 3000 unless the local config overrides it.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M10",
+                content: "Mulch the tomato beds after watering so the garden keeps moisture through the afternoon heat.",
+                importance: 0.25,
+                reliability: 0.8,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M11",
+                content: "After changing the site's CSS bundle, do a hard refresh or clear the browser cache to see the new styles.",
+                importance: 0.78,
+                reliability: 0.9,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M12",
+                content: "For posture work, start with light weights: two sets of twelve goblet squats at eight kilograms.",
+                importance: 0.55,
+                reliability: 0.85,
+                access_count: 0,
+            },
+            BenchmarkMemorySpec {
+                label: "M13",
+                content: "Before release day, run smoke tests, update the changelog, and verify the release notes.",
+                importance: 0.95,
+                reliability: 1.0,
+                access_count: 18,
+            },
+        ]
+    }
+
+    fn realistic_benchmark_query_cases() -> [BenchmarkQueryCase; 6] {
+        [
+            BenchmarkQueryCase {
+                label: "R2",
+                query: "alt Windows release path",
+                target_label: "M02",
+            },
+            BenchmarkQueryCase {
+                label: "R4",
+                query: "wipe whole namespace?",
+                target_label: "M04",
+            },
+            BenchmarkQueryCase {
+                label: "R6",
+                query: "README vs system docs",
+                target_label: "M07",
+            },
+            BenchmarkQueryCase {
+                label: "R7",
+                query: "wrong git identity",
+                target_label: "M08",
+            },
+            BenchmarkQueryCase {
+                label: "R8",
+                query: "audit log location",
+                target_label: "M05",
+            },
+            BenchmarkQueryCase {
+                label: "L3",
+                query: "smoke tests before changelog",
+                target_label: "M13",
+            },
+        ]
+    }
+
+    fn realistic_benchmark_similarity(case_label: &str, memory_label: &str) -> f32 {
+        match (case_label, memory_label) {
+            ("R1", "M01") => 0.97,
+            ("R1", "M08") => 0.45,
+            ("R1", "M13") => 0.42,
+            ("R2", "M02") => 0.96,
+            ("R2", "M08") => 0.58,
+            ("R2", "M13") => 0.55,
+            ("R4", "M04") => 0.95,
+            ("R4", "M08") => 0.60,
+            ("R4", "M13") => 0.57,
+            ("R6", "M07") => 0.94,
+            ("R6", "M08") => 0.59,
+            ("R6", "M13") => 0.54,
+            ("R7", "M08") => 0.98,
+            ("R7", "M13") => 0.50,
+            ("R8", "M05") => 0.95,
+            ("R8", "M08") => 0.56,
+            ("R8", "M13") => 0.55,
+            ("L3", "M13") => 0.97,
+            ("L3", "M08") => 0.52,
+            (_, "M10") => 0.06,
+            _ => 0.18,
+        }
+    }
+
     fn insert_version_snapshot(store: &SqliteMemoryStore, memory_id: &MemoryId) {
         store
             .with_connection(|connection| {
@@ -7795,6 +8476,39 @@ mod tests {
 
     fn query_embedding() -> Vec<f32> {
         embedding_with_similarity(1.0)
+    }
+
+    fn query_basis_embedding(index: usize, total_queries: usize) -> Vec<f32> {
+        assert!(total_queries > 0);
+        assert!(index < total_queries);
+
+        let mut embedding = vec![0.0; 768];
+        embedding[index] = 1.0;
+        embedding
+    }
+
+    fn embedding_with_query_similarities(similarities: &[f32]) -> Vec<f32> {
+        assert!(!similarities.is_empty());
+        assert!(similarities.len() + 1 < 768);
+
+        let sum_of_squares = similarities
+            .iter()
+            .map(|value| {
+                let clamped = value.clamp(0.0, 1.0);
+                clamped * clamped
+            })
+            .sum::<f32>();
+        assert!(
+            sum_of_squares <= 1.0,
+            "similarities must fit inside a normalized embedding"
+        );
+
+        let mut embedding = vec![0.0; 768];
+        for (index, similarity) in similarities.iter().enumerate() {
+            embedding[index] = similarity.clamp(0.0, 1.0);
+        }
+        embedding[similarities.len()] = (1.0 - sum_of_squares).sqrt();
+        embedding
     }
 
     fn embedding_with_similarity(similarity: f32) -> Vec<f32> {
@@ -8323,12 +9037,12 @@ mod tests {
 
         fixture
             .store
-            .store_embedding(&similarity_favored_id, &embedding_with_similarity(0.95))
+            .store_embedding(&similarity_favored_id, &embedding_with_similarity(0.75))
             .await
             .expect("store high-similarity embedding");
         fixture
             .store
-            .store_embedding(&priority_favored_id, &embedding_with_similarity(0.50))
+            .store_embedding(&priority_favored_id, &embedding_with_similarity(0.40))
             .await
             .expect("store high-priority embedding");
 
@@ -8337,11 +9051,11 @@ mod tests {
             .with_connection(|connection| {
                 let now = super::format_timestamp(Utc::now());
                 connection.execute(
-                    "UPDATE memories SET access_count = 0, importance_score = 0.35, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    "UPDATE memories SET access_count = 0, importance_score = 0.30, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
                     params![similarity_favored_id.to_string(), now.clone()],
                 )?;
                 connection.execute(
-                    "UPDATE memories SET access_count = 8, importance_score = 0.9, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    "UPDATE memories SET access_count = 64, importance_score = 1.0, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
                     params![priority_favored_id.to_string(), now],
                 )?;
                 Ok(())
@@ -8399,11 +9113,11 @@ mod tests {
                 super::persist_learned_weights(connection, report.effective_weights)?;
 
                 connection.execute(
-                    "UPDATE memories SET access_count = 0, importance_score = 0.35, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    "UPDATE memories SET access_count = 0, importance_score = 0.30, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
                     params![similarity_favored_id.to_string(), now.clone()],
                 )?;
                 connection.execute(
-                    "UPDATE memories SET access_count = 8, importance_score = 0.9, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
+                    "UPDATE memories SET access_count = 64, importance_score = 1.0, updated_at = ?2, last_accessed_at = NULL WHERE id = ?1",
                     params![priority_favored_id.to_string(), now],
                 )?;
                 Ok(())
