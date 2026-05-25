@@ -33,6 +33,17 @@ Before writing any code, read the relevant architecture docs:
 5. **Embeddings are async-safe.** Embedding computation can fail or be slow. Always handle `embedding_stale` flag. Never block writes on embedding generation.
 6. **Provenance is mandatory.** Every memory must have a provenance level. Default is `Imported` (lowest trust).
 
+## Git Workflow
+
+- Promotion chain: `roro/<topic>` -> `roro` -> `dev` -> `main`
+- Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
+- Do feature work on `roro/<topic>` branches, not directly on `roro`, `dev`, or `main`
+- Merge `roro/<topic>` into `roro` only after validation is clean
+- Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes
+- Merge `dev` into `main` only after `dev` is clean and validated
+- If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work
+- If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work
+
 ## File Organization
 
 ```
@@ -67,4 +78,3 @@ Elegy/
 │               └── local_store.rs
 └── prompt.md
 ```
-
