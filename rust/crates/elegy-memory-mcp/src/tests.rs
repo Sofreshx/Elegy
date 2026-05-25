@@ -167,11 +167,9 @@ impl TestHarness {
             oauth: Arc::clone(&oauth),
         };
 
-        let transport_config = StreamableHttpServerConfig {
-            sse_keep_alive: None,
-            sse_retry: None,
-            ..Default::default()
-        };
+        let transport_config = StreamableHttpServerConfig::default()
+            .with_sse_keep_alive(None)
+            .with_sse_retry(None);
 
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
             .await
@@ -317,10 +315,11 @@ fn access_token_claims_with_jti(
     }
 }
 
-fn first_sse_payload(body: &str) -> &str {
+fn first_json_sse_payload(body: &str) -> Value {
     body.lines()
-        .find_map(|line| line.strip_prefix("data: "))
-        .unwrap_or_else(|| panic!("initialize response should contain an SSE payload"))
+        .filter_map(|line| line.strip_prefix("data: "))
+        .find_map(|payload| serde_json::from_str(payload).ok())
+        .unwrap_or_else(|| panic!("response should contain a JSON SSE payload: {body}"))
 }
 
 #[tokio::test]
@@ -617,8 +616,7 @@ async fn full_code_flow_issues_hs256_tokens() {
         .text()
         .await
         .unwrap_or_else(|_| panic!("initialize body should be readable"));
-    let payload: Value = serde_json::from_str(first_sse_payload(&body))
-        .unwrap_or_else(|_| panic!("initialize payload should parse"));
+    let payload = first_json_sse_payload(&body);
     assert_eq!(
         payload["result"]["serverInfo"]["name"],
         json!(env!("CARGO_PKG_NAME"))
@@ -1361,8 +1359,7 @@ async fn parse_mcp_response(response: reqwest::Response) -> Value {
         .await
         .unwrap_or_else(|_| panic!("mcp body should be readable"));
     if body.trim_start().starts_with("data: ") {
-        serde_json::from_str(first_sse_payload(&body))
-            .unwrap_or_else(|_| panic!("mcp SSE payload should parse"))
+        first_json_sse_payload(&body)
     } else {
         serde_json::from_str(&body).unwrap_or_else(|_| panic!("mcp JSON payload should parse"))
     }
