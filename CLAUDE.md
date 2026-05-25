@@ -66,7 +66,10 @@ Include: date, what changed, test status, decisions made.
 
 ## Git
 
-- Working branch: `dev`
+- Base branch: `dev`
+- Keep `dev` clean and fast-forwardable to `origin/dev`
+- Do normal work on a personal branch (for example `roro` or `roro/<topic>`)
+- Merge to `dev` only when the work and validation are clean
 - Atomic commits: one logical change = one commit
 - Never push to `main`
 - Never force-push or rewrite history on `dev`

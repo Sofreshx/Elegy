@@ -1,5 +1,15 @@
 # FLIGHT_RECORDER
 
+## 2026-05-25 Branch workflow guardrail
+- What changed:
+  - Synced local `dev` with `origin/dev`, then moved ongoing work to a dedicated personal branch named `roro`.
+  - Updated `AGENTS.md` and `CLAUDE.md` to state that everyday work should happen on a personal branch and that `dev` should only receive validated, clean work.
+- Test status:
+  - No code-path validation needed; documentation/workflow-only change.
+- Decisions:
+  - Treat `dev` as the clean integration branch.
+  - Keep future work off `dev` until it is ready to merge cleanly.
+
 ## Session 4 Bootstrap
 - `FLIGHT_RECORDER_PROTOCOL.md` was missing at repo root even though `prompt.md` references it as a required operating protocol.
 - Worktree baseline (`git status --short`):
