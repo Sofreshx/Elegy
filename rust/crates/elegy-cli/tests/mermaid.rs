@@ -415,3 +415,46 @@ fn mermaid_reverse_command_rejects_unsupported_mermaid_direction() {
     assert!(stdout.contains("CLI-MERMAID-006"));
     assert!(stdout.contains("flowchart LR"));
 }
+
+#[test]
+fn mermaid_render_invalid_json_emits_correlation_id_in_json_mode() {
+    let temp_dir = unique_temp_dir("elegy-cli-mermaid-correlation");
+    let input_path = temp_dir.join("unsupported.json");
+    fs::write(
+        &input_path,
+        r#"{
+  "artifactKind": "summary-only-session-context-envelope",
+  "sessionContext": {
+    "scope": "workspace",
+    "representation": "summary-only",
+    "summary": "Not a Mermaid renderable canonical workflow shape.",
+    "rawTranscriptPersisted": false
+  }
+}
+"#,
+    )
+    .expect("write unsupported JSON fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-mermaid-err-1",
+            "mermaid",
+            "render",
+            "--input",
+            input_path.to_str().expect("utf-8 unsupported input path"),
+        ])
+        .output()
+        .expect("run elegy mermaid render invalid input with machine flags");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("\"correlationId\": \"corr-mermaid-err-1\""));
+    assert!(stdout.contains("\"nonInteractive\": true"));
+    assert!(stdout.contains("CLI-MERMAID-003"));
+}

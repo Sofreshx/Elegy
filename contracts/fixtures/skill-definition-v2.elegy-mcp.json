@@ -1,0 +1,141 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "mcp",
+    "version": "0.1.0",
+    "displayName": "Elegy MCP Descriptor Tools",
+    "aliases": ["elegy-mcp", "mcp-descriptor", "mcp-analysis"]
+  },
+  "metadata": {
+    "displayName": "Elegy MCP Descriptor Tools",
+    "description": "Governed descriptor authoring and analysis for MCP server descriptors.",
+    "summary": "Author and analyze governed MCP descriptors.",
+    "category": "mcp",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["mcp", "descriptor", "authoring", "analysis", "governed"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/architecture/mcp-skill-tooling-placement.md"
+  },
+  "capabilities": [
+    {
+      "id": "mcp-author-descriptor",
+      "name": "Author MCP Descriptor",
+      "description": "Create a governed MCP server descriptor from explicit tool names and descriptions.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["author", "mcp", "--server-name", "${serverName}", "--output", "${output}", "--transport", "${transport}", "--tool", "${tools}", "--force", "${force}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "serverName",
+            "type": "string",
+            "description": "Server name for descriptor authoring.",
+            "required": true
+          },
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Output path for the authored MCP descriptor.",
+            "required": true
+          },
+          {
+            "name": "transport",
+            "type": "string",
+            "description": "Transport for the descriptor. Supported values: stdio or http.",
+            "required": false,
+            "default": "stdio"
+          },
+          {
+            "name": "tools",
+            "type": "array",
+            "description": "Tool specs in NAME or NAME=DESCRIPTION form.",
+            "required": false
+          },
+          {
+            "name": "force",
+            "type": "boolean",
+            "description": "Allow overwriting an existing descriptor file.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "McpDescriptorResult",
+        "schemaRef": "https://elegy/contracts/schemas/mcp-descriptor-result.schema.json",
+        "description": "Authored MCP descriptor path and descriptor contents."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "mcp-analyze-descriptor",
+      "name": "Analyze MCP Descriptor",
+      "description": "Analyze a governed MCP descriptor for tool schema viability and extracted triggers.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["analyze", "mcp", "--descriptor", "${descriptor}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "descriptor",
+            "type": "path",
+            "description": "Path to a governed MCP descriptor.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "McpAnalysisResult",
+        "schemaRef": "https://elegy/contracts/schemas/mcp-analysis-result.schema.json",
+        "description": "MCP analysis result describing each tool and whether it has a valid schema."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "descriptor-scoped-only",
+      "description": "This surface is limited to descriptor authoring and analysis over governed MCP shapes.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": ["docs/architecture/mcp-skill-tooling-placement.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "descriptor-authoring"]
+  },
+  "discovery": {
+    "keywords": ["mcp", "descriptor", "author", "analyze", "governed"],
+    "triggers": [
+      {
+        "pattern": "mcp descriptor",
+        "description": "When descriptor-scoped MCP work should use governed MCP tooling."
+      }
+    ],
+    "capabilityHints": ["descriptor-authoring", "descriptor-analysis"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-mcp.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

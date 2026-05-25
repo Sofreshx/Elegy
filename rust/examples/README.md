@@ -7,7 +7,7 @@ They are kept in-repo as:
 - contributor onboarding assets
 - acceptance inputs for runtime/core validation
 - small, reviewable demonstrations of the supported runtime model
-- preserved goldens for the now-imported CLI and host smoke flows
+- preserved goldens for the currently exercised core, CLI, and host transport proofs
 
 ## Current imported status
 
@@ -18,12 +18,12 @@ The current monorepo runtime slice includes both examples that are exercised by 
 - `examples/fs-static-minimal/`
   - active acceptance input for filesystem/static validation and runtime composition
   - covered by `crates/elegy-core/tests/bootstrap_slice.rs`
-  - used by the imported CLI and host smoke checks for local operator validation
+  - shared acceptance input for current core validation and host transport coverage
   - includes `expected-resources.json` as the deterministic catalog reference for the currently implemented path
 - `examples/http-minimal/`
   - active acceptance input for the implemented plain constrained HTTP runtime path
   - covered by `crates/elegy-core/tests/bootstrap_slice.rs`
-  - used by the imported CLI smoke flows for config validation, runtime validation, resource inspection, and dry-run execution
+  - used by the current umbrella `elegy` dry-run acceptance and host transport coverage
   - preserves the expected JSON outputs used by the former standalone runtime repo so they remain available during monorepo consolidation
 
 ### Scaffolded today

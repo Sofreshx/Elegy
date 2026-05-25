@@ -1,0 +1,501 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "memory",
+    "version": "0.1.0",
+    "displayName": "Elegy Memory",
+    "aliases": ["elegy-memory", "session-context", "local-memory"]
+  },
+  "metadata": {
+    "displayName": "Elegy Memory",
+    "description": "Bounded local non-authoritative memory operations over the Elegy memory CLI surface.",
+    "summary": "Add, search, list, inspect, purge, health-check, export, and review local agent memory.",
+    "category": "memory",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["memory", "local-cli", "mvp", "preview", "non-authoritative"],
+    "owners": ["elegy"],
+    "documentationUri": "rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md"
+  },
+  "capabilities": [
+    {
+      "id": "memory-add",
+      "name": "Add Memory",
+      "description": "Add a distilled local memory with explicit type, importance, provenance, scope, and optional database path.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["add", "${content}", "--type", "${memoryType}", "--importance", "${importance}", "--provenance", "${provenance}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "content",
+            "type": "string",
+            "description": "Distilled memory content. Do not pass raw transcripts.",
+            "required": true
+          },
+          {
+            "name": "memoryType",
+            "type": "string",
+            "description": "Memory type: fact, preference, decision, procedure, or observation.",
+            "required": false,
+            "default": "observation"
+          },
+          {
+            "name": "importance",
+            "type": "number",
+            "description": "Importance score from 0.0 to 1.0.",
+            "required": false,
+            "default": 0.5
+          },
+          {
+            "name": "provenance",
+            "type": "string",
+            "description": "Provenance level: user-stated, agent-observed, consolidated, imported, or agent-inferred.",
+            "required": false,
+            "default": "user-stated"
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope: session, workspace, user, or agent.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryAddResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-add-result.schema.json",
+        "description": "Created memory record and salience gate result."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "memory-search",
+      "name": "Search Memory",
+      "description": "Search local memories with keyword matching and provider-backed embeddings when configured.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["search", "${query}", "--limit", "${limit}", "--include-dormant", "${includeDormant}", "--db", "${db}", "--scope", "${scope}", "--embedding-provider", "${provider}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "Search query.",
+            "required": true
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "description": "Maximum results to return.",
+            "required": false,
+            "default": 20
+          },
+          {
+            "name": "includeDormant",
+            "type": "boolean",
+            "description": "Include dormant records.",
+            "required": false,
+            "default": false
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          },
+          {
+            "name": "provider",
+            "type": "string",
+            "description": "Optional embedding provider, such as ollama.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemorySearchResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-search-result.schema.json",
+        "description": "Search results with scores and memory previews."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "memory-list",
+      "name": "List Memory",
+      "description": "List local memories by type, state, scope, and limit.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["list", "--type", "${memoryType}", "--state", "${state}", "--limit", "${limit}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "memoryType",
+            "type": "string",
+            "description": "Optional memory type filter.",
+            "required": false
+          },
+          {
+            "name": "state",
+            "type": "string",
+            "description": "Optional state filter: active, dormant, or deleted.",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "description": "Maximum records to return.",
+            "required": false,
+            "default": 20
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryListResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-list-result.schema.json",
+        "description": "Memory rows matching the requested filters."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "memory-inspect",
+      "name": "Inspect Memory",
+      "description": "Inspect a memory and its version history.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["inspect", "${id}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Memory identifier.",
+            "required": true
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryInspectResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-inspect-result.schema.json",
+        "description": "Memory record and version history."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "memory-purge",
+      "name": "Purge Memory Store",
+      "description": "Purge the configured memory database after explicit confirmation.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["purge", "--yes", "${yes}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "yes",
+            "type": "boolean",
+            "description": "Skip confirmation prompt. Required for non-interactive use.",
+            "required": false,
+            "default": false
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryPurgeReport",
+        "schemaRef": "https://elegy/contracts/schemas/memory-purge-report.schema.json",
+        "description": "Purge report with deleted record counts."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "memory-health",
+      "name": "Memory Health",
+      "description": "Show health and count summaries for the configured memory scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["health", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryHealthReport",
+        "schemaRef": "https://elegy/contracts/schemas/memory-health-report.schema.json",
+        "description": "Memory health report and type counts."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "memory-export",
+      "name": "Export Memory",
+      "description": "Export memories as JSON to stdout or a file.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["export", "--output", "${output}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Optional export destination.",
+            "required": false
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryExportResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-export-result.schema.json",
+        "description": "Exported memories or export destination metadata."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "memory-reembed",
+      "name": "Re-embed Stale Memory",
+      "description": "Preview re-embedding of stale memories when a provider is configured.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["reembed", "--limit", "${limit}", "--embedding-provider", "${provider}", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "limit",
+            "type": "integer",
+            "description": "Maximum stale memories to process.",
+            "required": false,
+            "default": 100
+          },
+          {
+            "name": "provider",
+            "type": "string",
+            "description": "Embedding provider, such as ollama.",
+            "required": false
+          },
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryReembedResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-reembed-result.schema.json",
+        "description": "Re-embed preview report."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "memory-contradictions",
+      "name": "List Contradictions",
+      "description": "List unresolved contradiction records for the configured memory scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-memory",
+        "arguments": ["contradictions", "--db", "${db}", "--scope", "${scope}", "--format", "json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path.",
+            "required": false
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Memory scope.",
+            "required": false,
+            "default": "workspace"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "MemoryContradictionsResult",
+        "schemaRef": "https://elegy/contracts/schemas/memory-contradictions-result.schema.json",
+        "description": "Unresolved contradiction records."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "local-non-authoritative-surface",
+      "description": "This surface must not claim currentness, approval, freshness, retrieval ranking, runtime validation, or promotion authority.",
+      "required": true
+    },
+    {
+      "constraintId": "no-raw-transcripts",
+      "description": "Memories are distilled facts, decisions, preferences, procedures, and observations, not raw transcript dumps.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": ["docs/migration/reusable-memory-boundary.md", "docs/architecture/skill-core-v1.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "memory-operations"]
+  },
+  "discovery": {
+    "keywords": ["memory", "local memory", "search", "inspect", "export", "purge", "contradictions", "reembed"],
+    "triggers": [
+      {
+        "pattern": "memory",
+        "description": "When work involves Elegy's bounded local memory operator surface."
+      },
+      {
+        "pattern": "memory search",
+        "description": "When local memories need to be added, searched, listed, or inspected within a scope."
+      }
+    ],
+    "capabilityHints": ["local-memory-add-search", "local-memory-inspection-health-export", "local-memory-purge-and-contradictions", "local-memory-reembed-preview"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-memory.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

@@ -59,6 +59,10 @@
       "generated": "artifacts/contracts/canonical-workflow.schema.json"
     },
     {
+      "source": "contracts/schemas/capability-definition.schema.json",
+      "generated": "artifacts/contracts/capability-definition.schema.json"
+    },
+    {
       "source": "contracts/schemas/dynamic-skill-activation.schema.json",
       "generated": "artifacts/contracts/dynamic-skill-activation.schema.json"
     },
@@ -79,8 +83,12 @@
       "generated": "artifacts/contracts/monitoring-event.schema.json"
     },
     {
-      "source": "contracts/schemas/skill-definition.schema.json",
-      "generated": "artifacts/contracts/skill-definition.schema.json"
+      "source": "contracts/schemas/skill-definition-v2.schema.json",
+      "generated": "artifacts/contracts/skill-definition-v2.schema.json"
+    },
+    {
+      "source": "contracts/schemas/elegy-plugin-package-v1.schema.json",
+      "generated": "artifacts/contracts/elegy-plugin-package-v1.schema.json"
     },
     {
       "source": "contracts/schemas/skill-discovery-index.schema.json",
@@ -89,6 +97,22 @@
     {
       "source": "contracts/schemas/skill-forge-request.schema.json",
       "generated": "artifacts/contracts/skill-forge-request.schema.json"
+    },
+    {
+      "source": "contracts/schemas/structured-failure.schema.json",
+      "generated": "artifacts/contracts/structured-failure.schema.json"
+    },
+    {
+      "source": "contracts/schemas/invocation-request.schema.json",
+      "generated": "artifacts/contracts/invocation-request.schema.json"
+    },
+    {
+      "source": "contracts/schemas/invocation-response.schema.json",
+      "generated": "artifacts/contracts/invocation-response.schema.json"
+    },
+    {
+      "source": "contracts/schemas/execution-event.schema.json",
+      "generated": "artifacts/contracts/execution-event.schema.json"
     },
     {
       "source": "contracts/fixtures/agent-create-request.minimal.json",
@@ -131,6 +155,10 @@
       "generated": "artifacts/contracts/fixtures/canonical-workflow.minimal.json"
     },
     {
+      "source": "contracts/fixtures/capability-definition.minimal.json",
+      "generated": "artifacts/contracts/fixtures/capability-definition.minimal.json"
+    },
+    {
       "source": "contracts/fixtures/dynamic-skill-activation.minimal.json",
       "generated": "artifacts/contracts/fixtures/dynamic-skill-activation.minimal.json"
     },
@@ -163,24 +191,68 @@
       "generated": "artifacts/contracts/fixtures/monitoring-event.minimal.json"
     },
     {
-      "source": "contracts/fixtures/skill-definition.minimal.json",
-      "generated": "artifacts/contracts/fixtures/skill-definition.minimal.json"
+      "source": "contracts/fixtures/skill-definition-v2.minimal.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.minimal.json"
     },
     {
-      "source": "contracts/fixtures/skill-definition.elegy-memory.json",
-      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-memory.json"
+      "source": "contracts/fixtures/skill-definition-v2.elegy-data.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-data.json"
     },
     {
-      "source": "contracts/fixtures/skill-definition.elegy-mcp.json",
-      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-mcp.json"
+      "source": "contracts/fixtures/skill-definition-v2.elegy-desktop.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-desktop.json"
     },
     {
-      "source": "contracts/fixtures/skill-definition.elegy-skills.json",
-      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-skills.json"
+      "source": "contracts/fixtures/skill-definition-v2.elegy-diagram.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-diagram.json"
     },
     {
-      "source": "contracts/fixtures/skill-definition.elegy-mermaid.json",
-      "generated": "artifacts/contracts/fixtures/skill-definition.elegy-mermaid.json"
+      "source": "contracts/fixtures/skill-definition-v2.elegy-memory.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-memory.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-mcp.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-mcp.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-mermaid.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-mermaid.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-notify.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-notify.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-observe.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-observe.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-planning.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-repo.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-repo.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-skill-router.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-skill-router.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-skills.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-web.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-web.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v1.minimal.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json"
     },
     {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",
@@ -199,12 +271,52 @@
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-skills.json"
     },
     {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-planning.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-mermaid.json"
     },
     {
+      "source": ".agents/skills/elegy-memory/SKILL.md",
+      "generated": ".github/skills/elegy-memory/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-mcp/SKILL.md",
+      "generated": ".github/skills/elegy-mcp/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-skills/SKILL.md",
+      "generated": ".github/skills/elegy-skills/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-planning/SKILL.md",
+      "generated": ".github/skills/elegy-planning/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-mermaid/SKILL.md",
+      "generated": ".github/skills/elegy-mermaid/SKILL.md"
+    },
+    {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-forge-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/structured-failure.minimal.json",
+      "generated": "artifacts/contracts/fixtures/structured-failure.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-request.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-request.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/invocation-response.minimal.json",
+      "generated": "artifacts/contracts/fixtures/invocation-response.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/execution-event.minimal.json",
+      "generated": "artifacts/contracts/fixtures/execution-event.minimal.json"
     }
   ],
   "archivePatterns": [
@@ -213,6 +325,7 @@
   "wrapperArchivePatterns": [
     "artifacts/distribution/elegy-memory-wrapper-*.zip",
     "artifacts/distribution/elegy-mcp-wrapper-*.zip",
+    "artifacts/distribution/elegy-planning-wrapper-*.zip",
     "artifacts/distribution/elegy-skills-wrapper-*.zip"
   ],
   "installerArchivePatterns": [
@@ -223,12 +336,14 @@
     "checksums": "artifacts/distribution/elegy-release-checksums-*.json"
   },
   "wrapperArchiveRequiredEntries": [
+    "README.md",
     "install.ps1",
     "wrapper-entrypoint.json",
     "scripts/install-distribution.ps1"
   ],
   "installerArchiveRequiredEntries": [
-    "install-distribution.ps1"
+    "install-distribution.ps1",
+    "README.md"
   ],
   "wrapperArchiveSurfaceSpecificEntries": {
     "artifacts/distribution/elegy-memory-wrapper-*.zip": [
@@ -236,6 +351,9 @@
     ],
     "artifacts/distribution/elegy-mcp-wrapper-*.zip": [
       "skills/elegy-mcp/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-planning-wrapper-*.zip": [
+      "skills/elegy-planning/SKILL.md"
     ],
     "artifacts/distribution/elegy-skills-wrapper-*.zip": [
       "skills/elegy-skills/SKILL.md"

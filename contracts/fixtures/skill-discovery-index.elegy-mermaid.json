@@ -28,8 +28,8 @@
       "manifest": {
         "id": "elegy-mermaid",
         "loadMode": "onDemand",
-        "vaultRef": ".github/skills/elegy-mermaid/SKILL.md",
-        "sourceKind": "manual",
+        "vaultRef": ".agents/skills/elegy-mermaid/SKILL.md",
+        "sourceKind": "generated",
         "materializationKind": "declared"
       }
     }

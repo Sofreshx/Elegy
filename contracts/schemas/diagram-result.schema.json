@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/diagram-result.schema.json",
+  "title": "DiagramResult",
+  "description": "Result of a diagram capability: a CanonicalDiagram JSON object, a human-readable narrative, or a rendered projection.",
+  "type": "object"
+}

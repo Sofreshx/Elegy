@@ -19,12 +19,12 @@ jobs:
     name: fmt
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.95.0
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo fmt --all --check
@@ -35,12 +35,12 @@ jobs:
     name: clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
+          toolchain: 1.95.0
           components: clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo clippy --workspace --all-targets --all-features -- -D warnings
@@ -58,11 +58,11 @@ jobs:
           - windows-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.88.0
-      - uses: Swatinem/rust-cache@v2
+          toolchain: 1.95.0
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo test --workspace --all-targets --all-features

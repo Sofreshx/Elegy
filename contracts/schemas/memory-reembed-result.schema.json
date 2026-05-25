@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/memory-reembed-result.schema.json",
+  "title": "MemoryReembedResult",
+  "description": "Re-embedding preview report with counts of stale and re-embedded memories.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dbPath", "scope", "provider", "requestedLimit", "staleFound", "reembeddedCount", "reembeddedIds"],
+  "properties": {
+    "dbPath": { "type": "string" },
+    "scope": { "type": "string" },
+    "provider": { "type": "string" },
+    "requestedLimit": { "type": "integer", "minimum": 0 },
+    "staleFound": { "type": "integer", "minimum": 0 },
+    "reembeddedCount": { "type": "integer", "minimum": 0 },
+    "reembeddedIds": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

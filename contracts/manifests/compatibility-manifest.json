@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.3.1"
+    "version": "1.4.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
+      "targetPackageVersion": "1.4.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -36,7 +36,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
+      "targetPackageVersion": "1.4.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -58,11 +58,37 @@
       ]
     },
     {
+      "name": "elegy-planning-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetUpstreamPackageVersion": "1.4.0",
+      "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
+      "wrapperSurface": {
+        "root": "src/Elegy-planning",
+        "entrypoint": "src/Elegy-planning/wrapper-entrypoint.json",
+        "installer": "src/Elegy-planning/install.ps1",
+        "skillBridge": "src/Elegy-planning/skills/elegy-planning/SKILL.md",
+        "releaseAssetPrefix": "elegy-planning-wrapper",
+        "archivePattern": "elegy-planning-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-planning/, and the wrapper surface under wrappers/elegy-planning/."
+      },
+      "existingSchemasUnchanged": [
+        "planning-result",
+        "skill-definition-v2",
+        "skill-discovery-index"
+      ],
+      "authorityReservations": [
+        "contracts planning skill authority",
+        "rust/crates/elegy-planning durable state authority",
+        "downstream host-local policy and side-effect gating"
+      ]
+    },
+    {
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.3.1",
-      "scope": "Dedicated MCP-to-skill generation commands only.",
+      "targetPackageVersion": "1.4.0",
+      "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
         "entrypoint": "src/Elegy-skills/wrapper-entrypoint.json",
@@ -73,11 +99,11 @@
         "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-skills/, and the wrapper surface under wrappers/elegy-skills/."
       },
       "existingArtifactsUnchanged": [
-        "skill-definition",
+        "skill-definition-v2",
         "skill-discovery-index"
       ],
       "authorityReservations": [
-        "contracts skill-definition authority",
+        "contracts skill-definition-v2 authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
       ]
@@ -98,6 +124,72 @@
       "file": "canonical-workflow-graph.schema.json",
       "fixtures": [
         "fixtures/canonical-workflow-graph.minimal.json"
+      ]
+    },
+    {
+      "name": "capability-definition",
+      "schemaVersion": "1.0.0",
+      "file": "capability-definition.schema.json",
+      "fixtures": [
+        "fixtures/capability-definition.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-capability-profile",
+      "schemaVersion": "1.0.0",
+      "file": "agent-capability-profile.schema.json",
+      "fixtures": [
+        "fixtures/agent-capability-profile.minimal.json"
+      ]
+    },
+    {
+      "name": "agent-manifest",
+      "schemaVersion": "1.0.0",
+      "file": "agent-manifest.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "agent-check",
+      "schemaVersion": "1.0.0",
+      "file": "agent-check.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "agent-discovery",
+      "schemaVersion": "1.0.0",
+      "file": "agent-discovery.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "structured-failure",
+      "schemaVersion": "1.0.0",
+      "file": "structured-failure.schema.json",
+      "fixtures": [
+        "fixtures/structured-failure.minimal.json"
+      ]
+    },
+    {
+      "name": "invocation-request",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-request.schema.json",
+      "fixtures": [
+        "fixtures/invocation-request.minimal.json"
+      ]
+    },
+    {
+      "name": "invocation-response",
+      "schemaVersion": "1.0.0",
+      "file": "invocation-response.schema.json",
+      "fixtures": [
+        "fixtures/invocation-response.minimal.json"
+      ]
+    },
+    {
+      "name": "execution-event",
+      "schemaVersion": "1.0.0",
+      "file": "execution-event.schema.json",
+      "fixtures": [
+        "fixtures/execution-event.minimal.json"
       ]
     },
     {
@@ -173,15 +265,57 @@
       ]
     },
     {
-      "name": "skill-definition",
-      "schemaVersion": "1.0.0",
-      "file": "skill-definition.schema.json",
+      "name": "observation-event",
+      "schemaVersion": "1.1.0",
+      "file": "observation-event.schema.json",
       "fixtures": [
-        "fixtures/skill-definition.minimal.json",
-        "fixtures/skill-definition.elegy-memory.json",
-        "fixtures/skill-definition.elegy-mcp.json",
-        "fixtures/skill-definition.elegy-skills.json",
-        "fixtures/skill-definition.elegy-mermaid.json"
+        "fixtures/observation-event.minimal.json"
+      ]
+    },
+    {
+      "name": "observation-session",
+      "schemaVersion": "1.1.0",
+      "file": "observation-session.schema.json",
+      "fixtures": [
+        "fixtures/observation-session.minimal.json"
+      ]
+    },
+    {
+      "name": "observation-summary",
+      "schemaVersion": "1.1.0",
+      "file": "observation-summary.schema.json",
+      "fixtures": [
+        "fixtures/observation-summary.minimal.json"
+      ]
+    },
+    {
+      "name": "skill-definition-v2",
+      "schemaVersion": "2.0.0",
+      "file": "skill-definition-v2.schema.json",
+      "fixtures": [
+        "fixtures/skill-definition-v2.minimal.json",
+        "fixtures/skill-definition-v2.elegy-data.json",
+        "fixtures/skill-definition-v2.elegy-desktop.json",
+        "fixtures/skill-definition-v2.elegy-diagram.json",
+        "fixtures/skill-definition-v2.elegy-memory.json",
+        "fixtures/skill-definition-v2.elegy-mcp.json",
+        "fixtures/skill-definition-v2.elegy-mermaid.json",
+        "fixtures/skill-definition-v2.elegy-notify.json",
+        "fixtures/skill-definition-v2.elegy-observe.json",
+        "fixtures/skill-definition-v2.elegy-planning.json",
+        "fixtures/skill-definition-v2.elegy-repo.json",
+        "fixtures/skill-definition-v2.elegy-skill-router.json",
+        "fixtures/skill-definition-v2.elegy-skills.json",
+        "fixtures/skill-definition-v2.elegy-web.json"
+      ]
+    },
+    {
+      "name": "elegy-plugin-package-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-plugin-package-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-plugin-package-v1.minimal.json",
+        "fixtures/elegy-plugin-package-v1.elegy-planning.json"
       ]
     },
     {
@@ -208,6 +342,7 @@
         "fixtures/skill-discovery-index.minimal.json",
         "fixtures/skill-discovery-index.elegy-memory.json",
         "fixtures/skill-discovery-index.elegy-mcp.json",
+        "fixtures/skill-discovery-index.elegy-planning.json",
         "fixtures/skill-discovery-index.elegy-skills.json",
         "fixtures/skill-discovery-index.elegy-mermaid.json"
       ]
@@ -235,6 +370,168 @@
       "fixtures": [
         "fixtures/mcp-analysis-result.minimal.json"
       ]
+    },
+    {
+      "name": "repo-status",
+      "schemaVersion": "1.0.0",
+      "file": "repo-status.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-diff-summary",
+      "schemaVersion": "1.0.0",
+      "file": "repo-diff-summary.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-branches",
+      "schemaVersion": "1.0.0",
+      "file": "repo-branches.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "repo-log",
+      "schemaVersion": "1.0.0",
+      "file": "repo-log.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-search-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-search-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-list-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-list-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-inspect-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-inspect-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-health-report",
+      "schemaVersion": "1.0.0",
+      "file": "memory-health-report.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-add-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-add-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-purge-report",
+      "schemaVersion": "1.0.0",
+      "file": "memory-purge-report.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-export-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-export-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-reembed-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-reembed-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-contradictions-result",
+      "schemaVersion": "1.0.0",
+      "file": "memory-contradictions-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-search-input",
+      "schemaVersion": "1.0.0",
+      "file": "memory-search-input.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "memory-add-input",
+      "schemaVersion": "1.0.0",
+      "file": "memory-add-input.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "tool-projection",
+      "schemaVersion": "1.0.0",
+      "file": "tool-projection.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "diagram-result",
+      "schemaVersion": "1.0.0",
+      "file": "diagram-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "skill-discovery-result",
+      "schemaVersion": "1.0.0",
+      "file": "skill-discovery-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "mcp-descriptor-result",
+      "schemaVersion": "1.0.0",
+      "file": "mcp-descriptor-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "skill-generation-result",
+      "schemaVersion": "1.0.0",
+      "file": "skill-generation-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "mermaid-result",
+      "schemaVersion": "1.0.0",
+      "file": "mermaid-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "observe-result",
+      "schemaVersion": "1.0.0",
+      "file": "observe-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "planning-result",
+      "schemaVersion": "1.0.0",
+      "file": "planning-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "desktop-result",
+      "schemaVersion": "1.0.0",
+      "file": "desktop-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "web-result",
+      "schemaVersion": "1.0.0",
+      "file": "web-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "data-result",
+      "schemaVersion": "1.0.0",
+      "file": "data-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "notify-result",
+      "schemaVersion": "1.0.0",
+      "file": "notify-result.schema.json",
+      "fixtures": []
     }
   ]
 }
