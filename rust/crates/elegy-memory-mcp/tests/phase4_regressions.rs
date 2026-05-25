@@ -47,10 +47,7 @@ impl TestSession {
         Self::from_repository(temp_dir, repository).await
     }
 
-    async fn from_repository(
-        temp_dir: TempDir,
-        repository: Arc<MemoryRepository>,
-    ) -> Self {
+    async fn from_repository(temp_dir: TempDir, repository: Arc<MemoryRepository>) -> Self {
         let server = ElegyMemoryMcpServer::new(repository, Arc::new(NoopWriteAuditor));
         let (server_transport, client_transport) = tokio::io::duplex(4096);
         let server_task = tokio::spawn(async move {
@@ -172,10 +169,8 @@ impl EmbeddingProvider for FailingEmbeddingProvider {
 #[tokio::test]
 async fn memory_store_accepts_explicit_null_defaulted_fields() {
     let content = "Explicit null defaults now deserialize across MCP memory tools.";
-    let provider: Arc<dyn EmbeddingProvider> = Arc::new(StubEmbeddingProvider::new([(
-        content,
-        axis_embedding(0),
-    )]));
+    let provider: Arc<dyn EmbeddingProvider> =
+        Arc::new(StubEmbeddingProvider::new([(content, axis_embedding(0))]));
     let session = TestSession::new(provider, "phase4-null-agent").await;
 
     let stored = session

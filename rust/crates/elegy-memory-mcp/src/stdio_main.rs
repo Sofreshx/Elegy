@@ -426,8 +426,14 @@ mod tests {
             "nomic-embed-text:latest",
             DEFAULT_OLLAMA_MODEL,
         ));
-        assert!(ollama_model_matches("nomic-embed-text:v1", DEFAULT_OLLAMA_MODEL));
-        assert!(!ollama_model_matches("other-model:latest", DEFAULT_OLLAMA_MODEL));
+        assert!(ollama_model_matches(
+            "nomic-embed-text:v1",
+            DEFAULT_OLLAMA_MODEL
+        ));
+        assert!(!ollama_model_matches(
+            "other-model:latest",
+            DEFAULT_OLLAMA_MODEL
+        ));
     }
 
     #[tokio::test]
