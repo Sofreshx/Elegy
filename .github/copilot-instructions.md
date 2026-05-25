@@ -43,10 +43,10 @@ Before writing any code, read the relevant architecture docs:
 
 ## Git Workflow
 
-- Promotion chain: `roro/<topic>` -> `roro` -> `dev` -> `main`
+- Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`
 - Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
-- Do feature work on `roro/<topic>` branches, not directly on `roro`, `dev`, or `main`
-- Merge `roro/<topic>` into `roro` only after validation is clean
+- Do feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
+- Merge a topic branch into `roro` only after validation is clean
 - Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes
 - Merge `dev` into `main` only after `dev` is clean and validated
 - If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work
