@@ -761,11 +761,11 @@ mod tests {
     fn build_tools_parses_expected_capabilities() {
         let tools = build_tools_from_skill_definitions();
 
-        // The governed registry currently exposes 63 MCP tools.
+        // The governed registry currently exposes 83 MCP tools.
         assert_eq!(
             tools.len(),
-            63,
-            "expected 63 tools from the built-in v2 skill registry"
+            83,
+            "expected 83 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -1167,8 +1167,8 @@ mod tests {
 
         assert_eq!(
             tools.len(),
-            63,
-            "expected 63 tools from the built-in v2 skill registry"
+            83,
+            "expected 83 tools from the built-in v2 skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
