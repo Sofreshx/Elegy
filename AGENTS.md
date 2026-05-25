@@ -49,7 +49,9 @@
 ## Git Workflow
 
 - Keep `dev` clean and fast-forwardable to `origin/dev`.
-- Do day-to-day work on a personal branch (for example `roro` or `roro/<topic>`), not directly on `dev`.
+- The following personal-branch rules apply only when the current branch is `roro` or starts with `roro/`.
+- On `roro` / `roro/*`, keep that branch aligned with `dev` and do day-to-day work there instead of directly on `dev`.
+- Do not merge `roro` itself wholesale into `dev`; land validated work to `dev` from the intended topic branch or by cherry-picking the intended commits.
 - Merge to `dev` only after the relevant validation passes and the work is ready.
 - Never force-push or rewrite history on `dev`.
 
