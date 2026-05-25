@@ -98,7 +98,7 @@ Search uses a hybrid similarity signal plus recency/access/priority scoring:
 score_final =
     α × similarity
   + β × recency
-  + γ × ln(access_count + 1)
+  + γ × (access_count / (access_count + 8))
   + δ × (similarity × importance × reliability)
 ```
 
@@ -110,6 +110,8 @@ Default weights remain:
 - `δ = 0.20`
 
 Vector and keyword similarity are blended before this score, with vector similarity intentionally dominant in the current store.
+
+The access term is intentionally saturated so frequently returned memories cannot snowball into persistent hubs from access feedback alone.
 
 ### Feedback-Driven Weight Learning
 

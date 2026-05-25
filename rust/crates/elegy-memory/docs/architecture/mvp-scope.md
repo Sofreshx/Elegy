@@ -52,7 +52,7 @@
 |---------|-----------|-------|
 | Cosine similarity via stored embeddings | **MVP** | Core retrieval mechanism |
 | BM25 via FTS5 | **MVP** | Keyword fallback / blend |
-| Combined scoring formula | **MVP** | `α × similarity + β × recency + γ × ln(access + 1) + δ × (similarity × priority)` |
+| Combined scoring formula | **MVP** | `α × similarity + β × recency + γ × (access / (access + 8)) + δ × (similarity × priority)` |
 | Configurable weights (α, β, γ, δ) | **MVP** | Loaded from `scope_config` |
 | Recency decay (fixed λ) | **MVP** | Fixed base lambda, not adaptive |
 | Adaptive Decay Rate | **v1** | Implemented now with activity-rate scaling of lambda via `adaptive_retention()` |
@@ -248,4 +248,3 @@ Current default gate thresholds are stored in `scope_config` and default to:
 - agent-inferred archive threshold: `0.50`
 
 Retrieval scoring weights remain configurable (`0.40 / 0.25 / 0.15 / 0.20` by default). Thresholds are architecture defaults, not a claim that all higher-order tuning work is finished.
-
