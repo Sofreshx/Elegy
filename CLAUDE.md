@@ -68,7 +68,7 @@ Include: date, what changed, test status, decisions made.
 
 ## Git
 
-- Promotion chain: `roro/<topic>` -> `roro` -> `dev` -> `main`
+- Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`
 - Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
 - Do normal feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
 - Merge a topic branch into `roro` only when the work and validation are clean
