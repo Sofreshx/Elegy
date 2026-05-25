@@ -48,11 +48,14 @@
 
 ## Git Workflow
 
-- Keep `dev` clean and fast-forwardable to `origin/dev`.
-- The following personal-branch rules apply only when the current branch is `roro` or starts with `roro/`.
-- On `roro` / `roro/*`, keep that branch aligned with the branch it is tracking for the current work (for example `dev` when the target is `dev`) and do day-to-day work there instead of directly on the shared branch.
-- Merge to `dev` only after the relevant validation passes and the work is ready.
-- Never force-push or rewrite history on `dev`.
+- Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`.
+- Do feature work on `roro/<topic>` branches, not directly on `roro`, `dev`, or `main`.
+- Merge `roro/<topic>` into `roro` only after the relevant validation passes and the branch is ready to promote.
+- Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes.
+- Merge `dev` into `main` only after `dev` is clean and validated.
+- If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work.
+- If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work.
+- Never force-push or rewrite history on `main` or `dev`.
 
 ## Crate Structure
 

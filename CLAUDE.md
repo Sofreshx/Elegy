@@ -66,14 +66,17 @@ Include: date, what changed, test status, decisions made.
 
 ## Git
 
-- Base branch: `dev`
-- Keep `dev` clean and fast-forwardable to `origin/dev`
-- The following personal-branch rules apply only when the current branch is `roro` or starts with `roro/`
-- On `roro` / `roro/<topic>`, keep that branch aligned with the branch it is tracking for the current work (for example `dev` when the target is `dev`) and do normal work there instead of directly on the shared branch
-- Merge to `dev` only when the work and validation are clean
+- Promotion chain: `roro/<topic>` -> `roro` -> `dev` -> `main`
+- Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
+- Do normal feature work on `roro/<topic>`, not directly on `roro`, `dev`, or `main`
+- Merge `roro/<topic>` into `roro` only when the work and validation are clean
+- Merge `roro` into `dev` only when `roro` is clean, validated, and reconciled with newer `main` changes
+- Merge `dev` into `main` only when `dev` is clean and validated
+- If a hotfix lands on `main`, propagate it back through `dev`, then `roro`, before continuing feature work
+- If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work
 - Atomic commits: one logical change = one commit
 - Never push to `main`
-- Never force-push or rewrite history on `dev`
+- Never force-push or rewrite history on `main` or `dev`
 
 ## Do NOT
 
