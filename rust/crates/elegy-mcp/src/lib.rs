@@ -1,9 +1,9 @@
 use elegy_contracts::{
     validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
-    McpServerDescriptor, McpToolAnalysis, McpToolDefinition, McpTransportKind, SkillDefinition,
-    SkillDiscoveryMetadata, SkillGovernanceMetadata, SkillIdentity, SkillInputContract,
-    SkillLifecycleState, SkillMaterializationKind, SkillMetadata, SkillOrigin, SkillSourceKind,
-    SkillTrigger,
+    McpServerDescriptor, McpToolAnalysis, McpToolDefinition, McpTransportKind, SkillCapability,
+    SkillCapabilityExecution, SkillCapabilityInput, SkillCapabilityOutput, SkillDefinitionV2,
+    SkillDiscovery, SkillGovernance, SkillIdentityV2, SkillImplementation, SkillMetadataV2,
+    SkillOriginV2, SkillTrigger,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -85,7 +85,7 @@ pub fn analyze_mcp_descriptor_file(path: &Path) -> Result<McpAnalysisResult, Mcp
 
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct McpSkillGenerationResult {
-    pub generated_skills: Vec<SkillDefinition>,
+    pub generated_skills: Vec<SkillDefinitionV2>,
     pub skipped_tools: Vec<McpToolDefinition>,
 }
 
@@ -132,53 +132,81 @@ impl McpSkillGenerator {
             let slug = build_slug(&analysis_result.server_name, &analysis.tool.name);
             let source_ref = format!("mcp://{}/tools/{slug}", analysis_result.server_name);
 
-            generated.push(SkillDefinition {
-                id: skill_id.clone(),
-                name: analysis.tool.name.clone(),
-                description: analysis.tool.description.clone(),
-                triggers: analysis.extracted_triggers.clone(),
-                constraints: Vec::new(),
-                identity: SkillIdentity {
-                    definition_id: skill_id,
-                    display_name: analysis.tool.name.clone(),
-                    namespace: Some(analysis_result.server_name.clone()),
-                    ..SkillIdentity::default()
+            generated.push(SkillDefinitionV2 {
+                skill_format: "elegy-skill-definition".to_string(),
+                skill_version: 2,
+                identity: SkillIdentityV2 {
+                    namespace: analysis_result.server_name.clone(),
+                    name: skill_id.clone(),
+                    version: "0.1.0".to_string(),
+                    display_name: Some(analysis.tool.name.clone()),
+                    aliases: vec![analysis.tool.name.clone()],
                 },
-                metadata: SkillMetadata {
+                metadata: Some(SkillMetadataV2 {
+                    display_name: Some(analysis.tool.name.clone()),
+                    description: analysis.tool.description.clone(),
                     summary: analysis.tool.description.clone(),
                     category: Some("mcp".to_string()),
                     tags: build_keywords(&analysis_result.server_name, &analysis.tool.name),
-                    ..SkillMetadata::default()
-                },
-                input: SkillInputContract {
-                    schema_ref: analysis
+                    ..SkillMetadataV2::default()
+                }),
+                capabilities: vec![SkillCapability {
+                    id: skill_id.clone(),
+                    name: analysis.tool.name.clone(),
+                    description: analysis
                         .tool
-                        .input_schema
-                        .as_ref()
-                        .map(|_| format!("{source_ref}/input-schema")),
-                    ..SkillInputContract::default()
-                },
-                governance: SkillGovernanceMetadata {
+                        .description
+                        .clone()
+                        .unwrap_or_else(|| format!("Call MCP tool '{}'.", analysis.tool.name)),
+                    implementation: Some(SkillImplementation {
+                        execution_type: "mcp".to_string(),
+                        executable_name: analysis_result.server_name.clone(),
+                        arguments: vec![analysis.tool.name.clone()],
+                    }),
+                    input: Some(SkillCapabilityInput {
+                        schema_ref: analysis
+                            .tool
+                            .input_schema
+                            .as_ref()
+                            .map(|_| format!("{source_ref}/input-schema")),
+                        ..SkillCapabilityInput::default()
+                    }),
+                    output: Some(SkillCapabilityOutput {
+                        description: analysis.tool.description.clone(),
+                        ..SkillCapabilityOutput::default()
+                    }),
+                    execution: Some(SkillCapabilityExecution {
+                        mode: Some("requestResponse".to_string()),
+                        is_deterministic: false,
+                        has_side_effects: false,
+                        ..SkillCapabilityExecution::default()
+                    }),
+                    ..SkillCapability::default()
+                }],
+                governance: Some(SkillGovernance {
+                    risk_level: Some("low".to_string()),
+                    approval_requirement: Some("none".to_string()),
                     allowed_contexts: vec!["mcp".to_string()],
-                    ..SkillGovernanceMetadata::default()
-                },
-                discovery: SkillDiscoveryMetadata {
+                    ..SkillGovernance::default()
+                }),
+                discovery: Some(SkillDiscovery {
                     keywords: build_keywords(&analysis_result.server_name, &analysis.tool.name),
+                    triggers: analysis.extracted_triggers.clone(),
                     capability_hints: analysis
                         .extracted_triggers
                         .iter()
                         .map(|trigger| trigger.pattern.clone())
                         .collect(),
-                    ..SkillDiscoveryMetadata::default()
-                },
-                origin: SkillOrigin {
-                    materialization_kind: SkillMaterializationKind::Declared,
-                    source_kind: SkillSourceKind::Generated,
+                    ..SkillDiscovery::default()
+                }),
+                origin: Some(SkillOriginV2 {
+                    materialization_kind: Some("declared".to_string()),
+                    source_kind: Some("generated".to_string()),
                     source_ref: Some(source_ref),
-                    ..SkillOrigin::default()
-                },
-                lifecycle_state: SkillLifecycleState::Draft,
-                ..SkillDefinition::default()
+                    ..SkillOriginV2::default()
+                }),
+                lifecycle_state: "draft".to_string(),
+                ..SkillDefinitionV2::default()
             });
         }
 
@@ -489,10 +517,7 @@ mod tests {
         generated_skill_id, McpSkillGenerator, McpToolAnalyzer, McpToolResolveService,
         McpToolSearchService,
     };
-    use elegy_contracts::{
-        McpServerDescriptor, McpToolAnalysis, McpToolDefinition, SkillMaterializationKind,
-        SkillSourceKind,
-    };
+    use elegy_contracts::{McpServerDescriptor, McpToolAnalysis, McpToolDefinition};
     use serde_json::json;
 
     fn create_test_descriptor() -> McpServerDescriptor {
@@ -611,11 +636,17 @@ mod tests {
             "mcp-mcp-server-list-items"
         );
         assert_eq!(
-            generated.generated_skills[0].origin.source_ref.as_deref(),
+            generated.generated_skills[0]
+                .origin
+                .as_ref()
+                .and_then(|origin| origin.source_ref.as_deref()),
             Some("mcp://mcp-server/tools/mcp-server-list-items")
         );
         assert_eq!(
-            generated.generated_skills[0].input.schema_ref.as_deref(),
+            generated.generated_skills[0].capabilities[0]
+                .input
+                .as_ref()
+                .and_then(|input| input.schema_ref.as_deref()),
             Some("mcp://mcp-server/tools/mcp-server-list-items/input-schema")
         );
     }
@@ -672,7 +703,7 @@ mod tests {
         assert!(result
             .generated_skills
             .iter()
-            .all(|skill| skill.effective_id().starts_with("mcp-")));
+            .all(|skill| skill.identity.name.starts_with("mcp-")));
     }
 
     #[test]
@@ -690,20 +721,29 @@ mod tests {
         let result = generator.generate(&create_test_analysis());
 
         for skill in result.generated_skills {
-            assert_eq!(skill.origin.source_kind, SkillSourceKind::Generated);
             assert_eq!(
-                skill.origin.materialization_kind,
-                SkillMaterializationKind::Declared
+                skill
+                    .origin
+                    .as_ref()
+                    .and_then(|origin| origin.source_kind.as_deref()),
+                Some("generated")
+            );
+            assert_eq!(
+                skill
+                    .origin
+                    .as_ref()
+                    .and_then(|origin| origin.materialization_kind.as_deref()),
+                Some("declared")
             );
             assert!(skill
                 .origin
-                .source_ref
-                .as_deref()
+                .as_ref()
+                .and_then(|origin| origin.source_ref.as_deref())
                 .is_some_and(|value| value.starts_with("mcp://test-server/tools/")));
             assert!(skill
                 .discovery
-                .keywords
-                .contains(&"test-server".to_string()));
+                .as_ref()
+                .is_some_and(|discovery| discovery.keywords.contains(&"test-server".to_string())));
         }
     }
 
@@ -715,7 +755,7 @@ mod tests {
         assert!(result
             .generated_skills
             .iter()
-            .all(|skill| skill.lifecycle_state == elegy_contracts::SkillLifecycleState::Draft));
+            .all(|skill| skill.lifecycle_state == "draft"));
     }
 
     #[test]
@@ -723,11 +763,14 @@ mod tests {
         let generator = McpSkillGenerator;
         let result = generator.generate(&create_test_analysis());
 
-        assert!(result.generated_skills.iter().all(|skill| skill
-            .input
-            .schema_ref
-            .as_deref()
-            .is_some_and(|value| value.contains("/input-schema"))));
+        assert!(result
+            .generated_skills
+            .iter()
+            .all(|skill| skill.capabilities[0]
+                .input
+                .as_ref()
+                .and_then(|input| input.schema_ref.as_deref())
+                .is_some_and(|value| value.contains("/input-schema"))));
     }
 
     #[test]

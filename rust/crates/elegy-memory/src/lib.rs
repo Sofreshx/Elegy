@@ -17,7 +17,7 @@ use thiserror::Error;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime, UtcOffset};
 
 pub use consolidator::{LlmConsolidator, SimpleConsolidator};
-pub use decay::{retention, retention_with_lambda};
+pub use decay::{adaptive_retention, retention, retention_with_lambda, type_decay_multiplier};
 pub use embedding::{
     OllamaEmbeddingProvider, OpenAiEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL,
     DEFAULT_OLLAMA_CONNECT_TIMEOUT, DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL,
@@ -51,10 +51,12 @@ pub use traits::{
     SalienceGate,
 };
 pub use types::{
-    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, ExportFormat, Memory,
-    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryScope,
-    MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, ProvenanceLevel,
-    PurgeReport, ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel,
+    ConsolidationCandidate, ContradictionEntry, ContradictionRecord, CorrectionDisposition,
+    CorrectionRecord, ElegyArchive, ExportFormat, GraphNode, GraphTraversalResult, Memory,
+    MemoryCandidate, MemoryContextConfig, MemoryHealthReport, MemoryId, MemoryLink, MemoryScope,
+    MemorySearchQuery, MemorySearchResult, MemoryState, MemoryType, MemoryVersion, PoisoningAlert,
+    PoisoningAlertType, ProvenanceLevel, PurgeReport, ResolutionStatus, RetrievalFeedback,
+    ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig,
 };
 
 pub const SUMMARY_ONLY_SESSION_CONTEXT_ARTIFACT_KIND: &str =

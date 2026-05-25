@@ -77,7 +77,12 @@ The model keeps **importance** and **reliability** as separate values.
 - **Reliability** is seeded from provenance when the memory is created.
 - Recording a contradiction lowers the less-trusted side by `0.3`.
 
-The struct also carries `corroboration_count`, but automatic corroboration bonuses and broader staleness penalties are not implemented yet.
+The struct also carries `corroboration_count`, and corroboration is now operational:
+
+- `SqliteMemoryStore::corroborate()` increments `corroboration_count`
+- reliability increases by `+0.05` per corroboration
+- the bonus is capped at `base_reliability + 0.2`
+- the corroborating relationship is also recorded as a `corroborates` memory link
 
 Priority used in retrieval is:
 
@@ -93,7 +98,7 @@ Search uses a hybrid similarity signal plus recency/access/priority scoring:
 score_final =
     α × similarity
   + β × recency
-  + γ × ln(access_count + 1)
+  + γ × (access_count / (access_count + 8))
   + δ × (similarity × importance × reliability)
 ```
 
@@ -105,6 +110,34 @@ Default weights remain:
 - `δ = 0.20`
 
 Vector and keyword similarity are blended before this score, with vector similarity intentionally dominant in the current store.
+
+The access term is intentionally saturated so frequently returned memories cannot snowball into persistent hubs from access feedback alone.
+
+### Feedback-Driven Weight Learning
+
+Retrieval feedback now closes the loop into live ranking instead of acting as a report-only diagnostic.
+
+- `feedback` stores a `retrieval_feedback` row and immediately recomputes the effective scoring weights
+- the recomputed weights are written back into the live `scope_config` keys used by search:
+  - `similarity_weight`
+  - `recency_weight`
+  - `access_weight`
+  - `priority_weight`
+- `search()` reloads `scope_config` on each query, so newly learned weights affect the next retrieval without any extra migration or restart step
+
+Current learner behavior:
+
+- waits for at least **12** total feedback rows
+- also requires at least **3 relevant** and **3 irrelevant** judgments
+- derives four signals from the feedback corpus:
+  - query-to-memory lexical similarity proxy
+  - recency at feedback time
+  - access-frequency signal
+  - similarity-gated priority (`similarity × importance × reliability`)
+- measures how strongly each signal separates relevant from irrelevant outcomes
+- blends the learned profile back toward the defaults until enough balanced evidence exists, so weights move gradually instead of thrashing on small samples
+
+The `weights` CLI now reports whether the store is still using defaults or has switched into learned mode, along with sample counts, confidence, and the current effective live values.
 
 ### Context Window Budget
 
@@ -122,7 +155,17 @@ Defaults:
 
 ## Decay Model
 
-The current code uses a fixed scope-configured decay base (`decay_lambda_base`, default `0.10`) for recency scoring and retention calculations. Adaptive decay, type-specific decay tuning, and high-importance protection are still future refinements, not current behavior.
+The current code uses a scope-configured decay base (`decay_lambda_base`, default `0.10`) and then modulates it with implemented retention refinements:
+
+- **adaptive decay** adjusts effective retention by observed activity rate via `adaptive_retention()`
+- **type-specific decay** applies `type_decay_multiplier()` by memory type
+  - `Procedure = 0.7×`
+  - `Fact = 0.8×`
+  - `Decision = 0.85×`
+  - `Preference = 0.9×`
+  - `Observation = 1.2×`
+
+The configured base lambda still anchors the model, but decay is no longer fixed-only.
 
 ## Write-Time Salience Gate
 
@@ -209,6 +252,13 @@ When the gate decides to merge:
 
 `update_content()` versions the old text before replacement and marks embeddings stale for re-embedding.
 
+For `nomic-embed-text`, Elegy now applies task-aware prefixes at embedding time:
+
+- document / stored-memory embeddings use `search_document: <content>`
+- search-query embeddings use `search_query: <query>`
+
+This keeps the query/document spaces aligned for semantic retrieval. Rows embedded before this rule changed are not directly comparable with freshly generated vectors; mark them stale and re-embed (or rebuild the database) before relying on mixed old/new semantic rankings.
+
 ## Contradiction Journal
 
 Contradiction auto-detection is now implemented at write time, and the same journal is also reused by LLM-backed consolidation when the model flags a contradictory pair instead of returning merged text.
@@ -224,6 +274,71 @@ Current workflow:
    - **keep-both**: mark the contradiction resolved without changing either state
 
 There is no automatic contradiction resolution in the current codepath.
+
+## User Correction Feedback Loop
+
+`correct_memory()` is no longer just a versioning convenience. A user correction now runs back through the same gate-aware backend lane as new writes and records a durable correction-history row.
+
+Current correction outcomes:
+
+- **applied** — the corrected content replaces the memory in place
+- **archived** — the correction is accepted, but the gate moves the corrected memory to `Dormant`
+- **merged** — the corrected content is folded into another memory, and the corrected source memory becomes `Dormant`
+- **contradiction** — the corrected content is applied in place and a contradiction record is journaled against the related memory
+
+Each correction records:
+
+- the previous and corrected content
+- the actor and free-form reason
+- the final `disposition`
+- an optional `related_memory_id` for merge / contradiction / near-duplicate outcomes
+- the correction timestamp
+
+When correction changes content, embeddings are refreshed when possible. Until a corrected row is re-embedded, stale vectors are excluded from similarity search so retrieval does not keep ranking pre-correction embeddings.
+
+## Poisoning Detection and Remediation
+
+`detect-poisoning` now stays scoped to the store's configured scope for **all four heuristics** and loads its thresholds from internal `scope_config` keys instead of hardcoded constants.
+
+Current checks:
+
+- **frequency anomaly** — recent write volume versus scope-sized thresholds
+- **trust mismatch** — imported / inferred active memories with unusually high importance
+- **bulk overwrite** — many distinct active memories in the same scope updated in a short window
+- **mass contradiction** — scoped active memories accumulating repeated unresolved contradictions
+
+The CLI now prints operator-actionable poisoning records in both text and JSON output, including:
+
+- stable per-alert `id`
+- `detected_at` timestamp
+- implicated `memory_ids`
+- heuristic severity scores in the inclusive `0.0..=1.0` range
+- remediation actions showing which rows were quarantined or skipped and why
+
+When operators pass `detect-poisoning --quarantine` (the older `--remediate` spelling is still accepted as an alias), the store now applies a concrete containment step:
+
+- only **low-trust active memories** implicated by the alerts are targeted
+- those memories are moved to `Dormant`
+- they are marked as quarantined through metadata (`poisoning_quarantined_at`, `poisoning_alert_types`, `poisoning_alert_ids`, `poisoning_remediation`) so the store is protected without hard-deleting evidence
+
+Trusted user-stated memories are not auto-dormanted by this remediation pass.
+
+## Cross-Agent Sharing Safety
+
+`share-export` still filters by sensitivity and reliability, but `share-import` is now intentionally conservative on the receiving side.
+
+Imported shared memories now:
+
+- are evaluated through the same salience gate used for normal writes
+- still run an exact-text duplicate sweep across visible scopes even when no embedding provider is configured
+- **never auto-merge into an existing memory**
+- land as `Dormant` review entries even when accepted as novel
+- are escalated to a quarantined dormant entry when they look like a near-duplicate, merge candidate, or contradiction
+- are skipped entirely when an exact duplicate already exists in a higher visible scope
+- may record a contradiction journal entry when the imported content conflicts with an existing memory
+- surface per-item import dispositions (`review`, `quarantine`, `skip`) plus reasons and any referenced canonical memory in CLI output
+
+This keeps cross-agent content available for operator review without letting it poison the active canonical store by default.
 
 ## Memory Versioning
 
@@ -257,7 +372,11 @@ LLM consolidation degrades explicitly:
 
 ## Forgetting Budget
 
-Budget configuration exists and health reporting exposes `budget_usage_ratio`, but automatic budget-driven dormancy and hard-delete policies are not implemented yet.
+Budget configuration exists and health reporting exposes `budget_usage_ratio`, and automatic enforcement is now implemented through `SqliteMemoryStore::enforce_budget()`:
+
+- when active memories exceed `budget_active_max`, the lowest-scoring active rows transition to `Dormant`
+- when storage exceeds the cap, the lowest-scoring dormant rows are hard-deleted
+- the CLI `budget` command surfaces the resulting dormant / deleted counts
 
 ## Memory States
 
@@ -272,8 +391,5 @@ Dormant → Deleted  (hard_delete / purge)
 
 ## Future Work Still Outside Current Code
 
-- corroboration bonuses
-- adaptive/type-specific decay
-- automatic budget enforcement
-- user-correction feedback loops
-
+- knowledge-graph-native storage and retrieval beyond today's link graph + BFS traversal
+- PostgreSQL backend / multi-tenant runtime hardening beyond the current SQLite implementation

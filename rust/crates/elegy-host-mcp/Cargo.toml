@@ -9,7 +9,9 @@ repository.workspace = true
 
 [dependencies]
 base64.workspace = true
+elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 elegy-core = { version = "0.1.0", path = "../elegy-core" }
+elegy-skills = { version = "0.1.0", path = "../elegy-skills" }
 rmcp.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

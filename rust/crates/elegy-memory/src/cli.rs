@@ -16,15 +16,19 @@ use tokio::runtime::Builder;
 use uuid::Uuid;
 
 use crate::{
-    ConsolidationAction, DefaultSalienceGate, EmbeddingError, EmbeddingProvider, GateDecision,
-    GateError, LlmConsolidator, LlmProvider, Memory, MemoryCandidate, MemoryConsolidator,
-    MemoryFilter, MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryStore, MemoryType,
+    embedding::{prepare_embedding_input, EmbeddingTask},
+    storage::{LearnedWeightValues, LearnedWeightsReport},
+    ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
+    EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
+    LlmProvider, Memory, MemoryCandidate, MemoryConsolidator, MemoryFilter, MemoryHealthReport,
+    MemoryId, MemoryObservability, MemoryScope, MemoryState, MemoryStore, MemoryType,
     MemoryVersion, OllamaEmbeddingProvider, OllamaLlmProvider, OpenAiEmbeddingProvider,
     OpenAiLlmProvider, PromotionEngine, ProvenanceLevel, ResolutionStatus, SalienceGate,
-    ScoredMemory, SearchQuery, SensitivityLevel, SimpleConsolidator, SqliteMemoryStore, StoreError,
-    DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL,
-    DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS,
-    DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
+    ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig, SimpleConsolidator,
+    SqliteMemoryStore, StoreError, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL,
+    DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL,
+    DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL,
+    DEFAULT_OPENAI_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -105,7 +109,7 @@ enum Command {
         #[arg(long, default_value_t = DEFAULT_LIMIT)]
         limit: usize,
     },
-    /// Inspect a single memory and show its version history.
+    /// Inspect a single memory and show its version and correction history.
     Inspect {
         #[command(flatten)]
         store: StoreArgs,
@@ -123,14 +127,19 @@ enum Command {
         #[command(flatten)]
         store: StoreArgs,
     },
-    /// Export memories as JSON to stdout or a file.
+    /// Export memories in JSON, SQLite, or .elegy format.
     Export {
         #[command(flatten)]
         store: StoreArgs,
+        /// Output file path. Writes to stdout when omitted (JSON only).
         #[arg(long)]
         output: Option<PathBuf>,
+        /// Export all scopes instead of just the active scope.
         #[arg(long)]
         all_scopes: bool,
+        /// Export format.
+        #[arg(long, value_enum, default_value_t = CliExportFormat::Json)]
+        export_format: CliExportFormat,
     },
     /// Re-embed stale memories when a provider is configured.
     Reembed {
@@ -188,6 +197,114 @@ enum Command {
         consolidate_limit: usize,
         #[arg(long)]
         dry_run: bool,
+    },
+    /// Rollback a memory to a previous version.
+    Rollback {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID to rollback.
+        id: String,
+        /// Version number to restore.
+        #[arg(long)]
+        version: i64,
+    },
+    /// Corroborate a memory with another, boosting its reliability.
+    Corroborate {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// ID of the memory to corroborate (receives the reliability boost).
+        id: String,
+        /// ID of the corroborating memory.
+        #[arg(long)]
+        with: String,
+    },
+    /// Enforce storage budget: dormant low-scoring active memories and purge excess dormant ones.
+    Budget {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Apply a user correction to a memory.
+    Correct {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID to correct.
+        id: String,
+        /// New corrected content.
+        content: String,
+        /// Who is making the correction.
+        #[arg(long, default_value = "cli-user")]
+        by: String,
+        /// Optional reason for the correction.
+        #[arg(long)]
+        reason: Option<String>,
+    },
+    /// Record relevance feedback for a memory returned by search.
+    Feedback {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Memory ID the feedback is about.
+        id: String,
+        /// The query that returned this memory.
+        #[arg(long)]
+        query: String,
+        /// Whether the memory was relevant to the query.
+        #[arg(long)]
+        relevant: bool,
+    },
+    /// Show learned scoring weights based on accumulated feedback.
+    Weights {
+        #[command(flatten)]
+        store: StoreArgs,
+    },
+    /// Traverse the memory link graph starting from a given memory.
+    Traverse {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Starting memory ID.
+        id: String,
+        /// Maximum depth to traverse.
+        #[arg(long, default_value_t = 3)]
+        depth: u32,
+        /// Optional relation type filter.
+        #[arg(long)]
+        relation: Option<String>,
+    },
+    /// Run poisoning detection heuristics on the memory store.
+    DetectPoisoning {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Make implicated low-trust active memories dormant after detection.
+        #[arg(long = "quarantine", visible_alias = "remediate")]
+        quarantine: bool,
+    },
+    /// Delete a link between two memories by link ID.
+    DeleteLink {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Link ID to delete.
+        id: String,
+    },
+    /// Export memories for sharing with other agents, filtered by sensitivity and reliability.
+    ShareExport {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Output file path. Writes to stdout when omitted.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Maximum sensitivity level to include (default: medium).
+        #[arg(long, value_enum, default_value_t = CliSensitivityLevel::Medium)]
+        max_sensitivity: CliSensitivityLevel,
+        /// Minimum reliability score to include (default: 0.5).
+        #[arg(long, default_value_t = 0.5)]
+        min_reliability: f32,
+    },
+    /// Import shared memories from a JSON file or stdin.
+    ShareImport {
+        #[command(flatten)]
+        store: StoreArgs,
+        /// Input file path. Reads from stdin when omitted.
+        #[arg(long)]
+        input: Option<PathBuf>,
     },
 }
 
@@ -300,6 +417,47 @@ enum CliLlmProvider {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 enum ContradictionsAction {
     Resolve,
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum CliExportFormat {
+    /// JSON export (default).
+    #[default]
+    Json,
+    /// SQLite portable database file.
+    Sqlite,
+    /// Portable .elegy archive (JSON envelope with links and versions).
+    Elegy,
+}
+
+impl From<CliExportFormat> for ExportFormat {
+    fn from(value: CliExportFormat) -> Self {
+        match value {
+            CliExportFormat::Json => ExportFormat::Json,
+            CliExportFormat::Sqlite => ExportFormat::Sqlite,
+            CliExportFormat::Elegy => ExportFormat::Elegy,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum CliSensitivityLevel {
+    #[default]
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+impl From<CliSensitivityLevel> for SensitivityLevel {
+    fn from(value: CliSensitivityLevel) -> Self {
+        match value {
+            CliSensitivityLevel::Low => SensitivityLevel::Low,
+            CliSensitivityLevel::Medium => SensitivityLevel::Medium,
+            CliSensitivityLevel::High => SensitivityLevel::High,
+            CliSensitivityLevel::Critical => SensitivityLevel::Critical,
+        }
+    }
 }
 
 impl From<CliScope> for MemoryScope {
@@ -450,6 +608,7 @@ struct ListRow {
 struct InspectResponse {
     memory: Memory,
     versions: Vec<MemoryVersion>,
+    corrections: Vec<CorrectionHistoryRow>,
 }
 
 #[derive(Serialize)]
@@ -595,6 +754,193 @@ struct ImportFormatBObject {
     provenance: Option<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RollbackResponse {
+    memory_id: String,
+    restored_version: i64,
+    content_preview: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorroborateResponse {
+    memory_id: String,
+    corroborating_id: String,
+    new_reliability: f32,
+    corroboration_count: u32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct BudgetResponse {
+    dormanted: u64,
+    deleted: u64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorrectResponse {
+    correction: CorrectionHistoryRow,
+    corrected_memory_state: String,
+    new_reliability: f32,
+    embedding_stale: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CorrectionHistoryRow {
+    id: String,
+    memory_id: String,
+    corrected_at: String,
+    corrected_by: String,
+    reason: String,
+    disposition: String,
+    previous_content: String,
+    corrected_content: String,
+    outcome: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_state: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    related_memory_preview: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FeedbackResponse {
+    feedback_id: String,
+    memory_id: String,
+    was_relevant: bool,
+    learning: WeightsSummaryResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightsResponse {
+    learning: WeightsSummaryResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightsSummaryResponse {
+    strategy: String,
+    status_detail: String,
+    sample_size: usize,
+    relevant_samples: usize,
+    irrelevant_samples: usize,
+    learning_confidence: f64,
+    effective_weights: WeightValuesResponse,
+    default_weights: WeightValuesResponse,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WeightValuesResponse {
+    similarity_weight: f64,
+    recency_weight: f64,
+    access_weight: f64,
+    priority_weight: f64,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TraverseResponse {
+    start_id: String,
+    max_depth: u32,
+    node_count: usize,
+    nodes: Vec<TraverseNodeRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct TraverseNodeRow {
+    id: String,
+    depth: u32,
+    content_preview: String,
+    memory_type: String,
+    link_count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningResponse {
+    alert_count: usize,
+    alerts: Vec<PoisoningAlertRow>,
+    remediation: Option<PoisoningRemediationRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningAlertRow {
+    id: String,
+    detected_at: String,
+    alert_type: String,
+    severity: f32,
+    description: String,
+    affected_count: usize,
+    memory_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningRemediationRow {
+    quarantined_count: usize,
+    quarantined_ids: Vec<String>,
+    skipped_count: usize,
+    skipped_ids: Vec<String>,
+    actions: Vec<PoisoningRemediationActionRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct PoisoningRemediationActionRow {
+    memory_id: String,
+    action: String,
+    reason: String,
+    alert_ids: Vec<String>,
+    alert_types: Vec<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DeleteLinkResponse {
+    link_id: String,
+    deleted: bool,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareExportResponse {
+    exported_count: usize,
+    max_sensitivity: String,
+    min_reliability: f32,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareImportResponse {
+    imported_count: usize,
+    review_count: usize,
+    quarantined_count: usize,
+    skipped_count: usize,
+    new_ids: Vec<String>,
+    review_ids: Vec<String>,
+    quarantined_ids: Vec<String>,
+    skipped_reasons: Vec<String>,
+    outcomes: Vec<ShareImportOutcomeRow>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ShareImportOutcomeRow {
+    memory_id: Option<String>,
+    disposition: String,
+    reason: String,
+    related_memory_id: Option<String>,
+}
+
 pub fn run_from_env() -> Result<ExitCode, CliError> {
     run_from(std::env::args_os())
 }
@@ -658,7 +1004,14 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             store,
             output,
             all_scopes,
-        } => execute_export_command(open_store(store)?, output, all_scopes, cli.format),
+            export_format,
+        } => execute_export_command(
+            open_store(store)?,
+            output,
+            all_scopes,
+            export_format.into(),
+            cli.format,
+        ),
         Command::Reembed { store, limit } => {
             execute_reembed_command(open_store(store)?, limit, cli.format)
         }
@@ -705,6 +1058,54 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             dry_run,
             cli.format,
         ),
+        Command::Rollback { store, id, version } => {
+            execute_rollback_command(open_store(store)?, id, version, cli.format)
+        }
+        Command::Corroborate { store, id, with } => {
+            execute_corroborate_command(open_store(store)?, id, with, cli.format)
+        }
+        Command::Budget { store } => execute_budget_command(open_store(store)?, cli.format),
+        Command::Correct {
+            store,
+            id,
+            content,
+            by,
+            reason,
+        } => execute_correct_command(open_store(store)?, id, content, by, reason, cli.format),
+        Command::Feedback {
+            store,
+            id,
+            query,
+            relevant,
+        } => execute_feedback_command(open_store(store)?, id, query, relevant, cli.format),
+        Command::Weights { store } => execute_weights_command(open_store(store)?, cli.format),
+        Command::Traverse {
+            store,
+            id,
+            depth,
+            relation,
+        } => execute_traverse_command(open_store(store)?, id, depth, relation, cli.format),
+        Command::DetectPoisoning { store, quarantine } => {
+            execute_detect_poisoning_command(open_store(store)?, quarantine, cli.format)
+        }
+        Command::DeleteLink { store, id } => {
+            execute_delete_link_command(open_store(store)?, id, cli.format)
+        }
+        Command::ShareExport {
+            store,
+            output,
+            max_sensitivity,
+            min_reliability,
+        } => execute_share_export_command(
+            open_store(store)?,
+            output,
+            max_sensitivity.into(),
+            min_reliability,
+            cli.format,
+        ),
+        Command::ShareImport { store, input } => {
+            execute_share_import_command(open_store(store)?, input, cli.format)
+        }
     }
 }
 
@@ -977,7 +1378,13 @@ fn execute_inspect_command(
     let id = parse_memory_id(&raw_id)?;
     let memory = run_async(ctx.store.get_raw(&id))?.ok_or(StoreError::NotFound(id))?;
     let versions = ctx.store.list_versions(&id)?;
-    let response = InspectResponse { memory, versions };
+    let corrections =
+        build_correction_history_rows(&ctx, ctx.store.list_corrections(Some(&id), usize::MAX)?)?;
+    let response = InspectResponse {
+        memory,
+        versions,
+        corrections,
+    };
 
     match format {
         OutputFormat::Text => print_inspect_text(&response),
@@ -1022,7 +1429,7 @@ fn execute_purge_command(
 }
 
 fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
-    let report = run_async(ctx.store.health_report())?;
+    let report = run_async(MemoryStore::health_report(&ctx.store))?;
     let per_scope_reports = load_per_scope_reports(&ctx)?;
     let memories = run_async(ctx.store.list(MemoryFilter {
         scope: Some(ctx.scope),
@@ -1036,10 +1443,10 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
         agent_id: None,
         limit: None,
     }))?;
-    let contradictions = run_async(
-        ctx.store
-            .list_contradictions(Some(ResolutionStatus::Unresolved)),
-    )?;
+    let contradictions = run_async(MemoryStore::list_contradictions(
+        &ctx.store,
+        Some(ResolutionStatus::Unresolved),
+    ))?;
     let mut type_counts = BTreeMap::new();
     let mut total_importance = 0.0_f32;
     let now = Utc::now();
@@ -1116,73 +1523,118 @@ fn execute_export_command(
     ctx: StoreContext,
     output: Option<PathBuf>,
     all_scopes: bool,
+    export_format: ExportFormat,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let scopes = if all_scopes {
-        vec![
-            MemoryScope::Session,
-            MemoryScope::Workspace,
-            MemoryScope::User,
-            MemoryScope::Agent,
-        ]
-    } else {
-        vec![ctx.scope]
-    };
-    let mut memories = Vec::new();
-    for scope in &scopes {
-        let scoped_store = SqliteMemoryStore::new(&ctx.db_path, *scope)?;
-        memories.extend(run_async(scoped_store.list(MemoryFilter {
-            scope: Some(*scope),
-            state: None,
-            memory_types: None,
-            provenance_levels: None,
-            tags: None,
-            status: None,
-            tenant_id: None,
-            user_id: None,
-            agent_id: None,
-            limit: None,
-        }))?);
-    }
-    let response = ExportResponse {
-        exported_at: Utc::now().to_rfc3339(),
-        db_path: ctx.db_path.display().to_string(),
-        scope: if all_scopes {
-            "all".to_string()
-        } else {
-            display_scope(ctx.scope)
-        },
-        memories,
-    };
-    let payload = serde_json::to_string_pretty(&response)?;
-
-    if let Some(path) = output {
-        if let Some(parent) = path.parent() {
-            fs::create_dir_all(parent)?;
-        }
-        fs::write(&path, payload)?;
-        match format {
-            OutputFormat::Text => {
-                println!(
-                    "Exported {} memories to {}",
-                    response.memories.len(),
-                    path.display()
-                );
+    match export_format {
+        ExportFormat::Json => {
+            let scopes = if all_scopes {
+                vec![
+                    MemoryScope::Session,
+                    MemoryScope::Workspace,
+                    MemoryScope::User,
+                    MemoryScope::Agent,
+                ]
+            } else {
+                vec![ctx.scope]
+            };
+            let mut memories = Vec::new();
+            for scope in &scopes {
+                let scoped_store = SqliteMemoryStore::new(&ctx.db_path, *scope)?;
+                memories.extend(run_async(scoped_store.list(MemoryFilter {
+                    scope: Some(*scope),
+                    state: None,
+                    memory_types: None,
+                    provenance_levels: None,
+                    tags: None,
+                    status: None,
+                    tenant_id: None,
+                    user_id: None,
+                    agent_id: None,
+                    limit: None,
+                }))?);
             }
-            OutputFormat::Json => print_json(
-                "export",
-                &serde_json::json!({
-                    "outputPath": path.display().to_string(),
-                    "memoryCount": response.memories.len(),
-                    "scope": response.scope,
-                }),
-            )?,
-        }
-    } else {
-        println!("{payload}");
-    }
+            let response = ExportResponse {
+                exported_at: Utc::now().to_rfc3339(),
+                db_path: ctx.db_path.display().to_string(),
+                scope: if all_scopes {
+                    "all".to_string()
+                } else {
+                    display_scope(ctx.scope)
+                },
+                memories,
+            };
+            let payload = serde_json::to_string_pretty(&response)?;
 
-    Ok(ExitCode::SUCCESS)
+            if let Some(path) = output {
+                if let Some(parent) = path.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                fs::write(&path, payload)?;
+                match format {
+                    OutputFormat::Text => {
+                        println!(
+                            "Exported {} memories to {}",
+                            response.memories.len(),
+                            path.display()
+                        );
+                    }
+                    OutputFormat::Json => print_json(
+                        "export",
+                        &serde_json::json!({
+                            "outputPath": path.display().to_string(),
+                            "memoryCount": response.memories.len(),
+                            "scope": response.scope,
+                        }),
+                    )?,
+                }
+            } else {
+                println!("{payload}");
+            }
+
+            Ok(ExitCode::SUCCESS)
+        }
+        ExportFormat::Sqlite | ExportFormat::Elegy => {
+            if all_scopes {
+                return Err(CliError::Validation(
+                    "SQLite and .elegy exports operate on a single scope; remove --all-scopes"
+                        .to_string(),
+                ));
+            }
+            let output_path = output.ok_or_else(|| {
+                CliError::Validation(
+                    "--output is required for SQLite and .elegy export formats".to_string(),
+                )
+            })?;
+            let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
+            let bytes = store
+                .export_memories(ctx.scope, export_format)
+                .map_err(|error| CliError::Validation(format!("export failed: {error}")))?;
+            if let Some(parent) = output_path.parent() {
+                fs::create_dir_all(parent)?;
+            }
+            fs::write(&output_path, &bytes)?;
+            match format {
+                OutputFormat::Text => {
+                    println!(
+                        "Exported {} bytes to {}",
+                        bytes.len(),
+                        output_path.display()
+                    );
+                }
+                OutputFormat::Json => print_json(
+                    "export",
+                    &serde_json::json!({
+                        "outputPath": output_path.display().to_string(),
+                        "byteCount": bytes.len(),
+                        "scope": display_scope(ctx.scope),
+                        "format": format!("{export_format:?}"),
+                    }),
+                )?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+    }
 }
 
 fn execute_reembed_command(
@@ -1306,7 +1758,8 @@ fn execute_consolidate_command(
                     )?;
                 }
                 for source_id in source_ids {
-                    run_async(ctx.store.hard_delete(source_id))?;
+                    run_async(ctx.store.make_dormant(source_id))?;
+                    let _ = ctx.store.record_link(&result.id, source_id, "supersedes");
                 }
             }
             ConsolidationAction::Contradiction {
@@ -1373,10 +1826,10 @@ fn execute_list_contradictions_command(
     ctx: StoreContext,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let contradictions = run_async(
-        ctx.store
-            .list_contradictions(Some(ResolutionStatus::Unresolved)),
-    )?;
+    let contradictions = run_async(MemoryStore::list_contradictions(
+        &ctx.store,
+        Some(ResolutionStatus::Unresolved),
+    ))?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
         OutputFormat::Json => print_json("contradictions", &contradictions)?,
@@ -1469,6 +1922,8 @@ fn execute_resolve_contradiction_command(
                 ))),
             };
         }
+
+        let _ = ctx.store.record_link(&keep_id, &dormant_id, "supersedes");
 
         ResolveContradictionResponse {
             contradiction_id: contradiction.id,
@@ -2140,6 +2595,7 @@ fn build_search_response(
         max_results: limit,
         context_config: None,
         session_id: ctx.session_id.clone(),
+        agent_id: None,
     }))?;
 
     if include_dormant {
@@ -2152,6 +2608,7 @@ fn build_search_response(
             max_results: limit,
             context_config: None,
             session_id: ctx.session_id.clone(),
+            agent_id: None,
         }))?);
         sort_scored_memories(&mut results);
         results.truncate(limit);
@@ -2189,11 +2646,13 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
                 .ok_or_else(|| {
                     CliError::Validation(format!("failed to load memory {id}: not found"))
                 })?;
-            let embedding = provider.embed(&memory.content).await.map_err(|error| {
-                CliError::Validation(format!(
-                    "failed to generate embedding for memory {id}: {error}"
-                ))
-            })?;
+            let embedding = generate_document_embedding(provider.as_ref(), &memory.content)
+                .await
+                .map_err(|error| {
+                    CliError::Validation(format!(
+                        "failed to generate embedding for memory {id}: {error}"
+                    ))
+                })?;
             ctx.store
                 .store_embedding(id, &embedding)
                 .await
@@ -2217,6 +2676,14 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
     })
 }
 
+async fn generate_document_embedding(
+    provider: &dyn EmbeddingProvider,
+    content: &str,
+) -> Result<Vec<f32>, EmbeddingError> {
+    let prepared_input = prepare_embedding_input(provider, EmbeddingTask::Document, content);
+    provider.embed(prepared_input.as_ref()).await
+}
+
 fn parse_memory_id(raw: &str) -> Result<MemoryId, CliError> {
     Uuid::parse_str(raw).map_err(|source| CliError::InvalidId {
         value: raw.to_string(),
@@ -2228,7 +2695,7 @@ fn load_contradiction_by_id(
     ctx: &StoreContext,
     contradiction_id: &str,
 ) -> Result<crate::ContradictionEntry, CliError> {
-    run_async(ctx.store.list_contradictions(None))?
+    run_async(MemoryStore::list_contradictions(&ctx.store, None))?
         .into_iter()
         .find(|contradiction| contradiction.id == contradiction_id)
         .ok_or_else(|| CliError::Validation(format!("contradiction not found: {contradiction_id}")))
@@ -2243,7 +2710,7 @@ fn load_per_scope_reports(ctx: &StoreContext) -> Result<Vec<MemoryHealthReport>,
         MemoryScope::Agent,
     ] {
         let scoped_store = SqliteMemoryStore::new(&ctx.db_path, scope)?;
-        reports.push(run_async(scoped_store.health_report())?);
+        reports.push(run_async(MemoryStore::health_report(&scoped_store))?);
     }
     Ok(reports)
 }
@@ -2283,6 +2750,53 @@ fn search_result_row(result: ScoredMemory) -> SearchResultRow {
         memory_type: display_memory_type(result.memory.memory_type),
         preview: preview(&result.memory.content),
     }
+}
+
+fn build_correction_history_rows(
+    ctx: &StoreContext,
+    corrections: Vec<CorrectionRecord>,
+) -> Result<Vec<CorrectionHistoryRow>, CliError> {
+    corrections
+        .into_iter()
+        .map(|correction| correction_history_row(ctx, correction))
+        .collect()
+}
+
+fn correction_history_row(
+    ctx: &StoreContext,
+    correction: CorrectionRecord,
+) -> Result<CorrectionHistoryRow, CliError> {
+    let related_memory = correction
+        .related_memory_id
+        .map(|related_id| {
+            run_async(ctx.store.get_raw(&related_id)).map(|memory| (related_id, memory))
+        })
+        .transpose()?;
+
+    let (related_memory_id, related_memory_state, related_memory_preview) = match related_memory {
+        Some((related_id, Some(memory))) => (
+            Some(related_id.to_string()),
+            Some(display_state(memory.state)),
+            Some(preview(&memory.content)),
+        ),
+        Some((related_id, None)) => (Some(related_id.to_string()), None, None),
+        None => (None, None, None),
+    };
+
+    Ok(CorrectionHistoryRow {
+        id: correction.id,
+        memory_id: correction.memory_id.to_string(),
+        corrected_at: correction.corrected_at.to_rfc3339(),
+        corrected_by: correction.corrected_by,
+        reason: correction.reason,
+        disposition: display_correction_disposition(correction.disposition),
+        previous_content: correction.previous_content,
+        corrected_content: correction.corrected_content,
+        outcome: describe_correction_outcome(correction.disposition),
+        related_memory_id,
+        related_memory_state,
+        related_memory_preview,
+    })
 }
 
 fn list_row(memory: Memory) -> ListRow {
@@ -2349,6 +2863,34 @@ fn display_provenance(provenance: ProvenanceLevel) -> String {
         ProvenanceLevel::Consolidated => "consolidated",
         ProvenanceLevel::Imported => "imported",
         ProvenanceLevel::AgentInferred => "agent-inferred",
+    }
+    .to_string()
+}
+
+fn display_correction_disposition(disposition: CorrectionDisposition) -> String {
+    match disposition {
+        CorrectionDisposition::Applied => "applied",
+        CorrectionDisposition::Archived => "archived",
+        CorrectionDisposition::Merged => "merged",
+        CorrectionDisposition::Contradiction => "contradiction",
+    }
+    .to_string()
+}
+
+fn describe_correction_outcome(disposition: CorrectionDisposition) -> String {
+    match disposition {
+        CorrectionDisposition::Applied => {
+            "applied in place; the corrected memory remains the active canonical row"
+        }
+        CorrectionDisposition::Archived => {
+            "applied, then archived by the safety gate; the corrected memory is now dormant"
+        }
+        CorrectionDisposition::Merged => {
+            "merged into the related memory; the corrected memory was archived to dormant"
+        }
+        CorrectionDisposition::Contradiction => {
+            "applied in place and journaled as a contradiction against the related memory"
+        }
     }
     .to_string()
 }
@@ -2480,6 +3022,35 @@ fn print_inspect_text(response: &InspectResponse) {
             println!("  reason: {}", version.change_reason);
         }
         println!("  content: {}", preview(&version.content));
+    }
+    println!("correction history: {}", response.corrections.len());
+    for correction in &response.corrections {
+        println!(
+            "- {} at {} by {} [{}]",
+            correction.id, correction.corrected_at, correction.corrected_by, correction.disposition
+        );
+        if !correction.reason.is_empty() {
+            println!("  reason: {}", correction.reason);
+        }
+        println!("  previous: {}", preview(&correction.previous_content));
+        println!("  corrected: {}", preview(&correction.corrected_content));
+        if let Some(related_memory_id) = &correction.related_memory_id {
+            match (
+                correction.related_memory_state.as_deref(),
+                correction.related_memory_preview.as_deref(),
+            ) {
+                (Some(state), Some(related_preview)) => {
+                    println!("  related memory: {related_memory_id} ({state}) — {related_preview}");
+                }
+                (Some(state), None) => {
+                    println!("  related memory: {related_memory_id} ({state})");
+                }
+                _ => {
+                    println!("  related memory: {related_memory_id}");
+                }
+            }
+        }
+        println!("  outcome: {}", correction.outcome);
     }
 }
 
@@ -2673,6 +3244,578 @@ where
     Ok(())
 }
 
+fn execute_rollback_command(
+    ctx: StoreContext,
+    id: String,
+    version: i64,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let version_u32 = u32::try_from(version).map_err(|_| {
+        CliError::Validation(format!(
+            "version must be a non-negative 32-bit integer, got {version}"
+        ))
+    })?;
+    ctx.store.rollback_to_version(&memory_id, version_u32)?;
+    let memory =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    match format {
+        OutputFormat::Text => {
+            println!("Rolled back {} to version {version}", memory.id);
+            println!("Content: {}", preview(&memory.content));
+        }
+        OutputFormat::Json => {
+            print_json(
+                "rollback",
+                &RollbackResponse {
+                    memory_id: memory.id.to_string(),
+                    restored_version: version,
+                    content_preview: preview(&memory.content),
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_corroborate_command(
+    ctx: StoreContext,
+    id: String,
+    with: String,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let corroborating_id = parse_memory_id(&with)?;
+    ctx.store.corroborate(&memory_id, &corroborating_id)?;
+    let memory =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    match format {
+        OutputFormat::Text => {
+            println!("Corroborated {} with {}", memory.id, corroborating_id);
+            println!(
+                "Reliability: {:.2} | Corroboration count: {}",
+                memory.reliability_score, memory.corroboration_count
+            );
+        }
+        OutputFormat::Json => {
+            print_json(
+                "corroborate",
+                &CorroborateResponse {
+                    memory_id: memory.id.to_string(),
+                    corroborating_id: corroborating_id.to_string(),
+                    new_reliability: memory.reliability_score,
+                    corroboration_count: memory.corroboration_count,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_budget_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
+    let (dormanted, deleted) = ctx.store.enforce_budget()?;
+    match format {
+        OutputFormat::Text => {
+            println!("Budget enforcement complete");
+            println!("  Dormanted: {dormanted}");
+            println!("  Deleted: {deleted}");
+        }
+        OutputFormat::Json => {
+            print_json("budget", &BudgetResponse { dormanted, deleted })?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_correct_command(
+    ctx: StoreContext,
+    id: String,
+    content: String,
+    by: String,
+    reason: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let correction = ctx
+        .store
+        .correct_memory(&memory_id, &content, &by, reason.as_deref())?;
+    let updated =
+        run_async(ctx.store.get_raw(&memory_id))?.ok_or(StoreError::NotFound(memory_id))?;
+    let correction_row = correction_history_row(&ctx, correction)?;
+    match format {
+        OutputFormat::Text => {
+            println!("Corrected memory {memory_id}");
+            println!("  Correction ID: {}", correction_row.id);
+            println!("  Disposition: {}", correction_row.disposition);
+            println!("  Current state: {}", display_state(updated.state));
+            println!("  New reliability: {:.2}", updated.reliability_score);
+            println!("  Embedding stale: {}", updated.embedding_stale);
+            if let Some(related_memory_id) = &correction_row.related_memory_id {
+                match (
+                    correction_row.related_memory_state.as_deref(),
+                    correction_row.related_memory_preview.as_deref(),
+                ) {
+                    (Some(state), Some(related_preview)) => {
+                        println!(
+                            "  Related memory: {related_memory_id} ({state}) — {related_preview}"
+                        );
+                    }
+                    (Some(state), None) => {
+                        println!("  Related memory: {related_memory_id} ({state})");
+                    }
+                    _ => {
+                        println!("  Related memory: {related_memory_id}");
+                    }
+                }
+            }
+            println!("  Outcome: {}", correction_row.outcome);
+        }
+        OutputFormat::Json => {
+            print_json(
+                "correct",
+                &CorrectResponse {
+                    correction: correction_row,
+                    corrected_memory_state: display_state(updated.state),
+                    new_reliability: updated.reliability_score,
+                    embedding_stale: updated.embedding_stale,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_feedback_command(
+    ctx: StoreContext,
+    id: String,
+    query: String,
+    relevant: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let feedback = ctx.store.record_feedback(&memory_id, &query, relevant)?;
+    let learning_report = ctx.store.learned_weights_report()?;
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "Recorded {} feedback for {memory_id}",
+                if relevant { "positive" } else { "negative" }
+            );
+            print_weights_summary_text(&learning_report);
+        }
+        OutputFormat::Json => {
+            print_json(
+                "feedback",
+                &FeedbackResponse {
+                    feedback_id: feedback.id,
+                    memory_id: memory_id.to_string(),
+                    was_relevant: relevant,
+                    learning: weights_summary_response(&learning_report),
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_weights_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
+    let learning_report = ctx.store.learned_weights_report()?;
+    match format {
+        OutputFormat::Text => {
+            print_weights_summary_text(&learning_report);
+        }
+        OutputFormat::Json => {
+            print_json(
+                "weights",
+                &WeightsResponse {
+                    learning: weights_summary_response(&learning_report),
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn print_weights_summary_text(report: &LearnedWeightsReport) {
+    println!(
+        "Scoring mode: {} (samples: {} total = {} relevant / {} irrelevant, confidence: {:.2})",
+        if report.using_defaults {
+            "defaults"
+        } else {
+            "learned"
+        },
+        report.sample_size,
+        report.relevant_samples,
+        report.irrelevant_samples,
+        report.confidence,
+    );
+    println!("Reason: {}", report.status_detail);
+    println!("Effective live weights:");
+    print_weight_values_text(report.effective_weights);
+    println!("Default weights:");
+    print_weight_values_text(report.default_weights);
+}
+
+fn print_weight_values_text(weights: LearnedWeightValues) {
+    println!("  similarity_weight: {:.4}", weights.similarity_weight);
+    println!("  recency_weight: {:.4}", weights.recency_weight);
+    println!("  access_weight: {:.4}", weights.access_weight);
+    println!("  priority_weight: {:.4}", weights.priority_weight);
+}
+
+fn weights_summary_response(report: &LearnedWeightsReport) -> WeightsSummaryResponse {
+    WeightsSummaryResponse {
+        strategy: if report.using_defaults {
+            "defaults".to_string()
+        } else {
+            "learned".to_string()
+        },
+        status_detail: report.status_detail.clone(),
+        sample_size: report.sample_size,
+        relevant_samples: report.relevant_samples,
+        irrelevant_samples: report.irrelevant_samples,
+        learning_confidence: report.confidence,
+        effective_weights: weight_values_response(report.effective_weights),
+        default_weights: weight_values_response(report.default_weights),
+    }
+}
+
+fn weight_values_response(weights: LearnedWeightValues) -> WeightValuesResponse {
+    WeightValuesResponse {
+        similarity_weight: weights.similarity_weight,
+        recency_weight: weights.recency_weight,
+        access_weight: weights.access_weight,
+        priority_weight: weights.priority_weight,
+    }
+}
+
+fn execute_traverse_command(
+    ctx: StoreContext,
+    id: String,
+    depth: u32,
+    relation: Option<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let memory_id = parse_memory_id(&id)?;
+    let result = ctx
+        .store
+        .traverse_links(&memory_id, depth, relation.as_deref())?;
+    match format {
+        OutputFormat::Text => {
+            println!("Graph traversal from {memory_id} (max depth: {depth})");
+            println!("Found {} connected memories", result.nodes.len());
+            for node in &result.nodes {
+                println!(
+                    "  [depth={}] {} — {}",
+                    node.depth,
+                    node.memory.id,
+                    preview(&node.memory.content)
+                );
+            }
+        }
+        OutputFormat::Json => {
+            let nodes: Vec<TraverseNodeRow> = result
+                .nodes
+                .iter()
+                .map(|node| TraverseNodeRow {
+                    id: node.memory.id.to_string(),
+                    depth: node.depth,
+                    content_preview: preview(&node.memory.content),
+                    memory_type: display_memory_type(node.memory.memory_type),
+                    link_count: node.incoming_links.len(),
+                })
+                .collect();
+            print_json(
+                "traverse",
+                &TraverseResponse {
+                    start_id: memory_id.to_string(),
+                    max_depth: depth,
+                    node_count: nodes.len(),
+                    nodes,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_detect_poisoning_command(
+    ctx: StoreContext,
+    quarantine: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let alerts = ctx.store.detect_poisoning()?;
+    let remediation = quarantine
+        .then(|| ctx.store.remediate_poisoning(&alerts))
+        .transpose()?;
+    match format {
+        OutputFormat::Text => {
+            if alerts.is_empty() {
+                println!("No poisoning indicators detected.");
+            } else {
+                println!("Detected {} poisoning alert(s):", alerts.len());
+                for alert in &alerts {
+                    println!(
+                        "  [{:.1}] {:?} — {} ({} memories affected)",
+                        alert.severity,
+                        alert.alert_type,
+                        alert.description,
+                        alert.memory_ids.len()
+                    );
+                    println!("    alert_id: {}", alert.id);
+                    println!("    detected_at: {}", alert.detected_at.to_rfc3339());
+                    println!(
+                        "    memory_ids: {}",
+                        alert
+                            .memory_ids
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    );
+                }
+                if !quarantine {
+                    println!(
+                        "Run `detect-poisoning --quarantine` to dormant-quarantine implicated low-trust active memories (`--remediate` alias also works)."
+                    );
+                }
+                if let Some(remediation) = &remediation {
+                    println!(
+                        "Quarantine remediated {} low-trust active memories and skipped {} memories.",
+                        remediation.quarantined_ids.len(),
+                        remediation.skipped_ids.len()
+                    );
+                    for action in &remediation.actions {
+                        println!(
+                            "  {} {} — {}",
+                            action.action.as_str(),
+                            action.memory_id,
+                            action.reason
+                        );
+                        if !action.alert_ids.is_empty() {
+                            println!("    alert_ids: {}", action.alert_ids.join(", "));
+                        }
+                        if !action.alert_types.is_empty() {
+                            println!(
+                                "    alert_types: {}",
+                                action
+                                    .alert_types
+                                    .iter()
+                                    .map(crate::storage::display_poisoning_alert_type)
+                                    .map(str::to_string)
+                                    .collect::<Vec<_>>()
+                                    .join(", ")
+                            );
+                        }
+                    }
+                }
+            }
+        }
+        OutputFormat::Json => {
+            let rows: Vec<PoisoningAlertRow> = alerts
+                .iter()
+                .map(|alert| PoisoningAlertRow {
+                    id: alert.id.clone(),
+                    detected_at: alert.detected_at.to_rfc3339(),
+                    alert_type: crate::storage::display_poisoning_alert_type(&alert.alert_type)
+                        .to_string(),
+                    severity: alert.severity,
+                    description: alert.description.clone(),
+                    affected_count: alert.memory_ids.len(),
+                    memory_ids: alert.memory_ids.iter().map(ToString::to_string).collect(),
+                })
+                .collect();
+            print_json(
+                "detect-poisoning",
+                &PoisoningResponse {
+                    alert_count: rows.len(),
+                    alerts: rows,
+                    remediation: remediation.map(|report| PoisoningRemediationRow {
+                        quarantined_count: report.quarantined_ids.len(),
+                        quarantined_ids: report
+                            .quarantined_ids
+                            .iter()
+                            .map(ToString::to_string)
+                            .collect(),
+                        skipped_count: report.skipped_ids.len(),
+                        skipped_ids: report.skipped_ids.iter().map(ToString::to_string).collect(),
+                        actions: report
+                            .actions
+                            .into_iter()
+                            .map(|action| PoisoningRemediationActionRow {
+                                memory_id: action.memory_id.to_string(),
+                                action: action.action.as_str().to_string(),
+                                reason: action.reason,
+                                alert_ids: action.alert_ids,
+                                alert_types: action
+                                    .alert_types
+                                    .iter()
+                                    .map(crate::storage::display_poisoning_alert_type)
+                                    .map(str::to_string)
+                                    .collect(),
+                            })
+                            .collect(),
+                    }),
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_delete_link_command(
+    ctx: StoreContext,
+    id: String,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let deleted = ctx.store.delete_link(&id)?;
+    match format {
+        OutputFormat::Text => {
+            if deleted {
+                println!("Deleted link {id}");
+            } else {
+                println!("Link {id} not found");
+            }
+        }
+        OutputFormat::Json => {
+            print_json(
+                "delete-link",
+                &DeleteLinkResponse {
+                    link_id: id,
+                    deleted,
+                },
+            )?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_share_export_command(
+    ctx: StoreContext,
+    output: Option<PathBuf>,
+    max_sensitivity: SensitivityLevel,
+    min_reliability: f32,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let store = SqliteMemoryStore::new(&ctx.db_path, ctx.scope)?;
+    let config = ShareConfig {
+        max_sensitivity,
+        min_reliability,
+        type_filter: None,
+        tag_filter: None,
+    };
+    let memories = store.export_for_sharing(&config)?;
+    let payload = serde_json::to_string_pretty(&memories)?;
+
+    if let Some(path) = output {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(&path, &payload)?;
+        match format {
+            OutputFormat::Text => {
+                println!(
+                    "Exported {} memories for sharing to {}",
+                    memories.len(),
+                    path.display()
+                );
+            }
+            OutputFormat::Json => print_json(
+                "share-export",
+                &ShareExportResponse {
+                    exported_count: memories.len(),
+                    max_sensitivity: format!("{max_sensitivity:?}"),
+                    min_reliability,
+                },
+            )?,
+        }
+    } else {
+        match format {
+            OutputFormat::Text => println!("{payload}"),
+            OutputFormat::Json => print_json(
+                "share-export",
+                &serde_json::json!({
+                    "exportedCount": memories.len(),
+                    "memories": memories,
+                }),
+            )?,
+        }
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_share_import_command(
+    ctx: StoreContext,
+    input: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let raw = if let Some(path) = &input {
+        fs::read_to_string(path)?
+    } else {
+        let mut buf = String::new();
+        io::stdin().read_to_string(&mut buf)?;
+        buf
+    };
+
+    let memories: Vec<Memory> = serde_json::from_str(&raw)?;
+    let report = ctx.store.import_shared_with_report(&memories)?;
+
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "Imported {} shared memories as dormant review entries ({} quarantined, {} skipped)",
+                report.new_ids.len(),
+                report.quarantined_ids.len(),
+                report.skipped_reasons.len()
+            );
+            for outcome in &report.outcomes {
+                match outcome.memory_id {
+                    Some(memory_id) => println!(
+                        "  {} {} — {}",
+                        outcome.disposition.as_str(),
+                        memory_id,
+                        outcome.reason
+                    ),
+                    None => println!("  {} — {}", outcome.disposition.as_str(), outcome.reason),
+                }
+                if let Some(related_memory_id) = outcome.related_memory_id {
+                    println!("    related_memory_id: {related_memory_id}");
+                }
+            }
+        }
+        OutputFormat::Json => print_json(
+            "share-import",
+            &ShareImportResponse {
+                imported_count: report.new_ids.len(),
+                review_count: report.review_ids.len(),
+                quarantined_count: report.quarantined_ids.len(),
+                skipped_count: report.skipped_reasons.len(),
+                new_ids: report.new_ids.iter().map(ToString::to_string).collect(),
+                review_ids: report.review_ids.iter().map(ToString::to_string).collect(),
+                quarantined_ids: report
+                    .quarantined_ids
+                    .iter()
+                    .map(ToString::to_string)
+                    .collect(),
+                skipped_reasons: report.skipped_reasons,
+                outcomes: report
+                    .outcomes
+                    .into_iter()
+                    .map(|outcome| ShareImportOutcomeRow {
+                        memory_id: outcome.memory_id.map(|id| id.to_string()),
+                        disposition: outcome.disposition.as_str().to_string(),
+                        reason: outcome.reason,
+                        related_memory_id: outcome.related_memory_id.map(|id| id.to_string()),
+                    })
+                    .collect(),
+            },
+        )?,
+    }
+
+    Ok(ExitCode::SUCCESS)
+}
+
 #[cfg(test)]
 mod tests {
     use std::{
@@ -2690,9 +3833,9 @@ mod tests {
 
     use super::{
         build_search_response, execute_add_command, execute_import_command,
-        format_contradiction_gate_result, format_gate_result, open_store, reembed_stale_memories,
-        run_async, Cli, CliEmbeddingProvider, CliLlmProvider, CliScope, Command, OutputFormat,
-        StoreArgs, StoreContext,
+        format_contradiction_gate_result, format_gate_result, generate_document_embedding,
+        open_store, reembed_stale_memories, run_async, Cli, CliEmbeddingProvider, CliLlmProvider,
+        CliScope, Command, OutputFormat, StoreArgs, StoreContext,
     };
     use crate::{
         EmbeddingError, EmbeddingProvider, Memory, MemoryFilter, MemoryScope, MemoryState,
@@ -2711,6 +3854,7 @@ mod tests {
 
     #[derive(Debug)]
     struct StubEmbeddingProvider {
+        model_id: &'static str,
         responses: HashMap<String, StubEmbeddingResponse>,
         calls: Mutex<Vec<String>>,
     }
@@ -2721,7 +3865,16 @@ mod tests {
             I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
             S: Into<String>,
         {
+            Self::new_with_model("stub-embedding-provider", responses)
+        }
+
+        fn new_with_model<I, S>(model_id: &'static str, responses: I) -> Self
+        where
+            I: IntoIterator<Item = (S, StubEmbeddingResponse)>,
+            S: Into<String>,
+        {
             Self {
+                model_id,
                 responses: responses
                     .into_iter()
                     .map(|(text, response)| (text.into(), response))
@@ -2759,8 +3912,29 @@ mod tests {
         }
 
         fn model_id(&self) -> &str {
-            "stub-embedding-provider"
+            self.model_id
         }
+    }
+
+    #[tokio::test]
+    async fn reembed_path_uses_document_prefix_for_nomic_models() {
+        let provider = StubEmbeddingProvider::new_with_model(
+            "nomic-embed-text:latest",
+            [(
+                "search_document: Semantic document body",
+                StubEmbeddingResponse::Embedding(vec![0.42; 768]),
+            )],
+        );
+
+        let embedding = generate_document_embedding(&provider, "  Semantic document body  ")
+            .await
+            .expect("document embedding should succeed");
+
+        assert_eq!(embedding.len(), 768);
+        assert_eq!(
+            provider.calls(),
+            vec!["search_document: Semantic document body".to_string()]
+        );
     }
 
     #[test]

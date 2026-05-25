@@ -1,0 +1,1462 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "planning",
+    "version": "0.1.0",
+    "displayName": "Elegy Planning Authority",
+    "aliases": ["elegy-planning", "roadmap-planning", "durable-planning"]
+  },
+  "metadata": {
+    "displayName": "Elegy Planning Authority",
+    "description": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, validation, and projection rendering.",
+    "summary": "Create and inspect durable planning records over Elegy's dedicated planning CLI.",
+    "category": "planning",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["planning", "goal", "roadmap", "plan", "todo", "issue", "review", "validation", "projection", "sqlite"],
+    "owners": ["elegy"],
+    "documentationUri": "rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md"
+  },
+  "capabilities": [
+    {
+      "id": "planning-goal-create",
+      "name": "Create Goal",
+      "description": "Create a durable goal with explicit acceptance and rejection criteria.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "goal", "create", "--id", "${id}", "--title", "${title}", "--description", "${description}", "--acceptance", "${acceptance}", "--rejection", "${rejection}", "--status", "${status}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Correlation ID required for machine-safe goal authoring.",
+            "required": true
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable goal identifier.",
+            "required": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Goal title.",
+            "required": true
+          },
+          {
+            "name": "description",
+            "type": "string",
+            "description": "Goal description.",
+            "required": true
+          },
+          {
+            "name": "acceptance",
+            "type": "array",
+            "description": "One or more acceptance criteria.",
+            "required": true
+          },
+          {
+            "name": "rejection",
+            "type": "array",
+            "description": "One or more rejection criteria.",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional goal status: draft, proposed, active, validated, invalidated, superseded, or abandoned.",
+            "required": false,
+            "default": "draft"
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated goal tags.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created goal record and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-goal-show",
+      "name": "Show Goal",
+      "description": "Show one durable goal including linked planning context and validation state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "goal", "show", "--goal-id", "${goal_id}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "goal_id",
+            "type": "string",
+            "description": "Goal identifier.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Goal view with linked roadmaps and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-roadmap-create",
+      "name": "Create Roadmap",
+      "description": "Create a roadmap linked to an existing goal.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "roadmap", "create", "--id", "${id}", "--goal-id", "${goal_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Correlation ID required for machine-safe roadmap authoring.",
+            "required": true
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable roadmap identifier.",
+            "required": false
+          },
+          {
+            "name": "goal_id",
+            "type": "string",
+            "description": "Parent goal identifier.",
+            "required": true
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Roadmap title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Roadmap summary.",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional roadmap status: draft, proposed, active, blocked, completed, cancelled, or invalidated.",
+            "required": false,
+            "default": "draft"
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated roadmap tags.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created roadmap record and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-roadmap-add-work-point",
+      "name": "Add Work Point",
+      "description": "Attach a work point to a roadmap, optionally under one roadmap section.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "roadmap", "add-work-point", "--id", "${id}", "--roadmap-id", "${roadmap_id}", "--section-id", "${section_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--ordering", "${ordering}", "--dependency-id", "${dependency_ids}", "--validation", "${validation_expectations}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable work point identifier.",
+            "required": false
+          },
+          {
+            "name": "roadmap_id",
+            "type": "string",
+            "description": "Parent roadmap identifier.",
+            "required": true
+          },
+          {
+            "name": "section_id",
+            "type": "string",
+            "description": "Optional roadmap section identifier.",
+            "required": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Work point title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Work point summary.",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional work point status: draft, proposed, active, blocked, completed, cancelled, or invalidated.",
+            "required": false,
+            "default": "draft"
+          },
+          {
+            "name": "ordering",
+            "type": "integer",
+            "description": "Optional work point ordering override.",
+            "required": false
+          },
+          {
+            "name": "dependency_ids",
+            "type": "array",
+            "description": "Optional repeated dependency work point identifiers.",
+            "required": false
+          },
+          {
+            "name": "validation_expectations",
+            "type": "array",
+            "description": "Optional repeated validation expectations for the work point.",
+            "required": false
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated work point tags.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created work point record and refreshed roadmap validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-roadmap-show",
+      "name": "Show Roadmap",
+      "description": "Show one roadmap with sections, work points, attached findings, and validation state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "roadmap", "show", "--roadmap-id", "${roadmap_id}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "roadmap_id",
+            "type": "string",
+            "description": "Roadmap identifier.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Roadmap view with sections, work points, issues, review points, and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-plan-create",
+      "name": "Create Plan",
+      "description": "Create a plan linked to one goal and one roadmap.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "create", "--id", "${id}", "--goal-id", "${goal_id}", "--roadmap-id", "${roadmap_id}", "--title", "${title}", "--summary", "${summary}", "--plan-scope", "${scope}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--status", "${status}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Correlation ID required for machine-safe plan authoring.",
+            "required": true
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable plan identifier.",
+            "required": false
+          },
+          {
+            "name": "goal_id",
+            "type": "string",
+            "description": "Parent goal identifier.",
+            "required": true
+          },
+          {
+            "name": "roadmap_id",
+            "type": "string",
+            "description": "Parent roadmap identifier.",
+            "required": true
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Plan title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Plan summary.",
+            "required": true
+          },
+          {
+            "name": "scope",
+            "type": "string",
+            "description": "Implementation scope for the plan.",
+            "required": true
+          },
+          {
+            "name": "assumptions",
+            "type": "array",
+            "description": "Optional repeated assumptions.",
+            "required": false
+          },
+          {
+            "name": "stop_conditions",
+            "type": "array",
+            "description": "Optional repeated stop conditions.",
+            "required": false
+          },
+          {
+            "name": "validation_steps",
+            "type": "array",
+            "description": "Optional repeated validation steps.",
+            "required": false
+          },
+          {
+            "name": "targeted_work_point_ids",
+            "type": "array",
+            "description": "Optional repeated targeted work point identifiers.",
+            "required": false
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional plan status: draft, proposed, active, blocked, completed, cancelled, or invalidated.",
+            "required": false,
+            "default": "draft"
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated plan tags.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created plan record and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-plan-show",
+      "name": "Show Plan",
+      "description": "Show one plan with linked work points, todos, and validation state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "plan", "show", "--plan-id", "${plan_id}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "plan_id",
+            "type": "string",
+            "description": "Plan identifier.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Plan view with targeted work points, todos, issues, review points, and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-todo-create",
+      "name": "Create Todo",
+      "description": "Create a durable todo, optionally linked to a plan, a work point, or both.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "todo", "create", "--id", "${id}", "--plan-id", "${plan_id}", "--work-point-id", "${work_point_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--priority", "${priority}", "--evidence-ref", "${evidence_refs}", "--tag", "${tags}", "--ordering", "${ordering}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable todo identifier.",
+            "required": false
+          },
+          {
+            "name": "plan_id",
+            "type": "string",
+            "description": "Optional linked plan identifier.",
+            "required": false
+          },
+          {
+            "name": "work_point_id",
+            "type": "string",
+            "description": "Optional linked work point identifier.",
+            "required": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Todo title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Optional todo summary.",
+            "required": false,
+            "default": ""
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional todo status: pending, in-progress, blocked, completed, or cancelled.",
+            "required": false,
+            "default": "pending"
+          },
+          {
+            "name": "priority",
+            "type": "string",
+            "description": "Optional todo priority: low, medium, high, or urgent.",
+            "required": false,
+            "default": "medium"
+          },
+          {
+            "name": "evidence_refs",
+            "type": "array",
+            "description": "Optional repeated evidence references.",
+            "required": false
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated todo tags.",
+            "required": false
+          },
+          {
+            "name": "ordering",
+            "type": "integer",
+            "description": "Optional todo ordering override.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created todo record and refreshed validation state for linked entities."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-issue-record",
+      "name": "Record Issue",
+      "description": "Record a durable planning issue, optionally attached to another planning entity.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "issue", "record", "--id", "${id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--severity", "${severity}", "--related-entity-type", "${related_entity_type}", "--related-entity-id", "${related_entity_id}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Correlation ID required for machine-safe issue recording.",
+            "required": true
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable issue identifier.",
+            "required": false
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Issue title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Issue summary.",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional issue status: open, blocked, resolved, or reopened.",
+            "required": false,
+            "default": "open"
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "description": "Optional issue severity: low, medium, high, or critical.",
+            "required": false,
+            "default": "medium"
+          },
+          {
+            "name": "related_entity_type",
+            "type": "string",
+            "description": "Optional related entity type: goal, roadmap, roadmap-section, work-point, plan, todo, issue, or review-point.",
+            "required": false
+          },
+          {
+            "name": "related_entity_id",
+            "type": "string",
+            "description": "Optional related entity identifier.",
+            "required": false
+          },
+          {
+            "name": "tags",
+            "type": "array",
+            "description": "Optional repeated issue tags.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created issue record and refreshed validation state for linked entities."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-review-point-record",
+      "name": "Record Review Point",
+      "description": "Attach a review point to an existing planning entity.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "review-point", "record", "--id", "${id}", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--severity", "${severity}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "id",
+            "type": "string",
+            "description": "Optional stable review point identifier.",
+            "required": false
+          },
+          {
+            "name": "entity_type",
+            "type": "string",
+            "description": "Attached entity type: goal, roadmap, roadmap-section, work-point, plan, todo, issue, or review-point.",
+            "required": true
+          },
+          {
+            "name": "entity_id",
+            "type": "string",
+            "description": "Attached entity identifier.",
+            "required": true
+          },
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Review point title.",
+            "required": true
+          },
+          {
+            "name": "summary",
+            "type": "string",
+            "description": "Review point summary.",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "description": "Optional review point status: open, resolved, or accepted-risk.",
+            "required": false,
+            "default": "open"
+          },
+          {
+            "name": "severity",
+            "type": "string",
+            "description": "Optional review point severity: low, medium, high, or critical.",
+            "required": false,
+            "default": "medium"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created attached review point and refreshed validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-validate-all",
+      "name": "Validate Planning",
+      "description": "Run full deterministic planning validation over the current database.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "validate", "all"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Validation report spanning all planning entities and findings."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-health",
+      "name": "Planning Health",
+      "description": "Show planning database health and record counts.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "health"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Planning health report with counts and schema state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-project-render",
+      "name": "Render Projection",
+      "description": "Render a non-authoritative markdown or JSON projection for one planning entity.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "project", "render", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "entity_type",
+            "type": "string",
+            "description": "Entity type to render: goal, roadmap, plan, or issue.",
+            "required": true
+          },
+          {
+            "name": "entity_id",
+            "type": "string",
+            "description": "Entity identifier to render.",
+            "required": true
+          },
+          {
+            "name": "projection_format",
+            "type": "string",
+            "description": "Projection format: markdown or json.",
+            "required": false,
+            "default": "markdown"
+          },
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Destination path for the rendered projection.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Projection render metadata including entity identity, format, and output path."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-scope-list",
+      "name": "List Scopes",
+      "description": "List known planning scopes.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "scope", "list"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "db",
+            "type": "path",
+            "description": "Optional SQLite database path for planning state.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Scope list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-scope-create",
+      "name": "Create Scope",
+      "description": "Create a scope record for scoped planning state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "scope", "create", "--scope-key", "${scope_key}", "--scope-type", "${scope_type}", "--parent-scope-key", "${parent_scope_key}", "--metadata-json", "${metadata_json}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "scope_type", "type": "string", "description": "Optional scope type.", "required": false },
+          { "name": "parent_scope_key", "type": "string", "description": "Optional parent scope key.", "required": false },
+          { "name": "metadata_json", "type": "string", "description": "Optional metadata JSON object.", "required": false },
+          { "name": "tags", "type": "array", "description": "Optional scope tags.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created scope record."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-plan-revise",
+      "name": "Revise Plan",
+      "description": "Revise assumptions, stop conditions, validation steps, targeted work points, and tags for an existing plan.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "revise", "--plan-id", "${plan_id}", "--scope-key", "${scope_key}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "plan_id", "type": "string", "description": "Plan identifier.", "required": true },
+          { "name": "assumptions", "type": "array", "description": "Optional repeated assumptions.", "required": false },
+          { "name": "stop_conditions", "type": "array", "description": "Optional repeated stop conditions.", "required": false },
+          { "name": "validation_steps", "type": "array", "description": "Optional repeated validation steps.", "required": false },
+          { "name": "targeted_work_point_ids", "type": "array", "description": "Optional repeated targeted work point identifiers.", "required": false },
+          { "name": "tags", "type": "array", "description": "Optional repeated plan tags.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Revised plan record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-todo-update-status",
+      "name": "Update Todo Status",
+      "description": "Update todo status with optional completion evidence references.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "todo", "update-status", "--todo-id", "${todo_id}", "--status", "${status}", "--evidence-ref", "${evidence_refs}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "todo_id", "type": "string", "description": "Todo identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Todo status.", "required": true },
+          { "name": "evidence_refs", "type": "array", "description": "Optional evidence references.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated todo record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-scope-show",
+      "name": "Show Scope",
+      "description": "Show one scope record.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "scope", "show", "--scope-key", "${scope_key}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Scope record."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-goal-list",
+      "name": "List Goals",
+      "description": "List goals in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "goal", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Goal list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-goal-update-status",
+      "name": "Update Goal Status",
+      "description": "Transition goal lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "goal", "update-status", "--goal-id", "${goal_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "goal_id", "type": "string", "description": "Goal identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Goal status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated goal record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-roadmap-list",
+      "name": "List Roadmaps",
+      "description": "List roadmaps in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "roadmap", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Roadmap list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-roadmap-update-status",
+      "name": "Update Roadmap Status",
+      "description": "Transition roadmap lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "roadmap", "update-status", "--roadmap-id", "${roadmap_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "roadmap_id", "type": "string", "description": "Roadmap identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Roadmap status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated roadmap record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-work-point-list",
+      "name": "List Work Points",
+      "description": "List work points in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "work-point", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Work point list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-work-point-show",
+      "name": "Show Work Point",
+      "description": "Show one work point.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "work-point", "show", "--work-point-id", "${work_point_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "work_point_id", "type": "string", "description": "Work point identifier.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Work point view."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-work-point-update-status",
+      "name": "Update Work Point Status",
+      "description": "Transition work point lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "work-point", "update-status", "--work-point-id", "${work_point_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "work_point_id", "type": "string", "description": "Work point identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Work point status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated work point record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-plan-list",
+      "name": "List Plans",
+      "description": "List plans in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "plan", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Plan list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-plan-update-status",
+      "name": "Update Plan Status",
+      "description": "Transition plan lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "update-status", "--plan-id", "${plan_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "plan_id", "type": "string", "description": "Plan identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Plan status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated plan record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-todo-list",
+      "name": "List Todos",
+      "description": "List todos in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "todo", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Todo list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-issue-list",
+      "name": "List Issues",
+      "description": "List issues in one scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "issue", "list"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Issue list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-issue-update-status",
+      "name": "Update Issue Status",
+      "description": "Transition issue lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "issue", "update-status", "--issue-id", "${issue_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "issue_id", "type": "string", "description": "Issue identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Issue status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated issue record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-review-point-update-status",
+      "name": "Update Review Point Status",
+      "description": "Transition review point lifecycle status.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "review-point", "update-status", "--review-point-id", "${review_point_id}", "--status", "${status}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "review_point_id", "type": "string", "description": "Review point identifier.", "required": true },
+          { "name": "status", "type": "string", "description": "Review point status.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Updated review point record and validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-events-list",
+      "name": "List Planning Events",
+      "description": "List planning events in append order.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "events"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Planning events envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-project-export",
+      "name": "Export Projection",
+      "description": "Export a non-authoritative markdown or JSON projection for one planning entity.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "project", "export", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "entity_type", "type": "string", "description": "Entity type to export: goal, roadmap, plan, or issue.", "required": true },
+          { "name": "entity_id", "type": "string", "description": "Entity identifier to export.", "required": true },
+          { "name": "projection_format", "type": "string", "description": "Projection format: markdown or json.", "required": false, "default": "markdown" },
+          { "name": "output", "type": "path", "description": "Destination path for the exported projection.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Projection export metadata including entity identity, format, and output path."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "sqlite-authority-only",
+      "description": "SQLite planning state is authoritative; rendered markdown and JSON projections are derived outputs only.",
+      "required": true
+    },
+    {
+      "constraintId": "roadmaps-require-goals",
+      "description": "Roadmap authoring must always link each roadmap to an existing goal.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "medium",
+    "approvalRequirement": "none",
+    "policyRefs": ["rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md", "rust/crates/elegy-planning/docs/architecture/mvp-scope.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "planning-authority"]
+  },
+  "discovery": {
+    "keywords": ["planning", "goal", "roadmap", "roadmap planning", "work point", "plan", "todo", "issue", "review point", "validate planning", "projection"],
+    "triggers": [
+      {
+        "pattern": "create roadmap",
+        "description": "When durable roadmap authoring should happen through Elegy's planning authority."
+      },
+      {
+        "pattern": "roadmap planning",
+        "description": "When an agent needs the dedicated planning authority rather than ad hoc markdown only."
+      },
+      {
+        "pattern": "render roadmap projection",
+        "description": "When a planning entity should be projected to markdown or JSON for sharing or inspection."
+      },
+      {
+        "pattern": "validate planning",
+        "description": "When planning state should be checked for deterministic warnings and errors."
+      }
+    ],
+    "capabilityHints": ["durable-goal-authoring", "roadmap-authority", "plan-authoring", "todo-tracking", "issue-tracking", "planning-validation", "planning-projection", "planning-scope-management", "planning-lifecycle-transitions", "planning-event-history"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-planning.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

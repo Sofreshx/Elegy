@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "surface": "elegy-planning",
+  "surfaceRole": "thin-integration-wrapper",
+  "delegatesTo": {
+    "cliCrate": "rust/crates/elegy-planning",
+    "repoLocalSkillOutput": ".github/skills/elegy-planning/SKILL.md"
+  },
+  "integrationAssets": {
+    "installer": "install.ps1",
+    "surfaceLocalSkillBridge": "skills/elegy-planning/SKILL.md"
+  },
+  "authority": {
+    "contracts": "contracts/",
+    "governance": "governance/",
+    "implementation": "rust/crates/elegy-planning"
+  },
+  "helperLanes": {
+    "docs": "docs/",
+    "agents": "agents/",
+    "skills": "skills/"
+  },
+  "canonicalDocs": [
+    "rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md",
+    "rust/crates/elegy-planning/docs/architecture/mvp-scope.md"
+  ],
+  "distribution": {
+    "wrapperAssetPrefix": "elegy-planning-wrapper",
+    "wrapperArchivePattern": "elegy-planning-wrapper-<bundleVersion>.zip",
+    "installLayout": {
+      "contracts": "contracts/",
+      "cli": "bin/elegy-planning/",
+      "wrapper": "wrappers/elegy-planning/"
+    }
+  }
+}

@@ -14,7 +14,7 @@ elegy-memory is a **standalone memory engine for LLM agents**. It stores, retrie
 
 - **Storage:** SQLite + sqlite-vec (vector search) + FTS5 (keyword search). Single file per scope.
 - **Scopes:** Session (JSON, ephemeral), Workspace (SQLite per workspace), User (global SQLite), Agent (procedural SQLite).
-- **Scoring:** `score = α × similarity + β × recency + γ × log(access_count + 1) + δ × importance`. Weights are configurable.
+- **Scoring:** `score = α × similarity + β × recency + γ × (access_count / (access_count + 8)) + δ × (similarity × importance × reliability)`. Weights are configurable.
 - **Confidence Score:** Each memory has `importance_score` (LLM-assigned, 0-1) AND `reliability_score` (system-computed, 0-1). Priority = importance × reliability.
 - **Write-Time Gate:** 3-step filter before any write: (1) Novelty/dedup check cosine > 0.92, (2) Salience check importance > 0.2, (3) Provenance check — agent-inferred + low importance → dormant.
 - **Decay:** Ebbinghaus-inspired. `retention = importance × e^(-λ × days) × (1 + 0.2 × access_count)`. λ adapts to user activity rate.
@@ -46,4 +46,3 @@ elegy-memory is a **standalone memory engine for LLM agents**. It stores, retrie
 - Do NOT assume a single embedding provider. Always go through the `EmbeddingProvider` trait.
 - Do NOT forget to set `embedding_stale = true` when updating memory content.
 - Do NOT mix scopes in queries. Each scope is a separate storage unit.
-

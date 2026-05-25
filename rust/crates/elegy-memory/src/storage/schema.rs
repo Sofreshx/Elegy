@@ -9,11 +9,10 @@ const EMBEDDING_DIMENSIONS: usize = 768;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const SQLITE_VEC_MODULE_NAME: &str = "vec0";
 
-const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
+const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
     ("budget_active_max", "500"),
     ("storage_cap_mb", "100"),
     ("decay_lambda_base", "0.10"),
-    ("dedup_threshold", "0.85"),
     ("salience_threshold", "0.20"),
     ("novelty_doubt_threshold", "0.80"),
     ("embedding_dimensions", "768"),
@@ -26,6 +25,18 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 16] = [
     ("merge_similarity_threshold", "0.85"),
     ("duplicate_similarity_threshold", "0.99"),
     ("agent_inferred_importance_threshold", "0.50"),
+    ("poison_frequency_hourly_threshold", "50"),
+    ("poison_frequency_scope_ratio", "0.30"),
+    ("poison_frequency_burst_ratio", "0.25"),
+    ("poison_frequency_burst_min_hourly", "12"),
+    ("poison_trust_mismatch_importance_threshold", "0.80"),
+    ("poison_trust_mismatch_count_threshold", "5"),
+    ("poison_trust_mismatch_scope_ratio", "0.10"),
+    ("poison_bulk_overwrite_count_threshold", "20"),
+    ("poison_bulk_overwrite_scope_ratio", "0.15"),
+    ("poison_mass_contradiction_per_memory_threshold", "3"),
+    ("poison_mass_contradiction_scope_ratio", "0.05"),
+    ("poison_remediation_reliability_ceiling", "0.60"),
 ];
 
 /// Open or create a SQLite-backed memory store database and ensure the MVP schema exists.
@@ -188,6 +199,32 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
         CREATE INDEX IF NOT EXISTS idx_contradictions_status
             ON contradictions(resolution_status);
 
+        CREATE TABLE IF NOT EXISTS memory_corrections (
+            id               TEXT PRIMARY KEY,
+            memory_id        TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            previous_content TEXT NOT NULL,
+            corrected_content TEXT NOT NULL,
+            corrected_by     TEXT NOT NULL,
+            reason           TEXT NOT NULL,
+            disposition      TEXT NOT NULL DEFAULT 'applied',
+            related_memory_id TEXT,
+            corrected_at     TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_corrections_memory
+            ON memory_corrections(memory_id);
+
+        CREATE TABLE IF NOT EXISTS retrieval_feedback (
+            id          TEXT PRIMARY KEY,
+            memory_id   TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+            relevant    INTEGER NOT NULL,
+            query_text  TEXT,
+            recorded_at TEXT NOT NULL
+        );
+
+        CREATE INDEX IF NOT EXISTS idx_feedback_memory
+            ON retrieval_feedback(memory_id);
+
         CREATE TABLE IF NOT EXISTS scope_config (
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
@@ -197,6 +234,7 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
 
     ensure_vec_memories_object(connection)?;
     ensure_memory_embeddings_columns(connection)?;
+    ensure_memory_corrections_columns(connection)?;
 
     Ok(())
 }
@@ -242,6 +280,24 @@ fn ensure_memory_embeddings_columns(connection: &Connection) -> Result<(), Store
         "#,
         [],
     )?;
+
+    Ok(())
+}
+
+fn ensure_memory_corrections_columns(connection: &Connection) -> Result<(), StoreError> {
+    if !table_column_exists(connection, "memory_corrections", "disposition")? {
+        connection.execute(
+            "ALTER TABLE memory_corrections ADD COLUMN disposition TEXT NOT NULL DEFAULT 'applied'",
+            [],
+        )?;
+    }
+
+    if !table_column_exists(connection, "memory_corrections", "related_memory_id")? {
+        connection.execute(
+            "ALTER TABLE memory_corrections ADD COLUMN related_memory_id TEXT",
+            [],
+        )?;
+    }
 
     Ok(())
 }
@@ -356,11 +412,13 @@ mod tests {
             "contradictions",
             "memories",
             "memories_fts",
+            "memory_corrections",
             "memory_embeddings",
             "memory_links",
             "memory_promotions",
             "memory_session_accesses",
             "memory_versions",
+            "retrieval_feedback",
             "scope_config",
             "vec_memories",
         ];
@@ -540,11 +598,13 @@ mod tests {
                 'contradictions',
                 'memories',
                 'memories_fts',
+                'memory_corrections',
                 'memory_embeddings',
                 'memory_links',
                 'memory_promotions',
                 'memory_session_accesses',
                 'memory_versions',
+                'retrieval_feedback',
                 'scope_config',
                 'vec_memories'
             )

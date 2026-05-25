@@ -76,13 +76,28 @@ CREATE VIRTUAL TABLE vec_memories USING vec0(
 );
 ```
 
+When the `vec0` module is not available at runtime (e.g., sqlite-vec extension not loaded), the schema initialization falls back to a regular table:
+
+```sql
+CREATE TABLE vec_memories (
+    embedding BLOB NOT NULL
+);
+```
+
+This keeps the `rowid`-based mapping intact so that the rest of the schema can reference `vec_memories` uniformly.
+
 The `rowid` of `vec_memories` maps to a separate lookup. We maintain a mapping table:
 
 ```sql
 CREATE TABLE memory_embeddings (
-    memory_id   TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
-    vec_rowid   INTEGER NOT NULL UNIQUE  -- Maps to vec_memories rowid
+    memory_id      TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+    vec_rowid      INTEGER NOT NULL UNIQUE,  -- Maps to vec_memories rowid
+    content_sha256 TEXT                       -- Content hash for embedding-cache deduplication
 );
+
+CREATE INDEX idx_memory_embeddings_content_sha256
+    ON memory_embeddings(content_sha256)
+    WHERE content_sha256 IS NOT NULL;
 ```
 
 **KNN Query Pattern:**
@@ -93,9 +108,12 @@ JOIN memory_embeddings me ON me.vec_rowid = v.rowid
 JOIN memories m ON m.id = me.memory_id
 WHERE v.embedding MATCH ?query_embedding
   AND m.state = 'active'
+  AND m.embedding_stale = 0
 ORDER BY v.distance
 LIMIT ?k;
 ```
+
+Vector-backed retrieval now explicitly excludes stale embeddings. This matters after content mutations such as `update_content()`, `rollback_to_version()`, consolidation rewrites, and user corrections: the row can remain queryable by keyword / exact state inspection, but its old vector is ignored until a fresh embedding is stored.
 
 ### Virtual Table: memories_fts (FTS5)
 
@@ -122,10 +140,10 @@ LIMIT ?k;
 
 ### Hybrid Search
 
-Combine vector and keyword results with weighted scoring:
+Combine vector and keyword results into a blended similarity signal (see [Memory Model → Retrieval Scoring](memory-model.md#retrieval-scoring) for the full formula):
 ```sql
 -- Pseudo-query (implemented in Rust, not raw SQL)
-final_score = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
+blended_similarity = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
 ```
 
 ### Table: memory_links (Proto-Graph)
@@ -177,6 +195,11 @@ CREATE TABLE memory_promotions (
     trigger_session_id TEXT,
     promoted_at        TEXT NOT NULL
 );
+
+CREATE INDEX idx_memory_promotions_memory
+    ON memory_promotions(memory_id);
+CREATE INDEX idx_memory_promotions_promoted_at
+    ON memory_promotions(promoted_at);
 ```
 
 ### Table: memory_session_accesses
@@ -189,6 +212,11 @@ CREATE TABLE memory_session_accesses (
     last_accessed_at  TEXT NOT NULL,
     PRIMARY KEY(memory_id, session_id)
 );
+
+CREATE INDEX idx_memory_session_accesses_memory
+    ON memory_session_accesses(memory_id);
+CREATE INDEX idx_memory_session_accesses_session
+    ON memory_session_accesses(session_id);
 ```
 
 ### Table: contradictions
@@ -211,6 +239,50 @@ CREATE INDEX idx_contradictions_status ON contradictions(resolution_status);
 Tier 2 LLM consolidation does **not** add new persistence tables. When the model returns
 `CONTRADICTION: ...`, the implementation records that result in this same contradiction journal.
 
+### Table: memory_corrections
+
+```sql
+CREATE TABLE memory_corrections (
+    id                TEXT PRIMARY KEY,
+    memory_id         TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    previous_content  TEXT NOT NULL,
+    corrected_content TEXT NOT NULL,
+    corrected_by      TEXT NOT NULL,
+    reason            TEXT NOT NULL,
+    disposition       TEXT NOT NULL DEFAULT 'applied', -- 'applied' | 'archived' | 'merged' | 'contradiction'
+    related_memory_id TEXT,
+    corrected_at      TEXT NOT NULL
+);
+
+CREATE INDEX idx_corrections_memory
+    ON memory_corrections(memory_id);
+```
+
+`memory_corrections` records the operator-visible correction loop:
+
+- `disposition` captures the final backend outcome after the correction re-enters the write-time gate
+- `related_memory_id` points at the merge target, contradiction peer, or surfaced near-duplicate when one exists
+- corrections are ordered by `corrected_at DESC, id DESC` for CLI history queries
+
+The schema init path now also performs additive column backfills so older databases gain `disposition` and `related_memory_id` automatically.
+
+### Table: retrieval_feedback
+
+```sql
+CREATE TABLE retrieval_feedback (
+    id          TEXT PRIMARY KEY,
+    memory_id   TEXT NOT NULL REFERENCES memories(id) ON DELETE CASCADE,
+    relevant    INTEGER NOT NULL,
+    query_text  TEXT,
+    recorded_at TEXT NOT NULL
+);
+
+CREATE INDEX idx_feedback_memory
+    ON retrieval_feedback(memory_id);
+```
+
+`retrieval_feedback` is the learner's evidence table. The current implementation does **not** create a second learned-weights table: each `feedback` write recomputes the effective retrieval profile and writes the resulting live values back into the existing `scope_config` retrieval-weight keys.
+
 ### Table: scope_config
 
 ```sql
@@ -223,6 +295,7 @@ CREATE TABLE scope_config (
 -- 'schema_version' → current schema version
 -- 'budget_active_max' → '500'
 -- 'storage_cap_mb' → '100'
+-- 'embedding_dimensions' → '768'
 -- 'decay_lambda_base' → '0.10'
 -- 'similarity_weight' → '0.40'
 -- 'recency_weight' → '0.25'
@@ -235,7 +308,32 @@ CREATE TABLE scope_config (
 -- 'merge_similarity_threshold' → '0.85'
 -- 'duplicate_similarity_threshold' → '0.99'
 -- 'agent_inferred_importance_threshold' → '0.50'
+-- 'poison_frequency_hourly_threshold' → '50'
+-- 'poison_frequency_scope_ratio' → '0.30'
+-- 'poison_frequency_burst_ratio' → '0.25'
+-- 'poison_frequency_burst_min_hourly' → '12'
+-- 'poison_trust_mismatch_importance_threshold' → '0.80'
+-- 'poison_trust_mismatch_count_threshold' → '5'
+-- 'poison_trust_mismatch_scope_ratio' → '0.10'
+-- 'poison_bulk_overwrite_count_threshold' → '20'
+-- 'poison_bulk_overwrite_scope_ratio' → '0.15'
+-- 'poison_mass_contradiction_per_memory_threshold' → '3'
+-- 'poison_mass_contradiction_scope_ratio' → '0.05'
+-- 'poison_remediation_reliability_ceiling' → '0.60'
+
+The key `dedup_threshold` also exists in databases created before the threshold rename and is maintained by the schema migration path, but it is not loaded by current application code.
 ```
+
+The poisoning keys are internal operational controls used by scoped detection/remediation. No new tables or columns are required; quarantined memories continue to use the existing `state`, `status`, and `custom_metadata` fields, including alert/remediation trace keys such as `poisoning_quarantined_at`, `poisoning_alert_types`, `poisoning_alert_ids`, and `poisoning_remediation`.
+
+The four retrieval-weight keys are also the live parameter-learning write-back surface:
+
+- `similarity_weight`
+- `recency_weight`
+- `access_weight`
+- `priority_weight`
+
+`feedback` persists those exact keys, and `search()` reloads them directly from `scope_config` before scoring results.
 
 ## Migration Strategy
 
