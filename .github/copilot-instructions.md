@@ -46,43 +46,17 @@ Before writing any code, read the relevant architecture docs:
 - Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`
 - Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
 - Do feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
-- Merge a topic branch into `roro` only after validation is clean
-- Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes
 - Merge `dev` into `main` only after `dev` is clean and validated
 - If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work
 - If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work
+- After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle
+- Push promoted branches to `origin` only after the local promotion step is clean. Publish in chain order: `main`, `dev`, then `roro`
+- The following `roro` rules apply only when the current branch is `roro`:
+- Merge a topic branch into `roro` only after validation is clean
+- Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes
 
 ## File Organization
 
-```
-Elegy/
-├── .github/
-│   ├── copilot-instructions.md
-│   ├── instructions/
-│   │   └── elegy-memory.instructions.md
-│   ├── skills/
-│   └── workflows/
-├── AGENTS.md
-├── CLAUDE.md
-├── rust/
-│   └── crates/
-│       └── elegy-memory/
-│           ├── Cargo.toml
-│           ├── docs/
-│           │   └── architecture/
-│           │       ├── ARCHITECTURE.md
-│           │       ├── memory-model.md
-│           │       ├── storage-schema.md
-│           │       ├── traits-and-interfaces.md
-│           │       └── mvp-scope.md
-│           ├── src/
-│           │   ├── lib.rs
-│           │   ├── main.rs
-│           │   ├── cli.rs
-│           │   └── local_store.rs
-│           └── tests/
-│               ├── cli.rs
-│               ├── governed_memory.rs
-│               └── local_store.rs
-└── prompt.md
-```
+- `contracts/`, `governance/`, `schemas/`, and `policies/` hold the governed contract and policy surfaces.
+- `rust/crates/` is the active Rust workspace and contains multiple first-party crates, including `elegy-memory`, `elegy-memory-mcp`, `elegy-host-mcp`, `elegy-skills`, `elegy-planning`, and related runtime/tooling crates.
+- `src/Elegy-*` directories are wrapper or contributor-navigation surfaces, not the canonical Rust implementation roots.

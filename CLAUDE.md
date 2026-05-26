@@ -71,13 +71,15 @@ Include: date, what changed, test status, decisions made.
 - Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`
 - Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
 - Do normal feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
-- Merge a topic branch into `roro` only when the work and validation are clean
-- Merge `roro` into `dev` only when `roro` is clean, validated, and reconciled with newer `main` changes
 - Merge `dev` into `main` only when `dev` is clean and validated
 - If a hotfix lands on `main`, propagate it back through `dev`, then `roro`, before continuing feature work
 - If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work
+- After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle
+- Push promoted branches to `origin` only after the local promotion step is clean. Publish in chain order: `main`, `dev`, then `roro`
+- The following `roro` rules apply only when the current branch is `roro`:
+- Merge a topic branch into `roro` only when the work and validation are clean
+- Merge `roro` into `dev` only when `roro` is clean, validated, and reconciled with newer `main` changes
 - Atomic commits: one logical change = one commit
-- Never push to `main`
 - Never force-push or rewrite history on `main` or `dev`
 
 ## Do NOT
