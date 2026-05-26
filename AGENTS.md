@@ -63,7 +63,7 @@
 - If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work.
 - If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work.
 - After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle.
-- Push promoted branches to `origin` only after the local promotion step is clean. Publish in chain order: `main`, `dev`, then `roro`.
+- After a clean local promotion cycle, push `main`, `dev`, and `roro` to `origin` immediately so the remote stays aligned with the validated local state. Prefer a single atomic push when available.
 - The following `roro` rules apply only when the current branch is `roro`:
 - Merge a topic branch into `roro` only after the relevant validation passes and the branch is ready to promote.
 - Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes.
