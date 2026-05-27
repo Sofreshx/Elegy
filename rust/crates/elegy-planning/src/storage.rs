@@ -278,7 +278,8 @@ impl PlanningStore {
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
         ensure_entity_exists(&transaction, EntityType::Goal, &input.goal_id, "goalId")?;
-        let inherited_scope_key = scope_key_for_entity(&transaction, EntityType::Goal, &input.goal_id)?;
+        let inherited_scope_key =
+            scope_key_for_entity(&transaction, EntityType::Goal, &input.goal_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = RoadmapRecord {
@@ -1051,7 +1052,8 @@ impl PlanningStore {
                         serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
                     )?,
                 )?;
-                let validation = refresh_validation_target(&transaction, EntityType::Goal, &record.id)?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::Goal, &record.id)?;
                 serde_json::json!({ "record": record, "validation": validation })
             }
             EntityType::Roadmap => {
@@ -1109,8 +1111,11 @@ impl PlanningStore {
                 )?;
                 let validation =
                     refresh_validation_target(&transaction, EntityType::WorkPoint, &record.id)?;
-                let _ =
-                    refresh_validation_target(&transaction, EntityType::Roadmap, &record.roadmap_id)?;
+                let _ = refresh_validation_target(
+                    &transaction,
+                    EntityType::Roadmap,
+                    &record.roadmap_id,
+                )?;
                 serde_json::json!({ "record": record, "validation": validation })
             }
             EntityType::Plan => {
@@ -1137,7 +1142,8 @@ impl PlanningStore {
                         serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
                     )?,
                 )?;
-                let validation = refresh_validation_target(&transaction, EntityType::Plan, &record.id)?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::Plan, &record.id)?;
                 serde_json::json!({ "record": record, "validation": validation })
             }
             EntityType::Todo => {
@@ -1175,7 +1181,8 @@ impl PlanningStore {
                         }),
                     )?,
                 )?;
-                let validation = refresh_validation_target(&transaction, EntityType::Todo, &record.id)?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::Todo, &record.id)?;
                 if let Some(plan_id) = &record.plan_id {
                     let _ = refresh_validation_target(&transaction, EntityType::Plan, plan_id)?;
                 }
@@ -1205,11 +1212,15 @@ impl PlanningStore {
                         serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
                     )?,
                 )?;
-                let validation = refresh_validation_target(&transaction, EntityType::Issue, &record.id)?;
+                let validation =
+                    refresh_validation_target(&transaction, EntityType::Issue, &record.id)?;
                 if record.related_entity_type == Some(EntityType::Plan) {
                     if let Some(related_entity_id) = &record.related_entity_id {
-                        let _ =
-                            refresh_validation_target(&transaction, EntityType::Plan, related_entity_id)?;
+                        let _ = refresh_validation_target(
+                            &transaction,
+                            EntityType::Plan,
+                            related_entity_id,
+                        )?;
                     }
                 }
                 serde_json::json!({ "record": record, "validation": validation })
@@ -1431,7 +1442,8 @@ impl PlanningStore {
         let mut statement = connection.prepare(
             "SELECT id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at FROM goals WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
-        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_goal)?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_goal)?;
         collect_rows(rows)
     }
 
@@ -1452,8 +1464,10 @@ impl PlanningStore {
         let mut statement = connection.prepare(
             "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
-        let rows =
-            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_roadmap)?;
+        let rows = statement.query_map(
+            params![normalize_scope_key_value(scope_key)],
+            row_to_roadmap,
+        )?;
         collect_rows(rows)
     }
 
@@ -1498,7 +1512,8 @@ impl PlanningStore {
         let mut statement = connection.prepare(
             "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
-        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_plan)?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_plan)?;
         collect_rows(rows)
     }
 
@@ -1519,7 +1534,8 @@ impl PlanningStore {
         let mut statement = connection.prepare(
             "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE scope_key = ?1 ORDER BY status ASC, ordering_index ASC, id ASC",
         )?;
-        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_todo)?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_todo)?;
         collect_rows(rows)
     }
 
@@ -3756,7 +3772,11 @@ mod tests {
         assert_eq!(todo[0].status, TodoStatus::Completed);
         assert_eq!(todo[0].evidence_refs, vec!["proof://ci".to_string()]);
         let events = store.list_events().expect("list events");
-        assert!(events.iter().any(|event| event.event_type == "todo.status-updated"));
-        assert!(events.iter().any(|event| event.event_type == "plan.revised"));
+        assert!(events
+            .iter()
+            .any(|event| event.event_type == "todo.status-updated"));
+        assert!(events
+            .iter()
+            .any(|event| event.event_type == "plan.revised"));
     }
 }

@@ -205,7 +205,9 @@ impl PlanningService {
         context: &PlanningContext,
         mut input: RevisePlanInput,
     ) -> Result<MutationResult<crate::PlanRecord>, PlanningStoreError> {
-        input.scope_key = input.scope_key.or_else(|| Some(self.config.scope_key.clone()));
+        input.scope_key = input
+            .scope_key
+            .or_else(|| Some(self.config.scope_key.clone()));
         input.run_id = resolve_run_id(context);
         self.store.revise_plan(input)
     }

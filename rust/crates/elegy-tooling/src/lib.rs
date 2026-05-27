@@ -214,9 +214,7 @@ pub fn generate_codex_plugin_from_package_file(
 
     let mut written_files = Vec::with_capacity(target_paths.len());
 
-    if let Err(error) = write_json_file(&manifest_path, &manifest, overwrite) {
-        return Err(error);
-    }
+    write_json_file(&manifest_path, &manifest, overwrite)?;
     written_files.push(display_path(&manifest_path));
 
     for document in &skill_documents {
