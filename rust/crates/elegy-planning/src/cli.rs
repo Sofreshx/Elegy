@@ -9,7 +9,7 @@ use crate::{
     AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
     CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EntityType,
     GoalStatus, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat,
-    RevisePlanInput, ReviewPointStatus, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput,
+    ReviewPointStatus, RevisePlanInput, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput,
     WorkPointStatus,
 };
 
