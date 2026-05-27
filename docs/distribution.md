@@ -51,7 +51,7 @@ GitHub Releases are the primary downstream distribution lane. The standalone ins
 
 Downloadable archives are self-describing. Packaging stages `PACKAGE_README.md` into every downloadable zip as archive-root `README.md`, and manifest validation treats that README as a required payload entry for the CLI, wrapper, and installer archive families.
 
-Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
+Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable general-purpose surface for agent onboarding, skills compatibility, docs tooling, Mermaid and diagram tooling, repo/web/data/notify utilities, read-only observation and desktop automation, optional MCP hosting, contracts export, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect` commands. The current published target set is intentionally narrow:
 
 - `x86_64-pc-windows-msvc`
 - `x86_64-unknown-linux-gnu`
@@ -159,7 +159,7 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, lower-level `generate codex-plugin`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for agent onboarding, skills compatibility, docs tooling, diagram, `run`, observe, desktop, repo, web, data, notify, contracts export, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect`; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
 
 ## Wrapper archive
 
