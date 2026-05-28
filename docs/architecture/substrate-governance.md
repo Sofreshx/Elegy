@@ -39,12 +39,14 @@ These crates consume governed artifacts and provide reusable executable behavior
 | --- | --- |
 | `rust/crates/elegy-contracts` | Rust consumption of governed contracts |
 | `rust/crates/elegy-policy` | Policy enforcement helpers |
-| `rust/crates/elegy-mcp` | MCP analysis and related runtime behavior |
-| `rust/crates/elegy-tooling` | Descriptor authoring, analysis, and skill generation |
+| `rust/crates/elegy-memory` | Dedicated bounded-memory executable behavior and CLI surface |
+| `rust/crates/elegy-mcp` | Dedicated MCP descriptor authoring/analysis behavior and CLI surface |
+| `rust/crates/elegy-skills` | Dedicated MCP-to-skill generation behavior and CLI surface |
+| `rust/crates/elegy-tooling` | Shared helper and compatibility infrastructure for descriptor and skill workflows |
 | `rust/crates/elegy-descriptor` | Descriptor loading and normalization |
 | `rust/crates/elegy-adapter-*` | Bounded adapter behavior |
 | `rust/crates/elegy-runtime` and `rust/crates/elegy-core` | Reusable runtime composition |
-| `rust/crates/elegy-host-mcp` and `rust/crates/elegy-cli` | Thin operator-facing surfaces |
+| `rust/crates/elegy-host-mcp` and `rust/crates/elegy-cli` | Thin host and umbrella general/compatibility surfaces |
 
 ### Layer 3: export and validation surfaces
 
@@ -67,6 +69,7 @@ The following rules are mandatory until a later architecture decision changes th
 4. Operator surfaces such as `elegy-cli` and `elegy-host-mcp` must remain thin over explicit runtime and tooling crates.
 5. Export scripts and workflows validate or package the repo surfaces; they are not alternate places to invent contract truth.
 6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
+7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists; wrapper overlays under `src/` do not create an internal Elegy agent orchestration lane.
 
 ## Post-legacy rule
 

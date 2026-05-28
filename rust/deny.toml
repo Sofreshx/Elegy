@@ -21,7 +21,9 @@ allow = [
     "Unicode-3.0",
     "Zlib",
 ]
-exceptions = []
+exceptions = [
+    { allow = ["MPL-2.0"], crate = "option-ext" },
+]
 private = { ignore = true }
 
 [bans]

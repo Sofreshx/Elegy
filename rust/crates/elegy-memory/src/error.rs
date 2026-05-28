@@ -23,7 +23,7 @@ pub enum StoreError {
 }
 
 /// Errors produced by [`crate::traits::EmbeddingProvider`] implementations.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Error)]
 pub enum EmbeddingError {
     /// The provider failed to generate an embedding.
     #[error("embedding provider error: {0}")]
@@ -31,6 +31,17 @@ pub enum EmbeddingError {
     /// The produced embedding does not match the expected dimensionality.
     #[error("dimension mismatch: expected {expected}, got {actual}")]
     DimensionMismatch { expected: usize, actual: usize },
+}
+
+/// Errors produced by [`crate::traits::LlmProvider`] implementations.
+#[derive(Debug, Clone, Error)]
+pub enum LlmError {
+    /// The provider failed to generate a completion.
+    #[error("llm provider error: {0}")]
+    Provider(String),
+    /// The provider returned a syntactically invalid or unusable response.
+    #[error("invalid llm response: {0}")]
+    InvalidResponse(String),
 }
 
 /// Errors produced by [`crate::traits::SalienceGate`] implementations.
@@ -53,6 +64,9 @@ pub enum ConsolidationError {
     /// Consolidation failed while reading from or writing to the store.
     #[error("store error during consolidation: {0}")]
     Store(#[from] StoreError),
+    /// Consolidation failed while calling an LLM provider.
+    #[error("llm error during consolidation: {0}")]
+    Llm(#[from] LlmError),
     /// The requested consolidation operation is not supported by this implementation.
     #[error("unsupported consolidation operation: {0}")]
     Unsupported(String),
