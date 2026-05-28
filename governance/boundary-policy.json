@@ -93,11 +93,13 @@
         "elegy-mcp-wrapper",
         "elegy-planning-wrapper",
         "elegy-skills-wrapper",
+        "elegy-configuration-wrapper",
         "surface: elegy-cli",
         "surface: elegy-memory",
         "surface: elegy-mcp",
         "surface: elegy-planning",
         "surface: elegy-skills",
+        "surface: elegy-configuration",
         "matrix\\.surface"
       ]
     },
@@ -135,7 +137,8 @@
         "elegy-memory",
         "elegy-mcp",
         "elegy-planning",
-        "elegy-skills"
+        "elegy-skills",
+        "elegy-configuration"
       ]
     },
     {
@@ -153,7 +156,8 @@
         "elegy-memory-wrapper",
         "elegy-mcp-wrapper",
         "elegy-planning-wrapper",
-        "elegy-skills-wrapper"
+        "elegy-skills-wrapper",
+        "elegy-configuration-wrapper"
       ]
     },
     {
@@ -174,12 +178,14 @@
         "elegy-mcp",
         "elegy-planning",
         "elegy-skills",
+        "elegy-configuration",
         "LocalArtifactsRoot",
         "WrapperSurfaces",
         "elegy-memory-wrapper",
         "elegy-mcp-wrapper",
         "elegy-planning-wrapper",
-        "elegy-skills-wrapper"
+        "elegy-skills-wrapper",
+        "elegy-configuration-wrapper"
       ]
     },
     {

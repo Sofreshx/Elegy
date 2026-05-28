@@ -554,6 +554,140 @@ fn generate_codex_plugin_command_rejects_unsafe_plugin_output_name() {
 }
 
 #[test]
+fn configuration_apply_command_supports_package_profiles() {
+    let temp_dir = unique_temp_dir("elegy-cli-config-package-apply");
+    let target_dir = temp_dir.join("target");
+    let package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.demo-config.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "apply",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration apply --package");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "apply"]));
+    assert_eq!(body["data"]["sourceKind"], "package");
+    assert_eq!(body["data"]["subjectKind"], "profile");
+    assert_eq!(body["data"]["subjectId"], "demo-profile");
+    assert_eq!(body["data"]["verified"], true);
+    assert_eq!(body["data"]["summary"]["created"], 1);
+    assert!(body["data"]["sourceRef"]
+        .as_str()
+        .expect("sourceRef string")
+        .contains("#demo-profile"));
+    assert_eq!(
+        fs::read_to_string(target_dir.join("generated").join("demo.txt")).expect("generated file"),
+        "demo\n"
+    );
+}
+
+#[test]
+fn configuration_verify_command_supports_package_profiles() {
+    let temp_dir = unique_temp_dir("elegy-cli-config-package-verify");
+    let target_dir = temp_dir.join("target");
+    let package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.demo-config.json");
+
+    let apply_output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "apply",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration apply before verify");
+
+    assert!(
+        apply_output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&apply_output.stderr)
+    );
+
+    let verify_output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration verify --package");
+
+    assert!(
+        verify_output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&verify_output.stderr)
+    );
+
+    let body: Value =
+        serde_json::from_slice(&verify_output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "verify"]));
+    assert_eq!(body["data"]["sourceKind"], "package");
+    assert_eq!(body["data"]["subjectKind"], "profile");
+    assert_eq!(body["data"]["subjectId"], "demo-profile");
+    assert_eq!(body["data"]["verified"], true);
+    assert_eq!(body["data"]["summary"]["verified"], 1);
+    assert_eq!(body["data"]["summary"]["mismatched"], 0);
+}
+
+#[test]
+fn configuration_list_command_does_not_claim_missing_catalog_schema() {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args(["configuration", "list", "--json"])
+        .output()
+        .expect("run elegy configuration list --json");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "list"]));
+    assert!(body.get("dataSchema").is_none());
+}
+
+#[test]
 fn run_dry_run_command_matches_http_example_catalog() {
     let example = rust_workspace_root().join("examples/http-minimal");
     let expected: serde_json::Value = serde_json::from_str(

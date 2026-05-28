@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills')]
+    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills', 'elegy-configuration')]
     [string]$Surface = 'elegy-cli',
     [string]$Target = '',
     [string]$OutputDirectory = '',
@@ -57,6 +57,14 @@ function Get-DistributionSurfaceMetadata {
                 Package = 'elegy-skills'
                 Binary = 'elegy-skills'
                 AssetPrefix = 'elegy-skills'
+            }
+        }
+        'elegy-configuration' {
+            return @{
+                Surface = 'elegy-configuration'
+                Package = 'elegy-configuration'
+                Binary = 'elegy-configuration'
+                AssetPrefix = 'elegy-configuration'
             }
         }
         default {

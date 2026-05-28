@@ -3,7 +3,7 @@
   "consumerVersion": "0.1.0",
   "upstreamPackage": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.4.0"
+    "version": "1.6.0"
   },
   "authority": {
     "sourceOfTruth": "contracts/support/elegy-rust-support.json",
@@ -20,7 +20,7 @@
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.6.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -47,7 +47,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.6.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -72,7 +72,7 @@
       "name": "elegy-planning-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.6.0",
       "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
       "wrapperSurface": {
         "root": "src/Elegy-planning",
@@ -98,7 +98,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.6.0",
       "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -117,6 +117,27 @@
         "contracts skill-definition-v2 authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
+      ]
+    },
+    {
+      "name": "elegy-configuration-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetUpstreamPackageVersion": "1.6.0",
+      "scope": "Deterministic materialization and verification of agentic configuration templates, profiles, and receipts for harness, repo, and workspace targets.",
+      "wrapperSurface": {
+        "root": "src/Elegy-configuration",
+        "entrypoint": "src/Elegy-configuration/wrapper-entrypoint.json",
+        "installer": "src/Elegy-configuration/install.ps1",
+        "skillBridge": "src/Elegy-configuration/skills/elegy-configuration/SKILL.md",
+        "releaseAssetPrefix": "elegy-configuration-wrapper",
+        "archivePattern": "elegy-configuration-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-configuration/, and the wrapper surface under wrappers/elegy-configuration/."
+      },
+      "authorityReservations": [
+        "contracts configuration template/profile/receipt authority",
+        "rust/crates/elegy-configuration deterministic materialization behavior",
+        "downstream hosts own release download, auth, trust, approvals, and runtime registration"
       ]
     }
   ],
@@ -137,6 +158,7 @@
     "summary-only-session-context-envelope": "1.0.0",
     "skill-definition-v2": "2.0.0",
     "elegy-plugin-package-v1": "1.0.0",
+    "elegy-plugin-package-v2": "1.0.0",
     "skill-discovery-index": "1.0.0",
     "mcp-tool-definition": "1.0.0",
     "mcp-server-descriptor": "1.0.0",
@@ -144,6 +166,9 @@
     "observation-event": "1.1.0",
     "observation-session": "1.1.0",
     "observation-summary": "1.1.0",
+    "elegy-configuration-template-v1": "1.0.0",
+    "elegy-configuration-profile-v1": "1.0.0",
+    "elegy-configuration-receipt-v1": "1.1.0",
     "structured-failure": "1.0.0"
   }
 }

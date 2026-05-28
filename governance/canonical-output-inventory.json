@@ -91,6 +91,10 @@
       "generated": "artifacts/contracts/elegy-plugin-package-v1.schema.json"
     },
     {
+      "source": "contracts/schemas/elegy-plugin-package-v2.schema.json",
+      "generated": "artifacts/contracts/elegy-plugin-package-v2.schema.json"
+    },
+    {
       "source": "contracts/schemas/skill-discovery-index.schema.json",
       "generated": "artifacts/contracts/skill-discovery-index.schema.json"
     },
@@ -251,6 +255,26 @@
       "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.minimal.json"
     },
     {
+      "source": "contracts/fixtures/elegy-plugin-package-v2.minimal.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.minimal.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v2.demo-config.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.demo-config.json"
+    },
+    {
+      "source": "contracts/fixtures/configuration/demo-template.json",
+      "generated": "artifacts/contracts/fixtures/configuration/demo-template.json"
+    },
+    {
+      "source": "contracts/fixtures/configuration/demo-profile.json",
+      "generated": "artifacts/contracts/fixtures/configuration/demo-profile.json"
+    },
+    {
+      "source": "contracts/fixtures/configuration/assets/demo.txt",
+      "generated": "artifacts/contracts/fixtures/configuration/assets/demo.txt"
+    },
+    {
       "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json",
       "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json"
     },
@@ -299,6 +323,10 @@
       "generated": ".github/skills/elegy-mermaid/SKILL.md"
     },
     {
+      "source": ".agents/skills/elegy-configuration/SKILL.md",
+      "generated": ".github/skills/elegy-configuration/SKILL.md"
+    },
+    {
       "source": "contracts/fixtures/skill-forge-request.minimal.json",
       "generated": "artifacts/contracts/fixtures/skill-forge-request.minimal.json"
     },
@@ -326,7 +354,8 @@
     "artifacts/distribution/elegy-memory-wrapper-*.zip",
     "artifacts/distribution/elegy-mcp-wrapper-*.zip",
     "artifacts/distribution/elegy-planning-wrapper-*.zip",
-    "artifacts/distribution/elegy-skills-wrapper-*.zip"
+    "artifacts/distribution/elegy-skills-wrapper-*.zip",
+    "artifacts/distribution/elegy-configuration-wrapper-*.zip"
   ],
   "installerArchivePatterns": [
     "artifacts/distribution/elegy-installer-*.zip"
@@ -357,6 +386,9 @@
     ],
     "artifacts/distribution/elegy-skills-wrapper-*.zip": [
       "skills/elegy-skills/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-configuration-wrapper-*.zip": [
+      "skills/elegy-configuration/SKILL.md"
     ]
   }
 }

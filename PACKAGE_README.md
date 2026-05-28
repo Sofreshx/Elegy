@@ -16,7 +16,7 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
 
 - `elegy-cli-<cliVersion>-<target>.zip`
   - Ships the umbrella `elegy` binary.
-  - Carries the umbrella feature families: mermaid, diagram, skills registry (`skills list|describe|get|search|resolve|capability|validate`), lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify.
+  - Carries the general-purpose `elegy` surface: agent onboarding, skills compatibility, docs tooling, Mermaid and diagram tooling, repo/web/data/notify utilities, read-only observation and desktop automation, optional MCP hosting, contracts export, deterministic configuration materialization, and lower-level `author|analyze|generate|validate|inspect` commands.
 - `elegy-memory-<cliVersion>-<target>.zip`
   - Dedicated `elegy-memory` binary.
 - `elegy-mcp-<cliVersion>-<target>.zip`
@@ -25,7 +25,9 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
   - Dedicated `elegy-planning` binary.
 - `elegy-skills-<cliVersion>-<target>.zip`
   - Dedicated `elegy-skills` binary.
-- `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-planning-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`
+- `elegy-configuration-<cliVersion>-<target>.zip`
+  - Dedicated `elegy-configuration` binary.
+- `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-planning-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`, `elegy-configuration-wrapper-<bundleVersion>.zip`
   - Dedicated wrapper surfaces with wrapper metadata, local install entrypoint, skill bridge, bundled installer helper, and this README.
 - `elegy-installer-<bundleVersion>.zip`
   - Standalone installer bootstrap with `install-distribution.ps1` and this README.

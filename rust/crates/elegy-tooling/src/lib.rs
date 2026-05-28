@@ -1,3 +1,7 @@
+mod docs;
+
+pub use docs::*;
+
 use elegy_contracts::{
     validate_elegy_plugin_package, validate_mcp_analysis_result, validate_mcp_server_descriptor,
     validate_skill_definition_v2, ElegyPluginPackage,
@@ -111,6 +115,12 @@ pub enum ToolingError {
         #[source]
         source: serde_json::Error,
     },
+    #[error("failed to parse YAML in {path}: {source}")]
+    Yaml {
+        path: PathBuf,
+        #[source]
+        source: serde_yaml::Error,
+    },
     #[error("invalid MCP descriptor in {path}")]
     InvalidMcpDescriptor { path: PathBuf, issues: Vec<String> },
     #[error("invalid MCP analysis result for {path}")]
@@ -122,6 +132,10 @@ pub enum ToolingError {
     },
     #[error("invalid Elegy plugin package in {path}")]
     InvalidPluginPackage { path: PathBuf, issues: Vec<String> },
+    #[error("invalid docs config in {path}")]
+    InvalidDocsConfig { path: PathBuf, issues: Vec<String> },
+    #[error("invalid docs request")]
+    InvalidDocsRequest { issues: Vec<String> },
     #[error("duplicate generated skill ID: {skill_id}")]
     DuplicateSkillId { skill_id: String },
     #[error("output file already exists: {path}")]

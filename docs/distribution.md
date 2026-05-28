@@ -2,7 +2,7 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the four dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, and `elegy-configuration` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the five dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp`, `rust/crates/elegy-planning`, and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis, durable planning authority, and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
@@ -40,10 +40,12 @@ Tagged releases are configured to publish neutral asset families across the cont
 - MCP CLI archive: `elegy-mcp-<cliVersion>-<target>.zip`
 - planning CLI archive: `elegy-planning-<cliVersion>-<target>.zip`
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
+- configuration CLI archive: `elegy-configuration-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
 - planning wrapper archive: `elegy-planning-wrapper-<bundleVersion>.zip`
 - skills wrapper archive: `elegy-skills-wrapper-<bundleVersion>.zip`
+- configuration wrapper archive: `elegy-configuration-wrapper-<bundleVersion>.zip`
 
 The contracts bundle remains the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
 
@@ -51,7 +53,7 @@ GitHub Releases are the primary downstream distribution lane. The standalone ins
 
 Downloadable archives are self-describing. Packaging stages `PACKAGE_README.md` into every downloadable zip as archive-root `README.md`, and manifest validation treats that README as a required payload entry for the CLI, wrapper, and installer archive families.
 
-Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
+Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable general-purpose surface for agent onboarding, skills compatibility, docs tooling, Mermaid and diagram tooling, repo/web/data/notify utilities, read-only observation and desktop automation, optional MCP hosting, contracts export, deterministic configuration materialization, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect` commands. The current published target set is intentionally narrow:
 
 - `x86_64-pc-windows-msvc`
 - `x86_64-unknown-linux-gnu`
@@ -117,11 +119,14 @@ Current governed workflow artifacts in that bundle include both the portable wor
 - `fixtures/canonical-workflow-graph.minimal.json`
 
 Current governed package artifacts in that bundle include the portable plugin
-package contract. This is metadata and validation support for consuming hosts,
+package contracts. These are metadata and validation support for consuming hosts,
 plus conservative derived projection tooling support, not an Elegy plugin runtime:
 
 - `elegy-plugin-package-v1.schema.json`
 - `fixtures/elegy-plugin-package-v1.minimal.json`
+- `elegy-plugin-package-v2.schema.json`
+- `fixtures/elegy-plugin-package-v2.minimal.json`
+- `fixtures/elegy-plugin-package-v2.demo-config.json`
 
 Current governed dedicated-surface skill artifacts in that bundle include:
 
@@ -149,6 +154,7 @@ pwsh ./scripts/package-cli.ps1 -Surface elegy-memory
 pwsh ./scripts/package-cli.ps1 -Surface elegy-mcp
 pwsh ./scripts/package-cli.ps1 -Surface elegy-planning
 pwsh ./scripts/package-cli.ps1 -Surface elegy-skills
+pwsh ./scripts/package-cli.ps1 -Surface elegy-configuration
 ```
 
 Output:
@@ -159,7 +165,50 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, lower-level `generate codex-plugin`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for agent onboarding, skills compatibility, docs tooling, diagram, `run`, observe, desktop, repo, web, data, notify, contracts export, `configuration`, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect`; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+
+## Configuration materialization
+
+The umbrella CLI carries `elegy configuration list|show|apply|verify` and the
+dedicated `elegy-configuration` archive carries `elegy-configuration
+list|show|apply|verify` for deterministic materialization and drift
+verification of repo-local or home-level agentic assets from governed templates
+and profiles.
+
+This is a post-install or from-source operator lane, not a new distribution
+model:
+
+- distribution install still owns release-tag selection, asset download,
+  checksum verification, and archive extraction
+- `elegy configuration ...` and `elegy-configuration ...` own deterministic
+  file materialization and drift verification for declared assets such as skill
+  mirrors, instruction blocks, MCP config, hooks, agents, and bounded text,
+  JSON, or TOML patches
+- local `elegy-plugin-package/v2` files may carry governed configuration
+  templates and profiles for package-backed apply/verify flows
+- consuming repos still own product-specific bootstrap, runtime auth/state,
+  approvals, orchestration, and any host-local startup wiring
+
+Current built-in templates and profiles live under `contracts/configuration/`.
+The current built-ins intentionally stay small: repo skill mirroring,
+repo-local OpenCode materialization, repo-local Codex skill mirroring, and a
+bounded Codex home template.
+
+Examples:
+
+```bash
+elegy configuration list --json
+elegy configuration show --template-id repo-opencode-agentic-minimal --json
+elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
+elegy configuration verify --profile-id repo-opencode-minimal --target . --json
+elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package-v2.demo-config.json --profile-id demo-profile --target . --dry-run --json
+```
+
+Binding defaults are template-local and overrideable:
+
+```bash
+elegy configuration apply --template-id repo-skill-mirror-minimal --target . --binding authority.skills=.github/skills --binding target.skills=.agents/skills --json
+```
 
 ## Wrapper archive
 
@@ -175,6 +224,7 @@ Outputs:
 - `artifacts/distribution/elegy-mcp-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-planning-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-skills-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-configuration-wrapper-<bundleVersion>.zip`
 
 Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
 
@@ -229,7 +279,7 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 
 1. Update bundle and manifest package metadata/version in `governance/version-policy.json` when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
-3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
+3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, and `elegy-configuration`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
 4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
 5. Run `pwsh ./scripts/package-installer.ps1`.
 6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.

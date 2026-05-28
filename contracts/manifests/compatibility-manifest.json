@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.4.0"
+    "version": "1.6.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.6.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -36,7 +36,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.6.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -61,7 +61,7 @@
       "name": "elegy-planning-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.6.0",
       "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
       "wrapperSurface": {
         "root": "src/Elegy-planning",
@@ -87,7 +87,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.6.0",
       "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -106,6 +106,27 @@
         "contracts skill-definition-v2 authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
+      ]
+    },
+    {
+      "name": "elegy-configuration-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.6.0",
+      "scope": "Deterministic materialization and verification of agentic configuration templates, profiles, and receipts for harness, repo, and workspace targets.",
+      "wrapperSurface": {
+        "root": "src/Elegy-configuration",
+        "entrypoint": "src/Elegy-configuration/wrapper-entrypoint.json",
+        "installer": "src/Elegy-configuration/install.ps1",
+        "skillBridge": "src/Elegy-configuration/skills/elegy-configuration/SKILL.md",
+        "releaseAssetPrefix": "elegy-configuration-wrapper",
+        "archivePattern": "elegy-configuration-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-configuration/, and the wrapper surface under wrappers/elegy-configuration/."
+      },
+      "authorityReservations": [
+        "contracts configuration template/profile/receipt authority",
+        "rust/crates/elegy-configuration deterministic materialization behavior",
+        "downstream hosts own release download, auth, trust, approvals, and runtime registration"
       ]
     }
   ],
@@ -316,6 +337,15 @@
       "fixtures": [
         "fixtures/elegy-plugin-package-v1.minimal.json",
         "fixtures/elegy-plugin-package-v1.elegy-planning.json"
+      ]
+    },
+    {
+      "name": "elegy-plugin-package-v2",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-plugin-package-v2.schema.json",
+      "fixtures": [
+        "fixtures/elegy-plugin-package-v2.minimal.json",
+        "fixtures/elegy-plugin-package-v2.demo-config.json"
       ]
     },
     {
@@ -532,6 +562,32 @@
       "schemaVersion": "1.0.0",
       "file": "notify-result.schema.json",
       "fixtures": []
+    },
+    {
+      "name": "elegy-configuration-template-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-configuration-template-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-template-v1.minimal.json",
+        "fixtures/configuration/demo-template.json"
+      ]
+    },
+    {
+      "name": "elegy-configuration-profile-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-configuration-profile-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-profile-v1.minimal.json",
+        "fixtures/configuration/demo-profile.json"
+      ]
+    },
+    {
+      "name": "elegy-configuration-receipt-v1",
+      "schemaVersion": "1.1.0",
+      "file": "elegy-configuration-receipt-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-receipt-v1.minimal.json"
+      ]
     }
   ]
 }

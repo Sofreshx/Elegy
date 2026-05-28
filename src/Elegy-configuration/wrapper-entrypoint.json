@@ -1,0 +1,36 @@
+{
+  "schemaVersion": 1,
+  "surface": "elegy-configuration",
+  "surfaceRole": "thin-integration-wrapper",
+  "delegatesTo": {
+    "cliCrate": "rust/crates/elegy-configuration",
+    "repoLocalSkillOutput": ".github/skills/elegy-configuration/SKILL.md"
+  },
+  "integrationAssets": {
+    "installer": "install.ps1",
+    "surfaceLocalSkillBridge": "skills/elegy-configuration/SKILL.md"
+  },
+  "authority": {
+    "contracts": "contracts/",
+    "governance": "governance/",
+    "implementation": "rust/crates/elegy-configuration"
+  },
+  "helperLanes": {
+    "docs": "docs/",
+    "agents": "agents/",
+    "skills": "skills/"
+  },
+  "canonicalDocs": [
+    "docs/architecture/elegy-configuration-v1.md",
+    "docs/distribution.md"
+  ],
+  "distribution": {
+    "wrapperAssetPrefix": "elegy-configuration-wrapper",
+    "wrapperArchivePattern": "elegy-configuration-wrapper-<bundleVersion>.zip",
+    "installLayout": {
+      "contracts": "contracts/",
+      "cli": "bin/elegy-configuration/",
+      "wrapper": "wrappers/elegy-configuration/"
+    }
+  }
+}

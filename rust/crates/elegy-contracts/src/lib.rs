@@ -1,3 +1,7 @@
+mod configuration;
+
+pub use configuration::*;
+
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -39,6 +43,7 @@ const SUPPLEMENTAL_FIXTURE_FILES: &[&str] = &[
     "fixtures/mcp-server-descriptor.parity.json",
     "fixtures/mcp-analysis-result.parity.json",
     "fixtures/mcp-parity-expected.json",
+    "fixtures/configuration/assets/demo.txt",
 ];
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -154,7 +159,8 @@ pub fn validate_agent_capability_profile(
     AgentCapabilityProfileValidationResult { issues }
 }
 
-pub const ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+pub const ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+pub const ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION: &str = "elegy-plugin-package/v2";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -208,6 +214,10 @@ pub struct ElegyPluginPackageComponents {
     pub docs: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assets: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configuration_templates: Vec<ElegyPluginPackageConfigurationComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configuration_profiles: Vec<ElegyPluginPackageConfigurationComponent>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -223,6 +233,15 @@ pub struct ElegyPluginPackageSkillDefinitionComponent {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ElegyPluginPackagePathComponent {
+    pub id: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageConfigurationComponent {
     pub id: String,
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -304,9 +323,12 @@ pub fn validate_elegy_plugin_package(
 ) -> ElegyPluginPackageValidationResult {
     let mut issues = Vec::new();
 
-    if package.schema_version != ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION {
+    let is_v1 = package.schema_version == ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION;
+    let is_v2 = package.schema_version == ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION;
+    if !is_v1 && !is_v2 {
         issues.push(format!(
-            "schemaVersion must be '{ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION}'."
+            "schemaVersion must be '{}' or '{}'.",
+            ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION
         ));
     }
     if !is_package_id(&package.identity.package_id) {
@@ -381,6 +403,39 @@ pub fn validate_elegy_plugin_package(
             .map(|component| component.id.as_str()),
         &mut issues,
     );
+    validate_component_ids(
+        "components.configurationTemplates",
+        package
+            .components
+            .configuration_templates
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.configurationProfiles",
+        package
+            .components
+            .configuration_profiles
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+
+    if is_v1 {
+        if !package.components.configuration_templates.is_empty() {
+            issues.push(
+                "components.configurationTemplates requires schemaVersion 'elegy-plugin-package/v2'."
+                    .to_string(),
+            );
+        }
+        if !package.components.configuration_profiles.is_empty() {
+            issues.push(
+                "components.configurationProfiles requires schemaVersion 'elegy-plugin-package/v2'."
+                    .to_string(),
+            );
+        }
+    }
 
     let mut capability_refs = BTreeSet::new();
     for component in &package.components.skill_definitions {
@@ -423,6 +478,19 @@ pub fn validate_elegy_plugin_package(
         .iter()
         .chain(package.components.docs.iter())
         .chain(package.components.assets.iter())
+    {
+        validate_portable_relative_path(
+            &format!("component path '{}'", component.id),
+            &component.path,
+            &mut issues,
+        );
+    }
+
+    for component in package
+        .components
+        .configuration_templates
+        .iter()
+        .chain(package.components.configuration_profiles.iter())
     {
         validate_portable_relative_path(
             &format!("component path '{}'", component.id),
@@ -2237,6 +2305,15 @@ pub fn load_elegy_plugin_package_fixture_from_dir(
     )
 }
 
+pub fn load_elegy_plugin_package_v2_fixture_from_dir(
+    dir: &Path,
+) -> Result<ElegyPluginPackage, ContractsError> {
+    load_json_file(
+        &dir.join("fixtures")
+            .join("elegy-plugin-package-v2.minimal.json"),
+    )
+}
+
 pub fn load_skill_discovery_index_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDiscoveryIndex, ContractsError> {
@@ -3297,7 +3374,7 @@ mod tests {
             "DemoPlugin",
         ] {
             let package = ElegyPluginPackage {
-                schema_version: ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION.to_string(),
+                schema_version: ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION.to_string(),
                 identity: ElegyPluginPackageIdentity {
                     package_id: "elegy.demo-plugin".to_string(),
                     name: invalid_name.to_string(),

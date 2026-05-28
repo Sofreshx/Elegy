@@ -31,6 +31,11 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-skills-wrapper'
             SurfaceRoot = 'src/Elegy-skills'
         }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration-wrapper'
+            SurfaceRoot = 'src/Elegy-configuration'
+        }
     }
 }
 

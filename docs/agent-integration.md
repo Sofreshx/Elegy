@@ -106,10 +106,12 @@ the durable authority.
 
 ## Portable Plugin Packages
 
-`elegy-plugin-package/v1` is a portable package metadata contract for hosts that
-want one governed package surface over multiple components. A package can bundle
-or reference `skill-definition-v2` definitions, instruction skill files, MCP
-projection metadata, docs, and assets.
+`elegy-plugin-package/v1` and `elegy-plugin-package/v2` are portable package
+metadata contracts for hosts that want one governed package surface over
+multiple components. A package can bundle or reference `skill-definition-v2`
+definitions, instruction skill files, MCP projection metadata, docs, and
+assets. `elegy-plugin-package/v2` also adds local configuration template/profile
+components for deterministic `elegy-configuration` loading.
 
 The package contract is not a runtime. It must not contain host workspace ids,
 approval state, secret refs, runtime sessions, adapter handles, or local trust
@@ -124,6 +126,11 @@ skill schemas under `contracts/schemas/` remain the authority roots.
 Portable packages may also be projected into conservative Codex plugin folders
 through `elegy generate codex-plugin`, but those generated `.codex-plugin/`
 and `skills/` outputs remain derived adapter surfaces rather than authority.
+
+Local `elegy-plugin-package/v2` files may also be consumed directly by
+`elegy-configuration` or the umbrella `elegy configuration` commands for
+package-backed deterministic configuration apply/verify flows. The package file
+remains metadata plus packaged assets, not a runtime.
 
 ## Optional MCP Adapter
 

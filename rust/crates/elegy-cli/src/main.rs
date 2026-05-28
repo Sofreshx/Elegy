@@ -1,4 +1,9 @@
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use elegy_configuration::{
+    apply_configuration, list_builtin_configuration_catalog, show_configuration_template,
+    verify_configuration, ApplyConfigurationRequest, ConfigurationError,
+    VerifyConfigurationRequest,
+};
 use elegy_contracts::{
     export_contract_bundle, AgentCapabilityProfile, ContractsBundleExport, ContractsError,
     ObservationSession, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
@@ -37,8 +42,10 @@ use elegy_skills::{
     RegistrySkillEntry, SkillRegistry, SkillRegistryQuery,
 };
 use elegy_tooling::{
-    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
-    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, ToolingError as ToolingSurfaceError,
+    docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
+    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file, DocsCheckReport,
+    DocsCreateResult, DocsIndexResult, DocsInitResult, GeneratedCodexPluginArtifacts,
+    GeneratedSkillArtifacts, NewDocRequest, ToolingError as ToolingSurfaceError,
 };
 use serde::Serialize;
 use serde_json::json;
@@ -192,6 +199,63 @@ enum Command {
     Notify {
         #[command(subcommand)]
         command: NotifyCommand,
+    },
+    Docs {
+        #[command(subcommand)]
+        command: DocsCommand,
+    },
+    Configuration {
+        #[command(subcommand)]
+        command: ConfigurationCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum ConfigurationCommand {
+    List,
+    Show {
+        #[arg(long)]
+        package: Option<PathBuf>,
+        #[arg(long)]
+        template_id: Option<String>,
+        #[arg(long)]
+        template_path: Option<PathBuf>,
+    },
+    Apply {
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        dry_run: bool,
+        #[arg(long)]
+        package: Option<PathBuf>,
+        #[arg(long)]
+        template_id: Option<String>,
+        #[arg(long)]
+        template_path: Option<PathBuf>,
+        #[arg(long)]
+        profile_id: Option<String>,
+        #[arg(long)]
+        profile_path: Option<PathBuf>,
+        #[arg(long = "binding", value_name = "KEY=VALUE")]
+        bindings: Vec<String>,
+        #[arg(long)]
+        force: bool,
+    },
+    Verify {
+        #[arg(long)]
+        target: PathBuf,
+        #[arg(long)]
+        package: Option<PathBuf>,
+        #[arg(long)]
+        template_id: Option<String>,
+        #[arg(long)]
+        template_path: Option<PathBuf>,
+        #[arg(long)]
+        profile_id: Option<String>,
+        #[arg(long)]
+        profile_path: Option<PathBuf>,
+        #[arg(long = "binding", value_name = "KEY=VALUE")]
+        bindings: Vec<String>,
     },
 }
 
@@ -659,6 +723,41 @@ enum NotifyCommand {
 }
 
 #[derive(Subcommand, Debug)]
+enum DocsCommand {
+    Init,
+    New {
+        #[command(subcommand)]
+        command: DocsNewCommand,
+    },
+    Check,
+    Index,
+}
+
+#[derive(Subcommand, Debug)]
+enum DocsNewCommand {
+    Adr {
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        slug: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+    Spec {
+        #[arg(long)]
+        title: String,
+        #[arg(long)]
+        owner: Option<String>,
+        #[arg(long)]
+        slug: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
 enum MermaidCommand {
     Render {
         #[arg(long)]
@@ -881,6 +980,12 @@ struct MermaidNarrateReport {
     input_source: &'static str,
     #[serde(skip_serializing_if = "Option::is_none")]
     input_path: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct DocsCommandContext {
+    project_root: String,
 }
 
 struct AgentProfileSelection {
@@ -1320,6 +1425,114 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Notify {
             command: NotifyCommand::Webhook { url, payload },
         } => execute_notify_webhook_command(url, payload, format),
+        Command::Docs {
+            command: DocsCommand::Init,
+        } => execute_docs_init_command(resolve_project_root(locator), format),
+        Command::Docs {
+            command:
+                DocsCommand::New {
+                    command:
+                        DocsNewCommand::Adr {
+                            title,
+                            owner,
+                            slug,
+                            status,
+                        },
+                },
+        } => execute_docs_new_adr_command(
+            resolve_project_root(locator),
+            NewDocRequest {
+                title,
+                owner,
+                slug,
+                status,
+            },
+            format,
+        ),
+        Command::Docs {
+            command:
+                DocsCommand::New {
+                    command:
+                        DocsNewCommand::Spec {
+                            title,
+                            owner,
+                            slug,
+                            status,
+                        },
+                },
+        } => execute_docs_new_spec_command(
+            resolve_project_root(locator),
+            NewDocRequest {
+                title,
+                owner,
+                slug,
+                status,
+            },
+            format,
+        ),
+        Command::Docs {
+            command: DocsCommand::Check,
+        } => execute_docs_check_command(resolve_project_root(locator), format),
+        Command::Docs {
+            command: DocsCommand::Index,
+        } => execute_docs_index_command(resolve_project_root(locator), format),
+        Command::Configuration {
+            command: ConfigurationCommand::List,
+        } => execute_configuration_list_command(format),
+        Command::Configuration {
+            command:
+                ConfigurationCommand::Show {
+                    package,
+                    template_id,
+                    template_path,
+                },
+        } => execute_configuration_show_command(package, template_id, template_path, format),
+        Command::Configuration {
+            command:
+                ConfigurationCommand::Apply {
+                    target,
+                    dry_run,
+                    package,
+                    template_id,
+                    template_path,
+                    profile_id,
+                    profile_path,
+                    bindings,
+                    force,
+                },
+        } => execute_configuration_apply_command(
+            target,
+            dry_run,
+            package,
+            template_id,
+            template_path,
+            profile_id,
+            profile_path,
+            bindings,
+            force,
+            format,
+        ),
+        Command::Configuration {
+            command:
+                ConfigurationCommand::Verify {
+                    target,
+                    package,
+                    template_id,
+                    template_path,
+                    profile_id,
+                    profile_path,
+                    bindings,
+                },
+        } => execute_configuration_verify_command(
+            target,
+            package,
+            template_id,
+            template_path,
+            profile_id,
+            profile_path,
+            bindings,
+            format,
+        ),
     }
 }
 
@@ -1346,7 +1559,7 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
                         "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
-                        "observe", "desktop", "repo", "web", "data", "notify"
+                        "observe", "desktop", "repo", "web", "data", "notify", "docs"
                     ],
                     "skillDefinitionFormat": 2,
                     "mcpHostCapable": true
@@ -3057,6 +3270,11 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
             format!("failed to parse JSON in {}: {source}", path.display()),
         )
         .with_path(path.display().to_string())],
+        ToolingSurfaceError::Yaml { path, source } => vec![Diagnostic::error(
+            "CLI-TOOLING-003",
+            format!("failed to parse YAML in {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
         ToolingSurfaceError::InvalidMcpDescriptor { path, issues } => issues
             .into_iter()
             .map(|issue| {
@@ -3095,6 +3313,21 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
                     )
             })
             .collect(),
+        ToolingSurfaceError::InvalidDocsConfig { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-DOCS-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint("fix .elegy/docs.yaml so it only uses supported repo-relative values")
+            })
+            .collect(),
+        ToolingSurfaceError::InvalidDocsRequest { issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-DOCS-002", issue)
+                    .with_hint("use supported doc type, status, owner, and slug values")
+            })
+            .collect(),
         ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
@@ -3106,6 +3339,143 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
         .with_path(path.display().to_string())
         .with_hint("pass --force to overwrite generated output")],
     }
+}
+
+fn configuration_error_diagnostics(error: ConfigurationError) -> Vec<Diagnostic> {
+    match error {
+        ConfigurationError::BuiltinTemplateJson { template_id, source } => {
+            vec![Diagnostic::error(
+                "CLI-CONFIG-001",
+                format!("failed to parse built-in template '{template_id}': {source}"),
+            )]
+        }
+        ConfigurationError::BuiltinProfileJson { profile_id, source } => {
+            vec![Diagnostic::error(
+                "CLI-CONFIG-002",
+                format!("failed to parse built-in profile '{profile_id}': {source}"),
+            )]
+        }
+        ConfigurationError::Io { path, source } => vec![Diagnostic::error(
+            "CLI-CONFIG-003",
+            format!("failed to access {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::Json { path, source } => vec![Diagnostic::error(
+            "CLI-CONFIG-004",
+            format!("failed to parse JSON in {}: {source}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::InvalidTemplate { template_id, issues } => issues
+            .into_iter()
+            .map(|issue| Diagnostic::error("CLI-CONFIG-005", issue).with_field(template_id.clone()))
+            .collect(),
+        ConfigurationError::InvalidProfile { profile_id, issues } => issues
+            .into_iter()
+            .map(|issue| Diagnostic::error("CLI-CONFIG-006", issue).with_field(profile_id.clone()))
+            .collect(),
+        ConfigurationError::InvalidReceipt { receipt_id, issues } => issues
+            .into_iter()
+            .map(|issue| Diagnostic::error("CLI-CONFIG-007", issue).with_field(receipt_id.clone()))
+            .collect(),
+        ConfigurationError::UnknownBuiltinTemplate { template_id } => vec![Diagnostic::error(
+            "CLI-CONFIG-008",
+            format!("unknown built-in template '{template_id}'"),
+        )],
+        ConfigurationError::UnknownBuiltinProfile { profile_id } => vec![Diagnostic::error(
+            "CLI-CONFIG-009",
+            format!("unknown built-in profile '{profile_id}'"),
+        )],
+        ConfigurationError::InvalidPluginPackage { path, issues } => issues
+            .into_iter()
+            .map(|issue| Diagnostic::error("CLI-CONFIG-010", issue).with_path(path.display().to_string()))
+            .collect(),
+        ConfigurationError::UnsupportedPluginPackageVersion { path, required } => vec![Diagnostic::error(
+            "CLI-CONFIG-011",
+            format!(
+                "plugin package in {} must use schemaVersion '{required}' for configuration loading",
+                path.display()
+            ),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::UnknownPackageTemplate { path, template_id } => vec![Diagnostic::error(
+            "CLI-CONFIG-012",
+            format!(
+                "plugin package in {} does not contain configuration template '{template_id}'",
+                path.display()
+            ),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::UnknownPackageProfile { path, profile_id } => vec![Diagnostic::error(
+            "CLI-CONFIG-013",
+            format!(
+                "plugin package in {} does not contain configuration profile '{profile_id}'",
+                path.display()
+            ),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::MissingBinding { binding_key } => vec![Diagnostic::error(
+            "CLI-CONFIG-014",
+            format!("missing required binding '{binding_key}'"),
+        )],
+        ConfigurationError::MissingTemplateAsset { template_id, path } => vec![Diagnostic::error(
+            "CLI-CONFIG-015",
+            format!("template '{template_id}' references missing template asset '{path}'"),
+        )],
+        ConfigurationError::MissingSourcePath { template_id, path } => vec![Diagnostic::error(
+            "CLI-CONFIG-016",
+            format!("template '{template_id}' source path does not exist: {}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::JsonDestinationNotObject { operation_id, path } => vec![Diagnostic::error(
+            "CLI-CONFIG-017",
+            format!(
+                "operation '{operation_id}' expected an object-valued JSON destination at {}",
+                path.display()
+            ),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::MergeJsonInvalid {
+            operation_id,
+            source,
+        } => vec![Diagnostic::error(
+            "CLI-CONFIG-018",
+            format!("operation '{operation_id}' produced invalid JSON: {source}"),
+        )],
+        ConfigurationError::Conflict { operation_id, path } => vec![Diagnostic::error(
+            "CLI-CONFIG-019",
+            format!("operation '{operation_id}' detected a conflict at {}", path.display()),
+        )
+        .with_path(path.display().to_string())],
+        ConfigurationError::Contracts(message) => vec![Diagnostic::error("CLI-CONFIG-020", message)],
+    }
+}
+
+fn configuration_receipt_diagnostics(
+    receipt: &elegy_contracts::ElegyConfigurationReceipt,
+) -> Vec<Diagnostic> {
+    let mut diagnostics = Vec::new();
+    for issue in &receipt.issues {
+        diagnostics.push(Diagnostic::error("CLI-CONFIG-018", issue.clone()));
+    }
+    for entry in &receipt.entries {
+        if matches!(
+            entry.action,
+            elegy_contracts::ElegyConfigurationReceiptAction::Mismatched
+                | elegy_contracts::ElegyConfigurationReceiptAction::Conflict
+        ) {
+            let mut diagnostic = Diagnostic::error(
+                "CLI-CONFIG-019",
+                entry
+                    .detail
+                    .clone()
+                    .unwrap_or_else(|| format!("configuration mismatch at {}", entry.path)),
+            )
+            .with_path(entry.path.clone());
+            diagnostic = diagnostic.with_field(entry.operation_id.clone());
+            diagnostics.push(diagnostic);
+        }
+    }
+    diagnostics
 }
 
 fn emit_local_store_error<T: Serialize>(
@@ -5407,6 +5777,475 @@ fn execute_notify_webhook_command(
             }
             Ok(exit_runtime())
         }
+    }
+}
+
+fn execute_docs_init_command(
+    project_root: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match docs_init(&project_root) {
+        Ok(report) => print_docs_init_result(report, format),
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["docs", "init"],
+            DocsCommandContext {
+                project_root: project_root.display().to_string(),
+            },
+        ),
+    }
+}
+
+fn execute_docs_new_adr_command(
+    project_root: PathBuf,
+    request: NewDocRequest,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match docs_new_adr(&project_root, request) {
+        Ok(report) => print_docs_create_result(["docs", "new", "adr"], report, format),
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["docs", "new", "adr"],
+            DocsCommandContext {
+                project_root: project_root.display().to_string(),
+            },
+        ),
+    }
+}
+
+fn execute_docs_new_spec_command(
+    project_root: PathBuf,
+    request: NewDocRequest,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match docs_new_spec(&project_root, request) {
+        Ok(report) => print_docs_create_result(["docs", "new", "spec"], report, format),
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["docs", "new", "spec"],
+            DocsCommandContext {
+                project_root: project_root.display().to_string(),
+            },
+        ),
+    }
+}
+
+fn execute_docs_check_command(
+    project_root: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match docs_check(&project_root) {
+        Ok(report) => print_docs_check_result(report, format),
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["docs", "check"],
+            DocsCommandContext {
+                project_root: project_root.display().to_string(),
+            },
+        ),
+    }
+}
+
+fn execute_docs_index_command(
+    project_root: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match docs_index(&project_root) {
+        Ok(report) => print_docs_index_result(report, format),
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["docs", "index"],
+            DocsCommandContext {
+                project_root: project_root.display().to_string(),
+            },
+        ),
+    }
+}
+
+fn execute_configuration_list_command(format: OutputFormat) -> Result<ExitCode, serde_json::Error> {
+    match list_builtin_configuration_catalog() {
+        Ok(report) => match format {
+            OutputFormat::Text => {
+                println!("elegy configuration catalog");
+                println!("templates: {}", report.template_count);
+                for template in &report.templates {
+                    println!(
+                        "- {} [{}] ops={}",
+                        template.template_id, template.scope, template.operation_count
+                    );
+                }
+                println!("profiles: {}", report.profile_count);
+                for profile in &report.profiles {
+                    println!(
+                        "- {} templates={}",
+                        profile.profile_id, profile.template_count
+                    );
+                }
+                Ok(ExitCode::SUCCESS)
+            }
+            OutputFormat::Json => {
+                print_json(&build_envelope_with_schema(
+                    ["configuration", "list"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                    None,
+                ))?;
+                Ok(ExitCode::SUCCESS)
+            }
+        },
+        Err(error) => {
+            emit_configuration_error(error, format, vec!["configuration", "list"], json!({}))
+        }
+    }
+}
+
+fn execute_configuration_show_command(
+    package: Option<PathBuf>,
+    template_id: Option<String>,
+    template_path: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match show_configuration_template(
+        package.as_deref(),
+        template_id.as_deref(),
+        template_path.as_deref(),
+    ) {
+        Ok(report) => match format {
+            OutputFormat::Text => {
+                println!("configuration template: {}", report.template.template_id);
+                if let Some(display_name) = &report.template.display_name {
+                    println!("display: {display_name}");
+                }
+                println!("scope: {:?}", report.template.scope);
+                println!("operations: {}", report.template.operations.len());
+                Ok(ExitCode::SUCCESS)
+            }
+            OutputFormat::Json => {
+                print_json(&build_envelope_with_schema(
+                    ["configuration", "show"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                    Some("https://elegy/contracts/schemas/elegy-configuration-template-v1.schema.json"),
+                ))?;
+                Ok(ExitCode::SUCCESS)
+            }
+        },
+        Err(error) => {
+            emit_configuration_error(error, format, vec!["configuration", "show"], json!({}))
+        }
+    }
+}
+
+fn execute_configuration_apply_command(
+    target: PathBuf,
+    dry_run: bool,
+    package: Option<PathBuf>,
+    template_id: Option<String>,
+    template_path: Option<PathBuf>,
+    profile_id: Option<String>,
+    profile_path: Option<PathBuf>,
+    bindings: Vec<String>,
+    force: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let bindings = match parse_configuration_bindings(bindings) {
+        Ok(bindings) => bindings,
+        Err(error) => {
+            return emit_configuration_error(
+                error,
+                format,
+                vec!["configuration", "apply"],
+                json!({}),
+            )
+        }
+    };
+
+    match apply_configuration(ApplyConfigurationRequest {
+        target_root: target,
+        dry_run,
+        force,
+        bindings,
+        package_path: package,
+        template_id,
+        template_path,
+        profile_id,
+        profile_path,
+    }) {
+        Ok(report) => match format {
+            OutputFormat::Text => {
+                println!(
+                    "configuration apply{}",
+                    if dry_run { " (dry-run)" } else { "" }
+                );
+                println!("subject: {}", report.subject_id);
+                println!("verified: {}", report.verified);
+                println!("created: {}", report.summary.created);
+                println!("updated: {}", report.summary.updated);
+                println!("conflicts: {}", report.summary.conflicts);
+                println!("issues: {}", report.summary.issues);
+                Ok(if report.verified {
+                    ExitCode::SUCCESS
+                } else {
+                    exit_invalid()
+                })
+            }
+            OutputFormat::Json => {
+                print_json(&build_envelope_with_schema(
+                    ["configuration", "apply"],
+                    if report.verified { "ok" } else { "invalid" },
+                    Summary::default(),
+                    report.clone(),
+                    configuration_receipt_diagnostics(&report),
+                    Some("https://elegy/contracts/schemas/elegy-configuration-receipt-v1.schema.json"),
+                ))?;
+                Ok(if report.verified {
+                    ExitCode::SUCCESS
+                } else {
+                    exit_invalid()
+                })
+            }
+        },
+        Err(error) => {
+            emit_configuration_error(error, format, vec!["configuration", "apply"], json!({}))
+        }
+    }
+}
+
+fn execute_configuration_verify_command(
+    target: PathBuf,
+    package: Option<PathBuf>,
+    template_id: Option<String>,
+    template_path: Option<PathBuf>,
+    profile_id: Option<String>,
+    profile_path: Option<PathBuf>,
+    bindings: Vec<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let bindings = match parse_configuration_bindings(bindings) {
+        Ok(bindings) => bindings,
+        Err(error) => {
+            return emit_configuration_error(
+                error,
+                format,
+                vec!["configuration", "verify"],
+                json!({}),
+            )
+        }
+    };
+
+    match verify_configuration(VerifyConfigurationRequest {
+        target_root: target,
+        bindings,
+        package_path: package,
+        template_id,
+        template_path,
+        profile_id,
+        profile_path,
+    }) {
+        Ok(report) => match format {
+            OutputFormat::Text => {
+                println!("configuration verify");
+                println!("subject: {}", report.subject_id);
+                println!("verified: {}", report.verified);
+                println!("verified entries: {}", report.summary.verified);
+                println!("mismatched: {}", report.summary.mismatched);
+                println!("issues: {}", report.summary.issues);
+                Ok(if report.verified {
+                    ExitCode::SUCCESS
+                } else {
+                    exit_invalid()
+                })
+            }
+            OutputFormat::Json => {
+                print_json(&build_envelope_with_schema(
+                    ["configuration", "verify"],
+                    if report.verified { "ok" } else { "invalid" },
+                    Summary::default(),
+                    report.clone(),
+                    configuration_receipt_diagnostics(&report),
+                    Some("https://elegy/contracts/schemas/elegy-configuration-receipt-v1.schema.json"),
+                ))?;
+                Ok(if report.verified {
+                    ExitCode::SUCCESS
+                } else {
+                    exit_invalid()
+                })
+            }
+        },
+        Err(error) => {
+            emit_configuration_error(error, format, vec!["configuration", "verify"], json!({}))
+        }
+    }
+}
+
+fn parse_configuration_bindings(
+    values: Vec<String>,
+) -> Result<std::collections::BTreeMap<String, String>, ConfigurationError> {
+    let mut bindings = std::collections::BTreeMap::new();
+    for value in values {
+        let Some((key, binding_value)) = value.split_once('=') else {
+            return Err(ConfigurationError::Contracts(format!(
+                "binding must use KEY=VALUE syntax: {value}"
+            )));
+        };
+        if key.trim().is_empty() {
+            return Err(ConfigurationError::Contracts(
+                "binding keys must not be empty".to_string(),
+            ));
+        }
+        bindings.insert(key.trim().to_string(), binding_value.to_string());
+    }
+    Ok(bindings)
+}
+
+fn emit_configuration_error<T: Serialize>(
+    error: ConfigurationError,
+    format: OutputFormat,
+    command: Vec<&str>,
+    data: T,
+) -> Result<ExitCode, serde_json::Error> {
+    emit_diagnostics(
+        format,
+        command,
+        configuration_error_diagnostics(error),
+        data,
+        "invalid",
+        exit_invalid(),
+    )
+}
+
+fn print_docs_init_result(
+    report: DocsInitResult,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match format {
+        OutputFormat::Text => {
+            println!("initialized docs practice files");
+            println!("root: {}", report.root_path);
+            println!("config: {}", report.config_path);
+            if !report.created.is_empty() {
+                println!("created:");
+                for path in &report.created {
+                    println!("- {path}");
+                }
+            }
+            if !report.skipped.is_empty() {
+                println!("skipped:");
+                for path in &report.skipped {
+                    println!("- {path}");
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["docs", "init"],
+            "ok",
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn print_docs_create_result<S: Into<String>>(
+    command: impl IntoIterator<Item = S>,
+    report: DocsCreateResult,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match format {
+        OutputFormat::Text => {
+            println!("created {}", report.doc_type);
+            println!("title: {}", report.title);
+            println!("path: {}", report.output_path);
+            println!("status: {}", report.status);
+            println!("owner: {}", report.owner);
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            command,
+            "ok",
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn print_docs_check_result(
+    report: DocsCheckReport,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let status = if report.valid { "ok" } else { "invalid" };
+    let exit_code = if report.valid {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+    match format {
+        OutputFormat::Text => {
+            if report.valid {
+                println!("documentation inputs are valid");
+            } else {
+                println!("documentation inputs are invalid");
+            }
+            println!("root: {}", report.root_path);
+            println!("config: {}", report.config_path);
+            println!("docs checked: {}", report.docs_checked);
+            println!("files checked: {}", report.files_checked);
+            if !report.issues.is_empty() {
+                println!("issues:");
+                for issue in &report.issues {
+                    println!("- [{}] {}: {}", issue.code, issue.path, issue.message);
+                }
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["docs", "check"],
+            status,
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
+    }
+    Ok(exit_code)
+}
+
+fn print_docs_index_result(
+    report: DocsIndexResult,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match format {
+        OutputFormat::Text => {
+            println!("wrote documentation index");
+            println!("root: {}", report.root_path);
+            println!("output: {}", report.output_path);
+            println!("adrs: {}", report.adr_count);
+            println!("specs: {}", report.spec_count);
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["docs", "index"],
+            "ok",
+            Summary::default(),
+            report,
+            Vec::new(),
+        ))?,
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn resolve_project_root(locator: ProjectLocator) -> PathBuf {
+    match locator {
+        ProjectLocator::Auto => std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
+        ProjectLocator::Path(path) => path,
     }
 }
 

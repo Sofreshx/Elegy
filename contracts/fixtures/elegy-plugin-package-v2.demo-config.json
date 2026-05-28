@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.demo-config",
+    "name": "demo-config",
+    "version": "0.1.0",
+    "displayName": "Elegy Demo Config"
+  },
+  "metadata": {
+    "description": "Portable package fixture for package-backed configuration loading.",
+    "tags": ["plugin", "configuration", "demo"],
+    "license": "MIT"
+  },
+  "components": {
+    "configurationTemplates": [
+      {
+        "id": "demo-template",
+        "path": "configuration/demo-template.json"
+      }
+    ],
+    "configurationProfiles": [
+      {
+        "id": "demo-profile",
+        "path": "configuration/demo-profile.json"
+      }
+    ]
+  }
+}

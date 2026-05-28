@@ -1,0 +1,11 @@
+schemaVersion: elegy-docs/v1
+adrPath: docs/adr
+specPath: docs/specs
+indexPath: docs/docs-index.md
+requiredDocTriggers:
+- architecture-change
+- durable-decision
+- behavior-change
+- cross-repo-impact
+- onboarding-change
+localExceptions: []

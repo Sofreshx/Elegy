@@ -74,6 +74,11 @@ function Get-CliSurfaceMetadata {
             AssetPrefix = 'elegy-skills'
             Binary = 'elegy-skills'
         }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration'
+            Binary = 'elegy-configuration'
+        }
     }
 }
 
@@ -102,6 +107,12 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-skills-wrapper'
             Installer = 'install.ps1'
             SkillBridge = 'skills/elegy-skills/SKILL.md'
+        }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-configuration/SKILL.md'
         }
     }
 }

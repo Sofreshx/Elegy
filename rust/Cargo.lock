@@ -545,6 +545,7 @@ name = "elegy-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
+ "elegy-configuration",
  "elegy-contracts",
  "elegy-core",
  "elegy-data",
@@ -563,6 +564,18 @@ dependencies = [
  "serde",
  "serde_json",
  "tokio",
+]
+
+[[package]]
+name = "elegy-configuration"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "elegy-contracts",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror",
 ]
 
 [[package]]
@@ -794,7 +807,9 @@ dependencies = [
  "elegy-mcp",
  "serde",
  "serde_json",
+ "serde_yaml",
  "thiserror",
+ "time",
 ]
 
 [[package]]
