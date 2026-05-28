@@ -7,7 +7,13 @@ use crate::StoreError;
 pub const CURRENT_SCHEMA_VERSION: &str = "1";
 const EMBEDDING_DIMENSIONS: usize = 768;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
+const RETRIEVAL_SCORING_VERSION_KEY: &str = "retrieval_scoring_version";
+const CURRENT_RETRIEVAL_SCORING_VERSION: &str = "2";
 const SQLITE_VEC_MODULE_NAME: &str = "vec0";
+const SAFE_SIMILARITY_WEIGHT_CEILING: f64 = 0.70;
+const SAFE_RECENCY_WEIGHT_CEILING: f64 = 0.45;
+const SAFE_ACCESS_WEIGHT_CEILING: f64 = 0.05;
+const SAFE_PRIORITY_WEIGHT_CEILING: f64 = 0.45;
 
 const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
     ("budget_active_max", "500"),
@@ -18,7 +24,7 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
     ("embedding_dimensions", "768"),
     ("similarity_weight", "0.4"),
     ("recency_weight", "0.25"),
-    ("access_weight", "0.15"),
+    ("access_weight", "0.05"),
     ("priority_weight", "0.2"),
     ("memory_context_ratio", "0.10"),
     ("response_reserve", "4096"),
@@ -40,6 +46,10 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
 ];
 
 /// Open or create a SQLite-backed memory store database and ensure the MVP schema exists.
+///
+/// All schema and config migrations run inside a single SQLite transaction so source-of-truth
+/// memory rows remain preserve-only across upgrades. The only intentional mutations during
+/// initialization target derived, recalculable config entries such as bounded retrieval weights.
 pub fn init_database(path: &Path) -> Result<Connection, StoreError> {
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
@@ -321,6 +331,8 @@ fn initialize_scope_config(connection: &Connection) -> Result<(), StoreError> {
         )?;
     }
 
+    migrate_retrieval_scoring_config(connection)?;
+
     let existing_schema_version: Option<String> = connection
         .query_row(
             "SELECT value FROM scope_config WHERE key = ?1",
@@ -335,6 +347,44 @@ fn initialize_scope_config(connection: &Connection) -> Result<(), StoreError> {
             (SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION),
         )?;
     }
+
+    Ok(())
+}
+
+fn migrate_retrieval_scoring_config(connection: &Connection) -> Result<(), StoreError> {
+    let existing_version: Option<String> = connection
+        .query_row(
+            "SELECT value FROM scope_config WHERE key = ?1",
+            [RETRIEVAL_SCORING_VERSION_KEY],
+            |row| row.get(0),
+        )
+        .optional()?;
+    if existing_version.as_deref() == Some(CURRENT_RETRIEVAL_SCORING_VERSION) {
+        return Ok(());
+    }
+
+    // This migration is preserve-only for memory source-of-truth rows: it only re-clamps
+    // persisted derived retrieval weights and records the retrieval scoring config version.
+    for (key, ceiling_value, ceiling_text) in [
+        ("similarity_weight", SAFE_SIMILARITY_WEIGHT_CEILING, "0.70"),
+        ("recency_weight", SAFE_RECENCY_WEIGHT_CEILING, "0.45"),
+        ("access_weight", SAFE_ACCESS_WEIGHT_CEILING, "0.05"),
+        ("priority_weight", SAFE_PRIORITY_WEIGHT_CEILING, "0.45"),
+    ] {
+        connection.execute(
+            "UPDATE scope_config SET value = ?2 WHERE key = ?1 AND CAST(value AS REAL) > ?3",
+            (key, ceiling_text, ceiling_value),
+        )?;
+    }
+
+    connection.execute(
+        "INSERT INTO scope_config(key, value) VALUES (?1, ?2) \
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        (
+            RETRIEVAL_SCORING_VERSION_KEY,
+            CURRENT_RETRIEVAL_SCORING_VERSION,
+        ),
+    )?;
 
     Ok(())
 }
@@ -391,13 +441,17 @@ fn is_missing_module_error(error: &rusqlite::Error, module_name: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use std::{env, fs, io::ErrorKind};
+    use std::{collections::BTreeMap, env, fs, io::ErrorKind, path::Path};
 
     use uuid::Uuid;
 
-    use rusqlite::Connection;
+    use rusqlite::{params, Connection};
 
-    use super::{init_database, table_column_exists, CURRENT_SCHEMA_VERSION};
+    use super::{
+        create_schema, init_database, migrate_retrieval_scoring_config, table_column_exists,
+        CURRENT_RETRIEVAL_SCORING_VERSION, CURRENT_SCHEMA_VERSION, DEFAULT_SCOPE_CONFIG,
+        SCHEMA_VERSION_KEY,
+    };
 
     #[test]
     fn init_database_creates_expected_schema_objects_idempotently() {
@@ -443,6 +497,24 @@ mod tests {
             "read initialized schema_version",
         );
         assert_eq!(schema_version, CURRENT_SCHEMA_VERSION);
+        let retrieval_scoring_version = must(
+            first_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read initialized retrieval_scoring_version",
+        );
+        assert_eq!(retrieval_scoring_version, CURRENT_RETRIEVAL_SCORING_VERSION);
+        let access_weight = must(
+            first_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'access_weight'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read initialized access_weight",
+        );
+        assert_eq!(access_weight, "0.05");
         drop(first_connection);
 
         let second_connection = must(
@@ -587,6 +659,279 @@ mod tests {
         }
     }
 
+    #[test]
+    fn init_database_migrates_retrieval_scoring_weights_to_safe_bounds() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-schema-{}.sqlite3", Uuid::new_v4()));
+
+        let connection = must(
+            Connection::open(&database_path),
+            "create legacy temporary retrieval scoring database",
+        );
+        must(
+            connection.execute_batch(
+                r#"
+                CREATE TABLE scope_config (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                INSERT INTO scope_config(key, value) VALUES
+                    ('similarity_weight', '0.95'),
+                    ('recency_weight', '0.40'),
+                    ('access_weight', '0.15'),
+                    ('priority_weight', '0.60'),
+                    ('schema_version', '1');
+                "#,
+            ),
+            "create legacy retrieval scoring scope_config table",
+        );
+        drop(connection);
+
+        let upgraded_connection = must(
+            init_database(&database_path),
+            "upgrade legacy retrieval scoring database",
+        );
+
+        let similarity_weight = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'similarity_weight'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read migrated similarity_weight",
+        );
+        let recency_weight = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'recency_weight'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read migrated recency_weight",
+        );
+        let access_weight = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'access_weight'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read migrated access_weight",
+        );
+        let priority_weight = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'priority_weight'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read migrated priority_weight",
+        );
+        let retrieval_scoring_version = must(
+            upgraded_connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get::<_, String>(0),
+            ),
+            "read migrated retrieval_scoring_version",
+        );
+
+        assert_eq!(similarity_weight, "0.70");
+        assert_eq!(recency_weight, "0.40");
+        assert_eq!(access_weight, "0.05");
+        assert_eq!(priority_weight, "0.45");
+        assert_eq!(retrieval_scoring_version, CURRENT_RETRIEVAL_SCORING_VERSION);
+        drop(upgraded_connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::NotFound,
+                "failed to remove temporary database {}: {error}",
+                database_path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn init_database_preserves_memory_rows_while_migrating_retrieval_weights() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-schema-{}.sqlite3", Uuid::new_v4()));
+
+        let fixture_connection = must(
+            build_v1_retrieval_fixture_database(&database_path),
+            "create v1 retrieval fixture database",
+        );
+        let memory_rows_before = must(
+            load_memory_row_snapshots(&fixture_connection),
+            "snapshot memory rows before retrieval migration",
+        );
+        let scope_config_before = must(
+            load_scope_config_map(&fixture_connection),
+            "snapshot scope config before retrieval migration",
+        );
+        drop(fixture_connection);
+
+        let upgraded_connection = must(
+            init_database(&database_path),
+            "upgrade v1 retrieval fixture database",
+        );
+        let memory_rows_after = must(
+            load_memory_row_snapshots(&upgraded_connection),
+            "snapshot memory rows after retrieval migration",
+        );
+        let scope_config_after = must(
+            load_scope_config_map(&upgraded_connection),
+            "snapshot scope config after retrieval migration",
+        );
+
+        assert_eq!(
+            memory_rows_before.len(),
+            memory_rows_after.len(),
+            "memory count must stay identical across retrieval config migration",
+        );
+        assert_eq!(
+            memory_rows_before, memory_rows_after,
+            "retrieval config migration must preserve every memory row byte-for-byte and metadata-for-metadata",
+        );
+
+        let changed_scope_entries = scope_config_after
+            .iter()
+            .filter_map(|(key, after_value)| {
+                let before_value = scope_config_before.get(key);
+                if before_value == Some(after_value) {
+                    None
+                } else {
+                    Some((key.clone(), (before_value.cloned(), after_value.clone())))
+                }
+            })
+            .collect::<BTreeMap<_, _>>();
+
+        let expected_changed_entries = BTreeMap::from([
+            (
+                "access_weight".to_string(),
+                (Some("0.15".to_string()), "0.05".to_string()),
+            ),
+            (
+                "priority_weight".to_string(),
+                (Some("0.60".to_string()), "0.45".to_string()),
+            ),
+            (
+                "retrieval_scoring_version".to_string(),
+                (None, CURRENT_RETRIEVAL_SCORING_VERSION.to_string()),
+            ),
+            (
+                "similarity_weight".to_string(),
+                (Some("0.95".to_string()), "0.70".to_string()),
+            ),
+        ]);
+
+        assert_eq!(
+            changed_scope_entries, expected_changed_entries,
+            "only retrieval weights above the safe ceilings may change during migration",
+        );
+        drop(upgraded_connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::NotFound,
+                "failed to remove temporary database {}: {error}",
+                database_path.display()
+            );
+        }
+    }
+
+    #[test]
+    fn retrieval_scoring_migration_rolls_back_atomically() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-schema-{}.sqlite3", Uuid::new_v4()));
+
+        let mut connection = must(
+            build_v1_retrieval_fixture_database(&database_path),
+            "create rollback fixture database",
+        );
+        let scope_config_before = must(
+            load_scope_config_map(&connection),
+            "snapshot scope config before rollback test",
+        );
+
+        {
+            let transaction = must(
+                connection.transaction(),
+                "open retrieval migration rollback transaction",
+            );
+            must(
+                migrate_retrieval_scoring_config(&transaction),
+                "apply retrieval migration inside rollback transaction",
+            );
+
+            let scope_config_during = must(
+                load_scope_config_map(&transaction),
+                "snapshot scope config inside rollback transaction",
+            );
+            assert_eq!(
+                scope_config_during
+                    .get("retrieval_scoring_version")
+                    .map(String::as_str),
+                Some(CURRENT_RETRIEVAL_SCORING_VERSION),
+                "version bump must occur in the same transaction as weight clamps",
+            );
+            assert_eq!(
+                scope_config_during.get("access_weight").map(String::as_str),
+                Some("0.05"),
+                "clamped weights must be visible before commit inside the transaction",
+            );
+
+            must(
+                transaction.rollback(),
+                "roll back retrieval migration transaction",
+            );
+        }
+
+        let scope_config_after = must(
+            load_scope_config_map(&connection),
+            "snapshot scope config after rollback",
+        );
+        assert_eq!(
+            scope_config_after, scope_config_before,
+            "rolling back the outer transaction must leave the database fully coherent",
+        );
+        drop(connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(
+                error.kind(),
+                ErrorKind::NotFound,
+                "failed to remove temporary database {}: {error}",
+                database_path.display()
+            );
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct MemoryRowSnapshot {
+        id: String,
+        content: String,
+        summary: Option<String>,
+        scope: String,
+        memory_type: String,
+        provenance: String,
+        importance_score: String,
+        reliability_score: String,
+        sensitivity: String,
+        state: String,
+        tags: String,
+        status: Option<String>,
+        custom_metadata: String,
+        access_count: i64,
+        corroboration_count: i64,
+        embedding_stale: i64,
+        created_at: String,
+        updated_at: String,
+        last_accessed_at: Option<String>,
+        tenant_id: Option<String>,
+        user_id: Option<String>,
+        agent_id: Option<String>,
+    }
+
     fn load_object_names(
         connection: &rusqlite::Connection,
     ) -> Result<Vec<String>, rusqlite::Error> {
@@ -619,6 +964,211 @@ mod tests {
         }
 
         Ok(names)
+    }
+
+    fn build_v1_retrieval_fixture_database(path: &Path) -> Result<Connection, crate::StoreError> {
+        let connection = Connection::open(path)?;
+        create_schema(&connection)?;
+        seed_scope_config_v1(&connection)?;
+        insert_memory_fixture_rows(&connection)?;
+        Ok(connection)
+    }
+
+    fn seed_scope_config_v1(connection: &Connection) -> Result<(), crate::StoreError> {
+        for (key, value) in DEFAULT_SCOPE_CONFIG {
+            connection.execute(
+                "INSERT INTO scope_config(key, value) VALUES (?1, ?2)",
+                params![key, value],
+            )?;
+        }
+        connection.execute(
+            "INSERT INTO scope_config(key, value) VALUES (?1, ?2)",
+            params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        )?;
+        connection.execute(
+            "UPDATE scope_config SET value = '0.95' WHERE key = 'similarity_weight'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE scope_config SET value = '0.40' WHERE key = 'recency_weight'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE scope_config SET value = '0.15' WHERE key = 'access_weight'",
+            [],
+        )?;
+        connection.execute(
+            "UPDATE scope_config SET value = '0.60' WHERE key = 'priority_weight'",
+            [],
+        )?;
+        Ok(())
+    }
+
+    fn insert_memory_fixture_rows(connection: &Connection) -> Result<(), crate::StoreError> {
+        let long_content =
+            "long-preserve-only-fixture-".repeat(512) + "terminal-sentinel-for-byte-identity";
+        connection.execute(
+            r#"
+            INSERT INTO memories (
+                id, content, summary, scope, memory_type, provenance,
+                importance_score, reliability_score, sensitivity, state, tags, status,
+                custom_metadata, access_count, corroboration_count, embedding_stale,
+                created_at, updated_at, last_accessed_at, tenant_id, user_id, agent_id
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6,
+                ?7, ?8, ?9, ?10, ?11, ?12,
+                ?13, ?14, ?15, ?16,
+                ?17, ?18, ?19, ?20, ?21, ?22
+            )
+            "#,
+            params![
+                "fixture-memory-long",
+                long_content,
+                "Long fixture summary",
+                "workspace",
+                "fact",
+                "user_stated",
+                0.91_f64,
+                0.88_f64,
+                "medium",
+                "active",
+                r#"["alpha","beta","gamma"]"#,
+                "pinned",
+                r#"{"source":"migration-test","lang":"fr","version":1}"#,
+                42_i64,
+                3_i64,
+                0_i64,
+                "2026-05-01T08:00:00Z",
+                "2026-05-02T09:30:00Z",
+                "2026-05-03T10:45:00Z",
+                "tenant-fixture",
+                "user-fixture",
+                "agent-fixture",
+            ],
+        )?;
+        connection.execute(
+            r#"
+            INSERT INTO memories (
+                id, content, summary, scope, memory_type, provenance,
+                importance_score, reliability_score, sensitivity, state, tags, status,
+                custom_metadata, access_count, corroboration_count, embedding_stale,
+                created_at, updated_at, last_accessed_at, tenant_id, user_id, agent_id
+            ) VALUES (
+                ?1, ?2, ?3, ?4, ?5, ?6,
+                ?7, ?8, ?9, ?10, ?11, ?12,
+                ?13, ?14, ?15, ?16,
+                ?17, ?18, ?19, ?20, ?21, ?22
+            )
+            "#,
+            params![
+                "fixture-memory-nullable",
+                "Short fixture content with explicit nullables preserved.",
+                Option::<String>::None,
+                "session",
+                "observation",
+                "imported",
+                0.33_f64,
+                0.61_f64,
+                "low",
+                "dormant",
+                r#"["delta"]"#,
+                Option::<String>::None,
+                r#"{"source":"migration-test","nullable":true}"#,
+                0_i64,
+                0_i64,
+                1_i64,
+                "2026-04-11T06:15:00Z",
+                "2026-04-11T06:15:00Z",
+                Option::<String>::None,
+                Option::<String>::None,
+                Option::<String>::None,
+                Option::<String>::None,
+            ],
+        )?;
+        Ok(())
+    }
+
+    fn load_memory_row_snapshots(
+        connection: &rusqlite::Connection,
+    ) -> Result<Vec<MemoryRowSnapshot>, rusqlite::Error> {
+        let mut statement = connection.prepare(
+            r#"
+            SELECT
+                id,
+                content,
+                summary,
+                scope,
+                memory_type,
+                provenance,
+                CAST(importance_score AS TEXT),
+                CAST(reliability_score AS TEXT),
+                sensitivity,
+                state,
+                tags,
+                status,
+                custom_metadata,
+                access_count,
+                corroboration_count,
+                embedding_stale,
+                created_at,
+                updated_at,
+                last_accessed_at,
+                tenant_id,
+                user_id,
+                agent_id
+            FROM memories
+            ORDER BY id
+            "#,
+        )?;
+        let rows = statement.query_map([], |row| {
+            Ok(MemoryRowSnapshot {
+                id: row.get(0)?,
+                content: row.get(1)?,
+                summary: row.get(2)?,
+                scope: row.get(3)?,
+                memory_type: row.get(4)?,
+                provenance: row.get(5)?,
+                importance_score: row.get(6)?,
+                reliability_score: row.get(7)?,
+                sensitivity: row.get(8)?,
+                state: row.get(9)?,
+                tags: row.get(10)?,
+                status: row.get(11)?,
+                custom_metadata: row.get(12)?,
+                access_count: row.get(13)?,
+                corroboration_count: row.get(14)?,
+                embedding_stale: row.get(15)?,
+                created_at: row.get(16)?,
+                updated_at: row.get(17)?,
+                last_accessed_at: row.get(18)?,
+                tenant_id: row.get(19)?,
+                user_id: row.get(20)?,
+                agent_id: row.get(21)?,
+            })
+        })?;
+
+        let mut snapshots = Vec::new();
+        for row in rows {
+            snapshots.push(row?);
+        }
+        Ok(snapshots)
+    }
+
+    fn load_scope_config_map(
+        connection: &rusqlite::Connection,
+    ) -> Result<BTreeMap<String, String>, rusqlite::Error> {
+        let mut statement =
+            connection.prepare("SELECT key, value FROM scope_config ORDER BY key ASC")?;
+        let rows = statement.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut config = BTreeMap::new();
+        for row in rows {
+            let (key, value) = row?;
+            config.insert(key, value);
+        }
+        Ok(config)
     }
 
     fn must<T, E>(result: Result<T, E>, context: &str) -> T
