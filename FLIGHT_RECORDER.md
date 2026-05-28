@@ -2630,3 +2630,17 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Caveats:
   - `T = 0.03` is currently fitted to the observed `fr_q07` hot canary gap and should be revisited against the real distribution of similarity gaps rather than treated as permanently universal.
   - Structural protection is total only when the similarity gap is strictly greater than `T`; candidates inside the tie band remain quasi-equalities that the secondary blend is still allowed to refine.
+## 2026-05-28 WU16 Continuous secondary fade ranking
+- What changed:
+  - Replaced the WU15 hard similarity band in `rust/crates/elegy-memory/src/storage/sqlite_store.rs` with a continuous fade on secondary signals based on each candidate's similarity gap to the best semantic match.
+  - Ranking now uses `blended_similarity + faded_secondary_refinement`, where recency/access/priority influence decays smoothly to zero as the gap approaches `T = 0.03`, while the access clamp and learned-weight ceiling remain unchanged.
+  - Updated structural regressions from band-index assertions to fade semantics: outside-threshold candidates must see zero secondary fade, inside-threshold quasi-ties must still be refinable, and the fade function is explicitly tested for monotone decay.
+- Test status:
+  - `cargo fmt --all` passed from `rust/`.
+  - `cargo test -p elegy-memory` passed from `rust/` with 181 tests green.
+  - `cargo clippy -p elegy-memory -- -D warnings` passed from `rust/`.
+  - `cargo test --release -p elegy-memory-mcp --test wu13_repro versioned_retrieval_benchmark_fixture_runs_through_stdio -- --exact --nocapture` passed with `ELEGY_EXPLAIN_RETRIEVAL_SCORING=1`.
+- Decisions:
+  - Chose a smoothstep fade instead of a hard band or linear cutoff because it keeps the score contribution continuous and also flattens the derivative at `gap = 0` and `gap = T`, making the exact threshold less brittle around boundary cases.
+  - Faded only the secondary subtotal (`recency + access + priority`) rather than the full additive total so the fade governs exactly the signals it is supposed to attenuate; similarity remains the structural backbone of ranking.
+  - Kept `T = 0.03` and the existing refinement cap so the hot `fr_q07` canary stays protected while the coffee hub's top-3 concentration drops further without introducing new top-1 misses.
