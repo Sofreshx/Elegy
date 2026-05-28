@@ -63,13 +63,11 @@ const DEFAULT_AGENT_BUDGET: f32 = 200.0;
 const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
 const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
 const ACCESS_SIGNAL_HALF_SATURATION: f32 = 8.0;
-// WU15: secondaries may only refine ranking inside a narrow similarity band. A gap above 0.03
-// must keep the semantic winner ahead; this protects the observed fr_q07 hot canary (~0.03147).
-// The threshold is canary-fitted and should be revisited against the observed distribution of
-// similarity gaps; only gaps strictly above T get full structural protection, while quasi-equalities
-// inside the band still resolve through the secondary blend.
-const RETRIEVAL_SIMILARITY_TIE_THRESHOLD: f32 = 0.03;
-const RETRIEVAL_BAND_REFINEMENT_RATIO: f32 = 0.49;
+// WU16: secondaries now fade out continuously as the similarity gap to the best candidate grows.
+// The fade threshold remains canary-fitted to the observed fr_q07 hot gap (~0.03147), but the
+// smooth decay makes the exact threshold less brittle than a hard band cutoff.
+const RETRIEVAL_SECONDARY_FADE_THRESHOLD: f32 = 0.03;
+const RETRIEVAL_SECONDARY_REFINEMENT_RATIO: f32 = 0.49;
 const RETRIEVAL_SCORING_MODE_ENV: &str = "ELEGY_RETRIEVAL_SCORING_MODE";
 const EXPLAIN_RETRIEVAL_SCORING_ENV: &str = "ELEGY_EXPLAIN_RETRIEVAL_SCORING";
 const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
@@ -4787,8 +4785,9 @@ struct RetrievalScoreBreakdown {
     weighted_priority: f32,
     total_score: f32,
     ranking_score: f32,
-    similarity_band_index: usize,
-    similarity_band_leader: f32,
+    secondary_refinement_score: f32,
+    similarity_gap_to_best: f32,
+    secondary_fade_factor: f32,
 }
 
 type RankedSearchCandidate = (ScoredMemory, RetrievalScoreBreakdown);
@@ -4897,12 +4896,12 @@ fn rank_search_candidates(
         ));
     }
 
-    assign_similarity_protected_ranking(&mut ranked_candidates, &scope_config, scoring_mode);
+    assign_continuous_secondary_fade_ranking(&mut ranked_candidates, &scope_config, scoring_mode);
 
     Ok(ranked_candidates)
 }
 
-fn assign_similarity_protected_ranking(
+fn assign_continuous_secondary_fade_ranking(
     ranked_candidates: &mut [RankedSearchCandidate],
     scope_config: &ScopeConfig,
     scoring_mode: RetrievalScoringMode,
@@ -4912,64 +4911,68 @@ fn assign_similarity_protected_ranking(
     }
 
     ranked_candidates.sort_by(compare_ranked_candidates_by_similarity_then_total);
-    let max_total_score = maximum_possible_retrieval_score(scope_config, scoring_mode);
+    let best_similarity = ranked_candidates[0].0.similarity;
 
     if scoring_mode == RetrievalScoringMode::SimilarityOnly {
         for (scored_memory, breakdown) in ranked_candidates.iter_mut() {
             breakdown.ranking_score = breakdown.total_score;
-            breakdown.similarity_band_index = 0;
-            breakdown.similarity_band_leader = breakdown.blended_similarity;
+            breakdown.secondary_refinement_score = 0.0;
+            breakdown.similarity_gap_to_best =
+                (best_similarity - breakdown.blended_similarity).max(0.0);
+            breakdown.secondary_fade_factor = 0.0;
             scored_memory.score = breakdown.ranking_score;
         }
+        ranked_candidates.sort_by(compare_ranked_candidates_by_ranking);
         return;
     }
 
-    let mut band_start = 0;
-    let mut band_index = 0;
-    while band_start < ranked_candidates.len() {
-        let band_leader_similarity = ranked_candidates[band_start].0.similarity;
-        let mut band_end = band_start + 1;
-        while band_end < ranked_candidates.len()
-            && (band_leader_similarity - ranked_candidates[band_end].0.similarity)
-                <= RETRIEVAL_SIMILARITY_TIE_THRESHOLD
-        {
-            band_end += 1;
-        }
-
-        ranked_candidates[band_start..band_end].sort_by(compare_ranked_candidates_by_total);
-        for (scored_memory, breakdown) in ranked_candidates[band_start..band_end].iter_mut() {
-            breakdown.ranking_score = band_leader_similarity
-                + normalize_retrieval_score_for_band(breakdown.total_score, max_total_score);
-            breakdown.similarity_band_index = band_index;
-            breakdown.similarity_band_leader = band_leader_similarity;
-            scored_memory.score = breakdown.ranking_score;
-        }
-
-        band_start = band_end;
-        band_index += 1;
+    let max_secondary_score = maximum_possible_secondary_score(scope_config, scoring_mode);
+    for (scored_memory, breakdown) in ranked_candidates.iter_mut() {
+        let similarity_gap = (best_similarity - breakdown.blended_similarity).max(0.0);
+        let fade_factor = compute_secondary_fade_factor(similarity_gap);
+        let secondary_score =
+            breakdown.weighted_recency + breakdown.weighted_access + breakdown.weighted_priority;
+        let refinement =
+            normalize_secondary_score_for_ranking(secondary_score, max_secondary_score)
+                * fade_factor;
+        breakdown.ranking_score = breakdown.blended_similarity + refinement;
+        breakdown.secondary_refinement_score = refinement;
+        breakdown.similarity_gap_to_best = similarity_gap;
+        breakdown.secondary_fade_factor = fade_factor;
+        scored_memory.score = breakdown.ranking_score;
     }
+    ranked_candidates.sort_by(compare_ranked_candidates_by_ranking);
 }
 
-fn maximum_possible_retrieval_score(
+fn maximum_possible_secondary_score(
     scope_config: &ScopeConfig,
     scoring_mode: RetrievalScoringMode,
 ) -> f32 {
-    let similarity_weight = scope_config.similarity_weight.max(0.0);
-    let secondary_weights = match scoring_mode {
+    match scoring_mode {
         RetrievalScoringMode::Default => {
             scope_config.recency_weight.max(0.0)
                 + scope_config.access_weight.max(0.0)
                 + scope_config.priority_weight.max(0.0)
         }
         RetrievalScoringMode::SimilarityOnly => 0.0,
-    };
-    (similarity_weight + secondary_weights).max(f32::EPSILON)
+    }
 }
 
-fn normalize_retrieval_score_for_band(total_score: f32, max_total_score: f32) -> f32 {
-    ((total_score.max(0.0) / max_total_score.max(f32::EPSILON)).clamp(0.0, 1.0))
-        * RETRIEVAL_SIMILARITY_TIE_THRESHOLD
-        * RETRIEVAL_BAND_REFINEMENT_RATIO
+fn normalize_secondary_score_for_ranking(secondary_score: f32, max_secondary_score: f32) -> f32 {
+    if max_secondary_score <= f32::EPSILON {
+        return 0.0;
+    }
+
+    ((secondary_score.max(0.0) / max_secondary_score).clamp(0.0, 1.0))
+        * RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        * RETRIEVAL_SECONDARY_REFINEMENT_RATIO
+}
+
+fn compute_secondary_fade_factor(similarity_gap: f32) -> f32 {
+    let normalized_gap = (similarity_gap.max(0.0)
+        / RETRIEVAL_SECONDARY_FADE_THRESHOLD.max(f32::EPSILON))
+    .clamp(0.0, 1.0);
+    1.0 - (normalized_gap * normalized_gap * (3.0 - 2.0 * normalized_gap))
 }
 
 fn compare_ranked_candidates_by_similarity_then_total(
@@ -4994,6 +4997,18 @@ fn compare_ranked_candidates_by_total(
         .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
         .then_with(|| right.0.memory.updated_at.cmp(&left.0.memory.updated_at))
         .then_with(|| right.0.memory.id.cmp(&left.0.memory.id))
+}
+
+fn compare_ranked_candidates_by_ranking(
+    left: &RankedSearchCandidate,
+    right: &RankedSearchCandidate,
+) -> std::cmp::Ordering {
+    right
+        .1
+        .ranking_score
+        .total_cmp(&left.1.ranking_score)
+        .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
+        .then_with(|| compare_ranked_candidates_by_total(left, right))
 }
 
 fn compute_retrieval_score_breakdown_with_mode(
@@ -5036,8 +5051,9 @@ fn compute_retrieval_score_breakdown_with_mode(
         weighted_priority,
         total_score: weighted_similarity + weighted_recency + weighted_access + weighted_priority,
         ranking_score: weighted_similarity + weighted_recency + weighted_access + weighted_priority,
-        similarity_band_index: 0,
-        similarity_band_leader: blended_similarity,
+        secondary_refinement_score: 0.0,
+        similarity_gap_to_best: 0.0,
+        secondary_fade_factor: 0.0,
     }
 }
 
@@ -5084,14 +5100,15 @@ fn emit_search_score_explanations(
 
     for (rank, (scored_memory, breakdown)) in ranked_candidates.iter().take(limit).enumerate() {
         eprintln!(
-            "  rank={} id={} score={:.3} raw_total_score={:.3} similarity={:.3} band={} band_leader_similarity={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
+            "  rank={} id={} score={:.3} raw_total_score={:.3} similarity={:.3} gap_to_best={:.3} secondary_fade={:.3} secondary_refinement={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
             rank + 1,
             scored_memory.memory.id,
             scored_memory.score,
             breakdown.total_score,
             scored_memory.similarity,
-            breakdown.similarity_band_index,
-            breakdown.similarity_band_leader,
+            breakdown.similarity_gap_to_best,
+            breakdown.secondary_fade_factor,
+            breakdown.secondary_refinement_score,
             format_optional_retrieval_score(breakdown.vector_similarity),
             format_optional_retrieval_score(breakdown.keyword_similarity),
             breakdown.weighted_similarity,
@@ -7292,19 +7309,19 @@ mod tests {
         assert!(target_ranked.0.similarity > hub_ranked.0.similarity);
         assert!(
             (target_ranked.0.similarity - hub_ranked.0.similarity)
-                > super::RETRIEVAL_SIMILARITY_TIE_THRESHOLD
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
         );
         assert!(
             target_ranked.1.total_score < hub_ranked.1.total_score,
-            "raw score should still favor the warmed hub to prove the band guard is active"
+            "raw score should still favor the warmed hub to prove the fade guard is active"
         );
         assert!(target_ranked.0.score > hub_ranked.0.score);
-        assert_eq!(target_ranked.1.similarity_band_index, 0);
-        assert!(hub_ranked.1.similarity_band_index > target_ranked.1.similarity_band_index);
+        assert_eq!(target_ranked.1.secondary_fade_factor, 1.0);
+        assert_eq!(hub_ranked.1.secondary_fade_factor, 0.0);
     }
 
     #[tokio::test]
-    async fn similarity_band_blocks_recency_only_overrides_outside_threshold() {
+    async fn continuous_fade_neutralizes_recency_only_overrides_past_threshold() {
         let fixture = test_fixture();
         set_scope_config(&fixture.store, "similarity_weight", "0.4");
         set_scope_config(&fixture.store, "recency_weight", "1.0");
@@ -7368,17 +7385,18 @@ mod tests {
         assert!(semantic_ranked.0.similarity > fresh_ranked.0.similarity);
         assert!(
             (semantic_ranked.0.similarity - fresh_ranked.0.similarity)
-                > super::RETRIEVAL_SIMILARITY_TIE_THRESHOLD
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
         );
         assert!(
             semantic_ranked.1.total_score < fresh_ranked.1.total_score,
             "raw score should favor recency to prove the structural guard is active"
         );
         assert!(semantic_ranked.0.score > fresh_ranked.0.score);
+        assert_eq!(fresh_ranked.1.secondary_fade_factor, 0.0);
     }
 
     #[tokio::test]
-    async fn similarity_band_still_allows_recency_refinement_inside_threshold() {
+    async fn continuous_fade_still_allows_recency_refinement_inside_threshold() {
         let fixture = test_fixture();
         set_scope_config(&fixture.store, "similarity_weight", "0.4");
         set_scope_config(&fixture.store, "recency_weight", "1.0");
@@ -7416,7 +7434,7 @@ mod tests {
             .expect("store old candidate embedding");
         fixture
             .store
-            .store_embedding(&fresh_quasi_tie_id, &embedding_with_similarity(0.605))
+            .store_embedding(&fresh_quasi_tie_id, &embedding_with_similarity(0.615))
             .await
             .expect("store fresh candidate embedding");
 
@@ -7447,16 +7465,14 @@ mod tests {
         assert_eq!(ranked[0].0.memory.id, fresh_quasi_tie_id);
         assert!(
             (old_ranked.0.similarity - fresh_ranked.0.similarity)
-                < super::RETRIEVAL_SIMILARITY_TIE_THRESHOLD
+                < super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
         );
-        assert_eq!(
-            old_ranked.1.similarity_band_index,
-            fresh_ranked.1.similarity_band_index
-        );
+        assert_eq!(old_ranked.1.secondary_fade_factor, 1.0);
+        assert!(fresh_ranked.1.secondary_fade_factor > 0.0);
     }
 
     #[tokio::test]
-    async fn similarity_band_blocks_priority_only_overrides_outside_threshold() {
+    async fn continuous_fade_neutralizes_priority_only_overrides_past_threshold() {
         let fixture = test_fixture();
         set_scope_config(&fixture.store, "similarity_weight", "0.1");
         set_scope_config(&fixture.store, "recency_weight", "0.0");
@@ -7507,13 +7523,37 @@ mod tests {
         assert!(semantic_ranked.0.similarity > boosted_ranked.0.similarity);
         assert!(
             (semantic_ranked.0.similarity - boosted_ranked.0.similarity)
-                > super::RETRIEVAL_SIMILARITY_TIE_THRESHOLD
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
         );
         assert!(
             semantic_ranked.1.total_score < boosted_ranked.1.total_score,
             "raw score should favor the priority-heavy runner up to prove the structural guard is active"
         );
         assert!(semantic_ranked.0.score > boosted_ranked.0.score);
+        assert_eq!(boosted_ranked.1.secondary_fade_factor, 0.0);
+    }
+
+    #[test]
+    fn continuous_secondary_fade_is_monotonic_and_zero_at_threshold() {
+        let quarter =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.25);
+        let half =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.5);
+        let three_quarters =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.75);
+
+        assert_eq!(super::compute_secondary_fade_factor(0.0), 1.0);
+        assert!(quarter < 1.0 && quarter > half);
+        assert!(half > three_quarters);
+        assert!(three_quarters > 0.0);
+        assert_eq!(
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD),
+            0.0
+        );
+        assert_eq!(
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 1.5),
+            0.0
+        );
     }
 
     #[test]
@@ -9660,10 +9700,8 @@ mod tests {
         assert_eq!(before[1].0.memory.id, priority_favored_id);
         let before_similarity = find_ranked_candidate(&before, &similarity_favored_id);
         let before_priority = find_ranked_candidate(&before, &priority_favored_id);
-        assert_eq!(before_similarity.1.similarity_band_index, 0);
-        assert!(
-            before_priority.1.similarity_band_index > before_similarity.1.similarity_band_index
-        );
+        assert_eq!(before_similarity.1.secondary_fade_factor, 1.0);
+        assert_eq!(before_priority.1.secondary_fade_factor, 0.0);
 
         fixture
             .store
