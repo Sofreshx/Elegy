@@ -39,6 +39,7 @@ The implemented CLI surface in `rust/crates/elegy-memory/src/cli.rs` is:
 - `elegy-memory purge`
 - `elegy-memory health`
 - `elegy-memory export`
+- `elegy-memory import`
 - `elegy-memory reembed`
 - `elegy-memory contradictions`
 
@@ -55,6 +56,7 @@ The current MVP CLI behavior is intentionally narrow:
 - `list` supports type and state filters with a simple limit
 - `inspect` returns the current record plus version history
 - `export` writes the current scope as JSON, either to stdout or to a file
+- `import` restores JSON file or stdin inputs; full export-shape imports preserve exported memory state while simplified imports keep the current gate-first behavior unless `--force` is used
 - `purge` deletes the configured database contents after confirmation unless `--yes` is passed
 - `contradictions` lists unresolved contradiction records for the current scope
 - `reembed` currently reports queued stale records and exits because provider-backed re-embedding is not wired yet

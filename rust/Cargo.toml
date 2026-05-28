@@ -4,6 +4,7 @@ members = [
     "crates/elegy-mermaid",
     "crates/elegy-contracts",
     "crates/elegy-memory",
+    "crates/elegy-memory-mcp",
     "crates/elegy-planning",
     "crates/elegy-policy",
     "crates/elegy-mcp",
@@ -16,7 +17,8 @@ members = [
     "crates/elegy-runtime",
     "crates/elegy-core",
     "crates/elegy-host-mcp",
-    "crates/elegy-cli", "crates/elegy-diagram",
+    "crates/elegy-cli",
+    "crates/elegy-diagram",
     "crates/elegy-observe-win32",
     "crates/elegy-observe",
     "crates/elegy-desktop-win32",
@@ -45,7 +47,7 @@ base64 = "0.22.1"
 clap = { version = "4.5.30", features = ["derive"] }
 glob = "0.3.2"
 reqwest = { version = "0.12.12", default-features = false, features = ["blocking", "rustls-tls"] }
-rmcp = { version = "1.2.0", features = ["server", "transport-io"] }
+rmcp = { version = "1.2.0", features = ["server", "transport-io", "transport-streamable-http-server"] }
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.138"
 serde_yaml = "0.9.34"
