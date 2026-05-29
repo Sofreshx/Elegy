@@ -4950,9 +4950,11 @@ fn execute_agent_discover_command(
 
     let registry = &loaded.registry;
     let filtered_skills = filtered_agent_skill_entries_for_registry(registry, &selection);
-    let filtered_definitions = detail
-        .then(|| filtered_agent_skill_definitions_for_registry(registry, &selection))
-        .unwrap_or_default();
+    let filtered_definitions = if detail {
+        filtered_agent_skill_definitions_for_registry(registry, &selection)
+    } else {
+        Vec::new()
+    };
     let discovered_skills = match &query {
         Some(query) => registry.search_filtered(&filtered_skills, query, detail),
         None => filtered_skills,
@@ -6226,6 +6228,7 @@ fn execute_configuration_show_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_configuration_apply_command(
     target: PathBuf,
     dry_run: bool,
@@ -6301,6 +6304,7 @@ fn execute_configuration_apply_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_configuration_verify_command(
     target: PathBuf,
     package: Option<PathBuf>,

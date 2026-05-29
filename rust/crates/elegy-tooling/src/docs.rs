@@ -857,19 +857,18 @@ fn validate_document(
         Err(_) => {}
     }
 
-    if document.kind == DocKind::Adr {
-        if frontmatter
+    if document.kind == DocKind::Adr
+        && frontmatter
             .date
             .as_ref()
             .map(|value| !is_valid_iso_date(value.trim()))
             .unwrap_or(true)
-        {
-            issues.push(DocsCheckIssue {
-                code: "DOCS-CHECK-006".to_string(),
-                path: document.summary.path.clone(),
-                message: "ADR frontmatter must include a YYYY-MM-DD date".to_string(),
-            });
-        }
+    {
+        issues.push(DocsCheckIssue {
+            code: "DOCS-CHECK-006".to_string(),
+            path: document.summary.path.clone(),
+            message: "ADR frontmatter must include a YYYY-MM-DD date".to_string(),
+        });
     }
 
     let headings = collect_second_level_headings(&document.parsed.body);

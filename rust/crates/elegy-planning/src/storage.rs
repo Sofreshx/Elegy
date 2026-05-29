@@ -1685,7 +1685,8 @@ impl PlanningStore {
         let rows = statement.query_map([], row_to_plan)?;
         let mut items = collect_rows(rows)?;
         let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
         for item in &mut items {
             item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
         }
@@ -1704,7 +1705,8 @@ impl PlanningStore {
             statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_plan)?;
         let mut items = collect_rows(rows)?;
         let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
         for item in &mut items {
             item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
         }
@@ -1719,7 +1721,8 @@ impl PlanningStore {
         let rows = statement.query_map([], row_to_todo)?;
         let mut items = collect_rows(rows)?;
         let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
         for item in &mut items {
             item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
         }
@@ -1738,7 +1741,8 @@ impl PlanningStore {
             statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_todo)?;
         let mut items = collect_rows(rows)?;
         let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
         for item in &mut items {
             item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
         }
@@ -3032,7 +3036,8 @@ pub(crate) fn list_work_points_for_roadmap(
     let rows = statement.query_map(params![roadmap_id], row_to_work_point)?;
     let mut items = collect_rows(rows)?;
     let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
+    let mut file_scopes_by_id =
+        load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
     for item in &mut items {
         item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
     }
@@ -3050,7 +3055,8 @@ pub(crate) fn list_work_points_for_roadmap_in_scope(
     let rows = statement.query_map(params![roadmap_id, scope_key], row_to_work_point)?;
     let mut items = collect_rows(rows)?;
     let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
-    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
+    let mut file_scopes_by_id =
+        load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
     for item in &mut items {
         item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
     }
@@ -3347,13 +3353,16 @@ fn load_file_scopes_for_entity(
     let mut statement = connection.prepare(
         "SELECT selector_type, selector, intent FROM entity_file_scopes WHERE owner_entity_type = ?1 AND owner_entity_id = ?2 ORDER BY ordering_index ASC, id ASC",
     )?;
-    let rows = statement.query_map(params![owner_entity_type.as_str(), owner_entity_id], |row| {
-        Ok(FileScopeRecord {
-            selector_type: parse_file_scope_selector_type(row.get::<_, String>(0)?)?,
-            selector: row.get(1)?,
-            intent: parse_file_scope_intent(row.get::<_, String>(2)?)?,
-        })
-    })?;
+    let rows = statement.query_map(
+        params![owner_entity_type.as_str(), owner_entity_id],
+        |row| {
+            Ok(FileScopeRecord {
+                selector_type: parse_file_scope_selector_type(row.get::<_, String>(0)?)?,
+                selector: row.get(1)?,
+                intent: parse_file_scope_intent(row.get::<_, String>(2)?)?,
+            })
+        },
+    )?;
     collect_rows(rows)
 }
 
@@ -3929,9 +3938,7 @@ fn parse_effort_tier(value: String) -> Result<EffortTier, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
 
-fn parse_file_scope_selector_type(
-    value: String,
-) -> Result<FileScopeSelectorType, rusqlite::Error> {
+fn parse_file_scope_selector_type(value: String) -> Result<FileScopeSelectorType, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
 
@@ -4777,8 +4784,9 @@ mod tests {
             .map(|index| format!("plan-{index}"))
             .collect::<Vec<_>>();
 
-        let grouped = load_file_scopes_for_entities(&connection, EntityType::Plan, &owner_entity_ids)
-            .expect("load file scopes in chunks");
+        let grouped =
+            load_file_scopes_for_entities(&connection, EntityType::Plan, &owner_entity_ids)
+                .expect("load file scopes in chunks");
 
         assert!(grouped.is_empty());
     }
@@ -5219,5 +5227,3 @@ mod tests {
             .any(|event| event.event_type == "plan.revised"));
     }
 }
-
-

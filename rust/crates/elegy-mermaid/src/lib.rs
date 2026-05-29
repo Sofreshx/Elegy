@@ -796,12 +796,12 @@ fn build_canonical_workflow_projection(
             });
 
             if let Some(target_step_id) = trigger.target_step_id.as_deref() {
-                let target_node_id = step_node_ids
-                    .get(target_step_id)
-                    .ok_or_else(|| MermaidToolError::InvalidCanonicalWorkflowReference {
+                let target_node_id = step_node_ids.get(target_step_id).ok_or_else(|| {
+                    MermaidToolError::InvalidCanonicalWorkflowReference {
                         field: "trigger.target_step_id",
                         step_id: target_step_id.to_string(),
-                    })?;
+                    }
+                })?;
                 projection.edges.push(MermaidProjectionEdge {
                     from_node_id: trigger_node_id.clone(),
                     to_node_id: target_node_id.clone(),
@@ -902,10 +902,12 @@ fn build_canonical_workflow_graph_projection(
         if let Some(entry_step_id) = document.entry_step_id.as_deref() {
             let entry_node_id = graph_node_ids
                 .get(entry_step_id)
-                .ok_or_else(|| MermaidToolError::InvalidCanonicalWorkflowGraphReference {
-                    field: "entry_step_id",
-                    node_id: entry_step_id.to_string(),
-                })?
+                .ok_or_else(
+                    || MermaidToolError::InvalidCanonicalWorkflowGraphReference {
+                        field: "entry_step_id",
+                        node_id: entry_step_id.to_string(),
+                    },
+                )?
                 .clone();
             projection.edges.push(MermaidProjectionEdge {
                 from_node_id: trigger_node_id,
@@ -919,17 +921,21 @@ fn build_canonical_workflow_graph_projection(
     for edge in &document.edges {
         let from_node_id = graph_node_ids
             .get(&edge.from_step_id)
-            .ok_or_else(|| MermaidToolError::InvalidCanonicalWorkflowGraphReference {
-                field: "edge.from_step_id",
-                node_id: edge.from_step_id.clone(),
-            })?
+            .ok_or_else(
+                || MermaidToolError::InvalidCanonicalWorkflowGraphReference {
+                    field: "edge.from_step_id",
+                    node_id: edge.from_step_id.clone(),
+                },
+            )?
             .clone();
         let to_node_id = graph_node_ids
             .get(&edge.to_step_id)
-            .ok_or_else(|| MermaidToolError::InvalidCanonicalWorkflowGraphReference {
-                field: "edge.to_step_id",
-                node_id: edge.to_step_id.clone(),
-            })?
+            .ok_or_else(
+                || MermaidToolError::InvalidCanonicalWorkflowGraphReference {
+                    field: "edge.to_step_id",
+                    node_id: edge.to_step_id.clone(),
+                },
+            )?
             .clone();
 
         projection.edges.push(MermaidProjectionEdge {

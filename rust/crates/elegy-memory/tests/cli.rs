@@ -1146,7 +1146,10 @@ fn consolidate_cross_scope_promotes_survivor_and_deletes_duplicate() {
     );
     let consolidate_json: serde_json::Value =
         serde_json::from_slice(&consolidate.stdout).expect("parse consolidate response");
-    assert_eq!(consolidate_json["command"], serde_json::json!(["consolidate"]));
+    assert_eq!(
+        consolidate_json["command"],
+        serde_json::json!(["consolidate"])
+    );
     assert_eq!(consolidate_json["data"]["mergedCount"].as_u64(), Some(1));
     assert_eq!(
         consolidate_json["data"]["mergedIds"]
