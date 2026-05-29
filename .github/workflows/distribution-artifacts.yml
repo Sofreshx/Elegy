@@ -82,6 +82,9 @@ jobs:
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             surface: elegy-configuration
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-documentation
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             surface: elegy-cli
@@ -100,6 +103,9 @@ jobs:
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             surface: elegy-configuration
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-documentation
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-cli
@@ -118,6 +124,9 @@ jobs:
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-configuration
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-documentation
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
@@ -153,7 +162,7 @@ jobs:
       - name: Package wrapper archives
         shell: pwsh
         run: |
-          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration
+          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration,elegy-documentation
 
       - name: Validate wrapper archives
         shell: pwsh
@@ -171,6 +180,7 @@ jobs:
             artifacts/distribution/elegy-planning-wrapper-*.zip
             artifacts/distribution/elegy-skills-wrapper-*.zip
             artifacts/distribution/elegy-configuration-wrapper-*.zip
+            artifacts/distribution/elegy-documentation-wrapper-*.zip
 
   package-installer:
     runs-on: ubuntu-latest

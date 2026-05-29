@@ -3,6 +3,7 @@ members = [
     "crates/elegy-agent-events",
     "crates/elegy-mermaid",
     "crates/elegy-contracts",
+    "crates/elegy-documentation",
     "crates/elegy-memory",
     "crates/elegy-memory-mcp",
     "crates/elegy-planning",

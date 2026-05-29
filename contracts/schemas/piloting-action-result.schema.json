@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-action-result.schema.json",
+  "title": "PilotingActionResult",
+  "description": "Structured piloting action outcome with observed delta plus retry or refusal hints.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "actionId",
+    "status",
+    "message",
+    "observedDelta",
+    "evidenceRefs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-action-result/v1"
+    },
+    "actionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["succeeded", "failed", "refused", "retryable"]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "observedDelta": {
+      "type": "object"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "retryHint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "refusalHint": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": { "status": { "const": "retryable" } },
+        "required": ["status"]
+      },
+      "then": { "required": ["retryHint"] }
+    },
+    {
+      "if": {
+        "properties": { "status": { "const": "refused" } },
+        "required": ["status"]
+      },
+      "then": { "required": ["refusalHint"] }
+    }
+  ]
+}

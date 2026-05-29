@@ -3,6 +3,8 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use serde_json::Value;
+
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
@@ -11,6 +13,20 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
     let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
     fs::create_dir_all(&dir).expect("create temp directory");
     dir
+}
+
+fn command_json(args: &[&str]) -> Value {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(args)
+        .output()
+        .expect("run elegy-planning command");
+
+    assert!(
+        output.stderr.is_empty(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    serde_json::from_slice(&output.stdout).expect("stdout should be valid json")
 }
 
 #[test]
@@ -307,4 +323,268 @@ fn parse_time_invalid_enum_emits_structured_invalid_json_with_format_flag() {
     assert!(stdout.contains("\"status\": \"invalid\""));
     assert!(stdout.contains("\"correlationId\": \"corr-plan-format-1\""));
     assert!(stdout.contains("invalid value 'done' for '--status <STATUS>'"));
+}
+
+#[test]
+fn out_of_scope_update_status_returns_structured_invalid_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-scope-invalid");
+    let db_path = temp_dir.join("planning.db");
+
+    let create_scope = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-a",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create workspace-a scope");
+    assert!(create_scope.status.success());
+
+    let create_goal = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--scope",
+            "workspace-a",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-scope-invalid-1",
+            "goal",
+            "create",
+            "--id",
+            "goal-scope-invalid-1",
+            "--title",
+            "Scoped goal",
+            "--description",
+            "Workspace goal",
+            "--acceptance",
+            "ok",
+            "--rejection",
+            "no",
+        ])
+        .output()
+        .expect("create scoped goal");
+    assert!(create_goal.status.success());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-scope-invalid-2",
+            "goal",
+            "update-status",
+            "--goal-id",
+            "goal-scope-invalid-1",
+            "--status",
+            "validated",
+        ])
+        .output()
+        .expect("run out-of-scope update-status");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("goal `goal-scope-invalid-1` is in scope `workspace-a`"));
+    assert!(stdout.contains("\"correlationId\": \"corr-scope-invalid-2\""));
+}
+
+#[test]
+fn events_are_isolated_by_scope_in_machine_mode() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-events-scope");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "scope",
+        "create",
+        "--scope-key",
+        "workspace-a",
+        "--scope-type",
+        "workspace",
+    ]);
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--scope",
+        "default",
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-events-default",
+        "goal",
+        "create",
+        "--id",
+        "goal-events-default",
+        "--title",
+        "Default goal",
+        "--description",
+        "Default scope goal",
+        "--acceptance",
+        "ok",
+        "--rejection",
+        "no",
+    ]);
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--scope",
+        "workspace-a",
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-events-custom",
+        "goal",
+        "create",
+        "--id",
+        "goal-events-custom",
+        "--title",
+        "Custom goal",
+        "--description",
+        "Custom scope goal",
+        "--acceptance",
+        "ok",
+        "--rejection",
+        "no",
+    ]);
+
+    let default_events = command_json(&[
+        "--db",
+        db,
+        "--scope",
+        "default",
+        "--json",
+        "--non-interactive",
+        "events",
+    ]);
+    let workspace_events = command_json(&[
+        "--db",
+        db,
+        "--scope",
+        "workspace-a",
+        "--json",
+        "--non-interactive",
+        "events",
+    ]);
+
+    let default_events = default_events["data"]["events"]
+        .as_array()
+        .expect("default events array");
+    let workspace_events = workspace_events["data"]["events"]
+        .as_array()
+        .expect("workspace events array");
+
+    assert!(default_events
+        .iter()
+        .any(|event| { event["entityId"].as_str() == Some("goal-events-default") }));
+    assert!(!default_events
+        .iter()
+        .any(|event| { event["entityId"].as_str() == Some("goal-events-custom") }));
+    assert!(workspace_events
+        .iter()
+        .any(|event| { event["entityId"].as_str() == Some("goal-events-custom") }));
+    assert!(!workspace_events
+        .iter()
+        .any(|event| { event["entityId"].as_str() == Some("goal-events-default") }));
+}
+
+#[test]
+fn out_of_scope_project_render_returns_structured_invalid_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-render-scope-invalid");
+    let db_path = temp_dir.join("planning.db");
+    let output_path = temp_dir.join("goal.json");
+
+    let create_scope = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-a",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create workspace-a scope");
+    assert!(create_scope.status.success());
+
+    let create_goal = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--scope",
+            "workspace-a",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-render-scope-1",
+            "goal",
+            "create",
+            "--id",
+            "goal-render-scope-1",
+            "--title",
+            "Scoped goal",
+            "--description",
+            "Workspace goal",
+            "--acceptance",
+            "ok",
+            "--rejection",
+            "no",
+        ])
+        .output()
+        .expect("create scoped goal");
+    assert!(create_goal.status.success());
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "project",
+            "render",
+            "--entity-type",
+            "goal",
+            "--entity-id",
+            "goal-render-scope-1",
+            "--projection-format",
+            "json",
+            "--output",
+            output_path.to_str().expect("utf-8 output path"),
+        ])
+        .output()
+        .expect("run out-of-scope project render");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("goal `goal-render-scope-1` is in scope `workspace-a`"));
+    assert!(!output_path.exists());
 }

@@ -1,0 +1,307 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "documentation",
+    "version": "0.1.0",
+    "displayName": "Elegy Documentation Authority",
+    "aliases": ["elegy-documentation", "agent-readable-docs", "docs-authority-map"]
+  },
+  "metadata": {
+    "displayName": "Elegy Documentation Authority",
+    "description": "Dedicated authority-aware documentation inspection, mapping, objective checking, and export over repo-local docs roots.",
+    "summary": "Inspect, map, check, and export governed documentation posture with a dedicated deterministic CLI.",
+    "category": "documentation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["documentation", "docs", "authority", "mapping", "validation", "llms", "bundle"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/architecture/documentation-practices.md"
+  },
+  "capabilities": [
+    {
+      "id": "documentation-init",
+      "name": "Initialize Documentation Config",
+      "description": "Initialize .elegy/docs.yaml with authority roots, entrypoints, derived surfaces, and freshness defaults for the current repo. Supports dry-run.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "init", "--project", "${project}", "--dry-run", "${dry_run}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to initialize or inspect.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Correlation ID for machine-safe command tracing.",
+            "required": false
+          },
+          {
+            "name": "dry_run",
+            "type": "boolean",
+            "description": "When true, preview init behavior without writing the config file.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationInitResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-init-result.schema.json",
+        "description": "Init result envelope including config posture plus created and skipped paths."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "documentation-inspect",
+      "name": "Inspect Documentation Authority",
+      "description": "Inspect documentation authority roots, entrypoints, and derived surfaces for a repo without changing files.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "inspect", "--project", "${project}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to inspect.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for machine tracing.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationMapResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-map-result.schema.json",
+        "description": "Documentation authority map envelope with entrypoints, classified documents, and recommended reading order."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "documentation-map",
+      "name": "Map Documentation Corpus",
+      "description": "Map repo-local documentation into current, planning, research, generated, and other classes with derived-surface drift state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "map", "--project", "${project}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to map.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for machine tracing.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationMapResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-map-result.schema.json",
+        "description": "Documentation authority map envelope with entrypoints, classified documents, and recommended reading order."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "documentation-check",
+      "name": "Check Documentation Objectively",
+      "description": "Run objective documentation checks for metadata, authority/status alignment, parseable dates, internal links, freshness warnings, and export drift.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "check", "--project", "${project}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to validate.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for machine tracing.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationCheckResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-check-result.schema.json",
+        "description": "Documentation validation envelope with checked documents, derived surfaces, and objective findings."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "documentation-export-llms",
+      "name": "Export LLMs View",
+      "description": "Render a deterministic non-authoritative llms.txt style export over the current documentation map.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "export", "llms", "--project", "${project}", "--output", "${output}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to export from.",
+            "required": true
+          },
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Output path for the rendered export.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for machine tracing.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationExportResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-export-result.schema.json",
+        "description": "Documentation export envelope with export kind, output path, source counts, and authority posture."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "documentation-export-bundle",
+      "name": "Export Documentation Bundle",
+      "description": "Render a deterministic non-authoritative JSON bundle over the current documentation map.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--correlation-id", "${correlation_id}", "--json", "export", "bundle", "--project", "${project}", "--output", "${output}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to export from.",
+            "required": true
+          },
+          {
+            "name": "output",
+            "type": "path",
+            "description": "Output path for the rendered bundle.",
+            "required": true
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for machine tracing.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationExportResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-export-result.schema.json",
+        "description": "Documentation export envelope with export kind, output path, source counts, and authority posture."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "objective-only-validation",
+      "description": "Validation stays objective: metadata, statuses, links, dates, freshness warnings, and export drift only. The surface does not score prose quality or rewrite documents.",
+      "required": true
+    },
+    {
+      "constraintId": "exports-are-non-authoritative",
+      "description": "Generated llms and bundle exports remain derived outputs. Source documents and governed config stay authoritative.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": ["docs/architecture/documentation-practices.md", "docs/agent-integration.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "documentation-governance"]
+  },
+  "discovery": {
+    "keywords": ["documentation", "docs", "authority", "map", "check", "llms", "bundle", "entrypoint"],
+    "triggers": [
+      {
+        "pattern": "agent readable docs",
+        "description": "When an agent needs the best authority-aware map of repo documentation."
+      },
+      {
+        "pattern": "documentation map",
+        "description": "When repo docs need classification into current, planning, research, and derived surfaces."
+      },
+      {
+        "pattern": "check docs objectively",
+        "description": "When documentation needs metadata, link, freshness, and drift validation without subjective scoring."
+      }
+    ],
+    "capabilityHints": [
+      "documentation-authority-inspection",
+      "documentation-objective-validation",
+      "documentation-derived-export"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-documentation.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

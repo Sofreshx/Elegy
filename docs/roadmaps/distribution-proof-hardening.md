@@ -1,6 +1,6 @@
 ---
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-05-28
 category: governance
 status: active
 doc_kind: reference
@@ -15,7 +15,7 @@ Record the two local distribution-proof phases completed in this session: claim-
 ## Phase Boundaries
 
 - This roadmap only covers proof that can be produced inside the current repo.
-- Remote release publication remains blocked and stays tracked through [Unresolved Goals](../issues/unresolved-goals.md) rather than as an active phase here.
+- Hosted release publication now runs on `main`, tags, and release events; ongoing remote verification stays tracked through [Unresolved Goals](../issues/unresolved-goals.md) rather than as an active phase here.
 
 ## Completed Phases
 
@@ -71,7 +71,7 @@ Primary Evidence:
 - [scripts/install-distribution.ps1](../../scripts/install-distribution.ps1)
 - [scripts/validate-canonical-outputs.ps1](../../scripts/validate-canonical-outputs.ps1)
 
-Exit Signal: achieved locally. Local distribution validation is documented and evidenced without relying on blocked remote publish execution.
+Exit Signal: achieved locally. Local distribution validation is documented and evidenced independently of the hosted publish lane, which is now active and verified through the release workflow itself.
 
 ## References
 

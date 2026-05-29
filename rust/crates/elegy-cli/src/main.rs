@@ -1,12 +1,27 @@
+use std::collections::BTreeSet;
+use std::fs;
+use std::io::{self, Read};
+use std::path::Path;
+use std::path::PathBuf;
+use std::process::ExitCode;
+use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use serde::{de::DeserializeOwned, Serialize};
+use serde_json::json;
+
 use elegy_configuration::{
     apply_configuration, list_builtin_configuration_catalog, show_configuration_template,
     verify_configuration, ApplyConfigurationRequest, ConfigurationError,
     VerifyConfigurationRequest,
 };
 use elegy_contracts::{
-    export_contract_bundle, AgentCapabilityProfile, ContractsBundleExport, ContractsError,
-    ObservationSession, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+    export_contract_bundle, validate_elegy_plugin_package, validate_piloting_adapter_manifest,
+    validate_piloting_fixture_pack, validate_piloting_package_file, AgentCapabilityProfile,
+    ContractsBundleExport, ContractsError, ElegyPluginPackage, ObservationSession,
+    PilotingAdapterManifest, PilotingFixturePack, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+    ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION,
 };
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
@@ -38,8 +53,8 @@ use elegy_observe::{
     record_observation_session, snapshot_processes, system_info, ObservationRecordRequest,
 };
 use elegy_skills::{
-    AgentCapabilityProfile as RegistryAgentCapabilityProfile, RegistryCapabilityCard,
-    RegistrySkillEntry, SkillRegistry, SkillRegistryQuery,
+    CapabilityDefinition, RegistryCapabilityCard, RegistrySkillEntry, SkillRegistry,
+    SkillRegistryQuery,
 };
 use elegy_tooling::{
     docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
@@ -47,16 +62,6 @@ use elegy_tooling::{
     DocsCreateResult, DocsIndexResult, DocsInitResult, GeneratedCodexPluginArtifacts,
     GeneratedSkillArtifacts, NewDocRequest, ToolingError as ToolingSurfaceError,
 };
-use serde::Serialize;
-use serde_json::json;
-use std::collections::BTreeSet;
-use std::fs;
-use std::io::{self, Read};
-use std::path::Path;
-use std::path::PathBuf;
-use std::process::ExitCode;
-use std::sync::OnceLock;
-use std::time::{SystemTime, UNIX_EPOCH};
 
 const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
 const LOCAL_DEFAULT_ROOT_DIR: &str = ".elegy-local-memory";
@@ -203,6 +208,10 @@ enum Command {
     Docs {
         #[command(subcommand)]
         command: DocsCommand,
+    },
+    Piloting {
+        #[command(subcommand)]
+        command: PilotingCommand,
     },
     Configuration {
         #[command(subcommand)]
@@ -734,6 +743,24 @@ enum DocsCommand {
 }
 
 #[derive(Subcommand, Debug)]
+enum PilotingCommand {
+    #[command(name = "validate-adapter")]
+    ValidateAdapter { path: PathBuf },
+    #[command(name = "validate-fixtures")]
+    ValidateFixtures { path: PathBuf },
+    Package {
+        #[arg(long, value_enum)]
+        target: PilotingPackageTarget,
+        path: PathBuf,
+    },
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
+enum PilotingPackageTarget {
+    Holon,
+}
+
+#[derive(Subcommand, Debug)]
 enum DocsNewCommand {
     Adr {
         #[arg(long)]
@@ -996,6 +1023,11 @@ struct AgentProfileSelection {
     total_skill_count: usize,
     total_capability_count: usize,
     diagnostics: Vec<Diagnostic>,
+}
+
+struct LoadedAgentProfileSelection {
+    registry: SkillRegistry,
+    selection: AgentProfileSelection,
 }
 
 impl AgentProfileSelection {
@@ -1476,6 +1508,15 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Docs {
             command: DocsCommand::Index,
         } => execute_docs_index_command(resolve_project_root(locator), format),
+        Command::Piloting {
+            command: PilotingCommand::ValidateAdapter { path },
+        } => execute_piloting_validate_adapter_command(path, format),
+        Command::Piloting {
+            command: PilotingCommand::ValidateFixtures { path },
+        } => execute_piloting_validate_fixtures_command(path, format),
+        Command::Piloting {
+            command: PilotingCommand::Package { target, path },
+        } => execute_piloting_package_command(target, path, format),
         Command::Configuration {
             command: ConfigurationCommand::List,
         } => execute_configuration_list_command(format),
@@ -1559,7 +1600,8 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
                         "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
-                        "observe", "desktop", "repo", "web", "data", "notify", "docs"
+                        "observe", "desktop", "repo", "web", "data", "notify", "docs",
+                        "piloting", "configuration"
                     ],
                     "skillDefinitionFormat": 2,
                     "mcpHostCapable": true
@@ -2270,8 +2312,8 @@ async fn execute_run_command(
             );
         }
 
-        let selection = match load_agent_profile_selection(profile.as_deref()) {
-            Ok(selection) => selection,
+        let loaded = match load_agent_profile_selection_with_registry(profile.as_deref()) {
+            Ok(loaded) => loaded,
             Err(diagnostics) => {
                 return emit_diagnostics(
                     format,
@@ -2283,12 +2325,13 @@ async fn execute_run_command(
                 );
             }
         };
+        let selection = loaded.selection;
         if selection.has_errors() {
             return emit_diagnostics(
                 format,
                 vec!["run"],
                 selection.error_diagnostics(),
-                json!(agent_check_data(&selection)),
+                json!(agent_check_data_for_registry(&loaded.registry, &selection)),
                 "invalid",
                 exit_invalid(),
             );
@@ -2344,6 +2387,394 @@ fn execute_contracts_export_command(
             Ok(ExitCode::SUCCESS)
         }
         Err(error) => emit_contracts_error(error, format, vec!["contracts", "export"]),
+    }
+}
+
+fn execute_piloting_validate_adapter_command(
+    path: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "validate-adapter"])?
+    else {
+        return Ok(exit_runtime());
+    };
+
+    let data = match parse_json_for_cli::<PilotingAdapterManifest, 2>(
+        &path,
+        &contents,
+        format,
+        ["piloting", "validate-adapter"],
+        "CLI-PILOT-002",
+        "failed to parse piloting adapter manifest JSON",
+    )? {
+        Some(data) => data,
+        None => return Ok(exit_invalid()),
+    };
+
+    let validation = validate_piloting_adapter_manifest(&data);
+    let issues = validation
+        .issues
+        .iter()
+        .map(|issue| {
+            Diagnostic::error("CLI-PILOT-003", issue.clone())
+                .with_path(path.display().to_string())
+                .with_hint("keep adapter manifests contracts-only and target-specific")
+        })
+        .collect::<Vec<_>>();
+    let status = if issues.is_empty() { "ok" } else { "invalid" };
+    let exit_code = if issues.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+    let data = json!({
+        "path": path.display().to_string(),
+        "valid": issues.is_empty(),
+        "adapterId": data.adapter_id,
+        "mode": data.mode,
+        "targetCount": data.supported_software.len(),
+        "surfaceCount": data.supported_surfaces.len(),
+        "fixtureCount": data.fixtures.len()
+    });
+
+    match format {
+        OutputFormat::Text => {
+            if issues.is_empty() {
+                println!("piloting adapter manifest is valid");
+                println!("path: {}", path.display());
+                println!(
+                    "adapter: {}",
+                    data["adapterId"].as_str().unwrap_or_default()
+                );
+            } else {
+                print_diagnostics_text(&issues);
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["piloting", "validate-adapter"],
+            status,
+            summarize(&issues),
+            data,
+            issues,
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn execute_piloting_validate_fixtures_command(
+    path: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "validate-fixtures"])?
+    else {
+        return Ok(exit_runtime());
+    };
+
+    if let Ok(adapter_manifest) = serde_json::from_str::<PilotingAdapterManifest>(&contents) {
+        let adapter_validation = validate_piloting_adapter_manifest(&adapter_manifest);
+        let diagnostics = adapter_validation
+            .issues
+            .iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-PILOT-004", issue.clone())
+                    .with_path(path.display().to_string())
+            })
+            .collect::<Vec<_>>();
+        let status = if diagnostics.is_empty() {
+            "ok"
+        } else {
+            "invalid"
+        };
+        let exit_code = if diagnostics.is_empty() {
+            ExitCode::SUCCESS
+        } else {
+            exit_invalid()
+        };
+        let data = json!({
+            "path": path.display().to_string(),
+            "fixtureKind": "adapter-manifest",
+            "valid": diagnostics.is_empty(),
+            "adapterId": adapter_manifest.adapter_id,
+            "fixtureCount": adapter_manifest.fixtures.len()
+        });
+        match format {
+            OutputFormat::Text => {
+                if diagnostics.is_empty() {
+                    println!("piloting adapter fixture manifest is valid");
+                    println!("path: {}", path.display());
+                } else {
+                    print_diagnostics_text(&diagnostics);
+                }
+            }
+            OutputFormat::Json => print_json(&build_envelope(
+                ["piloting", "validate-fixtures"],
+                status,
+                summarize(&diagnostics),
+                data,
+                diagnostics,
+            ))?,
+        }
+        return Ok(exit_code);
+    }
+
+    let fixture_pack = match parse_json_for_cli::<PilotingFixturePack, 2>(
+        &path,
+        &contents,
+        format,
+        ["piloting", "validate-fixtures"],
+        "CLI-PILOT-005",
+        "failed to parse piloting fixture pack JSON",
+    )? {
+        Some(data) => data,
+        None => return Ok(exit_invalid()),
+    };
+
+    let validation = validate_piloting_fixture_pack(&fixture_pack);
+    let diagnostics = validation
+        .issues
+        .iter()
+        .map(|issue| {
+            Diagnostic::error("CLI-PILOT-006", issue.clone())
+                .with_path(path.display().to_string())
+                .with_hint("fixture packs must stay replay-style and contracts-only")
+        })
+        .collect::<Vec<_>>();
+    let status = if diagnostics.is_empty() {
+        "ok"
+    } else {
+        "invalid"
+    };
+    let exit_code = if diagnostics.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+    let data = json!({
+        "path": path.display().to_string(),
+        "fixtureKind": "fixture-pack",
+        "valid": diagnostics.is_empty(),
+        "fixturePackId": fixture_pack.fixture_pack_id,
+        "adapterId": fixture_pack.adapter_id,
+        "actionCount": fixture_pack.allowed_actions.len(),
+        "observationCount": fixture_pack.observations.len(),
+        "policyDecisionCount": fixture_pack.policy_decisions.len(),
+        "simulationResultCount": fixture_pack.simulation_results.len(),
+        "replayCheckpointCount": fixture_pack.replay_checkpoints.len(),
+        "lifecycleEventCount": fixture_pack.lifecycle_events.len()
+    });
+
+    match format {
+        OutputFormat::Text => {
+            if diagnostics.is_empty() {
+                println!("piloting fixture pack is valid");
+                println!("path: {}", path.display());
+            } else {
+                print_diagnostics_text(&diagnostics);
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["piloting", "validate-fixtures"],
+            status,
+            summarize(&diagnostics),
+            data,
+            diagnostics,
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn execute_piloting_package_command(
+    target: PilotingPackageTarget,
+    path: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "package"])? else {
+        return Ok(exit_runtime());
+    };
+    let package = match parse_json_for_cli::<ElegyPluginPackage, 2>(
+        &path,
+        &contents,
+        format,
+        ["piloting", "package"],
+        "CLI-PILOT-007",
+        "failed to parse portable plugin package JSON",
+    )? {
+        Some(data) => data,
+        None => return Ok(exit_invalid()),
+    };
+
+    let package_validation = validate_elegy_plugin_package(&package);
+    let mut diagnostics = package_validation
+        .issues
+        .into_iter()
+        .map(|issue| {
+            Diagnostic::error("CLI-PILOT-008", issue)
+                .with_path(path.display().to_string())
+                .with_hint(
+                    "keep piloting packages inside the governed elegy-plugin-package/v2 contract",
+                )
+        })
+        .collect::<Vec<_>>();
+
+    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION {
+        diagnostics.push(
+            Diagnostic::error(
+                "CLI-PILOT-009",
+                format!(
+                    "piloting packaging requires schemaVersion '{}'",
+                    ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION
+                ),
+            )
+            .with_path(path.display().to_string()),
+        );
+    }
+
+    let target_name = match target {
+        PilotingPackageTarget::Holon => "holon",
+    };
+
+    if target == PilotingPackageTarget::Holon {
+        let publishing = package.publishing.as_ref();
+        if publishing.is_none() {
+            diagnostics.push(
+                Diagnostic::error(
+                    "CLI-PILOT-015",
+                    "Holon packaging requires publishing metadata on elegy-plugin-package/v2.",
+                )
+                .with_path(path.display().to_string()),
+            );
+        }
+        if publishing.and_then(|publishing| publishing.marketplace_target.as_deref())
+            != Some("holon")
+        {
+            diagnostics.push(
+                Diagnostic::error(
+                    "CLI-PILOT-016",
+                    "Holon packaging requires publishing.marketplaceTarget to be 'holon'.",
+                )
+                .with_path(path.display().to_string()),
+            );
+        }
+        if publishing.and_then(|publishing| publishing.import_mode.as_deref()) != Some("package") {
+            diagnostics.push(
+                Diagnostic::error(
+                    "CLI-PILOT-017",
+                    "Holon packaging requires publishing.importMode to be 'package'.",
+                )
+                .with_path(path.display().to_string()),
+            );
+        }
+
+        for issue in validate_piloting_package_file(&path, &package).issues {
+            diagnostics.push(
+                Diagnostic::error("CLI-PILOT-010", issue).with_path(path.display().to_string()),
+            );
+        }
+    }
+
+    let status = if diagnostics.is_empty() {
+        "ok"
+    } else {
+        "invalid"
+    };
+    let exit_code = if diagnostics.is_empty() {
+        ExitCode::SUCCESS
+    } else {
+        exit_invalid()
+    };
+    let data = json!({
+        "path": path.display().to_string(),
+        "target": target_name,
+        "valid": diagnostics.is_empty(),
+        "schemaVersion": package.schema_version,
+        "packageId": package.identity.package_id,
+        "pilotingAdapterCount": package.components.piloting_adapters.len(),
+        "fixturePackCount": package.components.fixture_packs.len(),
+        "publishing": package.publishing.as_ref().map(|publishing| json!({
+            "marketplaceTarget": publishing.marketplace_target,
+            "importMode": publishing.import_mode,
+            "sourceRepository": publishing.source_repository,
+            "sourceRef": publishing.source_ref,
+            "sourceCommit": publishing.source_commit
+        }))
+    });
+
+    match format {
+        OutputFormat::Text => {
+            if diagnostics.is_empty() {
+                println!("piloting package is valid for {}", target_name);
+                println!("path: {}", path.display());
+                println!("package: {}", package.identity.package_id);
+            } else {
+                print_diagnostics_text(&diagnostics);
+            }
+        }
+        OutputFormat::Json => print_json(&build_envelope(
+            ["piloting", "package"],
+            status,
+            summarize(&diagnostics),
+            data,
+            diagnostics,
+        ))?,
+    }
+
+    Ok(exit_code)
+}
+
+fn read_json_file_for_cli<const N: usize>(
+    path: &Path,
+    format: OutputFormat,
+    command: [&str; N],
+) -> Result<Option<String>, serde_json::Error> {
+    match fs::read_to_string(path) {
+        Ok(contents) => Ok(Some(contents)),
+        Err(error) => {
+            emit_diagnostics(
+                format,
+                command.to_vec(),
+                vec![Diagnostic::error(
+                    "CLI-PILOT-001",
+                    format!("failed to read {}: {error}", path.display()),
+                )
+                .with_path(path.display().to_string())],
+                json!({}),
+                "error",
+                exit_runtime(),
+            )?;
+            Ok(None)
+        }
+    }
+}
+
+fn parse_json_for_cli<T, const N: usize>(
+    path: &Path,
+    contents: &str,
+    format: OutputFormat,
+    command: [&str; N],
+    code: &str,
+    message: &str,
+) -> Result<Option<T>, serde_json::Error>
+where
+    T: DeserializeOwned,
+{
+    match serde_json::from_str::<T>(contents) {
+        Ok(value) => Ok(Some(value)),
+        Err(error) => {
+            emit_diagnostics(
+                format,
+                command.to_vec(),
+                vec![
+                    Diagnostic::error(code, format!("{message} {}: {error}", path.display()))
+                        .with_path(path.display().to_string()),
+                ],
+                json!({}),
+                "invalid",
+                exit_invalid(),
+            )?;
+            Ok(None)
+        }
     }
 }
 
@@ -3717,9 +4148,9 @@ impl From<CliTransport> for McpTransportKind {
     }
 }
 
-fn load_agent_profile_selection(
+fn load_agent_profile_selection_with_registry(
     profile_path: Option<&Path>,
-) -> Result<AgentProfileSelection, Vec<Diagnostic>> {
+) -> Result<LoadedAgentProfileSelection, Vec<Diagnostic>> {
     let profile = match profile_path {
         Some(path) => {
             let contents = fs::read_to_string(path).map_err(|source| {
@@ -3730,15 +4161,13 @@ fn load_agent_profile_selection(
                 .with_path(path.display().to_string())]
             })?;
             Some(
-                serde_json::from_str::<RegistryAgentCapabilityProfile>(&contents).map_err(
-                    |source| {
-                        vec![Diagnostic::error(
-                            "CLI-AGENT-002",
-                            format!("invalid agent capability profile JSON: {source}"),
-                        )
-                        .with_path(path.display().to_string())]
-                    },
-                )?,
+                serde_json::from_str::<AgentCapabilityProfile>(&contents).map_err(|source| {
+                    vec![Diagnostic::error(
+                        "CLI-AGENT-002",
+                        format!("invalid agent capability profile JSON: {source}"),
+                    )
+                    .with_path(path.display().to_string())]
+                })?,
             )
         }
         None => None,
@@ -3758,21 +4187,17 @@ fn load_agent_profile_selection(
         .map(registry_issue_to_diagnostic)
         .collect::<Vec<_>>();
 
-    Ok(AgentProfileSelection {
-        profile_path: profile_path.map(Path::to_path_buf),
-        profile: profile.map(|profile| AgentCapabilityProfile {
-            schema_version: profile.schema_version,
-            profile_id: profile.profile_id,
-            include_skills: profile.include_skills,
-            include_capabilities: profile.include_capabilities,
-            exclude_capabilities: profile.exclude_capabilities,
-            always_include_router: profile.always_include_router,
-        }),
-        selected_skill_ids: selection.selected_skill_ids,
-        selected_capability_ids: selection.selected_capability_ids,
-        total_skill_count: selection.total_skill_count,
-        total_capability_count: selection.total_capability_count,
-        diagnostics,
+    Ok(LoadedAgentProfileSelection {
+        registry,
+        selection: AgentProfileSelection {
+            profile_path: profile_path.map(Path::to_path_buf),
+            profile,
+            selected_skill_ids: selection.selected_skill_ids,
+            selected_capability_ids: selection.selected_capability_ids,
+            total_skill_count: selection.total_skill_count,
+            total_capability_count: selection.total_capability_count,
+            diagnostics,
+        },
     })
 }
 
@@ -3791,8 +4216,11 @@ fn agent_profile_data(selection: &AgentProfileSelection) -> serde_json::Value {
     })
 }
 
-fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
-    filtered_agent_skill_entries(selection)
+fn agent_selected_skills_data_for_registry(
+    registry: &SkillRegistry,
+    selection: &AgentProfileSelection,
+) -> Vec<serde_json::Value> {
+    filtered_agent_skill_entries_for_registry(registry, selection)
         .into_iter()
         .map(|skill| {
             json!({
@@ -3806,9 +4234,12 @@ fn agent_selected_skills_data(selection: &AgentProfileSelection) -> Vec<serde_js
         .collect()
 }
 
-fn agent_selected_capabilities_data(selection: &AgentProfileSelection) -> Vec<serde_json::Value> {
+fn agent_selected_capabilities_data_for_registry(
+    registry: &SkillRegistry,
+    selection: &AgentProfileSelection,
+) -> Vec<serde_json::Value> {
     let mut capabilities = Vec::new();
-    for skill in filtered_agent_skill_entries(selection) {
+    for skill in filtered_agent_skill_entries_for_registry(registry, selection) {
         if let Some(caps) = skill.capabilities {
             for capability in caps {
                 capabilities.push(json!({
@@ -3823,59 +4254,35 @@ fn agent_selected_capabilities_data(selection: &AgentProfileSelection) -> Vec<se
     capabilities
 }
 
-fn agent_check_data(selection: &AgentProfileSelection) -> serde_json::Value {
+fn agent_check_data_for_registry(
+    registry: &SkillRegistry,
+    selection: &AgentProfileSelection,
+) -> serde_json::Value {
     json!({
         "valid": !selection.has_errors(),
         "integrationVersion": AGENT_INTEGRATION_VERSION,
         "profile": agent_profile_data(selection),
         "selected": {
-            "skills": agent_selected_skills_data(selection),
-            "capabilities": agent_selected_capabilities_data(selection)
+            "skills": agent_selected_skills_data_for_registry(registry, selection),
+            "capabilities": agent_selected_capabilities_data_for_registry(registry, selection)
         }
     })
 }
 
-fn filtered_agent_skill_entries(selection: &AgentProfileSelection) -> Vec<RegistrySkillEntry> {
-    let registry = match load_builtin_registry() {
-        Ok(registry) => registry,
-        Err(_) => return Vec::new(),
-    };
-    let profile = selection
-        .profile
-        .as_ref()
-        .map(|profile| RegistryAgentCapabilityProfile {
-            schema_version: profile.schema_version.clone(),
-            profile_id: profile.profile_id.clone(),
-            include_skills: profile.include_skills.clone(),
-            include_capabilities: profile.include_capabilities.clone(),
-            exclude_capabilities: profile.exclude_capabilities.clone(),
-            always_include_router: profile.always_include_router,
-        });
-    let selection = registry.profile_selection(profile.as_ref());
+fn filtered_agent_skill_entries_for_registry(
+    registry: &SkillRegistry,
+    selection: &AgentProfileSelection,
+) -> Vec<RegistrySkillEntry> {
+    let selection = registry.profile_selection(selection.profile.as_ref());
     registry.filtered_by_profile(&selection)
 }
 
-fn filtered_agent_skill_definitions(
+fn filtered_agent_skill_definitions_for_registry(
+    registry: &SkillRegistry,
     selection: &AgentProfileSelection,
 ) -> Vec<elegy_skills::SkillDefinitionV2> {
-    let registry = match load_builtin_registry() {
-        Ok(registry) => registry,
-        Err(_) => return Vec::new(),
-    };
-    let profile = selection
-        .profile
-        .as_ref()
-        .map(|profile| RegistryAgentCapabilityProfile {
-            schema_version: profile.schema_version.clone(),
-            profile_id: profile.profile_id.clone(),
-            include_skills: profile.include_skills.clone(),
-            include_capabilities: profile.include_capabilities.clone(),
-            exclude_capabilities: profile.exclude_capabilities.clone(),
-            always_include_router: profile.always_include_router,
-        });
-    let selection = registry.profile_selection(profile.as_ref());
     registry
-        .filtered_by_profile(&selection)
+        .filtered_by_profile(&registry.profile_selection(selection.profile.as_ref()))
         .into_iter()
         .filter_map(|skill| registry.skill_definition(&skill.summary.id))
         .map(|mut definition| {
@@ -3885,116 +4292,6 @@ fn filtered_agent_skill_definitions(
             definition
         })
         .collect()
-}
-
-fn local_match_result(
-    skill: &RegistrySkillEntry,
-    query_lower: &str,
-) -> elegy_skills::RegistrySearchMatch {
-    let mut score = 0.0;
-    let mut matched_capabilities = Vec::new();
-    let mut match_reasons = Vec::new();
-    let mut field_hits = 0u32;
-    let total_possible_fields = 5u32;
-
-    let id_lower = skill.summary.id.to_ascii_lowercase();
-    let name_lower = skill.summary.name.to_ascii_lowercase();
-    let desc_lower = skill.summary.description.to_ascii_lowercase();
-    let category_lower = skill.summary.category.to_ascii_lowercase();
-
-    if id_lower.contains(query_lower) {
-        score += 0.9;
-        match_reasons.push("skill-id".to_string());
-        field_hits += 1;
-    }
-    if name_lower.contains(query_lower) {
-        score += 0.9;
-        match_reasons.push("skill-name".to_string());
-        field_hits += 1;
-    }
-    if category_lower.contains(query_lower) {
-        score += 0.5;
-        if !match_reasons.iter().any(|reason| reason == "category") {
-            match_reasons.push("category".to_string());
-        }
-    }
-    if desc_lower.contains(query_lower) {
-        score += 0.5;
-        if !match_reasons.iter().any(|reason| reason == "description") {
-            match_reasons.push("description".to_string());
-        }
-    }
-
-    let mut keyword_phrase_hit = false;
-    for keyword in &skill.trigger_keywords {
-        if keyword.to_ascii_lowercase().contains(query_lower) {
-            score += 0.8;
-            keyword_phrase_hit = true;
-            if !match_reasons
-                .iter()
-                .any(|reason| reason == "discovery-keyword")
-            {
-                match_reasons.push("discovery-keyword".to_string());
-                field_hits += 1;
-            }
-            break;
-        }
-    }
-
-    if let Some(capabilities) = &skill.capabilities {
-        for capability in capabilities {
-            let capability_id = capability.id.to_ascii_lowercase();
-            let capability_name = capability.name.to_ascii_lowercase();
-            let capability_description = capability.description.to_ascii_lowercase();
-
-            let matched = capability_id.contains(query_lower)
-                || capability_name.contains(query_lower)
-                || capability_description.contains(query_lower);
-            if matched {
-                matched_capabilities.push(capability.id.clone());
-                score += if capability_id.contains(query_lower)
-                    || capability_name.contains(query_lower)
-                {
-                    1.0
-                } else {
-                    0.5
-                };
-                if !match_reasons.iter().any(|reason| reason == "capability") {
-                    match_reasons.push("capability".to_string());
-                    field_hits += 1;
-                }
-            }
-        }
-    }
-
-    let query_tokens = query_lower.split_whitespace().collect::<Vec<_>>();
-    if query_tokens.len() > 1 {
-        let mut token_hits = 0u32;
-        for token in &query_tokens {
-            if id_lower.contains(token) || name_lower.contains(token) {
-                token_hits += 1;
-            } else if keyword_phrase_hit {
-            } else if desc_lower.contains(token) || category_lower.contains(token) {
-                token_hits += 1;
-            }
-        }
-        score += (token_hits as f64 / query_tokens.len() as f64) * 0.3;
-    }
-
-    let normalized = if score > 0.0 {
-        let field_coverage = field_hits as f64 / total_possible_fields as f64;
-        let raw = (score / 3.0).min(1.0);
-        (raw * 0.7 + field_coverage * 0.3).min(1.0)
-    } else {
-        0.0
-    };
-
-    elegy_skills::RegistrySearchMatch {
-        matched: score > 0.0,
-        score: (normalized * 100.0).round() / 100.0,
-        matched_capabilities,
-        match_reasons,
-    }
 }
 
 fn registry_issue_to_diagnostic(issue: &elegy_skills::RegistryValidationIssue) -> Diagnostic {
@@ -4258,7 +4555,7 @@ fn execute_skills_capability_command(
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
     let registry = load_builtin_registry()?;
-    let Some(capability) = registry.capability(&capability_id) else {
+    let Some(capability_definition) = registry.capability_definition(&capability_id) else {
         return emit_diagnostics(
             format,
             vec!["skills", "capability"],
@@ -4273,12 +4570,12 @@ fn execute_skills_capability_command(
     };
 
     match format {
-        OutputFormat::Text => print_capability_card_text(&capability),
+        OutputFormat::Text => print_capability_definition_text(&capability_definition),
         OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["skills", "capability"],
             "ok",
             Summary::default(),
-            &capability,
+            &capability_definition,
             Vec::new(),
             Some("elegy://schemas/capability-definition"),
         ))?,
@@ -4318,6 +4615,24 @@ fn execute_skills_validate_command(
     } else {
         exit_invalid()
     };
+    let diagnostics = if report.valid {
+        Vec::new()
+    } else {
+        report
+            .issues
+            .iter()
+            .map(|issue| {
+                let mut diagnostic = Diagnostic::error("CLI-SKILLS-004", issue.message.clone());
+                if let Some(path) = &issue.path {
+                    diagnostic = diagnostic.with_path(path.clone());
+                }
+                if let Some(skill_id) = &issue.skill_id {
+                    diagnostic = diagnostic.with_field(skill_id.clone());
+                }
+                diagnostic
+            })
+            .collect::<Vec<_>>()
+    };
 
     match format {
         OutputFormat::Text => {
@@ -4333,9 +4648,9 @@ fn execute_skills_validate_command(
         OutputFormat::Json => print_json(&build_envelope_with_schema(
             ["skills", "validate"],
             status,
-            Summary::default(),
+            summarize(&diagnostics),
             report,
-            Vec::new(),
+            diagnostics,
             Some("elegy://schemas/skill-discovery-result"),
         ))?,
     }
@@ -4450,23 +4765,26 @@ fn print_skill_resolve_text(
     }
 }
 
-fn print_capability_card_text(capability: &RegistryCapabilityCard) {
+fn print_capability_definition_text(capability: &CapabilityDefinition) {
     println!(
         "Capability: {} ({})",
-        capability.capability_name, capability.capability_id
+        capability.display_name, capability.id
     );
-    println!("Skill: {} ({})", capability.skill_name, capability.skill_id);
-    println!("Side effects: {}", capability.has_side_effects);
-    println!("Deterministic: {}", capability.is_deterministic);
-    println!("Approval: {}", capability.approval_requirement);
+    if let Some(description) = &capability.description {
+        println!("Description: {description}");
+    }
+    println!("Family: {:?}", capability.family);
+    println!("Side effects: {:?}", capability.execution.side_effect_class);
+    println!("Auth: {:?}", capability.execution.auth_mode);
+    println!("Approval: {:?}", capability.governance.approval_requirement);
 }
 
 fn execute_agent_manifest_command(
     profile: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let selection = match load_agent_profile_selection(profile.as_deref()) {
-        Ok(selection) => selection,
+    let loaded = match load_agent_profile_selection_with_registry(profile.as_deref()) {
+        Ok(loaded) => loaded,
         Err(diagnostics) => {
             return emit_diagnostics(
                 format,
@@ -4478,12 +4796,13 @@ fn execute_agent_manifest_command(
             );
         }
     };
+    let selection = loaded.selection;
     if selection.has_errors() {
         return emit_diagnostics(
             format,
             vec!["agent", "manifest"],
             selection.error_diagnostics(),
-            agent_check_data(&selection),
+            agent_check_data_for_registry(&loaded.registry, &selection),
             "invalid",
             exit_invalid(),
         );
@@ -4519,8 +4838,8 @@ fn execute_agent_manifest_command(
             "role": "optional projection for MCP-native clients"
         },
         "selected": {
-            "skills": agent_selected_skills_data(&selection),
-            "capabilities": agent_selected_capabilities_data(&selection)
+            "skills": agent_selected_skills_data_for_registry(&loaded.registry, &selection),
+            "capabilities": agent_selected_capabilities_data_for_registry(&loaded.registry, &selection)
         }
     });
 
@@ -4552,8 +4871,8 @@ fn execute_agent_check_command(
     profile: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let selection = match load_agent_profile_selection(profile.as_deref()) {
-        Ok(selection) => selection,
+    let loaded = match load_agent_profile_selection_with_registry(profile.as_deref()) {
+        Ok(loaded) => loaded,
         Err(diagnostics) => {
             return emit_diagnostics(
                 format,
@@ -4565,6 +4884,7 @@ fn execute_agent_check_command(
             );
         }
     };
+    let selection = loaded.selection;
     let status = if selection.has_errors() {
         "invalid"
     } else {
@@ -4588,7 +4908,7 @@ fn execute_agent_check_command(
             ["agent", "check"],
             status,
             summarize(&selection.diagnostics),
-            agent_check_data(&selection),
+            agent_check_data_for_registry(&loaded.registry, &selection),
             selection.diagnostics,
             Some("elegy://schemas/agent-check"),
         ))?,
@@ -4603,8 +4923,8 @@ fn execute_agent_discover_command(
     profile: Option<PathBuf>,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
-    let selection = match load_agent_profile_selection(profile.as_deref()) {
-        Ok(selection) => selection,
+    let loaded = match load_agent_profile_selection_with_registry(profile.as_deref()) {
+        Ok(loaded) => loaded,
         Err(diagnostics) => {
             return emit_diagnostics(
                 format,
@@ -4616,86 +4936,47 @@ fn execute_agent_discover_command(
             );
         }
     };
+    let selection = loaded.selection;
     if selection.has_errors() {
         return emit_diagnostics(
             format,
             vec!["agent", "discover"],
             selection.error_diagnostics(),
-            agent_check_data(&selection),
+            agent_check_data_for_registry(&loaded.registry, &selection),
             "invalid",
             exit_invalid(),
         );
     }
 
-    let filtered_skills = filtered_agent_skill_entries(&selection);
-    let filtered_definitions = filtered_agent_skill_definitions(&selection);
-    let entries = if let Some(query) = &query {
-        let query_lower = query.to_ascii_lowercase();
-        let mut ranked = filtered_skills
-            .into_iter()
-            .filter_map(|mut skill| {
-                let match_result = local_match_result(&skill, &query_lower);
-                if match_result.matched {
-                    let definition = filtered_definitions
-                        .iter()
-                        .find(|definition| definition.identity.name == skill.summary.id);
-                    skill.match_result = Some(match_result.clone());
-                    Some(if detail {
-                        definition
-                            .map(|definition| {
-                                agent_discovery_detail_entry_from_definition(
-                                    definition,
-                                    profile.as_deref(),
-                                    Some(&match_result),
-                                )
-                            })
-                            .unwrap_or_else(|| {
-                                agent_discovery_entry(&skill, detail, profile.as_deref())
-                            })
-                    } else {
-                        agent_discovery_entry(&skill, detail, profile.as_deref())
-                    })
-                } else {
-                    None
-                }
-            })
-            .collect::<Vec<_>>();
-        ranked.sort_by(|a, b| {
-            let a_score = a
-                .get("matchScore")
-                .and_then(|value| value.as_f64())
-                .unwrap_or(0.0);
-            let b_score = b
-                .get("matchScore")
-                .and_then(|value| value.as_f64())
-                .unwrap_or(0.0);
-            b_score
-                .partial_cmp(&a_score)
-                .unwrap_or(std::cmp::Ordering::Equal)
-        });
-        ranked
-    } else {
-        filtered_skills
-            .iter()
-            .map(|skill| {
-                if detail {
-                    filtered_definitions
-                        .iter()
-                        .find(|definition| definition.identity.name == skill.summary.id)
-                        .map(|definition| {
-                            agent_discovery_detail_entry_from_definition(
-                                definition,
-                                profile.as_deref(),
-                                skill.match_result.as_ref(),
-                            )
-                        })
-                        .unwrap_or_else(|| agent_discovery_entry(skill, detail, profile.as_deref()))
-                } else {
-                    agent_discovery_entry(skill, detail, profile.as_deref())
-                }
-            })
-            .collect::<Vec<_>>()
+    let registry = &loaded.registry;
+    let filtered_skills = filtered_agent_skill_entries_for_registry(registry, &selection);
+    let filtered_definitions = detail
+        .then(|| filtered_agent_skill_definitions_for_registry(registry, &selection))
+        .unwrap_or_default();
+    let discovered_skills = match &query {
+        Some(query) => registry.search_filtered(&filtered_skills, query, detail),
+        None => filtered_skills,
     };
+    let entries = discovered_skills
+        .iter()
+        .map(|skill| {
+            if detail {
+                filtered_definitions
+                    .iter()
+                    .find(|definition| definition.identity.name == skill.summary.id)
+                    .map(|definition| {
+                        agent_discovery_detail_entry_from_definition(
+                            definition,
+                            profile.as_deref(),
+                            skill.match_result.as_ref(),
+                        )
+                    })
+                    .unwrap_or_else(|| agent_discovery_entry(skill, detail, profile.as_deref()))
+            } else {
+                agent_discovery_entry(skill, detail, profile.as_deref())
+            }
+        })
+        .collect::<Vec<_>>();
 
     let diagnostics = selection.diagnostics.clone();
     let total_results = entries.len();

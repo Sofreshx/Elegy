@@ -1,12 +1,12 @@
 {
   "matrixVersion": "1.0.0",
-  "generatedAtUtc": "2026-03-23T00:00:00Z",
+  "generatedAtUtc": "2026-05-28T00:00:00Z",
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.6.0 <2.0.0",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -33,7 +33,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.6.0 <2.0.0",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -58,7 +58,7 @@
       "name": "elegy-planning-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.6.0",
+      "targetUpstreamPackageVersion": "1.8.0",
       "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
       "wrapperSurface": {
         "root": "src/Elegy-planning",
@@ -84,7 +84,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.6.0 <2.0.0",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
       "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -109,7 +109,7 @@
       "name": "elegy-configuration-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersionRange": ">=1.6.0 <2.0.0",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
       "scope": "Deterministic materialization and verification of agentic configuration templates, profiles, and receipts for harness, repo, and workspace targets.",
       "wrapperSurface": {
         "root": "src/Elegy-configuration",
@@ -125,17 +125,50 @@
         "rust/crates/elegy-configuration deterministic materialization behavior",
         "downstream hosts own release download, auth, trust, approvals, and runtime registration"
       ]
+    },
+    {
+      "name": "elegy-documentation-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
+      "scope": "Dedicated authority-aware documentation inspection, mapping, objective validation, and non-authoritative export commands over repo-local docs roots.",
+      "wrapperSurface": {
+        "root": "src/Elegy-documentation",
+        "entrypoint": "src/Elegy-documentation/wrapper-entrypoint.json",
+        "installer": "src/Elegy-documentation/install.ps1",
+        "skillBridge": "src/Elegy-documentation/skills/elegy-documentation/SKILL.md",
+        "releaseAssetPrefix": "elegy-documentation-wrapper",
+        "archivePattern": "elegy-documentation-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-documentation/, and the wrapper surface under wrappers/elegy-documentation/."
+      },
+      "authorityReservations": [
+        "contracts documentation config and result schema authority",
+        "rust/crates/elegy-documentation deterministic docs inspection behavior",
+        "source documents remain authoritative over derived llms and bundle exports"
+      ]
+    },
+    {
+      "name": "elegy-piloting-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
+      "scope": "Contracts-first targeted piloting foundation with typed policy, simulation, and replay validation plus Holon-compatible package metadata only.",
+      "authorityReservations": [
+        "contracts piloting schema and fixture authority",
+        "portable package metadata authority for Holon-compatible targeted plugins",
+        "downstream hosts own marketplace trust, approvals, leases, bridge sessions, execution, and evidence"
+      ]
     }
   ],
   "entries": [
     {
       "holonVersionRange": ">=0.1.0 <0.2.0",
       "instructionEngineVersionRange": ">=0.1.0 <0.2.0",
-      "elegyPackageVersionRange": ">=1.6.0 <2.0.0",
-      "elegySchemaVersionRange": ">=1.3.0 <2.0.0",
+      "elegyPackageVersionRange": ">=1.8.0 <2.0.0",
+      "elegySchemaVersionRange": ">=1.5.0 <2.0.0",
       "policySchemaVersionRange": null,
       "supportLevel": "supported",
-      "notes": "Publishes bundle 1.6.0 as an additive update on the existing 1.x line: prior agent, capability, skill, MCP, invocation, observation, and memory contract families remain backward compatible, and the new elegy-configuration template/profile/receipt families plus local elegy-plugin-package/v2-backed configuration loading add governed deterministic agentic configuration materialization and verification without moving host runtime registration, release download, auth, approval, or trust authority into Elegy."
+      "notes": "Publishes bundle 1.8.0 as an additive update on the existing 1.x line: prior agent, capability, skill, MCP, invocation, observation, memory, planning, configuration, and initial piloting families remain backward compatible, while the new piloting policy-decision, simulation-result, replay-checkpoint, and lifecycle-event contracts extend targeted plugin validation without moving runtime authority, marketplace trust, approvals, leases, bridge sessions, live actuation, or evidence ownership into Elegy."
     }
   ]
 }

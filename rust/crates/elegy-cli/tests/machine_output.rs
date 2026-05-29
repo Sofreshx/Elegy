@@ -54,3 +54,26 @@ fn blank_correlation_id_argument_is_treated_as_absent() {
         "unexpected generated correlation id: {correlation_id}"
     );
 }
+
+#[test]
+fn version_json_reports_piloting_and_configuration_commands() {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args(["--version", "--json"])
+        .output()
+        .expect("run elegy version in json mode");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid machine json");
+    let commands = envelope["data"]["availableCommands"]
+        .as_array()
+        .expect("availableCommands should be an array");
+
+    assert!(commands.iter().any(|value| value == "piloting"));
+    assert!(commands.iter().any(|value| value == "configuration"));
+}

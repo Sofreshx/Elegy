@@ -77,6 +77,7 @@ Every successful write appends an event to `planning_events`.
 Event metadata currently includes:
 
 - `event_id`
+- `scope_key`
 - `entity_type`
 - `entity_id`
 - `aggregate_type`
@@ -90,6 +91,8 @@ Event metadata currently includes:
 - `payload_json`
 
 Current-state tables provide fast reads for CLI and projections.
+
+Flat event listing is scope-filtered by the active scope while still using append order within that filtered view.
 
 This is a pragmatic MVP version of event-sourced authority: append event, update projection table, validate current state, store findings.
 

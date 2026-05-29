@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.6.0"
+    "version": "1.8.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.6.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -36,7 +36,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.6.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -61,7 +61,7 @@
       "name": "elegy-planning-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.6.0",
+      "targetUpstreamPackageVersion": "1.8.0",
       "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
       "wrapperSurface": {
         "root": "src/Elegy-planning",
@@ -87,7 +87,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.6.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -112,7 +112,7 @@
       "name": "elegy-configuration-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.6.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Deterministic materialization and verification of agentic configuration templates, profiles, and receipts for harness, repo, and workspace targets.",
       "wrapperSurface": {
         "root": "src/Elegy-configuration",
@@ -127,6 +127,39 @@
         "contracts configuration template/profile/receipt authority",
         "rust/crates/elegy-configuration deterministic materialization behavior",
         "downstream hosts own release download, auth, trust, approvals, and runtime registration"
+      ]
+    },
+    {
+      "name": "elegy-documentation-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Dedicated authority-aware documentation inspection, mapping, objective validation, and non-authoritative export commands over repo-local docs roots.",
+      "wrapperSurface": {
+        "root": "src/Elegy-documentation",
+        "entrypoint": "src/Elegy-documentation/wrapper-entrypoint.json",
+        "installer": "src/Elegy-documentation/install.ps1",
+        "skillBridge": "src/Elegy-documentation/skills/elegy-documentation/SKILL.md",
+        "releaseAssetPrefix": "elegy-documentation-wrapper",
+        "archivePattern": "elegy-documentation-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-documentation/, and the wrapper surface under wrappers/elegy-documentation/."
+      },
+      "authorityReservations": [
+        "contracts documentation config and result schema authority",
+        "rust/crates/elegy-documentation deterministic docs inspection behavior",
+        "source documents remain authoritative over derived llms and bundle exports"
+      ]
+    },
+    {
+      "name": "elegy-piloting-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Contracts-first targeted piloting foundation for portable observation, action, readiness, adapter, fixture, policy, simulation, replay, and Holon-compatible package metadata only.",
+      "authorityReservations": [
+        "contracts piloting schema and fixture authority",
+        "portable package metadata authority for Holon-compatible targeted plugins",
+        "downstream hosts own marketplace trust, approvals, leases, bridge sessions, live execution, and evidence"
       ]
     }
   ],
@@ -318,6 +351,7 @@
         "fixtures/skill-definition-v2.elegy-data.json",
         "fixtures/skill-definition-v2.elegy-desktop.json",
         "fixtures/skill-definition-v2.elegy-diagram.json",
+        "fixtures/skill-definition-v2.elegy-documentation.json",
         "fixtures/skill-definition-v2.elegy-memory.json",
         "fixtures/skill-definition-v2.elegy-mcp.json",
         "fixtures/skill-definition-v2.elegy-mermaid.json",
@@ -345,7 +379,104 @@
       "file": "elegy-plugin-package-v2.schema.json",
       "fixtures": [
         "fixtures/elegy-plugin-package-v2.minimal.json",
-        "fixtures/elegy-plugin-package-v2.demo-config.json"
+        "fixtures/elegy-plugin-package-v2.demo-config.json",
+        "fixtures/elegy-plugin-package-v2.piloting-blender.json"
+      ]
+    },
+    {
+      "name": "piloting-target-descriptor",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-target-descriptor.schema.json",
+      "fixtures": [
+        "fixtures/piloting-target-descriptor.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-surface-descriptor",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-surface-descriptor.schema.json",
+      "fixtures": [
+        "fixtures/piloting-surface-descriptor.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-observation-frame",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-observation-frame.schema.json",
+      "fixtures": [
+        "fixtures/piloting-observation-frame.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-action-intent",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-action-intent.schema.json",
+      "fixtures": [
+        "fixtures/piloting-action-intent.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-action-result",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-action-result.schema.json",
+      "fixtures": [
+        "fixtures/piloting-action-result.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-readiness-report",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-readiness-report.schema.json",
+      "fixtures": [
+        "fixtures/piloting-readiness-report.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-adapter-manifest",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-adapter-manifest.schema.json",
+      "fixtures": [
+        "fixtures/piloting-adapter-manifest.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-fixture-pack",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-fixture-pack.schema.json",
+      "fixtures": [
+        "fixtures/piloting-fixture-pack.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-policy-decision",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-policy-decision.schema.json",
+      "fixtures": [
+        "fixtures/piloting-fixture-pack.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-simulation-result",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-simulation-result.schema.json",
+      "fixtures": [
+        "fixtures/piloting-fixture-pack.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-replay-checkpoint",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-replay-checkpoint.schema.json",
+      "fixtures": [
+        "fixtures/piloting-fixture-pack.minimal.json"
+      ]
+    },
+    {
+      "name": "piloting-lifecycle-event",
+      "schemaVersion": "1.0.0",
+      "file": "piloting-lifecycle-event.schema.json",
+      "fixtures": [
+        "fixtures/piloting-fixture-pack.minimal.json"
       ]
     },
     {
@@ -371,6 +502,7 @@
       "fixtures": [
         "fixtures/skill-discovery-index.minimal.json",
         "fixtures/skill-discovery-index.elegy-memory.json",
+        "fixtures/skill-discovery-index.elegy-documentation.json",
         "fixtures/skill-discovery-index.elegy-mcp.json",
         "fixtures/skill-discovery-index.elegy-planning.json",
         "fixtures/skill-discovery-index.elegy-skills.json",
@@ -561,6 +693,38 @@
       "name": "notify-result",
       "schemaVersion": "1.0.0",
       "file": "notify-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "elegy-documentation-v2",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-documentation-v2.schema.json",
+      "fixtures": [
+        "fixtures/elegy-documentation-v2.minimal.json"
+      ]
+    },
+    {
+      "name": "documentation-init-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-init-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-map-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-map-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-check-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-check-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-export-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-export-result.schema.json",
       "fixtures": []
     },
     {

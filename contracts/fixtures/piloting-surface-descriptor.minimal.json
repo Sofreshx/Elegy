@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "elegy-piloting-surface-descriptor/v1",
+  "surfaceId": "blender.desktop.main-window",
+  "targetId": "blender.desktop",
+  "surfaceKind": "desktop",
+  "stability": "stable",
+  "selectors": [
+    {
+      "strategy": "windowTitle",
+      "value": "Blender"
+    }
+  ],
+  "semanticAnchors": ["primary workspace", "top menu bar"]
+}

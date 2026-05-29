@@ -669,6 +669,642 @@ fn configuration_verify_command_supports_package_profiles() {
 }
 
 #[test]
+fn piloting_validate_adapter_accepts_valid_targeted_adapter_package() {
+    let package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package --target holon");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["piloting", "package"]));
+    assert_eq!(body["data"]["target"], "holon");
+    assert_eq!(body["data"]["packageId"], "elegy.blender-piloting");
+}
+
+#[test]
+fn piloting_validate_adapter_rejects_missing_target_identity() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-missing-target");
+    let input_path = temp_dir.join("adapter.json");
+
+    fs::write(
+        &input_path,
+        r#"{
+  "schemaVersion": "elegy-piloting-adapter-manifest/v1",
+  "adapterId": "broken.piloting",
+  "displayName": "Broken Piloting Adapter",
+  "version": "0.1.0",
+  "mode": "contracts_only",
+  "supportedSoftware": [
+    {
+      "schemaVersion": "elegy-piloting-target-descriptor/v1",
+      "targetId": "",
+      "productName": "Broken",
+      "versionRange": ">=1.0 <2.0",
+      "platforms": ["windows"],
+      "launchHints": { "executables": ["broken.exe"], "arguments": [], "urls": [] },
+      "attachHints": { "processNames": ["broken.exe"], "windowTitles": [], "surfaceUrls": [] }
+    }
+  ],
+  "supportedSurfaces": [
+    {
+      "schemaVersion": "elegy-piloting-surface-descriptor/v1",
+      "surfaceId": "broken.main",
+      "targetId": "broken.desktop",
+      "surfaceKind": "desktop",
+      "stability": "stable",
+      "selectors": [{ "strategy": "windowTitle", "value": "Broken" }],
+      "semanticAnchors": []
+    }
+  ],
+  "contracts": {
+    "targetDescriptorSchemaRef": "contracts/schemas/piloting-target-descriptor.schema.json",
+    "surfaceDescriptorSchemaRef": "contracts/schemas/piloting-surface-descriptor.schema.json",
+    "observationFrameSchemaRef": "contracts/schemas/piloting-observation-frame.schema.json",
+    "actionIntentSchemaRef": "contracts/schemas/piloting-action-intent.schema.json",
+    "actionResultSchemaRef": "contracts/schemas/piloting-action-result.schema.json",
+    "readinessReportSchemaRef": "contracts/schemas/piloting-readiness-report.schema.json",
+    "fixturePackSchemaRef": "contracts/schemas/piloting-fixture-pack.schema.json",
+    "policyDecisionSchemaRef": "contracts/schemas/piloting-policy-decision.schema.json",
+    "simulationResultSchemaRef": "contracts/schemas/piloting-simulation-result.schema.json",
+    "replayCheckpointSchemaRef": "contracts/schemas/piloting-replay-checkpoint.schema.json",
+    "lifecycleEventSchemaRef": "contracts/schemas/piloting-lifecycle-event.schema.json"
+  },
+  "fixtures": [{ "fixturePackId": "broken.fixtures", "path": "fixtures/broken.json" }],
+  "permissions": {
+    "sideEffectClasses": ["desktop_ui"],
+    "requiresHostApproval": true
+  }
+}"#,
+    )
+    .expect("write invalid adapter fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "validate-adapter",
+            input_path.to_str().expect("utf-8 input path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting validate-adapter invalid target");
+
+    assert_eq!(output.status.code(), Some(1));
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "invalid");
+    assert!(body["diagnostics"]
+        .as_array()
+        .expect("diagnostics array")
+        .iter()
+        .any(|entry| entry["code"] == "CLI-PILOT-003"));
+    assert!(String::from_utf8_lossy(&output.stdout).contains("targetId must not be empty"));
+}
+
+#[test]
+fn piloting_package_rejects_undeclared_side_effects() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-side-effects");
+    let input_path = temp_dir.join("package.json");
+    let valid_package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json");
+
+    let mut package: Value = serde_json::from_str(
+        &fs::read_to_string(valid_package_path).expect("read valid piloting package"),
+    )
+    .expect("parse valid piloting package");
+    package["components"]["fixturePacks"][0]["fixturePack"]["allowedActions"][0]
+        ["sideEffectClass"] = json!("process_spawn");
+
+    fs::write(
+        &input_path,
+        serde_json::to_string_pretty(&package).expect("serialize broken package"),
+    )
+    .expect("write broken package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            input_path.to_str().expect("utf-8 input path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package undeclared side effects");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("undeclared sideEffectClass 'process_spawn'"));
+}
+
+#[test]
+fn piloting_package_rejects_live_actuation_fields_in_contracts_only_package() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-live-fields");
+    let input_path = temp_dir.join("package.json");
+
+    fs::write(
+        &input_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.bad-piloting",
+    "name": "bad-piloting",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "description": "Broken piloting package",
+    "license": "Apache-2.0"
+  },
+  "components": {
+    "pilotingAdapters": [
+      {
+        "id": "bad-adapter",
+        "manifest": {
+          "schemaVersion": "elegy-piloting-adapter-manifest/v1",
+          "adapterId": "bad.piloting",
+          "displayName": "Bad Piloting Adapter",
+          "version": "0.1.0",
+          "mode": "live_runtime",
+          "supportedSoftware": [
+            {
+              "schemaVersion": "elegy-piloting-target-descriptor/v1",
+              "targetId": "bad.desktop",
+              "productName": "Bad",
+              "versionRange": ">=1.0 <2.0",
+              "platforms": ["windows"],
+              "launchHints": { "executables": ["bad.exe"], "arguments": [], "urls": [] },
+              "attachHints": { "processNames": ["bad.exe"], "windowTitles": ["Bad"], "surfaceUrls": [] }
+            }
+          ],
+          "supportedSurfaces": [
+            {
+              "schemaVersion": "elegy-piloting-surface-descriptor/v1",
+              "surfaceId": "bad.desktop.main-window",
+              "targetId": "bad.desktop",
+              "surfaceKind": "desktop",
+              "stability": "stable",
+              "selectors": [{ "strategy": "windowTitle", "value": "Bad" }],
+              "semanticAnchors": []
+            }
+          ],
+          "contracts": {
+            "targetDescriptorSchemaRef": "contracts/schemas/piloting-target-descriptor.schema.json",
+            "surfaceDescriptorSchemaRef": "contracts/schemas/piloting-surface-descriptor.schema.json",
+            "observationFrameSchemaRef": "contracts/schemas/piloting-observation-frame.schema.json",
+            "actionIntentSchemaRef": "contracts/schemas/piloting-action-intent.schema.json",
+            "actionResultSchemaRef": "contracts/schemas/piloting-action-result.schema.json",
+            "readinessReportSchemaRef": "contracts/schemas/piloting-readiness-report.schema.json",
+            "fixturePackSchemaRef": "contracts/schemas/piloting-fixture-pack.schema.json",
+            "policyDecisionSchemaRef": "contracts/schemas/piloting-policy-decision.schema.json",
+            "simulationResultSchemaRef": "contracts/schemas/piloting-simulation-result.schema.json",
+            "replayCheckpointSchemaRef": "contracts/schemas/piloting-replay-checkpoint.schema.json",
+            "lifecycleEventSchemaRef": "contracts/schemas/piloting-lifecycle-event.schema.json"
+          },
+          "fixtures": [{ "fixturePackId": "bad.fixtures", "path": "fixtures/bad.json" }],
+          "permissions": {
+            "sideEffectClasses": ["desktop_ui"],
+            "requiresHostApproval": true
+          }
+        }
+      }
+    ],
+    "fixturePacks": [
+      {
+        "id": "bad-fixtures",
+        "fixturePack": {
+          "schemaVersion": "elegy-piloting-fixture-pack/v1",
+          "fixturePackId": "bad.fixtures",
+          "adapterId": "bad.piloting",
+          "targetId": "bad.desktop",
+          "recordedAtUtc": "2026-05-28T10:05:00Z",
+          "observations": [
+            {
+              "schemaVersion": "elegy-piloting-observation-frame/v1",
+              "frameId": "obs.bad.1",
+              "targetId": "bad.desktop",
+              "surfaceId": "bad.desktop.main-window",
+              "observedAtUtc": "2026-05-28T10:00:00Z",
+              "redactionClass": "internal",
+              "source": "fixture",
+              "confidence": 1,
+              "state": {},
+              "evidenceRefs": []
+            }
+          ],
+          "allowedActions": [
+            {
+              "schemaVersion": "elegy-piloting-action-intent/v1",
+              "actionId": "click-anything",
+              "targetId": "bad.desktop",
+              "surfaceId": "bad.desktop.main-window",
+              "operation": "click",
+              "inputSchema": { "type": "object" },
+              "sideEffectClass": "desktop_ui",
+              "requiredConfirmation": "explicit"
+            }
+          ],
+          "expectedResultChecks": [
+            {
+              "actionId": "click-anything",
+              "expectedStatus": "succeeded",
+              "checks": ["state changes"],
+              "evidenceRefs": []
+            }
+          ],
+          "policyDecisions": [
+            {
+              "schemaVersion": "elegy-piloting-policy-decision/v1",
+              "decisionId": "policy.click-anything.1",
+              "actionId": "click-anything",
+              "targetId": "bad.desktop",
+              "decision": "simulate",
+              "sideEffectClass": "desktop_ui",
+              "evaluatedAtUtc": "2026-05-28T10:01:00Z",
+              "approvalRequirement": "explicit",
+              "reasons": ["dry-run first"]
+            }
+          ],
+          "simulationResults": [
+            {
+              "schemaVersion": "elegy-piloting-simulation-result/v1",
+              "simulationId": "sim.click-anything.1",
+              "actionId": "click-anything",
+              "targetId": "bad.desktop",
+              "status": "predicted",
+              "simulatedAtUtc": "2026-05-28T10:02:00Z",
+              "predictedOutcome": {},
+              "checks": ["window receives focus"],
+              "policyDecisionRef": "policy.click-anything.1"
+            }
+          ],
+          "replayCheckpoints": [
+            {
+              "schemaVersion": "elegy-piloting-replay-checkpoint/v1",
+              "checkpointId": "checkpoint.click-anything.before",
+              "actionId": "click-anything",
+              "targetId": "bad.desktop",
+              "stage": "before",
+              "capturedAtUtc": "2026-05-28T10:00:00Z",
+              "stateRef": "obs.bad.1"
+            }
+          ],
+          "lifecycleEvents": [
+            {
+              "schemaVersion": "elegy-piloting-lifecycle-event/v1",
+              "eventId": "event.click-anything.intent",
+              "actionId": "click-anything",
+              "targetId": "bad.desktop",
+              "eventType": "intent_recorded",
+              "recordedAtUtc": "2026-05-28T10:00:30Z",
+              "refId": "click-anything",
+              "message": "intent recorded"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "desktop_ui",
+    "requiresApproval": true,
+    "policyTags": ["contracts-only"]
+  },
+  "publishing": {
+    "marketplaceTarget": "holon",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy.git",
+    "sourceRef": "refs/tags/v0.1.0-bad",
+    "sourceCommit": "1111111111111111111111111111111111111111",
+    "changelogRef": "docs/changelog/piloting.md",
+    "provenanceRef": "contracts/fixtures/piloting-readiness-report.minimal.json",
+    "signatureRefs": ["signatures/bad.sig"],
+    "compatibility": [{ "host": "holon", "versionRange": ">=0.1.0 <0.2.0" }]
+  }
+}"#,
+    )
+    .expect("write invalid live-runtime package fixture");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            input_path.to_str().expect("utf-8 input path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package invalid live runtime package");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("CLI-PILOT-008") || stdout.contains("CLI-PILOT-012"));
+    assert!(stdout.contains("contracts_only") || stdout.contains("live_runtime"));
+}
+
+#[test]
+fn piloting_package_rejects_missing_holon_marketplace_metadata() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-missing-metadata");
+    let input_path = temp_dir.join("package.json");
+
+    let valid_package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json");
+    let mut package: Value = serde_json::from_str(
+        &fs::read_to_string(valid_package_path).expect("read valid piloting package"),
+    )
+    .expect("parse valid piloting package");
+    package["publishing"]
+        .as_object_mut()
+        .expect("publishing object")
+        .remove("sourceRepository");
+    package["publishing"]
+        .as_object_mut()
+        .expect("publishing object")
+        .remove("provenanceRef");
+    fs::write(
+        &input_path,
+        serde_json::to_string_pretty(&package).expect("serialize broken package"),
+    )
+    .expect("write broken package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            input_path.to_str().expect("utf-8 input path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package missing metadata");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("Holon publishing requires publishing.sourceRepository"));
+    assert!(stdout.contains("Holon publishing requires publishing.provenanceRef"));
+}
+
+#[test]
+fn piloting_package_accepts_ref_backed_manifest_and_fixture_pack_components() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-ref-backed");
+    let package_dir = temp_dir.join("package");
+    fs::create_dir_all(package_dir.join("signatures")).expect("create signature dir");
+
+    let repo_root = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .to_path_buf();
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-adapter-manifest.minimal.json"),
+        package_dir.join("adapter.json"),
+    )
+    .expect("copy adapter manifest");
+    let mut adapter_manifest: Value = serde_json::from_str(
+        &fs::read_to_string(package_dir.join("adapter.json")).expect("read copied adapter"),
+    )
+    .expect("parse copied adapter");
+    adapter_manifest["fixtures"][0]["path"] = json!("fixture-pack.json");
+    fs::write(
+        package_dir.join("adapter.json"),
+        serde_json::to_string_pretty(&adapter_manifest).expect("serialize copied adapter"),
+    )
+    .expect("rewrite copied adapter");
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-fixture-pack.minimal.json"),
+        package_dir.join("fixture-pack.json"),
+    )
+    .expect("copy fixture pack");
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-readiness-report.minimal.json"),
+        package_dir.join("provenance.json"),
+    )
+    .expect("copy provenance");
+    fs::write(package_dir.join("CHANGELOG.md"), "# Changelog\n").expect("write changelog");
+    fs::write(package_dir.join("signatures").join("package.sig"), "sig\n")
+        .expect("write signature");
+
+    let package_path = package_dir.join("package.json");
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.ref-backed-piloting",
+    "name": "ref-backed-piloting",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "description": "Ref-backed piloting package fixture.",
+    "license": "Apache-2.0"
+  },
+  "components": {
+    "pilotingAdapters": [
+      {
+        "id": "adapter",
+        "manifestRef": "adapter.json"
+      }
+    ],
+    "fixturePacks": [
+      {
+        "id": "fixture-pack",
+        "fixturePackRef": "fixture-pack.json"
+      }
+    ]
+  },
+  "publishing": {
+    "marketplaceTarget": "holon",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy.git",
+    "sourceRef": "refs/heads/main",
+    "sourceCommit": "8d062afa1b106e2db5f63e3afdd8b1198bc6e960",
+    "changelogRef": "CHANGELOG.md",
+    "provenanceRef": "provenance.json",
+    "signatureRefs": ["signatures/package.sig"],
+    "compatibility": [{ "host": "holon", "versionRange": ">=0.1.0 <0.2.0" }]
+  }
+}"#,
+    )
+    .expect("write package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package ref-backed package");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["data"]["packageId"], "elegy.ref-backed-piloting");
+}
+
+#[test]
+fn piloting_validate_fixtures_reports_policy_and_replay_counts() {
+    let fixture_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("piloting-fixture-pack.minimal.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "validate-fixtures",
+            fixture_path.to_str().expect("utf-8 fixture path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting validate-fixtures");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["data"]["fixtureKind"], "fixture-pack");
+    assert_eq!(body["data"]["policyDecisionCount"], 1);
+    assert_eq!(body["data"]["simulationResultCount"], 1);
+    assert_eq!(body["data"]["replayCheckpointCount"], 2);
+    assert_eq!(body["data"]["lifecycleEventCount"], 4);
+}
+
+#[test]
+fn piloting_validate_fixtures_rejects_unknown_policy_references() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-fixture-policy-ref");
+    let fixture_path = temp_dir.join("fixture-pack.json");
+    let repo_root = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .to_path_buf();
+    let mut fixture_pack: Value = serde_json::from_str(
+        &fs::read_to_string(
+            repo_root
+                .join("contracts")
+                .join("fixtures")
+                .join("piloting-fixture-pack.minimal.json"),
+        )
+        .expect("read piloting fixture pack"),
+    )
+    .expect("parse piloting fixture pack");
+    fixture_pack["simulationResults"][0]["policyDecisionRef"] = json!("missing-policy");
+    fs::write(
+        &fixture_path,
+        serde_json::to_string_pretty(&fixture_pack).expect("serialize modified fixture pack"),
+    )
+    .expect("write modified fixture pack");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "validate-fixtures",
+            fixture_path.to_str().expect("utf-8 fixture path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting validate-fixtures invalid policy ref");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("CLI-PILOT-006"));
+    assert!(stdout.contains("unknown policyDecisionRef 'missing-policy'"));
+}
+
+#[test]
+fn piloting_package_rejects_missing_holon_compatibility_entry() {
+    let temp_dir = unique_temp_dir("elegy-cli-piloting-missing-holon-compat");
+    let input_path = temp_dir.join("package.json");
+    let valid_package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json");
+
+    let mut package: Value = serde_json::from_str(
+        &fs::read_to_string(valid_package_path).expect("read valid piloting package"),
+    )
+    .expect("parse valid piloting package");
+    package["publishing"]["compatibility"] = json!([
+      { "host": "someone-else", "versionRange": ">=1.0.0 <2.0.0" }
+    ]);
+
+    fs::write(
+        &input_path,
+        serde_json::to_string_pretty(&package).expect("serialize broken package"),
+    )
+    .expect("write broken package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "piloting",
+            "package",
+            "--target",
+            "holon",
+            input_path.to_str().expect("utf-8 input path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy piloting package missing holon compatibility");
+
+    assert_eq!(output.status.code(), Some(1));
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("publishing.compatibility entry for host 'holon'"));
+}
+
+#[test]
 fn configuration_list_command_does_not_claim_missing_catalog_schema() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args(["configuration", "list", "--json"])

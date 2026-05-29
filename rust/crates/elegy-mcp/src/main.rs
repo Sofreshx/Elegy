@@ -1,5 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use elegy_contracts::{McpAnalysisResult, McpTransportKind};
+use elegy_contracts::{
+    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
+    CliFailureKind, CliMachineContext, CliMachineEnvelope, McpAnalysisResult, McpTransportKind,
+};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
     AuthorMcpToolRequest,
@@ -7,6 +10,7 @@ use elegy_mcp::{
 use serde::Serialize;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::OnceLock;
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
@@ -33,29 +37,13 @@ enum OutputFormat {
     Json,
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MachineEnvelope<T>
-where
-    T: Serialize,
-{
-    #[serde(skip_serializing_if = "Option::is_none")]
-    correlation_id: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
-    non_interactive: bool,
-    command: Vec<String>,
-    status: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
+static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
 
 #[derive(Clone, Debug)]
 struct MachineContext {
     format: OutputFormat,
-    non_interactive: bool,
-    correlation_id: Option<String>,
+    machine: CliMachineContext,
+    command: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -97,6 +85,21 @@ fn main() -> ExitCode {
     match run() {
         Ok(code) => code,
         Err(error) => {
+            if let Some(context) = CLI_MACHINE_CONTEXT.get() {
+                if context.format == OutputFormat::Json
+                    && print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+                        &context.machine,
+                        context.command.clone(),
+                        CliFailureKind::Runtime,
+                        error.to_string(),
+                        None,
+                    ))
+                    .is_ok()
+                {
+                    return exit_runtime();
+                }
+            }
+
             eprintln!("unexpected CLI failure: {error}");
             exit_runtime()
         }
@@ -107,9 +110,10 @@ fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
     let context = MachineContext {
         format: resolve_output_format(cli.json, cli.format),
-        non_interactive: cli.non_interactive,
-        correlation_id: cli.correlation_id,
+        machine: build_cli_machine_context(cli.non_interactive, cli.correlation_id, "elegy-mcp"),
+        command: vec![command_name(&cli.command).to_string()],
     };
+    let _ = CLI_MACHINE_CONTEXT.set(context.clone());
 
     match cli.command {
         Command::Author {
@@ -186,14 +190,17 @@ fn emit_error(
 ) -> Result<ExitCode, serde_json::Error> {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: vec![command.to_string()],
-            status: "error",
-            data: None,
-            error: Some(message),
-        })?,
+        OutputFormat::Json => print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+            &context.machine,
+            [command],
+            if code == exit_invalid() {
+                CliFailureKind::InvalidInput
+            } else {
+                CliFailureKind::Runtime
+            },
+            message,
+            None,
+        ))?,
     }
 
     Ok(code)
@@ -211,23 +218,12 @@ fn build_success_envelope<T, S>(
     context: &MachineContext,
     command: impl IntoIterator<Item = S>,
     data: T,
-) -> MachineEnvelope<T>
+) -> CliMachineEnvelope<T>
 where
     T: Serialize,
     S: Into<String>,
 {
-    MachineEnvelope {
-        correlation_id: context.correlation_id.clone(),
-        non_interactive: context.non_interactive,
-        command: command.into_iter().map(Into::into).collect(),
-        status: "ok",
-        data: Some(data),
-        error: None,
-    }
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
+    build_cli_success_envelope(&context.machine, command, data)
 }
 
 fn exit_invalid() -> ExitCode {
@@ -293,6 +289,13 @@ fn parse_tool_specs(values: &[String]) -> Result<Vec<AuthorMcpToolRequest>, Stri
             })
         })
         .collect()
+}
+
+fn command_name(command: &Command) -> &'static str {
+    match command {
+        Command::Author { .. } => "author",
+        Command::Analyze { .. } => "analyze",
+    }
 }
 
 fn print_json<T>(value: &T) -> Result<(), serde_json::Error>

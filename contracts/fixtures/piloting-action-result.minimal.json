@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-piloting-action-result/v1",
+  "actionId": "select-default-cube",
+  "status": "succeeded",
+  "message": "Cube selection changed to the requested object.",
+  "observedDelta": {
+    "selectedObject": {
+      "before": null,
+      "after": "Cube"
+    }
+  },
+  "evidenceRefs": ["evidence/blender/layout-2.png"]
+}

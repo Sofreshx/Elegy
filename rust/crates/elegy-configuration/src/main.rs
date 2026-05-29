@@ -1,4 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use elegy_contracts::{
+    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
+    CliFailureKind, CliMachineContext, CliMachineEnvelope,
+};
 use elegy_configuration::{
     apply_configuration, list_builtin_configuration_catalog, show_configuration_template,
     verify_configuration, ApplyConfigurationRequest, ConfigurationError,
@@ -82,29 +86,10 @@ enum Command {
     },
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MachineEnvelope<T>
-where
-    T: Serialize,
-{
-    #[serde(skip_serializing_if = "Option::is_none")]
-    correlation_id: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
-    non_interactive: bool,
-    command: Vec<String>,
-    status: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
 #[derive(Clone, Debug)]
 struct MachineContext {
     format: OutputFormat,
-    non_interactive: bool,
-    correlation_id: Option<String>,
+    machine: CliMachineContext,
 }
 
 fn main() -> ExitCode {
@@ -121,8 +106,11 @@ fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
     let context = MachineContext {
         format: resolve_output_format(cli.json, cli.format),
-        non_interactive: cli.non_interactive,
-        correlation_id: cli.correlation_id,
+        machine: build_cli_machine_context(
+            cli.non_interactive,
+            cli.correlation_id,
+            "elegy-configuration",
+        ),
     };
 
     match cli.command {
@@ -349,14 +337,17 @@ where
 {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: command.into_iter().map(Into::into).collect(),
-            status: "invalid",
-            data: None,
-            error: Some(message),
-        })?,
+        OutputFormat::Json => print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+            &context.machine,
+            command,
+            if code == exit_invalid() {
+                CliFailureKind::InvalidInput
+            } else {
+                CliFailureKind::Runtime
+            },
+            message,
+            None,
+        ))?,
     }
 
     Ok(code)
@@ -374,28 +365,17 @@ fn build_success_envelope<T, S>(
     context: &MachineContext,
     command: impl IntoIterator<Item = S>,
     data: T,
-) -> MachineEnvelope<T>
+) -> CliMachineEnvelope<T>
 where
     T: Serialize,
     S: Into<String>,
 {
-    MachineEnvelope {
-        correlation_id: context.correlation_id.clone(),
-        non_interactive: context.non_interactive,
-        command: command.into_iter().map(Into::into).collect(),
-        status: "ok",
-        data: Some(data),
-        error: None,
-    }
+    build_cli_success_envelope(&context.machine, command, data)
 }
 
 fn print_json<T: Serialize>(value: &T) -> Result<(), serde_json::Error> {
     println!("{}", serde_json::to_string_pretty(value)?);
     Ok(())
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
 }
 
 fn exit_invalid() -> ExitCode {

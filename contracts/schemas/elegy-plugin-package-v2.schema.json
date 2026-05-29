@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elegy/contracts/schemas/elegy-plugin-package-v2.schema.json",
   "title": "Elegy Plugin Package V2",
-  "description": "Portable package metadata for bundling Elegy skills, instruction skills, deterministic configuration templates/profiles, MCP projection metadata, docs, and assets for host-governed import.",
+  "description": "Portable package metadata for bundling Elegy skills, piloting contracts, deterministic configuration templates/profiles, MCP projection metadata, docs, assets, and Holon-compatible publishing metadata for host-governed import.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "identity", "components"],
@@ -70,7 +70,27 @@
           "minItems": 1,
           "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/skillDefinitionComponent" }
         },
+        "capabilityContracts": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
         "instructionSkills": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
+        "evalPacks": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
+        "resourcePacks": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
+        "toolAdapterContracts": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
+        "bridgeAdapterContracts": {
           "type": "array",
           "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
         },
@@ -82,11 +102,23 @@
           "type": "array",
           "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/capabilityProjectionComponent" }
         },
+        "pilotingAdapters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pilotingAdapterComponent" }
+        },
+        "fixturePacks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fixturePackComponent" }
+        },
         "docs": {
           "type": "array",
           "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
         },
         "assets": {
+          "type": "array",
+          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+        },
+        "cliHelpers": {
           "type": "array",
           "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
         },
@@ -102,6 +134,9 @@
     },
     "hostPolicyHints": {
       "$ref": "elegy-plugin-package-v1.schema.json#/properties/hostPolicyHints"
+    },
+    "publishing": {
+      "$ref": "#/$defs/publishingMetadata"
     }
   },
   "$defs": {
@@ -120,6 +155,112 @@
         "description": {
           "type": "string",
           "minLength": 1
+        }
+      }
+    },
+    "pilotingAdapterComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestRef": {
+          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+        },
+        "manifest": {
+          "$ref": "piloting-adapter-manifest.schema.json"
+        }
+      },
+      "anyOf": [
+        { "required": ["manifestRef"] },
+        { "required": ["manifest"] }
+      ]
+    },
+    "fixturePackComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixturePackRef": {
+          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+        },
+        "fixturePack": {
+          "$ref": "piloting-fixture-pack.schema.json"
+        }
+      },
+      "anyOf": [
+        { "required": ["fixturePackRef"] },
+        { "required": ["fixturePack"] }
+      ]
+    },
+    "compatibilityMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "versionRange"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "versionRange": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publishingMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "marketplaceTarget": {
+          "type": "string",
+          "enum": ["holon"]
+        },
+        "importMode": {
+          "type": "string",
+          "enum": ["package", "dry_run"]
+        },
+        "sourceRepository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceCommit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changelogRef": {
+          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+        },
+        "provenanceRef": {
+          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+        },
+        "signatureRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          },
+          "uniqueItems": true
+        },
+        "compatibility": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/compatibilityMetadata"
+          }
         }
       }
     }

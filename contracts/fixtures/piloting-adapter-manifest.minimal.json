@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "elegy-piloting-adapter-manifest/v1",
+  "adapterId": "blender.piloting",
+  "displayName": "Blender Piloting Adapter",
+  "version": "0.1.0",
+  "description": "Contracts-first Blender piloting example restricted to declared desktop surfaces.",
+  "mode": "contracts_only",
+  "supportedSoftware": [
+    {
+      "schemaVersion": "elegy-piloting-target-descriptor/v1",
+      "targetId": "blender.desktop",
+      "productName": "Blender",
+      "versionRange": ">=4.0 <5.0",
+      "platforms": ["windows"],
+      "launchHints": {
+        "executables": ["blender.exe"],
+        "arguments": [],
+        "urls": []
+      },
+      "attachHints": {
+        "processNames": ["blender.exe"],
+        "windowTitles": ["Blender"],
+        "surfaceUrls": []
+      }
+    }
+  ],
+  "supportedSurfaces": [
+    {
+      "schemaVersion": "elegy-piloting-surface-descriptor/v1",
+      "surfaceId": "blender.desktop.main-window",
+      "targetId": "blender.desktop",
+      "surfaceKind": "desktop",
+      "stability": "stable",
+      "selectors": [
+        {
+          "strategy": "windowTitle",
+          "value": "Blender"
+        }
+      ],
+      "semanticAnchors": ["primary workspace", "top menu bar"]
+    }
+  ],
+  "contracts": {
+    "targetDescriptorSchemaRef": "../schemas/piloting-target-descriptor.schema.json",
+    "surfaceDescriptorSchemaRef": "../schemas/piloting-surface-descriptor.schema.json",
+    "observationFrameSchemaRef": "../schemas/piloting-observation-frame.schema.json",
+    "actionIntentSchemaRef": "../schemas/piloting-action-intent.schema.json",
+    "actionResultSchemaRef": "../schemas/piloting-action-result.schema.json",
+    "readinessReportSchemaRef": "../schemas/piloting-readiness-report.schema.json",
+    "fixturePackSchemaRef": "../schemas/piloting-fixture-pack.schema.json",
+    "policyDecisionSchemaRef": "../schemas/piloting-policy-decision.schema.json",
+    "simulationResultSchemaRef": "../schemas/piloting-simulation-result.schema.json",
+    "replayCheckpointSchemaRef": "../schemas/piloting-replay-checkpoint.schema.json",
+    "lifecycleEventSchemaRef": "../schemas/piloting-lifecycle-event.schema.json"
+  },
+  "fixtures": [
+    {
+      "fixturePackId": "blender.fixtures.layout-basic",
+      "path": "contracts/fixtures/piloting-fixture-pack.minimal.json",
+      "description": "Basic Blender default scene fixture pack."
+    }
+  ],
+  "permissions": {
+    "sideEffectClasses": ["desktop_ui"],
+    "requiresHostApproval": true
+  }
+}

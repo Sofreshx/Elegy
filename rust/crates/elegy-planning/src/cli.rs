@@ -690,6 +690,7 @@ fn execute_goal(
                 entity_id: args.goal_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -753,6 +754,7 @@ fn execute_roadmap(
                 entity_id: args.roadmap_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -845,6 +847,7 @@ fn execute_work_point(
                 entity_id: args.work_point_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -889,6 +892,7 @@ fn execute_plan(
             vec!["plan", "revise"],
             store.revise_plan(RevisePlanInput {
                 plan_id: args.plan_id,
+                active_scope_key: Some(context.scope_key.clone()),
                 scope_key: args.scope_key,
                 assumptions: optional_vec(args.assumptions),
                 stop_conditions: optional_vec(args.stop_conditions),
@@ -906,6 +910,7 @@ fn execute_plan(
                 entity_id: args.plan_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -964,6 +969,7 @@ fn execute_todo(
                 entity_id: args.todo_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: optional_vec(args.evidence_refs),
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -1012,6 +1018,7 @@ fn execute_issue(
                 entity_id: args.issue_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -1067,6 +1074,7 @@ fn execute_review_point(
                 entity_id: args.review_point_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
         ),
@@ -1089,7 +1097,7 @@ fn execute_events(store: &PlanningStore, context: &MachineContext) -> Result<Exi
     emit_success(
         context,
         vec!["events", "list"],
-        json!({ "events": store.list_events()? }),
+        json!({ "events": store.list_events_in_scope(&context.scope_key)? }),
     )
 }
 
@@ -1106,7 +1114,8 @@ fn execute_project(
         ProjectCommand::Export(args) => emit_success(
             context,
             vec!["project", "export"],
-            store.render_projection(
+            store.render_projection_in_scope(
+                &context.scope_key,
                 args.entity_type,
                 &args.entity_id,
                 args.projection_format,
@@ -1116,7 +1125,8 @@ fn execute_project(
         ProjectCommand::Render(args) => emit_success(
             context,
             vec!["project", "render"],
-            store.render_projection(
+            store.render_projection_in_scope(
+                &context.scope_key,
                 args.entity_type,
                 &args.entity_id,
                 args.projection_format,

@@ -1,5 +1,5 @@
 created: 2026-03-24
-updated: 2026-03-30
+updated: 2026-05-28
 category: governance
 status: active
 doc_kind: reference
@@ -14,11 +14,11 @@ Track non-active carryover goals that remain after a workflow closes.
 
 ### GOAL-20260324-01
 
-Goal Statement: Make the prepared wrapper and CLI surfaces live on GitHub through remote push/tag/release execution and verify hosted distribution workflows end to end.
+Goal Statement: Keep the hosted distribution lane healthy by continuously verifying that push, tag, and release execution refresh GitHub Release assets end to end.
 
-Status: partial.
+Status: active.
 
-Resume When: remote publishing is authorized, then execute the release flow and verify downloadable wrapper archives from GitHub.
+Resume When: the hosted publish lane drifts, `main-snapshot` stops tracking `main`, or downloadable release assets need to be revalidated after workflow changes.
 
 Source Artifact: [Distribution and downstream consumption](../distribution.md)
 
@@ -26,7 +26,7 @@ Owner: workflow-orchestrator
 
 First Seen: 2026-03-24
 
-Last Reviewed: 2026-03-30
+Last Reviewed: 2026-05-28
 
 ## References
 

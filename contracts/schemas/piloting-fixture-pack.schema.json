@@ -1,0 +1,103 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-fixture-pack.schema.json",
+  "title": "PilotingFixturePack",
+  "description": "Recorded observations, allowed actions, and expected result checks for replay-style piloting validation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "fixturePackId",
+    "adapterId",
+    "targetId",
+    "recordedAtUtc",
+    "observations",
+    "allowedActions",
+    "expectedResultChecks",
+    "policyDecisions",
+    "simulationResults",
+    "replayCheckpoints",
+    "lifecycleEvents"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-fixture-pack/v1"
+    },
+    "fixturePackId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "adapterId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "recordedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observations": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-observation-frame.schema.json" }
+    },
+    "allowedActions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-action-intent.schema.json" }
+    },
+    "expectedResultChecks": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["actionId", "expectedStatus", "checks", "evidenceRefs"],
+        "properties": {
+          "actionId": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9._-]+$"
+          },
+          "expectedStatus": {
+            "type": "string",
+            "enum": ["succeeded", "failed", "refused", "retryable"]
+          },
+          "checks": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          },
+          "evidenceRefs": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "uniqueItems": true
+          }
+        }
+      }
+    },
+    "policyDecisions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-policy-decision.schema.json" }
+    },
+    "simulationResults": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-simulation-result.schema.json" }
+    },
+    "replayCheckpoints": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-replay-checkpoint.schema.json" }
+    },
+    "lifecycleEvents": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "piloting-lifecycle-event.schema.json" }
+    }
+  }
+}
