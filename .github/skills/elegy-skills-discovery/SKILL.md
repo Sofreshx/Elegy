@@ -4,6 +4,27 @@ Use this skill when an agent needs to discover the current governed Elegy skill 
 
 ## Primary Commands
 
+For host onboarding and profile-filtered progressive discovery:
+
+```bash
+elegy agent check --json
+elegy agent manifest --json --profile <profile-path>
+elegy agent discover --query "<task>" --detail --json --profile <profile-path>
+```
+
+For registry inspection while developing Elegy or choosing a governed skill:
+
+```bash
+elegy-skills list --json
+elegy-skills search --query "<task>" --json
+elegy-skills resolve --query "<task>" --json
+elegy-skills get --skill-id <id-or-alias> --json
+elegy-skills capability --capability-id <id> --json
+elegy-skills validate --file <path> --json
+```
+
+Umbrella compatibility commands remain available:
+
 ```bash
 elegy skills list --json
 elegy skills search --query "<task>" --json
@@ -15,7 +36,8 @@ elegy skills capability --capability-id <id> --json
 ## Rules
 
 - Treat v2 skill definitions as authoritative. They live in `contracts/fixtures/skill-definition-v2.*.json`.
-- Treat `elegy-skills` and `elegy skills ...` as mirrored registry surfaces; prefer the umbrella command when you are already operating through `elegy`.
+- Treat `elegy agent ...` as the host onboarding and discovery path.
+- Treat `elegy-skills` as the dedicated governed registry surface and `elegy skills ...` as the umbrella compatibility path.
 - Do not use or recreate v1 `skill-definition.*.json` files.
 - Inspect `capabilities[].implementation.arguments` before invoking a command.
 - Check `capabilities[].execution.hasSideEffects` before running mutations.

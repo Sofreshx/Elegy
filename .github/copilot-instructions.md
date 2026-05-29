@@ -1,19 +1,22 @@
-# Elegy Project — Copilot Instructions
+# Elegy Project - Copilot Instructions
 
 ## Project Overview
 
-Elegy is a modular AI agent infrastructure project written in **Rust**. It combines governed contracts, CLI tools, v2 skill definitions, and an MCP host so agentic harnesses can discover and invoke local capabilities safely.
+Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.
+Governed contracts, v2 skill definitions, compatibility data, and policy artifacts are
+the durable authority. Rust implements reusable executable behavior over those artifacts.
+CLI invocation templates are the default agent boundary; MCP is an optional projection.
 
 ## Architecture Documentation
 
 Before writing any code, read the relevant architecture docs:
 
-- `docs/agent-integration.md` — Agent-facing discovery, invocation, JSON envelopes, and MCP tool dispatch.
-- `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` — Start here. Overview of all systems, design philosophy, and navigation guide.
-- `rust/crates/elegy-memory/docs/architecture/memory-model.md` — Memory types, scopes, scoring formulas, and behavioral rules.
-- `rust/crates/elegy-memory/docs/architecture/storage-schema.md` — SQLite schema, tables, indexes, and migration strategy.
-- `rust/crates/elegy-memory/docs/architecture/traits-and-interfaces.md` — All Rust traits, their contracts, and implementation rules.
-- `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` — What is in MVP vs v1 vs v2. **Do not implement features outside the current milestone.**
+- `README.md` - current public project shape and shipped surfaces.
+- `docs/agent-integration.md` - host onboarding, discovery, invocation templates, profiles, JSON envelopes, and MCP projection.
+- `docs/architecture/mcp-skill-tooling-placement.md` - MCP, skill generation, portable package, and ownership boundaries.
+- `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` - ADR/spec doctrine and docs validation posture.
+- `docs/spec-baseline.md` - current MCP protocol baseline.
+- `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` - memory architecture and MVP scope.
 
 ## Coding Standards
 
@@ -22,15 +25,17 @@ Before writing any code, read the relevant architecture docs:
 - Naming: snake_case for functions/variables, PascalCase for types/traits, SCREAMING_SNAKE_CASE for constants.
 - Documentation: Every public type, trait, and function must have a doc comment explaining its purpose and contract.
 - Testing: Every public function must have at least one unit test. Integration tests live in `rust/crates/elegy-memory/tests/`.
-- Dependencies: Minimize external dependencies. Prefer `rusqlite` (bundled feature), `sqlite-vec`, `serde`, `chrono`, `uuid`, `clap` for CLI.
+- Dependencies: Minimize external dependencies, especially in crates that feed CLI, MCP, host, or contract surfaces.
 - No `unsafe` code without explicit justification in a comment.
 
 ## Agent Tool Discovery
 
-- Prefer `elegy skills list/search/describe --json` when you need the current capability surface.
+- Prefer `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
+- Use `elegy-skills list/search/resolve/get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
 - V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are the supported skill contract.
 - Do not reintroduce v1 `skill-definition.*.json` files.
-- `elegy run` exposes the same v2 registry as MCP tools. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.
+- `elegy run` exposes an optional MCP stdio adapter over governed capabilities. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.
+- Profiles are allowlists, not approvals.
 
 ## Architecture Rules — Critical
 
@@ -40,6 +45,7 @@ Before writing any code, read the relevant architecture docs:
 4. **Scopes are isolated.** Session, Workspace, User, and Agent scopes have separate storage. Never cross-query scopes without explicit API calls.
 5. **Embeddings are async-safe.** Embedding computation can fail or be slow. Always handle `embedding_stale` flag. Never block writes on embedding generation.
 6. **Provenance is mandatory.** Every memory must have a provenance level. Default is `Imported` (lowest trust).
+7. **Derived surfaces are adapters.** Do not promote `.agents/skills/**`, `.github/skills/**`, wrapper folders, generated bundles, Codex plugin projections, or MCP projections into authority roots.
 
 ## Git Workflow
 
@@ -58,5 +64,6 @@ Before writing any code, read the relevant architecture docs:
 ## File Organization
 
 - `contracts/`, `governance/`, `schemas/`, and `policies/` hold the governed contract and policy surfaces.
-- `rust/crates/` is the active Rust workspace and contains multiple first-party crates, including `elegy-memory`, `elegy-memory-mcp`, `elegy-host-mcp`, `elegy-skills`, `elegy-planning`, and related runtime/tooling crates.
+- `rust/crates/` is the active Rust workspace and contains first-party crates for the umbrella CLI, dedicated CLIs, runtime, adapters, policy, contracts, memory, MCP, skills, planning, configuration, documentation, observe, desktop, data, web, notify, and related tooling.
 - `src/Elegy-*` directories are wrapper or contributor-navigation surfaces, not the canonical Rust implementation roots.
+- `docs/adr/` and `docs/specs/` are the configured current documentation authority roots for durable decisions and implementation-facing specs.

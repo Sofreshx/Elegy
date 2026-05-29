@@ -11,7 +11,7 @@ Authority stays one-way:
 
 1. `contracts/fixtures/skill-definition-v2.elegy-skills.json` is the governed source of truth.
 2. `contracts/fixtures/skill-discovery-index.elegy-skills.json` is the governed discovery projection.
-3. `.github/skills/elegy-skills/SKILL.md` remains the repo-local contributor-routing output.
+3. `.agents/skills/elegy-skills/SKILL.md` and `.github/skills/elegy-skills/SKILL.md` remain repo-local contributor-routing outputs.
 4. This file mirrors the install and CLI handoff needed by wrapper consumers.
 
 ## Wrapper install
@@ -31,10 +31,10 @@ elegy-skills validate --file <path>
 elegy-skills validate --dir <path>
 ```
 
-`--format json` is available when structured output is needed.
+`--json` or `--format json` is available when structured output is needed, depending on the command surface version.
 
 ## Surface posture
 
-- This dedicated surface is registry-first: search, resolve, inspect, and validate governed v2 skills.
+- This dedicated surface is registry-first: list, search, resolve, get, capability, and validate governed v2 skills.
 - The same registry behavior is also available on the umbrella `elegy skills ...` commands.
 - Downstream Rust hosts can prefer the reusable `rust/crates/elegy-skills` API over shelling out when direct in-process integration is a better fit.

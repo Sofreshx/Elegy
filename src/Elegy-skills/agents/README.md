@@ -7,7 +7,8 @@ It does not become an in-repo agent implementation center, orchestration center,
 Use it to keep wrapper-level external-agent integration and contributor-routing guidance aligned with the owned locations:
 
 - `contracts/` and `governance/` for canonical skill authority.
-- `rust/crates/elegy-skills` for the dedicated MCP-to-skill generation CLI implementation.
+- `rust/crates/elegy-skills` for the dedicated governed skill-registry CLI implementation and reusable Rust registry API.
+- `rust/crates/elegy-tooling` and the umbrella `elegy generate ...` flows for lower-level MCP-to-skill generation when contributor tooling needs it.
 - downstream consuming repos for host-specific agent registration, orchestration, auth, and runtime policy.
 
 External agents should load the associated skill guidance and invoke `elegy-skills` directly. `src/Elegy-skills` remains a thin wrapper surface, not an implementation center. This wrapper lane does not reopen a shared in-repo agent package-family story.
