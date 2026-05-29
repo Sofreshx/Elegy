@@ -39,3 +39,11 @@ elegy-planning project export|render ...
 - SQLite remains the durable authority.
 - Omitted scope defaults to `default`.
 - Markdown and JSON projections are generated sharing artifacts, not authority.
+
+## Agent invocation guidance
+
+- Prefer machine mode for all mutations: `--json --non-interactive --correlation-id <id>`.
+- Repeat multi-value flags once per value instead of comma-joining.
+- For work-point, plan, and todo authoring, use `--effort-tier <fast|balanced|deep>` and repeat `--file-scope <selector-type:intent:selector>` as needed.
+- File-scope selector types are `exact` and `glob`; intents are `primary`, `review`, or `affected`.
+- Plan revise clearing is explicit: use `--clear-routing-hint` and `--clear-file-scopes` when you need removal semantics.

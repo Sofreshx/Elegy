@@ -116,6 +116,23 @@ string_enum!(Priority {
     Urgent => "urgent"
 });
 
+string_enum!(EffortTier {
+    Fast => "fast",
+    Balanced => "balanced",
+    Deep => "deep"
+});
+
+string_enum!(FileScopeSelectorType {
+    Exact => "exact",
+    Glob => "glob"
+});
+
+string_enum!(FileScopeIntent {
+    Primary => "primary",
+    Review => "review",
+    Affected => "affected"
+});
+
 string_enum!(Severity {
     Low => "low",
     Medium => "medium",
@@ -213,6 +230,8 @@ pub struct WorkPointRecord {
     pub ordering: i64,
     pub dependency_ids: Vec<String>,
     pub validation_expectations: Vec<String>,
+    pub effort_tier: EffortTier,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub tags: Vec<String>,
     pub revision: i64,
     pub created_at: String,
@@ -234,6 +253,10 @@ pub struct PlanRecord {
     pub stop_conditions: Vec<String>,
     pub validation_steps: Vec<String>,
     pub targeted_work_point_ids: Vec<String>,
+    pub effort_tier: EffortTier,
+    pub routing_hint: Option<String>,
+    pub allow_parallel_overlap: bool,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub status: PlanStatus,
     pub tags: Vec<String>,
     pub revision: i64,
@@ -252,12 +275,22 @@ pub struct TodoRecord {
     pub summary: String,
     pub status: TodoStatus,
     pub priority: Priority,
+    pub effort_tier: EffortTier,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub evidence_refs: Vec<String>,
     pub tags: Vec<String>,
     pub ordering: i64,
     pub revision: i64,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct FileScopeRecord {
+    pub selector_type: FileScopeSelectorType,
+    pub selector: String,
+    pub intent: FileScopeIntent,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

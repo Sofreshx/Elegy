@@ -215,7 +215,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "roadmap", "add-work-point", "--id", "${id}", "--roadmap-id", "${roadmap_id}", "--section-id", "${section_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--ordering", "${ordering}", "--dependency-id", "${dependency_ids}", "--validation", "${validation_expectations}", "--tag", "${tags}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "roadmap", "add-work-point", "--id", "${id}", "--roadmap-id", "${roadmap_id}", "--section-id", "${section_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--ordering", "${ordering}", "--dependency-id", "${dependency_ids}", "--validation", "${validation_expectations}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--tag", "${tags}"]
       },
       "input": {
         "parameters": [
@@ -281,6 +281,19 @@
             "required": false
           },
           {
+            "name": "effort_tier",
+            "type": "string",
+            "description": "Optional work point effort tier: fast, balanced, or deep.",
+            "required": false,
+            "default": "balanced"
+          },
+          {
+            "name": "file_scopes",
+            "type": "array",
+            "description": "Optional repeated file-scope selectors (selector-type:intent:selector).",
+            "required": false
+          },
+          {
             "name": "tags",
             "type": "array",
             "description": "Optional repeated work point tags.",
@@ -342,7 +355,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "create", "--id", "${id}", "--goal-id", "${goal_id}", "--roadmap-id", "${roadmap_id}", "--title", "${title}", "--summary", "${summary}", "--plan-scope", "${scope}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--status", "${status}", "--tag", "${tags}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "create", "--id", "${id}", "--goal-id", "${goal_id}", "--roadmap-id", "${roadmap_id}", "--title", "${title}", "--summary", "${summary}", "--plan-scope", "${scope}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--effort-tier", "${effort_tier}", "--routing-hint", "${routing_hint}", "--file-scope", "${file_scopes}", "--status", "${status}", "--tag", "${tags}"]
       },
       "input": {
         "parameters": [
@@ -419,6 +432,25 @@
             "required": false
           },
           {
+            "name": "effort_tier",
+            "type": "string",
+            "description": "Optional plan effort tier: fast, balanced, or deep.",
+            "required": false,
+            "default": "balanced"
+          },
+          {
+            "name": "routing_hint",
+            "type": "string",
+            "description": "Optional routing hint for assigning plan execution lanes.",
+            "required": false
+          },
+          {
+            "name": "file_scopes",
+            "type": "array",
+            "description": "Optional repeated file-scope selectors (selector-type:intent:selector).",
+            "required": false
+          },
+          {
             "name": "status",
             "type": "string",
             "description": "Optional plan status: draft, proposed, active, blocked, completed, cancelled, or invalidated.",
@@ -487,7 +519,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "todo", "create", "--id", "${id}", "--plan-id", "${plan_id}", "--work-point-id", "${work_point_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--priority", "${priority}", "--evidence-ref", "${evidence_refs}", "--tag", "${tags}", "--ordering", "${ordering}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--json", "todo", "create", "--id", "${id}", "--plan-id", "${plan_id}", "--work-point-id", "${work_point_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--priority", "${priority}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--evidence-ref", "${evidence_refs}", "--tag", "${tags}", "--ordering", "${ordering}"]
       },
       "input": {
         "parameters": [
@@ -541,6 +573,19 @@
             "description": "Optional todo priority: low, medium, high, or urgent.",
             "required": false,
             "default": "medium"
+          },
+          {
+            "name": "effort_tier",
+            "type": "string",
+            "description": "Optional todo effort tier: fast, balanced, or deep.",
+            "required": false,
+            "default": "balanced"
+          },
+          {
+            "name": "file_scopes",
+            "type": "array",
+            "description": "Optional repeated file-scope selectors (selector-type:intent:selector).",
+            "required": false
           },
           {
             "name": "evidence_refs",
@@ -915,7 +960,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "revise", "--plan-id", "${plan_id}", "--scope-key", "${scope_key}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--tag", "${tags}"]
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "plan", "revise", "--plan-id", "${plan_id}", "--scope-key", "${scope_key}", "--assumption", "${assumptions}", "--stop-condition", "${stop_conditions}", "--validation-step", "${validation_steps}", "--target-work-point-id", "${targeted_work_point_ids}", "--effort-tier", "${effort_tier}", "--routing-hint", "${routing_hint}", "--clear-routing-hint", "${clear_routing_hint}", "--file-scope", "${file_scopes}", "--clear-file-scopes", "${clear_file_scopes}", "--tag", "${tags}"]
       },
       "input": {
         "parameters": [
@@ -927,6 +972,11 @@
           { "name": "stop_conditions", "type": "array", "description": "Optional repeated stop conditions.", "required": false },
           { "name": "validation_steps", "type": "array", "description": "Optional repeated validation steps.", "required": false },
           { "name": "targeted_work_point_ids", "type": "array", "description": "Optional repeated targeted work point identifiers.", "required": false },
+          { "name": "effort_tier", "type": "string", "description": "Optional plan effort tier: fast, balanced, or deep.", "required": false },
+          { "name": "routing_hint", "type": "string", "description": "Optional routing hint for assigning plan execution lanes.", "required": false },
+          { "name": "clear_routing_hint", "type": "boolean", "description": "When true, explicitly clears any existing routing hint.", "required": false },
+          { "name": "file_scopes", "type": "array", "description": "Optional repeated file-scope selectors (selector-type:intent:selector).", "required": false },
+          { "name": "clear_file_scopes", "type": "boolean", "description": "When true, explicitly clears all file scopes for the plan.", "required": false },
           { "name": "tags", "type": "array", "description": "Optional repeated plan tags.", "required": false }
         ]
       },

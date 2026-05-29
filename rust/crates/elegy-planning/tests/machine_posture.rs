@@ -404,6 +404,102 @@ fn out_of_scope_update_status_returns_structured_invalid_json() {
 }
 
 #[test]
+fn plan_revise_rejects_conflicting_clear_flags() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-plan-revise-conflict");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-plan-conflict-1",
+        "goal",
+        "create",
+        "--id",
+        "goal-plan-conflict-1",
+        "--title",
+        "Goal",
+        "--description",
+        "Desc",
+        "--acceptance",
+        "ok",
+        "--rejection",
+        "no",
+    ]);
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-plan-conflict-1",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-plan-conflict-1",
+        "--goal-id",
+        "goal-plan-conflict-1",
+        "--title",
+        "Roadmap",
+        "--summary",
+        "Summary",
+    ]);
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-plan-conflict-1",
+        "plan",
+        "create",
+        "--id",
+        "plan-conflict-1",
+        "--goal-id",
+        "goal-plan-conflict-1",
+        "--roadmap-id",
+        "roadmap-plan-conflict-1",
+        "--title",
+        "Plan",
+        "--summary",
+        "Summary",
+        "--scope",
+        "Execution",
+    ]);
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-plan-conflict-2",
+            "plan",
+            "revise",
+            "--plan-id",
+            "plan-conflict-1",
+            "--clear-routing-hint",
+            "--routing-hint",
+            "flash-lane",
+        ])
+        .output()
+        .expect("run plan revise with conflicting clear routing hint flags");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("--clear-routing-hint cannot be combined with --routing-hint"));
+}
+
+#[test]
 fn events_are_isolated_by_scope_in_machine_mode() {
     let temp_dir = unique_temp_dir("elegy-planning-machine-events-scope");
     let db_path = temp_dir.join("planning.db");

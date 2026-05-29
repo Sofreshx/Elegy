@@ -1,28 +1,31 @@
 use std::{
+    collections::HashMap,
     fs,
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use rusqlite::{params, Connection, OptionalExtension, Row, Transaction};
+use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row, Transaction};
 use serde::Serialize;
 use serde_json::Value;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
-    validation::validate_entity, EntityType, GoalRecord, GoalStatus, GoalView, IssueRecord,
-    IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEvent,
-    PlanningHealthReport, PlanningStoreError, Priority, ProjectionFormat, RenderedProjection,
-    ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord, RoadmapStatus,
-    RoadmapView, ScopeRecord, Severity, TodoRecord, TodoStatus, ValidationFinding,
-    ValidationReport, ValidationRunReport, ValidationSeverity, WorkPointRecord, WorkPointStatus,
-    WorkPointView,
+    validation::validate_entity, EffortTier, EntityType, FileScopeRecord, FileScopeSelectorType,
+    GoalRecord, GoalStatus, GoalView, IssueRecord, IssueStatus, IssueView, MutationResult,
+    PlanRecord, PlanStatus, PlanView, PlanningEvent, PlanningHealthReport, PlanningStoreError,
+    Priority, ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus,
+    RoadmapRecord, RoadmapSectionRecord, RoadmapStatus, RoadmapView, ScopeRecord, Severity,
+    TodoRecord, TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport,
+    ValidationSeverity, WorkPointRecord, WorkPointStatus, WorkPointView,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "3";
+pub const CURRENT_SCHEMA_VERSION: &str = "4";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
+const SQLITE_MAX_VARIABLES: usize = 999;
+const FILE_SCOPE_QUERY_FIXED_VARIABLES: usize = 1;
 
 #[derive(Clone, Debug)]
 pub struct PlanningStore {
@@ -80,6 +83,8 @@ pub struct AddWorkPointInput {
     pub ordering: Option<i64>,
     pub dependency_ids: Vec<String>,
     pub validation_expectations: Vec<String>,
+    pub effort_tier: EffortTier,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub tags: Vec<String>,
     pub run_id: Option<String>,
 }
@@ -98,6 +103,10 @@ pub struct CreatePlanInput {
     pub stop_conditions: Vec<String>,
     pub validation_steps: Vec<String>,
     pub targeted_work_point_ids: Vec<String>,
+    pub effort_tier: EffortTier,
+    pub routing_hint: Option<String>,
+    pub allow_parallel_overlap: bool,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub status: PlanStatus,
     pub tags: Vec<String>,
     pub run_id: Option<String>,
@@ -113,6 +122,8 @@ pub struct CreateTodoInput {
     pub summary: String,
     pub status: TodoStatus,
     pub priority: Priority,
+    pub effort_tier: EffortTier,
+    pub file_scopes: Vec<FileScopeRecord>,
     pub evidence_refs: Vec<String>,
     pub tags: Vec<String>,
     pub ordering: Option<i64>,
@@ -176,6 +187,12 @@ pub struct RevisePlanInput {
     pub stop_conditions: Option<Vec<String>>,
     pub validation_steps: Option<Vec<String>>,
     pub targeted_work_point_ids: Option<Vec<String>>,
+    pub effort_tier: Option<EffortTier>,
+    pub routing_hint: Option<String>,
+    pub clear_routing_hint: bool,
+    pub allow_parallel_overlap: Option<bool>,
+    pub file_scopes: Option<Vec<FileScopeRecord>>,
+    pub clear_file_scopes: bool,
     pub tags: Option<Vec<String>>,
     pub run_id: Option<String>,
 }
@@ -476,6 +493,8 @@ impl PlanningStore {
             ordering,
             dependency_ids: normalize_string_list(input.dependency_ids),
             validation_expectations: normalize_string_list(input.validation_expectations),
+            effort_tier: input.effort_tier,
+            file_scopes: normalize_file_scopes(input.file_scopes),
             tags: normalize_string_list(input.tags),
             revision: 1,
             created_at: now.clone(),
@@ -486,9 +505,9 @@ impl PlanningStore {
             r#"
             INSERT INTO work_points (
                 id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index,
-                dependency_ids_json, validation_expectations_json, tags_json, revision, created_at,
-                updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                dependency_ids_json, validation_expectations_json, effort_tier, tags_json,
+                revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             "#,
             params![
                 record.id,
@@ -501,11 +520,21 @@ impl PlanningStore {
                 record.ordering,
                 to_json_text(&record.dependency_ids)?,
                 to_json_text(&record.validation_expectations)?,
+                record.effort_tier.as_str(),
                 to_json_text(&record.tags)?,
                 record.revision,
                 record.created_at,
                 record.updated_at,
             ],
+        )?;
+
+        replace_entity_file_scopes(
+            &transaction,
+            &record.scope_key,
+            EntityType::WorkPoint,
+            &record.id,
+            &record.file_scopes,
+            &now,
         )?;
 
         let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
@@ -588,6 +617,13 @@ impl PlanningStore {
             stop_conditions: normalize_string_list(input.stop_conditions),
             validation_steps: normalize_string_list(input.validation_steps),
             targeted_work_point_ids: normalize_string_list(input.targeted_work_point_ids),
+            effort_tier: input.effort_tier,
+            routing_hint: input
+                .routing_hint
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty()),
+            allow_parallel_overlap: input.allow_parallel_overlap,
+            file_scopes: normalize_file_scopes(input.file_scopes),
             status: input.status,
             tags: normalize_string_list(input.tags),
             revision: 1,
@@ -600,8 +636,9 @@ impl PlanningStore {
             INSERT INTO plans (
                 id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope,
                 assumptions_json, stop_conditions_json, validation_steps_json,
-                targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17)
+                targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap,
+                status, tags_json, revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             "#,
             params![
                 record.id,
@@ -616,12 +653,24 @@ impl PlanningStore {
                 to_json_text(&record.stop_conditions)?,
                 to_json_text(&record.validation_steps)?,
                 to_json_text(&record.targeted_work_point_ids)?,
+                record.effort_tier.as_str(),
+                record.routing_hint,
+                if record.allow_parallel_overlap { 1 } else { 0 },
                 record.status.as_str(),
                 to_json_text(&record.tags)?,
                 record.revision,
                 record.created_at,
                 record.updated_at,
             ],
+        )?;
+
+        replace_entity_file_scopes(
+            &transaction,
+            &record.scope_key,
+            EntityType::Plan,
+            &record.id,
+            &record.file_scopes,
+            &now,
         )?;
 
         append_event(
@@ -705,6 +754,8 @@ impl PlanningStore {
             summary: input.summary.trim().to_string(),
             status: input.status,
             priority: input.priority,
+            effort_tier: input.effort_tier,
+            file_scopes: normalize_file_scopes(input.file_scopes),
             evidence_refs: normalize_string_list(input.evidence_refs),
             tags: normalize_string_list(input.tags),
             ordering,
@@ -717,8 +768,9 @@ impl PlanningStore {
             r#"
             INSERT INTO todos (
                 id, scope_key, plan_id, work_point_id, title, summary, status, priority,
-                evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+                effort_tier, evidence_refs_json, tags_json, ordering_index, revision,
+                created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
             "#,
             params![
                 record.id,
@@ -729,6 +781,7 @@ impl PlanningStore {
                 record.summary,
                 record.status.as_str(),
                 record.priority.as_str(),
+                record.effort_tier.as_str(),
                 to_json_text(&record.evidence_refs)?,
                 to_json_text(&record.tags)?,
                 record.ordering,
@@ -736,6 +789,15 @@ impl PlanningStore {
                 record.created_at,
                 record.updated_at,
             ],
+        )?;
+
+        replace_entity_file_scopes(
+            &transaction,
+            &record.scope_key,
+            EntityType::Todo,
+            &record.id,
+            &record.file_scopes,
+            &now,
         )?;
 
         let (aggregate_type, aggregate_id, correlation_id) = if let Some(plan_id) = &record.plan_id
@@ -1369,6 +1431,27 @@ impl PlanningStore {
             .validation_steps
             .map(normalize_string_list)
             .unwrap_or(existing.validation_steps.clone());
+        let effort_tier = input.effort_tier.unwrap_or(existing.effort_tier);
+        let routing_hint = if input.clear_routing_hint {
+            None
+        } else {
+            input
+                .routing_hint
+                .map(|value| value.trim().to_string())
+                .filter(|value| !value.is_empty())
+                .or(existing.routing_hint.clone())
+        };
+        let allow_parallel_overlap = input
+            .allow_parallel_overlap
+            .unwrap_or(existing.allow_parallel_overlap);
+        let file_scopes = if input.clear_file_scopes {
+            Vec::new()
+        } else {
+            input
+                .file_scopes
+                .map(normalize_file_scopes)
+                .unwrap_or(existing.file_scopes.clone())
+        };
         let tags = input
             .tags
             .map(normalize_string_list)
@@ -1383,9 +1466,12 @@ impl PlanningStore {
                    stop_conditions_json = ?4,
                    validation_steps_json = ?5,
                    targeted_work_point_ids_json = ?6,
-                   tags_json = ?7,
+                   effort_tier = ?7,
+                   routing_hint = ?8,
+                   allow_parallel_overlap = ?9,
+                   tags_json = ?10,
                    revision = revision + 1,
-                   updated_at = ?8
+                   updated_at = ?11
              WHERE id = ?1
             "#,
             params![
@@ -1395,9 +1481,21 @@ impl PlanningStore {
                 to_json_text(&stop_conditions)?,
                 to_json_text(&validation_steps)?,
                 to_json_text(&targeted_work_point_ids)?,
+                effort_tier.as_str(),
+                routing_hint,
+                if allow_parallel_overlap { 1 } else { 0 },
                 to_json_text(&tags)?,
                 now,
             ],
+        )?;
+
+        replace_entity_file_scopes(
+            &transaction,
+            &scope_key,
+            EntityType::Plan,
+            &input.plan_id,
+            &file_scopes,
+            &now,
         )?;
 
         let record = load_plan(&transaction, &input.plan_id)?;
@@ -1417,6 +1515,10 @@ impl PlanningStore {
                     "stopConditions": record.stop_conditions,
                     "validationSteps": record.validation_steps,
                     "targetedWorkPointIds": record.targeted_work_point_ids,
+                    "effortTier": record.effort_tier,
+                    "routingHint": record.routing_hint,
+                    "allowParallelOverlap": record.allow_parallel_overlap,
+                    "fileScopes": record.file_scopes,
                     "tags": record.tags,
                     "revision": record.revision
                 }),
@@ -1540,10 +1642,17 @@ impl PlanningStore {
     pub fn list_work_points(&self) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_work_point)?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::WorkPoint, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_work_points_in_scope(
@@ -1552,22 +1661,35 @@ impl PlanningStore {
     ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map(
             params![normalize_scope_key_value(scope_key)],
             row_to_work_point,
         )?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id =
+            load_file_scopes_for_entities(&connection, EntityType::WorkPoint, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_plans(&self) -> Result<Vec<PlanRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_plan)?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_plans_in_scope(
@@ -1576,20 +1698,32 @@ impl PlanningStore {
     ) -> Result<Vec<PlanRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap, status, tags_json, revision, created_at, updated_at FROM plans WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
         let rows =
             statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_plan)?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Plan, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_todos(&self) -> Result<Vec<TodoRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos ORDER BY status ASC, ordering_index ASC, id ASC",
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos ORDER BY status ASC, ordering_index ASC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_todo)?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_todos_in_scope(
@@ -1598,11 +1732,17 @@ impl PlanningStore {
     ) -> Result<Vec<TodoRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE scope_key = ?1 ORDER BY status ASC, ordering_index ASC, id ASC",
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE scope_key = ?1 ORDER BY status ASC, ordering_index ASC, id ASC",
         )?;
         let rows =
             statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_todo)?;
-        collect_rows(rows)
+        let mut items = collect_rows(rows)?;
+        let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+        let mut file_scopes_by_id = load_file_scopes_for_entities(&connection, EntityType::Todo, &ids)?;
+        for item in &mut items {
+            item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+        }
+        Ok(items)
     }
 
     pub fn list_issues(&self) -> Result<Vec<IssueRecord>, PlanningStoreError> {
@@ -1878,6 +2018,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             ordering_index INTEGER NOT NULL,
             dependency_ids_json TEXT NOT NULL,
             validation_expectations_json TEXT NOT NULL,
+            effort_tier TEXT NOT NULL,
             tags_json TEXT NOT NULL,
             revision INTEGER NOT NULL,
             created_at TEXT NOT NULL,
@@ -1898,6 +2039,9 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             stop_conditions_json TEXT NOT NULL,
             validation_steps_json TEXT NOT NULL,
             targeted_work_point_ids_json TEXT NOT NULL,
+            effort_tier TEXT NOT NULL,
+            routing_hint TEXT,
+            allow_parallel_overlap INTEGER NOT NULL,
             status TEXT NOT NULL,
             tags_json TEXT NOT NULL,
             revision INTEGER NOT NULL,
@@ -1917,6 +2061,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             summary TEXT NOT NULL,
             status TEXT NOT NULL,
             priority TEXT NOT NULL,
+            effort_tier TEXT NOT NULL,
             evidence_refs_json TEXT NOT NULL,
             tags_json TEXT NOT NULL,
             ordering_index INTEGER NOT NULL,
@@ -1991,6 +2136,22 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_validation_findings_entity ON validation_findings(entity_type, entity_id);
+
+        CREATE TABLE IF NOT EXISTS entity_file_scopes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            owner_entity_type TEXT NOT NULL,
+            owner_entity_id TEXT NOT NULL,
+            selector_type TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            intent TEXT NOT NULL,
+            ordering_index INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(owner_entity_type, owner_entity_id, selector_type, selector, intent)
+        );
+        CREATE INDEX IF NOT EXISTS idx_entity_file_scopes_owner ON entity_file_scopes(owner_entity_type, owner_entity_id, ordering_index);
+        CREATE INDEX IF NOT EXISTS idx_entity_file_scopes_scope ON entity_file_scopes(scope_key, selector_type, selector);
         "#,
     )?;
     Ok(())
@@ -2017,9 +2178,14 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
         }
         Some("1") => {
             migrate_v1_to_v2(connection)?;
-            migrate_v2_to_v3(connection)
+            migrate_v2_to_v3(connection)?;
+            migrate_v3_to_v4(connection)
         }
-        Some("2") => migrate_v2_to_v3(connection),
+        Some("2") => {
+            migrate_v2_to_v3(connection)?;
+            migrate_v3_to_v4(connection)
+        }
+        Some("3") => migrate_v3_to_v4(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -2069,6 +2235,75 @@ fn migrate_v2_to_v3(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     ensure_default_scope(connection)?;
     create_scope_indexes(connection)?;
     ensure_event_scope_support(connection)?;
+    connection.execute(
+        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+    )?;
+    Ok(())
+}
+
+fn migrate_v3_to_v4(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    ensure_default_scope(connection)?;
+    create_scope_indexes(connection)?;
+    ensure_event_scope_support(connection)?;
+
+    if !table_has_column(connection, "work_points", "effort_tier")? {
+        connection.execute(
+            "ALTER TABLE work_points ADD COLUMN effort_tier TEXT NOT NULL DEFAULT 'balanced'",
+            [],
+        )?;
+    }
+    if !table_has_column(connection, "plans", "effort_tier")? {
+        connection.execute(
+            "ALTER TABLE plans ADD COLUMN effort_tier TEXT NOT NULL DEFAULT 'balanced'",
+            [],
+        )?;
+    }
+    if !table_has_column(connection, "plans", "routing_hint")? {
+        connection.execute("ALTER TABLE plans ADD COLUMN routing_hint TEXT", [])?;
+    }
+    if !table_has_column(connection, "plans", "allow_parallel_overlap")? {
+        connection.execute(
+            "ALTER TABLE plans ADD COLUMN allow_parallel_overlap INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
+    if !table_has_column(connection, "todos", "effort_tier")? {
+        connection.execute(
+            "ALTER TABLE todos ADD COLUMN effort_tier TEXT NOT NULL DEFAULT 'balanced'",
+            [],
+        )?;
+    }
+
+    connection.execute_batch(
+        r#"
+        UPDATE work_points SET effort_tier = 'balanced' WHERE effort_tier IS NULL OR TRIM(effort_tier) = '';
+        UPDATE plans SET effort_tier = 'balanced' WHERE effort_tier IS NULL OR TRIM(effort_tier) = '';
+        UPDATE plans SET allow_parallel_overlap = 0 WHERE allow_parallel_overlap IS NULL;
+        UPDATE todos SET effort_tier = 'balanced' WHERE effort_tier IS NULL OR TRIM(effort_tier) = '';
+        "#,
+    )?;
+
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS entity_file_scopes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            owner_entity_type TEXT NOT NULL,
+            owner_entity_id TEXT NOT NULL,
+            selector_type TEXT NOT NULL,
+            selector TEXT NOT NULL,
+            intent TEXT NOT NULL,
+            ordering_index INTEGER NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(owner_entity_type, owner_entity_id, selector_type, selector, intent)
+        );
+        CREATE INDEX IF NOT EXISTS idx_entity_file_scopes_owner ON entity_file_scopes(owner_entity_type, owner_entity_id, ordering_index);
+        CREATE INDEX IF NOT EXISTS idx_entity_file_scopes_scope ON entity_file_scopes(scope_key, selector_type, selector);
+        "#,
+    )?;
+
     connection.execute(
         "UPDATE planning_config SET value = ?2 WHERE key = ?1",
         params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
@@ -2569,7 +2804,7 @@ fn list_work_point_dependents(
     dependency_id: &str,
 ) -> Result<Vec<String>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points ORDER BY id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points ORDER BY id ASC",
     )?;
     let rows = statement.query_map([], row_to_work_point)?;
     let work_points = collect_rows(rows)?;
@@ -2590,7 +2825,7 @@ fn list_plans_targeting_work_point(
     work_point_id: &str,
 ) -> Result<Vec<String>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY id ASC",
+        "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap, status, tags_json, revision, created_at, updated_at FROM plans ORDER BY id ASC",
     )?;
     let rows = statement.query_map([], row_to_plan)?;
     let plans = collect_rows(rows)?;
@@ -2681,13 +2916,15 @@ pub(crate) fn load_plan(
     connection: &Connection,
     id: &str,
 ) -> Result<PlanRecord, PlanningStoreError> {
-    connection
+    let mut record = connection
         .query_row(
-            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, status, tags_json, revision, created_at, updated_at FROM plans WHERE id = ?1",
+            "SELECT id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap, status, tags_json, revision, created_at, updated_at FROM plans WHERE id = ?1",
             params![id],
             row_to_plan,
         )
-        .map_err(|error| map_not_found(error, EntityType::Plan, id))
+        .map_err(|error| map_not_found(error, EntityType::Plan, id))?;
+    record.file_scopes = load_file_scopes_for_entity(connection, EntityType::Plan, id)?;
+    Ok(record)
 }
 
 pub(crate) fn load_issue(
@@ -2707,26 +2944,30 @@ pub(crate) fn load_work_point(
     connection: &Connection,
     id: &str,
 ) -> Result<WorkPointRecord, PlanningStoreError> {
-    connection
+    let mut record = connection
         .query_row(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
             params![id],
             row_to_work_point,
         )
-        .map_err(|error| map_not_found(error, EntityType::WorkPoint, id))
+        .map_err(|error| map_not_found(error, EntityType::WorkPoint, id))?;
+    record.file_scopes = load_file_scopes_for_entity(connection, EntityType::WorkPoint, id)?;
+    Ok(record)
 }
 
 pub(crate) fn load_todo(
     connection: &Connection,
     id: &str,
 ) -> Result<TodoRecord, PlanningStoreError> {
-    connection
+    let mut record = connection
         .query_row(
-            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE id = ?1",
+            "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE id = ?1",
             params![id],
             row_to_todo,
         )
-        .map_err(|error| map_not_found(error, EntityType::Todo, id))
+        .map_err(|error| map_not_found(error, EntityType::Todo, id))?;
+    record.file_scopes = load_file_scopes_for_entity(connection, EntityType::Todo, id)?;
+    Ok(record)
 }
 
 pub(crate) fn load_review_point(
@@ -2786,10 +3027,15 @@ pub(crate) fn list_work_points_for_roadmap(
     roadmap_id: &str,
 ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id], row_to_work_point)?;
-    let items = collect_rows(rows)?;
+    let mut items = collect_rows(rows)?;
+    let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
+    for item in &mut items {
+        item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+    }
     Ok(items)
 }
 
@@ -2799,10 +3045,15 @@ pub(crate) fn list_work_points_for_roadmap_in_scope(
     scope_key: &str,
 ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id, scope_key], row_to_work_point)?;
-    let items = collect_rows(rows)?;
+    let mut items = collect_rows(rows)?;
+    let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::WorkPoint, &ids)?;
+    for item in &mut items {
+        item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+    }
     Ok(items)
 }
 
@@ -2811,10 +3062,15 @@ pub(crate) fn list_todos_for_plan(
     plan_id: &str,
 ) -> Result<Vec<TodoRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![plan_id], row_to_todo)?;
-    let items = collect_rows(rows)?;
+    let mut items = collect_rows(rows)?;
+    let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::Todo, &ids)?;
+    for item in &mut items {
+        item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+    }
     Ok(items)
 }
 
@@ -2824,10 +3080,15 @@ pub(crate) fn list_todos_for_plan_in_scope(
     scope_key: &str,
 ) -> Result<Vec<TodoRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![plan_id, scope_key], row_to_todo)?;
-    let items = collect_rows(rows)?;
+    let mut items = collect_rows(rows)?;
+    let ids = items.iter().map(|item| item.id.clone()).collect::<Vec<_>>();
+    let mut file_scopes_by_id = load_file_scopes_for_entities(connection, EntityType::Todo, &ids)?;
+    for item in &mut items {
+        item.file_scopes = file_scopes_by_id.remove(&item.id).unwrap_or_default();
+    }
     Ok(items)
 }
 
@@ -3014,6 +3275,133 @@ fn next_todo_ordering(
     )?)
 }
 
+fn normalize_file_scopes(file_scopes: Vec<FileScopeRecord>) -> Vec<FileScopeRecord> {
+    let mut scopes: Vec<FileScopeRecord> = file_scopes
+        .into_iter()
+        .map(|scope| FileScopeRecord {
+            selector_type: scope.selector_type,
+            selector: scope.selector.trim().to_string(),
+            intent: scope.intent,
+        })
+        .filter(|scope| !scope.selector.is_empty())
+        .collect();
+    scopes.sort_by(|left, right| {
+        left.selector_type
+            .as_str()
+            .cmp(right.selector_type.as_str())
+            .then_with(|| left.intent.as_str().cmp(right.intent.as_str()))
+            .then_with(|| left.selector.cmp(&right.selector))
+    });
+    scopes.dedup_by(|left, right| {
+        left.selector_type == right.selector_type
+            && left.intent == right.intent
+            && left.selector == right.selector
+    });
+    scopes
+}
+
+fn replace_entity_file_scopes(
+    connection: &Transaction<'_>,
+    scope_key: &str,
+    owner_entity_type: EntityType,
+    owner_entity_id: &str,
+    file_scopes: &[FileScopeRecord],
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    connection.execute(
+        "DELETE FROM entity_file_scopes WHERE owner_entity_type = ?1 AND owner_entity_id = ?2",
+        params![owner_entity_type.as_str(), owner_entity_id],
+    )?;
+
+    for (index, file_scope) in file_scopes.iter().enumerate() {
+        connection.execute(
+            r#"
+            INSERT INTO entity_file_scopes (
+                id, scope_key, owner_entity_type, owner_entity_id, selector_type, selector,
+                intent, ordering_index, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+            "#,
+            params![
+                new_id(),
+                scope_key,
+                owner_entity_type.as_str(),
+                owner_entity_id,
+                file_scope.selector_type.as_str(),
+                file_scope.selector,
+                file_scope.intent.as_str(),
+                index as i64,
+                now,
+                now,
+            ],
+        )?;
+    }
+
+    Ok(())
+}
+
+fn load_file_scopes_for_entity(
+    connection: &Connection,
+    owner_entity_type: EntityType,
+    owner_entity_id: &str,
+) -> Result<Vec<FileScopeRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT selector_type, selector, intent FROM entity_file_scopes WHERE owner_entity_type = ?1 AND owner_entity_id = ?2 ORDER BY ordering_index ASC, id ASC",
+    )?;
+    let rows = statement.query_map(params![owner_entity_type.as_str(), owner_entity_id], |row| {
+        Ok(FileScopeRecord {
+            selector_type: parse_file_scope_selector_type(row.get::<_, String>(0)?)?,
+            selector: row.get(1)?,
+            intent: parse_file_scope_intent(row.get::<_, String>(2)?)?,
+        })
+    })?;
+    collect_rows(rows)
+}
+
+fn load_file_scopes_for_entities(
+    connection: &Connection,
+    owner_entity_type: EntityType,
+    owner_entity_ids: &[String],
+) -> Result<HashMap<String, Vec<FileScopeRecord>>, PlanningStoreError> {
+    if owner_entity_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut grouped = HashMap::<String, Vec<FileScopeRecord>>::new();
+    let chunk_size = SQLITE_MAX_VARIABLES - FILE_SCOPE_QUERY_FIXED_VARIABLES;
+
+    for chunk in owner_entity_ids.chunks(chunk_size) {
+        let mut params_vec = Vec::with_capacity(chunk.len() + 1);
+        params_vec.push(owner_entity_type.as_str().to_string());
+        params_vec.extend(chunk.iter().cloned());
+        let placeholders = (2..(chunk.len() + 2))
+            .map(|index| format!("?{index}"))
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT owner_entity_id, selector_type, selector, intent FROM entity_file_scopes WHERE owner_entity_type = ?1 AND owner_entity_id IN ({placeholders}) ORDER BY owner_entity_id ASC, ordering_index ASC, id ASC"
+        );
+
+        let mut statement = connection.prepare(&query)?;
+        let rows = statement.query_map(params_from_iter(params_vec), |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                FileScopeRecord {
+                    selector_type: parse_file_scope_selector_type(row.get::<_, String>(1)?)?,
+                    selector: row.get(2)?,
+                    intent: parse_file_scope_intent(row.get::<_, String>(3)?)?,
+                },
+            ))
+        })?;
+
+        for row in rows {
+            let (entity_id, scope) = row?;
+            grouped.entry(entity_id).or_default().push(scope);
+        }
+    }
+
+    Ok(grouped)
+}
+
 fn update_status_row(
     connection: &Transaction<'_>,
     table: &str,
@@ -3150,10 +3538,12 @@ fn row_to_work_point(row: &Row<'_>) -> Result<WorkPointRecord, rusqlite::Error> 
         ordering: row.get(7)?,
         dependency_ids: parse_json_column(row.get::<_, String>(8)?)?,
         validation_expectations: parse_json_column(row.get::<_, String>(9)?)?,
-        tags: parse_json_column(row.get::<_, String>(10)?)?,
-        revision: row.get(11)?,
-        created_at: row.get(12)?,
-        updated_at: row.get(13)?,
+        effort_tier: parse_effort_tier(row.get::<_, String>(10)?)?,
+        file_scopes: Vec::new(),
+        tags: parse_json_column(row.get::<_, String>(11)?)?,
+        revision: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
     })
 }
 
@@ -3171,11 +3561,15 @@ fn row_to_plan(row: &Row<'_>) -> Result<PlanRecord, rusqlite::Error> {
         stop_conditions: parse_json_column(row.get::<_, String>(9)?)?,
         validation_steps: parse_json_column(row.get::<_, String>(10)?)?,
         targeted_work_point_ids: parse_json_column(row.get::<_, String>(11)?)?,
-        status: parse_plan_status(row.get::<_, String>(12)?)?,
-        tags: parse_json_column(row.get::<_, String>(13)?)?,
-        revision: row.get(14)?,
-        created_at: row.get(15)?,
-        updated_at: row.get(16)?,
+        effort_tier: parse_effort_tier(row.get::<_, String>(12)?)?,
+        routing_hint: row.get(13)?,
+        allow_parallel_overlap: row.get::<_, i64>(14)? != 0,
+        file_scopes: Vec::new(),
+        status: parse_plan_status(row.get::<_, String>(15)?)?,
+        tags: parse_json_column(row.get::<_, String>(16)?)?,
+        revision: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 
@@ -3189,12 +3583,14 @@ fn row_to_todo(row: &Row<'_>) -> Result<TodoRecord, rusqlite::Error> {
         summary: row.get(5)?,
         status: parse_todo_status(row.get::<_, String>(6)?)?,
         priority: parse_priority(row.get::<_, String>(7)?)?,
-        evidence_refs: parse_json_column(row.get::<_, String>(8)?)?,
-        tags: parse_json_column(row.get::<_, String>(9)?)?,
-        ordering: row.get(10)?,
-        revision: row.get(11)?,
-        created_at: row.get(12)?,
-        updated_at: row.get(13)?,
+        effort_tier: parse_effort_tier(row.get::<_, String>(8)?)?,
+        file_scopes: Vec::new(),
+        evidence_refs: parse_json_column(row.get::<_, String>(9)?)?,
+        tags: parse_json_column(row.get::<_, String>(10)?)?,
+        ordering: row.get(11)?,
+        revision: row.get(12)?,
+        created_at: row.get(13)?,
+        updated_at: row.get(14)?,
     })
 }
 
@@ -3529,6 +3925,20 @@ fn parse_priority(value: String) -> Result<Priority, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
 
+fn parse_effort_tier(value: String) -> Result<EffortTier, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_file_scope_selector_type(
+    value: String,
+) -> Result<FileScopeSelectorType, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_file_scope_intent(value: String) -> Result<crate::FileScopeIntent, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
 fn parse_severity(value: String) -> Result<Severity, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
@@ -3636,6 +4046,8 @@ mod tests {
                 ordering: None,
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: None,
             })
@@ -3654,6 +4066,10 @@ mod tests {
                 stop_conditions: Vec::new(),
                 validation_steps: vec!["validate".to_string()],
                 targeted_work_point_ids: vec![work_point_id.clone()],
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: None,
+                allow_parallel_overlap: false,
+                file_scopes: Vec::new(),
                 status: PlanStatus::Active,
                 tags: Vec::new(),
                 run_id: None,
@@ -3669,6 +4085,8 @@ mod tests {
                 summary: "Scoped todo".to_string(),
                 status: TodoStatus::InProgress,
                 priority: Priority::High,
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 evidence_refs: Vec::new(),
                 tags: Vec::new(),
                 ordering: None,
@@ -3770,6 +4188,8 @@ mod tests {
                 ordering: None,
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["health command passes".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: Some("run-wp".to_string()),
             })
@@ -3792,6 +4212,10 @@ mod tests {
                 stop_conditions: vec!["validation invalid".to_string()],
                 validation_steps: vec!["cargo test -p elegy-planning".to_string()],
                 targeted_work_point_ids: vec!["wp-1".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: None,
+                allow_parallel_overlap: false,
+                file_scopes: Vec::new(),
                 status: PlanStatus::Active,
                 tags: Vec::new(),
                 run_id: Some("run-plan".to_string()),
@@ -3814,6 +4238,8 @@ mod tests {
                 summary: "Wire the first shipping slice.".to_string(),
                 status: TodoStatus::InProgress,
                 priority: Priority::High,
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 evidence_refs: vec!["cargo-test:elegy-planning".to_string()],
                 tags: Vec::new(),
                 ordering: None,
@@ -3848,6 +4274,8 @@ mod tests {
                 summary: "Allowed for manual tracking.".to_string(),
                 status: TodoStatus::Pending,
                 priority: Priority::Medium,
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 evidence_refs: Vec::new(),
                 tags: Vec::new(),
                 ordering: None,
@@ -3955,6 +4383,8 @@ mod tests {
                 ordering: None,
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: Some("run-wp-issue".to_string()),
             })
@@ -3973,6 +4403,10 @@ mod tests {
                 stop_conditions: Vec::new(),
                 validation_steps: vec!["validate".to_string()],
                 targeted_work_point_ids: vec!["wp-issue-1".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: None,
+                allow_parallel_overlap: false,
+                file_scopes: Vec::new(),
                 status: PlanStatus::Active,
                 tags: Vec::new(),
                 run_id: Some("run-plan-issue".to_string()),
@@ -3988,6 +4422,8 @@ mod tests {
                 summary: "Summary".to_string(),
                 status: TodoStatus::Pending,
                 priority: Priority::Medium,
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 evidence_refs: Vec::new(),
                 tags: Vec::new(),
                 ordering: None,
@@ -4074,6 +4510,10 @@ mod tests {
                 stop_conditions: Vec::new(),
                 validation_steps: Vec::new(),
                 targeted_work_point_ids: Vec::new(),
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: None,
+                allow_parallel_overlap: false,
+                file_scopes: Vec::new(),
                 status: PlanStatus::Draft,
                 tags: Vec::new(),
                 run_id: Some("run-events-plan".to_string()),
@@ -4175,6 +4615,12 @@ mod tests {
                 stop_conditions: None,
                 validation_steps: None,
                 targeted_work_point_ids: None,
+                effort_tier: None,
+                routing_hint: None,
+                clear_routing_hint: false,
+                allow_parallel_overlap: None,
+                file_scopes: None,
+                clear_file_scopes: false,
                 tags: None,
                 run_id: None,
             })
@@ -4196,6 +4642,12 @@ mod tests {
                 stop_conditions: Some(vec!["stop".to_string()]),
                 validation_steps: None,
                 targeted_work_point_ids: None,
+                effort_tier: None,
+                routing_hint: None,
+                clear_routing_hint: false,
+                allow_parallel_overlap: None,
+                file_scopes: None,
+                clear_file_scopes: false,
                 tags: Some(vec!["transfer".to_string()]),
                 run_id: Some("run-transfer".to_string()),
             })
@@ -4222,6 +4674,113 @@ mod tests {
         assert!(!workspace_b_events.iter().any(|event| {
             event.entity_id == fixture.plan_id && event.event_type == "plan.revised"
         }));
+    }
+
+    #[test]
+    fn revise_plan_can_clear_routing_hint_and_file_scopes() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-clear".to_string()),
+                scope_key: None,
+                correlation_id: "corr-clear".to_string(),
+                title: "Goal".to_string(),
+                description: "Description".to_string(),
+                acceptance_criteria: vec!["done".to_string()],
+                rejection_criteria: Vec::new(),
+                status: GoalStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create goal");
+
+        store
+            .create_roadmap(CreateRoadmapInput {
+                id: Some("roadmap-clear".to_string()),
+                scope_key: None,
+                goal_id: "goal-clear".to_string(),
+                correlation_id: "corr-clear".to_string(),
+                title: "Roadmap".to_string(),
+                summary: "Summary".to_string(),
+                status: RoadmapStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create roadmap");
+
+        store
+            .create_plan(CreatePlanInput {
+                id: Some("plan-clear".to_string()),
+                scope_key: None,
+                goal_id: "goal-clear".to_string(),
+                roadmap_id: "roadmap-clear".to_string(),
+                correlation_id: "corr-clear".to_string(),
+                title: "Plan".to_string(),
+                summary: "Summary".to_string(),
+                scope: "scope".to_string(),
+                assumptions: vec!["a1".to_string()],
+                stop_conditions: Vec::new(),
+                validation_steps: Vec::new(),
+                targeted_work_point_ids: Vec::new(),
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: Some("flash-lane".to_string()),
+                allow_parallel_overlap: false,
+                file_scopes: vec![crate::FileScopeRecord {
+                    selector_type: crate::FileScopeSelectorType::Glob,
+                    selector: "rust/crates/elegy-planning/src/**".to_string(),
+                    intent: crate::FileScopeIntent::Primary,
+                }],
+                status: PlanStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create plan");
+
+        let revised = store
+            .revise_plan(RevisePlanInput {
+                plan_id: "plan-clear".to_string(),
+                active_scope_key: None,
+                scope_key: None,
+                assumptions: None,
+                stop_conditions: None,
+                validation_steps: None,
+                targeted_work_point_ids: None,
+                effort_tier: None,
+                routing_hint: None,
+                clear_routing_hint: true,
+                allow_parallel_overlap: None,
+                file_scopes: None,
+                clear_file_scopes: true,
+                tags: None,
+                run_id: None,
+            })
+            .expect("revise plan");
+
+        assert_eq!(revised.record.id, "plan-clear");
+        assert!(revised.record.routing_hint.is_none());
+        assert!(revised.record.file_scopes.is_empty());
+    }
+
+    #[test]
+    fn load_file_scopes_for_entities_supports_ids_over_sqlite_variable_limit() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+
+        let connection = store.open_connection().expect("open connection");
+        let owner_entity_ids = (0..1200)
+            .map(|index| format!("plan-{index}"))
+            .collect::<Vec<_>>();
+
+        let grouped = load_file_scopes_for_entities(&connection, EntityType::Plan, &owner_entity_ids)
+            .expect("load file scopes in chunks");
+
+        assert!(grouped.is_empty());
     }
 
     #[test]
@@ -4400,7 +4959,7 @@ mod tests {
         assert_eq!(goals.len(), 1);
         assert_eq!(goals[0].scope_key, "default");
         let health = store.health().expect("health");
-        assert_eq!(health.schema_version, "3");
+        assert_eq!(health.schema_version, CURRENT_SCHEMA_VERSION);
         assert_eq!(health.scope_count, 1);
     }
 
@@ -4564,6 +5123,8 @@ mod tests {
                 ordering: None,
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: None,
             })
@@ -4582,6 +5143,10 @@ mod tests {
                 stop_conditions: Vec::new(),
                 validation_steps: vec!["validate".to_string()],
                 targeted_work_point_ids: vec!["wp-life".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                routing_hint: None,
+                allow_parallel_overlap: false,
+                file_scopes: Vec::new(),
                 status: PlanStatus::Active,
                 tags: Vec::new(),
                 run_id: None,
@@ -4597,6 +5162,8 @@ mod tests {
                 summary: "Summary".to_string(),
                 status: TodoStatus::InProgress,
                 priority: Priority::High,
+                effort_tier: crate::EffortTier::Balanced,
+                file_scopes: Vec::new(),
                 evidence_refs: Vec::new(),
                 tags: Vec::new(),
                 ordering: None,
@@ -4623,6 +5190,12 @@ mod tests {
                 stop_conditions: Some(vec!["stop".to_string()]),
                 validation_steps: None,
                 targeted_work_point_ids: None,
+                effort_tier: None,
+                routing_hint: None,
+                clear_routing_hint: false,
+                allow_parallel_overlap: None,
+                file_scopes: None,
+                clear_file_scopes: false,
                 tags: Some(vec!["rev-1".to_string()]),
                 run_id: Some("run-life".to_string()),
             })
@@ -4646,3 +5219,5 @@ mod tests {
             .any(|event| event.event_type == "plan.revised"));
     }
 }
+
+
