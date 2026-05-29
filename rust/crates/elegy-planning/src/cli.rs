@@ -7,10 +7,10 @@ use thiserror::Error;
 
 use crate::{
     AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EntityType,
-    GoalStatus, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat,
-    ReviewPointStatus, RevisePlanInput, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput,
-    WorkPointStatus,
+    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
+    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus,
+    IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat, ReviewPointStatus,
+    RevisePlanInput, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -283,6 +283,10 @@ struct RoadmapAddWorkPointArgs {
     dependency_ids: Vec<String>,
     #[arg(long = "validation")]
     validation_expectations: Vec<String>,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -325,6 +329,14 @@ struct PlanCreateArgs {
     validation_steps: Vec<String>,
     #[arg(long = "target-work-point-id")]
     targeted_work_point_ids: Vec<String>,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "routing-hint")]
+    routing_hint: Option<String>,
+    #[arg(long, default_value_t = false)]
+    allow_parallel_overlap: bool,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long, value_enum, default_value_t = PlanStatus::Draft)]
     status: PlanStatus,
     #[arg(long = "tag")]
@@ -351,6 +363,18 @@ struct PlanReviseArgs {
     validation_steps: Vec<String>,
     #[arg(long = "target-work-point-id")]
     targeted_work_point_ids: Vec<String>,
+    #[arg(long, value_enum)]
+    effort_tier: Option<EffortTier>,
+    #[arg(long = "routing-hint")]
+    routing_hint: Option<String>,
+    #[arg(long, default_value_t = false)]
+    clear_routing_hint: bool,
+    #[arg(long)]
+    allow_parallel_overlap: Option<bool>,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
+    #[arg(long, default_value_t = false)]
+    clear_file_scopes: bool,
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -379,6 +403,10 @@ struct TodoCreateArgs {
     status: TodoStatus,
     #[arg(long, value_enum, default_value_t = Priority::Medium)]
     priority: Priority,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long = "evidence-ref")]
     evidence_refs: Vec<String>,
     #[arg(long = "tag")]
@@ -786,6 +814,8 @@ fn execute_roadmap(
                 ordering: args.ordering,
                 dependency_ids: args.dependency_ids,
                 validation_expectations: args.validation_expectations,
+                effort_tier: args.effort_tier,
+                file_scopes: parse_file_scopes(args.file_scopes)?,
                 tags: args.tags,
                 run_id: context.correlation_id.clone(),
             })?,
@@ -881,27 +911,55 @@ fn execute_plan(
                     stop_conditions: args.stop_conditions,
                     validation_steps: args.validation_steps,
                     targeted_work_point_ids: args.targeted_work_point_ids,
+                    effort_tier: args.effort_tier,
+                    routing_hint: args.routing_hint,
+                    allow_parallel_overlap: args.allow_parallel_overlap,
+                    file_scopes: parse_file_scopes(args.file_scopes)?,
                     status: args.status,
                     tags: args.tags,
                     run_id: context.correlation_id.clone(),
                 })?,
             )
         }
-        PlanCommand::Revise(args) => emit_success(
-            context,
-            vec!["plan", "revise"],
-            store.revise_plan(RevisePlanInput {
-                plan_id: args.plan_id,
-                active_scope_key: Some(context.scope_key.clone()),
-                scope_key: args.scope_key,
-                assumptions: optional_vec(args.assumptions),
-                stop_conditions: optional_vec(args.stop_conditions),
-                validation_steps: optional_vec(args.validation_steps),
-                targeted_work_point_ids: optional_vec(args.targeted_work_point_ids),
-                tags: optional_vec(args.tags),
-                run_id: context.correlation_id.clone(),
-            })?,
-        ),
+        PlanCommand::Revise(args) => {
+            if args.clear_routing_hint && args.routing_hint.is_some() {
+                return emit_error(
+                    context,
+                    vec!["plan", "revise"],
+                    "--clear-routing-hint cannot be combined with --routing-hint".to_string(),
+                    true,
+                );
+            }
+            if args.clear_file_scopes && !args.file_scopes.is_empty() {
+                return emit_error(
+                    context,
+                    vec!["plan", "revise"],
+                    "--clear-file-scopes cannot be combined with --file-scope".to_string(),
+                    true,
+                );
+            }
+            emit_success(
+                context,
+                vec!["plan", "revise"],
+                store.revise_plan(RevisePlanInput {
+                    plan_id: args.plan_id,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    scope_key: args.scope_key,
+                    assumptions: optional_vec(args.assumptions),
+                    stop_conditions: optional_vec(args.stop_conditions),
+                    validation_steps: optional_vec(args.validation_steps),
+                    targeted_work_point_ids: optional_vec(args.targeted_work_point_ids),
+                    effort_tier: args.effort_tier,
+                    routing_hint: args.routing_hint,
+                    clear_routing_hint: args.clear_routing_hint,
+                    allow_parallel_overlap: args.allow_parallel_overlap,
+                    file_scopes: optional_file_scopes(args.file_scopes)?,
+                    clear_file_scopes: args.clear_file_scopes,
+                    tags: optional_vec(args.tags),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
         PlanCommand::UpdateStatus(args) => emit_success(
             context,
             vec!["plan", "update-status"],
@@ -955,6 +1013,8 @@ fn execute_todo(
                 summary: args.summary,
                 status: args.status,
                 priority: args.priority,
+                effort_tier: args.effort_tier,
+                file_scopes: parse_file_scopes(args.file_scopes)?,
                 evidence_refs: args.evidence_refs,
                 tags: args.tags,
                 ordering: args.ordering,
@@ -1441,6 +1501,41 @@ fn optional_vec(values: Vec<String>) -> Option<Vec<String>> {
     } else {
         Some(values)
     }
+}
+
+fn optional_file_scopes(values: Vec<String>) -> Result<Option<Vec<FileScopeRecord>>, CliError> {
+    if values.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(parse_file_scopes(values)?))
+    }
+}
+
+fn parse_file_scopes(values: Vec<String>) -> Result<Vec<FileScopeRecord>, CliError> {
+    let mut scopes = Vec::new();
+    for raw in values {
+        let mut segments = raw.splitn(3, ':');
+        let selector_type = segments.next().unwrap_or_default().trim();
+        let intent = segments.next().unwrap_or_default().trim();
+        let selector = segments.next().unwrap_or_default().trim();
+        if selector_type.is_empty() || intent.is_empty() || selector.is_empty() {
+            return Err(CliError::Store(crate::PlanningStoreError::InvalidInput(
+                "file scope must match '<selector-type>:<intent>:<selector>'".to_string(),
+            )));
+        }
+        let selector_type = selector_type.parse::<FileScopeSelectorType>().map_err(|error| {
+            CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
+        })?;
+        let intent = intent.parse::<FileScopeIntent>().map_err(|error| {
+            CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
+        })?;
+        scopes.push(FileScopeRecord {
+            selector_type,
+            selector: selector.to_string(),
+            intent,
+        });
+    }
+    Ok(scopes)
 }
 
 fn parse_optional_json_object(
