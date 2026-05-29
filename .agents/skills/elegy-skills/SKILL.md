@@ -1,6 +1,6 @@
 ---
 name: elegy-skills
-description: "Derived repo-local skill bridge mirror for Elegy's current dedicated skill-registry surface. Use for governed skill search, resolve, inspect, and validation through the dedicated elegy-skills CLI."
+description: "Derived repo-local skill bridge mirror for Elegy's current dedicated skill-registry surface. Use for governed skill list, search, resolve, get, capability, and validation through the dedicated elegy-skills CLI."
 ---
 
 # Elegy Skills
@@ -15,7 +15,7 @@ The authority chain is one-way:
 
 ## When to use
 
-- Prefer the dedicated `elegy-skills` binary for registry-first skill work: searching, resolving, inspecting, and validating governed v2 skills.
+- Prefer the dedicated `elegy-skills` binary for registry-first skill work: listing, searching, resolving, getting skill or capability details, and validating governed v2 skills.
 - Use the same crate directly from Rust when a host such as Holon should avoid CLI subprocess overhead for registry access.
 - Treat `elegy skills ...` as the umbrella compatibility surface for the same registry features.
 
@@ -42,5 +42,5 @@ elegy-skills validate --dir <path>
 ## Surface posture
 
 - This CLI is the dedicated registry surface over the governed v2 skill catalog plus a reusable Rust API for in-process hosts.
-- The dedicated surface is intentionally bounded to discovery, resolution, inspection, and validation over governed skill artifacts.
+- The dedicated surface is intentionally bounded to discovery, resolution, skill/capability lookup, and validation over governed skill artifacts.
 - Governed skill artifacts remain rooted in `contracts/` and versioned through `governance/`.

@@ -1,6 +1,6 @@
 ---
 created: 2026-03-19
-updated: 2026-03-23
+updated: 2026-05-29
 category: architecture
 status: active
 doc_kind: reference
@@ -38,7 +38,7 @@ This means:
 
 The currently implemented slice is still intentionally narrower than the full spec:
 
-- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and use `elegy generate skills` for lower-level skill generation and `elegy generate codex-plugin` for conservative Codex package projection; `elegy` remains the general/compatibility surface while `elegy-skills` is the dedicated registry/search/validate surface
+- for contributor-facing CLI work in the current MCP slice, prefer the dedicated `elegy-mcp` `author`/`analyze` path and use lower-level `elegy generate ...` flows for skill generation or conservative Codex package projection; `elegy` remains the general/compatibility surface while `elegy-skills` is the dedicated registry list/search/resolve/get/capability/validate surface
 - `elegy-host-mcp` exists as a thin stdio host over runtime-composed resources
 - resources-first behavior remains the current live runtime posture
 - no implied support for prompts, sampling, autonomous MCP-native self-authoring, or built-in skill-driven orchestration unless documentation and implementation are updated together

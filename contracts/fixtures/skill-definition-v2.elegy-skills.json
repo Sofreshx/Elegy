@@ -11,7 +11,7 @@
   "metadata": {
     "displayName": "Elegy Skill Registry",
     "description": "Registry-first discovery, resolution, and validation over governed v2 skill definitions.",
-    "summary": "Search, resolve, inspect, and validate governed skills with a dedicated CLI and reusable Rust API.",
+    "summary": "List, search, resolve, get, inspect capability details, and validate governed skills with a dedicated CLI and reusable Rust API.",
     "category": "skills",
     "author": "Elegy Contributors",
     "license": "Apache-2.0",

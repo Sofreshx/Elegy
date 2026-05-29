@@ -10,7 +10,7 @@ Delegation stays one-way:
 
 - `contracts/` and `governance/` remain canonical for skill schemas, fixtures, discovery projections, and policy.
 - `rust/crates/elegy-skills` remains the implementation center for the dedicated skill-registry CLI and reusable Rust registry API.
-- `.github/skills/elegy-skills/SKILL.md` remains the repo-local non-authoritative contributor-routing output for this surface.
+- `.agents/skills/elegy-skills/SKILL.md` and `.github/skills/elegy-skills/SKILL.md` remain repo-local non-authoritative contributor-routing outputs for this surface.
 - `docs/architecture/skill-core-v1.md` and `docs/architecture/mcp-skill-tooling-placement.md` remain the canonical documentation entrypoints.
 
 This wrapper surface organizes its helper lanes like this:

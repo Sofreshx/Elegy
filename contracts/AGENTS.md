@@ -17,5 +17,5 @@
 ## Validation
 
 - Use the narrowest contract or Rust validation that covers the edited artifact.
-- For agent-facing changes, inspect the JSON that `elegy agent manifest/discover` or `elegy skills describe` emits.
+- For host-facing capability changes, inspect the JSON emitted by `elegy agent manifest/discover --detail --json` and, when relevant, `elegy-skills get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface.
 - If generated outputs or archives are affected, validate the relevant export or canonical-output flow rather than only the source file.
