@@ -1488,7 +1488,7 @@ fn resolve_block_content(
     target_root: &Path,
 ) -> Result<String, ConfigurationError> {
     if let Some(content) = content {
-        return Ok(render_path_template(content, bindings)?);
+        return render_path_template(content, bindings);
     }
     let content_path = content_path.as_ref().ok_or_else(|| {
         ConfigurationError::Contracts(format!(
@@ -1876,6 +1876,7 @@ fn deep_merge_json(target: &mut Value, incoming: &Value) {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_receipt(
     mode: ElegyConfigurationReceiptMode,
     subject_kind: ElegyConfigurationReceiptSubjectKind,
@@ -1928,6 +1929,7 @@ fn summarize_entries(
     summary
 }
 
+#[allow(clippy::too_many_arguments)]
 fn build_entry(
     template: &ElegyConfigurationTemplate,
     operation_id: &str,

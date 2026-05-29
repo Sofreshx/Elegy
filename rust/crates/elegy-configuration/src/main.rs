@@ -1,12 +1,12 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use elegy_contracts::{
-    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
-    CliFailureKind, CliMachineContext, CliMachineEnvelope,
-};
 use elegy_configuration::{
     apply_configuration, list_builtin_configuration_catalog, show_configuration_template,
     verify_configuration, ApplyConfigurationRequest, ConfigurationError,
     VerifyConfigurationRequest,
+};
+use elegy_contracts::{
+    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
+    CliFailureKind, CliMachineContext, CliMachineEnvelope,
 };
 use serde::Serialize;
 use std::path::PathBuf;
@@ -209,6 +209,7 @@ fn execute_show_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_apply_command(
     target: PathBuf,
     dry_run: bool,
@@ -261,6 +262,7 @@ fn execute_apply_command(
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn execute_verify_command(
     target: PathBuf,
     package: Option<PathBuf>,

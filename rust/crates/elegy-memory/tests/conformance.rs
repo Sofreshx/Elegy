@@ -1,8 +1,8 @@
 use elegy_contracts::{
     validate_execution_event, validate_invocation_request, validate_invocation_response,
     validate_structured_failure, ExecutionEvent, ExecutionEventStatus, ExecutionEventType,
-    InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus,
-    StructuredFailure, CLI_SCHEMA_VERSION,
+    InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus, StructuredFailure,
+    CLI_SCHEMA_VERSION,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -190,7 +190,8 @@ fn health_command_machine_output_maps_cleanly_to_invocation_contracts() {
     );
 
     assert!(
-        response.output.as_ref().expect("completed output")["data"]["averageImportance"].is_number()
+        response.output.as_ref().expect("completed output")["data"]["averageImportance"]
+            .is_number()
     );
 }
 
@@ -225,7 +226,10 @@ fn purge_without_yes_machine_output_maps_cleanly_to_failure_contracts() {
 
     let failure = envelope.failure.expect("structured failure");
     assert_eq!(failure.code, "CLI-INVALID-INPUT");
-    assert_eq!(failure.correlation_id.as_deref(), Some("corr-memory-invalid-1"));
+    assert_eq!(
+        failure.correlation_id.as_deref(),
+        Some("corr-memory-invalid-1")
+    );
     assert!(failure
         .message
         .contains("purge requires --yes when --non-interactive is set"));

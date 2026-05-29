@@ -1055,9 +1055,11 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             keep_both,
             context.format,
         ),
-        Command::Import { store, input, force } => {
-            execute_import_command(open_store(store)?, input, force, context.format)
-        }
+        Command::Import {
+            store,
+            input,
+            force,
+        } => execute_import_command(open_store(store)?, input, force, context.format),
         Command::Promote {
             store,
             id,
@@ -1480,7 +1482,7 @@ fn execute_purge_command(
     if !yes && !confirm_purge(&ctx)? {
         match format {
             OutputFormat::Text => println!("Purge cancelled."),
-        OutputFormat::Json => print_success_json(
+            OutputFormat::Json => print_success_json(
                 "purge",
                 &serde_json::json!({
                     "status": "cancelled",
@@ -3319,10 +3321,7 @@ where
     Ok(())
 }
 
-fn print_success_json<T>(
-    command: &'static str,
-    data: &T,
-) -> Result<(), CliError>
+fn print_success_json<T>(command: &'static str, data: &T) -> Result<(), CliError>
 where
     T: Serialize,
 {
@@ -3331,14 +3330,10 @@ where
     print_json(&build_cli_success_envelope(machine, [command], data))
 }
 
-pub fn emit_machine_failure(
-    error: &CliError,
-) -> Result<(), CliError> {
+pub fn emit_machine_failure(error: &CliError) -> Result<(), CliError> {
     let context = current_machine_context();
     let kind = match error {
-        CliError::Validation(_) | CliError::InvalidId { .. } => {
-            CliFailureKind::InvalidInput
-        }
+        CliError::Validation(_) | CliError::InvalidId { .. } => CliFailureKind::InvalidInput,
         CliError::Consolidation(_)
         | CliError::Store(_)
         | CliError::Gate(_)
@@ -4596,7 +4591,7 @@ mod tests {
             MemoryType::Observation,
             0.8,
             ProvenanceLevel::UserStated,
-            OutputFormat::Json,
+            OutputFormat::Text,
         )
         .expect("add should succeed");
 
@@ -4672,7 +4667,7 @@ mod tests {
             llm_provider: None,
             llm_provider_label: None,
         };
-        execute_import_command(ctx, Some(json_path.clone()), false, OutputFormat::Json)
+        execute_import_command(ctx, Some(json_path.clone()), false, OutputFormat::Text)
             .expect("import should succeed");
 
         let memories = run_async(store.list(MemoryFilter {

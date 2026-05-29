@@ -684,7 +684,9 @@ fn resolve_docs_config(
         .map(str::trim)
         .unwrap_or("");
 
-    let (view, legacy_index_path) = if schema_version == DOCS_CONFIG_V1_SCHEMA_VERSION || looks_like_v1_config(&raw) {
+    let (view, legacy_index_path) = if schema_version == DOCS_CONFIG_V1_SCHEMA_VERSION
+        || looks_like_v1_config(&raw)
+    {
         let config = serde_yaml::from_str::<LegacyDocsConfig>(&content).map_err(|source| {
             DocumentationError::Yaml {
                 path: config_path.clone(),
@@ -1374,15 +1376,14 @@ fn validate_authority_alignment(
     let mut issues = Vec::new();
     let path = document.relative_path.clone();
     match document.authority_class {
-        AuthorityClass::Current => {
-            if ["planning", "research", "generated"].contains(&doc_kind) {
-                issues.push(error_issue(
-                    "DOCS-CHECK-010",
-                    &path,
-                    format!("current authority roots must not classify documents as `{doc_kind}`"),
-                ));
-            }
+        AuthorityClass::Current if ["planning", "research", "generated"].contains(&doc_kind) => {
+            issues.push(error_issue(
+                "DOCS-CHECK-010",
+                &path,
+                format!("current authority roots must not classify documents as `{doc_kind}`"),
+            ));
         }
+        AuthorityClass::Current => {}
         AuthorityClass::Planning if doc_kind != "planning" => issues.push(error_issue(
             "DOCS-CHECK-010",
             &path,

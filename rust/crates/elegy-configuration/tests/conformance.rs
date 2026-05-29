@@ -1,8 +1,8 @@
 use elegy_contracts::{
     validate_execution_event, validate_invocation_request, validate_invocation_response,
     validate_structured_failure, ExecutionEvent, ExecutionEventStatus, ExecutionEventType,
-    InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus,
-    StructuredFailure, CLI_SCHEMA_VERSION,
+    InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus, StructuredFailure,
+    CLI_SCHEMA_VERSION,
 };
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -209,8 +209,13 @@ fn invalid_binding_machine_output_maps_cleanly_to_failure_contracts() {
 
     let failure = envelope.failure.expect("structured failure");
     assert_eq!(failure.code, "CLI-INVALID-INPUT");
-    assert_eq!(failure.correlation_id.as_deref(), Some("corr-config-invalid-1"));
-    assert!(failure.message.contains("binding must use KEY=VALUE syntax: invalid"));
+    assert_eq!(
+        failure.correlation_id.as_deref(),
+        Some("corr-config-invalid-1")
+    );
+    assert!(failure
+        .message
+        .contains("binding must use KEY=VALUE syntax: invalid"));
 
     let failure_validation = validate_structured_failure(&failure);
     assert!(

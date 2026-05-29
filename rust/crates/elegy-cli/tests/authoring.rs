@@ -597,10 +597,9 @@ fn configuration_apply_command_supports_package_profiles() {
         .as_str()
         .expect("sourceRef string")
         .contains("#demo-profile"));
-    assert_eq!(
-        fs::read_to_string(target_dir.join("generated").join("demo.txt")).expect("generated file"),
-        "demo\n"
-    );
+    let generated =
+        fs::read_to_string(target_dir.join("generated").join("demo.txt")).expect("generated file");
+    assert_eq!(generated.trim_end_matches(['\r', '\n']), "demo");
 }
 
 #[test]

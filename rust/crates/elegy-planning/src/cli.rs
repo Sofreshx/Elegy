@@ -8,9 +8,9 @@ use thiserror::Error;
 use crate::{
     AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
     CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
-    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus,
-    IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat, ReviewPointStatus,
-    RevisePlanInput, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
+    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus, IssueStatus,
+    PlanStatus, PlanningStore, Priority, ProjectionFormat, ReviewPointStatus, RevisePlanInput,
+    RoadmapStatus, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -1523,9 +1523,11 @@ fn parse_file_scopes(values: Vec<String>) -> Result<Vec<FileScopeRecord>, CliErr
                 "file scope must match '<selector-type>:<intent>:<selector>'".to_string(),
             )));
         }
-        let selector_type = selector_type.parse::<FileScopeSelectorType>().map_err(|error| {
-            CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
-        })?;
+        let selector_type = selector_type
+            .parse::<FileScopeSelectorType>()
+            .map_err(|error| {
+                CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
+            })?;
         let intent = intent.parse::<FileScopeIntent>().map_err(|error| {
             CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
         })?;

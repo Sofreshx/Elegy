@@ -1,8 +1,6 @@
 use crate::HostError;
 use base64::Engine as _;
-use elegy_contracts::{
-    StructuredFailure, StructuredFailureCategory, CLI_SCHEMA_VERSION,
-};
+use elegy_contracts::{StructuredFailure, StructuredFailureCategory, CLI_SCHEMA_VERSION};
 use elegy_core::{
     compose_runtime_state, CatalogResource, ProjectLocator, ReadResourceError, ResourceReadResult,
     RuntimeState,
@@ -721,7 +719,10 @@ mod tests {
                 .current_dir(repo_root())
                 .status()
                 .expect("build elegy binary for MCP host tests");
-            assert!(status.success(), "failed to build elegy binary for MCP host tests");
+            assert!(
+                status.success(),
+                "failed to build elegy binary for MCP host tests"
+            );
         });
     }
 
@@ -1231,7 +1232,8 @@ mod tests {
 
     #[test]
     fn find_tool_binding_returns_matching_capability() {
-        let binding = find_tool_binding("diagram-create").expect("should find diagram-create capability");
+        let binding =
+            find_tool_binding("diagram-create").expect("should find diagram-create capability");
         assert_eq!(binding.capability_id, "diagram-create");
         assert_eq!(binding.execution_type, "subprocess");
     }
@@ -1369,8 +1371,8 @@ mod tests {
 
         assert_eq!(result.is_error, Some(false));
         let structured = expect_structured_content(&result);
-        let envelope: HostMachineEnvelope =
-            serde_json::from_value(structured).expect("structured content should be an elegy envelope");
+        let envelope: HostMachineEnvelope = serde_json::from_value(structured)
+            .expect("structured content should be an elegy envelope");
         assert_eq!(envelope.schema_version, CLI_SCHEMA_VERSION);
         assert_eq!(envelope.command, ["data", "validate"]);
         assert_eq!(envelope.status, "ok");
@@ -1399,8 +1401,8 @@ mod tests {
             service.waiting().await.expect("server should run cleanly");
         });
 
-        let missing_path = unique_temp_dir("elegy-host-mcp-data-validate-missing")
-            .join("missing-schema.json");
+        let missing_path =
+            unique_temp_dir("elegy-host-mcp-data-validate-missing").join("missing-schema.json");
 
         let client_service = client
             .serve(client_transport)
