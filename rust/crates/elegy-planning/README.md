@@ -97,6 +97,7 @@ The SQLite schema currently includes:
 `planning_events` stores append-only event history with:
 
 - `event_id`
+- `scope_key`
 - `entity_type`
 - `entity_id`
 - `aggregate_type`
@@ -110,6 +111,8 @@ The SQLite schema currently includes:
 - `payload_json`
 
 The event log is paired with current-state projection tables for simpler CLI reads.
+
+Event listing is scope-aware: `events` returns only events for the active scope.
 
 `sequence` is stream-local to `stream_id`. Flat event listing uses append order rather than treating `sequence` as a global ordering key.
 
@@ -165,6 +168,8 @@ cargo run -p elegy-planning -- --json validate all
 
 `project render` writes non-authoritative projections for human or LLM consumption.
 
+Projection reads are scope-enforced in the same way as `show`: out-of-scope entity IDs are rejected instead of rendering cross-scope data.
+
 Currently supported rendered entity types:
 
 - `goal`
@@ -180,6 +185,13 @@ Formats:
 Use `--projection-format` on `project render` so projection rendering does not collide with the global CLI `--format` output flag.
 
 These projections are derived outputs, not the planning source of truth.
+
+## Scope Behavior
+
+- default scope remains `default` when `--scope` is omitted
+- reads and writes reject out-of-scope entity IDs under the active scope
+- linked creates reject cross-scope parent or attached references
+- `plan revise --scope-key` is the only explicit scope-transfer operation, and it is rejected when linked roadmap, work point, todo, issue, or review-point records would remain in another scope
 
 ## Relationship to instruction-engine
 

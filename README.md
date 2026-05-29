@@ -90,6 +90,7 @@ If you already have a repository checkout, the same installer is available at
 | Dedicated MCP CLI | `elegy-mcp-<cliVersion>-<target>.zip` |
 | Dedicated planning CLI | `elegy-planning-<cliVersion>-<target>.zip` |
 | Dedicated skill registry CLI | `elegy-skills-<cliVersion>-<target>.zip` |
+| Dedicated documentation CLI | `elegy-documentation-<cliVersion>-<target>.zip` |
 | Wrapper surface for a dedicated tool family | `elegy-*-wrapper-<bundleVersion>.zip` |
 
 Direct release asset families include:
@@ -99,6 +100,7 @@ Direct release asset families include:
 - `elegy-mcp-<cliVersion>-<target>.zip` - dedicated MCP CLI
 - `elegy-planning-<cliVersion>-<target>.zip` - dedicated planning CLI
 - `elegy-skills-<cliVersion>-<target>.zip` - dedicated skill registry CLI
+- `elegy-documentation-<cliVersion>-<target>.zip` - dedicated documentation authority CLI
 - `elegy-contracts-<bundleVersion>.zip` - governed contracts bundle
 - `elegy-installer-<bundleVersion>.zip` - installer bootstrap
 - `elegy-*-wrapper-<bundleVersion>.zip` - dedicated wrapper surfaces
@@ -196,6 +198,7 @@ of Elegy instead of exposing every built-in tool.
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
 | `elegy-skills` | Dedicated skill registry CLI with search, resolve, inspect, and built-in format validation. |
 | `elegy-configuration` | Dedicated deterministic configuration CLI for governed template/profile list, show, apply, and verify flows. |
+| `elegy-documentation` | Dedicated documentation authority CLI for inspect, map, objective check, and non-authoritative llms/bundle export flows. |
 
 ## Configuration Materialization
 

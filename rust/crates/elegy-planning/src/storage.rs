@@ -20,7 +20,7 @@ use crate::{
     WorkPointView,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "2";
+pub const CURRENT_SCHEMA_VERSION: &str = "3";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 
@@ -163,12 +163,14 @@ pub struct UpdateStatusInput {
     pub entity_id: String,
     pub status: String,
     pub evidence_refs: Option<Vec<String>>,
+    pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct RevisePlanInput {
     pub plan_id: String,
+    pub active_scope_key: Option<String>,
     pub scope_key: Option<String>,
     pub assumptions: Option<Vec<String>>,
     pub stop_conditions: Option<Vec<String>>,
@@ -277,9 +279,14 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        ensure_entity_exists(&transaction, EntityType::Goal, &input.goal_id, "goalId")?;
-        let inherited_scope_key =
-            scope_key_for_entity(&transaction, EntityType::Goal, &input.goal_id)?;
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
+            &transaction,
+            EntityType::Goal,
+            &input.goal_id,
+            "goalId",
+            &active_scope_key,
+        )?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = RoadmapRecord {
@@ -349,14 +356,14 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        ensure_entity_exists(
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
             &transaction,
             EntityType::Roadmap,
             &input.roadmap_id,
             "roadmapId",
+            &active_scope_key,
         )?;
-        let inherited_scope_key =
-            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let ordering = input.ordering.unwrap_or(next_ordering(
@@ -432,20 +439,21 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        ensure_entity_exists(
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
             &transaction,
             EntityType::Roadmap,
             &input.roadmap_id,
             "roadmapId",
+            &active_scope_key,
         )?;
-        let inherited_scope_key =
-            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         if let Some(section_id) = &input.section_id {
-            ensure_entity_exists(
+            ensure_referenced_entity_in_scope(
                 &transaction,
                 EntityType::RoadmapSection,
                 section_id,
                 "sectionId",
+                &active_scope_key,
             )?;
             ensure_section_belongs_to_roadmap(&transaction, section_id, &input.roadmap_id)?;
         }
@@ -550,15 +558,21 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        ensure_entity_exists(&transaction, EntityType::Goal, &input.goal_id, "goalId")?;
-        ensure_entity_exists(
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        ensure_referenced_entity_in_scope(
+            &transaction,
+            EntityType::Goal,
+            &input.goal_id,
+            "goalId",
+            &active_scope_key,
+        )?;
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
             &transaction,
             EntityType::Roadmap,
             &input.roadmap_id,
             "roadmapId",
+            &active_scope_key,
         )?;
-        let inherited_scope_key =
-            scope_key_for_entity(&transaction, EntityType::Roadmap, &input.roadmap_id)?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = PlanRecord {
@@ -638,25 +652,40 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        if let Some(plan_id) = &input.plan_id {
-            ensure_entity_exists(&transaction, EntityType::Plan, plan_id, "planId")?;
-        }
-        if let Some(work_point_id) = &input.work_point_id {
-            ensure_entity_exists(
-                &transaction,
-                EntityType::WorkPoint,
-                work_point_id,
-                "workPointId",
-            )?;
-        }
-        let scope_key = if let Some(plan_id) = &input.plan_id {
-            scope_key_for_entity(&transaction, EntityType::Plan, plan_id)?
-        } else if let Some(work_point_id) = &input.work_point_id {
-            scope_key_for_entity(&transaction, EntityType::WorkPoint, work_point_id)?
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        let plan_scope_key = input
+            .plan_id
+            .as_ref()
+            .map(|plan_id| {
+                ensure_referenced_entity_in_scope(
+                    &transaction,
+                    EntityType::Plan,
+                    plan_id,
+                    "planId",
+                    &active_scope_key,
+                )
+            })
+            .transpose()?;
+        let work_point_scope_key = input
+            .work_point_id
+            .as_ref()
+            .map(|work_point_id| {
+                ensure_referenced_entity_in_scope(
+                    &transaction,
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    "workPointId",
+                    &active_scope_key,
+                )
+            })
+            .transpose()?;
+        let scope_key = if input.plan_id.is_some() {
+            plan_scope_key.unwrap_or_else(|| active_scope_key.clone())
+        } else if input.work_point_id.is_some() {
+            work_point_scope_key.unwrap_or_else(|| active_scope_key.clone())
         } else {
-            let resolved = normalized_scope_key(input.scope_key);
-            ensure_scope_exists(&transaction, &resolved)?;
-            resolved
+            ensure_scope_exists(&transaction, &active_scope_key)?;
+            active_scope_key.clone()
         };
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
@@ -758,14 +787,20 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
         let scope_key = if let (Some(entity_type), Some(entity_id)) =
             (input.related_entity_type, input.related_entity_id.as_ref())
         {
-            scope_key_for_entity(&transaction, entity_type, entity_id)?
+            ensure_referenced_entity_in_scope(
+                &transaction,
+                entity_type,
+                entity_id,
+                "relatedEntityId",
+                &active_scope_key,
+            )?
         } else {
-            let resolved = normalized_scope_key(input.scope_key);
-            ensure_scope_exists(&transaction, &resolved)?;
-            resolved
+            ensure_scope_exists(&transaction, &active_scope_key)?;
+            active_scope_key.clone()
         };
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
@@ -849,16 +884,13 @@ impl PlanningStore {
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
-        ensure_entity_exists(
+        let active_scope_key = normalized_scope_key(input.scope_key.clone());
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
             &transaction,
             input.attached_entity_type,
             &input.attached_entity_id,
             "attachedEntityId",
-        )?;
-        let inherited_scope_key = scope_key_for_entity(
-            &transaction,
-            input.attached_entity_type,
-            &input.attached_entity_id,
+            &active_scope_key,
         )?;
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
@@ -1026,6 +1058,22 @@ impl PlanningStore {
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
         let now = now_string()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key.clone());
+
+        match input.entity_type {
+            EntityType::RoadmapSection | EntityType::Scope => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "status transitions are not supported for {}",
+                    input.entity_type.as_str()
+                )));
+            }
+            _ => ensure_entity_in_scope(
+                &transaction,
+                input.entity_type,
+                &input.entity_id,
+                &active_scope_key,
+            )?,
+        };
 
         let result = match input.entity_type {
             EntityType::Goal => {
@@ -1282,6 +1330,13 @@ impl PlanningStore {
         require_non_empty("planId", &input.plan_id)?;
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key.clone());
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::Plan,
+            &input.plan_id,
+            &active_scope_key,
+        )?;
         let existing = load_plan(&transaction, &input.plan_id)?;
 
         let scope_key = input
@@ -1289,11 +1344,18 @@ impl PlanningStore {
             .map(|value| normalize_scope_key_value(&value))
             .unwrap_or_else(|| existing.scope_key.clone());
         ensure_scope_exists(&transaction, &scope_key)?;
-        if scope_key != existing.scope_key {
-            return Err(PlanningStoreError::InvalidInput(
-                "plan scopeKey cannot diverge from inherited roadmap scope".to_string(),
-            ));
-        }
+
+        let targeted_work_point_ids = input
+            .targeted_work_point_ids
+            .clone()
+            .map(normalize_string_list)
+            .unwrap_or(existing.targeted_work_point_ids.clone());
+        ensure_plan_transfer_compatible(
+            &transaction,
+            &existing,
+            &scope_key,
+            &targeted_work_point_ids,
+        )?;
 
         let assumptions = input
             .assumptions
@@ -1307,10 +1369,6 @@ impl PlanningStore {
             .validation_steps
             .map(normalize_string_list)
             .unwrap_or(existing.validation_steps.clone());
-        let targeted_work_point_ids = input
-            .targeted_work_point_ids
-            .map(normalize_string_list)
-            .unwrap_or(existing.targeted_work_point_ids.clone());
         let tags = input
             .tags
             .map(normalize_string_list)
@@ -1320,17 +1378,19 @@ impl PlanningStore {
         transaction.execute(
             r#"
             UPDATE plans
-               SET assumptions_json = ?2,
-                   stop_conditions_json = ?3,
-                   validation_steps_json = ?4,
-                   targeted_work_point_ids_json = ?5,
-                   tags_json = ?6,
+               SET scope_key = ?2,
+                   assumptions_json = ?3,
+                   stop_conditions_json = ?4,
+                   validation_steps_json = ?5,
+                   targeted_work_point_ids_json = ?6,
+                   tags_json = ?7,
                    revision = revision + 1,
-                   updated_at = ?7
+                   updated_at = ?8
              WHERE id = ?1
             "#,
             params![
                 input.plan_id,
+                scope_key,
                 to_json_text(&assumptions)?,
                 to_json_text(&stop_conditions)?,
                 to_json_text(&validation_steps)?,
@@ -1371,7 +1431,7 @@ impl PlanningStore {
     pub fn goal(&self, id: &str) -> Result<GoalView, PlanningStoreError> {
         let connection = self.open_connection()?;
         let goal = load_goal(&connection, id)?;
-        let roadmaps = list_roadmaps_for_goal(&connection, id)?;
+        let roadmaps = list_roadmaps_for_goal_in_scope(&connection, id, &goal.scope_key)?;
         let validation = load_validation_report(&connection, EntityType::Goal, id)?;
         Ok(GoalView {
             goal,
@@ -1383,8 +1443,9 @@ impl PlanningStore {
     pub fn roadmap(&self, id: &str) -> Result<RoadmapView, PlanningStoreError> {
         let connection = self.open_connection()?;
         let roadmap = load_roadmap(&connection, id)?;
-        let sections = list_sections_for_roadmap(&connection, id)?;
-        let work_points = list_work_points_for_roadmap(&connection, id)?;
+        let sections = list_sections_for_roadmap_in_scope(&connection, id, &roadmap.scope_key)?;
+        let work_points =
+            list_work_points_for_roadmap_in_scope(&connection, id, &roadmap.scope_key)?;
         let validation = load_validation_report(&connection, EntityType::Roadmap, id)?;
         Ok(RoadmapView {
             roadmap,
@@ -1397,8 +1458,13 @@ impl PlanningStore {
     pub fn plan(&self, id: &str) -> Result<PlanView, PlanningStoreError> {
         let connection = self.open_connection()?;
         let plan = load_plan(&connection, id)?;
-        let todos = list_todos_for_plan(&connection, id)?;
-        let review_points = list_review_points_for_entity(&connection, EntityType::Plan, id)?;
+        let todos = list_todos_for_plan_in_scope(&connection, id, &plan.scope_key)?;
+        let review_points = list_review_points_for_entity_in_scope(
+            &connection,
+            EntityType::Plan,
+            id,
+            &plan.scope_key,
+        )?;
         let validation = load_validation_report(&connection, EntityType::Plan, id)?;
         Ok(PlanView {
             plan,
@@ -1570,6 +1636,19 @@ impl PlanningStore {
         collect_rows(rows)
     }
 
+    pub fn list_events_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<PlanningEvent>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT event_id, entity_type, entity_id, aggregate_type, aggregate_id, correlation_id, causation_id, run_id, stream_id, sequence, parent_event_id, event_type, timestamp, payload_json FROM planning_events WHERE scope_key = ?1 ORDER BY rowid ASC",
+        )?;
+        let rows =
+            statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_event)?;
+        collect_rows(rows)
+    }
+
     pub fn health(&self) -> Result<PlanningHealthReport, PlanningStoreError> {
         let connection = self.open_connection()?;
         Ok(PlanningHealthReport {
@@ -1681,6 +1760,20 @@ impl PlanningStore {
             revision,
             output_path: output_path.display().to_string(),
         })
+    }
+
+    pub fn render_projection_in_scope(
+        &self,
+        scope_key: &str,
+        entity_type: EntityType,
+        entity_id: &str,
+        format: ProjectionFormat,
+        output_path: &Path,
+    ) -> Result<RenderedProjection, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized_scope_key = normalize_scope_key_value(scope_key);
+        ensure_entity_in_scope(&connection, entity_type, entity_id, &normalized_scope_key)?;
+        self.render_projection(entity_type, entity_id, format, output_path)
     }
 
     fn open_connection(&self) -> Result<Connection, PlanningStoreError> {
@@ -1870,6 +1963,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
         CREATE TABLE IF NOT EXISTS planning_events (
             event_id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
             entity_type TEXT NOT NULL,
             entity_id TEXT NOT NULL,
             aggregate_type TEXT NOT NULL,
@@ -1918,9 +2012,14 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
         Some(CURRENT_SCHEMA_VERSION) => {
             ensure_default_scope(connection)?;
             create_scope_indexes(connection)?;
+            ensure_event_scope_support(connection)?;
             Ok(())
         }
-        Some("1") => migrate_v1_to_v2(connection),
+        Some("1") => {
+            migrate_v1_to_v2(connection)?;
+            migrate_v2_to_v3(connection)
+        }
+        Some("2") => migrate_v2_to_v3(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -1960,9 +2059,20 @@ fn migrate_v1_to_v2(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
 
     connection.execute(
         "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        params![SCHEMA_VERSION_KEY, "2"],
     )?;
     create_scope_indexes(connection)?;
+    Ok(())
+}
+
+fn migrate_v2_to_v3(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    ensure_default_scope(connection)?;
+    create_scope_indexes(connection)?;
+    ensure_event_scope_support(connection)?;
+    connection.execute(
+        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+    )?;
     Ok(())
 }
 
@@ -2012,6 +2122,54 @@ fn create_scope_indexes(connection: &Transaction<'_>) -> Result<(), PlanningStor
     Ok(())
 }
 
+fn ensure_event_scope_support(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    if !table_has_column(connection, "planning_events", "scope_key")? {
+        connection.execute("ALTER TABLE planning_events ADD COLUMN scope_key TEXT", [])?;
+    }
+    backfill_event_scope_keys(connection)?;
+    connection.execute_batch(
+        r#"
+        CREATE INDEX IF NOT EXISTS idx_planning_events_scope ON planning_events(scope_key);
+        UPDATE planning_events
+           SET scope_key = 'default'
+         WHERE scope_key IS NULL OR TRIM(scope_key) = ''
+        "#,
+    )?;
+    Ok(())
+}
+
+fn backfill_event_scope_keys(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT rowid, entity_type, entity_id, aggregate_type, aggregate_id FROM planning_events WHERE scope_key IS NULL OR TRIM(scope_key) = '' ORDER BY rowid ASC",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok((
+            row.get::<_, i64>(0)?,
+            parse_entity_type(row.get::<_, String>(1)?)?,
+            row.get::<_, String>(2)?,
+            parse_entity_type(row.get::<_, String>(3)?)?,
+            row.get::<_, String>(4)?,
+        ))
+    })?;
+
+    for row in rows {
+        let (rowid, entity_type, entity_id, aggregate_type, aggregate_id) = row?;
+        let scope_key = resolve_event_scope_key(
+            connection,
+            entity_type,
+            &entity_id,
+            aggregate_type,
+            &aggregate_id,
+        )?;
+        connection.execute(
+            "UPDATE planning_events SET scope_key = ?2 WHERE rowid = ?1",
+            params![rowid, scope_key],
+        )?;
+    }
+
+    Ok(())
+}
+
 fn append_event(
     connection: &Transaction<'_>,
     event: PlanningEvent,
@@ -2019,13 +2177,20 @@ fn append_event(
     connection.execute(
         r#"
         INSERT INTO planning_events (
-            event_id, entity_type, entity_id, aggregate_type, aggregate_id, correlation_id,
+            event_id, scope_key, entity_type, entity_id, aggregate_type, aggregate_id, correlation_id,
             causation_id, run_id, stream_id, sequence, parent_event_id, event_type, timestamp,
             payload_json
-        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14)
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
         "#,
         params![
             event.event_id,
+            resolve_event_scope_key(
+                connection,
+                event.entity_type,
+                &event.entity_id,
+                event.aggregate_type,
+                &event.aggregate_id,
+            )?,
             event.entity_type.as_str(),
             event.entity_id,
             event.aggregate_type.as_str(),
@@ -2146,6 +2311,70 @@ fn ensure_entity_exists(
     }
 }
 
+fn ensure_referenced_entity_in_scope(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+    field_name: &str,
+    active_scope_key: &str,
+) -> Result<String, PlanningStoreError> {
+    ensure_entity_exists(connection, entity_type, entity_id, field_name)?;
+    let scope_key = scope_key_for_entity(connection, entity_type, entity_id)?;
+    if scope_key != active_scope_key {
+        return Err(scope_reference_mismatch_error(
+            field_name,
+            entity_type,
+            entity_id,
+            &scope_key,
+            active_scope_key,
+        ));
+    }
+    Ok(scope_key)
+}
+
+fn ensure_entity_in_scope(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+    active_scope_key: &str,
+) -> Result<String, PlanningStoreError> {
+    let scope_key = scope_key_for_entity(connection, entity_type, entity_id)?;
+    if scope_key != active_scope_key {
+        return Err(scope_entity_mismatch_error(
+            entity_type,
+            entity_id,
+            &scope_key,
+            active_scope_key,
+        ));
+    }
+    Ok(scope_key)
+}
+
+fn scope_reference_mismatch_error(
+    field_name: &str,
+    entity_type: EntityType,
+    entity_id: &str,
+    actual_scope_key: &str,
+    active_scope_key: &str,
+) -> PlanningStoreError {
+    PlanningStoreError::InvalidInput(format!(
+        "{field_name} references {} `{entity_id}` in scope `{actual_scope_key}`, not active scope `{active_scope_key}`",
+        entity_type.as_str()
+    ))
+}
+
+fn scope_entity_mismatch_error(
+    entity_type: EntityType,
+    entity_id: &str,
+    actual_scope_key: &str,
+    active_scope_key: &str,
+) -> PlanningStoreError {
+    PlanningStoreError::InvalidInput(format!(
+        "{} `{entity_id}` is in scope `{actual_scope_key}`, not active scope `{active_scope_key}`",
+        entity_type.as_str()
+    ))
+}
+
 fn ensure_section_belongs_to_roadmap(
     connection: &Connection,
     section_id: &str,
@@ -2220,6 +2449,119 @@ fn scope_key_for_entity(
     connection
         .query_row(sql, params![entity_id], |row| row.get::<_, String>(0))
         .map_err(|error| map_not_found(error, entity_type, entity_id))
+}
+
+fn resolve_event_scope_key(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+    aggregate_type: EntityType,
+    aggregate_id: &str,
+) -> Result<String, PlanningStoreError> {
+    scope_key_for_entity(connection, entity_type, entity_id)
+        .or_else(|_| scope_key_for_entity(connection, aggregate_type, aggregate_id))
+}
+
+fn ensure_plan_transfer_compatible(
+    connection: &Connection,
+    plan: &PlanRecord,
+    target_scope_key: &str,
+    targeted_work_point_ids: &[String],
+) -> Result<(), PlanningStoreError> {
+    if target_scope_key == plan.scope_key {
+        return Ok(());
+    }
+
+    ensure_plan_transfer_entity_in_scope(
+        connection,
+        &plan.id,
+        EntityType::Goal,
+        &plan.goal_id,
+        target_scope_key,
+    )?;
+    ensure_plan_transfer_entity_in_scope(
+        connection,
+        &plan.id,
+        EntityType::Roadmap,
+        &plan.roadmap_id,
+        target_scope_key,
+    )?;
+
+    for work_point_id in targeted_work_point_ids {
+        ensure_plan_transfer_entity_in_scope(
+            connection,
+            &plan.id,
+            EntityType::WorkPoint,
+            work_point_id,
+            target_scope_key,
+        )?;
+    }
+
+    for todo in list_todos_for_plan(connection, &plan.id)? {
+        ensure_plan_transfer_record_in_scope(
+            &plan.id,
+            EntityType::Todo,
+            &todo.id,
+            &todo.scope_key,
+            target_scope_key,
+        )?;
+    }
+
+    for review_point in list_review_points_for_entity(connection, EntityType::Plan, &plan.id)? {
+        ensure_plan_transfer_record_in_scope(
+            &plan.id,
+            EntityType::ReviewPoint,
+            &review_point.id,
+            &review_point.scope_key,
+            target_scope_key,
+        )?;
+    }
+
+    for issue in list_issues_for_related_entity(connection, EntityType::Plan, &plan.id)? {
+        ensure_plan_transfer_record_in_scope(
+            &plan.id,
+            EntityType::Issue,
+            &issue.id,
+            &issue.scope_key,
+            target_scope_key,
+        )?;
+    }
+
+    Ok(())
+}
+
+fn ensure_plan_transfer_entity_in_scope(
+    connection: &Connection,
+    plan_id: &str,
+    entity_type: EntityType,
+    entity_id: &str,
+    target_scope_key: &str,
+) -> Result<(), PlanningStoreError> {
+    let actual_scope_key = scope_key_for_entity(connection, entity_type, entity_id)?;
+    ensure_plan_transfer_record_in_scope(
+        plan_id,
+        entity_type,
+        entity_id,
+        &actual_scope_key,
+        target_scope_key,
+    )
+}
+
+fn ensure_plan_transfer_record_in_scope(
+    plan_id: &str,
+    entity_type: EntityType,
+    entity_id: &str,
+    actual_scope_key: &str,
+    target_scope_key: &str,
+) -> Result<(), PlanningStoreError> {
+    if actual_scope_key == target_scope_key {
+        return Ok(());
+    }
+
+    Err(PlanningStoreError::InvalidInput(format!(
+        "plan `{plan_id}` cannot transfer to scope `{target_scope_key}` because linked {} `{entity_id}` remains in scope `{actual_scope_key}`",
+        entity_type.as_str()
+    )))
 }
 
 fn list_work_point_dependents(
@@ -2413,26 +2755,28 @@ pub(crate) fn load_scope(
         .map_err(|error| map_not_found(error, EntityType::Scope, scope_key))
 }
 
-pub(crate) fn list_roadmaps_for_goal(
+pub(crate) fn list_roadmaps_for_goal_in_scope(
     connection: &Connection,
     goal_id: &str,
+    scope_key: &str,
 ) -> Result<Vec<RoadmapRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE goal_id = ?1 ORDER BY updated_at DESC, id ASC",
+        "SELECT id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at FROM roadmaps WHERE goal_id = ?1 AND scope_key = ?2 ORDER BY updated_at DESC, id ASC",
     )?;
-    let rows = statement.query_map(params![goal_id], row_to_roadmap)?;
+    let rows = statement.query_map(params![goal_id, scope_key], row_to_roadmap)?;
     let items = collect_rows(rows)?;
     Ok(items)
 }
 
-pub(crate) fn list_sections_for_roadmap(
+pub(crate) fn list_sections_for_roadmap_in_scope(
     connection: &Connection,
     roadmap_id: &str,
+    scope_key: &str,
 ) -> Result<Vec<RoadmapSectionRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
     )?;
-    let rows = statement.query_map(params![roadmap_id], row_to_section)?;
+    let rows = statement.query_map(params![roadmap_id, scope_key], row_to_section)?;
     let items = collect_rows(rows)?;
     Ok(items)
 }
@@ -2449,6 +2793,19 @@ pub(crate) fn list_work_points_for_roadmap(
     Ok(items)
 }
 
+pub(crate) fn list_work_points_for_roadmap_in_scope(
+    connection: &Connection,
+    roadmap_id: &str,
+    scope_key: &str,
+) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
+    )?;
+    let rows = statement.query_map(params![roadmap_id, scope_key], row_to_work_point)?;
+    let items = collect_rows(rows)?;
+    Ok(items)
+}
+
 pub(crate) fn list_todos_for_plan(
     connection: &Connection,
     plan_id: &str,
@@ -2457,6 +2814,19 @@ pub(crate) fn list_todos_for_plan(
         "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![plan_id], row_to_todo)?;
+    let items = collect_rows(rows)?;
+    Ok(items)
+}
+
+pub(crate) fn list_todos_for_plan_in_scope(
+    connection: &Connection,
+    plan_id: &str,
+    scope_key: &str,
+) -> Result<Vec<TodoRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, scope_key, plan_id, work_point_id, title, summary, status, priority, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at FROM todos WHERE plan_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
+    )?;
+    let rows = statement.query_map(params![plan_id, scope_key], row_to_todo)?;
     let items = collect_rows(rows)?;
     Ok(items)
 }
@@ -2473,6 +2843,36 @@ pub(crate) fn list_review_points_for_entity(
         params![entity_type.as_str(), entity_id],
         row_to_review_point,
     )?;
+    let items = collect_rows(rows)?;
+    Ok(items)
+}
+
+pub(crate) fn list_review_points_for_entity_in_scope(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+    scope_key: &str,
+) -> Result<Vec<ReviewPointRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, scope_key, attached_entity_type, attached_entity_id, title, summary, status, severity, revision, created_at, updated_at FROM review_points WHERE attached_entity_type = ?1 AND attached_entity_id = ?2 AND scope_key = ?3 ORDER BY created_at ASC, id ASC",
+    )?;
+    let rows = statement.query_map(
+        params![entity_type.as_str(), entity_id, scope_key],
+        row_to_review_point,
+    )?;
+    let items = collect_rows(rows)?;
+    Ok(items)
+}
+
+pub(crate) fn list_issues_for_related_entity(
+    connection: &Connection,
+    entity_type: EntityType,
+    entity_id: &str,
+) -> Result<Vec<IssueRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, scope_key, correlation_id, title, summary, status, severity, related_entity_type, related_entity_id, tags_json, revision, created_at, updated_at FROM issues WHERE related_entity_type = ?1 AND related_entity_id = ?2 ORDER BY created_at ASC, id ASC",
+    )?;
+    let rows = statement.query_map(params![entity_type.as_str(), entity_id], row_to_issue)?;
     let items = collect_rows(rows)?;
     Ok(items)
 }
@@ -3156,6 +3556,165 @@ mod tests {
     use super::*;
     use crate::ValidationStatus;
 
+    #[derive(Clone, Debug)]
+    struct ScopedFixtureIds {
+        goal_id: String,
+        roadmap_id: String,
+        work_point_id: String,
+        plan_id: String,
+        todo_id: String,
+        issue_id: String,
+        review_point_id: String,
+    }
+
+    fn ensure_scope(store: &PlanningStore, scope_key: &str) {
+        if scope_key == DEFAULT_SCOPE_KEY {
+            return;
+        }
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: scope_key.to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scope");
+    }
+
+    fn seed_scoped_fixture(
+        store: &PlanningStore,
+        scope_key: &str,
+        prefix: &str,
+    ) -> ScopedFixtureIds {
+        let goal_id = format!("{prefix}-goal");
+        let roadmap_id = format!("{prefix}-roadmap");
+        let work_point_id = format!("{prefix}-work-point");
+        let plan_id = format!("{prefix}-plan");
+        let todo_id = format!("{prefix}-todo");
+        let issue_id = format!("{prefix}-issue");
+        let review_point_id = format!("{prefix}-review");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some(goal_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                correlation_id: format!("corr-{prefix}"),
+                title: format!("{prefix} goal"),
+                description: "Scoped goal".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scoped goal");
+        store
+            .create_roadmap(CreateRoadmapInput {
+                id: Some(roadmap_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                goal_id: goal_id.clone(),
+                correlation_id: format!("corr-{prefix}"),
+                title: format!("{prefix} roadmap"),
+                summary: "Scoped roadmap".to_string(),
+                status: RoadmapStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scoped roadmap");
+        store
+            .add_work_point(AddWorkPointInput {
+                id: Some(work_point_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                roadmap_id: roadmap_id.clone(),
+                section_id: None,
+                title: format!("{prefix} work point"),
+                summary: "Scoped work point".to_string(),
+                status: WorkPointStatus::Active,
+                ordering: None,
+                dependency_ids: Vec::new(),
+                validation_expectations: vec!["proof".to_string()],
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scoped work point");
+        store
+            .create_plan(CreatePlanInput {
+                id: Some(plan_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                goal_id: goal_id.clone(),
+                roadmap_id: roadmap_id.clone(),
+                correlation_id: format!("corr-{prefix}"),
+                title: format!("{prefix} plan"),
+                summary: "Scoped plan".to_string(),
+                scope: "implementation".to_string(),
+                assumptions: vec!["a1".to_string()],
+                stop_conditions: Vec::new(),
+                validation_steps: vec!["validate".to_string()],
+                targeted_work_point_ids: vec![work_point_id.clone()],
+                status: PlanStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scoped plan");
+        store
+            .create_todo(CreateTodoInput {
+                id: Some(todo_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                plan_id: Some(plan_id.clone()),
+                work_point_id: Some(work_point_id.clone()),
+                title: format!("{prefix} todo"),
+                summary: "Scoped todo".to_string(),
+                status: TodoStatus::InProgress,
+                priority: Priority::High,
+                evidence_refs: Vec::new(),
+                tags: Vec::new(),
+                ordering: None,
+                run_id: None,
+            })
+            .expect("create scoped todo");
+        store
+            .create_issue(CreateIssueInput {
+                id: Some(issue_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                correlation_id: format!("corr-{prefix}"),
+                title: format!("{prefix} issue"),
+                summary: "Scoped issue".to_string(),
+                status: IssueStatus::Open,
+                severity: Severity::High,
+                related_entity_type: Some(EntityType::Plan),
+                related_entity_id: Some(plan_id.clone()),
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scoped issue");
+        store
+            .create_review_point(CreateReviewPointInput {
+                id: Some(review_point_id.clone()),
+                scope_key: Some(scope_key.to_string()),
+                attached_entity_type: EntityType::Plan,
+                attached_entity_id: plan_id.clone(),
+                title: format!("{prefix} review"),
+                summary: "Scoped review point".to_string(),
+                status: ReviewPointStatus::Open,
+                severity: Severity::Medium,
+                run_id: None,
+            })
+            .expect("create scoped review point");
+
+        ScopedFixtureIds {
+            goal_id,
+            roadmap_id,
+            work_point_id,
+            plan_id,
+            todo_id,
+            issue_id,
+            review_point_id,
+        }
+    }
+
     #[test]
     fn store_persists_goal_roadmap_plan_and_validation_findings() {
         let temp = tempdir().expect("temp dir");
@@ -3533,6 +4092,197 @@ mod tests {
     }
 
     #[test]
+    fn out_of_scope_update_status_rejects_for_supported_entity_types() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+        ensure_scope(&store, "workspace-a");
+        let fixture = seed_scoped_fixture(&store, "workspace-a", "scope-status");
+
+        for (entity_type, entity_id, status, evidence_refs) in [
+            (EntityType::Goal, fixture.goal_id.clone(), "validated", None),
+            (
+                EntityType::Roadmap,
+                fixture.roadmap_id.clone(),
+                "blocked",
+                None,
+            ),
+            (
+                EntityType::WorkPoint,
+                fixture.work_point_id.clone(),
+                "completed",
+                None,
+            ),
+            (EntityType::Plan, fixture.plan_id.clone(), "blocked", None),
+            (
+                EntityType::Todo,
+                fixture.todo_id.clone(),
+                "completed",
+                Some(vec!["proof://ci".to_string()]),
+            ),
+            (
+                EntityType::Issue,
+                fixture.issue_id.clone(),
+                "resolved",
+                None,
+            ),
+            (
+                EntityType::ReviewPoint,
+                fixture.review_point_id.clone(),
+                "resolved",
+                None,
+            ),
+        ] {
+            let error = store
+                .update_status(UpdateStatusInput {
+                    entity_type,
+                    entity_id: entity_id.clone(),
+                    status: status.to_string(),
+                    evidence_refs,
+                    active_scope_key: Some("default".to_string()),
+                    run_id: None,
+                })
+                .expect_err("out-of-scope update should fail");
+
+            match error {
+                PlanningStoreError::InvalidInput(message) => {
+                    assert!(message.contains("workspace-a"), "{message}");
+                    assert!(message.contains("default"), "{message}");
+                    assert!(message.contains(&entity_id), "{message}");
+                }
+                other => panic!("expected invalid input, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn revise_plan_rejects_out_of_scope_and_incompatible_scope_transfer() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+        ensure_scope(&store, "workspace-a");
+        ensure_scope(&store, "workspace-b");
+        let fixture = seed_scoped_fixture(&store, "workspace-a", "scope-revise");
+
+        let error = store
+            .revise_plan(RevisePlanInput {
+                plan_id: fixture.plan_id.clone(),
+                active_scope_key: Some("default".to_string()),
+                scope_key: None,
+                assumptions: None,
+                stop_conditions: None,
+                validation_steps: None,
+                targeted_work_point_ids: None,
+                tags: None,
+                run_id: None,
+            })
+            .expect_err("out-of-scope revise should fail");
+        match error {
+            PlanningStoreError::InvalidInput(message) => {
+                assert!(message.contains("workspace-a"), "{message}");
+                assert!(message.contains("default"), "{message}");
+            }
+            other => panic!("expected invalid input, got {other:?}"),
+        }
+
+        let error = store
+            .revise_plan(RevisePlanInput {
+                plan_id: fixture.plan_id.clone(),
+                active_scope_key: Some("workspace-a".to_string()),
+                scope_key: Some("workspace-b".to_string()),
+                assumptions: Some(vec!["a1".to_string(), "a2".to_string()]),
+                stop_conditions: Some(vec!["stop".to_string()]),
+                validation_steps: None,
+                targeted_work_point_ids: None,
+                tags: Some(vec!["transfer".to_string()]),
+                run_id: Some("run-transfer".to_string()),
+            })
+            .expect_err("incompatible scope transfer should fail");
+
+        match error {
+            PlanningStoreError::InvalidInput(message) => {
+                assert!(
+                    message.contains("cannot transfer to scope `workspace-b`"),
+                    "{message}"
+                );
+                assert!(message.contains("workspace-a"), "{message}");
+            }
+            other => panic!("expected invalid input, got {other:?}"),
+        }
+
+        let plan = store
+            .plan(&fixture.plan_id)
+            .expect("plan remains in source scope");
+        assert_eq!(plan.plan.scope_key, "workspace-a");
+        let workspace_b_events = store
+            .list_events_in_scope("workspace-b")
+            .expect("list workspace-b events");
+        assert!(!workspace_b_events.iter().any(|event| {
+            event.entity_id == fixture.plan_id && event.event_type == "plan.revised"
+        }));
+    }
+
+    #[test]
+    fn list_events_in_scope_returns_only_matching_scope_events() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init planning db");
+        ensure_scope(&store, "workspace-a");
+
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-default-events".to_string()),
+                scope_key: None,
+                correlation_id: "corr-default-events".to_string(),
+                title: "Default goal".to_string(),
+                description: "Default scope goal".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Draft,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create default goal");
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("goal-custom-events".to_string()),
+                scope_key: Some("workspace-a".to_string()),
+                correlation_id: "corr-custom-events".to_string(),
+                title: "Custom goal".to_string(),
+                description: "Custom scope goal".to_string(),
+                acceptance_criteria: vec!["ok".to_string()],
+                rejection_criteria: vec!["no".to_string()],
+                status: GoalStatus::Draft,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create custom goal");
+
+        let default_events = store
+            .list_events_in_scope("default")
+            .expect("list default events");
+        let custom_events = store
+            .list_events_in_scope("workspace-a")
+            .expect("list custom events");
+
+        assert!(default_events
+            .iter()
+            .any(|event| event.entity_id == "goal-default-events"));
+        assert!(!default_events
+            .iter()
+            .any(|event| event.entity_id == "goal-custom-events"));
+        assert!(custom_events
+            .iter()
+            .any(|event| event.entity_id == "goal-custom-events"));
+        assert!(!custom_events
+            .iter()
+            .any(|event| event.entity_id == "goal-default-events"));
+    }
+
+    #[test]
     fn scoped_lists_are_isolated_and_default_scope_is_applied() {
         let temp = tempdir().expect("temp dir");
         let db_path = temp.path().join("planning.db");
@@ -3650,8 +4400,122 @@ mod tests {
         assert_eq!(goals.len(), 1);
         assert_eq!(goals[0].scope_key, "default");
         let health = store.health().expect("health");
-        assert_eq!(health.schema_version, "2");
+        assert_eq!(health.schema_version, "3");
         assert_eq!(health.scope_count, 1);
+    }
+
+    #[test]
+    fn init_migrates_v2_events_and_backfills_scope_keys() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning-v2.db");
+
+        {
+            let connection = rusqlite::Connection::open(&db_path).expect("open sqlite");
+            connection
+                .execute_batch(
+                    r#"
+                    CREATE TABLE planning_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                    INSERT INTO planning_config (key, value) VALUES ('schema_version', '2');
+                    CREATE TABLE goals (
+                        id TEXT PRIMARY KEY,
+                        scope_key TEXT NOT NULL,
+                        correlation_id TEXT NOT NULL,
+                        title TEXT NOT NULL,
+                        description TEXT NOT NULL,
+                        acceptance_criteria_json TEXT NOT NULL,
+                        rejection_criteria_json TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        tags_json TEXT NOT NULL,
+                        revision INTEGER NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                    CREATE TABLE planning_events (
+                        event_id TEXT PRIMARY KEY,
+                        entity_type TEXT NOT NULL,
+                        entity_id TEXT NOT NULL,
+                        aggregate_type TEXT NOT NULL,
+                        aggregate_id TEXT NOT NULL,
+                        correlation_id TEXT NOT NULL,
+                        causation_id TEXT,
+                        run_id TEXT NOT NULL,
+                        stream_id TEXT NOT NULL,
+                        sequence INTEGER NOT NULL,
+                        parent_event_id TEXT,
+                        event_type TEXT NOT NULL,
+                        timestamp TEXT NOT NULL,
+                        payload_json TEXT NOT NULL
+                    );
+                    "#,
+                )
+                .expect("create v2 schema");
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO goals (
+                        id, scope_key, correlation_id, title, description, acceptance_criteria_json,
+                        rejection_criteria_json, status, tags_json, revision, created_at, updated_at
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)
+                    "#,
+                    params![
+                        "goal-v2",
+                        "default",
+                        "corr-v2",
+                        "Goal v2",
+                        "Goal before event scope migration",
+                        "[\"ok\"]",
+                        "[\"no\"]",
+                        "draft",
+                        "[]",
+                        "2026-05-24T00:00:00Z"
+                    ],
+                )
+                .expect("insert v2 goal");
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO planning_events (
+                        event_id, entity_type, entity_id, aggregate_type, aggregate_id,
+                        correlation_id, causation_id, run_id, stream_id, sequence,
+                        parent_event_id, event_type, timestamp, payload_json
+                    ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, NULL, ?7, ?8, ?9, NULL, ?10, ?11, ?12)
+                    "#,
+                    params![
+                        "event-v2-goal",
+                        "goal",
+                        "goal-v2",
+                        "goal",
+                        "goal-v2",
+                        "corr-v2",
+                        "run-v2",
+                        "goal-v2",
+                        1_i64,
+                        "goal.created",
+                        "2026-05-24T00:00:00Z",
+                        "{\"id\":\"goal-v2\"}"
+                    ],
+                )
+                .expect("insert v2 event");
+        }
+
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("migrate schema");
+
+        let default_events = store
+            .list_events_in_scope("default")
+            .expect("list migrated default events");
+        assert_eq!(default_events.len(), 1);
+        assert_eq!(default_events[0].event_id, "event-v2-goal");
+
+        let connection = rusqlite::Connection::open(&db_path).expect("reopen sqlite");
+        let scope_key: String = connection
+            .query_row(
+                "SELECT scope_key FROM planning_events WHERE event_id = ?1",
+                params!["event-v2-goal"],
+                |row| row.get(0),
+            )
+            .expect("load backfilled event scope");
+        assert_eq!(scope_key, "default");
     }
 
     #[test]
@@ -3746,12 +4610,14 @@ mod tests {
                 entity_id: "todo-life".to_string(),
                 status: "completed".to_string(),
                 evidence_refs: Some(vec!["proof://ci".to_string()]),
+                active_scope_key: None,
                 run_id: Some("run-life".to_string()),
             })
             .expect("complete todo");
         let revise = store
             .revise_plan(RevisePlanInput {
                 plan_id: "plan-life".to_string(),
+                active_scope_key: None,
                 scope_key: None,
                 assumptions: Some(vec!["a1".to_string(), "a2".to_string()]),
                 stop_conditions: Some(vec!["stop".to_string()]),

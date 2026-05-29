@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-replay-checkpoint.schema.json",
+  "title": "PilotingReplayCheckpoint",
+  "description": "Bounded replay checkpoint for targeted piloting evidence and expected-state progression.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "checkpointId",
+    "actionId",
+    "targetId",
+    "stage",
+    "capturedAtUtc",
+    "stateRef"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-replay-checkpoint/v1"
+    },
+    "checkpointId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "actionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "stage": {
+      "type": "string",
+      "enum": ["before", "predicted_after", "after", "rollback"]
+    },
+    "capturedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "stateRef": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    },
+    "notes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  }
+}

@@ -1,0 +1,321 @@
+{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.blender-piloting",
+    "name": "blender-piloting",
+    "version": "0.1.0",
+    "displayName": "Blender Piloting Package"
+  },
+  "metadata": {
+    "description": "Contracts-first Blender piloting package for Holon-compatible marketplace publishing.",
+    "tags": ["piloting", "blender", "holon", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/docs/architecture/elegy-piloting-foundation.md"
+  },
+  "components": {
+    "evalPacks": [
+      {
+        "id": "blender-layout-evals",
+        "path": "piloting-fixture-pack.minimal.json",
+        "description": "Replay-style Blender fixture and expected result checks."
+      }
+    ],
+    "resourcePacks": [
+      {
+        "id": "blender-evidence-pack",
+        "path": "piloting-observation-frame.minimal.json",
+        "description": "Observed state and evidence references for the Blender example."
+      }
+    ],
+    "toolAdapterContracts": [
+      {
+        "id": "blender-tool-adapter-contract",
+        "path": "piloting-adapter-manifest.minimal.json",
+        "description": "Targeted tool-adapter contract for Blender desktop piloting."
+      }
+    ],
+    "bridgeAdapterContracts": [
+      {
+        "id": "blender-bridge-adapter-contract",
+        "path": "piloting-readiness-report.minimal.json",
+        "description": "Readiness-oriented bridge contract example for host validation."
+      }
+    ],
+    "pilotingAdapters": [
+      {
+        "id": "blender-piloting-adapter",
+        "manifest": {
+          "schemaVersion": "elegy-piloting-adapter-manifest/v1",
+          "adapterId": "blender.piloting",
+          "displayName": "Blender Piloting Adapter",
+          "version": "0.1.0",
+          "description": "Contracts-first Blender piloting example restricted to declared desktop surfaces.",
+          "mode": "contracts_only",
+          "supportedSoftware": [
+            {
+              "schemaVersion": "elegy-piloting-target-descriptor/v1",
+              "targetId": "blender.desktop",
+              "productName": "Blender",
+              "versionRange": ">=4.0 <5.0",
+              "platforms": ["windows"],
+              "launchHints": {
+                "executables": ["blender.exe"],
+                "arguments": [],
+                "urls": []
+              },
+              "attachHints": {
+                "processNames": ["blender.exe"],
+                "windowTitles": ["Blender"],
+                "surfaceUrls": []
+              }
+            }
+          ],
+          "supportedSurfaces": [
+            {
+              "schemaVersion": "elegy-piloting-surface-descriptor/v1",
+              "surfaceId": "blender.desktop.main-window",
+              "targetId": "blender.desktop",
+              "surfaceKind": "desktop",
+              "stability": "stable",
+              "selectors": [
+                {
+                  "strategy": "windowTitle",
+                  "value": "Blender"
+                }
+              ],
+              "semanticAnchors": ["primary workspace", "top menu bar"]
+            }
+          ],
+          "contracts": {
+            "targetDescriptorSchemaRef": "../schemas/piloting-target-descriptor.schema.json",
+            "surfaceDescriptorSchemaRef": "../schemas/piloting-surface-descriptor.schema.json",
+            "observationFrameSchemaRef": "../schemas/piloting-observation-frame.schema.json",
+            "actionIntentSchemaRef": "../schemas/piloting-action-intent.schema.json",
+            "actionResultSchemaRef": "../schemas/piloting-action-result.schema.json",
+            "readinessReportSchemaRef": "../schemas/piloting-readiness-report.schema.json",
+            "fixturePackSchemaRef": "../schemas/piloting-fixture-pack.schema.json",
+            "policyDecisionSchemaRef": "../schemas/piloting-policy-decision.schema.json",
+            "simulationResultSchemaRef": "../schemas/piloting-simulation-result.schema.json",
+            "replayCheckpointSchemaRef": "../schemas/piloting-replay-checkpoint.schema.json",
+            "lifecycleEventSchemaRef": "../schemas/piloting-lifecycle-event.schema.json"
+          },
+          "fixtures": [
+            {
+              "fixturePackId": "blender.fixtures.layout-basic",
+              "path": "piloting-fixture-pack.minimal.json",
+              "description": "Basic Blender default scene fixture pack."
+            }
+          ],
+          "permissions": {
+            "sideEffectClasses": ["desktop_ui"],
+            "requiresHostApproval": true
+          }
+        }
+      }
+    ],
+    "fixturePacks": [
+      {
+        "id": "blender-layout-basic-fixtures",
+        "fixturePack": {
+          "schemaVersion": "elegy-piloting-fixture-pack/v1",
+          "fixturePackId": "blender.fixtures.layout-basic",
+          "adapterId": "blender.piloting",
+          "targetId": "blender.desktop",
+          "recordedAtUtc": "2026-05-28T10:05:00Z",
+          "observations": [
+            {
+              "schemaVersion": "elegy-piloting-observation-frame/v1",
+              "frameId": "obs.blender.1",
+              "targetId": "blender.desktop",
+              "surfaceId": "blender.desktop.main-window",
+              "observedAtUtc": "2026-05-28T10:00:00Z",
+              "redactionClass": "internal",
+              "source": "fixture",
+              "confidence": 0.97,
+              "state": {
+                "activeWorkspace": "Layout",
+                "selectedObject": null
+              },
+              "evidenceRefs": ["evidence/blender/layout-1.png"]
+            }
+          ],
+          "allowedActions": [
+            {
+              "schemaVersion": "elegy-piloting-action-intent/v1",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "surfaceId": "blender.desktop.main-window",
+              "operation": "select_object",
+              "description": "Select the default cube in the main 3D workspace.",
+              "inputSchema": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "objectName": { "type": "string" }
+                },
+                "required": ["objectName"]
+              },
+              "sideEffectClass": "desktop_ui",
+              "requiredConfirmation": "advisory"
+            }
+          ],
+          "expectedResultChecks": [
+            {
+              "actionId": "select-default-cube",
+              "expectedStatus": "succeeded",
+              "checks": [
+                "selectedObject becomes Cube",
+                "activeWorkspace remains Layout"
+              ],
+              "evidenceRefs": ["evidence/blender/layout-2.png"]
+            }
+          ],
+          "policyDecisions": [
+            {
+              "schemaVersion": "elegy-piloting-policy-decision/v1",
+              "decisionId": "policy.select-default-cube.1",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "decision": "simulate",
+              "sideEffectClass": "desktop_ui",
+              "evaluatedAtUtc": "2026-05-28T10:01:00Z",
+              "policyRef": "policy://holon/piloting/contracts-only",
+              "approvalRequirement": "advisory",
+              "reasons": [
+                "contracts-first piloting slice requires simulation before execution",
+                "desktop_ui remains host-gated"
+              ],
+              "evidenceRefs": ["evidence/blender/layout-1.png"]
+            }
+          ],
+          "simulationResults": [
+            {
+              "schemaVersion": "elegy-piloting-simulation-result/v1",
+              "simulationId": "sim.select-default-cube.1",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "status": "predicted",
+              "simulatedAtUtc": "2026-05-28T10:02:00Z",
+              "predictedOutcome": {
+                "selectedObject": "Cube",
+                "activeWorkspace": "Layout"
+              },
+              "checks": [
+                "predicted selection remains inside declared surface",
+                "no undeclared side effects are introduced"
+              ],
+              "policyDecisionRef": "policy.select-default-cube.1",
+              "evidenceRefs": ["evidence/blender/layout-2.png"]
+            }
+          ],
+          "replayCheckpoints": [
+            {
+              "schemaVersion": "elegy-piloting-replay-checkpoint/v1",
+              "checkpointId": "checkpoint.select-default-cube.before",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "stage": "before",
+              "capturedAtUtc": "2026-05-28T10:00:00Z",
+              "stateRef": "obs.blender.1",
+              "evidenceRefs": ["evidence/blender/layout-1.png"],
+              "notes": ["default Blender scene before replayed action"]
+            },
+            {
+              "schemaVersion": "elegy-piloting-replay-checkpoint/v1",
+              "checkpointId": "checkpoint.select-default-cube.predicted-after",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "stage": "predicted_after",
+              "capturedAtUtc": "2026-05-28T10:02:00Z",
+              "stateRef": "sim.select-default-cube.1",
+              "evidenceRefs": ["evidence/blender/layout-2.png"],
+              "notes": ["predicted post-action state for replay review"]
+            }
+          ],
+          "lifecycleEvents": [
+            {
+              "schemaVersion": "elegy-piloting-lifecycle-event/v1",
+              "eventId": "event.select-default-cube.intent",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "eventType": "intent_recorded",
+              "recordedAtUtc": "2026-05-28T10:00:30Z",
+              "refId": "select-default-cube",
+              "message": "Recorded replayable Blender selection intent.",
+              "metadata": {
+                "surfaceId": "blender.desktop.main-window"
+              }
+            },
+            {
+              "schemaVersion": "elegy-piloting-lifecycle-event/v1",
+              "eventId": "event.select-default-cube.policy",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "eventType": "policy_evaluated",
+              "recordedAtUtc": "2026-05-28T10:01:00Z",
+              "refId": "policy.select-default-cube.1",
+              "message": "Policy evaluated the action as simulate-only.",
+              "metadata": {
+                "decision": "simulate"
+              }
+            },
+            {
+              "schemaVersion": "elegy-piloting-lifecycle-event/v1",
+              "eventId": "event.select-default-cube.simulation",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "eventType": "simulation_recorded",
+              "recordedAtUtc": "2026-05-28T10:02:00Z",
+              "refId": "sim.select-default-cube.1",
+              "message": "Simulation result recorded for replay review.",
+              "metadata": {
+                "status": "predicted"
+              }
+            },
+            {
+              "schemaVersion": "elegy-piloting-lifecycle-event/v1",
+              "eventId": "event.select-default-cube.checkpoint",
+              "actionId": "select-default-cube",
+              "targetId": "blender.desktop",
+              "eventType": "checkpoint_recorded",
+              "recordedAtUtc": "2026-05-28T10:02:00Z",
+              "refId": "checkpoint.select-default-cube.predicted-after",
+              "message": "Predicted replay checkpoint captured.",
+              "metadata": {
+                "stage": "predicted_after"
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "docs": [
+      {
+        "id": "blender-piloting-changelog",
+        "path": "blender-piloting-changelog.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "desktop_ui",
+    "requiresApproval": true,
+    "policyTags": ["contracts-only", "targeted-plugin"]
+  },
+  "publishing": {
+    "marketplaceTarget": "holon",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy.git",
+    "sourceRef": "refs/tags/v0.1.0-piloting-foundation",
+    "sourceCommit": "8d062afa1b106e2db5f63e3afdd8b1198bc6e960",
+    "changelogRef": "blender-piloting-changelog.md",
+    "provenanceRef": "piloting-readiness-report.minimal.json",
+    "signatureRefs": ["signatures/blender-piloting.sig"],
+    "compatibility": [
+      {
+        "host": "holon",
+        "versionRange": ">=0.1.0 <0.2.0",
+        "notes": "Contracts-only package; Holon still owns install trust, approvals, leases, bridge sessions, and execution."
+      }
+    ]
+  }
+}

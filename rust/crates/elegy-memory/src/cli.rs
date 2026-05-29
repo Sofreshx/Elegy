@@ -5,11 +5,15 @@ use std::{
     io::{self, Read, Write},
     path::PathBuf,
     process::ExitCode,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use chrono::Utc;
 use clap::{Args, Parser, Subcommand, ValueEnum};
+use elegy_contracts::{
+    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
+    CliFailureKind, CliMachineContext, CliMachineEnvelope,
+};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::runtime::Builder;
@@ -35,6 +39,8 @@ const DEFAULT_IMPORTANCE: f32 = 0.5;
 const DEFAULT_LIMIT: usize = 20;
 const DEFAULT_REEMBED_LIMIT: usize = 100;
 const PREVIEW_LIMIT: usize = 80;
+
+static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
 
 #[derive(Debug, Error)]
 pub enum CliError {
@@ -68,6 +74,12 @@ pub enum CliError {
 struct Cli {
     #[arg(long, value_enum, global = true, default_value_t = OutputFormat::Text)]
     format: OutputFormat,
+    #[arg(long, global = true)]
+    json: bool,
+    #[arg(long, global = true)]
+    non_interactive: bool,
+    #[arg(long, global = true)]
+    correlation_id: Option<String>,
     #[command(subcommand)]
     command: Command,
 }
@@ -369,6 +381,13 @@ pub enum OutputFormat {
     Json,
 }
 
+#[derive(Clone, Debug)]
+struct MachineContext {
+    format: OutputFormat,
+    machine: CliMachineContext,
+    command: &'static str,
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 enum CliScope {
     Session,
@@ -543,15 +562,6 @@ impl std::fmt::Debug for StoreContext {
             .field("llm_provider_label", &self.llm_provider_label)
             .finish()
     }
-}
-
-#[derive(Serialize)]
-struct JsonEnvelope<T>
-where
-    T: Serialize,
-{
-    command: &'static str,
-    data: T,
 }
 
 #[derive(Serialize)]
@@ -950,10 +960,24 @@ where
     I: IntoIterator<Item = T>,
     T: Into<OsString> + Clone,
 {
-    dispatch(Cli::parse_from(args))
+    let cli = Cli::parse_from(args);
+    let format = resolve_output_format(cli.json, cli.format);
+    let machine = build_cli_machine_context(
+        cli.non_interactive,
+        cli.correlation_id.clone(),
+        "elegy-memory",
+    );
+    let context = MachineContext {
+        format,
+        machine,
+        command: command_name(&cli.command),
+    };
+    let _ = CLI_MACHINE_CONTEXT.set(context.clone());
+    dispatch(cli)
 }
 
 fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
+    let context = current_machine_context();
     match cli.command {
         Command::Add {
             store,
@@ -967,7 +991,7 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             memory_type.into(),
             importance,
             provenance.into(),
-            cli.format,
+            context.format,
         ),
         Command::Search {
             store,
@@ -979,7 +1003,7 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             query,
             limit,
             include_dormant,
-            cli.format,
+            context.format,
         ),
         Command::List {
             store,
@@ -993,13 +1017,15 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             state.map(Into::into),
             include_dormant,
             limit,
-            cli.format,
+            context.format,
         ),
         Command::Inspect { store, id } => {
-            execute_inspect_command(open_store(store)?, id, cli.format)
+            execute_inspect_command(open_store(store)?, id, context.format)
         }
-        Command::Purge { store, yes } => execute_purge_command(open_store(store)?, yes, cli.format),
-        Command::Health { store } => execute_health_command(open_store(store)?, cli.format),
+        Command::Purge { store, yes } => {
+            execute_purge_command(open_store(store)?, yes, context.format)
+        }
+        Command::Health { store } => execute_health_command(open_store(store)?, context.format),
         Command::Export {
             store,
             output,
@@ -1010,10 +1036,10 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             output,
             all_scopes,
             export_format.into(),
-            cli.format,
+            context.format,
         ),
         Command::Reembed { store, limit } => {
-            execute_reembed_command(open_store(store)?, limit, cli.format)
+            execute_reembed_command(open_store(store)?, limit, context.format)
         }
         Command::Contradictions {
             store,
@@ -1027,13 +1053,11 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             id,
             keep,
             keep_both,
-            cli.format,
+            context.format,
         ),
-        Command::Import {
-            store,
-            input,
-            force,
-        } => execute_import_command(open_store(store)?, input, force, cli.format),
+        Command::Import { store, input, force } => {
+            execute_import_command(open_store(store)?, input, force, context.format)
+        }
         Command::Promote {
             store,
             id,
@@ -1044,7 +1068,7 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             id,
             to.map(Into::into),
             limit,
-            cli.format,
+            context.format,
         ),
         Command::Consolidate {
             store,
@@ -1056,40 +1080,40 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             cross_scope,
             consolidate_limit,
             dry_run,
-            cli.format,
+            context.format,
         ),
         Command::Rollback { store, id, version } => {
-            execute_rollback_command(open_store(store)?, id, version, cli.format)
+            execute_rollback_command(open_store(store)?, id, version, context.format)
         }
         Command::Corroborate { store, id, with } => {
-            execute_corroborate_command(open_store(store)?, id, with, cli.format)
+            execute_corroborate_command(open_store(store)?, id, with, context.format)
         }
-        Command::Budget { store } => execute_budget_command(open_store(store)?, cli.format),
+        Command::Budget { store } => execute_budget_command(open_store(store)?, context.format),
         Command::Correct {
             store,
             id,
             content,
             by,
             reason,
-        } => execute_correct_command(open_store(store)?, id, content, by, reason, cli.format),
+        } => execute_correct_command(open_store(store)?, id, content, by, reason, context.format),
         Command::Feedback {
             store,
             id,
             query,
             relevant,
-        } => execute_feedback_command(open_store(store)?, id, query, relevant, cli.format),
-        Command::Weights { store } => execute_weights_command(open_store(store)?, cli.format),
+        } => execute_feedback_command(open_store(store)?, id, query, relevant, context.format),
+        Command::Weights { store } => execute_weights_command(open_store(store)?, context.format),
         Command::Traverse {
             store,
             id,
             depth,
             relation,
-        } => execute_traverse_command(open_store(store)?, id, depth, relation, cli.format),
+        } => execute_traverse_command(open_store(store)?, id, depth, relation, context.format),
         Command::DetectPoisoning { store, quarantine } => {
-            execute_detect_poisoning_command(open_store(store)?, quarantine, cli.format)
+            execute_detect_poisoning_command(open_store(store)?, quarantine, context.format)
         }
         Command::DeleteLink { store, id } => {
-            execute_delete_link_command(open_store(store)?, id, cli.format)
+            execute_delete_link_command(open_store(store)?, id, context.format)
         }
         Command::ShareExport {
             store,
@@ -1101,12 +1125,60 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
             output,
             max_sensitivity.into(),
             min_reliability,
-            cli.format,
+            context.format,
         ),
         Command::ShareImport { store, input } => {
-            execute_share_import_command(open_store(store)?, input, cli.format)
+            execute_share_import_command(open_store(store)?, input, context.format)
         }
     }
+}
+
+fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
+    if json {
+        OutputFormat::Json
+    } else {
+        format
+    }
+}
+
+fn command_name(command: &Command) -> &'static str {
+    match command {
+        Command::Add { .. } => "add",
+        Command::Search { .. } => "search",
+        Command::List { .. } => "list",
+        Command::Inspect { .. } => "inspect",
+        Command::Purge { .. } => "purge",
+        Command::Health { .. } => "health",
+        Command::Export { .. } => "export",
+        Command::Reembed { .. } => "reembed",
+        Command::Contradictions { action, .. } => match action {
+            Some(ContradictionsAction::Resolve) => "contradictions.resolve",
+            None => "contradictions",
+        },
+        Command::Import { .. } => "import",
+        Command::Promote { .. } => "promote",
+        Command::Consolidate { .. } => "consolidate",
+        Command::Rollback { .. } => "rollback",
+        Command::Corroborate { .. } => "corroborate",
+        Command::Budget { .. } => "budget",
+        Command::Correct { .. } => "correct",
+        Command::Feedback { .. } => "feedback",
+        Command::Weights { .. } => "weights",
+        Command::Traverse { .. } => "traverse",
+        Command::DetectPoisoning { .. } => "detect-poisoning",
+        Command::DeleteLink { .. } => "delete-link",
+        Command::ShareExport { .. } => "share-export",
+        Command::ShareImport { .. } => "share-import",
+    }
+}
+
+fn current_machine_context() -> &'static MachineContext {
+    // SAFETY: CLI_MACHINE_CONTEXT is always set in run_from_env() before any
+    // dispatch path that calls this function. All call sites are private and
+    // only reachable after initialization.
+    CLI_MACHINE_CONTEXT
+        .get()
+        .expect("memory CLI machine context should be initialized during run")
 }
 
 fn execute_add_command(
@@ -1300,7 +1372,7 @@ fn execute_add_command(
 
     match format {
         OutputFormat::Text => print_add_text(&ctx, &response),
-        OutputFormat::Json => print_json("add", &response)?,
+        OutputFormat::Json => print_success_json("add", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1317,7 +1389,7 @@ fn execute_search_command(
 
     match format {
         OutputFormat::Text => print_search_text(&response),
-        OutputFormat::Json => print_json("search", &response)?,
+        OutputFormat::Json => print_success_json("search", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1364,7 +1436,7 @@ fn execute_list_command(
 
     match format {
         OutputFormat::Text => print_list_text(&response),
-        OutputFormat::Json => print_json("list", &response)?,
+        OutputFormat::Json => print_success_json("list", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1388,7 +1460,7 @@ fn execute_inspect_command(
 
     match format {
         OutputFormat::Text => print_inspect_text(&response),
-        OutputFormat::Json => print_json("inspect", &response)?,
+        OutputFormat::Json => print_success_json("inspect", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1399,10 +1471,16 @@ fn execute_purge_command(
     yes: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
+    if !yes && current_machine_context().machine.non_interactive {
+        return Err(CliError::Validation(
+            "purge requires --yes when --non-interactive is set".to_string(),
+        ));
+    }
+
     if !yes && !confirm_purge(&ctx)? {
         match format {
             OutputFormat::Text => println!("Purge cancelled."),
-            OutputFormat::Json => print_json(
+        OutputFormat::Json => print_success_json(
                 "purge",
                 &serde_json::json!({
                     "status": "cancelled",
@@ -1422,7 +1500,7 @@ fn execute_purge_command(
 
     match format {
         OutputFormat::Text => print_purge_text(&response),
-        OutputFormat::Json => print_json("purge", &response)?,
+        OutputFormat::Json => print_success_json("purge", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1513,7 +1591,7 @@ fn execute_health_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
 
     match format {
         OutputFormat::Text => print_health_text(&response),
-        OutputFormat::Json => print_json("health", &response)?,
+        OutputFormat::Json => print_success_json("health", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1579,7 +1657,7 @@ fn execute_export_command(
                             path.display()
                         );
                     }
-                    OutputFormat::Json => print_json(
+                    OutputFormat::Json => print_success_json(
                         "export",
                         &serde_json::json!({
                             "outputPath": path.display().to_string(),
@@ -1622,7 +1700,7 @@ fn execute_export_command(
                         output_path.display()
                     );
                 }
-                OutputFormat::Json => print_json(
+                OutputFormat::Json => print_success_json(
                     "export",
                     &serde_json::json!({
                         "outputPath": output_path.display().to_string(),
@@ -1646,7 +1724,7 @@ fn execute_reembed_command(
 
     match format {
         OutputFormat::Text => print_reembed_text(&response),
-        OutputFormat::Json => print_json("reembed", &response)?,
+        OutputFormat::Json => print_success_json("reembed", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1688,7 +1766,7 @@ fn execute_promote_command(
     };
     match format {
         OutputFormat::Text => print_promote_text(&response),
-        OutputFormat::Json => print_json("promote", &response)?,
+        OutputFormat::Json => print_success_json("promote", &response)?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -1794,7 +1872,7 @@ fn execute_consolidate_command(
     };
     match format {
         OutputFormat::Text => print_consolidate_text(&response),
-        OutputFormat::Json => print_json("consolidate", &response)?,
+        OutputFormat::Json => print_success_json("consolidate", &response)?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -1832,7 +1910,7 @@ fn execute_list_contradictions_command(
     ))?;
     match format {
         OutputFormat::Text => print_contradictions_text(&ctx, &contradictions),
-        OutputFormat::Json => print_json("contradictions", &contradictions)?,
+        OutputFormat::Json => print_success_json("contradictions", &contradictions)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -1936,7 +2014,7 @@ fn execute_resolve_contradiction_command(
 
     match format {
         OutputFormat::Text => print_resolve_contradiction_text(&ctx, &response),
-        OutputFormat::Json => print_json("contradictions.resolve", &response)?,
+        OutputFormat::Json => print_success_json("contradictions.resolve", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -2277,7 +2355,7 @@ fn execute_import_command(
 
     match format {
         OutputFormat::Text => print_import_text(&response),
-        OutputFormat::Json => print_json("import", &response)?,
+        OutputFormat::Json => print_success_json("import", &response)?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -3233,15 +3311,54 @@ fn print_consolidate_text(response: &ConsolidateResponse) {
     }
 }
 
-fn print_json<T>(command: &'static str, data: &T) -> Result<(), CliError>
+fn print_json<T>(envelope: &CliMachineEnvelope<T>) -> Result<(), CliError>
 where
     T: Serialize,
 {
-    println!(
-        "{}",
-        serde_json::to_string_pretty(&JsonEnvelope { command, data })?
-    );
+    println!("{}", serde_json::to_string_pretty(envelope)?);
     Ok(())
+}
+
+fn print_success_json<T>(
+    command: &'static str,
+    data: &T,
+) -> Result<(), CliError>
+where
+    T: Serialize,
+{
+    let machine = &current_machine_context().machine;
+    let data = serde_json::to_value(data)?;
+    print_json(&build_cli_success_envelope(machine, [command], data))
+}
+
+pub fn emit_machine_failure(
+    error: &CliError,
+) -> Result<(), CliError> {
+    let context = current_machine_context();
+    let kind = match error {
+        CliError::Validation(_) | CliError::InvalidId { .. } => {
+            CliFailureKind::InvalidInput
+        }
+        CliError::Consolidation(_)
+        | CliError::Store(_)
+        | CliError::Gate(_)
+        | CliError::Embedding(_)
+        | CliError::Llm(_)
+        | CliError::Io(_)
+        | CliError::Json(_) => CliFailureKind::Runtime,
+    };
+
+    print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+        &context.machine,
+        [context.command],
+        kind,
+        error.to_string(),
+        None,
+    ))
+}
+
+pub fn has_machine_context() -> bool {
+    CLI_MACHINE_CONTEXT.get().is_some()
 }
 
 fn execute_rollback_command(
@@ -3265,7 +3382,7 @@ fn execute_rollback_command(
             println!("Content: {}", preview(&memory.content));
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "rollback",
                 &RollbackResponse {
                     memory_id: memory.id.to_string(),
@@ -3298,7 +3415,7 @@ fn execute_corroborate_command(
             );
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "corroborate",
                 &CorroborateResponse {
                     memory_id: memory.id.to_string(),
@@ -3321,7 +3438,7 @@ fn execute_budget_command(ctx: StoreContext, format: OutputFormat) -> Result<Exi
             println!("  Deleted: {deleted}");
         }
         OutputFormat::Json => {
-            print_json("budget", &BudgetResponse { dormanted, deleted })?;
+            print_success_json("budget", &BudgetResponse { dormanted, deleted })?;
         }
     }
     Ok(ExitCode::SUCCESS)
@@ -3371,7 +3488,7 @@ fn execute_correct_command(
             println!("  Outcome: {}", correction_row.outcome);
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "correct",
                 &CorrectResponse {
                     correction: correction_row,
@@ -3404,7 +3521,7 @@ fn execute_feedback_command(
             print_weights_summary_text(&learning_report);
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "feedback",
                 &FeedbackResponse {
                     feedback_id: feedback.id,
@@ -3425,7 +3542,7 @@ fn execute_weights_command(ctx: StoreContext, format: OutputFormat) -> Result<Ex
             print_weights_summary_text(&learning_report);
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "weights",
                 &WeightsResponse {
                     learning: weights_summary_response(&learning_report),
@@ -3525,7 +3642,7 @@ fn execute_traverse_command(
                     link_count: node.incoming_links.len(),
                 })
                 .collect();
-            print_json(
+            print_success_json(
                 "traverse",
                 &TraverseResponse {
                     start_id: memory_id.to_string(),
@@ -3625,7 +3742,7 @@ fn execute_detect_poisoning_command(
                     memory_ids: alert.memory_ids.iter().map(ToString::to_string).collect(),
                 })
                 .collect();
-            print_json(
+            print_success_json(
                 "detect-poisoning",
                 &PoisoningResponse {
                     alert_count: rows.len(),
@@ -3678,7 +3795,7 @@ fn execute_delete_link_command(
             }
         }
         OutputFormat::Json => {
-            print_json(
+            print_success_json(
                 "delete-link",
                 &DeleteLinkResponse {
                     link_id: id,
@@ -3720,7 +3837,7 @@ fn execute_share_export_command(
                     path.display()
                 );
             }
-            OutputFormat::Json => print_json(
+            OutputFormat::Json => print_success_json(
                 "share-export",
                 &ShareExportResponse {
                     exported_count: memories.len(),
@@ -3732,7 +3849,7 @@ fn execute_share_export_command(
     } else {
         match format {
             OutputFormat::Text => println!("{payload}"),
-            OutputFormat::Json => print_json(
+            OutputFormat::Json => print_success_json(
                 "share-export",
                 &serde_json::json!({
                     "exportedCount": memories.len(),
@@ -3784,7 +3901,7 @@ fn execute_share_import_command(
                 }
             }
         }
-        OutputFormat::Json => print_json(
+        OutputFormat::Json => print_success_json(
             "share-import",
             &ShareImportResponse {
                 imported_count: report.new_ids.len(),

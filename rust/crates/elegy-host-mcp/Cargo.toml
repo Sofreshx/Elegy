@@ -19,6 +19,7 @@ tokio.workspace = true
 
 [dev-dependencies]
 rmcp = { workspace = true, features = ["client", "server", "transport-io"] }
+serde = { workspace = true, features = ["derive"] }
 tokio.workspace = true
 
 [lints]

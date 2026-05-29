@@ -1,8 +1,8 @@
 ---
 created: 2026-04-25
-updated: 2026-04-25
+updated: 2026-05-28
 category: integration
-status: proposed
+status: active
 doc_kind: roadmap
 ---
 
@@ -33,6 +33,39 @@ contracts, Rust crates, skill fixtures, and these live checks:
 
 The targeted Rust test set passed. The current gaps are mostly contract,
 integration, policy, and agent-ergonomics gaps rather than basic build failures.
+
+## Status note, 2026-05-28
+
+Phase 1 is no longer just planned work.
+
+- Shared CLI machine-output and structured-failure helpers now back
+  `elegy-skills`, `elegy-configuration`, and `elegy-memory`.
+- Real-output conformance tests now validate those dedicated CLI surfaces
+  against governed invocation and structured-failure contracts.
+- `elegy-host-mcp` now returns recognized Elegy machine envelopes as structured
+  MCP results instead of flattening them to text, and host-generated denials or
+  timeouts are also structured.
+
+Phase 2 is actively in progress.
+
+- Built-in v2 skill capabilities now project into real
+  `CapabilityDefinition` payloads.
+- `elegy skills capability` and `elegy-skills capability` now emit that
+  contract directly.
+- `elegy agent discover` now routes profile filtering and search through the
+  shared `SkillRegistry` search/filter path instead of its own local scorer.
+
+Remaining near-term work is still real.
+
+- Normalize the dedicated `elegy-mcp` CLI onto the shared top-level `failure`
+  envelope and add real-output conformance coverage there.
+- Add governed projected-capability fixture or contract-level conformance
+  coverage without introducing an `elegy-contracts` to `elegy-skills` crate
+  cycle.
+- Finish the remaining `elegy agent` helper consolidation around shared
+  profile/selection data.
+- Propagate invocation context and install-metadata executable resolution
+  through MCP subprocess dispatch.
 
 ## Current read
 
@@ -374,6 +407,16 @@ Exit:
 
 Owner: Elegy.
 
+Status, 2026-05-28:
+
+- Complete for shared machine-envelope and structured-failure adoption in
+  `elegy-skills`, `elegy-configuration`, and `elegy-memory`.
+- Complete for real-output conformance on those dedicated CLIs.
+- Complete for structured MCP result handling in `elegy-host-mcp` when
+  subprocess stdout is a recognized Elegy machine envelope.
+- Remaining: dedicated `elegy-mcp` CLI normalization and any still-uncovered
+  runtime paths that bypass the shared failure shape.
+
 Work:
 
 - Add shared Rust types/helpers for machine output, diagnostics, structured
@@ -391,6 +434,17 @@ Exit:
 ### Phase 2: Build the normalized capability registry
 
 Owner: Elegy.
+
+Status, 2026-05-28:
+
+- In progress.
+- Done so far: built-in capability-definition projection, direct capability
+  inspection output from both `elegy` and `elegy-skills`, shared typed MCP tool
+  bindings, and the first `elegy agent discover` dedup onto shared registry
+  filtering/search.
+- Remaining: governed projected-capability fixtures or contract-level
+  conformance, remaining `elegy agent` helper consolidation, and dedicated
+  `elegy-mcp` capability-model alignment.
 
 Work:
 
@@ -492,15 +546,18 @@ Exit:
 
 ## Immediate next work
 
-1. Implement shared machine-output and structured-failure helpers for the Rust
-   CLI family.
-2. Fix blank `correlationId` behavior in `elegy --json`.
-3. Add conformance tests that validate real CLI JSON against invocation and
-   failure contracts.
-4. Project built-in v2 skill capabilities into `capability-definition`.
-5. Add structured policy denials to `elegy-host-mcp`.
-6. Clarify desktop window matching semantics in skill docs and CLI help.
-7. Add downstream distribution smoke coverage for a clean generic host install.
+1. Normalize the dedicated `elegy-mcp` CLI onto the shared top-level
+   `failure` envelope and add real-output conformance coverage.
+2. Add governed projected-capability fixture or contract-level conformance
+   coverage without reintroducing an `elegy-contracts` to `elegy-skills` crate
+   cycle.
+3. Finish the remaining `elegy agent` helper consolidation around shared
+   profile/selection data.
+4. Propagate invocation context through MCP tool calls and replace workspace
+   fallback executable resolution with install-metadata validation.
+5. Clarify desktop window matching semantics in skill docs and CLI help.
+6. Add downstream distribution smoke coverage for a clean generic host install.
+7. Add a shared retrieval-result package for agent-facing memory consumption.
 
 ## Decision summary
 

@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "elegy-piloting-readiness-report/v1",
+  "reportId": "readiness.blender.1",
+  "targetId": "blender.desktop",
+  "generatedAtUtc": "2026-05-28T10:02:00Z",
+  "availability": "degraded",
+  "dependencies": [
+    {
+      "id": "target-installed",
+      "kind": "application",
+      "status": "ready"
+    },
+    {
+      "id": "workspace-template",
+      "kind": "fixture",
+      "status": "degraded",
+      "details": "Observed layout differs from the recorded fixture baseline."
+    }
+  ],
+  "blockedReasons": ["Fixture drift detected in workspace layout"],
+  "driftStatus": "drifted"
+}

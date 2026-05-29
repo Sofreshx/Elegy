@@ -1,5 +1,5 @@
 use elegy_contracts::{
-    default_support_manifest_path, export_contract_bundle,
+    builtin_capability_definitions, default_support_manifest_path, export_contract_bundle,
     load_agent_capability_profile_fixture_from_dir, load_capability_definition_fixture_from_dir,
     load_compatibility_manifest_from_dir, load_consumer_support_manifest,
     load_elegy_configuration_profile_fixture_from_dir,
@@ -9,7 +9,12 @@ use elegy_contracts::{
     load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
     load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
     load_observation_event_fixture_from_dir, load_observation_session_fixture_from_dir,
-    load_observation_summary_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
+    load_observation_summary_fixture_from_dir, load_piloting_action_intent_fixture_from_dir,
+    load_piloting_action_result_fixture_from_dir, load_piloting_adapter_manifest_fixture_from_dir,
+    load_piloting_fixture_pack_fixture_from_dir, load_piloting_observation_frame_fixture_from_dir,
+    load_piloting_readiness_report_fixture_from_dir,
+    load_piloting_surface_descriptor_fixture_from_dir,
+    load_piloting_target_descriptor_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
     load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
     resolve_upstream_contracts_dir, validate_agent_capability_profile,
     validate_capability_definition, validate_elegy_configuration_profile,
@@ -17,6 +22,11 @@ use elegy_contracts::{
     validate_elegy_plugin_package, validate_execution_event, validate_invocation_request,
     validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
     validate_observation_event, validate_observation_session, validate_observation_summary,
+    validate_piloting_action_intent, validate_piloting_action_result,
+    validate_piloting_adapter_manifest, validate_piloting_fixture_pack,
+    validate_piloting_fixture_pack_against_manifest, validate_piloting_observation_frame,
+    validate_piloting_package_file, validate_piloting_readiness_report,
+    validate_piloting_surface_descriptor, validate_piloting_target_descriptor,
     validate_skill_definition_v2, validate_structured_failure,
     validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
     CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
@@ -69,6 +79,14 @@ fn upstream_bundle_contains_supported_schema_entries() {
     assert!(schema_names.contains("observation-event"));
     assert!(schema_names.contains("observation-session"));
     assert!(schema_names.contains("observation-summary"));
+    assert!(schema_names.contains("piloting-target-descriptor"));
+    assert!(schema_names.contains("piloting-surface-descriptor"));
+    assert!(schema_names.contains("piloting-observation-frame"));
+    assert!(schema_names.contains("piloting-action-intent"));
+    assert!(schema_names.contains("piloting-action-result"));
+    assert!(schema_names.contains("piloting-readiness-report"));
+    assert!(schema_names.contains("piloting-adapter-manifest"));
+    assert!(schema_names.contains("piloting-fixture-pack"));
 }
 
 #[test]
@@ -232,6 +250,27 @@ fn upstream_skill_definition_fixture_is_semantically_valid() {
 }
 
 #[test]
+fn builtin_skill_capability_projections_are_semantically_valid() {
+    let definitions = builtin_capability_definitions()
+        .expect("built-in capability definitions should project cleanly");
+
+    assert!(
+        !definitions.is_empty(),
+        "expected at least one built-in capability definition"
+    );
+
+    for definition in definitions {
+        let validation = validate_capability_definition(&definition);
+        assert!(
+            validation.is_valid(),
+            "unexpected issues for {}: {:?}",
+            definition.id,
+            validation.issues
+        );
+    }
+}
+
+#[test]
 fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
     let package = load_elegy_plugin_package_v2_fixture_from_dir(&contracts_dir)
@@ -251,6 +290,378 @@ fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
     );
     assert_eq!(package.components.configuration_templates.len(), 1);
     assert_eq!(package.components.configuration_profiles.len(), 1);
+}
+
+#[test]
+fn upstream_piloting_fixtures_are_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let target = load_piloting_target_descriptor_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting target fixture");
+    let surface = load_piloting_surface_descriptor_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting surface fixture");
+    let observation = load_piloting_observation_frame_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting observation fixture");
+    let action_intent = load_piloting_action_intent_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting action intent fixture");
+    let action_result = load_piloting_action_result_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting action result fixture");
+    let readiness = load_piloting_readiness_report_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting readiness fixture");
+    let adapter_manifest = load_piloting_adapter_manifest_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting adapter manifest fixture");
+    let fixture_pack = load_piloting_fixture_pack_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting fixture pack fixture");
+
+    assert!(validate_piloting_target_descriptor(&target).is_valid());
+    assert!(validate_piloting_surface_descriptor(&surface).is_valid());
+    assert!(validate_piloting_observation_frame(&observation).is_valid());
+    assert!(validate_piloting_action_intent(&action_intent).is_valid());
+    assert!(validate_piloting_action_result(&action_result).is_valid());
+    assert!(validate_piloting_readiness_report(&readiness).is_valid());
+    assert!(validate_piloting_adapter_manifest(&adapter_manifest).is_valid());
+    assert!(validate_piloting_fixture_pack(&fixture_pack).is_valid());
+    assert!(
+        validate_piloting_fixture_pack_against_manifest(&fixture_pack, &adapter_manifest)
+            .is_valid()
+    );
+
+    assert_eq!(target.target_id, "blender.desktop");
+    assert_eq!(surface.surface_id, "blender.desktop.main-window");
+    assert_eq!(action_intent.action_id, "select-default-cube");
+    assert_eq!(readiness.report_id, "readiness.blender.1");
+    assert_eq!(adapter_manifest.adapter_id, "blender.piloting");
+    assert_eq!(
+        fixture_pack.fixture_pack_id,
+        "blender.fixtures.layout-basic"
+    );
+    assert_eq!(fixture_pack.policy_decisions.len(), 1);
+    assert_eq!(fixture_pack.simulation_results.len(), 1);
+    assert_eq!(fixture_pack.replay_checkpoints.len(), 2);
+    assert_eq!(fixture_pack.lifecycle_events.len(), 4);
+}
+
+#[test]
+fn upstream_piloting_package_fixture_is_semantically_valid() {
+    let repo_root = resolve_upstream_contracts_dir()
+        .parent()
+        .expect("repo root from contracts dir")
+        .to_path_buf();
+    let package: elegy_contracts::ElegyPluginPackage = serde_json::from_str(
+        &fs::read_to_string(
+            repo_root
+                .join("contracts")
+                .join("fixtures")
+                .join("elegy-plugin-package-v2.piloting-blender.json"),
+        )
+        .expect("read piloting package fixture"),
+    )
+    .expect("parse piloting package fixture");
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    assert_eq!(package.identity.package_id, "elegy.blender-piloting");
+    assert_eq!(package.components.piloting_adapters.len(), 1);
+    assert_eq!(package.components.fixture_packs.len(), 1);
+    assert_eq!(
+        package
+            .publishing
+            .as_ref()
+            .and_then(|publishing| publishing.marketplace_target.as_deref()),
+        Some("holon")
+    );
+
+    let package_path = repo_root
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json");
+    let file_validation = validate_piloting_package_file(&package_path, &package);
+    assert!(
+        file_validation.is_valid(),
+        "unexpected file-backed issues: {:?}",
+        file_validation.issues
+    );
+}
+
+#[test]
+fn file_backed_piloting_package_supports_manifest_refs_and_fixture_pack_refs() {
+    let temp_root = env::temp_dir().join(format!(
+        "elegy-contracts-piloting-package-{}-{}",
+        process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix epoch")
+            .as_nanos()
+    ));
+    let package_dir = temp_root.join("package");
+    fs::create_dir_all(&package_dir).expect("create package dir");
+    fs::create_dir_all(package_dir.join("signatures")).expect("create signature dir");
+
+    let repo_root = resolve_upstream_contracts_dir()
+        .parent()
+        .expect("repo root from contracts dir")
+        .to_path_buf();
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-adapter-manifest.minimal.json"),
+        package_dir.join("adapter.json"),
+    )
+    .expect("copy adapter manifest");
+    let mut adapter_manifest: serde_json::Value = serde_json::from_str(
+        &fs::read_to_string(package_dir.join("adapter.json")).expect("read copied adapter"),
+    )
+    .expect("parse copied adapter");
+    adapter_manifest["fixtures"][0]["path"] = serde_json::json!("fixture-pack.json");
+    fs::write(
+        package_dir.join("adapter.json"),
+        serde_json::to_string_pretty(&adapter_manifest).expect("serialize copied adapter"),
+    )
+    .expect("rewrite copied adapter");
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-fixture-pack.minimal.json"),
+        package_dir.join("fixture-pack.json"),
+    )
+    .expect("copy fixture pack");
+    fs::copy(
+        repo_root
+            .join("contracts")
+            .join("fixtures")
+            .join("piloting-readiness-report.minimal.json"),
+        package_dir.join("provenance.json"),
+    )
+    .expect("copy provenance fixture");
+    fs::write(package_dir.join("CHANGELOG.md"), "# Changelog\n").expect("write changelog");
+    fs::write(package_dir.join("signatures").join("package.sig"), "sig\n")
+        .expect("write signature");
+
+    let package_path = package_dir.join("package.json");
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.ref-backed-piloting",
+    "name": "ref-backed-piloting",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "description": "Ref-backed piloting package fixture.",
+    "license": "Apache-2.0"
+  },
+  "components": {
+    "pilotingAdapters": [
+      {
+        "id": "adapter",
+        "manifestRef": "adapter.json"
+      }
+    ],
+    "fixturePacks": [
+      {
+        "id": "fixture-pack",
+        "fixturePackRef": "fixture-pack.json"
+      }
+    ]
+  },
+  "publishing": {
+    "marketplaceTarget": "holon",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy.git",
+    "sourceRef": "refs/heads/main",
+    "sourceCommit": "8d062afa1b106e2db5f63e3afdd8b1198bc6e960",
+    "changelogRef": "CHANGELOG.md",
+    "provenanceRef": "provenance.json",
+    "signatureRefs": ["signatures/package.sig"],
+    "compatibility": [
+      {
+        "host": "holon",
+        "versionRange": ">=0.1.0 <0.2.0"
+      }
+    ]
+  }
+}"#,
+    )
+    .expect("write ref-backed package");
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(&fs::read_to_string(&package_path).expect("read package"))
+            .expect("parse ref-backed package");
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "unexpected issues: {:?}",
+        validation.issues
+    );
+
+    let file_validation = validate_piloting_package_file(&package_path, &package);
+    assert!(
+        file_validation.is_valid(),
+        "unexpected file-backed issues: {:?}",
+        file_validation.issues
+    );
+
+    fs::remove_dir_all(&temp_root).expect("remove temp package root");
+}
+
+#[test]
+fn plugin_package_validator_rejects_invalid_uri_fields() {
+    let mut package =
+        load_elegy_plugin_package_v2_fixture_from_dir(&resolve_upstream_contracts_dir())
+            .expect("load upstream elegy-plugin-package fixture");
+
+    package.metadata = Some(elegy_contracts::ElegyPluginPackageMetadata {
+        homepage: Some("not-a-uri".to_string()),
+        documentation_uri: Some("also-not-a-uri".to_string()),
+        ..package.metadata.unwrap_or_default()
+    });
+    package.publishing = Some(elegy_contracts::ElegyPluginPackagePublishingMetadata {
+        source_repository: Some("still-not-a-uri".to_string()),
+        ..package.publishing.unwrap_or_default()
+    });
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(validation
+        .issues
+        .contains(&"metadata.homepage must be a valid URI.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"metadata.documentationUri must be a valid URI.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"publishing.sourceRepository must be a valid URI.".to_string()));
+}
+
+#[test]
+fn piloting_validators_reject_invalid_rfc3339_timestamps() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let mut observation = load_piloting_observation_frame_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting observation fixture");
+    observation.observed_at_utc = "not-a-timestamp".to_string();
+    let observation_validation = validate_piloting_observation_frame(&observation);
+    assert!(observation_validation
+        .issues
+        .contains(&"observedAtUtc must be a valid RFC3339 date-time.".to_string()));
+
+    let mut readiness = load_piloting_readiness_report_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting readiness fixture");
+    readiness.generated_at_utc = "not-a-timestamp".to_string();
+    let readiness_validation = validate_piloting_readiness_report(&readiness);
+    assert!(readiness_validation
+        .issues
+        .contains(&"generatedAtUtc must be a valid RFC3339 date-time.".to_string()));
+
+    let mut fixture_pack = load_piloting_fixture_pack_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting fixture pack fixture");
+    fixture_pack.recorded_at_utc = "not-a-timestamp".to_string();
+    let fixture_pack_validation = validate_piloting_fixture_pack(&fixture_pack);
+    assert!(fixture_pack_validation
+        .issues
+        .contains(&"recordedAtUtc must be a valid RFC3339 date-time.".to_string()));
+}
+
+#[test]
+fn file_backed_piloting_package_rejects_dual_source_manifest_drift() {
+    let temp_root = env::temp_dir().join(format!(
+        "elegy-contracts-piloting-dual-source-{}-{}",
+        process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix epoch")
+            .as_nanos()
+    ));
+    let package_dir = temp_root.join("package");
+    fs::create_dir_all(&package_dir).expect("create package dir");
+
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let inline_manifest = load_piloting_adapter_manifest_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting adapter fixture");
+    let mut referenced_manifest = inline_manifest.clone();
+    referenced_manifest.display_name = "Drifted Manifest".to_string();
+    fs::write(
+        package_dir.join("adapter.json"),
+        serde_json::to_string_pretty(&referenced_manifest).expect("serialize referenced manifest"),
+    )
+    .expect("write referenced manifest");
+
+    let inline_fixture_pack = load_piloting_fixture_pack_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting fixture pack fixture");
+    let mut referenced_fixture_pack = inline_fixture_pack.clone();
+    referenced_fixture_pack.expected_result_checks[0].expected_status = "failed".to_string();
+    fs::write(
+        package_dir.join("fixture-pack.json"),
+        serde_json::to_string_pretty(&referenced_fixture_pack)
+            .expect("serialize referenced fixture pack"),
+    )
+    .expect("write referenced fixture pack");
+
+    let package = elegy_contracts::ElegyPluginPackage {
+        schema_version: "elegy-plugin-package/v2".to_string(),
+        identity: elegy_contracts::ElegyPluginPackageIdentity {
+            package_id: "elegy.dual-source-piloting".to_string(),
+            name: "dual-source-piloting".to_string(),
+            version: "0.1.0".to_string(),
+            display_name: None,
+        },
+        components: elegy_contracts::ElegyPluginPackageComponents {
+            piloting_adapters: vec![
+                elegy_contracts::ElegyPluginPackagePilotingAdapterComponent {
+                    id: "adapter".to_string(),
+                    manifest_ref: Some("adapter.json".to_string()),
+                    manifest: Some(inline_manifest),
+                },
+            ],
+            fixture_packs: vec![
+                elegy_contracts::ElegyPluginPackagePilotingFixturePackComponent {
+                    id: "fixture-pack".to_string(),
+                    fixture_pack_ref: Some("fixture-pack.json".to_string()),
+                    fixture_pack: Some(inline_fixture_pack),
+                },
+            ],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let package_path = package_dir.join("package.json");
+    let file_validation = validate_piloting_package_file(&package_path, &package);
+    assert!(file_validation.issues.iter().any(|issue| issue
+        .contains("must keep manifestRef 'adapter.json' aligned with the inline manifest.")));
+    assert!(file_validation.issues.iter().any(|issue| issue.contains(
+        "must keep fixturePackRef 'fixture-pack.json' aligned with the inline fixture pack."
+    )));
+
+    fs::remove_dir_all(&temp_root).expect("remove temp package root");
+}
+
+#[test]
+fn piloting_fixture_pack_rejects_unknown_policy_and_replay_refs() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let mut fixture_pack = load_piloting_fixture_pack_fixture_from_dir(&contracts_dir)
+        .expect("load upstream piloting fixture pack fixture");
+
+    fixture_pack.simulation_results[0].policy_decision_ref = Some("missing-policy".to_string());
+    fixture_pack.replay_checkpoints[0].state_ref = "missing-state".to_string();
+    fixture_pack.lifecycle_events[1].ref_id = Some("missing-ref".to_string());
+
+    let validation = validate_piloting_fixture_pack(&fixture_pack);
+    assert!(validation.issues.iter().any(|issue| issue.contains(
+        "simulationResults entry 'sim.select-default-cube.1' references unknown policyDecisionRef 'missing-policy'."
+    )));
+    assert!(validation.issues.iter().any(|issue| issue.contains(
+        "replayCheckpoints entry 'checkpoint.select-default-cube.before' references unknown stateRef 'missing-state'."
+    )));
+    assert!(validation.issues.iter().any(|issue| issue.contains(
+        "lifecycleEvents entry 'event.select-default-cube.policy' references unknown refId 'missing-ref'."
+    )));
 }
 
 #[test]
@@ -338,6 +749,10 @@ fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
         .expect("repo root from contracts dir")
         .to_path_buf();
     let fixtures = [
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-documentation.json",
+            ".agents/skills/elegy-documentation/SKILL.md",
+        ),
         (
             "contracts/fixtures/skill-discovery-index.elegy-memory.json",
             ".agents/skills/elegy-memory/SKILL.md",
@@ -731,6 +1146,30 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("observation-summary.schema.json")
         .is_file());
     assert!(output_path
+        .join("piloting-target-descriptor.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-surface-descriptor.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-observation-frame.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-action-intent.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-action-result.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-readiness-report.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-adapter-manifest.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("piloting-fixture-pack.schema.json")
+        .is_file());
+    assert!(output_path
         .join("fixtures")
         .join("capability-definition.minimal.json")
         .is_file());
@@ -741,6 +1180,42 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert!(output_path
         .join("fixtures")
         .join("elegy-plugin-package-v2.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("elegy-plugin-package-v2.piloting-blender.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-target-descriptor.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-surface-descriptor.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-observation-frame.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-action-intent.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-action-result.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-readiness-report.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-adapter-manifest.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("piloting-fixture-pack.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -813,6 +1288,28 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("observation-session.schema.json").is_ok());
         assert!(archive.by_name("observation-summary.schema.json").is_ok());
         assert!(archive
+            .by_name("piloting-target-descriptor.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-surface-descriptor.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-observation-frame.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-action-intent.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-action-result.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-readiness-report.schema.json")
+            .is_ok());
+        assert!(archive
+            .by_name("piloting-adapter-manifest.schema.json")
+            .is_ok());
+        assert!(archive.by_name("piloting-fixture-pack.schema.json").is_ok());
+        assert!(archive
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
         assert!(archive
@@ -820,6 +1317,33 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
             .is_ok());
         assert!(archive
             .by_name("fixtures/elegy-plugin-package-v2.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/elegy-plugin-package-v2.piloting-blender.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-target-descriptor.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-surface-descriptor.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-observation-frame.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-action-intent.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-action-result.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-readiness-report.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-adapter-manifest.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/piloting-fixture-pack.minimal.json")
             .is_ok());
         assert!(archive
             .by_name("fixtures/configuration/demo-template.json")

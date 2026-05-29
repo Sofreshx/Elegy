@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-action-intent.schema.json",
+  "title": "PilotingActionIntent",
+  "description": "Abstract desired piloting operation with input schema, side-effect class, and confirmation posture.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "actionId",
+    "targetId",
+    "surfaceId",
+    "operation",
+    "inputSchema",
+    "sideEffectClass",
+    "requiredConfirmation"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-action-intent/v1"
+    },
+    "actionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "surfaceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "operation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "inputSchema": {
+      "type": ["object", "boolean"]
+    },
+    "sideEffectClass": {
+      "type": "string",
+      "enum": ["none", "read_only", "disk_read", "disk_write", "network_outbound", "process_spawn", "desktop_ui"]
+    },
+    "requiredConfirmation": {
+      "type": "string",
+      "enum": ["none", "advisory", "explicit"]
+    }
+  }
+}

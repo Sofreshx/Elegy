@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-surface-descriptor.schema.json",
+  "title": "PilotingSurfaceDescriptor",
+  "description": "Targeted piloting surface identity with stability plus selectors or semantic anchors.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "surfaceId",
+    "targetId",
+    "surfaceKind",
+    "stability",
+    "selectors",
+    "semanticAnchors"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-surface-descriptor/v1"
+    },
+    "surfaceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "surfaceKind": {
+      "type": "string",
+      "enum": ["ui", "api", "browser", "desktop"]
+    },
+    "stability": {
+      "type": "string",
+      "enum": ["experimental", "volatile", "stable", "pinned"]
+    },
+    "selectors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["strategy", "value"],
+        "properties": {
+          "strategy": { "type": "string", "minLength": 1 },
+          "value": { "type": "string", "minLength": 1 },
+          "description": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "semanticAnchors": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  },
+  "anyOf": [
+    { "properties": { "selectors": { "minItems": 1 } } },
+    { "properties": { "semanticAnchors": { "minItems": 1 } } }
+  ]
+}

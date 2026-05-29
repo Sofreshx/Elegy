@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-lifecycle-event.schema.json",
+  "title": "PilotingLifecycleEvent",
+  "description": "Typed lifecycle event for a replayable, policy-gated targeted piloting action without granting live runtime authority.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "eventId",
+    "actionId",
+    "targetId",
+    "eventType",
+    "recordedAtUtc"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-lifecycle-event/v1"
+    },
+    "eventId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "actionId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "eventType": {
+      "type": "string",
+      "enum": ["intent_recorded", "policy_evaluated", "simulation_recorded", "checkpoint_recorded", "result_recorded"]
+    },
+    "recordedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "refId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

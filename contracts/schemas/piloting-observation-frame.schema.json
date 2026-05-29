@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/piloting-observation-frame.schema.json",
+  "title": "PilotingObservationFrame",
+  "description": "Timestamped observed piloting state with redaction, source, confidence, and evidence references.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "frameId",
+    "targetId",
+    "surfaceId",
+    "observedAtUtc",
+    "redactionClass",
+    "source",
+    "confidence",
+    "state",
+    "evidenceRefs"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-piloting-observation-frame/v1"
+    },
+    "frameId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "targetId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "surfaceId": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "observedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "redactionClass": {
+      "type": "string",
+      "enum": ["none", "internal", "sensitive", "restricted"]
+    },
+    "source": {
+      "type": "string",
+      "enum": ["fixture", "ui", "api", "browser", "desktop", "manual"]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "state": {
+      "type": "object"
+    },
+    "evidenceRefs": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "uniqueItems": true
+    }
+  }
+}
