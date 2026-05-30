@@ -38,8 +38,10 @@ Implemented in MVP:
 - `todo`
 - `issue`
 - `review point`
+- `insight`
 - `planning event`
 - `validation finding`
+- `tag index`
 
 ## Core Design Choices
 
@@ -140,11 +142,10 @@ Not yet implemented:
 
 - compatibility import from `instruction-engine` roadmap workflow artifacts
 - automatic export/projection into shared repo planning docs
-- update and transition subcommands beyond initial create flows
 - richer evidence aggregates
 - replay-based rebuild from events alone
-- explicit migration history beyond schema version `1`
 - dedicated wrapper projection for repo-local skill bridge surfaces
+- FTS5 rebuild on entity update (currently only on create)
 
 ## Intended Next Steps
 

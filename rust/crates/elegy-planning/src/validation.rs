@@ -5,8 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::{
     storage::{
         attached_entity_correlation_id, list_review_points_for_entity, list_todos_for_plan,
-        list_work_points_for_roadmap, load_goal, load_issue, load_plan, load_roadmap, load_todo,
-        load_work_point,
+        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan,
+        load_roadmap, load_todo, load_work_point,
     },
     EntityType, GoalStatus, IssueStatus, PlanningStoreError, ReviewPointStatus, Severity,
     TodoStatus, ValidationFinding, ValidationSeverity,
@@ -27,6 +27,7 @@ pub(crate) fn validate_entity(
         EntityType::Todo => validate_todo(connection, entity_id),
         EntityType::Issue => validate_issue(connection, entity_id),
         EntityType::ReviewPoint => validate_review_point(connection, entity_id),
+        EntityType::Insight => validate_insight(connection, entity_id),
     }
 }
 
@@ -230,6 +231,28 @@ fn validate_work_point(
                 &format!("dependency `{dependency_id}` does not exist"),
             )?),
             Err(error) => return Err(error),
+        }
+    }
+
+    if !work_point.dependency_ids.is_empty() {
+        let mut visited = std::collections::HashSet::new();
+        let mut stack = work_point.dependency_ids.clone();
+        while let Some(dep_id) = stack.pop() {
+            if dep_id == work_point_id {
+                findings.push(error(
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    "WORK-POINT-DEPENDENCY-CYCLE",
+                    "work point dependency graph contains a cycle",
+                )?);
+                break;
+            }
+            if !visited.insert(dep_id.clone()) {
+                continue;
+            }
+            if let Ok(dep) = load_work_point(connection, &dep_id) {
+                stack.extend(dep.dependency_ids.iter().cloned());
+            }
         }
     }
 
@@ -490,6 +513,49 @@ fn validate_review_point(
             review_point_id,
             "REVIEW-POINT-CRITICAL-OPEN",
             "critical review point remains open and should be resolved or explicitly accepted",
+        )?);
+    }
+
+    Ok(findings)
+}
+
+fn validate_insight(
+    connection: &Connection,
+    insight_id: &str,
+) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
+    let insight = load_insight(connection, insight_id)?;
+    let mut findings = Vec::new();
+
+    if insight.content.trim().is_empty() {
+        findings.push(error(
+            EntityType::Insight,
+            insight_id,
+            "INSIGHT-EMPTY-CONTENT",
+            "insight content must not be empty",
+        )?);
+    }
+
+    if insight.tags.is_empty() {
+        findings.push(warning(
+            EntityType::Insight,
+            insight_id,
+            "INSIGHT-TAG-ORPHAN",
+            "insight has no tags; add tags for discoverability",
+        )?);
+    }
+
+    if let Err(PlanningStoreError::NotFound { .. }) =
+        attached_entity_correlation_id(connection, insight.parent_entity_type, &insight.parent_entity_id)
+    {
+        findings.push(error(
+            EntityType::Insight,
+            insight_id,
+            "INSIGHT-NO-PARENT",
+            &format!(
+                "insight references missing parent {} `{}`",
+                insight.parent_entity_type.as_str(),
+                insight.parent_entity_id
+            ),
         )?);
     }
 

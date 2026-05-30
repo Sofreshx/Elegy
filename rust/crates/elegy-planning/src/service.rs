@@ -3,11 +3,12 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use crate::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalView, IssueView,
-    MutationResult, PlanView, PlanningHealthReport, PlanningStore, PlanningStoreError,
-    ProjectionFormat, RenderedProjection, RevisePlanInput, RoadmapView, ScopeRecord,
-    UpdateStatusInput, ValidationRunReport, WorkPointRecord, WorkPointView,
+    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateTodoInput, EntityType, GoalView, InsightView, IssueView, MutationResult, PlanView,
+    PlanningHealthReport, PlanningStore, PlanningStoreError, ProjectionFormat, RenderedProjection,
+    RevisePlanInput, RoadmapView, ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport,
+    WorkPointRecord, WorkPointView,
 };
 
 #[derive(Clone, Debug)]
@@ -244,6 +245,60 @@ impl PlanningService {
 
     pub fn health(&self) -> Result<PlanningHealthReport, PlanningStoreError> {
         self.store.health()
+    }
+
+    pub fn create_insight(
+        &self,
+        context: &PlanningContext,
+        mut input: CreateInsightInput,
+    ) -> Result<MutationResult<crate::InsightRecord>, PlanningStoreError> {
+        input.scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.create_insight(input)
+    }
+
+    pub fn insight(&self, id: &str) -> Result<InsightView, PlanningStoreError> {
+        let view = self.store.insight(id)?;
+        ensure_scope_match(
+            "insight",
+            id,
+            &view.insight.scope_key,
+            &self.config.scope_key,
+        )?;
+        Ok(view)
+    }
+
+    pub fn list_insights(
+        &self,
+        entity_type: EntityType,
+        entity_id: &str,
+    ) -> Result<Vec<crate::InsightRecord>, PlanningStoreError> {
+        self.store
+            .list_insights_for_entity(entity_type, entity_id, &self.config.scope_key)
+    }
+
+    pub fn list_tags(
+        &self,
+        entity_type: Option<&str>,
+    ) -> Result<Vec<TagInfo>, PlanningStoreError> {
+        self.store.list_tags(&self.config.scope_key, entity_type)
+    }
+
+    pub fn context_bundle(
+        &self,
+        entity_type: EntityType,
+        entity_id: &str,
+    ) -> Result<crate::EntityContextBundle, PlanningStoreError> {
+        self.store
+            .context_bundle(entity_type, entity_id, &self.config.scope_key)
+    }
+
+    pub fn session_context(
+        &self,
+        correlation_id: &str,
+    ) -> Result<crate::SessionContextBundle, PlanningStoreError> {
+        self.store
+            .session_context(correlation_id, &self.config.scope_key)
     }
 
     pub fn render(

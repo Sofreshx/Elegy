@@ -1,6 +1,7 @@
 pub mod cli;
 mod error;
 mod model;
+pub mod session;
 mod service;
 mod storage;
 mod validation;
@@ -9,7 +10,8 @@ pub use error::PlanningStoreError;
 pub use model::*;
 pub use service::{PlanningContext, PlanningService, PlanningServiceConfig};
 pub use storage::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, PlanningStore,
-    RevisePlanInput, UpdateStatusInput,
+    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateScopeInput, CreateTodoInput, PlanningStore, RevisePlanInput, SearchInput,
+    UpdateStatusInput,
 };

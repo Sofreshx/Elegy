@@ -45,7 +45,8 @@ string_enum!(EntityType {
     Plan => "plan",
     Todo => "todo",
     Issue => "issue",
-    ReviewPoint => "review-point"
+    ReviewPoint => "review-point",
+    Insight => "insight"
 });
 
 string_enum!(GoalStatus {
@@ -154,6 +155,22 @@ string_enum!(ValidationStatus {
 string_enum!(ProjectionFormat {
     Markdown => "markdown",
     Json => "json"
+});
+
+string_enum!(InsightStatus {
+    Active => "active",
+    Superseded => "superseded",
+    Archived => "archived"
+});
+
+string_enum!(InsightType {
+    DesignDecision => "design-decision",
+    EdgeCase => "edge-case",
+    Optimization => "optimization",
+    Constraint => "constraint",
+    Assumption => "assumption",
+    Risk => "risk",
+    Context => "context"
 });
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -329,6 +346,80 @@ pub struct ReviewPointRecord {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct InsightRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub correlation_id: String,
+    pub title: String,
+    pub content: String,
+    pub insight_type: InsightType,
+    pub parent_entity_type: EntityType,
+    pub parent_entity_id: String,
+    pub tags: Vec<String>,
+    pub status: InsightStatus,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct InsightView {
+    pub insight: InsightRecord,
+    pub validation: ValidationReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TagInfo {
+    pub tag: String,
+    pub entity_count: i64,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct TokenEstimate {
+    pub entity_tokens: usize,
+    pub related_tokens: usize,
+    pub insight_tokens: usize,
+    pub total_tokens: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct EntityContextBundle {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub entity: serde_json::Value,
+    pub parent_summary: Option<serde_json::Value>,
+    pub children: Vec<serde_json::Value>,
+    pub insights: Vec<InsightRecord>,
+    pub related_insights: Vec<InsightRecord>,
+    pub tags: Vec<String>,
+    pub validation: ValidationReport,
+    pub token_estimate: TokenEstimate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionContextBundle {
+    pub session_id: Option<String>,
+    pub correlation_id: Option<String>,
+    pub entities_touched: Vec<SearchResult>,
+    pub insights_recorded: Vec<InsightRecord>,
+    pub validation_summary: SessionValidationSummary,
+    pub token_estimate: TokenEstimate,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionValidationSummary {
+    pub error_count: usize,
+    pub warning_count: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanningEvent {
     pub event_id: String,
     pub entity_type: EntityType,
@@ -472,6 +563,7 @@ pub struct PlanningHealthReport {
     pub todo_count: i64,
     pub issue_count: i64,
     pub review_point_count: i64,
+    pub insight_count: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -482,4 +574,15 @@ pub struct RenderedProjection {
     pub format: ProjectionFormat,
     pub revision: i64,
     pub output_path: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SearchResult {
+    pub entity_type: String,
+    pub id: String,
+    pub title: String,
+    pub status: String,
+    pub updated_at: String,
+    pub created_at: String,
 }
