@@ -1,8 +1,8 @@
 pub mod cli;
 mod error;
 mod model;
-pub mod session;
 mod service;
+pub mod session;
 mod storage;
 mod validation;
 

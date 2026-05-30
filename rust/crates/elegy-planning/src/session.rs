@@ -1,7 +1,4 @@
-use std::{
-    env, fs,
-    path::PathBuf,
-};
+use std::{env, fs, path::PathBuf};
 
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
@@ -44,9 +41,11 @@ pub fn init_session(scope: &str) -> Result<PlanningSession, PlanningStoreError> 
 }
 
 pub fn use_session(session_id: &str) -> Result<PlanningSession, PlanningStoreError> {
-    let mut session = read_session()?.ok_or_else(|| PlanningStoreError::InvalidInput(
-        "no active session; run `elegy-planning session init` first".to_string(),
-    ))?;
+    let mut session = read_session()?.ok_or_else(|| {
+        PlanningStoreError::InvalidInput(
+            "no active session; run `elegy-planning session init` first".to_string(),
+        )
+    })?;
 
     let now = time::OffsetDateTime::now_utc()
         .format(&time::format_description::well_known::Rfc3339)
@@ -72,10 +71,11 @@ fn read_session() -> Result<Option<PlanningSession>, PlanningStoreError> {
     if !path.exists() {
         return Ok(None);
     }
-    let content = fs::read_to_string(&path).map_err(|source| PlanningStoreError::CreateDirectory {
-        path: path.clone(),
-        source,
-    })?;
+    let content =
+        fs::read_to_string(&path).map_err(|source| PlanningStoreError::CreateDirectory {
+            path: path.clone(),
+            source,
+        })?;
     let session: PlanningSession = serde_json::from_str(&content)?;
     Ok(Some(session))
 }
@@ -89,9 +89,7 @@ fn write_session(session: &PlanningSession) -> Result<(), PlanningStoreError> {
         })?;
     }
     let content = serde_json::to_string_pretty(session)?;
-    fs::write(&path, content).map_err(|source| PlanningStoreError::CreateDirectory {
-        path,
-        source,
-    })?;
+    fs::write(&path, content)
+        .map_err(|source| PlanningStoreError::CreateDirectory { path, source })?;
     Ok(())
 }

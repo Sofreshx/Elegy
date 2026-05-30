@@ -309,7 +309,13 @@ impl PlanningStore {
 
         let validation = validate_and_store(&transaction, EntityType::Goal, &id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::Goal, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.description)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.description,
+        )?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -389,7 +395,13 @@ impl PlanningStore {
         let validation = refresh_validation_target(&transaction, EntityType::Roadmap, &id)?;
         let _ = refresh_validation_target(&transaction, EntityType::Goal, &record.goal_id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::Roadmap, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.summary)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.summary,
+        )?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -602,7 +614,13 @@ impl PlanningStore {
         let validation =
             refresh_validation_target(&transaction, EntityType::Roadmap, &record.roadmap_id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::WorkPoint, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.summary)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.summary,
+        )?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -723,7 +741,13 @@ impl PlanningStore {
 
         let validation = refresh_validation_target(&transaction, EntityType::Plan, &id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::Plan, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.summary)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.summary,
+        )?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -868,7 +892,13 @@ impl PlanningStore {
 
         let validation = refresh_validation_target(&transaction, EntityType::Todo, &id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::Todo, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.summary)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.summary,
+        )?;
         if let Some(plan_id) = &record.plan_id {
             let _ = refresh_validation_target(&transaction, EntityType::Plan, plan_id)?;
         }
@@ -964,7 +994,13 @@ impl PlanningStore {
 
         let validation = refresh_validation_target(&transaction, EntityType::Issue, &id)?;
         rebuild_tag_index_for_entity(&transaction, EntityType::Issue, &id, &record.tags)?;
-        upsert_fts_entry(&transaction, "entities_fts", &id, &record.title, &record.summary)?;
+        upsert_fts_entry(
+            &transaction,
+            "entities_fts",
+            &id,
+            &record.title,
+            &record.summary,
+        )?;
         if record.related_entity_type == Some(EntityType::Plan) {
             if let Some(related_entity_id) = &record.related_entity_id {
                 let _ =
@@ -1165,7 +1201,10 @@ impl PlanningStore {
         let connection = self.open_connection()?;
         let insight = load_insight(&connection, id)?;
         let validation = load_validation_report(&connection, EntityType::Insight, id)?;
-        Ok(InsightView { insight, validation })
+        Ok(InsightView {
+            insight,
+            validation,
+        })
     }
 
     pub fn list_insights_for_entity(
@@ -1220,8 +1259,7 @@ impl PlanningStore {
                 }
                 let placeholders = rowids
                     .iter()
-                    .enumerate()
-                    .map(|(_i, _)| format!("?{param_index}"))
+                    .map(|_| format!("?{param_index}"))
                     .collect::<Vec<_>>()
                     .join(", ");
                 sql.push_str(&format!(" AND id IN ({placeholders})"));
@@ -1322,17 +1360,19 @@ impl PlanningStore {
         let entity_json = load_entity_json(&connection, entity_type, entity_id)?;
         let parent_summary = load_parent_summary(&connection, entity_type, entity_id)?;
         let children = load_children_json(&connection, entity_type, entity_id)?;
-        let insights = list_insights_for_entity_in_scope(
-            &connection,
-            entity_type,
-            entity_id,
-            &normalized,
-        )?;
+        let insights =
+            list_insights_for_entity_in_scope(&connection, entity_type, entity_id, &normalized)?;
         let related_insights = if let Some(ref parent) = parent_summary {
             if let (Some(ptype), Some(pid)) = (parent.get("entityType"), parent.get("id")) {
                 if let Ok(parent_et) = ptype.as_str().unwrap_or("").parse::<EntityType>() {
                     let parent_id = pid.as_str().unwrap_or("");
-                    list_insights_for_entity_in_scope(&connection, parent_et, parent_id, &normalized).unwrap_or_default()
+                    list_insights_for_entity_in_scope(
+                        &connection,
+                        parent_et,
+                        parent_id,
+                        &normalized,
+                    )
+                    .unwrap_or_default()
                 } else {
                     Vec::new()
                 }
@@ -1345,9 +1385,15 @@ impl PlanningStore {
         let tags = load_entity_tags(&connection, entity_type, entity_id)?;
         let validation = load_validation_report(&connection, entity_type, entity_id)?;
         let entity_tokens = estimate_tokens(&entity_json.to_string());
-        let children_tokens: usize = children.iter().map(|c| estimate_tokens(&c.to_string())).sum();
+        let children_tokens: usize = children
+            .iter()
+            .map(|c| estimate_tokens(&c.to_string()))
+            .sum();
         let insight_tokens: usize = insights.iter().map(|i| estimate_tokens(&i.content)).sum();
-        let related_tokens: usize = related_insights.iter().map(|i| estimate_tokens(&i.content)).sum();
+        let related_tokens: usize = related_insights
+            .iter()
+            .map(|i| estimate_tokens(&i.content))
+            .sum();
         Ok(crate::EntityContextBundle {
             entity_type,
             entity_id: entity_id.to_string(),
@@ -1396,18 +1442,24 @@ impl PlanningStore {
         let mut insight_statement = connection.prepare(
             "SELECT id, scope_key, correlation_id, title, content, insight_type, parent_entity_type, parent_entity_id, tags_json, status, revision, created_at, updated_at FROM insights WHERE correlation_id = ?1 AND scope_key = ?2 ORDER BY created_at ASC, id ASC",
         )?;
-        let insight_rows = insight_statement.query_map(
-            params![correlation_id, normalized],
-            row_to_insight,
-        )?;
+        let insight_rows =
+            insight_statement.query_map(params![correlation_id, normalized], row_to_insight)?;
         let insights_recorded = collect_rows(insight_rows)?;
         let mut error_count = 0usize;
         let mut warning_count = 0usize;
         for entity in &entities_touched {
             if let Ok(et) = entity.entity_type.parse::<EntityType>() {
                 if let Ok(report) = load_validation_report(&connection, et, &entity.id) {
-                    error_count += report.findings.iter().filter(|f| f.severity == ValidationSeverity::Error).count();
-                    warning_count += report.findings.iter().filter(|f| f.severity == ValidationSeverity::Warning).count();
+                    error_count += report
+                        .findings
+                        .iter()
+                        .filter(|f| f.severity == ValidationSeverity::Error)
+                        .count();
+                    warning_count += report
+                        .findings
+                        .iter()
+                        .filter(|f| f.severity == ValidationSeverity::Warning)
+                        .count();
                 }
             }
         }
@@ -1415,8 +1467,14 @@ impl PlanningStore {
             error_count,
             warning_count,
         };
-        let entity_tokens: usize = entities_touched.iter().map(|e| estimate_tokens(&e.title)).sum();
-        let insight_tokens: usize = insights_recorded.iter().map(|i| estimate_tokens(&i.content)).sum();
+        let entity_tokens: usize = entities_touched
+            .iter()
+            .map(|e| estimate_tokens(&e.title))
+            .sum();
+        let insight_tokens: usize = insights_recorded
+            .iter()
+            .map(|i| estimate_tokens(&i.content))
+            .sum();
         let total_tokens = entity_tokens + insight_tokens;
         Ok(crate::SessionContextBundle {
             session_id: None,
@@ -2029,12 +2087,7 @@ impl PlanningStore {
         )?;
 
         let validation = refresh_validation_target(&transaction, EntityType::Plan, &record.id)?;
-        rebuild_tag_index_for_entity(
-            &transaction,
-            EntityType::Plan,
-            &record.id,
-            &record.tags,
-        )?;
+        rebuild_tag_index_for_entity(&transaction, EntityType::Plan, &record.id, &record.tags)?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -2952,9 +3005,7 @@ fn migrate_v4_to_v5(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     }
 
     {
-        let mut statement = connection.prepare(
-            "SELECT id, title, content FROM insights",
-        )?;
+        let mut statement = connection.prepare("SELECT id, title, content FROM insights")?;
         let rows = statement.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -2989,9 +3040,8 @@ fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningS
         ("issues", EntityType::Issue),
         ("insights", EntityType::Insight),
     ] {
-        let mut statement = connection.prepare(&format!(
-            "SELECT id, scope_key, tags_json FROM {table}"
-        ))?;
+        let mut statement =
+            connection.prepare(&format!("SELECT id, scope_key, tags_json FROM {table}"))?;
         let rows = statement.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
@@ -3001,8 +3051,7 @@ fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningS
         })?;
         for row in rows {
             let (id, scope_key, tags_json) = row?;
-            let tags: Vec<String> =
-                serde_json::from_str(&tags_json).map_err(to_sql_error)?;
+            let tags: Vec<String> = serde_json::from_str(&tags_json).map_err(to_sql_error)?;
             for tag in &tags {
                 connection.execute(
                     "INSERT OR IGNORE INTO tag_index (scope_key, entity_type, entity_id, tag) VALUES (?1, ?2, ?3, ?4)",
@@ -3511,9 +3560,7 @@ fn list_work_point_dependents(
     let mut statement = connection.prepare(
         "SELECT id FROM work_points WHERE EXISTS (SELECT 1 FROM json_each(work_points.dependency_ids_json) WHERE json_each.value = ?1)",
     )?;
-    let rows = statement.query_map(params![dependency_id], |row| {
-        row.get::<_, String>(0)
-    })?;
+    let rows = statement.query_map(params![dependency_id], |row| row.get::<_, String>(0))?;
     collect_rows(rows)
 }
 
@@ -3524,9 +3571,7 @@ fn list_plans_targeting_work_point(
     let mut statement = connection.prepare(
         "SELECT id FROM plans WHERE EXISTS (SELECT 1 FROM json_each(plans.targeted_work_point_ids_json) WHERE json_each.value = ?1)",
     )?;
-    let rows = statement.query_map(params![work_point_id], |row| {
-        row.get::<_, String>(0)
-    })?;
+    let rows = statement.query_map(params![work_point_id], |row| row.get::<_, String>(0))?;
     collect_rows(rows)
 }
 
@@ -4748,7 +4793,7 @@ fn upsert_fts_entry(
 }
 
 fn estimate_tokens(text: &str) -> usize {
-    (text.len() + 3) / 4
+    text.len().div_ceil(4)
 }
 
 fn resolve_search_result(
@@ -4787,9 +4832,7 @@ fn search_entity_fts(
     let mut statement = connection.prepare(&format!(
         "SELECT entity_id FROM {fts_table} WHERE {fts_table} MATCH ?1"
     ))?;
-    let rows = statement.query_map(params![fts_query], |row| {
-        row.get::<_, String>(0)
-    })?;
+    let rows = statement.query_map(params![fts_query], |row| row.get::<_, String>(0))?;
     let mut ids = Vec::new();
     for row in rows {
         ids.push(row?);
@@ -4884,7 +4927,9 @@ fn load_entity_json(
         EntityType::Plan => serde_json::to_string(&load_plan(connection, entity_id)?),
         EntityType::Todo => serde_json::to_string(&load_todo(connection, entity_id)?),
         EntityType::Issue => serde_json::to_string(&load_issue(connection, entity_id)?),
-        EntityType::ReviewPoint => serde_json::to_string(&load_review_point(connection, entity_id)?),
+        EntityType::ReviewPoint => {
+            serde_json::to_string(&load_review_point(connection, entity_id)?)
+        }
         EntityType::Insight => serde_json::to_string(&load_insight(connection, entity_id)?),
         EntityType::Scope => serde_json::to_string(&load_scope(connection, entity_id)?),
         EntityType::RoadmapSection => {

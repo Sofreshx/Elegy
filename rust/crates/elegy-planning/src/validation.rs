@@ -5,8 +5,8 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::{
     storage::{
         attached_entity_correlation_id, list_review_points_for_entity, list_todos_for_plan,
-        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan,
-        load_roadmap, load_todo, load_work_point,
+        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan, load_roadmap,
+        load_todo, load_work_point,
     },
     EntityType, GoalStatus, IssueStatus, PlanningStoreError, ReviewPointStatus, Severity,
     TodoStatus, ValidationFinding, ValidationSeverity,
@@ -544,9 +544,11 @@ fn validate_insight(
         )?);
     }
 
-    if let Err(PlanningStoreError::NotFound { .. }) =
-        attached_entity_correlation_id(connection, insight.parent_entity_type, &insight.parent_entity_id)
-    {
+    if let Err(PlanningStoreError::NotFound { .. }) = attached_entity_correlation_id(
+        connection,
+        insight.parent_entity_type,
+        &insight.parent_entity_id,
+    ) {
         findings.push(error(
             EntityType::Insight,
             insight_id,

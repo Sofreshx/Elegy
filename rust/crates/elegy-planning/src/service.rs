@@ -4,11 +4,11 @@ use serde_json::Value;
 
 use crate::{
     AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
-    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateTodoInput, EntityType, GoalView, InsightView, IssueView, MutationResult, PlanView,
-    PlanningHealthReport, PlanningStore, PlanningStoreError, ProjectionFormat, RenderedProjection,
-    RevisePlanInput, RoadmapView, ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport,
-    WorkPointRecord, WorkPointView,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput,
+    EntityType, GoalView, InsightView, IssueView, MutationResult, PlanView, PlanningHealthReport,
+    PlanningStore, PlanningStoreError, ProjectionFormat, RenderedProjection, RevisePlanInput,
+    RoadmapView, ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport, WorkPointRecord,
+    WorkPointView,
 };
 
 #[derive(Clone, Debug)]
@@ -277,10 +277,7 @@ impl PlanningService {
             .list_insights_for_entity(entity_type, entity_id, &self.config.scope_key)
     }
 
-    pub fn list_tags(
-        &self,
-        entity_type: Option<&str>,
-    ) -> Result<Vec<TagInfo>, PlanningStoreError> {
+    pub fn list_tags(&self, entity_type: Option<&str>) -> Result<Vec<TagInfo>, PlanningStoreError> {
         self.store.list_tags(&self.config.scope_key, entity_type)
     }
 
