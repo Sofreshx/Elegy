@@ -1459,6 +1459,152 @@
         "isDeterministic": false,
         "hasSideEffects": true
       }
+    },
+    {
+      "id": "planning-insight-record",
+      "name": "Record Insight",
+      "description": "Record a reasoning insight attached to any planning entity (design-decision, edge-case, optimization, constraint, assumption, risk, context).",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "insight", "record", "--title", "${title}", "--content", "${content}", "--insight-type", "${insight_type}", "--parent-type", "${parent_entity_type}", "--parent-id", "${parent_entity_id}", "--tag", "${tags}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for session tracking.", "required": true },
+          { "name": "title", "type": "string", "description": "Insight title.", "required": true },
+          { "name": "content", "type": "string", "description": "The reasoning content.", "required": true },
+          { "name": "insight_type", "type": "string", "description": "Type: design-decision, edge-case, optimization, constraint, assumption, risk, or context.", "required": true },
+          { "name": "parent_entity_type", "type": "string", "description": "Parent entity type: goal, roadmap, plan, todo, issue, etc.", "required": true },
+          { "name": "parent_entity_id", "type": "string", "description": "Parent entity ID.", "required": true },
+          { "name": "tags", "type": "array", "description": "Tags for discoverability.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Created insight record with validation findings."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-context-entity",
+      "name": "Entity Context Bundle",
+      "description": "Load a full context bundle for an entity: entity data, parent summary, children, insights, related insights, tags, validation, and token estimate.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "context", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "entity_type", "type": "string", "description": "Entity type.", "required": true },
+          { "name": "entity_id", "type": "string", "description": "Entity ID.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Context bundle with entity, related data, insights, tags, validation, and token estimate."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-context-session",
+      "name": "Session Context Bundle",
+      "description": "Load all entities and insights touched in the current correlation session.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "context", "--session"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID to load session for.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Session context with entities touched, insights recorded, validation summary, and token estimate."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-tags-list",
+      "name": "List Tags",
+      "description": "List all in-use tags with entity counts, optionally filtered by entity type.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "tags", "--entity-type", "${entity_type}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "entity_type", "type": "string", "description": "Optional entity type filter.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "List of tags with entity counts."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-search-extended",
+      "name": "Extended Search",
+      "description": "Search planning entities with tag and full-text search filters.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "search", "--title", "${title}", "--status", "${status}", "--tag", "${tag}", "--fts", "${fts}", "--latest", "${latest}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "title", "type": "string", "description": "Title pattern (SQL LIKE).", "required": false },
+          { "name": "status", "type": "string", "description": "Exact status filter.", "required": false },
+          { "name": "tag", "type": "string", "description": "Tag filter.", "required": false },
+          { "name": "fts", "type": "string", "description": "Full-text search query.", "required": false },
+          { "name": "latest", "type": "string", "description": "Max results.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Search results with entity summaries."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
     }
   ],
   "constraints": [
@@ -1480,7 +1626,7 @@
     "allowedContexts": ["contributor-routing", "local-cli", "planning-authority"]
   },
   "discovery": {
-    "keywords": ["planning", "goal", "roadmap", "roadmap planning", "work point", "plan", "todo", "issue", "review point", "validate planning", "projection"],
+    "keywords": ["planning", "goal", "roadmap", "roadmap planning", "work point", "plan", "todo", "issue", "review point", "validate planning", "projection", "insight", "reasoning", "context", "tags", "full-text search"],
     "triggers": [
       {
         "pattern": "create roadmap",
@@ -1497,9 +1643,21 @@
       {
         "pattern": "validate planning",
         "description": "When planning state should be checked for deterministic warnings and errors."
+      },
+      {
+        "pattern": "record insight",
+        "description": "When reasoning or design decisions should be captured alongside planning entities."
+      },
+      {
+        "pattern": "planning context",
+        "description": "When an LLM needs full context about a planning entity including related insights and tags."
+      },
+      {
+        "pattern": "search by tag",
+        "description": "When finding planning entities by tag correlation."
       }
     ],
-    "capabilityHints": ["durable-goal-authoring", "roadmap-authority", "plan-authoring", "todo-tracking", "issue-tracking", "planning-validation", "planning-projection", "planning-scope-management", "planning-lifecycle-transitions", "planning-event-history"],
+    "capabilityHints": ["durable-goal-authoring", "roadmap-authority", "plan-authoring", "todo-tracking", "issue-tracking", "planning-validation", "planning-projection", "planning-scope-management", "planning-lifecycle-transitions", "planning-event-history", "planning-insight-recording", "planning-context-bundle", "planning-tag-search", "planning-full-text-search"],
     "isHidden": false
   },
   "origin": {

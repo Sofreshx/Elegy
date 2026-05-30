@@ -6,11 +6,12 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
-    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus, IssueStatus,
-    PlanStatus, PlanningStore, Priority, ProjectionFormat, ReviewPointStatus, RevisePlanInput,
-    RoadmapStatus, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
+    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
+    FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
+    PlanningStore, Priority, ProjectionFormat, ReviewPointStatus, RevisePlanInput, RoadmapStatus,
+    SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -99,6 +100,17 @@ enum Command {
         #[command(subcommand)]
         command: ProjectCommand,
     },
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
+    Search(SearchArgs),
+    Insight {
+        #[command(subcommand)]
+        command: InsightCommand,
+    },
+    Context(ContextArgs),
+    Tags(TagsArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -107,6 +119,7 @@ enum GoalCommand {
     UpdateStatus(GoalUpdateStatusArgs),
     List,
     Show(GoalShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -117,6 +130,7 @@ enum RoadmapCommand {
     AddWorkPoint(RoadmapAddWorkPointArgs),
     List,
     Show(RoadmapShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -134,6 +148,7 @@ enum PlanCommand {
     UpdateStatus(PlanUpdateStatusArgs),
     List,
     Show(PlanShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -141,6 +156,7 @@ enum TodoCommand {
     Create(TodoCreateArgs),
     UpdateStatus(TodoUpdateStatusArgs),
     List,
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -149,6 +165,7 @@ enum IssueCommand {
     UpdateStatus(IssueUpdateStatusArgs),
     List,
     Show(IssueShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -166,6 +183,142 @@ enum ValidateCommand {
 enum ProjectCommand {
     Export(ProjectRenderArgs),
     Render(ProjectRenderArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum SessionCommand {
+    Init(SessionInitArgs),
+    Use(SessionUseArgs),
+    Show,
+}
+
+#[derive(Args, Debug)]
+struct SessionInitArgs {
+    #[arg(long, default_value = "default")]
+    scope: String,
+}
+
+#[derive(Args, Debug)]
+struct SessionUseArgs {
+    #[arg(long = "session-id")]
+    session_id: String,
+}
+
+#[derive(Args, Debug)]
+struct EntitySearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct SearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+enum InsightCommand {
+    Record(InsightRecordArgs),
+    List(InsightListArgs),
+    Show(InsightShowArgs),
+    Search(InsightSearchArgs),
+    UpdateStatus(InsightUpdateStatusArgs),
+}
+
+#[derive(Args, Debug)]
+struct InsightRecordArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    title: String,
+    #[arg(long)]
+    content: String,
+    #[arg(long, value_enum)]
+    insight_type: InsightType,
+    #[arg(long = "parent-type", value_enum)]
+    parent_entity_type: EntityType,
+    #[arg(long = "parent-id")]
+    parent_entity_id: String,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, value_enum, default_value_t = InsightStatus::Active)]
+    status: InsightStatus,
+}
+
+#[derive(Args, Debug)]
+struct InsightListArgs {
+    #[arg(long = "parent-type", value_enum)]
+    parent_entity_type: EntityType,
+    #[arg(long = "parent-id")]
+    parent_entity_id: String,
+}
+
+#[derive(Args, Debug)]
+struct InsightShowArgs {
+    #[arg(long = "insight-id")]
+    insight_id: String,
+}
+
+#[derive(Args, Debug)]
+struct InsightSearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct InsightUpdateStatusArgs {
+    #[arg(long = "insight-id")]
+    insight_id: String,
+    #[arg(long, value_enum)]
+    status: InsightStatus,
+}
+
+#[derive(Args, Debug)]
+struct ContextArgs {
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: Option<EntityType>,
+    #[arg(long = "entity-id")]
+    entity_id: Option<String>,
+    #[arg(long)]
+    session: bool,
+}
+
+#[derive(Args, Debug)]
+struct TagsArgs {
+    #[arg(long = "entity-type")]
+    entity_type: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -604,6 +757,11 @@ where
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
         Command::Project { command } => execute_project(command, &store, &context),
+        Command::Session { command } => execute_session(command, &context),
+        Command::Search(args) => execute_search(args, &store, &context),
+        Command::Insight { command } => execute_insight(command, &store, &context),
+        Command::Context(args) => execute_context(args, &store, &context),
+        Command::Tags(args) => execute_tags(args, &store, &context),
     }
 }
 
@@ -742,6 +900,7 @@ fn execute_goal(
             }
             emit_success(context, vec!["goal", "show"], view)
         }
+        GoalCommand::Search(args) => execute_entity_search(args, store, context, "goal"),
     }
 }
 
@@ -840,6 +999,7 @@ fn execute_roadmap(
             }
             emit_success(context, vec!["roadmap", "show"], view)
         }
+        RoadmapCommand::Search(args) => execute_entity_search(args, store, context, "roadmap"),
     }
 }
 
@@ -992,6 +1152,7 @@ fn execute_plan(
             }
             emit_success(context, vec!["plan", "show"], view)
         }
+        PlanCommand::Search(args) => execute_entity_search(args, store, context, "plan"),
     }
 }
 
@@ -1038,6 +1199,7 @@ fn execute_todo(
             vec!["todo", "list"],
             json!({ "todos": store.list_todos_in_scope(&context.scope_key)? }),
         ),
+        TodoCommand::Search(args) => execute_entity_search(args, store, context, "todo"),
     }
 }
 
@@ -1102,6 +1264,7 @@ fn execute_issue(
             }
             emit_success(context, vec!["issue", "show"], view)
         }
+        IssueCommand::Search(args) => execute_entity_search(args, store, context, "issue"),
     }
 }
 
@@ -1194,6 +1357,200 @@ fn execute_project(
             )?,
         ),
     }
+}
+
+fn execute_session(
+    command: SessionCommand,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        SessionCommand::Init(args) => {
+            let session = crate::session::init_session(&args.scope)?;
+            emit_success(context, vec!["session", "init"], session)
+        }
+        SessionCommand::Use(args) => {
+            let session = crate::session::use_session(&args.session_id)?;
+            emit_success(context, vec!["session", "use"], session)
+        }
+        SessionCommand::Show => {
+            let session = crate::session::show_session()?;
+            emit_success(context, vec!["session", "show"], session)
+        }
+    }
+}
+
+fn execute_search(
+    args: SearchArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let input = SearchInput {
+        scope_key: Some(context.scope_key.clone()),
+        title: args.title,
+        status: args.status,
+        since: args.since,
+        latest: args.latest,
+        tag: args.tag,
+        fts: args.fts,
+    };
+    let results = store.search_all(&input)?;
+    emit_success(context, vec!["search"], json!({ "results": results }))
+}
+
+fn execute_entity_search(
+    args: EntitySearchArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+    entity_type: &str,
+) -> Result<ExitCode, CliError> {
+    let input = SearchInput {
+        scope_key: Some(context.scope_key.clone()),
+        title: args.title,
+        status: args.status,
+        since: args.since,
+        latest: args.latest,
+        tag: args.tag,
+        fts: args.fts,
+    };
+    let results = match entity_type {
+        "goal" => store.search_goals(&input)?,
+        "roadmap" => store.search_roadmaps(&input)?,
+        "plan" => store.search_plans(&input)?,
+        "todo" => store.search_todos(&input)?,
+        "issue" => store.search_issues(&input)?,
+        "insight" => store.search_insights(&input)?,
+        _ => Vec::new(),
+    };
+    emit_success(
+        context,
+        vec![entity_type, "search"],
+        json!({ "results": results }),
+    )
+}
+
+fn execute_insight(
+    command: InsightCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        InsightCommand::Record(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["insight", "record"], message, true)
+                }
+            };
+            emit_success(
+                context,
+                vec!["insight", "record"],
+                store.create_insight(CreateInsightInput {
+                    id: args.id,
+                    scope_key: Some(context.scope_key.clone()),
+                    correlation_id,
+                    title: args.title,
+                    content: args.content,
+                    insight_type: args.insight_type,
+                    parent_entity_type: args.parent_entity_type,
+                    parent_entity_id: args.parent_entity_id,
+                    tags: args.tags,
+                    status: args.status,
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        InsightCommand::List(args) => emit_success(
+            context,
+            vec!["insight", "list"],
+            json!({ "insights": store.list_insights_for_entity(args.parent_entity_type, &args.parent_entity_id, &context.scope_key)? }),
+        ),
+        InsightCommand::Show(args) => {
+            let view = store.insight(&args.insight_id)?;
+            if view.insight.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["insight", "show"],
+                    format!(
+                        "insight `{}` is in scope `{}`, not `{}`",
+                        args.insight_id, view.insight.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["insight", "show"], view)
+        }
+        InsightCommand::Search(args) => {
+            let input = SearchInput {
+                scope_key: Some(context.scope_key.clone()),
+                title: args.title,
+                status: args.status,
+                since: args.since,
+                latest: args.latest,
+                tag: args.tag,
+                fts: args.fts,
+            };
+            let results = store.search_insights(&input)?;
+            emit_success(
+                context,
+                vec!["insight", "search"],
+                json!({ "results": results }),
+            )
+        }
+        InsightCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["insight", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Insight,
+                entity_id: args.insight_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
+    }
+}
+
+fn execute_context(
+    args: ContextArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    if args.session {
+        let correlation_id = context.correlation_id.clone().unwrap_or_default();
+        if correlation_id.is_empty() {
+            return emit_error(
+                context,
+                vec!["context"],
+                "session context requires --correlation-id or an active session".to_string(),
+                true,
+            );
+        }
+        let bundle = store.session_context(&correlation_id, &context.scope_key)?;
+        return emit_success(context, vec!["context"], bundle);
+    }
+
+    match (args.entity_type, args.entity_id) {
+        (Some(entity_type), Some(entity_id)) => {
+            let bundle = store.context_bundle(entity_type, &entity_id, &context.scope_key)?;
+            emit_success(context, vec!["context"], bundle)
+        }
+        _ => emit_error(
+            context,
+            vec!["context"],
+            "context requires --entity-type and --entity-id, or --session".to_string(),
+            true,
+        ),
+    }
+}
+
+fn execute_tags(
+    args: TagsArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let tags = store.list_tags(&context.scope_key, args.entity_type.as_deref())?;
+    emit_success(context, vec!["tags", "list"], json!({ "tags": tags }))
 }
 
 fn emit_success<T>(
@@ -1395,6 +1752,17 @@ fn command_path(command: &Command) -> Vec<String> {
             "project".to_string(),
             project_command_name(command).to_string(),
         ],
+        Command::Session { command } => vec![
+            "session".to_string(),
+            session_command_name(command).to_string(),
+        ],
+        Command::Search(_) => vec!["search".to_string()],
+        Command::Insight { command } => vec![
+            "insight".to_string(),
+            insight_command_name(command).to_string(),
+        ],
+        Command::Context(_) => vec!["context".to_string()],
+        Command::Tags(_) => vec!["tags".to_string()],
     }
 }
 
@@ -1412,6 +1780,7 @@ fn goal_command_name(command: &GoalCommand) -> &'static str {
         GoalCommand::UpdateStatus(_) => "update-status",
         GoalCommand::List => "list",
         GoalCommand::Show(_) => "show",
+        GoalCommand::Search(_) => "search",
     }
 }
 
@@ -1423,6 +1792,7 @@ fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
         RoadmapCommand::AddWorkPoint(_) => "add-work-point",
         RoadmapCommand::List => "list",
         RoadmapCommand::Show(_) => "show",
+        RoadmapCommand::Search(_) => "search",
     }
 }
 
@@ -1441,6 +1811,7 @@ fn plan_command_name(command: &PlanCommand) -> &'static str {
         PlanCommand::UpdateStatus(_) => "update-status",
         PlanCommand::List => "list",
         PlanCommand::Show(_) => "show",
+        PlanCommand::Search(_) => "search",
     }
 }
 
@@ -1449,6 +1820,7 @@ fn todo_command_name(command: &TodoCommand) -> &'static str {
         TodoCommand::Create(_) => "create",
         TodoCommand::UpdateStatus(_) => "update-status",
         TodoCommand::List => "list",
+        TodoCommand::Search(_) => "search",
     }
 }
 
@@ -1458,6 +1830,7 @@ fn issue_command_name(command: &IssueCommand) -> &'static str {
         IssueCommand::UpdateStatus(_) => "update-status",
         IssueCommand::List => "list",
         IssueCommand::Show(_) => "show",
+        IssueCommand::Search(_) => "search",
     }
 }
 
@@ -1465,6 +1838,16 @@ fn review_point_command_name(command: &ReviewPointCommand) -> &'static str {
     match command {
         ReviewPointCommand::Record(_) => "record",
         ReviewPointCommand::UpdateStatus(_) => "update-status",
+    }
+}
+
+fn insight_command_name(command: &InsightCommand) -> &'static str {
+    match command {
+        InsightCommand::Record(_) => "record",
+        InsightCommand::List(_) => "list",
+        InsightCommand::Show(_) => "show",
+        InsightCommand::Search(_) => "search",
+        InsightCommand::UpdateStatus(_) => "update-status",
     }
 }
 
@@ -1481,18 +1864,36 @@ fn project_command_name(command: &ProjectCommand) -> &'static str {
     }
 }
 
+fn session_command_name(command: &SessionCommand) -> &'static str {
+    match command {
+        SessionCommand::Init(_) => "init",
+        SessionCommand::Use(_) => "use",
+        SessionCommand::Show => "show",
+    }
+}
+
 fn resolve_correlation_id(
     command_value: Option<String>,
     context: &MachineContext,
 ) -> Result<String, String> {
-    command_value
-        .or_else(|| context.correlation_id.clone())
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            "correlation id is required; pass --correlation-id globally or on the command"
-                .to_string()
-        })
+    if let Some(value) = command_value {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(trimmed);
+        }
+    }
+    if let Some(value) = &context.correlation_id {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(trimmed);
+        }
+    }
+    if let Ok(Some(session_id)) = crate::session::resolve_session_correlation_id() {
+        if !session_id.is_empty() {
+            return Ok(session_id);
+        }
+    }
+    Err("correlation id is required; pass --correlation-id globally, on the command, or run `elegy-planning session init` first".to_string())
 }
 
 fn optional_vec(values: Vec<String>) -> Option<Vec<String>> {
