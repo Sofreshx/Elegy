@@ -1,7 +1,5 @@
 # Elegy Skills Discovery
 
-Use this skill when an agent needs to discover the current governed Elegy skill and capability surface before choosing a CLI or MCP action.
-
 ## Primary Commands
 
 For host onboarding and profile-filtered progressive discovery:

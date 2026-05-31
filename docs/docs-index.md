@@ -86,6 +86,16 @@
       "status": "active",
       "summary": "title: Documentation practices skill and CLI",
       "title": "Documentation practices skill and CLI"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/elegy-planning.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "title: elegy-planning Spec",
+      "title": "elegy-planning Spec"
     }
   ],
   "entrypoints": [
@@ -103,7 +113,8 @@
     "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
-    "docs/specs/documentation-practices-skill-and-cli.md"
+    "docs/specs/documentation-practices-skill-and-cli.md",
+    "docs/specs/elegy-planning.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

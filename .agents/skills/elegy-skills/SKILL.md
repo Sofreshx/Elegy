@@ -13,18 +13,6 @@ The authority chain is one-way:
 2. `contracts/fixtures/skill-discovery-index.elegy-skills.json` is the governed discovery projection derived from that definition.
 3. `.agents/skills/elegy-skills/SKILL.md` and `.github/skills/elegy-skills/SKILL.md` are repo-local rendered mirrors only.
 
-## When to use
-
-- Prefer the dedicated `elegy-skills` binary for registry-first skill work: listing, searching, resolving, getting skill or capability details, and validating governed v2 skills.
-- Use the same crate directly from Rust when a host such as Holon should avoid CLI subprocess overhead for registry access.
-- Treat `elegy skills ...` as the umbrella compatibility surface for the same registry features.
-
-## Do not use
-
-- Do not treat this skill as authority for runtime-side skill registration, autonomous authoring, or host-specific orchestration.
-- Do not infer that repo-local markdown is authoritative. Governed fixtures remain the source of truth.
-- Do not infer that the overlay under `src/Elegy-skills` is an implementation center or release surface.
-
 ## Current commands
 
 ```text
