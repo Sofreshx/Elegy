@@ -370,7 +370,8 @@
       "file": "elegy-plugin-package-v1.schema.json",
       "fixtures": [
         "fixtures/elegy-plugin-package-v1.minimal.json",
-        "fixtures/elegy-plugin-package-v1.elegy-planning.json"
+        "fixtures/elegy-plugin-package-v1.elegy-planning.json",
+        "fixtures/elegy-plugin-package-v1.elegy-skills.json"
       ]
     },
     {
@@ -380,103 +381,8 @@
       "fixtures": [
         "fixtures/elegy-plugin-package-v2.minimal.json",
         "fixtures/elegy-plugin-package-v2.demo-config.json",
-        "fixtures/elegy-plugin-package-v2.piloting-blender.json"
-      ]
-    },
-    {
-      "name": "piloting-target-descriptor",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-target-descriptor.schema.json",
-      "fixtures": [
-        "fixtures/piloting-target-descriptor.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-surface-descriptor",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-surface-descriptor.schema.json",
-      "fixtures": [
-        "fixtures/piloting-surface-descriptor.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-observation-frame",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-observation-frame.schema.json",
-      "fixtures": [
-        "fixtures/piloting-observation-frame.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-action-intent",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-action-intent.schema.json",
-      "fixtures": [
-        "fixtures/piloting-action-intent.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-action-result",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-action-result.schema.json",
-      "fixtures": [
-        "fixtures/piloting-action-result.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-readiness-report",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-readiness-report.schema.json",
-      "fixtures": [
-        "fixtures/piloting-readiness-report.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-adapter-manifest",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-adapter-manifest.schema.json",
-      "fixtures": [
-        "fixtures/piloting-adapter-manifest.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-fixture-pack",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-fixture-pack.schema.json",
-      "fixtures": [
-        "fixtures/piloting-fixture-pack.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-policy-decision",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-policy-decision.schema.json",
-      "fixtures": [
-        "fixtures/piloting-fixture-pack.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-simulation-result",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-simulation-result.schema.json",
-      "fixtures": [
-        "fixtures/piloting-fixture-pack.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-replay-checkpoint",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-replay-checkpoint.schema.json",
-      "fixtures": [
-        "fixtures/piloting-fixture-pack.minimal.json"
-      ]
-    },
-    {
-      "name": "piloting-lifecycle-event",
-      "schemaVersion": "1.0.0",
-      "file": "piloting-lifecycle-event.schema.json",
-      "fixtures": [
-        "fixtures/piloting-fixture-pack.minimal.json"
+        "fixtures/elegy-plugin-package-v2.elegy-planning.json",
+        "fixtures/elegy-plugin-package-v2.elegy-skills.json"
       ]
     },
     {

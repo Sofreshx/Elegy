@@ -86,19 +86,6 @@
         "rust/crates/elegy-documentation owns deterministic docs inspection behavior",
         "source documents remain authoritative over generated exports"
       ]
-    },
-    {
-      "name": "elegy-piloting-v1",
-      "status": "published",
-      "targetReleaseType": "minor",
-      "targetBundleVersion": "1.8.0",
-      "targetSchemaLine": "1.x",
-      "releaseStory": "Extend the contracts-first piloting foundation with typed policy-decision, simulation-result, replay-checkpoint, and lifecycle-event contracts plus replay-style fixture validation, while keeping runtime authority, approvals, trust, leases, bridge sessions, and live actuation in downstream hosts.",
-      "authorityReservations": [
-        "contracts own piloting target, surface, observation, action, readiness, adapter, and fixture authority",
-        "rust/crates/elegy-cli owns schema validation and package assembly behavior only",
-        "Holon and other downstream hosts own marketplace trust, approvals, leases, bridge sessions, execution, and evidence capture"
-      ]
     }
   ],
   "policy": {

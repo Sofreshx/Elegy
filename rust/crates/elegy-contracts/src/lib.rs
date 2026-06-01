@@ -1,8 +1,6 @@
 mod configuration;
-mod piloting;
 
 pub use configuration::*;
-pub use piloting::*;
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
@@ -394,10 +392,6 @@ pub struct ElegyPluginPackageComponents {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub capability_projections: Vec<ElegyPluginPackageCapabilityProjectionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub piloting_adapters: Vec<ElegyPluginPackagePilotingAdapterComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub fixture_packs: Vec<ElegyPluginPackagePilotingFixturePackComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub docs: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assets: Vec<ElegyPluginPackagePathComponent>,
@@ -465,28 +459,6 @@ pub struct ElegyPluginPackageCapabilityProjectionComponent {
     pub side_effect_class: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub projection: Option<ElegyPluginPackageProjectionMetadata>,
-}
-
-/// Piloting adapter component bundled in an Elegy plugin package.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ElegyPluginPackagePilotingAdapterComponent {
-    pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub manifest_ref: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub manifest: Option<PilotingAdapterManifest>,
-}
-
-/// Piloting fixture pack component bundled in an Elegy plugin package.
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ElegyPluginPackagePilotingFixturePackComponent {
-    pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixture_pack_ref: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub fixture_pack: Option<PilotingFixturePack>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -557,17 +529,6 @@ pub struct ElegyPluginPackageValidationResult {
 }
 
 impl ElegyPluginPackageValidationResult {
-    pub fn is_valid(&self) -> bool {
-        self.issues.is_empty()
-    }
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct PilotingPackageFileValidationResult {
-    pub issues: Vec<String>,
-}
-
-impl PilotingPackageFileValidationResult {
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
     }
@@ -694,24 +655,6 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
-        "components.pilotingAdapters",
-        package
-            .components
-            .piloting_adapters
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.fixturePacks",
-        package
-            .components
-            .fixture_packs
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
         "components.docs",
         package
             .components
@@ -797,18 +740,6 @@ pub fn validate_elegy_plugin_package(
         if !package.components.bridge_adapter_contracts.is_empty() {
             issues.push(
                 "components.bridgeAdapterContracts requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.piloting_adapters.is_empty() {
-            issues.push(
-                "components.pilotingAdapters requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.fixture_packs.is_empty() {
-            issues.push(
-                "components.fixturePacks requires schemaVersion 'elegy-plugin-package/v2'."
                     .to_string(),
             );
         }
@@ -947,384 +878,14 @@ pub fn validate_elegy_plugin_package(
         );
     }
 
-    for component in &package.components.piloting_adapters {
-        if component.manifest_ref.is_none() && component.manifest.is_none() {
-            issues.push(format!(
-                "components.pilotingAdapters entry '{}' must declare manifestRef or manifest.",
-                component.id
-            ));
-        }
-        if let Some(manifest_ref) = &component.manifest_ref {
-            validate_portable_relative_path(
-                &format!(
-                    "components.pilotingAdapters['{}'].manifestRef",
-                    component.id
-                ),
-                manifest_ref,
-                &mut issues,
-            );
-        }
-        if let Some(manifest) = &component.manifest {
-            let validation = validate_piloting_adapter_manifest(manifest);
-            for issue in validation.issues {
-                issues.push(format!(
-                    "components.pilotingAdapters entry '{}' contains invalid piloting adapter manifest: {issue}",
-                    component.id
-                ));
-            }
-        }
-    }
-
-    for component in &package.components.fixture_packs {
-        if component.fixture_pack_ref.is_none() && component.fixture_pack.is_none() {
-            issues.push(format!(
-                "components.fixturePacks entry '{}' must declare fixturePackRef or fixturePack.",
-                component.id
-            ));
-        }
-        if let Some(fixture_pack_ref) = &component.fixture_pack_ref {
-            validate_portable_relative_path(
-                &format!("components.fixturePacks['{}'].fixturePackRef", component.id),
-                fixture_pack_ref,
-                &mut issues,
-            );
-        }
-        if let Some(fixture_pack) = &component.fixture_pack {
-            let validation = validate_piloting_fixture_pack(fixture_pack);
-            for issue in validation.issues {
-                issues.push(format!(
-                    "components.fixturePacks entry '{}' contains invalid fixture pack: {issue}",
-                    component.id
-                ));
-            }
-        }
-    }
-
     if let Some(publishing) = &package.publishing {
         validate_plugin_package_publishing_metadata(package, publishing, &mut issues);
-    }
-
-    let inline_piloting_manifests = package
-        .components
-        .piloting_adapters
-        .iter()
-        .filter_map(|component| component.manifest.as_ref())
-        .collect::<Vec<_>>();
-    let inline_fixture_packs = package
-        .components
-        .fixture_packs
-        .iter()
-        .filter_map(|component| component.fixture_pack.as_ref())
-        .collect::<Vec<_>>();
-    if !inline_piloting_manifests.is_empty() || !inline_fixture_packs.is_empty() {
-        if inline_piloting_manifests.is_empty() {
-            issues.push(
-                "components.fixturePacks with inline fixturePack values require at least one inline piloting adapter manifest."
-                    .to_string(),
-            );
-        }
-        if inline_fixture_packs.is_empty() && !inline_piloting_manifests.is_empty() {
-            issues.push(
-                "components.pilotingAdapters with inline manifest values require at least one fixture pack in this contracts-first piloting slice."
-                    .to_string(),
-            );
-        }
-        for fixture_pack in &inline_fixture_packs {
-            let mut matched = false;
-            for manifest in &inline_piloting_manifests {
-                if manifest.adapter_id == fixture_pack.adapter_id {
-                    matched = true;
-                    for issue in
-                        validate_piloting_fixture_pack_against_manifest(fixture_pack, manifest)
-                            .issues
-                    {
-                        issues.push(format!(
-                            "fixture pack '{}' does not match adapter manifest '{}': {issue}",
-                            fixture_pack.fixture_pack_id, manifest.adapter_id
-                        ));
-                    }
-                }
-            }
-            if !matched {
-                issues.push(format!(
-                    "fixture pack '{}' does not have a matching inline adapter manifest.",
-                    fixture_pack.fixture_pack_id
-                ));
-            }
-        }
     }
 
     ElegyPluginPackageValidationResult { issues }
 }
 
-/// Validates piloting adapter and fixture pack components within an Elegy plugin package file.
-pub fn validate_piloting_package_file(
-    package_path: &Path,
-    package: &ElegyPluginPackage,
-) -> PilotingPackageFileValidationResult {
-    let mut issues = Vec::new();
-    let package_root = package_path.parent().unwrap_or_else(|| Path::new("."));
 
-    let mut resolved_manifests = Vec::new();
-    for component in &package.components.piloting_adapters {
-        match (&component.manifest_ref, &component.manifest) {
-            (Some(manifest_ref), Some(manifest)) => {
-                let manifest_path = package_root.join(manifest_ref);
-                match load_json_file::<PilotingAdapterManifest>(&manifest_path) {
-                    Ok(referenced_manifest) => {
-                        for issue in validate_piloting_adapter_manifest(&referenced_manifest).issues {
-                            issues.push(format!(
-                                "components.pilotingAdapters entry '{}' references invalid manifest '{}': {issue}",
-                                component.id, manifest_ref
-                            ));
-                        }
-                        if referenced_manifest != *manifest {
-                            issues.push(format!(
-                                "components.pilotingAdapters entry '{}' must keep manifestRef '{}' aligned with the inline manifest.",
-                                component.id, manifest_ref
-                            ));
-                        }
-                    }
-                    Err(error) => issues.push(format!(
-                        "components.pilotingAdapters entry '{}' could not load manifestRef '{}': {error}",
-                        component.id, manifest_ref
-                    )),
-                }
-                validate_piloting_adapter_manifest(manifest)
-                    .issues
-                    .into_iter()
-                    .for_each(|issue| {
-                        issues.push(format!(
-                            "components.pilotingAdapters entry '{}' contains invalid inline piloting adapter manifest: {issue}",
-                            component.id
-                        ));
-                    });
-                resolved_manifests.push((
-                    component.id.clone(),
-                    manifest_ref.clone(),
-                    manifest.clone(),
-                ));
-            }
-            (Some(manifest_ref), None) => {
-                let manifest_path = package_root.join(manifest_ref);
-                match load_json_file::<PilotingAdapterManifest>(&manifest_path) {
-                    Ok(manifest) => {
-                        for issue in validate_piloting_adapter_manifest(&manifest).issues {
-                            issues.push(format!(
-                                "components.pilotingAdapters entry '{}' references invalid manifest '{}': {issue}",
-                                component.id, manifest_ref
-                            ));
-                        }
-                        resolved_manifests.push((
-                            component.id.clone(),
-                            manifest_ref.clone(),
-                            manifest,
-                        ));
-                    }
-                    Err(error) => issues.push(format!(
-                        "components.pilotingAdapters entry '{}' could not load manifestRef '{}': {error}",
-                        component.id, manifest_ref
-                    )),
-                }
-            }
-            (None, Some(manifest)) => {
-                for issue in validate_piloting_adapter_manifest(manifest).issues {
-                    issues.push(format!(
-                        "components.pilotingAdapters entry '{}' contains invalid inline piloting adapter manifest: {issue}",
-                        component.id
-                    ));
-                }
-                resolved_manifests.push((component.id.clone(), String::new(), manifest.clone()));
-            }
-            (None, None) => {}
-        }
-    }
-
-    let mut resolved_fixture_packs = Vec::new();
-    for component in &package.components.fixture_packs {
-        match (&component.fixture_pack_ref, &component.fixture_pack) {
-            (Some(fixture_pack_ref), Some(fixture_pack)) => {
-                let fixture_pack_path = package_root.join(fixture_pack_ref);
-                match load_json_file::<PilotingFixturePack>(&fixture_pack_path) {
-                    Ok(referenced_fixture_pack) => {
-                        for issue in validate_piloting_fixture_pack(&referenced_fixture_pack).issues {
-                            issues.push(format!(
-                                "components.fixturePacks entry '{}' references invalid fixturePackRef '{}': {issue}",
-                                component.id, fixture_pack_ref
-                            ));
-                        }
-                        if referenced_fixture_pack != *fixture_pack {
-                            issues.push(format!(
-                                "components.fixturePacks entry '{}' must keep fixturePackRef '{}' aligned with the inline fixture pack.",
-                                component.id, fixture_pack_ref
-                            ));
-                        }
-                    }
-                    Err(error) => issues.push(format!(
-                        "components.fixturePacks entry '{}' could not load fixturePackRef '{}': {error}",
-                        component.id, fixture_pack_ref
-                    )),
-                }
-                validate_piloting_fixture_pack(fixture_pack)
-                    .issues
-                    .into_iter()
-                    .for_each(|issue| {
-                        issues.push(format!(
-                            "components.fixturePacks entry '{}' contains invalid inline fixture pack: {issue}",
-                            component.id
-                        ));
-                    });
-                resolved_fixture_packs.push((
-                    component.id.clone(),
-                    fixture_pack_ref.clone(),
-                    fixture_pack.clone(),
-                ));
-            }
-            (Some(fixture_pack_ref), None) => {
-                let fixture_pack_path = package_root.join(fixture_pack_ref);
-                match load_json_file::<PilotingFixturePack>(&fixture_pack_path) {
-                    Ok(fixture_pack) => {
-                        for issue in validate_piloting_fixture_pack(&fixture_pack).issues {
-                            issues.push(format!(
-                                "components.fixturePacks entry '{}' references invalid fixturePackRef '{}': {issue}",
-                                component.id, fixture_pack_ref
-                            ));
-                        }
-                        resolved_fixture_packs.push((
-                            component.id.clone(),
-                            fixture_pack_ref.clone(),
-                            fixture_pack,
-                        ));
-                    }
-                    Err(error) => issues.push(format!(
-                        "components.fixturePacks entry '{}' could not load fixturePackRef '{}': {error}",
-                        component.id, fixture_pack_ref
-                    )),
-                }
-            }
-            (None, Some(fixture_pack)) => {
-                for issue in validate_piloting_fixture_pack(fixture_pack).issues {
-                    issues.push(format!(
-                        "components.fixturePacks entry '{}' contains invalid inline fixture pack: {issue}",
-                        component.id
-                    ));
-                }
-                resolved_fixture_packs.push((
-                    component.id.clone(),
-                    String::new(),
-                    fixture_pack.clone(),
-                ));
-            }
-            (None, None) => {}
-        }
-    }
-
-    if !resolved_manifests.is_empty() || !resolved_fixture_packs.is_empty() {
-        if resolved_manifests.is_empty() {
-            issues.push(
-                "components.fixturePacks require at least one piloting adapter manifest when package-backed piloting assets are present."
-                    .to_string(),
-            );
-        }
-        if resolved_fixture_packs.is_empty() {
-            issues.push(
-                "components.pilotingAdapters require at least one fixture pack in this contracts-first piloting slice."
-                    .to_string(),
-            );
-        }
-
-        for (_, _, manifest) in &resolved_manifests {
-            if manifest.mode != "contracts_only" {
-                issues.push(format!(
-                    "piloting adapter '{}' must stay in contracts_only mode.",
-                    manifest.adapter_id
-                ));
-            }
-
-            for fixture in &manifest.fixtures {
-                let fixture_path = package_root.join(&fixture.path);
-                if !fixture_path.is_file() {
-                    issues.push(format!(
-                        "adapter manifest '{}' references missing fixture path '{}'.",
-                        manifest.adapter_id, fixture.path
-                    ));
-                }
-            }
-        }
-
-        for (_, _, fixture_pack) in &resolved_fixture_packs {
-            if fixture_pack.schema_version != PILOTING_FIXTURE_PACK_SCHEMA_VERSION {
-                issues.push(format!(
-                    "fixture pack '{}' must use schemaVersion '{}'.",
-                    fixture_pack.fixture_pack_id, PILOTING_FIXTURE_PACK_SCHEMA_VERSION
-                ));
-            }
-            if let Some((_, _, manifest)) = resolved_manifests
-                .iter()
-                .find(|(_, _, manifest)| manifest.adapter_id == fixture_pack.adapter_id)
-            {
-                for issue in
-                    validate_piloting_fixture_pack_against_manifest(fixture_pack, manifest).issues
-                {
-                    issues.push(format!(
-                        "fixture pack '{}' does not match adapter manifest '{}': {issue}",
-                        fixture_pack.fixture_pack_id, manifest.adapter_id
-                    ));
-                }
-            } else {
-                issues.push(format!(
-                    "fixture pack '{}' does not have a matching adapter manifest.",
-                    fixture_pack.fixture_pack_id
-                ));
-            }
-        }
-    }
-
-    if let Some(publishing) = &package.publishing {
-        if publishing.marketplace_target.as_deref() == Some("holon") {
-            let has_holon_compatibility = publishing.compatibility.iter().any(|entry| {
-                entry.host.trim().eq_ignore_ascii_case("holon")
-                    && !entry.version_range.trim().is_empty()
-            });
-            if !has_holon_compatibility {
-                issues.push(
-                    "Holon publishing requires at least one publishing.compatibility entry for host 'holon'."
-                        .to_string(),
-                );
-            }
-
-            if let Some(changelog_ref) = &publishing.changelog_ref {
-                let changelog_path = package_root.join(changelog_ref);
-                if !changelog_path.is_file() {
-                    issues.push(format!(
-                        "publishing.changelogRef references missing file '{}'.",
-                        changelog_ref
-                    ));
-                }
-            }
-            if let Some(provenance_ref) = &publishing.provenance_ref {
-                let provenance_path = package_root.join(provenance_ref);
-                if !provenance_path.is_file() {
-                    issues.push(format!(
-                        "publishing.provenanceRef references missing file '{}'.",
-                        provenance_ref
-                    ));
-                }
-            }
-            for signature_ref in &publishing.signature_refs {
-                let signature_path = package_root.join(signature_ref);
-                if !signature_path.is_file() {
-                    issues.push(format!(
-                        "publishing.signatureRefs references missing file '{}'.",
-                        signature_ref
-                    ));
-                }
-            }
-        }
-    }
-
-    PilotingPackageFileValidationResult { issues }
-}
 
 fn validate_uri(field: &str, value: &str, issues: &mut Vec<String>) {
     let value = value.trim();
@@ -2214,6 +1775,85 @@ pub struct SkillDefinitionV2 {
     pub origin: Option<SkillOriginV2>,
     /// Lifecycle state of the skill.
     pub lifecycle_state: String,
+    /// Optional explicit host projection metadata describing how runtime hosts
+    /// (such as Holon) should register this skill's capabilities as callable
+    /// tools, including the CLI binary, output contract family, default
+    /// side-effect class, and per-capability function-calling projections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_projection: Option<SkillHostProjection>,
+}
+
+/// Side-effect class advertised by [`SkillHostProjection`] for runtime host
+/// tool registration. Distinct from [`CapabilitySideEffectClass`] so that
+/// host-facing vocabulary stays aligned with the governed JSON schema and
+/// does not change when capability-side classification changes.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HostSideEffectClass {
+    #[default]
+    None,
+    ReadOnly,
+    DiskRead,
+    DiskWrite,
+    NetworkOutbound,
+    ProcessSpawn,
+    DesktopUi,
+}
+
+impl HostSideEffectClass {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HostSideEffectClass::None => "none",
+            HostSideEffectClass::ReadOnly => "read_only",
+            HostSideEffectClass::DiskRead => "disk_read",
+            HostSideEffectClass::DiskWrite => "disk_write",
+            HostSideEffectClass::NetworkOutbound => "network_outbound",
+            HostSideEffectClass::ProcessSpawn => "process_spawn",
+            HostSideEffectClass::DesktopUi => "desktop_ui",
+        }
+    }
+}
+
+/// Host-facing function-calling projection for a single capability within a
+/// [`SkillHostProjection`].
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillHostCapabilityProjection {
+    /// Governed capability id this projection derives from. Must match an
+    /// existing capability in the parent skill definition.
+    pub capability_id: String,
+    /// Stable function-calling name for runtime host tool registration.
+    pub function_name: String,
+    /// Optional capability-level side-effect class override. When absent the
+    /// projection falls back to the parent host projection's default class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_effect_class: Option<HostSideEffectClass>,
+    /// Whether this capability always produces the same output for the same
+    /// input. Used by hosts to enable caching or simplify reasoning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_deterministic: Option<bool>,
+}
+
+/// Explicit host projection metadata describing how a v2 skill definition's
+/// capabilities map to runtime host tool surfaces (CLI subprocess, function
+/// calling, etc.).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillHostProjection {
+    /// Stable CLI binary name for subprocess invocation (e.g.
+    /// `"elegy-planning"`, `"elegy-skills"`).
+    pub cli_name: String,
+    /// Versioned output contract family identifier used by hosts for
+    /// envelope validation (e.g. `"elegy-planning-v1"`,
+    /// `"elegy-skills-v1"`).
+    pub output_contract_id: String,
+    /// Skill-level default side-effect class. Individual capabilities may
+    /// override this with a more specific class.
+    pub default_side_effect_class: HostSideEffectClass,
+    /// Per-capability function-calling projections, including stable
+    /// function names and optional side-effect class overrides.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_projections: Vec<SkillHostCapabilityProjection>,
 }
 
 /// Identity block for a v2 skill definition.
@@ -2602,6 +2242,69 @@ pub fn validate_skill_definition_v2(def: &SkillDefinitionV2) -> Result<(), Contr
                     )));
                 }
             }
+        }
+    }
+    if let Some(host_projection) = &def.host_projection {
+        validate_skill_host_projection(def, host_projection)?;
+    }
+    Ok(())
+}
+
+fn validate_skill_host_projection(
+    def: &SkillDefinitionV2,
+    host_projection: &SkillHostProjection,
+) -> Result<(), ContractsError> {
+    if host_projection.cli_name.trim().is_empty() {
+        return Err(ContractsError::Compatibility(
+            "hostProjection.cliName must not be empty".to_string(),
+        ));
+    }
+    if host_projection.output_contract_id.trim().is_empty() {
+        return Err(ContractsError::Compatibility(
+            "hostProjection.outputContractId must not be empty".to_string(),
+        ));
+    }
+
+    let capability_ids = def
+        .capabilities
+        .iter()
+        .map(|cap| cap.id.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
+
+    let mut seen_capability_ids = BTreeSet::new();
+    let mut seen_function_names = BTreeSet::new();
+    for projection in &host_projection.capability_projections {
+        if projection.capability_id.trim().is_empty() {
+            return Err(ContractsError::Compatibility(
+                "hostProjection.capabilityProjections[].capabilityId must not be empty"
+                    .to_string(),
+            ));
+        }
+        let normalized_capability = projection.capability_id.to_ascii_lowercase();
+        if !capability_ids.contains(&normalized_capability) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].capabilityId '{}' does not match any capability declared on skill '{}'",
+                projection.capability_id, def.identity.name
+            )));
+        }
+        if !seen_capability_ids.insert(normalized_capability) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].capabilityId '{}' is duplicated",
+                projection.capability_id
+            )));
+        }
+
+        if projection.function_name.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].functionName for capability '{}' must not be empty",
+                projection.capability_id
+            )));
+        }
+        if !seen_function_names.insert(projection.function_name.to_ascii_lowercase()) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].functionName '{}' is duplicated",
+                projection.function_name
+            )));
         }
     }
     Ok(())
@@ -4342,15 +4045,6 @@ fn validate_plugin_package_publishing_metadata(
                 "Holon publishing requires at least one publishing.compatibility entry."
                     .to_string(),
             );
-        }
-        if package.components.piloting_adapters.is_empty() {
-            issues.push(
-                "Holon publishing requires at least one piloting adapter component.".to_string(),
-            );
-        }
-        if package.components.fixture_packs.is_empty() {
-            issues
-                .push("Holon publishing requires at least one fixture pack component.".to_string());
         }
     }
 

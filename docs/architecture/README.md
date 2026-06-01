@@ -17,7 +17,7 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Codex plugin projection](codex-plugin-projection.md) - current conservative Codex plugin projection slice and its boundaries
 - [Mermaid tooling](mermaid-tooling.md) - current Mermaid render, reverse, and narrative projection slice under the umbrella `elegy` CLI
 - [Observe CLI](observe-cli.md) - shipped read-only observation commands plus the bounded `elegy observe record` MVP contract
-- [Elegy Piloting Foundation](elegy-piloting-foundation.md) - contracts-first targeted piloting foundation and host-boundary split
+- [Piloting Moved To Holon](piloting-moved-to-holon.md) - migration note: piloting authority, protocol, and execution have moved to the Holon Rust runtime
 - [Elegy Plugin Readiness](elegy-plugin-readiness.md) - Holon-compatible package metadata and targeted-plugin publishing posture
 - [Elegy-memory V1](elegy-memory-v1.md) - shipped local memory surface under `elegy-memory`, authority chain, and retention/removal semantics
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - placement rules for governed MCP and skill artifacts versus Rust tooling

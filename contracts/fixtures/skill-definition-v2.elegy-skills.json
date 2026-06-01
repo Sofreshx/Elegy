@@ -155,5 +155,30 @@
     "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-skills.json",
     "sourceVersion": "0.1.0"
   },
-  "lifecycleState": "active"
+  "lifecycleState": "active",
+  "hostProjection": {
+    "cliName": "elegy-skills",
+    "outputContractId": "elegy-skills-v1",
+    "defaultSideEffectClass": "read_only",
+    "capabilityProjections": [
+      {
+        "capabilityId": "skills-registry-search",
+        "functionName": "skills_registry_search",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "skills-registry-resolve",
+        "functionName": "skills_registry_resolve",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "skills-registry-validate",
+        "functionName": "skills_registry_validate",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      }
+    ]
+  }
 }

@@ -8,7 +8,7 @@ use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use clap::{Args, Parser, Subcommand, ValueEnum};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::Serialize;
 use serde_json::json;
 
 use elegy_configuration::{
@@ -17,11 +17,9 @@ use elegy_configuration::{
     VerifyConfigurationRequest,
 };
 use elegy_contracts::{
-    export_contract_bundle, validate_elegy_plugin_package, validate_piloting_adapter_manifest,
-    validate_piloting_fixture_pack, validate_piloting_package_file, AgentCapabilityProfile,
-    ContractsBundleExport, ContractsError, ElegyPluginPackage, ObservationSession,
-    PilotingAdapterManifest, PilotingFixturePack, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
-    ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION,
+    export_contract_bundle, AgentCapabilityProfile,
+    ContractsBundleExport, ContractsError, ObservationSession,
+    AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
@@ -208,10 +206,6 @@ enum Command {
     Docs {
         #[command(subcommand)]
         command: DocsCommand,
-    },
-    Piloting {
-        #[command(subcommand)]
-        command: PilotingCommand,
     },
     Configuration {
         #[command(subcommand)]
@@ -740,24 +734,6 @@ enum DocsCommand {
     },
     Check,
     Index,
-}
-
-#[derive(Subcommand, Debug)]
-enum PilotingCommand {
-    #[command(name = "validate-adapter")]
-    ValidateAdapter { path: PathBuf },
-    #[command(name = "validate-fixtures")]
-    ValidateFixtures { path: PathBuf },
-    Package {
-        #[arg(long, value_enum)]
-        target: PilotingPackageTarget,
-        path: PathBuf,
-    },
-}
-
-#[derive(Clone, Copy, Debug, Eq, PartialEq, ValueEnum)]
-enum PilotingPackageTarget {
-    Holon,
 }
 
 #[derive(Subcommand, Debug)]
@@ -1508,15 +1484,6 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
         Command::Docs {
             command: DocsCommand::Index,
         } => execute_docs_index_command(resolve_project_root(locator), format),
-        Command::Piloting {
-            command: PilotingCommand::ValidateAdapter { path },
-        } => execute_piloting_validate_adapter_command(path, format),
-        Command::Piloting {
-            command: PilotingCommand::ValidateFixtures { path },
-        } => execute_piloting_validate_fixtures_command(path, format),
-        Command::Piloting {
-            command: PilotingCommand::Package { target, path },
-        } => execute_piloting_package_command(target, path, format),
         Command::Configuration {
             command: ConfigurationCommand::List,
         } => execute_configuration_list_command(format),
@@ -1601,7 +1568,7 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                         "author", "analyze", "generate", "validate", "inspect",
                         "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
                         "observe", "desktop", "repo", "web", "data", "notify", "docs",
-                        "piloting", "configuration"
+                        "configuration"
                     ],
                     "skillDefinitionFormat": 2,
                     "mcpHostCapable": true
@@ -2387,394 +2354,6 @@ fn execute_contracts_export_command(
             Ok(ExitCode::SUCCESS)
         }
         Err(error) => emit_contracts_error(error, format, vec!["contracts", "export"]),
-    }
-}
-
-fn execute_piloting_validate_adapter_command(
-    path: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "validate-adapter"])?
-    else {
-        return Ok(exit_runtime());
-    };
-
-    let data = match parse_json_for_cli::<PilotingAdapterManifest, 2>(
-        &path,
-        &contents,
-        format,
-        ["piloting", "validate-adapter"],
-        "CLI-PILOT-002",
-        "failed to parse piloting adapter manifest JSON",
-    )? {
-        Some(data) => data,
-        None => return Ok(exit_invalid()),
-    };
-
-    let validation = validate_piloting_adapter_manifest(&data);
-    let issues = validation
-        .issues
-        .iter()
-        .map(|issue| {
-            Diagnostic::error("CLI-PILOT-003", issue.clone())
-                .with_path(path.display().to_string())
-                .with_hint("keep adapter manifests contracts-only and target-specific")
-        })
-        .collect::<Vec<_>>();
-    let status = if issues.is_empty() { "ok" } else { "invalid" };
-    let exit_code = if issues.is_empty() {
-        ExitCode::SUCCESS
-    } else {
-        exit_invalid()
-    };
-    let data = json!({
-        "path": path.display().to_string(),
-        "valid": issues.is_empty(),
-        "adapterId": data.adapter_id,
-        "mode": data.mode,
-        "targetCount": data.supported_software.len(),
-        "surfaceCount": data.supported_surfaces.len(),
-        "fixtureCount": data.fixtures.len()
-    });
-
-    match format {
-        OutputFormat::Text => {
-            if issues.is_empty() {
-                println!("piloting adapter manifest is valid");
-                println!("path: {}", path.display());
-                println!(
-                    "adapter: {}",
-                    data["adapterId"].as_str().unwrap_or_default()
-                );
-            } else {
-                print_diagnostics_text(&issues);
-            }
-        }
-        OutputFormat::Json => print_json(&build_envelope(
-            ["piloting", "validate-adapter"],
-            status,
-            summarize(&issues),
-            data,
-            issues,
-        ))?,
-    }
-
-    Ok(exit_code)
-}
-
-fn execute_piloting_validate_fixtures_command(
-    path: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "validate-fixtures"])?
-    else {
-        return Ok(exit_runtime());
-    };
-
-    if let Ok(adapter_manifest) = serde_json::from_str::<PilotingAdapterManifest>(&contents) {
-        let adapter_validation = validate_piloting_adapter_manifest(&adapter_manifest);
-        let diagnostics = adapter_validation
-            .issues
-            .iter()
-            .map(|issue| {
-                Diagnostic::error("CLI-PILOT-004", issue.clone())
-                    .with_path(path.display().to_string())
-            })
-            .collect::<Vec<_>>();
-        let status = if diagnostics.is_empty() {
-            "ok"
-        } else {
-            "invalid"
-        };
-        let exit_code = if diagnostics.is_empty() {
-            ExitCode::SUCCESS
-        } else {
-            exit_invalid()
-        };
-        let data = json!({
-            "path": path.display().to_string(),
-            "fixtureKind": "adapter-manifest",
-            "valid": diagnostics.is_empty(),
-            "adapterId": adapter_manifest.adapter_id,
-            "fixtureCount": adapter_manifest.fixtures.len()
-        });
-        match format {
-            OutputFormat::Text => {
-                if diagnostics.is_empty() {
-                    println!("piloting adapter fixture manifest is valid");
-                    println!("path: {}", path.display());
-                } else {
-                    print_diagnostics_text(&diagnostics);
-                }
-            }
-            OutputFormat::Json => print_json(&build_envelope(
-                ["piloting", "validate-fixtures"],
-                status,
-                summarize(&diagnostics),
-                data,
-                diagnostics,
-            ))?,
-        }
-        return Ok(exit_code);
-    }
-
-    let fixture_pack = match parse_json_for_cli::<PilotingFixturePack, 2>(
-        &path,
-        &contents,
-        format,
-        ["piloting", "validate-fixtures"],
-        "CLI-PILOT-005",
-        "failed to parse piloting fixture pack JSON",
-    )? {
-        Some(data) => data,
-        None => return Ok(exit_invalid()),
-    };
-
-    let validation = validate_piloting_fixture_pack(&fixture_pack);
-    let diagnostics = validation
-        .issues
-        .iter()
-        .map(|issue| {
-            Diagnostic::error("CLI-PILOT-006", issue.clone())
-                .with_path(path.display().to_string())
-                .with_hint("fixture packs must stay replay-style and contracts-only")
-        })
-        .collect::<Vec<_>>();
-    let status = if diagnostics.is_empty() {
-        "ok"
-    } else {
-        "invalid"
-    };
-    let exit_code = if diagnostics.is_empty() {
-        ExitCode::SUCCESS
-    } else {
-        exit_invalid()
-    };
-    let data = json!({
-        "path": path.display().to_string(),
-        "fixtureKind": "fixture-pack",
-        "valid": diagnostics.is_empty(),
-        "fixturePackId": fixture_pack.fixture_pack_id,
-        "adapterId": fixture_pack.adapter_id,
-        "actionCount": fixture_pack.allowed_actions.len(),
-        "observationCount": fixture_pack.observations.len(),
-        "policyDecisionCount": fixture_pack.policy_decisions.len(),
-        "simulationResultCount": fixture_pack.simulation_results.len(),
-        "replayCheckpointCount": fixture_pack.replay_checkpoints.len(),
-        "lifecycleEventCount": fixture_pack.lifecycle_events.len()
-    });
-
-    match format {
-        OutputFormat::Text => {
-            if diagnostics.is_empty() {
-                println!("piloting fixture pack is valid");
-                println!("path: {}", path.display());
-            } else {
-                print_diagnostics_text(&diagnostics);
-            }
-        }
-        OutputFormat::Json => print_json(&build_envelope(
-            ["piloting", "validate-fixtures"],
-            status,
-            summarize(&diagnostics),
-            data,
-            diagnostics,
-        ))?,
-    }
-
-    Ok(exit_code)
-}
-
-fn execute_piloting_package_command(
-    target: PilotingPackageTarget,
-    path: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let Some(contents) = read_json_file_for_cli(&path, format, ["piloting", "package"])? else {
-        return Ok(exit_runtime());
-    };
-    let package = match parse_json_for_cli::<ElegyPluginPackage, 2>(
-        &path,
-        &contents,
-        format,
-        ["piloting", "package"],
-        "CLI-PILOT-007",
-        "failed to parse portable plugin package JSON",
-    )? {
-        Some(data) => data,
-        None => return Ok(exit_invalid()),
-    };
-
-    let package_validation = validate_elegy_plugin_package(&package);
-    let mut diagnostics = package_validation
-        .issues
-        .into_iter()
-        .map(|issue| {
-            Diagnostic::error("CLI-PILOT-008", issue)
-                .with_path(path.display().to_string())
-                .with_hint(
-                    "keep piloting packages inside the governed elegy-plugin-package/v2 contract",
-                )
-        })
-        .collect::<Vec<_>>();
-
-    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION {
-        diagnostics.push(
-            Diagnostic::error(
-                "CLI-PILOT-009",
-                format!(
-                    "piloting packaging requires schemaVersion '{}'",
-                    ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION
-                ),
-            )
-            .with_path(path.display().to_string()),
-        );
-    }
-
-    let target_name = match target {
-        PilotingPackageTarget::Holon => "holon",
-    };
-
-    if target == PilotingPackageTarget::Holon {
-        let publishing = package.publishing.as_ref();
-        if publishing.is_none() {
-            diagnostics.push(
-                Diagnostic::error(
-                    "CLI-PILOT-015",
-                    "Holon packaging requires publishing metadata on elegy-plugin-package/v2.",
-                )
-                .with_path(path.display().to_string()),
-            );
-        }
-        if publishing.and_then(|publishing| publishing.marketplace_target.as_deref())
-            != Some("holon")
-        {
-            diagnostics.push(
-                Diagnostic::error(
-                    "CLI-PILOT-016",
-                    "Holon packaging requires publishing.marketplaceTarget to be 'holon'.",
-                )
-                .with_path(path.display().to_string()),
-            );
-        }
-        if publishing.and_then(|publishing| publishing.import_mode.as_deref()) != Some("package") {
-            diagnostics.push(
-                Diagnostic::error(
-                    "CLI-PILOT-017",
-                    "Holon packaging requires publishing.importMode to be 'package'.",
-                )
-                .with_path(path.display().to_string()),
-            );
-        }
-
-        for issue in validate_piloting_package_file(&path, &package).issues {
-            diagnostics.push(
-                Diagnostic::error("CLI-PILOT-010", issue).with_path(path.display().to_string()),
-            );
-        }
-    }
-
-    let status = if diagnostics.is_empty() {
-        "ok"
-    } else {
-        "invalid"
-    };
-    let exit_code = if diagnostics.is_empty() {
-        ExitCode::SUCCESS
-    } else {
-        exit_invalid()
-    };
-    let data = json!({
-        "path": path.display().to_string(),
-        "target": target_name,
-        "valid": diagnostics.is_empty(),
-        "schemaVersion": package.schema_version,
-        "packageId": package.identity.package_id,
-        "pilotingAdapterCount": package.components.piloting_adapters.len(),
-        "fixturePackCount": package.components.fixture_packs.len(),
-        "publishing": package.publishing.as_ref().map(|publishing| json!({
-            "marketplaceTarget": publishing.marketplace_target,
-            "importMode": publishing.import_mode,
-            "sourceRepository": publishing.source_repository,
-            "sourceRef": publishing.source_ref,
-            "sourceCommit": publishing.source_commit
-        }))
-    });
-
-    match format {
-        OutputFormat::Text => {
-            if diagnostics.is_empty() {
-                println!("piloting package is valid for {}", target_name);
-                println!("path: {}", path.display());
-                println!("package: {}", package.identity.package_id);
-            } else {
-                print_diagnostics_text(&diagnostics);
-            }
-        }
-        OutputFormat::Json => print_json(&build_envelope(
-            ["piloting", "package"],
-            status,
-            summarize(&diagnostics),
-            data,
-            diagnostics,
-        ))?,
-    }
-
-    Ok(exit_code)
-}
-
-fn read_json_file_for_cli<const N: usize>(
-    path: &Path,
-    format: OutputFormat,
-    command: [&str; N],
-) -> Result<Option<String>, serde_json::Error> {
-    match fs::read_to_string(path) {
-        Ok(contents) => Ok(Some(contents)),
-        Err(error) => {
-            emit_diagnostics(
-                format,
-                command.to_vec(),
-                vec![Diagnostic::error(
-                    "CLI-PILOT-001",
-                    format!("failed to read {}: {error}", path.display()),
-                )
-                .with_path(path.display().to_string())],
-                json!({}),
-                "error",
-                exit_runtime(),
-            )?;
-            Ok(None)
-        }
-    }
-}
-
-fn parse_json_for_cli<T, const N: usize>(
-    path: &Path,
-    contents: &str,
-    format: OutputFormat,
-    command: [&str; N],
-    code: &str,
-    message: &str,
-) -> Result<Option<T>, serde_json::Error>
-where
-    T: DeserializeOwned,
-{
-    match serde_json::from_str::<T>(contents) {
-        Ok(value) => Ok(Some(value)),
-        Err(error) => {
-            emit_diagnostics(
-                format,
-                command.to_vec(),
-                vec![
-                    Diagnostic::error(code, format!("{message} {}: {error}", path.display()))
-                        .with_path(path.display().to_string()),
-                ],
-                json!({}),
-                "invalid",
-                exit_invalid(),
-            )?;
-            Ok(None)
-        }
     }
 }
 

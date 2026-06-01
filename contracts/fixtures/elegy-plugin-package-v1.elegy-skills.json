@@ -1,0 +1,130 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.skills-plugin",
+    "name": "elegy-skills",
+    "version": "0.1.0",
+    "displayName": "Elegy Skills Plugin"
+  },
+  "metadata": {
+    "description": "Portable skills registry package fixture for host projection from governed skill definitions.",
+    "tags": ["skills", "registry", "search", "resolve", "validation", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/skill-core-v1.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "skills-skill",
+        "definitionRef": "contracts/fixtures/skill-definition-v2.elegy-skills.json"
+      }
+    ],
+    "instructionSkills": [
+      {
+        "id": "skills-instructions",
+        "path": ".agents/skills/elegy-skills/SKILL.md",
+        "description": "Repo-local skills instruction bridge metadata."
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "skills-search-cli",
+        "skill": "elegy.skills",
+        "capability": "skills-registry-search",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" }
+          },
+          "required": ["query"],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" },
+            "data": { "type": "object" }
+          },
+          "required": ["status"],
+          "additionalProperties": true
+        },
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "skills_registry_search"
+        }
+      },
+      {
+        "id": "skills-resolve-cli",
+        "skill": "elegy.skills",
+        "capability": "skills-registry-resolve",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "query": { "type": "string" }
+          },
+          "required": ["query"],
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" },
+            "data": { "type": "object" }
+          },
+          "required": ["status"],
+          "additionalProperties": true
+        },
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "skills_registry_resolve"
+        }
+      },
+      {
+        "id": "skills-validate-cli",
+        "skill": "elegy.skills",
+        "capability": "skills-registry-validate",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "inputSchema": {
+          "type": "object",
+          "properties": {
+            "file": { "type": "string" },
+            "dir": { "type": "string" }
+          },
+          "additionalProperties": false
+        },
+        "outputSchema": {
+          "type": "object",
+          "properties": {
+            "status": { "type": "string" },
+            "data": { "type": "object" }
+          },
+          "required": ["status"],
+          "additionalProperties": true
+        },
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "skills_registry_validate"
+        }
+      }
+    ],
+    "docs": [
+      {
+        "id": "skills-readme",
+        "path": "rust/crates/elegy-skills/README.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "read_only",
+    "requiresApproval": false,
+    "policyTags": ["skill-registry", "read-only"]
+  }
+}

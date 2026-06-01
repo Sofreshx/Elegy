@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "elegy-plugin-package/v1",
+  "schemaVersion": "elegy-plugin-package/v2",
   "identity": {
     "packageId": "elegy.planning-plugin",
     "name": "elegy-planning",
@@ -7,8 +7,8 @@
     "displayName": "Elegy Planning Plugin"
   },
   "metadata": {
-    "description": "Portable planning package fixture for Codex plugin projection from governed planning skill definitions.",
-    "tags": ["planning", "roadmap", "durable-state", "plugin"],
+    "description": "Portable planning package fixture for Holon-compatible host projection from governed planning skill definitions.",
+    "tags": ["planning", "roadmap", "durable-state", "plugin", "holon"],
     "license": "Apache-2.0",
     "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md"
   },
@@ -52,6 +52,30 @@
         }
       },
       {
+        "id": "planning-roadmap-create-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-roadmap-create",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_roadmap_create"
+        }
+      },
+      {
+        "id": "planning-plan-show-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-plan-show",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_plan_show"
+        }
+      },
+      {
         "id": "planning-validate-all-cli",
         "skill": "elegy.planning",
         "capability": "planning-validate-all",
@@ -68,12 +92,16 @@
       {
         "id": "planning-readme",
         "path": "rust/crates/elegy-planning/README.md"
+      },
+      {
+        "id": "planning-architecture",
+        "path": "rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md"
       }
     ]
   },
   "hostPolicyHints": {
-    "sideEffectClass": "write",
+    "sideEffectClass": "disk_write",
     "requiresApproval": false,
-    "policyTags": ["planning-authority", "scope-aware"]
+    "policyTags": ["planning-authority", "scope-aware", "sqlite-backed"]
   }
 }

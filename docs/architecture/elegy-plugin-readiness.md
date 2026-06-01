@@ -2,27 +2,27 @@
 
 ## Purpose
 
-This document defines how Elegy packages prepare targeted piloting plugins for a
-future Holon marketplace without turning Elegy into a marketplace or runtime
+This document defines how Elegy packages prepare governed plugin artifacts for
+a future Holon marketplace without turning Elegy into a marketplace or runtime
 authority.
+
+Piloting authority, protocol, and execution ownership have moved to the Holon
+Rust runtime. See [piloting-moved-to-holon.md](piloting-moved-to-holon.md).
 
 ## Package Source Layout
 
-A piloting package is expected to come from a normal Git repository source tree.
+A plugin package is expected to come from a normal Git repository source tree.
 
 The package should contain governed assets such as:
 
 - package metadata under `elegy-plugin-package/v2`
-- piloting schemas and fixtures rooted in `contracts/`
+- schemas and fixtures rooted in `contracts/`
 - adapter manifests and fixture packs referenced by package components
 - supporting docs under `docs/`
 - optional helper CLI references when the helper performs validation or
   packaging only
 
-Package component paths resolve relative to the package file itself. In the
-current governed Blender example, the package lives under `contracts/fixtures/`,
-so package-local assets stay beside that file and adapter-manifest schema refs
-can point to sibling governed schemas under `../schemas/`.
+Package component paths resolve relative to the package file itself.
 
 ## Required Manifest Metadata
 
@@ -48,24 +48,17 @@ its own future trust and install decisions.
 
 ## Asset Kinds
 
-The first piloting slice allows Elegy to ship these package asset families:
+Elegy can ship these package asset families:
 
 - `capability-contract`
 - `skill`
 - `eval-pack`
 - `resource-pack`
 - `tool-adapter` contract
-- `bridge-adapter` contract
 - optional CLI helper
 
-The package can also include inline piloting adapter manifests and fixture packs
-through the governed `pilotingAdapters` and `fixturePacks` component lanes, or
-reference package-local JSON files through `manifestRef` and `fixturePackRef`.
-
-Fixture packs now also carry typed `policyDecisions`, `simulationResults`,
-`replayCheckpoints`, and `lifecycleEvents` so a downstream host can inspect the
-bounded pre-execution evidence model without treating Elegy as the execution
-authority.
+The package can also reference package-local JSON files through `manifestRef`
+and `fixturePackRef`.
 
 ## Non-Goals
 
@@ -80,6 +73,7 @@ That means:
 - no embedded live runtime sessions
 - no bridge ownership
 - no host-local secrets or lease state
+- no piloting authority (now owned by Holon runtime)
 
 The package is the portable source artifact. Holon decides whether and how to
 accept, trust, install, approve, and execute it.
@@ -92,8 +86,7 @@ In this slice, package validation checks only:
 - target and surface declaration completeness
 - side-effect declaration completeness
 - fixture presence and adapter alignment
-- policy-decision, simulation, replay-checkpoint, and lifecycle-event alignment
 - Holon publishing metadata completeness
 - absence of live actuation fields in a contracts-only package
 
-Live piloting proof remains a later targeted-plugin phase.
+Live piloting proof is now owned by the Holon runtime.
