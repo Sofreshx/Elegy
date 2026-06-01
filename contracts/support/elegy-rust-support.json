@@ -160,18 +160,6 @@
         "rust/crates/elegy-documentation deterministic docs inspection behavior",
         "source documents remain authoritative over derived llms and bundle exports"
       ]
-    },
-    {
-      "name": "elegy-piloting-v1",
-      "status": "published",
-      "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.8.0",
-      "scope": "Contracts-first targeted piloting foundation with typed policy, simulation, and replay validation plus Holon-compatible package metadata only.",
-      "authorityReservations": [
-        "contracts piloting schema and fixture authority",
-        "portable package metadata authority for Holon-compatible targeted plugins",
-        "downstream hosts own marketplace trust, approvals, leases, bridge sessions, execution, and evidence"
-      ]
     }
   ],
   "schemas": {
@@ -192,18 +180,6 @@
     "skill-definition-v2": "2.0.0",
     "elegy-plugin-package-v1": "1.0.0",
     "elegy-plugin-package-v2": "1.0.0",
-    "piloting-target-descriptor": "1.0.0",
-    "piloting-surface-descriptor": "1.0.0",
-    "piloting-observation-frame": "1.0.0",
-    "piloting-action-intent": "1.0.0",
-    "piloting-action-result": "1.0.0",
-    "piloting-readiness-report": "1.0.0",
-    "piloting-adapter-manifest": "1.0.0",
-    "piloting-fixture-pack": "1.0.0",
-    "piloting-policy-decision": "1.0.0",
-    "piloting-simulation-result": "1.0.0",
-    "piloting-replay-checkpoint": "1.0.0",
-    "piloting-lifecycle-event": "1.0.0",
     "skill-discovery-index": "1.0.0",
     "elegy-documentation-v2": "1.0.0",
     "documentation-init-result": "1.0.0",

@@ -215,7 +215,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "roadmap", "add-work-point", "--id", "${id}", "--roadmap-id", "${roadmap_id}", "--section-id", "${section_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--ordering", "${ordering}", "--dependency-id", "${dependency_ids}", "--validation", "${validation_expectations}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--tag", "${tags}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "roadmap", "add-work-point", "--id", "${id}", "--roadmap-id", "${roadmap_id}", "--section-id", "${section_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--ordering", "${ordering}", "--dependency-id", "${dependency_ids}", "--validation", "${validation_expectations}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--tag", "${tags}"]
       },
       "input": {
         "parameters": [
@@ -223,6 +223,12 @@
             "name": "db",
             "type": "path",
             "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.",
             "required": false
           },
           {
@@ -519,7 +525,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "todo", "create", "--id", "${id}", "--plan-id", "${plan_id}", "--work-point-id", "${work_point_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--priority", "${priority}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--evidence-ref", "${evidence_refs}", "--tag", "${tags}", "--ordering", "${ordering}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "todo", "create", "--id", "${id}", "--plan-id", "${plan_id}", "--work-point-id", "${work_point_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--priority", "${priority}", "--effort-tier", "${effort_tier}", "--file-scope", "${file_scopes}", "--evidence-ref", "${evidence_refs}", "--tag", "${tags}", "--ordering", "${ordering}"]
       },
       "input": {
         "parameters": [
@@ -527,6 +533,12 @@
             "name": "db",
             "type": "path",
             "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.",
             "required": false
           },
           {
@@ -711,7 +723,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "review-point", "record", "--id", "${id}", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--severity", "${severity}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "review-point", "record", "--id", "${id}", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--title", "${title}", "--summary", "${summary}", "--status", "${status}", "--severity", "${severity}"]
       },
       "input": {
         "parameters": [
@@ -719,6 +731,12 @@
             "name": "db",
             "type": "path",
             "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.",
             "required": false
           },
           {
@@ -845,7 +863,7 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "project", "render", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project", "render", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
       },
       "input": {
         "parameters": [
@@ -853,6 +871,12 @@
             "name": "db",
             "type": "path",
             "description": "Optional SQLite database path for planning state.",
+            "required": false
+          },
+          {
+            "name": "correlation_id",
+            "type": "string",
+            "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.",
             "required": false
           },
           {
@@ -930,11 +954,12 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--non-interactive", "--json", "scope", "create", "--scope-key", "${scope_key}", "--scope-type", "${scope_type}", "--parent-scope-key", "${parent_scope_key}", "--metadata-json", "${metadata_json}", "--tag", "${tags}"]
+        "arguments": ["--db", "${db}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "scope", "create", "--scope-key", "${scope_key}", "--scope-type", "${scope_type}", "--parent-scope-key", "${parent_scope_key}", "--metadata-json", "${metadata_json}", "--tag", "${tags}"]
       },
       "input": {
         "parameters": [
           { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
+          { "name": "correlation_id", "type": "string", "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.", "required": false },
           { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
           { "name": "scope_type", "type": "string", "description": "Optional scope type.", "required": false },
           { "name": "parent_scope_key", "type": "string", "description": "Optional parent scope key.", "required": false },
@@ -1437,12 +1462,13 @@
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-planning",
-        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "project", "export", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project", "export", "--entity-type", "${entity_type}", "--entity-id", "${entity_id}", "--projection-format", "${projection_format}", "--output", "${output}"]
       },
       "input": {
         "parameters": [
           { "name": "db", "type": "path", "description": "Optional SQLite database path for planning state.", "required": false },
           { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Optional correlation ID for mutation event lineage. If omitted, the global --correlation-id or active session is used.", "required": false },
           { "name": "entity_type", "type": "string", "description": "Entity type to export: goal, roadmap, plan, or issue.", "required": true },
           { "name": "entity_id", "type": "string", "description": "Entity identifier to export.", "required": true },
           { "name": "projection_format", "type": "string", "description": "Projection format: markdown or json.", "required": false, "default": "markdown" },
@@ -1666,5 +1692,240 @@
     "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-planning.json",
     "sourceVersion": "0.1.0"
   },
-  "lifecycleState": "active"
+  "lifecycleState": "active",
+  "hostProjection": {
+    "cliName": "elegy-planning",
+    "outputContractId": "elegy-planning-v1",
+    "defaultSideEffectClass": "disk_write",
+    "capabilityProjections": [
+      {
+        "capabilityId": "planning-goal-create",
+        "functionName": "planning_goal_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-goal-show",
+        "functionName": "planning_goal_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-goal-list",
+        "functionName": "planning_goal_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-goal-update-status",
+        "functionName": "planning_goal_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-roadmap-create",
+        "functionName": "planning_roadmap_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-roadmap-show",
+        "functionName": "planning_roadmap_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-roadmap-list",
+        "functionName": "planning_roadmap_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-roadmap-update-status",
+        "functionName": "planning_roadmap_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-roadmap-add-work-point",
+        "functionName": "planning_roadmap_add_work_point",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-plan-create",
+        "functionName": "planning_plan_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-plan-show",
+        "functionName": "planning_plan_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-plan-list",
+        "functionName": "planning_plan_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-plan-update-status",
+        "functionName": "planning_plan_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-plan-revise",
+        "functionName": "planning_plan_revise",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-todo-create",
+        "functionName": "planning_todo_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-todo-list",
+        "functionName": "planning_todo_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-todo-update-status",
+        "functionName": "planning_todo_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-issue-record",
+        "functionName": "planning_issue_record",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-issue-list",
+        "functionName": "planning_issue_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-issue-update-status",
+        "functionName": "planning_issue_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-review-point-record",
+        "functionName": "planning_review_point_record",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-review-point-update-status",
+        "functionName": "planning_review_point_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-validate-all",
+        "functionName": "planning_validate_all",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-health",
+        "functionName": "planning_health",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-render",
+        "functionName": "planning_project_render",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-export",
+        "functionName": "planning_project_export",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-scope-create",
+        "functionName": "planning_scope_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-scope-list",
+        "functionName": "planning_scope_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-scope-show",
+        "functionName": "planning_scope_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-events-list",
+        "functionName": "planning_events_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-insight-record",
+        "functionName": "planning_insight_record",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-context-entity",
+        "functionName": "planning_context_entity",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-context-session",
+        "functionName": "planning_context_session",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-tags-list",
+        "functionName": "planning_tags_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-search-extended",
+        "functionName": "planning_search_extended",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-work-point-list",
+        "functionName": "planning_work_point_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-work-point-show",
+        "functionName": "planning_work_point_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-work-point-update-status",
+        "functionName": "planning_work_point_update_status",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      }
+    ]
+  }
 }

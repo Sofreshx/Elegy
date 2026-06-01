@@ -94,54 +94,7 @@
       "source": "contracts/schemas/elegy-plugin-package-v2.schema.json",
       "generated": "artifacts/contracts/elegy-plugin-package-v2.schema.json"
     },
-    {
-      "source": "contracts/schemas/piloting-target-descriptor.schema.json",
-      "generated": "artifacts/contracts/piloting-target-descriptor.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-surface-descriptor.schema.json",
-      "generated": "artifacts/contracts/piloting-surface-descriptor.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-observation-frame.schema.json",
-      "generated": "artifacts/contracts/piloting-observation-frame.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-action-intent.schema.json",
-      "generated": "artifacts/contracts/piloting-action-intent.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-action-result.schema.json",
-      "generated": "artifacts/contracts/piloting-action-result.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-readiness-report.schema.json",
-      "generated": "artifacts/contracts/piloting-readiness-report.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-adapter-manifest.schema.json",
-      "generated": "artifacts/contracts/piloting-adapter-manifest.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-fixture-pack.schema.json",
-      "generated": "artifacts/contracts/piloting-fixture-pack.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-policy-decision.schema.json",
-      "generated": "artifacts/contracts/piloting-policy-decision.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-simulation-result.schema.json",
-      "generated": "artifacts/contracts/piloting-simulation-result.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-replay-checkpoint.schema.json",
-      "generated": "artifacts/contracts/piloting-replay-checkpoint.schema.json"
-    },
-    {
-      "source": "contracts/schemas/piloting-lifecycle-event.schema.json",
-      "generated": "artifacts/contracts/piloting-lifecycle-event.schema.json"
-    },
+
     {
       "source": "contracts/schemas/skill-discovery-index.schema.json",
       "generated": "artifacts/contracts/skill-discovery-index.schema.json"
@@ -338,42 +291,7 @@
       "source": "contracts/fixtures/elegy-plugin-package-v2.demo-config.json",
       "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.demo-config.json"
     },
-    {
-      "source": "contracts/fixtures/elegy-plugin-package-v2.piloting-blender.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.piloting-blender.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-target-descriptor.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-target-descriptor.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-surface-descriptor.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-surface-descriptor.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-observation-frame.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-observation-frame.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-action-intent.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-action-intent.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-action-result.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-action-result.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-readiness-report.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-readiness-report.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-adapter-manifest.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-adapter-manifest.minimal.json"
-    },
-    {
-      "source": "contracts/fixtures/piloting-fixture-pack.minimal.json",
-      "generated": "artifacts/contracts/fixtures/piloting-fixture-pack.minimal.json"
-    },
+
     {
       "source": "contracts/fixtures/configuration/demo-template.json",
       "generated": "artifacts/contracts/fixtures/configuration/demo-template.json"
@@ -389,6 +307,18 @@
     {
       "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json",
       "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-skills.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package-v2.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.elegy-skills.json"
     },
     {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",

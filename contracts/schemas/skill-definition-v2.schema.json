@@ -177,6 +177,58 @@
     "lifecycleState": {
       "type": "string",
       "enum": ["draft", "active", "deprecated", "archived"]
+    },
+    "hostProjection": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Explicit host projection metadata for Holon and other runtime hosts. Defines how this skill's capabilities map to CLI, function-calling, and other host surfaces.",
+      "properties": {
+        "cliName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable CLI binary name for subprocess invocation (e.g. 'elegy-planning', 'elegy-skills')."
+        },
+        "outputContractId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Versioned output contract family identifier (e.g. 'elegy-planning-v1', 'elegy-skills-v1')."
+        },
+        "defaultSideEffectClass": {
+          "type": "string",
+          "enum": ["none", "read_only", "disk_read", "disk_write", "network_outbound", "process_spawn", "desktop_ui"],
+          "description": "Default side-effect class for capabilities in this skill. Individual capabilities may override."
+        },
+        "capabilityProjections": {
+          "type": "array",
+          "description": "Per-capability function-calling projection metadata for host function-calling surfaces.",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["capabilityId", "functionName"],
+            "properties": {
+              "capabilityId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "The governed capability id this projection derives from."
+              },
+              "functionName": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Stable function name for function-calling surfaces (e.g. 'planning_goal_create', 'skills_registry_search')."
+              },
+              "sideEffectClass": {
+                "type": "string",
+                "enum": ["none", "read_only", "disk_read", "disk_write", "network_outbound", "process_spawn", "desktop_ui"],
+                "description": "Capability-specific side-effect class override."
+              },
+              "isDeterministic": {
+                "type": "boolean",
+                "description": "Whether this capability always produces the same output for the same input."
+              }
+            }
+          }
+        }
+      }
     }
   }
 }
