@@ -54,4 +54,3 @@ fn blank_correlation_id_argument_is_treated_as_absent() {
         "unexpected generated correlation id: {correlation_id}"
     );
 }
-

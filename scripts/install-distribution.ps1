@@ -125,6 +125,12 @@ function Get-WrapperSurfaceMetadata {
             Installer = 'install.ps1'
             SkillBridge = 'skills/elegy-documentation/SKILL.md'
         }
+        'elegy-obsidian' = @{
+            Surface = 'elegy-obsidian'
+            AssetPrefix = 'elegy-obsidian-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-obsidian/SKILL.md'
+        }
     }
 }
 

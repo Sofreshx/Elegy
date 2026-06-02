@@ -10,14 +10,14 @@
   },
   "metadata": {
     "displayName": "Elegy Planning Authority",
-    "description": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, validation, and projection rendering.",
+    "description": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.",
     "summary": "Create and inspect durable planning records over Elegy's dedicated planning CLI.",
     "category": "planning",
     "author": "Elegy Contributors",
     "license": "Apache-2.0",
-    "tags": ["planning", "goal", "roadmap", "plan", "todo", "issue", "review", "validation", "projection", "sqlite"],
+    "tags": ["planning", "goal", "roadmap", "plan", "todo", "issue", "review", "validation", "projection", "sqlite", "work-point", "project-run", "lease", "graph", "next-runnable"],
     "owners": ["elegy"],
-    "documentationUri": "rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md"
+    "documentationUri": "docs/architecture/elegy-planning-v1.md"
   },
   "capabilities": [
     {
@@ -1631,6 +1631,238 @@
         "isDeterministic": false,
         "hasSideEffects": false
       }
+    },
+    {
+      "id": "planning-project-run-claim",
+      "name": "Claim Project Run",
+      "description": "Claim a durable execution lease on a work point, scoping it to a goal, roadmap, repo, branch, worktree, session, and profile.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project-run", "claim", "--id", "${id}", "--goal-id", "${goal_id}", "--roadmap-id", "${roadmap_id}", "--work-point-id", "${work_point_id}", "--repo-id", "${repo_id}", "--branch", "${branch}", "--worktree-id", "${worktree_id}", "--session-id", "${session_id}", "--profile-id", "${profile_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "id", "type": "string", "description": "Optional stable project run identifier.", "required": false },
+          { "name": "goal_id", "type": "string", "description": "Parent goal identifier.", "required": true },
+          { "name": "roadmap_id", "type": "string", "description": "Parent roadmap identifier.", "required": true },
+          { "name": "work_point_id", "type": "string", "description": "Leased work point identifier.", "required": true },
+          { "name": "repo_id", "type": "string", "description": "Repo identifier.", "required": true },
+          { "name": "branch", "type": "string", "description": "Branch name.", "required": true },
+          { "name": "worktree_id", "type": "string", "description": "Worktree identifier.", "required": true },
+          { "name": "session_id", "type": "string", "description": "Session identifier.", "required": true },
+          { "name": "profile_id", "type": "string", "description": "Profile identifier.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Claimed project run record with status=claimed and empty evidence."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-project-run-activate",
+      "name": "Activate Project Run",
+      "description": "Transition a claimed project run to active. The only path from claimed to active.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project-run", "activate", "--project-run-id", "${project_run_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "project_run_id", "type": "string", "description": "Project run identifier to activate.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Activated project run record with status=active."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-project-run-release",
+      "name": "Release Project Run",
+      "description": "Release a project run lease, transitioning the run to a terminal status (completed, interrupted, or released).",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project-run", "release", "--project-run-id", "${project_run_id}", "--status", "${status}", "--evidence-json", "${evidence_json}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "project_run_id", "type": "string", "description": "Project run identifier to release.", "required": true },
+          { "name": "status", "type": "string", "description": "Final status: completed, interrupted, or released.", "required": true },
+          { "name": "evidence_json", "type": "string", "description": "Optional evidence JSON object to attach on release.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Released project run record with the requested terminal status and updated evidence."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-project-run-add-evidence",
+      "name": "Add Project Run Evidence",
+      "description": "Append or replace structured evidence on an active project run lease. Rejected when the run is completed or released.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--correlation-id", "${correlation_id}", "--json", "project-run", "add-evidence", "--project-run-id", "${project_run_id}", "--evidence-json", "${evidence_json}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "correlation_id", "type": "string", "description": "Correlation ID for mutation event lineage.", "required": true },
+          { "name": "project_run_id", "type": "string", "description": "Project run identifier to annotate.", "required": true },
+          { "name": "evidence_json", "type": "string", "description": "Full evidence JSON object: implementationRunRefs, warningRecords, validationFindingRefs, commitSha, prUrl, linkedSpecIds.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Project run record with updated evidence and refreshed validation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "planning-project-run-list",
+      "name": "List Project Runs",
+      "description": "List project runs in one scope, optionally filtered by status or work point.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "project-run", "list", "--status", "${status}", "--work-point-id", "${work_point_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "status", "type": "string", "description": "Optional status filter: suggested, claimed, active, interrupted, completed, or released.", "required": false },
+          { "name": "work_point_id", "type": "string", "description": "Optional work point identifier filter.", "required": false }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Project run list envelope."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-project-run-show",
+      "name": "Show Project Run",
+      "description": "Show one project run including claim metadata, evidence, and validation state.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "project-run", "show", "--project-run-id", "${project_run_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "project_run_id", "type": "string", "description": "Project run identifier.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Project run view with claim metadata, evidence, and validation state."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-work-point-next-runnable",
+      "name": "Next Runnable Work Points",
+      "description": "List work points in a roadmap that have no blocking dependencies and no active lease, ordered by ordering then id.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "work-point", "next-runnable", "--roadmap-id", "${roadmap_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "roadmap_id", "type": "string", "description": "Roadmap identifier to scan for runnable work points.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Runnable work point candidates with dependency titles and reasons."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "planning-work-point-work-graph",
+      "name": "Work Point Graph",
+      "description": "Render the work-point graph for a roadmap: nodes with active lease and plan counts, edges from declared dependencies.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-planning",
+        "arguments": ["--db", "${db}", "--scope", "${scope_key}", "--non-interactive", "--json", "work-point", "work-graph", "--roadmap-id", "${roadmap_id}"]
+      },
+      "input": {
+        "parameters": [
+          { "name": "db", "type": "path", "description": "Optional SQLite database path.", "required": false },
+          { "name": "scope_key", "type": "string", "description": "Scope key.", "required": true },
+          { "name": "roadmap_id", "type": "string", "description": "Roadmap identifier to render.", "required": true }
+        ]
+      },
+      "output": {
+        "resultType": "PlanningResult",
+        "schemaRef": "https://elegy/contracts/schemas/planning-result.schema.json",
+        "description": "Work graph with nodes and edges for the requested roadmap."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
     }
   ],
   "constraints": [
@@ -1925,6 +2157,54 @@
         "functionName": "planning_work_point_update_status",
         "sideEffectClass": "disk_write",
         "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-claim",
+        "functionName": "planning_project_run_claim",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-activate",
+        "functionName": "planning_project_run_activate",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-release",
+        "functionName": "planning_project_run_release",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-add-evidence",
+        "functionName": "planning_project_run_add_evidence",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-list",
+        "functionName": "planning_project_run_list",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-project-run-show",
+        "functionName": "planning_project_run_show",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "planning-work-point-next-runnable",
+        "functionName": "planning_work_point_next_runnable",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "planning-work-point-work-graph",
+        "functionName": "planning_work_point_work_graph",
+        "sideEffectClass": "disk_read",
+        "isDeterministic": true
       }
     ]
   }

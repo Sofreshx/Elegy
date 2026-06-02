@@ -5,11 +5,11 @@ use rusqlite::{params, Connection, OptionalExtension};
 use crate::{
     storage::{
         attached_entity_correlation_id, list_review_points_for_entity, list_todos_for_plan,
-        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan, load_roadmap,
-        load_todo, load_work_point,
+        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan,
+        load_project_run, load_roadmap, load_todo, load_work_point,
     },
-    EntityType, GoalStatus, IssueStatus, PlanningStoreError, ReviewPointStatus, Severity,
-    TodoStatus, ValidationFinding, ValidationSeverity,
+    EntityType, GoalStatus, IssueStatus, PlanningStoreError, ProjectRunStatus, ReviewPointStatus,
+    Severity, TodoStatus, ValidationFinding, ValidationSeverity, WorkPointStatus,
 };
 
 pub(crate) fn validate_entity(
@@ -36,8 +36,52 @@ fn validate_project_run(
     connection: &Connection,
     project_run_id: &str,
 ) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
-    let _ = crate::storage::load_project_run(connection, project_run_id)?;
-    Ok(Vec::new())
+    let run = load_project_run(connection, project_run_id)?;
+    let mut findings = Vec::new();
+
+    let goal = load_goal(connection, &run.goal_id)?;
+    if matches!(
+        goal.status,
+        GoalStatus::Invalidated | GoalStatus::Superseded | GoalStatus::Abandoned
+    ) {
+        findings.push(warning(
+            EntityType::ProjectRun,
+            project_run_id,
+            "PROJECT-RUN-GOAL-NOT-ACTIVE",
+            "project run references a goal that is no longer active",
+        )?);
+    }
+
+    let work_point = load_work_point(connection, &run.work_point_id)?;
+    if matches!(
+        work_point.status,
+        WorkPointStatus::Cancelled | WorkPointStatus::Invalidated
+    ) {
+        findings.push(error(
+            EntityType::ProjectRun,
+            project_run_id,
+            "PROJECT-RUN-WORK-POINT-INVALID",
+            "project run references a work point that has been cancelled or invalidated",
+        )?);
+    }
+
+    if run.status == ProjectRunStatus::Completed {
+        let has_evidence = !run.evidence.implementation_run_refs.is_empty()
+            || !run.evidence.validation_finding_refs.is_empty()
+            || !run.evidence.linked_spec_ids.is_empty()
+            || run.evidence.commit_sha.is_some()
+            || run.evidence.pr_url.is_some();
+        if !has_evidence {
+            findings.push(warning(
+                EntityType::ProjectRun,
+                project_run_id,
+                "PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE",
+                "project run is completed but has no evidence refs",
+            )?);
+        }
+    }
+
+    Ok(findings)
 }
 
 fn validate_goal(

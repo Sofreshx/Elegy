@@ -885,8 +885,6 @@ pub fn validate_elegy_plugin_package(
     ElegyPluginPackageValidationResult { issues }
 }
 
-
-
 fn validate_uri(field: &str, value: &str, issues: &mut Vec<String>) {
     let value = value.trim();
     if value.is_empty() {
@@ -2276,8 +2274,7 @@ fn validate_skill_host_projection(
     for projection in &host_projection.capability_projections {
         if projection.capability_id.trim().is_empty() {
             return Err(ContractsError::Compatibility(
-                "hostProjection.capabilityProjections[].capabilityId must not be empty"
-                    .to_string(),
+                "hostProjection.capabilityProjections[].capabilityId must not be empty".to_string(),
             ));
         }
         let normalized_capability = projection.capability_id.to_ascii_lowercase();

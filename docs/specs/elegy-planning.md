@@ -2,6 +2,11 @@
 title: elegy-planning Spec
 status: active
 owner: Elegy
+created: 2026-05-25
+updated: 2026-06-02
+doc_kind: spec
+summary: Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.
+schema_version: elegy-planning/v1
 ---
 
 # elegy-planning: Durable Planning Authority
@@ -111,11 +116,11 @@ See [CLI Interface](#cli-interface) for the full command reference and [Write Pa
 
 ## Acceptance Criteria
 
-- [ ] `elegy-planning --help` lists all commands with descriptions
-- [ ] `goal create --title "MVP"` produces a goal with a stable ID and stored validation findings
-- [ ] `plan create --goal-id <id> --roadmap-id <id>` enforces goal-roadmap match at preflight
-- [ ] `validate all` reports all validation findings without side effects
-- [ ] `--json` on every command produces a valid versioned envelope
+- [x] `elegy-planning --help` lists all commands with descriptions
+- [x] `goal create --title "MVP"` produces a goal with a stable ID and stored validation findings
+- [x] `plan create --goal-id <id> --roadmap-id <id>` enforces goal-roadmap match at preflight
+- [x] `validate all` reports all validation findings without side effects
+- [x] `--json` on every command produces a valid versioned envelope
 
 ## Validation
 
@@ -129,8 +134,7 @@ The validation engine runs automatically after every mutation. See [Validation E
 
 - Source crate: `rust/crates/elegy-planning/`
 - Spec: This document
-- Architecture: TBD
-- ADR: TBD
+- Architecture: [elegy-planning-v1](../architecture/elegy-planning-v1.md)
 
 ---
 
@@ -145,6 +149,7 @@ Scope (isolates all entities below)
  │    └── Roadmap                 (linked to exactly 1 goal)
  │         ├── Section            (structural grouping)
  │         └── WorkPoint          (durable item, may have dependencies)
+│              └── ProjectRun    (execution lease, attached to one work point)
  │
  ├── Plan                         (single execution pass, links to 1 goal + 1 roadmap)
  │    ├── Todo                    (linked or standalone; evidence_refs)
@@ -194,6 +199,19 @@ stateDiagram-v2
         Resolved --> Reopened
         Reopened --> Blocked
     }
+
+    state ProjectRun {
+        [*] --> Suggested
+        Suggested --> Claimed
+        Claimed --> Active
+        Active --> Completed
+        Active --> Interrupted
+        Active --> Released
+        Claimed --> Released
+        Interrupted --> Active
+        Interrupted --> Released
+    }
+}
 ```
 
 ### Key Relationship Rules
@@ -208,6 +226,13 @@ stateDiagram-v2
 | Insight must have a resolvable parent entity | Validation finding (`INSIGHT-NO-PARENT`, error severity) |
 | Cross-scope parent references | Rejected at preflight |
 | Scope transfer leaves dependent entities | Rejected at preflight |
+| ProjectRun must link to a goal, roadmap, and work point | Preflight check before insert |
+| Active ProjectRun lease on a work point blocks other claims | Preflight rejection (`ACTIVE-LEASE-CONFLICT`) |
+| Work point with active lease is excluded from `next-runnable` | Read-side filter |
+| `add-evidence` rejected when run is `completed` or `released` | Status check at preflight |
+| Completed project run with no evidence refs | Validation finding (`PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE`, warning) |
+| Project run attached to a cancelled or invalidated work point | Validation finding (`PROJECT-RUN-WORK-POINT-INVALID`, error) |
+| Project run attached to a goal that is invalidated, superseded, or abandoned | Validation finding (`PROJECT-RUN-GOAL-NOT-ACTIVE`, warning) |
 
 ---
 
@@ -322,7 +347,7 @@ via the session ID without needing `--correlation-id` on every call.
 | Scope | `create`, `list`, `show` |
 | Goal | `create`, `list`, `show`, `update-status`, `search` |
 | Roadmap | `create`, `add-section`, `add-work-point`, `list`, `show`, `update-status`, `search` |
-| Work point | `list`, `show`, `update-status` |
+| Work point | `list`, `show`, `update-status`, `next-runnable`, `work-graph` |
 | Plan | `create`, `list`, `show`, `revise`, `update-status`, `search` |
 | Todo | `create`, `list`, `update-status`, `search` |
 | Issue | `record`, `list`, `show`, `update-status`, `search` |
@@ -335,6 +360,7 @@ via the session ID without needing `--correlation-id` on every call.
 | Health | `health` |
 | Events | `events` |
 | Project | `render`, `export` |
+| Project run | `claim`, `activate`, `release`, `add-evidence`, `list`, `show` |
 
 ---
 
@@ -391,6 +417,9 @@ flowchart LR
 | `INSIGHT-EMPTY-CONTENT` | Error | Insight content must not be empty |
 | `INSIGHT-TAG-ORPHAN` | Warning | Insight has no tags; add tags for discoverability |
 | `INSIGHT-NO-PARENT` | Error | Insight references a missing parent entity |
+| `PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE` | Warning | Project run is completed but has no evidence refs |
+| `PROJECT-RUN-WORK-POINT-INVALID` | Error | Project run is attached to a cancelled or invalidated work point |
+| `PROJECT-RUN-GOAL-NOT-ACTIVE` | Warning | Project run references a goal that is no longer active |
 
 ---
 
@@ -592,4 +621,46 @@ sequenceDiagram
     C->>V: revalidate plan
     V-->>C: ok (all todos done, no blockers)
     C-->>A: { status: ok, ... }
+```
+
+### Project Run Lease Workflow
+
+```mermaid
+sequenceDiagram
+    participant A as Agent/Operator
+    participant C as elegy-planning CLI
+    participant D as SQLite Store
+    participant V as Validation Engine
+
+    A->>C: work-point next-runnable --roadmap-id r1
+    C->>D: validate_all + find_runnable_work_points
+    D-->>C: candidates: [wpa]
+    C-->>A: { candidates: [{id: wpa, reasons: ["no dependencies"]}] }
+
+    A->>C: project-run claim --id pr1 --goal-id g1 --roadmap-id r1 --work-point-id wpa ...
+    C->>D: write project_run (status=claimed, evidence={})
+    D-->>C: ok
+    C-->>A: { record: {status: claimed, ...} }
+
+    A->>C: project-run activate --project-run-id pr1
+    C->>D: load pr1, status=active
+    D-->>C: ok
+    C-->>A: { record: {status: active, ...} }
+
+    A->>C: work-point work-graph --roadmap-id r1
+    C->>D: validate_all + build_work_graph
+    D-->>C: wpa: hasActiveLease=true
+    C-->>A: { nodes: [...], edges: [...] }
+
+    A->>C: project-run add-evidence --project-run-id pr1 --evidence-json '...'
+    C->>D: append evidence (status=active → ok)
+    C->>V: revalidate project run
+    V-->>C: ok
+    C-->>A: { record: {status: active, evidence: {...} } }
+
+    A->>C: project-run release --project-run-id pr1 --status completed
+    C->>D: status=completed, completedAt=now
+    C->>V: revalidate project run
+    V-->>C: PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE (warning) if no refs
+    C-->>A: { record: {status: completed}, validation: [warning] }
 ```

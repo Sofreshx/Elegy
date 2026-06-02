@@ -58,7 +58,7 @@ owner: Elegy
 
 ## Validation
 
-- `cargo test -p elegy-tooling`
+- `cargo test -p elegy-cli --test docs`
 - `cargo test -p elegy-cli docs`
 - `cargo fmt --all`
 - `cargo test -p elegy-cli`

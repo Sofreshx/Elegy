@@ -6,8 +6,8 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
-    AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput, ClaimProjectRunInput,
-    CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
+    ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
     CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
     EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus, InsightStatus,
     InsightType, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectRunEvidence,
@@ -59,59 +59,77 @@ enum OutputFormat {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    #[command(about = "Manage planning scopes")]
     Scope {
         #[command(subcommand)]
         command: ScopeCommand,
     },
+    #[command(about = "Create and manage goals with acceptance criteria")]
     Goal {
         #[command(subcommand)]
         command: GoalCommand,
     },
+    #[command(about = "Manage roadmaps linked to goals")]
     Roadmap {
         #[command(subcommand)]
         command: RoadmapCommand,
     },
+    #[command(about = "Manage work points within plans")]
     WorkPoint {
         #[command(subcommand)]
         command: WorkPointCommand,
     },
+    #[command(about = "Create and manage plans with scope and roadmap references")]
     Plan {
         #[command(subcommand)]
         command: PlanCommand,
     },
+    #[command(about = "Manage actionable todo items")]
     Todo {
         #[command(subcommand)]
         command: TodoCommand,
     },
+    #[command(about = "Track and manage issues")]
     Issue {
         #[command(subcommand)]
         command: IssueCommand,
     },
+    #[command(about = "Manage review points for quality gates")]
     ReviewPoint {
         #[command(subcommand)]
         command: ReviewPointCommand,
     },
+    #[command(about = "Run validation checks across planning entities")]
     Validate {
         #[command(subcommand)]
         command: ValidateCommand,
     },
+    #[command(about = "View and manage event history")]
     Events,
+    #[command(about = "Check planning database health")]
     Health,
+    #[command(about = "Manage project-level configuration")]
     Project {
         #[command(subcommand)]
         command: ProjectCommand,
     },
+    #[command(about = "Manage operational sessions")]
     Session {
         #[command(subcommand)]
         command: SessionCommand,
     },
+    #[command(about = "Search across planning entities")]
     Search(SearchArgs),
+    #[command(about = "Manage retrospective insights")]
     Insight {
         #[command(subcommand)]
         command: InsightCommand,
     },
+    #[command(about = "Manage contextual information")]
     Context(ContextArgs),
+    #[command(about = "Manage tagging across entities")]
     Tags(TagsArgs),
+    #[command(about = "Manage project run records")]
     ProjectRun {
         #[command(subcommand)]
         command: ProjectRunCommand,
@@ -676,6 +694,7 @@ struct WorkPointWorkGraphArgs {
 #[derive(Subcommand, Debug)]
 enum ProjectRunCommand {
     Claim(ProjectRunClaimArgs),
+    Activate(ProjectRunActivateArgs),
     Release(ProjectRunReleaseArgs),
     AddEvidence(ProjectRunAddEvidenceArgs),
     List,
@@ -704,6 +723,12 @@ struct ProjectRunClaimArgs {
     profile_id: Option<String>,
     #[arg(long = "correlation-id")]
     correlation_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunActivateArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
 }
 
 #[derive(Args, Debug)]
@@ -866,6 +891,15 @@ fn execute_project_run(
                 correlation_id: args.correlation_id,
             })?,
         ),
+        ProjectRunCommand::Activate(args) => emit_success(
+            context,
+            vec!["project-run", "activate"],
+            store.activate_project_run(ActivateProjectRunInput {
+                project_run_id: args.project_run_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
         ProjectRunCommand::Release(args) => {
             let evidence = match args.evidence_json {
                 Some(json_str) => Some(serde_json::from_str::<ProjectRunEvidence>(&json_str)?),
@@ -884,8 +918,7 @@ fn execute_project_run(
             )
         }
         ProjectRunCommand::AddEvidence(args) => {
-            let evidence: ProjectRunEvidence =
-                serde_json::from_str(&args.evidence_json)?;
+            let evidence: ProjectRunEvidence = serde_json::from_str(&args.evidence_json)?;
             emit_success(
                 context,
                 vec!["project-run", "add-evidence"],
@@ -1196,16 +1229,22 @@ fn execute_work_point(
                 run_id: context.correlation_id.clone(),
             })?,
         ),
-        WorkPointCommand::NextRunnable(args) => emit_success(
-            context,
-            vec!["work-point", "next-runnable"],
-            store.find_runnable_work_points(&args.roadmap_id)?,
-        ),
-        WorkPointCommand::WorkGraph(args) => emit_success(
-            context,
-            vec!["work-point", "work-graph"],
-            store.build_work_graph(&args.roadmap_id)?,
-        ),
+        WorkPointCommand::NextRunnable(args) => {
+            let _ = store.validate_all()?;
+            emit_success(
+                context,
+                vec!["work-point", "next-runnable"],
+                store.find_runnable_work_points(&args.roadmap_id)?,
+            )
+        }
+        WorkPointCommand::WorkGraph(args) => {
+            let _ = store.validate_all()?;
+            emit_success(
+                context,
+                vec!["work-point", "work-graph"],
+                store.build_work_graph(&args.roadmap_id)?,
+            )
+        }
     }
 }
 
@@ -1978,6 +2017,7 @@ fn work_point_command_name(command: &WorkPointCommand) -> &'static str {
 fn project_run_command_name(command: &ProjectRunCommand) -> &'static str {
     match command {
         ProjectRunCommand::Claim(_) => "claim",
+        ProjectRunCommand::Activate(_) => "activate",
         ProjectRunCommand::Release(_) => "release",
         ProjectRunCommand::AddEvidence(_) => "add-evidence",
         ProjectRunCommand::List => "list",
