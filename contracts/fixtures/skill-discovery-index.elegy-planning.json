@@ -1,18 +1,23 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-05-24T00:00:00Z",
+  "builtAt": "2026-06-02T00:00:00Z",
   "entries": [
     {
       "skillId": "elegy-planning",
       "name": "Elegy Planning",
-      "description": "Derived projection of the governed Elegy-planning skill definition for loading rendered non-authoritative local skill markdown for the durable planning CLI surface.",
+      "description": "Derived projection of the governed Elegy-planning skill definition for loading rendered non-authoritative local skill markdown for the durable planning CLI surface, including work-point graph projection and project-run lease management.",
       "lifecycleState": "active",
       "triggersOn": [
         "planning",
         "roadmap planning",
         "durable planning",
         "plan revise",
-        "planning validate"
+        "planning validate",
+        "next runnable work point",
+        "work point graph",
+        "project run claim",
+        "project run release",
+        "project run lease"
       ],
       "keywords": [
         "planning",
@@ -26,14 +31,27 @@
         "review point",
         "events",
         "health",
-        "projection"
+        "projection",
+        "work-point graph",
+        "next runnable",
+        "project run",
+        "project-run claim",
+        "project-run activate",
+        "project-run release",
+        "project-run add-evidence",
+        "lease",
+        "execution lease"
       ],
       "capabilityHints": [
         "planning-scope-management",
         "planning-lifecycle-transitions",
         "planning-plan-revision",
         "planning-validation-and-health",
-        "planning-projection-export"
+        "planning-projection-export",
+        "planning-work-point-graph",
+        "planning-next-runnable-resolver",
+        "planning-project-run-lease",
+        "planning-project-run-evidence"
       ],
       "manifest": {
         "id": "elegy-planning",

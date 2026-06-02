@@ -41,6 +41,11 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-documentation-wrapper'
             SurfaceRoot = 'src/Elegy-documentation'
         }
+        'elegy-obsidian' = @{
+            Surface = 'elegy-obsidian'
+            AssetPrefix = 'elegy-obsidian-wrapper'
+            SurfaceRoot = 'src/Elegy-obsidian'
+        }
     }
 }
 

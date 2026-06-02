@@ -17,7 +17,7 @@ Holon now owns piloting end to end:
 
 - **Protocol DTOs**: `holon-protocol/src/pilot.rs` defines all piloting request/response shapes.
 - **PilotAdapterRegistry**: `holon-runtime-core/src/piloting.rs` provides the in-memory registry and all core functions.
-- **Native core plugin**: `holon.pilicing` is seeded at runtime initialization with 8 built-in tools.
+- **Native core plugin**: `holon.piloting` is seeded at runtime initialization with 8 built-in tools.
 - **Fail-closed execute**: Only `api` and `file_format` lanes are allowed for live pilot execution.
 - **V2-core asset family**: `pilot-adapter` is accepted in `holon-plugin/v2-core` manifests.
 - **Bundled plugin**: `piloting.blender.reference` demonstrates the reference adapter.

@@ -34,10 +34,7 @@ pub enum PlanningStoreError {
     #[error("work point already has an active lease: {work_point_id}")]
     ActiveLeaseConflict { work_point_id: String },
     #[error("project run not in expected status: expected {expected}, actual {actual}")]
-    ProjectRunStatusMismatch {
-        expected: String,
-        actual: String,
-    },
+    ProjectRunStatusMismatch { expected: String, actual: String },
 }
 
 impl PlanningStoreError {

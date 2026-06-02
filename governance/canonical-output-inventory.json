@@ -345,6 +345,14 @@
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-planning.json"
     },
     {
+      "source": "contracts/fixtures/skill-definition-v2.elegy-obsidian.json",
+      "generated": "artifacts/contracts/fixtures/skill-definition-v2.elegy-obsidian.json"
+    },
+    {
+      "source": "contracts/fixtures/skill-discovery-index.elegy-obsidian.json",
+      "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-obsidian.json"
+    },
+    {
       "source": "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
       "generated": "artifacts/contracts/fixtures/skill-discovery-index.elegy-mermaid.json"
     },
@@ -367,6 +375,10 @@
     {
       "source": ".agents/skills/elegy-planning/SKILL.md",
       "generated": ".github/skills/elegy-planning/SKILL.md"
+    },
+    {
+      "source": ".agents/skills/elegy-obsidian/SKILL.md",
+      "generated": ".github/skills/elegy-obsidian/SKILL.md"
     },
     {
       "source": ".agents/skills/elegy-mermaid/SKILL.md",
@@ -406,7 +418,8 @@
     "artifacts/distribution/elegy-planning-wrapper-*.zip",
     "artifacts/distribution/elegy-skills-wrapper-*.zip",
     "artifacts/distribution/elegy-configuration-wrapper-*.zip",
-    "artifacts/distribution/elegy-documentation-wrapper-*.zip"
+    "artifacts/distribution/elegy-documentation-wrapper-*.zip",
+    "artifacts/distribution/elegy-obsidian-wrapper-*.zip"
   ],
   "installerArchivePatterns": [
     "artifacts/distribution/elegy-installer-*.zip"
@@ -443,6 +456,9 @@
     ],
     "artifacts/distribution/elegy-documentation-wrapper-*.zip": [
       "skills/elegy-documentation/SKILL.md"
+    ],
+    "artifacts/distribution/elegy-obsidian-wrapper-*.zip": [
+      "skills/elegy-obsidian/SKILL.md"
     ]
   }
 }

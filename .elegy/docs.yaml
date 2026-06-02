@@ -8,4 +8,5 @@ requiredDocTriggers:
 - behavior-change
 - cross-repo-impact
 - onboarding-change
-localExceptions: []
+localExceptions:
+- docs/specs/obsidian-skill-and-cli.md
