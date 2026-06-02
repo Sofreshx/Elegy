@@ -15,14 +15,16 @@ use crate::{
     validation::validate_entity, EffortTier, EntityType, FileScopeRecord, FileScopeSelectorType,
     GoalRecord, GoalStatus, GoalView, InsightRecord, InsightStatus, InsightType, InsightView,
     IssueRecord, IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView,
-    PlanningEvent, PlanningHealthReport, PlanningStoreError, Priority, ProjectionFormat,
-    RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord,
-    RoadmapStatus, RoadmapView, ScopeRecord, Severity, TagInfo, TodoRecord, TodoStatus,
-    ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity, WorkPointRecord,
-    WorkPointStatus, WorkPointView,
+    PlanningEvent, PlanningHealthReport, PlanningStoreError, Priority, ProjectRunEvidence,
+    ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat, RenderedProjection,
+    ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord, RoadmapStatus,
+    RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord, Severity, TagInfo,
+    TodoRecord, TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport,
+    ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointRecord, WorkPointStatus,
+    WorkPointView,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "5";
+pub const CURRENT_SCHEMA_VERSION: &str = "6";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 const SQLITE_MAX_VARIABLES: usize = 999;
@@ -183,6 +185,39 @@ pub struct SearchInput {
     pub latest: Option<usize>,
     pub tag: Option<String>,
     pub fts: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ClaimProjectRunInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub goal_id: String,
+    pub roadmap_id: String,
+    pub work_point_id: String,
+    pub repo_id: Option<String>,
+    pub branch: Option<String>,
+    pub worktree_id: Option<String>,
+    pub session_id: Option<String>,
+    pub run_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub correlation_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReleaseProjectRunInput {
+    pub project_run_id: String,
+    pub status: ProjectRunStatus,
+    pub evidence: Option<ProjectRunEvidence>,
+    pub active_scope_key: Option<String>,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct AddEvidenceInput {
+    pub project_run_id: String,
+    pub evidence: ProjectRunEvidence,
+    pub active_scope_key: Option<String>,
+    pub run_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -1934,7 +1969,7 @@ impl PlanningStore {
                 )?;
                 serde_json::json!({ "record": record, "validation": validation })
             }
-            EntityType::RoadmapSection | EntityType::Scope => {
+            EntityType::RoadmapSection | EntityType::Scope | EntityType::ProjectRun => {
                 return Err(PlanningStoreError::InvalidInput(format!(
                     "status transitions are not supported for {}",
                     input.entity_type.as_str()
@@ -2333,6 +2368,432 @@ impl PlanningStore {
         collect_rows(rows)
     }
 
+    pub fn claim_project_run(
+        &self,
+        input: ClaimProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        require_non_empty("goalId", &input.goal_id)?;
+        require_non_empty("roadmapId", &input.roadmap_id)?;
+        require_non_empty("workPointId", &input.work_point_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        let inherited_scope_key = ensure_referenced_entity_in_scope(
+            &transaction,
+            EntityType::Goal,
+            &input.goal_id,
+            "goalId",
+            &scope_key,
+        )?;
+        let _ = ensure_referenced_entity_in_scope(
+            &transaction,
+            EntityType::Roadmap,
+            &input.roadmap_id,
+            "roadmapId",
+            &scope_key,
+        )?;
+        let _ = ensure_referenced_entity_in_scope(
+            &transaction,
+            EntityType::WorkPoint,
+            &input.work_point_id,
+            "workPointId",
+            &scope_key,
+        )?;
+
+        let active_count: i64 = transaction.query_row(
+            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active')",
+            params![input.work_point_id],
+            |row| row.get(0),
+        )?;
+        if active_count > 0 {
+            return Err(PlanningStoreError::ActiveLeaseConflict {
+                work_point_id: input.work_point_id.clone(),
+            });
+        }
+
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+        let evidence = ProjectRunEvidence::default();
+        let record = ProjectRunRecord {
+            id: id.clone(),
+            scope_key: inherited_scope_key,
+            goal_id: input.goal_id,
+            roadmap_id: input.roadmap_id,
+            work_point_id: input.work_point_id,
+            repo_id: input.repo_id,
+            branch: input.branch,
+            worktree_id: input.worktree_id,
+            session_id: input.session_id,
+            run_id: input.run_id.clone(),
+            profile_id: input.profile_id,
+            status: ProjectRunStatus::Claimed,
+            evidence,
+            revision: 1,
+            claimed_at: Some(now.clone()),
+            completed_at: None,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        transaction.execute(
+            r#"
+            INSERT INTO project_runs (
+                id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch,
+                worktree_id, session_id, run_id, profile_id, status, evidence_json,
+                revision, claimed_at, completed_at, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+            "#,
+            params![
+                record.id,
+                record.scope_key,
+                record.goal_id,
+                record.roadmap_id,
+                record.work_point_id,
+                record.repo_id,
+                record.branch,
+                record.worktree_id,
+                record.session_id,
+                record.run_id,
+                record.profile_id,
+                record.status.as_str(),
+                to_json_text(&record.evidence)?,
+                record.revision,
+                record.claimed_at,
+                record.completed_at,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+
+        let correlation_id = input
+            .correlation_id
+            .unwrap_or_else(|| format!("corr-{id}"));
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &correlation_id,
+                input.run_id,
+                "project-run.claimed",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        let validation = validate_and_store(&transaction, EntityType::ProjectRun, &id)?;
+        let _ = refresh_validation_target(
+            &transaction,
+            EntityType::WorkPoint,
+            &record.work_point_id,
+        )?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn release_project_run(
+        &self,
+        input: ReleaseProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        require_non_empty("projectRunId", &input.project_run_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::ProjectRun,
+            &input.project_run_id,
+            &active_scope_key,
+        )?;
+
+        let existing = load_project_run(&transaction, &input.project_run_id)?;
+        if existing.status != ProjectRunStatus::Claimed && existing.status != ProjectRunStatus::Active
+        {
+            return Err(PlanningStoreError::ProjectRunStatusMismatch {
+                expected: "claimed or active".to_string(),
+                actual: existing.status.to_string(),
+            });
+        }
+
+        let now = now_string()?;
+        let evidence = input.evidence.unwrap_or(existing.evidence);
+        let completed_at = if input.status == ProjectRunStatus::Completed {
+            Some(now.clone())
+        } else {
+            None
+        };
+
+        transaction.execute(
+            r#"
+            UPDATE project_runs SET
+                status = ?1,
+                evidence_json = ?2,
+                completed_at = ?3,
+                revision = revision + 1,
+                updated_at = ?4
+            WHERE id = ?5
+            "#,
+            params![
+                input.status.as_str(),
+                to_json_text(&evidence)?,
+                completed_at,
+                now,
+                input.project_run_id,
+            ],
+        )?;
+
+        let record = load_project_run(&transaction, &input.project_run_id)?;
+        let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &record.id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &correlation_id,
+                input.run_id,
+                "project-run.released",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
+        let _ = refresh_validation_target(
+            &transaction,
+            EntityType::WorkPoint,
+            &record.work_point_id,
+        )?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn add_project_run_evidence(
+        &self,
+        input: AddEvidenceInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        require_non_empty("projectRunId", &input.project_run_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::ProjectRun,
+            &input.project_run_id,
+            &active_scope_key,
+        )?;
+
+        let _existing = load_project_run(&transaction, &input.project_run_id)?;
+        let now = now_string()?;
+
+        transaction.execute(
+            r#"
+            UPDATE project_runs SET
+                evidence_json = ?1,
+                revision = revision + 1,
+                updated_at = ?2
+            WHERE id = ?3
+            "#,
+            params![to_json_text(&input.evidence)?, now, input.project_run_id],
+        )?;
+
+        let record = load_project_run(&transaction, &input.project_run_id)?;
+        let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &record.id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &correlation_id,
+                input.run_id,
+                "project-run.evidence-added",
+                serde_json::json!({ "evidence": input.evidence }),
+            )?,
+        )?;
+
+        let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn list_project_runs(
+        &self,
+    ) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map([], row_to_project_run)?;
+        collect_rows(rows)
+    }
+
+    pub fn list_project_runs_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_project_run)?;
+        collect_rows(rows)
+    }
+
+    pub fn project_run(&self, id: &str) -> Result<ProjectRunView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let record = load_project_run(&connection, id)?;
+        let work_point = load_work_point(&connection, &record.work_point_id).ok();
+        let validation = load_validation_report(&connection, EntityType::ProjectRun, id)?;
+        Ok(ProjectRunView {
+            project_run: record,
+            work_point,
+            validation,
+        })
+    }
+
+    pub fn find_runnable_work_points(
+        &self,
+        roadmap_id: &str,
+    ) -> Result<RunnableCandidates, PlanningStoreError> {
+        require_non_empty("roadmapId", roadmap_id)?;
+
+        let connection = self.open_connection()?;
+        let roadmap = load_roadmap(&connection, roadmap_id)?;
+        let all_work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
+        let mut candidates = Vec::new();
+
+        for wp in &all_work_points {
+            if matches!(
+                wp.status,
+                WorkPointStatus::Completed
+                    | WorkPointStatus::Cancelled
+                    | WorkPointStatus::Invalidated
+                    | WorkPointStatus::Blocked
+            ) {
+                continue;
+            }
+
+            let active_lease_count: i64 = connection.query_row(
+                "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
+                params![wp.id],
+                |row| row.get(0),
+            )?;
+            if active_lease_count > 0 {
+                continue;
+            }
+
+            let mut all_deps_exist = true;
+            let mut all_deps_completed = true;
+            let mut dependency_titles = Vec::new();
+
+            for dep_id in &wp.dependency_ids {
+                match load_work_point(&connection, dep_id) {
+                    Ok(dep) => {
+                        dependency_titles.push(dep.title.clone());
+                        if dep.status != WorkPointStatus::Completed {
+                            all_deps_completed = false;
+                        }
+                    }
+                    Err(_) => {
+                        all_deps_exist = false;
+                        dependency_titles.push(format!("<missing: {dep_id}>"));
+                    }
+                }
+            }
+
+            if !all_deps_exist {
+                continue;
+            }
+            if !all_deps_completed {
+                continue;
+            }
+
+            let mut reasons = Vec::new();
+            if wp.status == WorkPointStatus::Draft || wp.status == WorkPointStatus::Proposed {
+                reasons.push("status is ready for work".to_string());
+            }
+            if wp.dependency_ids.is_empty() {
+                reasons.push("no dependencies".to_string());
+            } else {
+                reasons.push("all dependencies completed".to_string());
+            }
+
+            candidates.push(RunnableWorkPointCandidate {
+                work_point: wp.clone(),
+                roadmap_id: roadmap_id.to_string(),
+                roadmap_title: roadmap.title.clone(),
+                dependency_titles,
+                reasons,
+            });
+        }
+
+        candidates.sort_by(|a, b| {
+            a.work_point
+                .ordering
+                .cmp(&b.work_point.ordering)
+                .then_with(|| a.work_point.id.cmp(&b.work_point.id))
+        });
+
+        Ok(RunnableCandidates {
+            roadmap_id: roadmap_id.to_string(),
+            candidates,
+        })
+    }
+
+    pub fn build_work_graph(
+        &self,
+        roadmap_id: &str,
+    ) -> Result<WorkGraph, PlanningStoreError> {
+        require_non_empty("roadmapId", roadmap_id)?;
+
+        let connection = self.open_connection()?;
+        let work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
+        let mut nodes = Vec::new();
+        let mut edges = Vec::new();
+
+        for wp in &work_points {
+            let plan_count: usize = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM plans WHERE EXISTS (SELECT 1 FROM json_each(plans.targeted_work_point_ids_json) WHERE json_each.value = ?1)",
+                    params![wp.id],
+                    |row| row.get(0),
+                )
+                .unwrap_or(0);
+            let has_active_lease: bool = connection
+                .query_row(
+                    "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active')",
+                    params![wp.id],
+                    |row| row.get::<_, i64>(0),
+                )
+                .unwrap_or(0)
+                > 0;
+
+            nodes.push(WorkGraphNode {
+                work_point: wp.clone(),
+                plan_count,
+                has_active_lease,
+            });
+
+            for dep_id in &wp.dependency_ids {
+                edges.push(WorkGraphEdge {
+                    source_id: dep_id.clone(),
+                    target_id: wp.id.clone(),
+                });
+            }
+        }
+
+        Ok(WorkGraph { nodes, edges })
+    }
+
     pub fn list_events(&self) -> Result<Vec<PlanningEvent>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
@@ -2372,6 +2833,7 @@ impl PlanningStore {
             issue_count: count_table(&connection, "issues")?,
             review_point_count: count_table(&connection, "review_points")?,
             insight_count: count_table(&connection, "insights")?,
+            project_run_count: count_table(&connection, "project_runs")?,
         })
     }
 
@@ -2747,6 +3209,29 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
         CREATE INDEX IF NOT EXISTS idx_insights_correlation ON insights(correlation_id);
         CREATE INDEX IF NOT EXISTS idx_insights_status ON insights(status);
 
+        CREATE TABLE IF NOT EXISTS project_runs (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+            roadmap_id TEXT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
+            work_point_id TEXT NOT NULL REFERENCES work_points(id) ON DELETE CASCADE,
+            repo_id TEXT,
+            branch TEXT,
+            worktree_id TEXT,
+            session_id TEXT,
+            run_id TEXT,
+            profile_id TEXT,
+            status TEXT NOT NULL,
+            evidence_json TEXT NOT NULL,
+            revision INTEGER NOT NULL,
+            claimed_at TEXT,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_runs_work_point ON project_runs(work_point_id, status);
+        CREATE INDEX IF NOT EXISTS idx_project_runs_roadmap ON project_runs(roadmap_id, status);
+
         CREATE TABLE IF NOT EXISTS tag_index (
             scope_key TEXT NOT NULL,
             entity_type TEXT NOT NULL,
@@ -2792,18 +3277,25 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v1_to_v2(connection)?;
             migrate_v2_to_v3(connection)?;
             migrate_v3_to_v4(connection)?;
-            migrate_v4_to_v5(connection)
+            migrate_v4_to_v5(connection)?;
+            migrate_v5_to_v6(connection)
         }
         Some("2") => {
             migrate_v2_to_v3(connection)?;
             migrate_v3_to_v4(connection)?;
-            migrate_v4_to_v5(connection)
+            migrate_v4_to_v5(connection)?;
+            migrate_v5_to_v6(connection)
         }
         Some("3") => {
             migrate_v3_to_v4(connection)?;
-            migrate_v4_to_v5(connection)
+            migrate_v4_to_v5(connection)?;
+            migrate_v5_to_v6(connection)
         }
-        Some("4") => migrate_v4_to_v5(connection),
+        Some("4") => {
+            migrate_v4_to_v5(connection)?;
+            migrate_v5_to_v6(connection)
+        }
+        Some("5") => migrate_v5_to_v6(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -3021,6 +3513,41 @@ fn migrate_v4_to_v5(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
             )?;
         }
     }
+
+    connection.execute(
+        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+    )?;
+    Ok(())
+}
+
+fn migrate_v5_to_v6(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS project_runs (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            goal_id TEXT NOT NULL REFERENCES goals(id) ON DELETE CASCADE,
+            roadmap_id TEXT NOT NULL REFERENCES roadmaps(id) ON DELETE CASCADE,
+            work_point_id TEXT NOT NULL REFERENCES work_points(id) ON DELETE CASCADE,
+            repo_id TEXT,
+            branch TEXT,
+            worktree_id TEXT,
+            session_id TEXT,
+            run_id TEXT,
+            profile_id TEXT,
+            status TEXT NOT NULL,
+            evidence_json TEXT NOT NULL DEFAULT '{}',
+            revision INTEGER NOT NULL DEFAULT 1,
+            claimed_at TEXT,
+            completed_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_project_runs_work_point ON project_runs(work_point_id, status);
+        CREATE INDEX IF NOT EXISTS idx_project_runs_roadmap ON project_runs(roadmap_id, status);
+        "#,
+    )?;
 
     connection.execute(
         "UPDATE planning_config SET value = ?2 WHERE key = ?1",
@@ -3286,6 +3813,7 @@ fn ensure_entity_exists(
             .map(|_| ())
             .map_err(|error| map_not_found(error, EntityType::ReviewPoint, entity_id)),
         EntityType::Insight => load_insight(connection, entity_id).map(|_| ()),
+        EntityType::ProjectRun => load_project_run(connection, entity_id).map(|_| ()),
     };
 
     match lookup {
@@ -3433,6 +3961,7 @@ fn scope_key_for_entity(
         EntityType::Issue => "SELECT scope_key FROM issues WHERE id = ?1",
         EntityType::ReviewPoint => "SELECT scope_key FROM review_points WHERE id = ?1",
         EntityType::Insight => "SELECT scope_key FROM insights WHERE id = ?1",
+        EntityType::ProjectRun => "SELECT scope_key FROM project_runs WHERE id = ?1",
     };
 
     connection
@@ -3900,6 +4429,11 @@ pub(crate) fn collect_entities(
         EntityType::ReviewPoint,
     )?);
     entities.extend(entity_ids(connection, "insights", EntityType::Insight)?);
+    entities.extend(entity_ids(
+        connection,
+        "project_runs",
+        EntityType::ProjectRun,
+    )?);
     Ok(entities)
 }
 
@@ -3959,6 +4493,10 @@ pub(crate) fn attached_entity_correlation_id(
         }
         EntityType::Issue => Ok(load_issue(connection, entity_id)?.correlation_id),
         EntityType::Insight => Ok(load_insight(connection, entity_id)?.correlation_id),
+        EntityType::ProjectRun => {
+            let run = load_project_run(connection, entity_id)?;
+            roadmap_correlation_id(connection, &run.roadmap_id)
+        }
         EntityType::RoadmapSection => {
             let section = connection
                 .query_row(
@@ -4209,6 +4747,7 @@ fn entity_revision(
         EntityType::Issue => ("issues", "id"),
         EntityType::ReviewPoint => ("review_points", "id"),
         EntityType::Insight => ("insights", "id"),
+        EntityType::ProjectRun => ("project_runs", "id"),
     };
     let sql = format!("SELECT revision FROM {table} WHERE {id_column} = ?1");
     connection
@@ -4717,6 +5256,33 @@ fn row_to_insight(row: &Row<'_>) -> Result<InsightRecord, rusqlite::Error> {
     })
 }
 
+fn row_to_project_run(row: &Row<'_>) -> Result<ProjectRunRecord, rusqlite::Error> {
+    Ok(ProjectRunRecord {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        goal_id: row.get(2)?,
+        roadmap_id: row.get(3)?,
+        work_point_id: row.get(4)?,
+        repo_id: row.get(5)?,
+        branch: row.get(6)?,
+        worktree_id: row.get(7)?,
+        session_id: row.get(8)?,
+        run_id: row.get(9)?,
+        profile_id: row.get(10)?,
+        status: parse_project_run_status(row.get::<_, String>(11)?)?,
+        evidence: parse_json_column(row.get::<_, String>(12)?)?,
+        revision: row.get(13)?,
+        claimed_at: row.get(14)?,
+        completed_at: row.get(15)?,
+        created_at: row.get(16)?,
+        updated_at: row.get(17)?,
+    })
+}
+
+fn parse_project_run_status(value: String) -> Result<ProjectRunStatus, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
 fn parse_insight_status(value: String) -> Result<InsightStatus, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
@@ -4736,6 +5302,19 @@ pub(crate) fn load_insight(
             row_to_insight,
         )
         .map_err(|error| map_not_found(error, EntityType::Insight, id))
+}
+
+pub(crate) fn load_project_run(
+    connection: &Connection,
+    id: &str,
+) -> Result<ProjectRunRecord, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE id = ?1",
+            params![id],
+            row_to_project_run,
+        )
+        .map_err(|error| map_not_found(error, EntityType::ProjectRun, id))
 }
 
 pub(crate) fn list_insights_for_entity_in_scope(
@@ -4941,6 +5520,9 @@ fn load_entity_json(
                 )
                 .map_err(|e| map_not_found(e, EntityType::RoadmapSection, entity_id))?;
             serde_json::to_string(&section)
+        }
+        EntityType::ProjectRun => {
+            serde_json::to_string(&load_project_run(connection, entity_id)?)
         }
     };
     let text = json_str.map_err(PlanningStoreError::from)?;

@@ -28,7 +28,16 @@ pub(crate) fn validate_entity(
         EntityType::Issue => validate_issue(connection, entity_id),
         EntityType::ReviewPoint => validate_review_point(connection, entity_id),
         EntityType::Insight => validate_insight(connection, entity_id),
+        EntityType::ProjectRun => validate_project_run(connection, entity_id),
     }
+}
+
+fn validate_project_run(
+    connection: &Connection,
+    project_run_id: &str,
+) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
+    let _ = crate::storage::load_project_run(connection, project_run_id)?;
+    Ok(Vec::new())
 }
 
 fn validate_goal(

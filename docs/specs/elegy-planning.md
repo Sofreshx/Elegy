@@ -6,6 +6,30 @@ owner: Elegy
 
 # elegy-planning: Durable Planning Authority
 
+## Problem
+
+Before `elegy-planning`, Elegy had two overlapping but underspecified planning surfaces: unqueryable Markdown roadmaps under `docs/roadmaps/` and retrospective-only observations in `elegy-memory`. Forward-looking execution intent — goals, plans, validation — had no structured, queryable, programmatically traversable home.
+
+See [What and Why](#what-and-why) for the full problem breakdown.
+
+## Goals
+
+1. Provide a standalone CLI and SQLite-backed store for durable planning state: goals, roadmaps, plans, todos, issues, review points, insights, validation findings, and event history.
+2. Ensure deterministic validation with automated checks on every write.
+3. Enforce scope isolation between workspace, user, agent, and session scopes.
+4. Produce machine-first JSON output with versioned envelopes and correlation IDs.
+5. Keep state queryable via SQL, FTS5 full-text search, and tag indexes.
+
+## Non-Goals
+
+- Do not replace `elegy-memory`. Planning addresses forward execution intent; memory handles distilled retrospective observations. See [Relationship to elegy-memory](#relationship-to-elegy-memory).
+- Do not enforce lifecycle state transitions at the type level in the MVP (deferred to v1).
+- Do not provide event replay or subscription/push APIs in the MVP.
+- Do not auto-score prose quality or architectural soundness.
+- Do not provide compatibility import from `instruction-engine` Markdown conventions.
+
+See [Critical Analysis](#critical-analysis) for a full discussion of scope boundaries and deferred features.
+
 ## What and Why
 
 `elegy-planning` is a standalone CLI and SQLite-backed store for durable planning state:
@@ -76,6 +100,37 @@ are we stuck, and is this ready to ship?"
 They are independent systems that serve complementary roles. A plan reaching completion
 might produce a memory observation about what was learned; a memory about a failed
 approach might inform why a goal was invalidated. But neither replaces the other.
+
+## Behavior
+
+`elegy-planning` exposes deterministic CRUD and validation commands through a CLI with structured JSON output. Every mutation goes through a preflight gate (parent refs, scope match), writes current state and events to SQLite atomically, then runs advisory validators. The write is never rolled back on validation failure — invalid state still exists but carries a `validation` payload describing what is wrong.
+
+Every command supports the machine envelope: versioned schema, correlation ID, non-interactive flag, structured data, typed errors.
+
+See [CLI Interface](#cli-interface) for the full command reference and [Write Path](#write-path) for the mutation pipeline.
+
+## Acceptance Criteria
+
+- [ ] `elegy-planning --help` lists all commands with descriptions
+- [ ] `goal create --title "MVP"` produces a goal with a stable ID and stored validation findings
+- [ ] `plan create --goal-id <id> --roadmap-id <id>` enforces goal-roadmap match at preflight
+- [ ] `validate all` reports all validation findings without side effects
+- [ ] `--json` on every command produces a valid versioned envelope
+
+## Validation
+
+```
+cargo test -p elegy-planning
+```
+
+The validation engine runs automatically after every mutation. See [Validation Engine](#validation-engine) for the full rule set and [Appendix: Example Workflow](#appendix-example-workflow) for a walkthrough.
+
+## Links
+
+- Source crate: `rust/crates/elegy-planning/`
+- Spec: This document
+- Architecture: TBD
+- ADR: TBD
 
 ---
 
