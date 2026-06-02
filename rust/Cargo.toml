@@ -37,8 +37,8 @@ edition = "2021"
 rust-version = "1.88"
 license = "Apache-2.0"
 authors = ["Elegy Contributors"]
-repository = "https://github.com/Sofreshx/Elegy"
-homepage = "https://github.com/Sofreshx/Elegy"
+repository = "https://github.com/sfrsh/Elegy"
+homepage = "https://github.com/sfrsh/Elegy"
 documentation = "https://github.com/Sofreshx/Elegy/blob/main/README.md"
 readme = "../README.md"
 

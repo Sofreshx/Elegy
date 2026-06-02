@@ -10,8 +10,8 @@ pub use error::PlanningStoreError;
 pub use model::*;
 pub use service::{PlanningContext, PlanningService, PlanningServiceConfig};
 pub use storage::{
-    AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput, ClaimProjectRunInput,
-    CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
+    ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
     CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, PlanningStore,
     ReleaseProjectRunInput, RevisePlanInput, SearchInput, UpdateStatusInput,
 };

@@ -3,14 +3,13 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use crate::{
-    AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput, ClaimProjectRunInput,
-    CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
+    ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
     CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalView, InsightView,
-    IssueView, MutationResult, PlanView, PlanningHealthReport, PlanningStore,
-    PlanningStoreError, ProjectRunRecord, ProjectRunView, ProjectionFormat,
-    ReleaseProjectRunInput, RenderedProjection, RevisePlanInput, RoadmapView, RunnableCandidates,
-    ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport, WorkGraph, WorkPointRecord,
-    WorkPointView,
+    IssueView, MutationResult, PlanView, PlanningHealthReport, PlanningStore, PlanningStoreError,
+    ProjectRunRecord, ProjectRunView, ProjectionFormat, ReleaseProjectRunInput, RenderedProjection,
+    RevisePlanInput, RoadmapView, RunnableCandidates, ScopeRecord, TagInfo, UpdateStatusInput,
+    ValidationRunReport, WorkGraph, WorkPointRecord, WorkPointView,
 };
 
 #[derive(Clone, Debug)]
@@ -336,6 +335,16 @@ impl PlanningService {
         self.store.release_project_run(input)
     }
 
+    pub fn activate_project_run(
+        &self,
+        context: &PlanningContext,
+        mut input: ActivateProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        input.active_scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.activate_project_run(input)
+    }
+
     pub fn add_project_run_evidence(
         &self,
         context: &PlanningContext,
@@ -347,7 +356,8 @@ impl PlanningService {
     }
 
     pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
-        self.store.list_project_runs_in_scope(&self.config.scope_key)
+        self.store
+            .list_project_runs_in_scope(&self.config.scope_key)
     }
 
     pub fn project_run(&self, id: &str) -> Result<ProjectRunView, PlanningStoreError> {
@@ -372,13 +382,11 @@ impl PlanningService {
             &view.roadmap.scope_key,
             &self.config.scope_key,
         )?;
+        self.store.validate_all()?;
         self.store.find_runnable_work_points(roadmap_id)
     }
 
-    pub fn build_work_graph(
-        &self,
-        roadmap_id: &str,
-    ) -> Result<WorkGraph, PlanningStoreError> {
+    pub fn build_work_graph(&self, roadmap_id: &str) -> Result<WorkGraph, PlanningStoreError> {
         let view = self.store.roadmap(roadmap_id)?;
         ensure_scope_match(
             "roadmap",
@@ -386,6 +394,7 @@ impl PlanningService {
             &view.roadmap.scope_key,
             &self.config.scope_key,
         )?;
+        self.store.validate_all()?;
         self.store.build_work_graph(roadmap_id)
     }
 }

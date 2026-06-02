@@ -49,7 +49,7 @@
       "authorityClass": "current",
       "created": "2026-05-25",
       "docKind": "adr",
-      "freshness": "unknown",
+      "freshness": "fresh",
       "path": "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
       "sourceOfTruth": "current-canon",
       "status": "accepted",
@@ -60,7 +60,7 @@
       "authorityClass": "current",
       "created": "2026-05-29",
       "docKind": "adr",
-      "freshness": "unknown",
+      "freshness": "fresh",
       "path": "docs/adr/README.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
@@ -70,7 +70,7 @@
     {
       "authorityClass": "current",
       "docKind": "spec",
-      "freshness": "unknown",
+      "freshness": "fresh",
       "path": "docs/specs/README.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
@@ -80,7 +80,7 @@
     {
       "authorityClass": "current",
       "docKind": "spec",
-      "freshness": "unknown",
+      "freshness": "fresh",
       "path": "docs/specs/documentation-practices-skill-and-cli.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
@@ -89,13 +89,26 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-05-25",
+      "updated": "2026-06-02",
       "docKind": "spec",
-      "freshness": "unknown",
+      "freshness": "fresh",
       "path": "docs/specs/elegy-planning.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "title: elegy-planning Spec",
+      "summary": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.",
       "title": "elegy-planning Spec"
+    },
+    {
+      "authorityClass": "current",
+      "created": "2026-06-02",
+      "docKind": "architecture",
+      "freshness": "fresh",
+      "path": "docs/architecture/elegy-planning-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "Architecture mirror for the elegy-planning durable planning surface, mirroring the elegy-memory-v1 and elegy-configuration-v1 layout.",
+      "title": "Elegy-planning V1"
     }
   ],
   "entrypoints": [
@@ -114,7 +127,8 @@
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/documentation-practices-skill-and-cli.md",
-    "docs/specs/elegy-planning.md"
+    "docs/specs/elegy-planning.md",
+    "docs/architecture/elegy-planning-v1.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

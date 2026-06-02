@@ -17,9 +17,8 @@ use elegy_configuration::{
     VerifyConfigurationRequest,
 };
 use elegy_contracts::{
-    export_contract_bundle, AgentCapabilityProfile,
-    ContractsBundleExport, ContractsError, ObservationSession,
-    AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
+    export_contract_bundle, AgentCapabilityProfile, ContractsBundleExport, ContractsError,
+    ObservationSession, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
 use elegy_core::{
     compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,

@@ -204,6 +204,13 @@ pub struct ClaimProjectRunInput {
 }
 
 #[derive(Clone, Debug)]
+pub struct ActivateProjectRunInput {
+    pub project_run_id: String,
+    pub active_scope_key: Option<String>,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub struct ReleaseProjectRunInput {
     pub project_run_id: String,
     pub status: ProjectRunStatus,
@@ -2402,7 +2409,7 @@ impl PlanningStore {
         )?;
 
         let active_count: i64 = transaction.query_row(
-            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active')",
+            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
             params![input.work_point_id],
             |row| row.get(0),
         )?;
@@ -2466,9 +2473,7 @@ impl PlanningStore {
             ],
         )?;
 
-        let correlation_id = input
-            .correlation_id
-            .unwrap_or_else(|| format!("corr-{id}"));
+        let correlation_id = input.correlation_id.unwrap_or_else(|| format!("corr-{id}"));
         append_event(
             &transaction,
             build_event(
@@ -2485,11 +2490,69 @@ impl PlanningStore {
         )?;
 
         let validation = validate_and_store(&transaction, EntityType::ProjectRun, &id)?;
-        let _ = refresh_validation_target(
+        let _ =
+            refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn activate_project_run(
+        &self,
+        input: ActivateProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        require_non_empty("projectRunId", &input.project_run_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
             &transaction,
-            EntityType::WorkPoint,
-            &record.work_point_id,
+            EntityType::ProjectRun,
+            &input.project_run_id,
+            &active_scope_key,
         )?;
+
+        let existing = load_project_run(&transaction, &input.project_run_id)?;
+        if existing.status != ProjectRunStatus::Claimed {
+            return Err(PlanningStoreError::ProjectRunStatusMismatch {
+                expected: "claimed".to_string(),
+                actual: existing.status.to_string(),
+            });
+        }
+
+        let now = now_string()?;
+
+        transaction.execute(
+            r#"
+            UPDATE project_runs SET
+                status = ?1,
+                revision = revision + 1,
+                updated_at = ?2
+            WHERE id = ?3
+            "#,
+            params![ProjectRunStatus::Active.as_str(), now, input.project_run_id],
+        )?;
+
+        let record = load_project_run(&transaction, &input.project_run_id)?;
+        let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &record.id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &correlation_id,
+                input.run_id,
+                "project-run.activated",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
+        let _ =
+            refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -2511,10 +2574,12 @@ impl PlanningStore {
         )?;
 
         let existing = load_project_run(&transaction, &input.project_run_id)?;
-        if existing.status != ProjectRunStatus::Claimed && existing.status != ProjectRunStatus::Active
+        if existing.status != ProjectRunStatus::Claimed
+            && existing.status != ProjectRunStatus::Active
+            && existing.status != ProjectRunStatus::Interrupted
         {
             return Err(PlanningStoreError::ProjectRunStatusMismatch {
-                expected: "claimed or active".to_string(),
+                expected: "claimed, active, or interrupted".to_string(),
                 actual: existing.status.to_string(),
             });
         }
@@ -2564,11 +2629,8 @@ impl PlanningStore {
         )?;
 
         let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
-        let _ = refresh_validation_target(
-            &transaction,
-            EntityType::WorkPoint,
-            &record.work_point_id,
-        )?;
+        let _ =
+            refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -2589,7 +2651,15 @@ impl PlanningStore {
             &active_scope_key,
         )?;
 
-        let _existing = load_project_run(&transaction, &input.project_run_id)?;
+        let existing = load_project_run(&transaction, &input.project_run_id)?;
+        if existing.status == ProjectRunStatus::Completed
+            || existing.status == ProjectRunStatus::Released
+        {
+            return Err(PlanningStoreError::ProjectRunStatusMismatch {
+                expected: "claimed or active".to_string(),
+                actual: existing.status.to_string(),
+            });
+        }
         let now = now_string()?;
 
         transaction.execute(
@@ -2625,9 +2695,7 @@ impl PlanningStore {
         Ok(MutationResult { record, validation })
     }
 
-    pub fn list_project_runs(
-        &self,
-    ) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
+    pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
             "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs ORDER BY updated_at DESC, id ASC",
@@ -2644,7 +2712,10 @@ impl PlanningStore {
         let mut statement = connection.prepare(
             "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
-        let rows = statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_project_run)?;
+        let rows = statement.query_map(
+            params![normalize_scope_key_value(scope_key)],
+            row_to_project_run,
+        )?;
         collect_rows(rows)
     }
 
@@ -2749,10 +2820,7 @@ impl PlanningStore {
         })
     }
 
-    pub fn build_work_graph(
-        &self,
-        roadmap_id: &str,
-    ) -> Result<WorkGraph, PlanningStoreError> {
+    pub fn build_work_graph(&self, roadmap_id: &str) -> Result<WorkGraph, PlanningStoreError> {
         require_non_empty("roadmapId", roadmap_id)?;
 
         let connection = self.open_connection()?;
@@ -2770,7 +2838,7 @@ impl PlanningStore {
                 .unwrap_or(0);
             let has_active_lease: bool = connection
                 .query_row(
-                    "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active')",
+                    "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
                     params![wp.id],
                     |row| row.get::<_, i64>(0),
                 )
@@ -5521,9 +5589,7 @@ fn load_entity_json(
                 .map_err(|e| map_not_found(e, EntityType::RoadmapSection, entity_id))?;
             serde_json::to_string(&section)
         }
-        EntityType::ProjectRun => {
-            serde_json::to_string(&load_project_run(connection, entity_id)?)
-        }
+        EntityType::ProjectRun => serde_json::to_string(&load_project_run(connection, entity_id)?),
     };
     let text = json_str.map_err(PlanningStoreError::from)?;
     serde_json::from_str(&text).map_err(PlanningStoreError::from)
