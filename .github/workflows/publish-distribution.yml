@@ -1,5 +1,7 @@
 name: Publish Distribution
 
+# surface: elegy-obsidian (wrapper-only; packaged via scripts/package-wrapper-surface.ps1, not the CLI matrix above)
+
 on:
   push:
     branches:
@@ -29,9 +31,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Validate canonical authority inventory
         shell: pwsh
@@ -138,9 +138,8 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
-          toolchain: 1.95.0
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2.9.1
@@ -169,7 +168,7 @@ jobs:
       - name: Package wrapper archives
         shell: pwsh
         run: |
-          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration,elegy-documentation
+          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration,elegy-documentation,elegy-obsidian
 
       - name: Validate wrapper archives
         shell: pwsh
@@ -188,6 +187,7 @@ jobs:
             artifacts/distribution/elegy-skills-wrapper-*.zip
             artifacts/distribution/elegy-configuration-wrapper-*.zip
             artifacts/distribution/elegy-documentation-wrapper-*.zip
+            artifacts/distribution/elegy-obsidian-wrapper-*.zip
 
   package-installer:
     runs-on: ubuntu-latest

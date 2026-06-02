@@ -14,7 +14,7 @@ authority surface.
 - `contracts/fixtures/skill-definition-v2.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
 - `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
 - `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs configured by `.elegy/docs.yaml`.
-- `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release surfaces.
+- `src/Elegy-memory`, `src/Elegy-mcp`, `src/Elegy-skills`, `src/Elegy-planning`, `src/Elegy-configuration`, `src/Elegy-documentation`, and `src/Elegy-mermaid` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release surfaces.
 
 ## Start Here
 

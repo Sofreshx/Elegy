@@ -1,8 +1,10 @@
+---
 created: 2026-03-24
 updated: 2026-05-28
 category: governance
 status: active
 doc_kind: reference
+---
 
 # Unresolved Goals
 

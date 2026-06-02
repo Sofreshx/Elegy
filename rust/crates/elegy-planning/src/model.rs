@@ -185,26 +185,21 @@ string_enum!(ProjectRunStatus {
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
+pub struct WarningRecord {
+    pub level: String,
+    pub message: String,
+    pub source: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "camelCase")]
 pub struct ProjectRunEvidence {
     pub implementation_run_refs: Vec<String>,
-    pub warning_records: Vec<String>,
+    pub warning_records: Vec<WarningRecord>,
     pub validation_finding_refs: Vec<String>,
     pub commit_sha: Option<String>,
     pub pr_url: Option<String>,
     pub linked_spec_ids: Vec<String>,
-}
-
-impl Default for ProjectRunEvidence {
-    fn default() -> Self {
-        Self {
-            implementation_run_refs: Vec::new(),
-            warning_records: Vec::new(),
-            validation_finding_refs: Vec::new(),
-            commit_sha: None,
-            pr_url: None,
-            linked_spec_ids: Vec::new(),
-        }
-    }
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]

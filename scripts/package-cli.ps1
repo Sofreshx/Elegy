@@ -1,11 +1,15 @@
 [CmdletBinding()]
 param(
-    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills', 'elegy-configuration', 'elegy-documentation')]
+    [ValidateSet('elegy-cli', 'elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills', 'elegy-configuration', 'elegy-documentation', 'elegy-obsidian')]
     [string]$Surface = 'elegy-cli',
     [string]$Target = '',
     [string]$OutputDirectory = '',
     [switch]$SkipBuild
 )
+
+# elegy-obsidian is a wrapper-only surface: it wraps the user's installed Obsidian Desktop CLI
+# and ships no Rust binary. Use scripts/package-wrapper-surface.ps1 -Surface elegy-obsidian
+# to stage the wrapper archive; do not invoke this script with -Surface elegy-obsidian.
 
 $ErrorActionPreference = 'Stop'
 
@@ -74,6 +78,9 @@ function Get-DistributionSurfaceMetadata {
                 Binary = 'elegy-documentation'
                 AssetPrefix = 'elegy-documentation'
             }
+        }
+        'elegy-obsidian' {
+            throw "elegy-obsidian is a wrapper-only surface and has no Rust CLI binary. Use scripts/package-wrapper-surface.ps1 -Surface elegy-obsidian to stage its wrapper archive."
         }
         default {
             throw "Unsupported distribution surface: $SurfaceName"

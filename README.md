@@ -285,6 +285,11 @@ The same profile filters the MCP tool list. MCP should be treated as an adapter
 over governed skills and CLI behavior, not as the primary Elegy integration
 model.
 
+Side-effecting tools stay blocked unless the host explicitly opts in. Add
+`--allow-side-effects` when launching the MCP host if a downstream client
+needs to run tools that mutate local state, and prefer `--dry-run` for
+one-off invocations.
+
 ## Project Status
 
 - Elegy is public and installable today through GitHub Releases.

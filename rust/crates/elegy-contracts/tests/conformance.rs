@@ -411,6 +411,10 @@ fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
             "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
             ".agents/skills/elegy-mermaid/SKILL.md",
         ),
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-obsidian.json",
+            ".agents/skills/elegy-obsidian/SKILL.md",
+        ),
     ];
 
     for (fixture_path, expected_vault_ref) in fixtures {
@@ -954,8 +958,7 @@ fn upstream_dedicated_skill_definitions_round_trip_host_projection() {
         "re-serialized planning fixture should preserve hostProjection"
     );
 
-    let skills_reserialized =
-        serde_json::to_string(&skills).expect("re-serialize skills fixture");
+    let skills_reserialized = serde_json::to_string(&skills).expect("re-serialize skills fixture");
     let skills_reparsed: SkillDefinitionV2 =
         serde_json::from_str(&skills_reserialized).expect("reparse skills fixture");
     assert_eq!(skills, skills_reparsed);
@@ -1092,8 +1095,8 @@ fn skill_definition_validator_rejects_invalid_host_projection() {
         default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
         capability_projections: Vec::new(),
     });
-    let error = validate_skill_definition_v2(&blank_cli)
-        .expect_err("blank cliName should fail validation");
+    let error =
+        validate_skill_definition_v2(&blank_cli).expect_err("blank cliName should fail validation");
     assert!(error
         .to_string()
         .contains("hostProjection.cliName must not be empty"));
@@ -1125,21 +1128,20 @@ fn load_dedicated_plugin_package(
 fn dedicated_elegy_plugin_package_fixtures_are_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
 
-    let v1_planning =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v1.elegy-planning.json");
+    let v1_planning = load_dedicated_plugin_package(
+        &contracts_dir,
+        "elegy-plugin-package-v1.elegy-planning.json",
+    );
     let v1_skills =
         load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v1.elegy-skills.json");
-    let v2_planning =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-planning.json");
+    let v2_planning = load_dedicated_plugin_package(
+        &contracts_dir,
+        "elegy-plugin-package-v2.elegy-planning.json",
+    );
     let v2_skills =
         load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-skills.json");
 
-    for package in [
-        &v1_planning,
-        &v1_skills,
-        &v2_planning,
-        &v2_skills,
-    ] {
+    for package in [&v1_planning, &v1_skills, &v2_planning, &v2_skills] {
         let validation = validate_elegy_plugin_package(package);
         assert!(
             validation.is_valid(),
@@ -1166,8 +1168,10 @@ fn dedicated_elegy_plugin_package_fixtures_are_semantically_valid() {
 fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projection() {
     let contracts_dir = resolve_upstream_contracts_dir();
 
-    let planning_package =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-planning.json");
+    let planning_package = load_dedicated_plugin_package(
+        &contracts_dir,
+        "elegy-plugin-package-v2.elegy-planning.json",
+    );
     let skills_package =
         load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-skills.json");
 
@@ -1235,10 +1239,9 @@ fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projectio
     let skills_skill_path = contracts_dir
         .join("fixtures")
         .join("skill-definition-v2.elegy-skills.json");
-    let skills_skill: SkillDefinitionV2 = serde_json::from_str(
-        &fs::read_to_string(&skills_skill_path).expect("read skills skill"),
-    )
-    .expect("parse skills skill");
+    let skills_skill: SkillDefinitionV2 =
+        serde_json::from_str(&fs::read_to_string(&skills_skill_path).expect("read skills skill"))
+            .expect("parse skills skill");
     let skills_skill_projection = skills_skill
         .host_projection
         .as_ref()
