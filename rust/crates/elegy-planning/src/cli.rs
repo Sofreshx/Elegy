@@ -6,12 +6,13 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
-    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
-    FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
-    PlanningStore, Priority, ProjectionFormat, ReviewPointStatus, RevisePlanInput, RoadmapStatus,
-    SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
+    AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput, ClaimProjectRunInput,
+    CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
+    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus, InsightStatus,
+    InsightType, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectRunEvidence,
+    ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput,
+    RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -111,6 +112,10 @@ enum Command {
     },
     Context(ContextArgs),
     Tags(TagsArgs),
+    ProjectRun {
+        #[command(subcommand)]
+        command: ProjectRunCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -138,6 +143,8 @@ enum WorkPointCommand {
     List,
     Show(WorkPointShowArgs),
     UpdateStatus(WorkPointUpdateStatusArgs),
+    NextRunnable(WorkPointNextRunnableArgs),
+    WorkGraph(WorkPointWorkGraphArgs),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -655,6 +662,75 @@ struct WorkPointUpdateStatusArgs {
 }
 
 #[derive(Args, Debug)]
+struct WorkPointNextRunnableArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointWorkGraphArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+}
+
+#[derive(Subcommand, Debug)]
+enum ProjectRunCommand {
+    Claim(ProjectRunClaimArgs),
+    Release(ProjectRunReleaseArgs),
+    AddEvidence(ProjectRunAddEvidenceArgs),
+    List,
+    Show(ProjectRunShowArgs),
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunClaimArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long = "goal-id")]
+    goal_id: String,
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+    #[arg(long = "repo-id")]
+    repo_id: Option<String>,
+    #[arg(long)]
+    branch: Option<String>,
+    #[arg(long = "worktree-id")]
+    worktree_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
+    #[arg(long = "profile-id")]
+    profile_id: Option<String>,
+    #[arg(long = "correlation-id")]
+    correlation_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunReleaseArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+    #[arg(long, value_enum)]
+    status: ProjectRunStatus,
+    #[arg(long = "evidence-json")]
+    evidence_json: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunAddEvidenceArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+    #[arg(long = "evidence-json")]
+    evidence_json: String,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunShowArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+}
+
+#[derive(Args, Debug)]
 struct ProjectRenderArgs {
     #[arg(long = "entity-type", value_enum)]
     entity_type: EntityType,
@@ -762,6 +838,85 @@ where
         Command::Insight { command } => execute_insight(command, &store, &context),
         Command::Context(args) => execute_context(args, &store, &context),
         Command::Tags(args) => execute_tags(args, &store, &context),
+        Command::ProjectRun { command } => execute_project_run(command, &store, &context),
+    }
+}
+
+fn execute_project_run(
+    command: ProjectRunCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        ProjectRunCommand::Claim(args) => emit_success(
+            context,
+            vec!["project-run", "claim"],
+            store.claim_project_run(ClaimProjectRunInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                goal_id: args.goal_id,
+                roadmap_id: args.roadmap_id,
+                work_point_id: args.work_point_id,
+                repo_id: args.repo_id,
+                branch: args.branch,
+                worktree_id: args.worktree_id,
+                session_id: args.session_id,
+                run_id: context.correlation_id.clone(),
+                profile_id: args.profile_id,
+                correlation_id: args.correlation_id,
+            })?,
+        ),
+        ProjectRunCommand::Release(args) => {
+            let evidence = match args.evidence_json {
+                Some(json_str) => Some(serde_json::from_str::<ProjectRunEvidence>(&json_str)?),
+                None => None,
+            };
+            emit_success(
+                context,
+                vec!["project-run", "release"],
+                store.release_project_run(ReleaseProjectRunInput {
+                    project_run_id: args.project_run_id,
+                    status: args.status,
+                    evidence,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        ProjectRunCommand::AddEvidence(args) => {
+            let evidence: ProjectRunEvidence =
+                serde_json::from_str(&args.evidence_json)?;
+            emit_success(
+                context,
+                vec!["project-run", "add-evidence"],
+                store.add_project_run_evidence(AddEvidenceInput {
+                    project_run_id: args.project_run_id,
+                    evidence,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        ProjectRunCommand::List => emit_success(
+            context,
+            vec!["project-run", "list"],
+            json!({ "projectRuns": store.list_project_runs_in_scope(&context.scope_key)? }),
+        ),
+        ProjectRunCommand::Show(args) => {
+            let view = store.project_run(&args.project_run_id)?;
+            if view.project_run.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["project-run", "show"],
+                    format!(
+                        "project run `{}` is in scope `{}`, not `{}`",
+                        args.project_run_id, view.project_run.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["project-run", "show"], view)
+        }
     }
 }
 
@@ -1040,6 +1195,16 @@ fn execute_work_point(
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
             })?,
+        ),
+        WorkPointCommand::NextRunnable(args) => emit_success(
+            context,
+            vec!["work-point", "next-runnable"],
+            store.find_runnable_work_points(&args.roadmap_id)?,
+        ),
+        WorkPointCommand::WorkGraph(args) => emit_success(
+            context,
+            vec!["work-point", "work-graph"],
+            store.build_work_graph(&args.roadmap_id)?,
         ),
     }
 }
@@ -1763,6 +1928,10 @@ fn command_path(command: &Command) -> Vec<String> {
         ],
         Command::Context(_) => vec!["context".to_string()],
         Command::Tags(_) => vec!["tags".to_string()],
+        Command::ProjectRun { command } => vec![
+            "project-run".to_string(),
+            project_run_command_name(command).to_string(),
+        ],
     }
 }
 
@@ -1801,6 +1970,18 @@ fn work_point_command_name(command: &WorkPointCommand) -> &'static str {
         WorkPointCommand::List => "list",
         WorkPointCommand::Show(_) => "show",
         WorkPointCommand::UpdateStatus(_) => "update-status",
+        WorkPointCommand::NextRunnable(_) => "next-runnable",
+        WorkPointCommand::WorkGraph(_) => "work-graph",
+    }
+}
+
+fn project_run_command_name(command: &ProjectRunCommand) -> &'static str {
+    match command {
+        ProjectRunCommand::Claim(_) => "claim",
+        ProjectRunCommand::Release(_) => "release",
+        ProjectRunCommand::AddEvidence(_) => "add-evidence",
+        ProjectRunCommand::List => "list",
+        ProjectRunCommand::Show(_) => "show",
     }
 }
 

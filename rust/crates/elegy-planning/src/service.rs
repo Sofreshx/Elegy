@@ -3,11 +3,13 @@ use std::path::{Path, PathBuf};
 use serde_json::Value;
 
 use crate::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateInsightInput,
-    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput,
-    EntityType, GoalView, InsightView, IssueView, MutationResult, PlanView, PlanningHealthReport,
-    PlanningStore, PlanningStoreError, ProjectionFormat, RenderedProjection, RevisePlanInput,
-    RoadmapView, ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport, WorkPointRecord,
+    AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput, ClaimProjectRunInput,
+    CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalView, InsightView,
+    IssueView, MutationResult, PlanView, PlanningHealthReport, PlanningStore,
+    PlanningStoreError, ProjectRunRecord, ProjectRunView, ProjectionFormat,
+    ReleaseProjectRunInput, RenderedProjection, RevisePlanInput, RoadmapView, RunnableCandidates,
+    ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport, WorkGraph, WorkPointRecord,
     WorkPointView,
 };
 
@@ -312,6 +314,79 @@ impl PlanningService {
             format,
             output_path,
         )
+    }
+
+    pub fn claim_project_run(
+        &self,
+        context: &PlanningContext,
+        mut input: ClaimProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        input.scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.claim_project_run(input)
+    }
+
+    pub fn release_project_run(
+        &self,
+        context: &PlanningContext,
+        mut input: ReleaseProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        input.active_scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.release_project_run(input)
+    }
+
+    pub fn add_project_run_evidence(
+        &self,
+        context: &PlanningContext,
+        mut input: AddEvidenceInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        input.active_scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.add_project_run_evidence(input)
+    }
+
+    pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
+        self.store.list_project_runs_in_scope(&self.config.scope_key)
+    }
+
+    pub fn project_run(&self, id: &str) -> Result<ProjectRunView, PlanningStoreError> {
+        let view = self.store.project_run(id)?;
+        ensure_scope_match(
+            "project run",
+            id,
+            &view.project_run.scope_key,
+            &self.config.scope_key,
+        )?;
+        Ok(view)
+    }
+
+    pub fn find_runnable_work_points(
+        &self,
+        roadmap_id: &str,
+    ) -> Result<RunnableCandidates, PlanningStoreError> {
+        let view = self.store.roadmap(roadmap_id)?;
+        ensure_scope_match(
+            "roadmap",
+            roadmap_id,
+            &view.roadmap.scope_key,
+            &self.config.scope_key,
+        )?;
+        self.store.find_runnable_work_points(roadmap_id)
+    }
+
+    pub fn build_work_graph(
+        &self,
+        roadmap_id: &str,
+    ) -> Result<WorkGraph, PlanningStoreError> {
+        let view = self.store.roadmap(roadmap_id)?;
+        ensure_scope_match(
+            "roadmap",
+            roadmap_id,
+            &view.roadmap.scope_key,
+            &self.config.scope_key,
+        )?;
+        self.store.build_work_graph(roadmap_id)
     }
 }
 

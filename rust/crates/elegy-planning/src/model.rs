@@ -46,7 +46,8 @@ string_enum!(EntityType {
     Todo => "todo",
     Issue => "issue",
     ReviewPoint => "review-point",
-    Insight => "insight"
+    Insight => "insight",
+    ProjectRun => "project-run"
 });
 
 string_enum!(GoalStatus {
@@ -172,6 +173,109 @@ string_enum!(InsightType {
     Risk => "risk",
     Context => "context"
 });
+
+string_enum!(ProjectRunStatus {
+    Suggested => "suggested",
+    Claimed => "claimed",
+    Active => "active",
+    Interrupted => "interrupted",
+    Completed => "completed",
+    Released => "released"
+});
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRunEvidence {
+    pub implementation_run_refs: Vec<String>,
+    pub warning_records: Vec<String>,
+    pub validation_finding_refs: Vec<String>,
+    pub commit_sha: Option<String>,
+    pub pr_url: Option<String>,
+    pub linked_spec_ids: Vec<String>,
+}
+
+impl Default for ProjectRunEvidence {
+    fn default() -> Self {
+        Self {
+            implementation_run_refs: Vec::new(),
+            warning_records: Vec::new(),
+            validation_finding_refs: Vec::new(),
+            commit_sha: None,
+            pr_url: None,
+            linked_spec_ids: Vec::new(),
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRunRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub goal_id: String,
+    pub roadmap_id: String,
+    pub work_point_id: String,
+    pub repo_id: Option<String>,
+    pub branch: Option<String>,
+    pub worktree_id: Option<String>,
+    pub session_id: Option<String>,
+    pub run_id: Option<String>,
+    pub profile_id: Option<String>,
+    pub status: ProjectRunStatus,
+    pub evidence: ProjectRunEvidence,
+    pub revision: i64,
+    pub claimed_at: Option<String>,
+    pub completed_at: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRunView {
+    pub project_run: ProjectRunRecord,
+    pub work_point: Option<WorkPointRecord>,
+    pub validation: ValidationReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunnableWorkPointCandidate {
+    pub work_point: WorkPointRecord,
+    pub roadmap_id: String,
+    pub roadmap_title: String,
+    pub dependency_titles: Vec<String>,
+    pub reasons: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RunnableCandidates {
+    pub roadmap_id: String,
+    pub candidates: Vec<RunnableWorkPointCandidate>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkGraphNode {
+    pub work_point: WorkPointRecord,
+    pub plan_count: usize,
+    pub has_active_lease: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkGraphEdge {
+    pub source_id: String,
+    pub target_id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkGraph {
+    pub nodes: Vec<WorkGraphNode>,
+    pub edges: Vec<WorkGraphEdge>,
+}
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -564,6 +668,7 @@ pub struct PlanningHealthReport {
     pub issue_count: i64,
     pub review_point_count: i64,
     pub insight_count: i64,
+    pub project_run_count: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
