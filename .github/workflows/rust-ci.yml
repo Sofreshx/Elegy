@@ -120,4 +120,4 @@ jobs:
           workspaces: rust -> rust/target
       - name: cargo run -p elegy-documentation -- check
         working-directory: ./rust
-        run: cargo run -p elegy-documentation -- --project .. check
+        run: cargo run -p elegy-documentation -- check --project ..
