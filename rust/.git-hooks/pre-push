@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+# NOTE: This hook has been migrated to the repo-root .githooks/ directory.
+# The active pre-push hook is now at .githooks/pre-push.
+# Use scripts/setup-hooks.ps1 to configure git to use the new hooks location.
+# This file is retained for reference.
 # Pre-push hook: enforce fmt + clippy before pushing to remote.
 # Install with: ln -sf .git-hooks/pre-push .git/hooks/pre-push
 set -euo pipefail
