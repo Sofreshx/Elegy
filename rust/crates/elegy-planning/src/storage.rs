@@ -12,19 +12,19 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
-    validation::validate_entity, EffortTier, EntityType, FileScopeRecord, FileScopeSelectorType,
-    GoalRecord, GoalStatus, GoalView, InsightRecord, InsightStatus, InsightType, InsightView,
-    IssueRecord, IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView,
-    PlanningEvent, PlanningHealthReport, PlanningStoreError, Priority, ProjectRunEvidence,
-    ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat, RenderedProjection,
-    ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord, RoadmapStatus,
-    RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord, Severity, TagInfo,
-    TodoRecord, TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport,
-    ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointRecord, WorkPointStatus,
-    WorkPointView,
+    validation::validate_entity, AttachWorktreeInput, EffortTier, EntityType, FileScopeRecord,
+    FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, InsightRecord, InsightStatus,
+    InsightType, InsightView, IssueRecord, IssueStatus, IssueView, MutationResult, PlanRecord,
+    PlanStatus, PlanView, PlanningEvent, PlanningHealthReport, PlanningStoreError, Priority,
+    ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat,
+    RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord,
+    RoadmapStatus, RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord,
+    SessionSummary, Severity, TagInfo, TodoRecord, TodoStatus, ValidationFinding, ValidationReport,
+    ValidationRunReport, ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode,
+    WorkPointRecord, WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "6";
+pub const CURRENT_SCHEMA_VERSION: &str = "7";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 const SQLITE_MAX_VARIABLES: usize = 999;
@@ -2695,6 +2695,166 @@ impl PlanningStore {
         Ok(MutationResult { record, validation })
     }
 
+    pub fn count_active_runs_for_session(
+        &self,
+        session_id: &str,
+    ) -> Result<i64, PlanningStoreError> {
+        let conn = self.open_connection()?;
+        let count: i64 = conn.query_row(
+            "SELECT COUNT(*) FROM project_runs WHERE session_id = ?1 AND status IN ('claimed','active','interrupted')",
+            params![session_id],
+            |row| row.get(0),
+        )?;
+        Ok(count)
+    }
+
+    /// Attach/register a worktree.
+    pub fn attach_worktree(
+        &self,
+        input: AttachWorktreeInput,
+    ) -> Result<WorktreeRecord, PlanningStoreError> {
+        let id = input.id.unwrap_or_else(new_id);
+        let scope_key = normalized_scope_key(input.scope_key.clone());
+        let now = now_string()?;
+
+        let conn = self.open_connection()?;
+        conn.execute(
+            "INSERT INTO worktrees (id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 'active', 1, ?8, ?8)
+             ON CONFLICT(id) DO UPDATE SET
+                repo_uri = excluded.repo_uri,
+                branch = excluded.branch,
+                worktree_path = excluded.worktree_path,
+                project_run_id = excluded.project_run_id,
+                session_id = excluded.session_id,
+                updated_at = excluded.updated_at,
+                revision = revision + 1;",
+            params![
+                id,
+                scope_key,
+                input.repo_uri,
+                input.branch,
+                input.worktree_path,
+                input.project_run_id,
+                input.session_id,
+                now,
+            ],
+        )?;
+
+        self.get_worktree(&id)
+    }
+
+    /// Get a worktree by ID.
+    pub fn get_worktree(&self, id: &str) -> Result<WorktreeRecord, PlanningStoreError> {
+        let conn = self.open_connection()?;
+        conn.query_row(
+            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(WorktreeRecord {
+                    id: row.get(0)?,
+                    scope_key: row.get(1)?,
+                    repo_uri: row.get(2)?,
+                    branch: row.get(3)?,
+                    worktree_path: row.get(4)?,
+                    project_run_id: row.get(5)?,
+                    session_id: row.get(6)?,
+                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    revision: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            },
+        )
+        .map_err(|e| {
+            PlanningStoreError::InvalidInput(format!("worktree not found: {id}: {e}"))
+        })
+    }
+
+    /// List worktrees in the current scope, with optional status filter.
+    pub fn list_worktrees(
+        &self,
+        status_filter: Option<&str>,
+    ) -> Result<Vec<WorktreeRecord>, PlanningStoreError> {
+        let conn = self.open_connection()?;
+        let scope_key = normalized_scope_key(None);
+        let status_val = status_filter.unwrap_or("active");
+
+        let sql = if status_filter.is_some() {
+            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE scope_key = ?1 AND status = ?2 ORDER BY created_at DESC".to_string()
+        } else {
+            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE scope_key = ?1 ORDER BY created_at DESC".to_string()
+        };
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows: Vec<WorktreeRecord> = if status_filter.is_some() {
+            stmt.query_map(params![scope_key, status_val], |row| {
+                Ok(WorktreeRecord {
+                    id: row.get(0)?, scope_key: row.get(1)?, repo_uri: row.get(2)?,
+                    branch: row.get(3)?, worktree_path: row.get(4)?, project_run_id: row.get(5)?,
+                    session_id: row.get(6)?, status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    revision: row.get(8)?, created_at: row.get(9)?, updated_at: row.get(10)?,
+                })
+            })?.filter_map(|r| r.ok()).collect()
+        } else {
+            stmt.query_map(params![scope_key], |row| {
+                Ok(WorktreeRecord {
+                    id: row.get(0)?, scope_key: row.get(1)?, repo_uri: row.get(2)?,
+                    branch: row.get(3)?, worktree_path: row.get(4)?, project_run_id: row.get(5)?,
+                    session_id: row.get(6)?, status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    revision: row.get(8)?, created_at: row.get(9)?, updated_at: row.get(10)?,
+                })
+            })?.filter_map(|r| r.ok()).collect()
+        };
+
+        Ok(rows)
+    }
+
+    /// Update worktree status.
+    pub fn update_worktree_status(
+        &self,
+        id: &str,
+        status: WorktreeStatus,
+    ) -> Result<WorktreeRecord, PlanningStoreError> {
+        let conn = self.open_connection()?;
+        let now = now_string()?;
+        conn.execute(
+            "UPDATE worktrees SET status = ?1, updated_at = ?2, revision = revision + 1 WHERE id = ?3",
+            params![status.to_string(), now, id],
+        )?;
+        self.get_worktree(id)
+    }
+
+    /// List recent sessions from the events table.
+    pub fn list_sessions(&self, limit: i64) -> Result<Vec<SessionSummary>, PlanningStoreError> {
+        let conn = self.open_connection()?;
+        let mut stmt = conn.prepare(
+            "SELECT
+                COALESCE(e.session_id, 'unknown') as sid,
+                COUNT(*) as event_count,
+                MAX(e.created_at) as last_seen,
+                (SELECT COUNT(*) FROM project_runs pr WHERE pr.session_id = e.session_id AND pr.status IN ('claimed','active','interrupted')) as active_runs
+             FROM planning_events e
+             WHERE e.session_id IS NOT NULL AND e.session_id != ''
+             GROUP BY e.session_id
+             ORDER BY last_seen DESC
+             LIMIT ?1"
+        )?;
+
+        let rows = stmt.query_map(params![limit], |row| {
+            Ok(SessionSummary {
+                session_id: row.get(0)?,
+                scope: String::new(),
+                created_at: None,
+                last_seen: row.get::<_, Option<String>>(2)?,
+                event_count: row.get(1)?,
+                active_project_runs: row.get(3)?,
+            })
+        })?;
+
+        Ok(rows.filter_map(|r| r.ok()).collect())
+    }
+
     pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
@@ -3364,6 +3524,7 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v5_to_v6(connection)
         }
         Some("5") => migrate_v5_to_v6(connection),
+        Some("6") => migrate_v6_to_v7(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -3614,6 +3775,35 @@ fn migrate_v5_to_v6(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
         );
         CREATE INDEX IF NOT EXISTS idx_project_runs_work_point ON project_runs(work_point_id, status);
         CREATE INDEX IF NOT EXISTS idx_project_runs_roadmap ON project_runs(roadmap_id, status);
+        "#,
+    )?;
+
+    connection.execute(
+        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+    )?;
+    Ok(())
+}
+
+fn migrate_v6_to_v7(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS worktrees (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            repo_uri TEXT,
+            branch TEXT,
+            worktree_path TEXT,
+            project_run_id TEXT REFERENCES project_runs(id) ON DELETE SET NULL,
+            session_id TEXT,
+            status TEXT NOT NULL DEFAULT 'active',
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_worktrees_project_run ON worktrees(project_run_id);
+        CREATE INDEX IF NOT EXISTS idx_worktrees_session ON worktrees(session_id);
+        CREATE INDEX IF NOT EXISTS idx_worktrees_status ON worktrees(status);
         "#,
     )?;
 
