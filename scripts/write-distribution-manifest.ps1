@@ -107,6 +107,11 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-documentation-wrapper'
             SkillBridge = 'skills/elegy-documentation/SKILL.md'
         }
+        'elegy-obsidian' = @{
+            Surface = 'elegy-obsidian'
+            AssetPrefix = 'elegy-obsidian-wrapper'
+            SkillBridge = 'skills/elegy-obsidian/SKILL.md'
+        }
     }
 }
 
