@@ -10,7 +10,7 @@
   },
   "metadata": {
     "displayName": "Elegy Planning Authority",
-    "description": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.",
+    "description": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, session management, worktree registry, validation, and projection rendering.",
     "summary": "Create and inspect durable planning records over Elegy's dedicated planning CLI.",
     "category": "planning",
     "author": "Elegy Contributors",
@@ -1884,7 +1884,7 @@
     "allowedContexts": ["contributor-routing", "local-cli", "planning-authority"]
   },
   "discovery": {
-    "keywords": ["planning", "goal", "roadmap", "roadmap planning", "work point", "plan", "todo", "issue", "review point", "validate planning", "projection", "insight", "reasoning", "context", "tags", "full-text search"],
+    "keywords": ["planning", "goal", "roadmap", "roadmap planning", "work point", "plan", "todo", "issue", "review point", "validate planning", "projection", "insight", "reasoning", "context", "tags", "full-text search", "session resume", "session list", "worktree", "worktree attach"],
     "triggers": [
       {
         "pattern": "create roadmap",
@@ -1913,6 +1913,22 @@
       {
         "pattern": "search by tag",
         "description": "When finding planning entities by tag correlation."
+      },
+      {
+        "pattern": "session resume",
+        "description": "When resuming an existing planning session or inspecting current session state."
+      },
+      {
+        "pattern": "session list",
+        "description": "When listing recent planning sessions from event history."
+      },
+      {
+        "pattern": "worktree list",
+        "description": "When listing registered worktrees tracked by the planning system."
+      },
+      {
+        "pattern": "worktree attach",
+        "description": "When attaching a worktree to a project run or session."
       }
     ],
     "capabilityHints": ["durable-goal-authoring", "roadmap-authority", "plan-authoring", "todo-tracking", "issue-tracking", "planning-validation", "planning-projection", "planning-scope-management", "planning-lifecycle-transitions", "planning-event-history", "planning-insight-recording", "planning-context-bundle", "planning-tag-search", "planning-full-text-search"],
