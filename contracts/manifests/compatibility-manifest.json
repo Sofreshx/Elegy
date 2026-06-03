@@ -357,6 +357,7 @@
         "fixtures/skill-definition-v2.elegy-mermaid.json",
         "fixtures/skill-definition-v2.elegy-notify.json",
         "fixtures/skill-definition-v2.elegy-observe.json",
+        "fixtures/skill-definition-v2.elegy-obsidian.json",
         "fixtures/skill-definition-v2.elegy-planning.json",
         "fixtures/skill-definition-v2.elegy-repo.json",
         "fixtures/skill-definition-v2.elegy-skill-router.json",
@@ -412,7 +413,8 @@
         "fixtures/skill-discovery-index.elegy-mcp.json",
         "fixtures/skill-discovery-index.elegy-planning.json",
         "fixtures/skill-discovery-index.elegy-skills.json",
-        "fixtures/skill-discovery-index.elegy-mermaid.json"
+        "fixtures/skill-discovery-index.elegy-mermaid.json",
+        "fixtures/skill-discovery-index.elegy-obsidian.json"
       ]
     },
     {
