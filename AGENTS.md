@@ -11,7 +11,7 @@ authority surface.
 ## Authority Centers
 
 - `contracts/`, `governance/`, `schemas/`, and `policies/` are the neutral authority roots for contracts, compatibility, schemas, and policy.
-- `contracts/fixtures/skill-definition-v2.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
+- `contracts/fixtures/skill.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
 - `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
 - `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs configured by `.elegy/docs.yaml`.
 - `src/Elegy-memory`, `src/Elegy-mcp`, `src/Elegy-skills`, `src/Elegy-planning`, `src/Elegy-configuration`, `src/Elegy-documentation`, and `src/Elegy-mermaid` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release surfaces.

@@ -48,7 +48,7 @@ Phase 1 is no longer just planned work.
 
 Phase 2 is actively in progress.
 
-- Built-in v2 skill capabilities now project into real
+- Built-in Skill capabilities now project into real
   `CapabilityDefinition` payloads.
 - `elegy skills capability` and `elegy-skills capability` now emit that
   contract directly.
@@ -75,7 +75,7 @@ surface lives in Rust crates and thin CLIs.
 
 The current agent-facing surface is real:
 
-- `elegy skills list/search/describe --json` exposes v2 skill discovery with
+- `elegy skills list/search/describe --json` exposes Skill discovery with
   progressive disclosure.
 - `elegy run` hosts the built-in capabilities through MCP.
 - `elegy desktop` provides bounded desktop automation primitives with dry-run
@@ -231,14 +231,14 @@ Acceptance:
 
 ### P1: Capability discovery is good, but capability governance is split
 
-The v2 skill registry is a strong agent-facing discovery surface. Separately,
+The Skill registry is a strong agent-facing discovery surface. Separately,
 the capability-definition schema has richer governance and execution metadata.
 Those two layers are not yet a single governed capability registry.
 
 Direction:
 
 - Define the skill-to-capability projection as a first-class contract.
-- Add conformance tests proving every built-in v2 skill capability can project
+- Add conformance tests proving every built-in Skill capability can project
   into `capability-definition` without losing required governance fields.
 - Expose an agent-friendly capability view that includes side-effect class,
   idempotence, auth mode, trust level, cost/latency hints, and observability
@@ -448,7 +448,7 @@ Status, 2026-05-28:
 
 Work:
 
-- Project v2 skill definitions into capability definitions.
+- Project skill definitions into capability definitions.
 - Add validation that built-in capabilities carry required governance and
   execution metadata.
 - Use normalized capability metadata in CLI discovery and MCP tool listing.

@@ -3,7 +3,7 @@
 ## Project Overview
 
 Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.
-Governed contracts, v2 skill definitions, compatibility data, and policy artifacts are
+Governed contracts, skill definitions, compatibility data, and policy artifacts are
 the durable authority. Rust implements reusable executable behavior over those artifacts.
 CLI invocation templates are the default agent boundary; MCP is an optional projection.
 
@@ -32,7 +32,7 @@ Before writing any code, read the relevant architecture docs:
 
 - Prefer `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
 - Use `elegy-skills list/search/resolve/get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
-- V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are the supported skill contract.
+- skill definitions in `contracts/fixtures/skill.*.json` are the supported skill contract.
 - Do not reintroduce v1 `skill-definition.*.json` files.
 - `elegy run` exposes an optional MCP stdio adapter over governed capabilities. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.
 - Profiles are allowlists, not approvals.

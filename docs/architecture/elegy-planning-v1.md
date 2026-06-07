@@ -32,9 +32,9 @@ It currently covers:
 
 The authority chain is explicit and one-way:
 
-1. `contracts/schemas/skill-definition-v2.schema.json` defines the durable
+1. `contracts/schemas/skill.schema.json` defines the durable
    capability contract shape.
-2. `contracts/fixtures/skill-definition-v2.elegy-planning.json` is the
+2. `contracts/fixtures/skill.elegy-planning.json` is the
    governed skill definition source of truth.
 3. `contracts/fixtures/skill-discovery-index.elegy-planning.json` is the
    governed discovery projection derived from that definition.

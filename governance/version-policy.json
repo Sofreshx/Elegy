@@ -95,7 +95,7 @@
       "targetSchemaLine": "1.x",
       "releaseStory": "Publish a thin skill that wraps the official Obsidian v1.12+ CLI for vault-aware note operations as a non-authoritative foundation for the future elegy-planning obsidian mirror/attach/resolve/list surface.",
       "authorityReservations": [
-        "contracts own the governed v2 skill definition and the obsidian-result envelope schema",
+        "contracts own the governed skill definition and the obsidian-result envelope schema",
         "the user's installed Obsidian Desktop provides the executable; the wrapper does not ship or own a binary",
         "elegy-planning and SQLite remain the durable planning authority; Obsidian is a non-canonical vault mirror"
       ]

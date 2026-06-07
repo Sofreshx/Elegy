@@ -39,7 +39,7 @@ fn tools_for_allowed_ids(allowed_tool_ids: Option<&BTreeSet<String>>) -> Vec<Too
         .collect()
 }
 
-/// Parse every embedded v2 skill-definition JSON and convert each capability
+/// Parse every embedded skill-definition JSON and convert each capability
 /// entry into an rmcp `Tool`.
 fn build_tool_bindings_from_skill_definitions() -> Vec<RegistryMcpToolBinding> {
     let registry = match SkillRegistry::builtin() {
@@ -872,7 +872,7 @@ mod tests {
         assert_eq!(
             tools.len(),
             expected_count,
-            "expected tool count to match the built-in v2 skill registry"
+            "expected tool count to match the built-in Skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -1277,7 +1277,7 @@ mod tests {
         assert_eq!(
             tools.len(),
             expected_count,
-            "expected tool count to match the built-in v2 skill registry"
+            "expected tool count to match the built-in Skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();

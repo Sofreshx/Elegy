@@ -1,6 +1,6 @@
 # Obsidian CLI Command Reference
 
-This reference distills the official Obsidian v1.12+ CLI surface into the argument shapes used by the `elegy-obsidian` skill. Use it to verify the argument vectors emitted by the v2 fixture and to debug unexpected behavior.
+This reference distills the official Obsidian v1.12+ CLI surface into the argument shapes used by the `elegy-obsidian` skill. Use it to verify the argument vectors emitted by the fixture and to debug unexpected behavior.
 
 The official CLI ships with Obsidian Desktop. Once enabled (see `install-obsidian-cli.md`), the `obsidian` binary lives on PATH. Most commands take `key=value` arguments; some accept free positional arguments. JSON output is opt-in for a small subset; the rest return plain text.
 

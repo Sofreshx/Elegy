@@ -16,7 +16,7 @@
     "skillDefinitions": [
       {
         "id": "planning-skill",
-        "definitionRef": "contracts/fixtures/skill-definition-v2.elegy-planning.json"
+        "definitionRef": "contracts/fixtures/skill.elegy-planning.json"
       }
     ],
     "instructionSkills": [

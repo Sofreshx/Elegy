@@ -4,7 +4,7 @@ This lane provides wrapper-level handoff guidance only.
 
 Authority for behavior remains in:
 
-- `contracts/fixtures/skill-definition-v2.elegy-obsidian.json`
+- `contracts/fixtures/skill.elegy-obsidian.json`
 - `contracts/fixtures/skill-discovery-index.elegy-obsidian.json`
 - `skills/elegy-obsidian/SKILL.md`
 

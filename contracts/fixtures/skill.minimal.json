@@ -3,7 +3,7 @@
   "skillVersion": 2,
   "identity": {
     "namespace": "elegy",
-    "name": "minimal-v2-example",
+    "name": "minimal-example",
     "version": "0.1.0"
   },
   "capabilities": [

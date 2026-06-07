@@ -8,7 +8,7 @@ The wrapper contract for this root lives in `wrapper-entrypoint.json`.
 
 Delegation stays one-way:
 
-- `contracts/` and `governance/` remain canonical for the governed v2 skill definition, the discovery projection, and release/version policy.
+- `contracts/` and `governance/` remain canonical for the governed skill definition, the discovery projection, and release/version policy.
 - The official `obsidian` CLI (shipped with the user's installed Obsidian Desktop) is the runtime. This surface is **not** a Rust crate; it is a non-authoritative vault bridge.
 - `skills/elegy-obsidian/SKILL.md` remains the repo-local non-authoritative contributor-routing output for this surface.
 - `docs/specs/obsidian-skill-and-cli.md` is the canonical design entrypoint for the foundation, including the extension point for the future `elegy-planning obsidian mirror/attach/resolve/list` commands.

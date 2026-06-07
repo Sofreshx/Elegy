@@ -50,7 +50,7 @@ fn upstream_bundle_contains_supported_schema_entries() {
         .map(|entry| entry.name.as_str())
         .collect::<BTreeSet<_>>();
 
-    assert!(schema_names.contains("skill-definition-v2"));
+    assert!(schema_names.contains("skill"));
     assert!(schema_names.contains("elegy-plugin-package-v1"));
     assert!(schema_names.contains("elegy-plugin-package-v2"));
     assert!(schema_names.contains("skill-discovery-index"));
@@ -226,7 +226,7 @@ fn upstream_capability_definition_fixture_is_semantically_valid() {
 fn upstream_skill_definition_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
     let definition = load_skill_definition_v2_fixture_from_dir(&contracts_dir)
-        .expect("load upstream skill-definition-v2 fixture");
+        .expect("load upstream skill fixture");
 
     validate_skill_definition_v2(&definition).expect("fixture should validate");
 }
@@ -919,10 +919,10 @@ fn upstream_dedicated_skill_definitions_round_trip_host_projection() {
     let contracts_dir = resolve_upstream_contracts_dir();
     let planning_path = contracts_dir
         .join("fixtures")
-        .join("skill-definition-v2.elegy-planning.json");
+        .join("skill.elegy-planning.json");
     let skills_path = contracts_dir
         .join("fixtures")
-        .join("skill-definition-v2.elegy-skills.json");
+        .join("skill.elegy-skills.json");
 
     let planning: SkillDefinitionV2 =
         serde_json::from_str(&fs::read_to_string(&planning_path).expect("read planning fixture"))
@@ -1203,7 +1203,7 @@ fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projectio
 
     let planning_skill_path = contracts_dir
         .join("fixtures")
-        .join("skill-definition-v2.elegy-planning.json");
+        .join("skill.elegy-planning.json");
     let planning_skill: SkillDefinitionV2 = serde_json::from_str(
         &fs::read_to_string(&planning_skill_path).expect("read planning skill"),
     )
@@ -1238,7 +1238,7 @@ fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projectio
 
     let skills_skill_path = contracts_dir
         .join("fixtures")
-        .join("skill-definition-v2.elegy-skills.json");
+        .join("skill.elegy-skills.json");
     let skills_skill: SkillDefinitionV2 =
         serde_json::from_str(&fs::read_to_string(&skills_skill_path).expect("read skills skill"))
             .expect("parse skills skill");
@@ -1265,7 +1265,7 @@ fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projectio
     for function_name in &skills_package_function_names {
         assert!(
             skills_skill_function_names.contains(function_name),
-            "v2 skills package function '{}' should also be declared on the host_projection of the skills skill",
+            "skills package function '{}' should also be declared on the host_projection of the skills skill",
             function_name
         );
     }
@@ -1318,4 +1318,87 @@ fn exported_contract_bundle_includes_dedicated_plugin_package_fixtures() {
     }
 
     fs::remove_dir_all(&temp_root).expect("remove temp export root");
+}
+
+#[test]
+fn readiness_side_effect_summary_serializes_with_schema_snake_case_keys() {
+    let summary = elegy_contracts::ElegyPluginReadinessSideEffectSummary {
+        none: 1,
+        read_only: 2,
+        disk_read: 3,
+        disk_write: 4,
+        network_outbound: 5,
+        process_spawn: 6,
+        desktop_ui: 7,
+    };
+
+    let json = serde_json::to_string(&summary).expect("serialize side effect summary");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json).expect("parse side effect summary JSON");
+
+    // Schema expects snake_case keys
+    assert_eq!(parsed["none"], 1);
+    assert_eq!(parsed["read_only"], 2);
+    assert_eq!(parsed["disk_read"], 3);
+    assert_eq!(parsed["disk_write"], 4);
+    assert_eq!(parsed["network_outbound"], 5);
+    assert_eq!(parsed["process_spawn"], 6);
+    assert_eq!(parsed["desktop_ui"], 7);
+
+    // Verify camelCase variants are NOT produced
+    assert!(
+        parsed.get("readOnly").is_none(),
+        "read_only must not serialize as readOnly"
+    );
+    assert!(
+        parsed.get("diskRead").is_none(),
+        "disk_read must not serialize as diskRead"
+    );
+    assert!(
+        parsed.get("diskWrite").is_none(),
+        "disk_write must not serialize as diskWrite"
+    );
+    assert!(
+        parsed.get("networkOutbound").is_none(),
+        "network_outbound must not serialize as networkOutbound"
+    );
+    assert!(
+        parsed.get("processSpawn").is_none(),
+        "process_spawn must not serialize as processSpawn"
+    );
+    assert!(
+        parsed.get("desktopUi").is_none(),
+        "desktop_ui must not serialize as desktopUi"
+    );
+}
+
+#[test]
+fn readiness_side_effect_summary_round_trips_through_deserialization() {
+    let json = r#"{"none":0,"read_only":1,"disk_read":2,"disk_write":3,"network_outbound":4,"process_spawn":5,"desktop_ui":6}"#;
+    let summary: elegy_contracts::ElegyPluginReadinessSideEffectSummary =
+        serde_json::from_str(json).expect("deserialize snake_case JSON");
+
+    assert_eq!(summary.none, 0);
+    assert_eq!(summary.read_only, 1);
+    assert_eq!(summary.disk_read, 2);
+    assert_eq!(summary.disk_write, 3);
+    assert_eq!(summary.network_outbound, 4);
+    assert_eq!(summary.process_spawn, 5);
+    assert_eq!(summary.desktop_ui, 6);
+
+    let reserialized = serde_json::to_string(&summary).expect("re-serialize");
+    let reparsed: serde_json::Value =
+        serde_json::from_str(&reserialized).expect("re-parse serialized");
+    assert_eq!(
+        reparsed["read_only"], 1,
+        "read_only must survive round-trip as snake_case"
+    );
+    assert_eq!(
+        reparsed["disk_read"], 2,
+        "disk_read must survive round-trip as snake_case"
+    );
+    assert_eq!(
+        reparsed["network_outbound"], 4,
+        "network_outbound must survive round-trip as snake_case"
+    );
 }

@@ -12,7 +12,7 @@ default execution boundary.
 Core model:
 
 - governed contracts are the durable authority
-- v2 skill definitions are the discovery authority
+- skill definitions are the discovery authority
 - CLI invocation templates are the default execution boundary
 - MCP is an optional projection for MCP-native clients
 
@@ -239,7 +239,7 @@ repo.
 
 Elegy's skills product is registry-first:
 
-- governed v2 skill definitions under `contracts/fixtures/skill-definition-v2.*.json` remain the discovery authority
+- governed skill definitions under `contracts/fixtures/skill.*.json` remain the discovery authority
 - `elegy-skills` is the dedicated registry surface for searching, resolving, inspecting, and validating those governed skills
 - `elegy skills ...` mirrors that functionality on the umbrella CLI as a compatibility surface
 - Rust hosts can call the shared `rust/crates/elegy-skills` library directly for registry loading, profile filtering, search, resolve, capability inspection, and validation
@@ -250,7 +250,7 @@ Dedicated registry examples:
 elegy-skills list --json
 elegy-skills search --query "repo status" --json
 elegy-skills resolve --query "repo status" --json
-elegy-skills validate --file ./contracts/fixtures/skill-definition-v2.elegy-repo.json --json
+elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
 
 ## Capability Profiles

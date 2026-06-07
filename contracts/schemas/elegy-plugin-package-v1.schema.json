@@ -147,7 +147,7 @@
           "minLength": 1
         },
         "definitionRef": { "$ref": "#/$defs/relativePath" },
-        "definition": { "$ref": "skill-definition-v2.schema.json" }
+        "definition": { "$ref": "skill.schema.json" }
       },
       "anyOf": [
         { "required": ["definitionRef"] },

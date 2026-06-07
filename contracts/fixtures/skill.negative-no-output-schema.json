@@ -57,7 +57,7 @@
   "origin": {
     "materializationKind": "declared",
     "sourceKind": "manual",
-    "sourceRef": "contracts/fixtures/skill-definition-v2.negative-no-output-schema.json",
+    "sourceRef": "contracts/fixtures/skill.negative-no-output-schema.json",
     "sourceVersion": "0.1.0"
   },
   "lifecycleState": "draft"

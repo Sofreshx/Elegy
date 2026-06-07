@@ -134,16 +134,16 @@ plus conservative derived projection tooling support, not an Elegy plugin runtim
 
 Current governed dedicated-surface skill artifacts in that bundle include:
 
-- `fixtures/skill-definition-v2.elegy-memory.json`
+- `fixtures/skill.elegy-memory.json`
 - `fixtures/skill-discovery-index.elegy-memory.json`
-- `fixtures/skill-definition-v2.elegy-mcp.json`
+- `fixtures/skill.elegy-mcp.json`
 - `fixtures/skill-discovery-index.elegy-mcp.json`
-- `fixtures/skill-definition-v2.elegy-planning.json`
-- `fixtures/skill-definition-v2.elegy-skills.json`
+- `fixtures/skill.elegy-planning.json`
+- `fixtures/skill.elegy-skills.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
-- `fixtures/skill-definition-v2.elegy-documentation.json`
+- `fixtures/skill.elegy-documentation.json`
 - `fixtures/skill-discovery-index.elegy-documentation.json`
-- `fixtures/skill-definition-v2.elegy-mermaid.json`
+- `fixtures/skill.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-mermaid.json`
 
 The repo carries `.agents/skills/elegy-memory/SKILL.md`, `.agents/skills/elegy-mcp/SKILL.md`, `.agents/skills/elegy-skills/SKILL.md`, `.agents/skills/elegy-documentation/SKILL.md`, and `.agents/skills/elegy-mermaid/SKILL.md` as repo-local host-facing derived mirrors for those surfaces. The repo also carries matching `.github/skills/.../SKILL.md` files as repo-local non-authoritative contributor-routing mirrors. Those markdown files are not part of the governed contracts bundle.

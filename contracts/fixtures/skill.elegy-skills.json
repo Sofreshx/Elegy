@@ -10,7 +10,7 @@
   },
   "metadata": {
     "displayName": "Elegy Skill Registry",
-    "description": "Registry-first discovery, resolution, and validation over governed v2 skill definitions.",
+    "description": "Registry-first discovery, resolution, and validation over governed skill definitions.",
     "summary": "List, search, resolve, get, inspect capability details, and validate governed skills with a dedicated CLI and reusable Rust API.",
     "category": "skills",
     "author": "Elegy Contributors",
@@ -83,7 +83,7 @@
     {
       "id": "skills-registry-validate",
       "name": "Validate Skill Format",
-      "description": "Validate one skill file or a directory of skill files against the governed v2 format plus registry invariants.",
+      "description": "Validate one skill file or a directory of skill files against the governed skill format plus registry invariants.",
       "implementation": {
         "executionType": "subprocess",
         "executableName": "elegy-skills",
@@ -120,7 +120,7 @@
   "constraints": [
     {
       "constraintId": "registry-first",
-      "description": "This surface is the dedicated registry, resolution, and validation entrypoint for governed v2 skill definitions.",
+      "description": "This surface is the dedicated registry, resolution, and validation entrypoint for governed skill definitions.",
       "required": true
     }
   ],
@@ -152,7 +152,7 @@
   "origin": {
     "materializationKind": "declared",
     "sourceKind": "manual",
-    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-skills.json",
+    "sourceRef": "contracts/fixtures/skill.elegy-skills.json",
     "sourceVersion": "0.1.0"
   },
   "lifecycleState": "active",

@@ -300,7 +300,7 @@
   "origin": {
     "materializationKind": "declared",
     "sourceKind": "manual",
-    "sourceRef": "contracts/fixtures/skill-definition-v2.elegy-documentation.json",
+    "sourceRef": "contracts/fixtures/skill.elegy-documentation.json",
     "sourceVersion": "0.1.0"
   },
   "lifecycleState": "active"
