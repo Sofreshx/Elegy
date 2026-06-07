@@ -1,23 +1,35 @@
 ---
 name: elegy-planning
-description: "Surface-local non-authoritative bridge shipped with the Elegy-planning wrapper surface and wrapper archive."
+description: Use when an agent needs to create, inspect, update, validate, or export durable planning state — goals, roadmaps, plans, work points, todos, issues, review points, insights, and project runs — through the dedicated elegy-planning CLI over SQLite.
 ---
 
 # Elegy-planning Surface Bridge
 
-This file is a surface-local, non-authoritative skill bridge shipped with the `src/Elegy-planning` wrapper surface and the `elegy-planning-wrapper-<bundleVersion>.zip` archive.
+This file is the surface-local, non-authoritative skill bridge shipped
+with the `src/Elegy-planning` wrapper surface and the
+`elegy-planning-wrapper-<bundleVersion>.zip` archive. It is a thin
+install-and-handoff page; the canonical operational body lives in the
+in-tree `skills/elegy-planning/SKILL.md` and is mirrored to
+`.agents/skills/elegy-planning/SKILL.md` and
+`.github/skills/elegy-planning/SKILL.md`.
 
 Authority stays one-way:
 
-1. `contracts/fixtures/skill-definition-v2.elegy-planning.json` is the governed source of truth.
-2. `contracts/fixtures/skill-discovery-index.elegy-planning.json` is the governed discovery projection.
-3. `.github/skills/elegy-planning/SKILL.md` remains the repo-local contributor-routing output.
-4. This file mirrors install and CLI handoff needed by wrapper consumers.
+1. `contracts/fixtures/skill.elegy-planning.json` is the governed
+   source of truth.
+2. `contracts/fixtures/skill-discovery-index.elegy-planning.json` is
+   the governed discovery projection.
+3. `skills/elegy-planning/SKILL.md` is the canonical operational body.
+4. This file mirrors install and CLI handoff needed by wrapper
+   consumers.
 
 ## Wrapper install
 
-- Run `./install.ps1` from this wrapper root to stage the contracts bundle, the `elegy-planning` CLI surface, and this wrapper surface together.
-- Pass `-LocalArtifactsRoot <path>` when validating against local archives instead of GitHub release assets.
+- Run `./install.ps1` from this wrapper root to stage the contracts
+  bundle, the `elegy-planning` CLI surface, and this wrapper surface
+  together.
+- Pass `-LocalArtifactsRoot <path>` when validating against local
+  archives instead of GitHub release assets.
 
 ## Current commands
 
@@ -25,7 +37,7 @@ Authority stays one-way:
 elegy-planning --scope <scope-key> scope create|list|show ...
 elegy-planning --scope <scope-key> goal create|list|show|update-status|search ...
 elegy-planning --scope <scope-key> roadmap create|list|show|add-section|add-work-point|update-status|search ...
-elegy-planning --scope <scope-key> work-point list|show|update-status ...
+elegy-planning --scope <scope-key> work-point list|show|update-status|next-runnable|work-graph ...
 elegy-planning --scope <scope-key> plan create|list|show|revise|update-status|search ...
 elegy-planning --scope <scope-key> todo create|list|update-status|search ...
 elegy-planning --scope <scope-key> issue record|list|show|update-status|search ...
@@ -35,27 +47,50 @@ elegy-planning --scope <scope-key> context --entity-type <type> --entity-id <id>
 elegy-planning --scope <scope-key> context --session --correlation-id <id>
 elegy-planning --scope <scope-key> tags [--entity-type <type>]
 elegy-planning --scope <scope-key> search [--tag <tag>] [--fts <query>] [--title <pattern>] [--status <s>]
+elegy-planning --scope <scope-key> validate all
+elegy-planning --scope <scope-key> health
+elegy-planning --scope <scope-key> project export|render ...
+elegy-planning --scope <scope-key> project run claim|activate|release|add-evidence|list|show ...
 elegy-planning --json --non-interactive --correlation-id <id> ...
-elegy-planning project export|render ...
 ```
 
 ## Behavior notes
 
-- SQLite remains the durable authority.
-- Omitted scope defaults to `default`.
-- Markdown and JSON projections are generated sharing artifacts, not authority.
-- Insights are first-class entities that capture reasoning attached to any planning entity.
+- SQLite remains the durable authority. Markdown and JSON projections
+  are generated, derived outputs.
+- Omitted scope defaults to `default`. Always pass `--scope` explicitly
+  in agent-driven calls; the silent default is a frequent source of
+  cross-scope pollution.
+- Insights are first-class entities that capture reasoning attached
+  to any planning entity. Use them liberally.
 - Tags are indexed for fast cross-entity correlation search.
-- FTS5 provides full-text content search across entities and insights.
-- Context commands return progressive disclosure bundles with token estimates.
+- FTS5 provides full-text content search across entities and
+  insights; if `health` shows FTS5 drift, rebuild the index.
+- Context commands return progressive disclosure bundles with token
+  estimates.
+- Project runs are durable leases; once claimed, a work point is
+  considered in-flight until `release` is called.
 
 ## Agent invocation guidance
 
-- Prefer machine mode for all mutations: `--json --non-interactive --correlation-id <id>`.
-- Repeat multi-value flags once per value instead of comma-joining.
-- For work-point, plan, and todo authoring, use `--effort-tier <fast|balanced|deep>` and repeat `--file-scope <selector-type:intent:selector>` as needed.
-- File-scope selector types are `exact` and `glob`; intents are `primary`, `review`, or `affected`.
-- Plan revise clearing is explicit: use `--clear-routing-hint` and `--clear-file-scopes` when you need removal semantics.
-- Record insights with `--insight-type <type>` and `--tag <tag>` for discoverability.
-- Use `context --entity-type <type> --entity-id <id>` to load full context including related insights and token estimates before deep work.
+- Prefer machine mode for all mutations:
+  `--json --non-interactive --correlation-id <id>`.
+- Repeat multi-value flags once per value instead of comma-joining
+  (`--acceptance <a1> --acceptance <a2>`, `--tag <t1> --tag <t2>`).
+- For work-point, plan, and todo authoring, use
+  `--effort-tier <fast|balanced|deep>` and repeat
+  `--file-scope <type:intent:selector>` as needed.
+- File-scope selector grammar: `<type>:<intent>:<selector>`. Types
+  are `exact` or `glob`. Intents are `primary`, `review`, or
+  `affected`.
+- Plan revise clearing is explicit: use `--clear-routing-hint` and
+  `--clear-file-scopes` when you need removal semantics. Empty
+  values are dropped, not cleared.
+- Record insights with `--insight-type <type>` and `--tag <tag>` for
+  discoverability across sessions.
+- Use `context --entity-type <type> --entity-id <id>` to load full
+  context including related insights and token estimates before
+  deep work.
 - Use `tags list` to discover available tags before searching.
+- For the full guardrails, common issues, and worked examples, load
+  the canonical body: `../../../skills/elegy-planning/SKILL.md`.

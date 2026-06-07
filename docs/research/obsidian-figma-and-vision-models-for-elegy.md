@@ -27,11 +27,11 @@ This note examines how each of these three lands on Elegy specifically (the Rust
 
 ## Executive summary
 
-The strongest direction for Elegy is to keep all three integrations **non-canonical, opt-in, and side-effect-gated**, and to expose them through the existing v2 skill + argv-template + `elegy-host-mcp` seam. Concretely:
+The strongest direction for Elegy is to keep all three integrations **non-canonical, opt-in, and side-effect-gated**, and to expose them through the existing Skill + argv-template + `elegy-host-mcp` seam. Concretely:
 
 - **Obsidian** becomes a non-canonical mirror of `elegy-planning` state (roadmaps, todos, review points), with a deterministic, machine-diffable Markdown format and a back-link graph that agents can traverse. Direct port of the Copilot `obsidian-synced-notes-contract.md` shape.
 - **Figma** becomes a read-mostly source of design truth (components, variables, styles) plus a side-effecting write lane (comment, token export). Figma variables flow into `elegy-memory` as `decision` records so they are retrievable context.
-- **Vision-capable models** sit behind a v2 skill (`elegy-vision`) that any agent host can call as `elegy vision describe` / `elegy vision diff` / `elegy vision ui-review`, with the model picked per-task from a curated roster. The visual feedback loop lands on top of the existing `elegy-desktop` skill for headless browser capture.
+- **Vision-capable models** sit behind a Skill (`elegy-vision`) that any agent host can call as `elegy vision describe` / `elegy vision diff` / `elegy vision ui-review`, with the model picked per-task from a curated roster. The visual feedback loop lands on top of the existing `elegy-desktop` skill for headless browser capture.
 - **Impeccable** is the strongest known skill for the "design quality" leg of the loop (slop detection, 23 commands, 46 anti-patterns, CI-friendly `npx impeccable detect`). It is consumed as an external skill and referenced from `elegy-vision ui-review` as a deterministic rule set.
 - **Image-gen → UI** is a two-step pipeline: GPT Image 2 (`gpt-image-2`) generates the hi-fi mock; a vision-capable model with strong UI/grounding (Claude Opus 4.7 or MiMo-V2-Omni) reads the mock and produces the actual code. Figma enters as the optional middle step when the design is durable enough to want component-graph truth, not just an image.
 
@@ -56,7 +56,7 @@ The research framing that this section responds to (Obsidian = knowledge, Figma 
 │  ┌──────────────────────────────────────────────────────────┐ │
 │  │ Elegy contract substrate (canonical authority)          │ │
 │  │  contracts/  governance/  schemas/  policies/            │ │
-│  │  skill-definition-v2.*.json                              │ │
+│  │  skill.*.json                              │ │
 │  └──────────────────────────────────────────────────────────┘ │
 │         │ argv template / subprocess                          │
 │         ▼                                                     │
@@ -74,7 +74,7 @@ The research framing that this section responds to (Obsidian = knowledge, Figma 
 └───────────────────────────────────────────────────────────────┘
 ```
 
-Obsidian and Figma are **non-canonical, opt-in context sources**, not authority roots. They are mirrored deterministically and exposed as v2 skills behind the MCP host.
+Obsidian and Figma are **non-canonical, opt-in context sources**, not authority roots. They are mirrored deterministically and exposed as skills behind the MCP host.
 
 ---
 
@@ -114,7 +114,7 @@ Add a non-canonical mirror mode where `elegy-planning` exports **read-only** Mar
    - `obsidian-resolve-result.schema.json`
    - `obsidian-vault-pointer.schema.json` (reusing Copilot's `IE_OBSIDIAN_*` shape for cross-product compatibility)
 
-3. **New v2 skill** `contracts/fixtures/skill-definition-v2.elegy-planning-obsidian.json` wrapping the above with argv templates.
+3. **New Skill** `contracts/fixtures/skill.elegy-planning-obsidian.json` wrapping the above with argv templates.
 
 4. **Discovery mirror** in `contracts/fixtures/skill-discovery-index.elegy-planning-obsidian.json`.
 
@@ -169,7 +169,7 @@ Add a non-canonical mirror mode where `elegy-planning` exports **read-only** Mar
 
 There is no Figma plugin, no MCP client, no design-token import path, no `figma://` URI scheme handling anywhere in any of the three repos.
 
-## Proposal: `elegy-figma` v2 skill (read-side) + optional write-side
+## Proposal: `elegy-figma` Skill (read-side) + optional write-side
 
 Figma has a stable REST API and an official Figma MCP server. The research framing maps to Elegy as a read-mostly source plus a small write surface.
 
@@ -213,7 +213,7 @@ Optional `elegy-figma tokens to-memory --file-key <key> --scope <workspace>` wri
 
 - **Elegy-Copilot**: new `SyncedNoteSourceProvider` value `'figma'`; `syncedNoteSourceFigmaRoutes.ts` peer of `syncedNoteSourceHttpRoutes.ts`; panel in `copilot-ui/ui/src/tabs/Planning/` (e.g. `FigmaDesignContextPanel.tsx`) mirroring `ObsidianNotesPanel.tsx`.
 - **Holon**: bundled `figma-bridge.holon-plugin.json`; design tokens as `resource-pack`; Figma files as `adapter-binding` with `lane: "api"`; secret resolved via `desktop_runtime_secret_upsert`.
-- **Elegy proper**: just the v2 skill fixture + a small adapter; the host projection is automatic.
+- **Elegy proper**: just the Skill fixture + a small adapter; the host projection is automatic.
 
 ---
 
@@ -278,9 +278,9 @@ Holon's RM-016/017/019–025 roadmap and its existing `provider_catalog.rs` alre
 - Frontier model (Claude Opus 4.7 or MiMo-V2-Omni) does the deep critique on items the cheap model flagged as "uncertain" or "complex."
 - Deterministic rules (Impeccable) run after both passes to enforce the "no AI slop" floor.
 
-## Proposal: `elegy-vision` v2 skill
+## Proposal: `elegy-vision` Skill
 
-A thin v2 skill that exposes the visual feedback loop as 5 capabilities, all argv-templated and JSON-emitting:
+A thin Skill that exposes the visual feedback loop as 5 capabilities, all argv-templated and JSON-emitting:
 
 1. `elegy vision describe --image <path-or-url> --prompt <text> --model <auto|opus-4.7|mimo-v2-omni|...> --json`
    - Returns structured description (objects, regions, text, issues)
@@ -400,7 +400,7 @@ If you want a single concrete starting point, I'd suggest the **Obsidian mirror 
 - It reuses Copilot's already-proven contract shape (`docs/system/obsidian-synced-notes-contract.md` + `ie_kind: planning-obsidian-representation`).
 - It does not require any new authority root — pure non-canonical mirror.
 - It gives every host (Elegy, Copilot, Holon, any MCP-aware agent) the same external-memory surface for planning state.
-- It is a single v2 skill fixture + 4 subcommands + 4 schemas — small enough to land in one PR.
+- It is a single Skill fixture + 4 subcommands + 4 schemas — small enough to land in one PR.
 - It directly serves the highest-value use case (Obsidian = persistent project memory) and is more durable than MCP alternatives because it writes through the planning authority, not around it.
 
 ## Suggested second slice (the user's actual ask)
@@ -416,7 +416,7 @@ The user explicitly asked about a vision-capable model that can "do visual feedb
 The slice lands as:
 
 - `rust/crates/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
-- `contracts/fixtures/skill-definition-v2.elegy-vision.json` — argv templates
+- `contracts/fixtures/skill.elegy-vision.json` — argv templates
 - `contracts/schemas/vision-result.schema.json`
 - `contracts/fixtures/impeccable-ruleset-v1.json` — the 41 deterministic + 4 opt-in + 5 LLM-only rules
 - Holon: `elegy-vision.holon-plugin.json` + `impeccable.holon-plugin.json`
@@ -488,7 +488,7 @@ The third slice is **`elegy-figma` read-side + tokens to memory** (items #3 + #4
 
 These are the concrete artifacts to draft next, sketched here for review before they are written as schemas / specs / skills. None of this is committed yet.
 
-### Draft 1 — `elegy-vision` v2 skill (5 capabilities)
+### Draft 1 — `elegy-vision` Skill (5 capabilities)
 
 All argv-templated, JSON-emitting. Thin Rust crate `elegy-vision` that reads `ELEGY_VISION_DEFAULT_MODEL` from config (defaults to the model the host profile pins) and falls back through the cost-optimized routing table.
 
@@ -572,7 +572,7 @@ The full loop, expressed as a 6-step sequence that any host agent can execute:
 If Part 4's "second slice" lands, the concrete deliverables are:
 
 - `rust/crates/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
-- `contracts/fixtures/skill-definition-v2.elegy-vision.json` — argv templates
+- `contracts/fixtures/skill.elegy-vision.json` — argv templates
 - `contracts/schemas/vision-result.schema.json`
 - `contracts/fixtures/impeccable-ruleset-v1.json` — the 41 deterministic + 4 opt-in + 5 LLM-only rules
 - `contracts/fixtures/vision-model-routing-v1.json` — the governed routing table

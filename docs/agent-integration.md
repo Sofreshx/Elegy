@@ -100,7 +100,7 @@ elegy skills search --query "diagram" --json
 elegy skills describe --skill-id diagram --json
 ```
 
-The skill definitions in `contracts/fixtures/skill-definition-v2.*.json` remain
+The skill definitions in `contracts/fixtures/skill.*.json` remain
 the discovery authority. The contract schemas under `contracts/schemas/` remain
 the durable authority.
 
@@ -108,7 +108,7 @@ the durable authority.
 
 `elegy-plugin-package/v1` and `elegy-plugin-package/v2` are portable package
 metadata contracts for hosts that want one governed package surface over
-multiple components. A package can bundle or reference `skill-definition-v2`
+multiple components. A package can bundle or reference `skill`
 definitions, instruction skill files, MCP projection metadata, docs, and
 assets. `elegy-plugin-package/v2` also adds local configuration template/profile
 components for deterministic `elegy-configuration` loading.
@@ -154,7 +154,7 @@ remain the default integration contract.
 
 ## Host Projection Metadata
 
-Governed v2 skill definitions may include a `hostProjection` block that gives
+governed skill definitions may include a `hostProjection` block that gives
 runtime hosts explicit metadata for mapping capabilities to their own tool
 surfaces:
 
@@ -242,7 +242,7 @@ The governed plugin package fixtures
 (`elegy-plugin-package-v2.elegy-planning.json` and
 `elegy-plugin-package-v2.elegy-skills.json`) carry self-sufficient
 `capabilityProjections` for direct host consumption, alongside the
-`hostProjection` block on the underlying v2 skill definition. To ship in a
+`hostProjection` block on the underlying skill definition. To ship in a
 released contract bundle, every package fixture must be listed under its
 schema entry in `contracts/manifests/compatibility-manifest.json` and
 mirrored in `governance/canonical-output-inventory.json`; otherwise the

@@ -43,7 +43,7 @@ owner: Elegy
   adopted by multiple repos without copy-pasting policy.
 - Positive: the CLI stays objective and deterministic, which makes advisory CI
   and local validation safe to automate.
-- Negative: the central skill package is not yet part of the governed v2 skill
+- Negative: the central skill package is not yet part of the governed skill
   registry, so discovery for this doctrine is repo-local rather than registry-driven.
 - Negative: prose quality, correctness of reasoning, and architecture taste
   still require human review and cannot be delegated to automated checks.

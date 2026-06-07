@@ -16,7 +16,7 @@
     "skillDefinitions": [
       {
         "id": "demo-skill",
-        "definitionRef": "skills/demo/skill-definition-v2.json",
+        "definitionRef": "skills/demo/skill.json",
         "definition": {
           "skillFormat": "elegy-skill-definition",
           "skillVersion": 2,

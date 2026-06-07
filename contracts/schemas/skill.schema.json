@@ -1,8 +1,8 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elegy/contracts/formalization/2.0.0/skill-definition-v2.schema.json",
-  "title": "SkillDefinitionV2",
-  "description": "Unified skill definition contract (v2) combining governance, lifecycle, discovery, and per-capability implementation details for agent-consumable invocation.",
+  "$id": "https://elegy/contracts/formalization/2.0.0/skill.schema.json",
+  "title": "Skill",
+  "description": "Unified skill definition contract (Elegy skill definition format) combining governance, lifecycle, discovery, and per-capability implementation details for agent-consumable invocation. The skillVersion field is an opaque format identifier; treat changes to required fields, capability shape, or side-effect posture as breaking.",
   "type": "object",
   "additionalProperties": false,
   "required": ["skillFormat", "skillVersion", "identity", "capabilities", "lifecycleState"],
@@ -87,7 +87,7 @@
             }
           },
           "output": {
-            "$comment": "Policy: every subprocess machine-invokable capability MUST declare output.schemaRef. Capabilities without it should be rejected or marked non-executable by validators. See skill-definition-v2.negative-no-output-schema.json for the negative test fixture.",
+            "$comment": "Policy: every subprocess machine-invokable capability MUST declare output.schemaRef. Capabilities without it should be rejected or marked non-executable by validators. See skill.negative-no-output-schema.json for the negative test fixture.",
             "type": "object",
             "additionalProperties": false,
             "properties": {

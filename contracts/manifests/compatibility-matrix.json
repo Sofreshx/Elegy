@@ -71,7 +71,7 @@
       },
       "existingSchemasUnchanged": [
         "planning-result",
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
@@ -96,11 +96,11 @@
         "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-skills/, and the wrapper surface under wrappers/elegy-skills/."
       },
       "existingArtifactsUnchanged": [
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
-        "contracts skill-definition-v2 authority",
+        "contracts skill authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
       ]

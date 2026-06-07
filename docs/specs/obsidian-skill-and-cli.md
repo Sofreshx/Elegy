@@ -17,7 +17,7 @@ Elegy treats planning state as durable and authoritative in SQLite via the `eleg
 
 Today there is no first-party Elegy skill for that. The pablo-mano/Obsidian-CLI-skill demonstrates a viable shape (a thin skill wrapping the official Obsidian CLI), but Elegy needs a version that:
 
-- Sits inside the Elegy contracts and discovery surface (`skill-definition-v2`, `skill-discovery-index`).
+- Sits inside the Elegy contracts and discovery surface (`skill`, `skill-discovery-index`).
 - Is installable through the same `scripts/install-distribution.ps1` flow as other Elegy surfaces.
 - Exposes a uniform `obsidian-result/v1` envelope so callers in any agent can reason about outcomes.
 - Leaves a clean extension point for future mirror commands without committing to them yet.
@@ -28,7 +28,7 @@ This document captures the foundation slice.
 
 In scope:
 
-- A governed v2 skill definition: `contracts/fixtures/skill-definition-v2.elegy-obsidian.json`.
+- A governed skill definition: `contracts/fixtures/skill.elegy-obsidian.json`.
 - A discovery projection: `contracts/fixtures/skill-discovery-index.elegy-obsidian.json`.
 - A result envelope schema: `contracts/schemas/obsidian-result.schema.json`.
 - A repo-local skill: `skills/elegy-obsidian/SKILL.md` plus a per-command reference and an install guide.
@@ -48,7 +48,7 @@ Out of scope (follow-up work):
 The skill follows the standard Elegy one-way authority chain:
 
 ```
-contracts/fixtures/skill-definition-v2.elegy-obsidian.json      (governed source of truth)
+contracts/fixtures/skill.elegy-obsidian.json      (governed source of truth)
         |
         v
 contracts/fixtures/skill-discovery-index.elegy-obsidian.json   (discovery projection)
@@ -120,7 +120,7 @@ The `data` shape is intentionally freeform because the official CLI returns text
 
 Obsidian is **non-canonical**. Durable planning state continues to flow through `elegy-planning` and SQLite. This skill encodes that boundary two ways:
 
-1. In the v2 fixture, three constraints are mandatory:
+1. In the fixture, three constraints are mandatory:
    - `external-binary-dependency` — the skill shells out to the official CLI; no custom binary.
    - `non-authoritative-vault` — the skill must never be the source of truth for planning entities.
    - `no-projection-of-authority` — the skill must not write into paths that shadow planning authority (`.copilot/backlogs`, `~/.copilot/backlogs/{repo}/planning/`, etc.).
@@ -137,7 +137,7 @@ Obsidian is **non-canonical**. Durable planning state continues to flow through 
 
 The research note describes the longer-term direction: add `elegy-planning obsidian mirror/attach/resolve/list` subcommands, plus a new schema family for mirror notes. The foundation deliberately leaves clean seams for that work:
 
-- The v2 fixture's `lifecycleState` is `draft`, not `active`. Promotion to `active` will accompany the mirror command set, not this foundation alone.
+- the fixture's `lifecycleState` is `draft`, not `active`. Promotion to `active` will accompany the mirror command set, not this foundation alone.
 - The skill's `capabilityHints` are listed in priority order in the research note; the foundation implements priorities 2 (vault/file/daily/tag/task capabilities), 3 (search), 4 (command/eval escape hatch via `obsidian-command`), and 7 (`obsidian-version` precondition). Priorities 1 (mirror commands), 5 (link/follow/unlinked), and 6 (bookmarks) remain future work.
 - The mirror frontmatter convention is documented in `skills/elegy-obsidian/references/obsidian-cli-command-reference.md` and will be the parsing contract for the future `elegy-planning obsidian resolve` and `attach` commands.
 - The wrapper surface structure mirrors the existing `src/Elegy-planning/` shape, so adding a future `rust/crates/elegy-obsidian/` crate is a localized change: drop in a new `cliCrate` in `delegatesTo`, add an entry in `Get-CliSurfaceMetadata`, and add a new install layout key.
@@ -146,7 +146,7 @@ The research note describes the longer-term direction: add `elegy-planning obsid
 
 The foundation is complete when all of the following are true:
 
-- The v2 fixture validates against `contracts/schemas/skill-definition-v2.schema.json` and the discovery index validates against `contracts/schemas/skill-discovery-index.schema.json`.
+- the fixture validates against `contracts/schemas/skill.schema.json` and the discovery index validates against `contracts/schemas/skill-discovery-index.schema.json`.
 - The result envelope schema validates against the JSON Schema 2020-12 grammar.
 - `scripts/install-distribution.ps1` accepts `-WrapperSurfaces @('elegy-obsidian')` and resolves the wrapper surface metadata.
 - A runbook exists in `skills/elegy-obsidian/references/install-obsidian-cli.md` that operators can follow to enable the official CLI.

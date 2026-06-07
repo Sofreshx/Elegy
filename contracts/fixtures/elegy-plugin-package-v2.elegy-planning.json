@@ -10,13 +10,22 @@
     "description": "Portable planning package fixture for Holon-compatible host projection from governed planning skill definitions, including work-point graph projection and project-run lease management.",
     "tags": ["planning", "roadmap", "durable-state", "plugin", "holon", "work-point", "project-run", "lease", "graph", "next-runnable"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/elegy-planning-v1.md"
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/elegy-planning-v1.md",
+    "subsetOf": [
+      "planning-goal-create", "planning-goal-show",
+      "planning-roadmap-create", "planning-plan-show",
+      "planning-validate-all", "planning-project-run-claim",
+      "planning-project-run-activate", "planning-project-run-release",
+      "planning-project-run-add-evidence", "planning-project-run-list",
+      "planning-project-run-show", "planning-work-point-next-runnable",
+      "planning-work-point-work-graph"
+    ]
   },
   "components": {
     "skillDefinitions": [
       {
         "id": "planning-skill",
-        "definitionRef": "contracts/fixtures/skill-definition-v2.elegy-planning.json"
+        "definitionRef": "contracts/fixtures/skill.elegy-planning.json"
       }
     ],
     "instructionSkills": [
@@ -182,6 +191,31 @@
           "projections": ["function_calling", "cli"],
           "functionName": "planning_work_point_work_graph"
         }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-planning",
+        "cliBinary": "elegy-planning",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Planning CLI for durable planning operations."
+      }
+    ],
+    "hostCompatibility": [
+      {
+        "host": "holon",
+        "versionRange": ">=1.0.0",
+        "notes": "Full Holon host support for durable planning with work-point graphs."
+      },
+      {
+        "host": "opencode",
+        "versionRange": ">=0.1.0",
+        "notes": "OpenCode support via CLI invocation templates."
+      },
+      {
+        "host": "generic",
+        "versionRange": ">=0.1.0"
       }
     ],
     "docs": [

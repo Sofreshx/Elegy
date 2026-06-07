@@ -3,7 +3,7 @@
 ## Authority
 
 - `contracts/schemas/**` are the durable contract authority.
-- Governed fixtures under `contracts/fixtures/**`, especially `skill-definition-v2.*.json`, are the stable agent-facing example and discovery surface.
+- Governed fixtures under `contracts/fixtures/**`, especially `skill.*.json`, are the stable agent-facing example and discovery surface.
 - Discovery indexes, generated bundles under `artifacts/`, and other materialized outputs are derived surfaces, not authored truth.
 - Do not add or revive v1 `skill-definition.*.json` files.
 

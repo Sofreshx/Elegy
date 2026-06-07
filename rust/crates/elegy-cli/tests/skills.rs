@@ -27,7 +27,7 @@ fn unique_temp_dir(prefix: &str) -> PathBuf {
 }
 
 #[test]
-fn skills_list_uses_builtin_v2_registry() {
+fn skills_list_uses_builtin_skill_registry() {
     let output = elegy()
         .args(["--json", "skills", "list"])
         .output()
@@ -170,7 +170,7 @@ fn skills_capability_returns_projected_capability_definition() {
 
 #[test]
 fn skills_validate_accepts_governed_skill_fixture() {
-    let fixture = governed_skill_fixture("skill-definition-v2.elegy-documentation.json");
+    let fixture = governed_skill_fixture("skill.elegy-documentation.json");
     let output = elegy()
         .args([
             "--json",
@@ -199,7 +199,7 @@ fn skills_validate_accepts_governed_skill_fixture() {
 
 #[test]
 fn skills_validate_reports_invalid_fixture_with_summary_and_diagnostics() {
-    let fixture = governed_skill_fixture("skill-definition-v2.negative-no-output-schema.json");
+    let fixture = governed_skill_fixture("skill.negative-no-output-schema.json");
     let output = elegy()
         .args([
             "--json",

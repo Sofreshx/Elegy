@@ -58,6 +58,15 @@
         "documentationUri": {
           "type": "string",
           "format": "uri"
+        },
+        "subsetOf": {
+          "type": "array",
+          "description": "Capability IDs that this package deliberately subsets from the underlying skill definitions. When declared, every capabilityProjection must reference only capabilities in this set.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },
@@ -129,6 +138,16 @@
         "configurationProfiles": {
           "type": "array",
           "items": { "$ref": "#/$defs/configurationComponent" }
+        },
+        "toolRequirements": {
+          "type": "array",
+          "description": "Required CLI tools and MCP surfaces this package needs installed and probeable.",
+          "items": { "$ref": "#/$defs/toolRequirementComponent" }
+        },
+        "hostCompatibility": {
+          "type": "array",
+          "description": "Host compatibility hints for target harnesses and version ranges.",
+          "items": { "$ref": "#/$defs/compatibilityMetadata" }
         }
       }
     },
@@ -199,6 +218,35 @@
         { "required": ["fixturePackRef"] },
         { "required": ["fixturePack"] }
       ]
+    },
+    "toolRequirementComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolName", "cliBinary"],
+      "properties": {
+        "toolName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable tool name for this requirement (e.g. 'elegy-planning')."
+        },
+        "cliBinary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CLI binary name to resolve and probe (e.g. 'elegy-planning')."
+        },
+        "minVersion": {
+          "type": "string",
+          "description": "Optional minimum version string."
+        },
+        "probeCommand": {
+          "type": "string",
+          "description": "Optional override for the probe command (defaults to '--version')."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
     },
     "compatibilityMetadata": {
       "type": "object",

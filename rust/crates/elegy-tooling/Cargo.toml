@@ -15,6 +15,7 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 time.workspace = true
 thiserror.workspace = true
+zip = { workspace = true }
 
 [lints]
 workspace = true

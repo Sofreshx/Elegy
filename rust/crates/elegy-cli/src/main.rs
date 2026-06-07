@@ -54,10 +54,12 @@ use elegy_skills::{
     SkillRegistryQuery,
 };
 use elegy_tooling::{
-    docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
-    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file, DocsCheckReport,
-    DocsCreateResult, DocsIndexResult, DocsInitResult, GeneratedCodexPluginArtifacts,
-    GeneratedSkillArtifacts, NewDocRequest, ToolingError as ToolingSurfaceError,
+    check_plugin_installation, docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
+    generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
+    inspect_plugin_package, pack_plugin_package, project_plugin_for_host, scaffold_plugin_package,
+    verify_plugin_package, DocsCheckReport, DocsCreateResult, DocsIndexResult, DocsInitResult,
+    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
+    PluginTemplateKind, ToolingError as ToolingSurfaceError,
 };
 
 const SESSION_CONTEXT_PREVIEW_LIMIT: usize = 160;
@@ -210,6 +212,10 @@ enum Command {
         #[command(subcommand)]
         command: ConfigurationCommand,
     },
+    Plugin {
+        #[command(subcommand)]
+        command: PluginCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -258,6 +264,101 @@ enum ConfigurationCommand {
         profile_path: Option<PathBuf>,
         #[arg(long = "binding", value_name = "KEY=VALUE")]
         bindings: Vec<String>,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PluginCommand {
+    /// Create a new plugin package from a template
+    New {
+        /// Template kind: skill-only, cli-tool, mcp-tool, configuration, mixed
+        #[arg(long)]
+        template: String,
+        /// Output directory for the new plugin package
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Verify a plugin package against its skill definitions
+    Verify {
+        /// Path to the plugin package JSON file
+        #[arg(long)]
+        package: PathBuf,
+        /// Optional package root directory for resolving definitionRef paths
+        #[arg(long)]
+        package_root: Option<PathBuf>,
+    },
+    /// Check whether required tools are installed and probeable
+    #[command(name = "install-check")]
+    InstallCheck {
+        /// Path to the plugin package JSON file
+        #[arg(long)]
+        package: PathBuf,
+        /// Path to the install receipt JSON file
+        #[arg(long)]
+        install_receipt: PathBuf,
+        /// Optional directory where binaries are installed
+        #[arg(long)]
+        bin_dir: Option<PathBuf>,
+        /// Skip binary probing (report as unprobed)
+        #[arg(long)]
+        skip_probe: bool,
+        /// Optional package root directory for resolving definitionRef paths
+        #[arg(long)]
+        package_root: Option<PathBuf>,
+    },
+    /// Inspect a plugin package and print its metadata summary
+    Inspect {
+        /// Path to the plugin package JSON file
+        #[arg(long)]
+        package: PathBuf,
+    },
+    /// Pack a plugin source directory into a portable zip archive
+    Pack {
+        /// Source directory containing plugin.json
+        #[arg(long)]
+        source: PathBuf,
+        /// Output path for the zip archive
+        #[arg(long)]
+        output: PathBuf,
+    },
+    /// Project a plugin package for a specific host
+    Project {
+        #[command(subcommand)]
+        command: PluginProjectCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum PluginProjectCommand {
+    /// Project a plugin package as a Codex plugin
+    Codex {
+        /// Path to the plugin package JSON file
+        #[arg(long)]
+        package: PathBuf,
+        /// Output directory for the Codex plugin
+        #[arg(long)]
+        output_dir: PathBuf,
+        /// Force overwrite existing output
+        #[arg(long)]
+        force: bool,
+    },
+    /// Project a plugin package for a specific host
+    Host {
+        /// Target host: holon, opencode, or generic
+        #[arg(long)]
+        host: String,
+        /// Path to the plugin package JSON file
+        #[arg(long)]
+        package: PathBuf,
+        /// Output directory for the host projection
+        #[arg(long)]
+        output_dir: PathBuf,
+        /// Force overwrite existing output
+        #[arg(long)]
+        force: bool,
+        /// Optional package root directory for resolving definitionRef paths
+        #[arg(long)]
+        package_root: Option<PathBuf>,
     },
 }
 
@@ -1540,6 +1641,69 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             bindings,
             format,
         ),
+        Command::Plugin {
+            command: PluginCommand::New { template, output },
+        } => execute_plugin_new_command(template, output, format),
+        Command::Plugin {
+            command:
+                PluginCommand::Verify {
+                    package,
+                    package_root,
+                },
+        } => execute_plugin_verify_command(package, package_root, format),
+        Command::Plugin {
+            command:
+                PluginCommand::InstallCheck {
+                    package,
+                    install_receipt,
+                    bin_dir,
+                    skip_probe,
+                    package_root,
+                },
+        } => execute_plugin_install_check_command(
+            package,
+            install_receipt,
+            bin_dir,
+            skip_probe,
+            package_root,
+            format,
+        ),
+        Command::Plugin {
+            command: PluginCommand::Inspect { package },
+        } => execute_plugin_inspect_command(package, format),
+        Command::Plugin {
+            command:
+                PluginCommand::Pack {
+                    source,
+                    output,
+                },
+        } => execute_plugin_pack_command(source, output, format),
+        Command::Plugin {
+            command:
+                PluginCommand::Project {
+                    command:
+                        PluginProjectCommand::Codex {
+                            package,
+                            output_dir,
+                            force,
+                        },
+                },
+        } => execute_generate_codex_plugin_command(package, output_dir, force, format),
+        Command::Plugin {
+            command:
+                PluginCommand::Project {
+                    command:
+                        PluginProjectCommand::Host {
+                            host,
+                            package,
+                            output_dir,
+                            force,
+                            package_root,
+                        },
+                },
+        } => execute_plugin_project_host_command(
+            host, package, output_dir, force, package_root, format,
+        ),
     }
 }
 
@@ -1566,7 +1730,7 @@ fn execute_version_command(format: OutputFormat) -> Result<ExitCode, serde_json:
                     "availableCommands": [
                         "author", "analyze", "generate", "validate", "inspect",
                         "local", "mermaid", "diagram", "run", "contracts", "skills", "agent",
-                        "observe", "desktop", "repo", "web", "data", "notify", "docs",
+                        "observe", "plugin", "desktop", "repo", "web", "data", "notify", "docs",
                         "configuration"
                     ],
                     "skillDefinitionFormat": 2,
@@ -2051,6 +2215,267 @@ fn execute_generate_codex_plugin_command(
         Err(error) => {
             emit_tooling_error(error, format, vec!["generate", "codex-plugin"], json!({}))
         }
+    }
+}
+
+fn execute_plugin_new_command(
+    template: String,
+    output: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let template_kind = match PluginTemplateKind::from_str(&template) {
+        Ok(kind) => kind,
+        Err(error) => {
+            return emit_tooling_error(error, format, vec!["plugin", "new"], json!({}));
+        }
+    };
+
+    // Derive package name from output directory name
+    let package_name = output
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("my-plugin");
+    let package_version = "0.1.0";
+
+    match scaffold_plugin_package(template_kind, &output, package_name, package_version) {
+        Ok(written_files) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Created plugin package at: {}", output.display());
+                    println!("Files written:");
+                    for file in &written_files {
+                        println!("  {}", file);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "new"],
+                    "ok",
+                    Summary::default(),
+                    json!({
+                        "template": template,
+                        "outputDir": output.display().to_string(),
+                        "writtenFiles": written_files
+                    }),
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["plugin", "new"], json!({}))
+        }
+    }
+}
+
+fn execute_plugin_verify_command(
+    package: PathBuf,
+    package_root: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match verify_plugin_package(&package, package_root.as_deref()) {
+        Ok(readiness) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Plugin: {} v{}", readiness.package_identity.name, readiness.package_identity.version);
+                    println!("Readiness: {}", readiness.readiness);
+                    if !readiness.findings.is_empty() {
+                        println!("Findings:");
+                        for finding in &readiness.findings {
+                            println!("  [{}] {}: {}", finding.severity, finding.code, finding.message);
+                        }
+                    }
+                    if readiness.readiness == "ready" {
+                        println!("Package verification passed.");
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "verify"],
+                    "ok",
+                    Summary::default(),
+                    readiness.clone(),
+                    Vec::new(),
+                ))?,
+            }
+            if readiness.readiness == "blocked" {
+                Ok(ExitCode::from(EXIT_CODE_INVALID_INPUT))
+            } else {
+                Ok(ExitCode::SUCCESS)
+            }
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["plugin", "verify"], json!({}))
+        }
+    }
+}
+
+fn execute_plugin_install_check_command(
+    package: PathBuf,
+    install_receipt: PathBuf,
+    bin_dir: Option<PathBuf>,
+    skip_probe: bool,
+    package_root: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match check_plugin_installation(
+        &package,
+        &install_receipt,
+        bin_dir.as_deref(),
+        skip_probe,
+        package_root.as_deref(),
+    ) {
+        Ok(readiness) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Plugin: {} v{}", readiness.package_identity.name, readiness.package_identity.version);
+                    println!("Readiness: {}", readiness.readiness);
+                    if !readiness.tool_statuses.is_empty() {
+                        println!("Tool Statuses:");
+                        for status in &readiness.tool_statuses {
+                            let binary = status.cli_binary.as_deref().unwrap_or("?");
+                            println!("  {} ({}) -> {}", status.tool_name, binary, status.status);
+                        }
+                    }
+                    if !readiness.findings.is_empty() {
+                        println!("Findings:");
+                        for finding in &readiness.findings {
+                            println!("  [{}] {}: {}", finding.severity, finding.code, finding.message);
+                        }
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "install-check"],
+                    "ok",
+                    Summary::default(),
+                    readiness.clone(),
+                    Vec::new(),
+                ))?,
+            }
+            if readiness.readiness == "blocked" {
+                Ok(ExitCode::from(EXIT_CODE_INVALID_INPUT))
+            } else {
+                Ok(ExitCode::SUCCESS)
+            }
+        }
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["plugin", "install-check"],
+            json!({}),
+        ),
+    }
+}
+
+fn execute_plugin_inspect_command(
+    package: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match inspect_plugin_package(&package) {
+        Ok(inspection) => {
+            match format {
+                OutputFormat::Text => {
+                    let identity = &inspection["identity"];
+                    let summary = &inspection["summary"];
+                    println!(
+                        "Package: {} v{}",
+                        identity["name"].as_str().unwrap_or("?"),
+                        identity["version"].as_str().unwrap_or("?")
+                    );
+                    println!(
+                        "Package ID: {}",
+                        identity["packageId"].as_str().unwrap_or("?")
+                    );
+                    println!("Skills: {}", summary["skillCount"]);
+                    println!("Capability Projections: {}", summary["capabilityProjectionCount"]);
+                    println!("MCP Projections: {}", summary["mcpProjectionCount"]);
+                    println!(
+                        "Configuration Templates: {}",
+                        summary["configurationTemplateCount"]
+                    );
+                    println!("Tool Requirements: {}", summary["toolRequirementCount"]);
+                    println!("Instruction Skills: {}", summary["instructionSkillCount"]);
+                    println!("Docs: {}", summary["docCount"]);
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "inspect"],
+                    "ok",
+                    Summary::default(),
+                    inspection,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["plugin", "inspect"], json!({}))
+        }
+    }
+}
+
+fn execute_plugin_pack_command(
+    source: PathBuf,
+    output: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match pack_plugin_package(&source, &output) {
+        Ok(archive_path) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("Plugin packed to: {}", archive_path);
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "pack"],
+                    "ok",
+                    Summary::default(),
+                    json!({
+                        "sourceDir": source.display().to_string(),
+                        "archivePath": archive_path
+                    }),
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["plugin", "pack"], json!({}))
+        }
+    }
+}
+
+fn execute_plugin_project_host_command(
+    host: String,
+    package: PathBuf,
+    output_dir: PathBuf,
+    force: bool,
+    package_root: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let host_target = match HostTarget::from_str(&host) {
+        Ok(target) => target,
+        Err(error) => {
+            return emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}));
+        }
+    };
+
+    match project_plugin_for_host(&package, host_target, &output_dir, force, package_root.as_deref()) {
+        Ok(result) => {
+            match format {
+                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["plugin", "project", "host"],
+                    "ok",
+                    Summary::default(),
+                    result,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["plugin", "project", "host"],
+            json!({}),
+        ),
     }
 }
 
@@ -3347,6 +3772,11 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
         )
         .with_path(path.display().to_string())
         .with_hint("pass --force to overwrite generated output")],
+        ToolingSurfaceError::UnsupportedHostTarget { host } => vec![Diagnostic::error(
+            "CLI-PLUGIN-006",
+            format!("unsupported host target: {host}"),
+        )
+        .with_hint("valid targets: codex, holon, opencode, generic")],
     }
 }
 
@@ -4047,7 +4477,7 @@ fn execute_skills_describe_command(
                 Summary::default(),
                 &definition,
                 Vec::new(),
-                Some("elegy://schemas/skill-definition-v2"),
+                Some("elegy://schemas/skill"),
             ))?,
         }
         return Ok(ExitCode::SUCCESS);

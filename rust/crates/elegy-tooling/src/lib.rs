@@ -4,9 +4,13 @@ pub use docs::*;
 
 use elegy_contracts::{
     validate_elegy_plugin_package, validate_mcp_analysis_result, validate_mcp_server_descriptor,
-    validate_skill_definition_v2, ElegyPluginPackage,
+    validate_skill_definition_v2, ElegyPluginInstallReceiptV1, ElegyPluginPackage,
     ElegyPluginPackageCapabilityProjectionComponent, ElegyPluginPackagePathComponent,
-    McpAnalysisResult, McpServerDescriptor, McpToolDefinition, McpTransportKind, SkillDefinitionV2,
+    ElegyPluginReadinessFinding, ElegyPluginReadinessPackageIdentity,
+    ElegyPluginReadinessProjectedTool, ElegyPluginReadinessSideEffectSummary,
+    ElegyPluginReadinessToolStatus, ElegyPluginReadinessV1, ElegyPluginReadinessVerifiedSkill,
+    HostSideEffectClass, McpAnalysisResult, McpServerDescriptor, McpToolDefinition,
+    McpTransportKind, SkillDefinitionV2, SkillHostProjection,
 };
 use elegy_mcp::{generated_skill_id, McpSkillGenerator, McpToolAnalyzer};
 use serde::Serialize;
@@ -14,6 +18,8 @@ use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
+use std::io::Read;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
 
@@ -140,6 +146,8 @@ pub enum ToolingError {
     DuplicateSkillId { skill_id: String },
     #[error("output file already exists: {path}")]
     OutputExists { path: PathBuf },
+    #[error("unsupported host target: {host}")]
+    UnsupportedHostTarget { host: String },
 }
 
 pub fn author_mcp_descriptor_to_path(
@@ -248,6 +256,1070 @@ pub fn generate_codex_plugin_from_package_file(
             plugin_manifest: display_path(&manifest_path),
             skills_dir: display_path(&skills_root),
             skills_count: skill_documents.len(),
+            apps_emitted: false,
+            mcp_servers_emitted: false,
+            hooks_emitted: false,
+        },
+        written_files,
+    })
+}
+
+/// Verify a plugin package against its referenced skill definitions.
+/// Cross-validates capability projections, side-effect classes, and subset declarations.
+/// Returns a readiness receipt with `ready`, `partial`, or `blocked` status.
+pub fn verify_plugin_package(
+    package_path: &Path,
+    package_root: Option<&Path>,
+) -> Result<ElegyPluginReadinessV1, ToolingError> {
+    let package = load_plugin_package_file(package_path)?;
+    let root = package_root.unwrap_or_else(|| package_path.parent().unwrap_or(Path::new(".")));
+
+    let mut readiness = ElegyPluginReadinessV1 {
+        schema_version: "elegy-plugin-readiness/v1".to_string(),
+        package_identity: ElegyPluginReadinessPackageIdentity {
+            package_id: package.identity.package_id.clone(),
+            name: package.identity.name.clone(),
+            version: package.identity.version.clone(),
+        },
+        readiness: "ready".to_string(),
+        ..Default::default()
+    };
+
+    let mut findings: Vec<ElegyPluginReadinessFinding> = Vec::new();
+
+    // Collect all capabilities from inlined skill definitions (keyed by "namespace.name")
+    // and from referenced definition files.
+    let mut known_capabilities: std::collections::BTreeMap<
+        String,
+        std::collections::BTreeSet<String>,
+    > = std::collections::BTreeMap::new();
+    let mut skill_host_projections: std::collections::BTreeMap<String, SkillHostProjection> =
+        std::collections::BTreeMap::new();
+
+    for component in &package.components.skill_definitions {
+        let _skill_key = if let Some(def) = &component.definition {
+            let key = format!("{}.{}", def.identity.namespace, def.identity.name);
+            let mut caps = std::collections::BTreeSet::new();
+            for cap in &def.capabilities {
+                caps.insert(cap.id.clone());
+            }
+            known_capabilities.insert(key.clone(), caps);
+            if let Some(hp) = &def.host_projection {
+                skill_host_projections.insert(key.clone(), hp.clone());
+            }
+            readiness.verified_skills.push(ElegyPluginReadinessVerifiedSkill {
+                skill_id: key.clone(),
+                status: "valid".to_string(),
+            });
+            key
+        } else if let Some(definition_ref) = &component.definition_ref {
+            // Try to load referenced skill definition from package root
+            let skill_path = root.join(definition_ref);
+            let key = format!("ref:{}", component.id);
+            match load_skill_definition_file(&skill_path) {
+                Ok(def) => {
+                    let skill_key =
+                        format!("{}.{}", def.identity.namespace, def.identity.name);
+                    let mut caps = std::collections::BTreeSet::new();
+                    for cap in &def.capabilities {
+                        caps.insert(cap.id.clone());
+                    }
+                    known_capabilities.insert(skill_key.clone(), caps);
+                    if let Some(hp) = &def.host_projection {
+                        skill_host_projections.insert(skill_key.clone(), hp.clone());
+                    }
+                    readiness
+                        .verified_skills
+                        .push(ElegyPluginReadinessVerifiedSkill {
+                            skill_id: skill_key.clone(),
+                            status: "valid".to_string(),
+                        });
+                }
+                Err(_) => {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "PKG-REF-MISSING".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Cannot resolve skill definition reference '{}' for component '{}'",
+                            definition_ref, component.id
+                        ),
+                        detail: Some(format!("Expected file at: {}", skill_path.display())),
+                    });
+                    readiness
+                        .verified_skills
+                        .push(ElegyPluginReadinessVerifiedSkill {
+                            skill_id: format!("ref:{}", component.id),
+                            status: "missing_ref".to_string(),
+                        });
+                }
+            }
+            key
+        } else {
+            continue;
+        };
+    }
+
+    // Cross-validate capability projections
+    for projection in &package.components.capability_projections {
+        let cap_ref = format!("{}.{}", projection.skill, projection.capability);
+        let known = known_capabilities.get(&projection.skill);
+
+        match known {
+            None => {
+                findings.push(ElegyPluginReadinessFinding {
+                    code: "CAP-SKILL-UNKNOWN".to_string(),
+                    severity: "error".to_string(),
+                    message: format!(
+                        "Projection '{}' references unknown skill '{}'",
+                        projection.id, projection.skill
+                    ),
+                    detail: None,
+                });
+                readiness.unsupported_capabilities.push(cap_ref.clone());
+            }
+            Some(caps) => {
+                if !caps.contains(&projection.capability) {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "CAP-PHANTOM".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Projection '{}' references capability '{}' not found in skill '{}'",
+                            projection.id, projection.capability, projection.skill
+                        ),
+                        detail: None,
+                    });
+                    readiness.unsupported_capabilities.push(cap_ref.clone());
+                } else {
+                    // Projected tool entry
+                    let func_name = projection
+                        .projection
+                        .as_ref()
+                        .and_then(|p| p.function_name.clone())
+                        .unwrap_or_else(|| {
+                            format!(
+                                "{}_{}",
+                                projection.skill.replace('.', "_"),
+                                projection.capability.replace('-', "_")
+                            )
+                        });
+                    readiness
+                        .projected_tools
+                        .push(ElegyPluginReadinessProjectedTool {
+                            tool_name: projection.skill.clone(),
+                            function_name: func_name,
+                            capability_id: Some(projection.capability.clone()),
+                            lane: Some(projection.lane.clone()),
+                        });
+                }
+            }
+        }
+
+        // Side-effect loosening check
+        if let Some(ref declared_class) = projection.side_effect_class {
+            if let Some(skill_hp) = skill_host_projections.get(&projection.skill) {
+                let skill_default = skill_hp.default_side_effect_class;
+                let skill_per_cap = skill_hp
+                    .capability_projections
+                    .iter()
+                    .find(|cp| cp.capability_id == projection.capability)
+                    .and_then(|cp| cp.side_effect_class)
+                    .unwrap_or(skill_default);
+
+                let declared_severity = side_effect_severity(declared_class);
+                let skill_severity = side_effect_severity_host(&skill_per_cap);
+
+                if declared_severity < skill_severity {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "SIDE-LOOSEN".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Projection '{}' declares sideEffectClass '{}' which is weaker than skill's '{}'",
+                            projection.id,
+                            declared_class,
+                            host_side_effect_to_string(&skill_per_cap)
+                        ),
+                        detail: None,
+                    });
+                }
+            }
+        }
+    }
+
+    // Check subset declarations
+    let empty_subset = Vec::new();
+    let subset_of = package
+        .metadata
+        .as_ref()
+        .map(|m| &m.subset_of)
+        .unwrap_or(&empty_subset);
+    if !subset_of.is_empty() {
+        // All projected capabilities must be in subset_of
+        for projection in &package.components.capability_projections {
+            if !subset_of.contains(&projection.capability) {
+                findings.push(ElegyPluginReadinessFinding {
+                    code: "SUBSET-VIOLATION".to_string(),
+                    severity: "warning".to_string(),
+                    message: format!(
+                        "Projection '{}' capability '{}' is not listed in metadata.subsetOf",
+                        projection.id, projection.capability
+                    ),
+                    detail: None,
+                });
+            }
+        }
+    } else {
+        // Check if subset is implied (not all skill capabilities are projected)
+        for (skill_key, caps) in &known_capabilities {
+            let projected_caps: std::collections::BTreeSet<String> = package
+                .components
+                .capability_projections
+                .iter()
+                .filter(|p| &p.skill == skill_key)
+                .map(|p| p.capability.clone())
+                .collect();
+
+            if !projected_caps.is_empty() && projected_caps.len() < caps.len() {
+                let omitted: Vec<String> = caps.difference(&projected_caps).cloned().collect();
+                for cap in &omitted {
+                    readiness
+                        .omitted_capabilities
+                        .push(format!("{}.{}", skill_key, cap));
+                }
+                if subset_of.is_empty() && !omitted.is_empty() {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "SUBSET-IMPLIED".to_string(),
+                        severity: "warning".to_string(),
+                        message: format!(
+                            "Skill '{}' has {} capabilities but only {} are projected. Consider declaring metadata.subsetOf.",
+                            skill_key,
+                            caps.len(),
+                            projected_caps.len()
+                        ),
+                        detail: Some(format!("Omitted: {}", omitted.join(", "))),
+                    });
+                }
+            }
+        }
+    }
+
+    // Compute side-effect summary
+    let mut side_effect_summary = ElegyPluginReadinessSideEffectSummary::default();
+    for projection in &package.components.capability_projections {
+        let se_class = projection.side_effect_class.as_deref().unwrap_or("read_only");
+        match se_class {
+            "none" => side_effect_summary.none += 1,
+            "read_only" => side_effect_summary.read_only += 1,
+            "disk_read" => side_effect_summary.disk_read += 1,
+            "disk_write" => side_effect_summary.disk_write += 1,
+            "network_outbound" => side_effect_summary.network_outbound += 1,
+            "process_spawn" => side_effect_summary.process_spawn += 1,
+            "desktop_ui" => side_effect_summary.desktop_ui += 1,
+            _ => {}
+        }
+    }
+    readiness.side_effect_summary = Some(side_effect_summary);
+
+    // Determine overall readiness
+    let has_errors = findings.iter().any(|f| f.severity == "error");
+    let has_warnings = findings.iter().any(|f| f.severity == "warning");
+
+    readiness.readiness = if has_errors {
+        "blocked".to_string()
+    } else if has_warnings {
+        "partial".to_string()
+    } else {
+        "ready".to_string()
+    };
+    readiness.findings = findings;
+
+    Ok(readiness)
+}
+
+/// Determine severity of a side-effect class string (higher = more restrictive).
+fn side_effect_severity(class: &str) -> i32 {
+    match class {
+        "none" => 0,
+        "read_only" => 1,
+        "disk_read" => 2,
+        "disk_write" => 3,
+        "network_outbound" => 4,
+        "process_spawn" => 5,
+        "desktop_ui" => 6,
+        _ => 0,
+    }
+}
+
+/// Determine severity from HostSideEffectClass enum.
+fn side_effect_severity_host(class: &HostSideEffectClass) -> i32 {
+    match class {
+        HostSideEffectClass::None => 0,
+        HostSideEffectClass::ReadOnly => 1,
+        HostSideEffectClass::DiskRead => 2,
+        HostSideEffectClass::DiskWrite => 3,
+        HostSideEffectClass::NetworkOutbound => 4,
+        HostSideEffectClass::ProcessSpawn => 5,
+        HostSideEffectClass::DesktopUi => 6,
+    }
+}
+
+fn host_side_effect_to_string(class: &HostSideEffectClass) -> String {
+    match class {
+        HostSideEffectClass::None => "none".to_string(),
+        HostSideEffectClass::ReadOnly => "read_only".to_string(),
+        HostSideEffectClass::DiskRead => "disk_read".to_string(),
+        HostSideEffectClass::DiskWrite => "disk_write".to_string(),
+        HostSideEffectClass::NetworkOutbound => "network_outbound".to_string(),
+        HostSideEffectClass::ProcessSpawn => "process_spawn".to_string(),
+        HostSideEffectClass::DesktopUi => "desktop_ui".to_string(),
+    }
+}
+
+/// Load a skill definition from a JSON file.
+fn load_skill_definition_file(path: &Path) -> Result<SkillDefinitionV2, ToolingError> {
+    let content = fs::read_to_string(path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let skill: SkillDefinitionV2 = serde_json::from_str(&content).map_err(|source| {
+        ToolingError::Json {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
+    Ok(skill)
+}
+
+/// Check whether the tools required by a plugin package are installed and probeable.
+/// Reads an install receipt and optionally probes binaries.
+pub fn check_plugin_installation(
+    package_path: &Path,
+    install_receipt_path: &Path,
+    bin_dir: Option<&Path>,
+    skip_probe: bool,
+    package_root: Option<&Path>,
+) -> Result<ElegyPluginReadinessV1, ToolingError> {
+    let package = load_plugin_package_file(package_path)?;
+    let _root = package_root.unwrap_or_else(|| package_path.parent().unwrap_or(Path::new(".")));
+
+    // Load install receipt
+    let receipt_content =
+        fs::read_to_string(install_receipt_path).map_err(|source| ToolingError::Io {
+            operation: "read",
+            path: install_receipt_path.to_path_buf(),
+            source,
+        })?;
+    let receipt: ElegyPluginInstallReceiptV1 =
+        serde_json::from_str(&receipt_content).map_err(|source| ToolingError::Json {
+            path: install_receipt_path.to_path_buf(),
+            source,
+        })?;
+
+    let mut readiness = ElegyPluginReadinessV1 {
+        schema_version: "elegy-plugin-readiness/v1".to_string(),
+        package_identity: ElegyPluginReadinessPackageIdentity {
+            package_id: package.identity.package_id.clone(),
+            name: package.identity.name.clone(),
+            version: package.identity.version.clone(),
+        },
+        readiness: "ready".to_string(),
+        ..Default::default()
+    };
+
+    let mut findings: Vec<ElegyPluginReadinessFinding> = Vec::new();
+
+    for tool_req in &package.components.tool_requirements {
+        let receipt_binary = receipt
+            .installed_binaries
+            .iter()
+            .find(|b| b.tool_name == tool_req.tool_name);
+
+        let resolved_path = resolve_binary_path(
+            receipt_binary.map(|rb| rb.binary_path.as_str()),
+            bin_dir,
+            &tool_req.cli_binary,
+        );
+
+        let probe_target = match resolved_path {
+            Some(ref path) => path.clone(),
+            None => {
+                readiness
+                    .tool_statuses
+                    .push(ElegyPluginReadinessToolStatus {
+                        tool_name: tool_req.tool_name.clone(),
+                        cli_binary: Some(tool_req.cli_binary.clone()),
+                        status: "missing".to_string(),
+                        detail: Some(format!(
+                            "Binary '{}' not found in install receipt, bin_dir, or PATH",
+                            tool_req.cli_binary
+                        )),
+                        ..Default::default()
+                    });
+                findings.push(ElegyPluginReadinessFinding {
+                    code: "BIN-MISSING".to_string(),
+                    severity: "error".to_string(),
+                    message: format!(
+                        "Required tool '{}' (binary '{}') is not installed",
+                        tool_req.tool_name, tool_req.cli_binary
+                    ),
+                    detail: None,
+                });
+                continue;
+            }
+        };
+
+        if skip_probe {
+            readiness
+                .tool_statuses
+                .push(ElegyPluginReadinessToolStatus {
+                    tool_name: tool_req.tool_name.clone(),
+                    cli_binary: Some(tool_req.cli_binary.clone()),
+                    status: "unprobed".to_string(),
+                    detail: Some("Probe skipped by --skip-probe flag".to_string()),
+                    ..Default::default()
+                });
+            findings.push(ElegyPluginReadinessFinding {
+                code: "READINESS-PROBE-SKIPPED".to_string(),
+                severity: "warning".to_string(),
+                message: format!(
+                    "Tool '{}' was not probed due to --skip-probe",
+                    tool_req.tool_name
+                ),
+                detail: None,
+            });
+        } else {
+            let probe_cmd = tool_req.probe_command.as_deref().unwrap_or("--version");
+            let probe_result = probe_binary(&probe_target, probe_cmd);
+
+            match probe_result {
+                ProbeResult::Success { output } => {
+                    readiness
+                        .tool_statuses
+                        .push(ElegyPluginReadinessToolStatus {
+                            tool_name: tool_req.tool_name.clone(),
+                            cli_binary: Some(tool_req.cli_binary.clone()),
+                            status: "present".to_string(),
+                            probe_output: Some(output),
+                            ..Default::default()
+                        });
+                }
+                ProbeResult::Failed { error } => {
+                    readiness
+                        .tool_statuses
+                        .push(ElegyPluginReadinessToolStatus {
+                            tool_name: tool_req.tool_name.clone(),
+                            cli_binary: Some(tool_req.cli_binary.clone()),
+                            status: "broken".to_string(),
+                            detail: Some(error.clone()),
+                            ..Default::default()
+                        });
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "BIN-BROKEN".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Tool '{}' found but probe failed: {}",
+                            tool_req.tool_name, error
+                        ),
+                        detail: None,
+                    });
+                }
+                ProbeResult::NotFound => {
+                    readiness
+                        .tool_statuses
+                        .push(ElegyPluginReadinessToolStatus {
+                            tool_name: tool_req.tool_name.clone(),
+                            cli_binary: Some(tool_req.cli_binary.clone()),
+                            status: "missing".to_string(),
+                            ..Default::default()
+                        });
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "BIN-MISSING".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Required tool '{}' not found",
+                            tool_req.tool_name
+                        ),
+                        detail: None,
+                    });
+                }
+            }
+        }
+    }
+
+    let has_errors = findings.iter().any(|f| f.severity == "error");
+    let has_warnings = findings.iter().any(|f| f.severity == "warning");
+    readiness.readiness = if has_errors {
+        "blocked"
+    } else if has_warnings {
+        "partial"
+    } else {
+        "ready"
+    }
+    .to_string();
+    readiness.findings = findings;
+
+    Ok(readiness)
+}
+
+/// Resolve the actual binary path for a tool requirement.
+///
+/// Resolution order:
+/// 1. `install_receipt.binaryPath` when present and the file exists.
+/// 2. `--bin-dir/<cliBinary[.exe]>` when `--bin-dir` is supplied and the file exists.
+/// 3. `cliBinary` found via `PATH` (returns the name as-is for Command lookup).
+fn resolve_binary_path(
+    receipt_binary_path: Option<&str>,
+    bin_dir: Option<&Path>,
+    cli_binary: &str,
+) -> Option<PathBuf> {
+    // Candidate binary names to check on disk
+    let candidates: Vec<String> = if cfg!(windows) {
+        vec![
+            format!("{}.exe", cli_binary),
+            format!("{}.cmd", cli_binary),
+            format!("{}.bat", cli_binary),
+            cli_binary.to_string(),
+        ]
+    } else {
+        vec![cli_binary.to_string()]
+    };
+
+    // 1. Receipt binary path
+    if let Some(receipt_path) = receipt_binary_path {
+        let path = PathBuf::from(receipt_path);
+        if path.is_file() {
+            return Some(path);
+        }
+    }
+
+    // 2. bin_dir binary path
+    if let Some(bd) = bin_dir {
+        for candidate in &candidates {
+            let path = bd.join(candidate);
+            if path.is_file() {
+                return Some(path);
+            }
+        }
+    }
+
+    // 3. PATH lookup
+    if probe_binary_in_path(cli_binary) {
+        return Some(PathBuf::from(cli_binary));
+    }
+
+    None
+}
+
+enum ProbeResult {
+    Success { output: String },
+    Failed { error: String },
+    NotFound,
+}
+
+fn probe_binary_in_path(binary_name: &str) -> bool {
+    if cfg!(windows) {
+        std::process::Command::new("where")
+            .arg(binary_name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    } else {
+        std::process::Command::new("which")
+            .arg(binary_name)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+}
+
+fn probe_binary(target: &Path, probe_arg: &str) -> ProbeResult {
+    let result = std::process::Command::new(target)
+        .arg(probe_arg)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match result {
+        Ok(output) => {
+            if output.status.success() {
+                let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                let combined = if stdout.is_empty() { stderr } else { stdout };
+                // Truncate to max 4KB
+                let truncated = if combined.len() > 4096 {
+                    format!("{}... (truncated)", &combined[..4096])
+                } else {
+                    combined
+                };
+                ProbeResult::Success { output: truncated }
+            } else {
+                let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+                ProbeResult::Failed { error: stderr }
+            }
+        }
+        Err(e) => {
+            if e.kind() == std::io::ErrorKind::NotFound {
+                ProbeResult::NotFound
+            } else {
+                ProbeResult::Failed {
+                    error: e.to_string(),
+                }
+            }
+        }
+    }
+}
+
+/// Supported plugin template kinds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum PluginTemplateKind {
+    SkillOnly,
+    CliTool,
+    McpTool,
+    Configuration,
+    Mixed,
+}
+
+impl PluginTemplateKind {
+    pub fn from_str(s: &str) -> Result<Self, ToolingError> {
+        match s {
+            "skill-only" => Ok(Self::SkillOnly),
+            "cli-tool" => Ok(Self::CliTool),
+            "mcp-tool" => Ok(Self::McpTool),
+            "configuration" => Ok(Self::Configuration),
+            "mixed" => Ok(Self::Mixed),
+            _ => Err(ToolingError::InvalidPluginPackage {
+                path: PathBuf::from(s),
+                issues: vec![format!(
+                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, mcp-tool, configuration, mixed",
+                    s
+                )],
+            }),
+        }
+    }
+}
+
+/// Scaffold a new plugin package directory from a template.
+pub fn scaffold_plugin_package(
+    template: PluginTemplateKind,
+    output_dir: &Path,
+    package_name: &str,
+    package_version: &str,
+) -> Result<Vec<String>, ToolingError> {
+    if output_dir.exists() {
+        return Err(ToolingError::OutputExists {
+            path: output_dir.to_path_buf(),
+        });
+    }
+
+    let mut written_files = Vec::new();
+    let package_id = format!("elegy.{}", package_name);
+
+    // Build the plugin.json
+    let plugin_json =
+        build_scaffold_plugin_json(&template, package_name, package_version, &package_id);
+    let plugin_json_path = output_dir.join("plugin.json");
+    write_json_file(&plugin_json_path, &plugin_json, false)?;
+    written_files.push(display_path(&plugin_json_path));
+
+    // Create common directories
+    let dirs_to_create = match template {
+        PluginTemplateKind::SkillOnly => vec!["skills", "docs"],
+        PluginTemplateKind::CliTool => vec!["skills", "docs", "contracts"],
+        PluginTemplateKind::McpTool => vec!["skills", "docs", "contracts", "mcp"],
+        PluginTemplateKind::Configuration => vec!["configuration", "docs"],
+        PluginTemplateKind::Mixed => {
+            vec!["skills", "docs", "contracts", "mcp", "configuration"]
+        }
+    };
+
+    for dir in &dirs_to_create {
+        let dir_path = output_dir.join(dir);
+        fs::create_dir_all(&dir_path).map_err(|source| ToolingError::Io {
+            operation: "create directory",
+            path: dir_path,
+            source,
+        })?;
+    }
+
+    // Create a README.md
+    let readme_content = format!(
+        "# {}\n\n{}\n\n## Overview\n\nThis is an Elegy plugin package.\n\n## Components\n\n",
+        package_name,
+        match template {
+            PluginTemplateKind::SkillOnly => "A skill-only plugin package.",
+            PluginTemplateKind::CliTool => "A CLI tool plugin package.",
+            PluginTemplateKind::McpTool => "An MCP tool plugin package.",
+            PluginTemplateKind::Configuration => "A configuration plugin package.",
+            PluginTemplateKind::Mixed => {
+                "A mixed plugin package with skills, tools, and configurations."
+            }
+        }
+    );
+    let readme_path = output_dir.join("README.md");
+    fs::write(&readme_path, &readme_content).map_err(|source| ToolingError::Io {
+        operation: "write",
+        path: readme_path.clone(),
+        source,
+    })?;
+    written_files.push(display_path(&readme_path));
+
+    Ok(written_files)
+}
+
+fn build_scaffold_plugin_json(
+    template: &PluginTemplateKind,
+    package_name: &str,
+    package_version: &str,
+    package_id: &str,
+) -> serde_json::Value {
+    let mut components = serde_json::json!({});
+
+    match template {
+        PluginTemplateKind::SkillOnly
+        | PluginTemplateKind::CliTool
+        | PluginTemplateKind::Mixed => {
+            components["skillDefinitions"] = serde_json::json!([{
+                "id": format!("{}-skill", package_name),
+                "definition": {
+                    "skillFormat": "elegy-skill-definition",
+                    "skillVersion": 2,
+                    "identity": {
+                        "namespace": "elegy",
+                        "name": package_name,
+                        "version": package_version
+                    },
+                    "capabilities": [],
+                    "lifecycleState": "draft"
+                }
+            }]);
+        }
+        PluginTemplateKind::McpTool => {
+            components["skillDefinitions"] = serde_json::json!([{
+                "id": format!("{}-skill", package_name),
+                "definition": {
+                    "skillFormat": "elegy-skill-definition",
+                    "skillVersion": 2,
+                    "identity": {
+                        "namespace": "elegy",
+                        "name": package_name,
+                        "version": package_version
+                    },
+                    "capabilities": [],
+                    "lifecycleState": "draft"
+                }
+            }]);
+            components["mcpProjections"] = serde_json::json!([{
+                "id": format!("{}-mcp", package_name),
+                "serverName": package_name
+            }]);
+        }
+        PluginTemplateKind::Configuration => {
+            components["configurationTemplates"] = serde_json::json!([{
+                "id": format!("{}-template", package_name),
+                "path": format!("configuration/{}-template.json", package_name),
+                "description": format!("Default configuration template for {}", package_name)
+            }]);
+        }
+    }
+
+    // Add docs
+    components["docs"] = serde_json::json!([{
+        "id": "readme",
+        "path": "README.md"
+    }]);
+
+    serde_json::json!({
+        "schemaVersion": "elegy-plugin-package/v2",
+        "identity": {
+            "packageId": package_id,
+            "name": package_name,
+            "version": package_version,
+            "displayName": format!("Elegy {} Plugin", package_name)
+        },
+        "metadata": {
+            "description": format!("A {} Elegy plugin package.", match template {
+                PluginTemplateKind::SkillOnly => "skill-only",
+                PluginTemplateKind::CliTool => "CLI tool",
+                PluginTemplateKind::McpTool => "MCP tool",
+                PluginTemplateKind::Configuration => "configuration",
+                PluginTemplateKind::Mixed => "mixed",
+            }),
+            "license": "MIT"
+        },
+        "components": components
+    })
+}
+
+/// Inspect a plugin package and return its metadata as a JSON value.
+pub fn inspect_plugin_package(package_path: &Path) -> Result<serde_json::Value, ToolingError> {
+    let package = load_plugin_package_file(package_path)?;
+
+    let skill_count = package.components.skill_definitions.len();
+    let projection_count = package.components.capability_projections.len();
+    let mcp_count = package.components.mcp_projections.len();
+    let config_template_count = package.components.configuration_templates.len();
+    let config_profile_count = package.components.configuration_profiles.len();
+    let tool_req_count = package.components.tool_requirements.len();
+    let instruction_count = package.components.instruction_skills.len();
+    let doc_count = package.components.docs.len();
+
+    Ok(serde_json::json!({
+        "schemaVersion": package.schema_version,
+        "identity": {
+            "packageId": package.identity.package_id,
+            "name": package.identity.name,
+            "version": package.identity.version,
+            "displayName": package.identity.display_name
+        },
+        "summary": {
+            "skillCount": skill_count,
+            "capabilityProjectionCount": projection_count,
+            "mcpProjectionCount": mcp_count,
+            "configurationTemplateCount": config_template_count,
+            "configurationProfileCount": config_profile_count,
+            "toolRequirementCount": tool_req_count,
+            "instructionSkillCount": instruction_count,
+            "docCount": doc_count
+        }
+    }))
+}
+
+/// Pack a plugin package source directory into a portable zip archive.
+pub fn pack_plugin_package(source_dir: &Path, output_zip: &Path) -> Result<String, ToolingError> {
+    // Verify plugin.json exists
+    let plugin_json_path = source_dir.join("plugin.json");
+    if !plugin_json_path.exists() {
+        return Err(ToolingError::Io {
+            operation: "find plugin.json",
+            path: plugin_json_path,
+            source: std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "plugin.json not found in source directory",
+            ),
+        });
+    }
+
+    // Validate the package before packing
+    let _package = load_plugin_package_file(&plugin_json_path)?;
+
+    // Create the zip archive
+    let file = fs::File::create(output_zip).map_err(|source| ToolingError::Io {
+        operation: "create",
+        path: output_zip.to_path_buf(),
+        source,
+    })?;
+
+    let mut zip_writer = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+
+    let mut buffer = Vec::new();
+    let entries = walk_dir_for_pack(source_dir)?;
+
+    for entry_path in &entries {
+        let relative = entry_path.strip_prefix(source_dir).unwrap_or(entry_path);
+        let relative_str = relative.to_string_lossy().replace('\\', "/");
+
+        zip_writer
+            .start_file(relative_str.clone(), options)
+            .map_err(|source| ToolingError::Io {
+                operation: "write zip entry",
+                path: PathBuf::from(&relative_str),
+                source: source.into(),
+            })?;
+
+        if entry_path.is_file() {
+            buffer.clear();
+            let mut f = fs::File::open(entry_path).map_err(|source| ToolingError::Io {
+                operation: "read",
+                path: entry_path.clone(),
+                source,
+            })?;
+            f.read_to_end(&mut buffer).map_err(|source| ToolingError::Io {
+                operation: "read",
+                path: entry_path.clone(),
+                source,
+            })?;
+            zip_writer
+                .write_all(&buffer)
+                .map_err(|source| ToolingError::Io {
+                    operation: "write zip content",
+                    path: entry_path.clone(),
+                    source,
+                })?;
+        }
+    }
+
+    zip_writer.finish().map_err(|source| ToolingError::Io {
+        operation: "finalize zip",
+        path: output_zip.to_path_buf(),
+        source: source.into(),
+    })?;
+
+    Ok(display_path(output_zip))
+}
+
+fn walk_dir_for_pack(dir: &Path) -> Result<Vec<PathBuf>, ToolingError> {
+    let mut entries = Vec::new();
+    walk_dir_recursive(dir, dir, &mut entries)?;
+    Ok(entries)
+}
+
+fn walk_dir_recursive(
+    base: &Path,
+    dir: &Path,
+    entries: &mut Vec<PathBuf>,
+) -> Result<(), ToolingError> {
+    for entry in fs::read_dir(dir).map_err(|source| ToolingError::Io {
+        operation: "read directory",
+        path: dir.to_path_buf(),
+        source,
+    })? {
+        let entry = entry.map_err(|source| ToolingError::Io {
+            operation: "read directory entry",
+            path: dir.to_path_buf(),
+            source,
+        })?;
+        let path = entry.path();
+        entries.push(path.clone());
+        if path.is_dir() {
+            walk_dir_recursive(base, &path, entries)?;
+        }
+    }
+    Ok(())
+}
+
+/// Project a plugin package for a specific host target.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum HostTarget {
+    Codex,
+    Holon,
+    OpenCode,
+    Generic,
+}
+
+impl HostTarget {
+    pub fn from_str(s: &str) -> Result<Self, ToolingError> {
+        match s.to_lowercase().as_str() {
+            "codex" => Ok(Self::Codex),
+            "holon" => Ok(Self::Holon),
+            "opencode" => Ok(Self::OpenCode),
+            "generic" => Ok(Self::Generic),
+            _ => Err(ToolingError::InvalidPluginPackage {
+                path: PathBuf::from(s),
+                issues: vec![format!(
+                    "Unknown host target '{}'. Valid options: codex, holon, opencode, generic",
+                    s
+                )],
+            }),
+        }
+    }
+}
+
+/// Project a plugin package for a specific host, emitting host-specific files.
+pub fn project_plugin_for_host(
+    package_path: &Path,
+    host: HostTarget,
+    output_dir: &Path,
+    overwrite: bool,
+    package_root: Option<&Path>,
+) -> Result<GeneratedCodexPluginArtifacts, ToolingError> {
+    match host {
+        HostTarget::Codex => {
+            generate_codex_plugin_from_package_file(package_path, output_dir, overwrite)
+        }
+        HostTarget::Holon | HostTarget::OpenCode | HostTarget::Generic => {
+            project_generic_host_plugin(package_path, host, output_dir, overwrite, package_root)
+        }
+    }
+}
+
+fn project_generic_host_plugin(
+    package_path: &Path,
+    host: HostTarget,
+    output_dir: &Path,
+    overwrite: bool,
+    package_root: Option<&Path>,
+) -> Result<GeneratedCodexPluginArtifacts, ToolingError> {
+    let package = load_plugin_package_file(package_path)?;
+    let _root = package_root.unwrap_or_else(|| package_path.parent().unwrap_or(Path::new(".")));
+    let plugin_output_name = package.identity.name.trim();
+
+    let host_name = match host {
+        HostTarget::Holon => "holon",
+        HostTarget::OpenCode => "opencode",
+        HostTarget::Generic => "generic",
+        _ => "generic",
+    };
+
+    let plugin_root = output_dir.join(plugin_output_name);
+    let manifest_dir = plugin_root.join(format!(".elegy-host-{}", host_name));
+    let manifest_path = manifest_dir.join("plugin.json");
+
+    let target_paths = vec![manifest_path.clone()];
+
+    if overwrite {
+        if plugin_root.exists() {
+            fs::remove_dir_all(&plugin_root).map_err(|source| ToolingError::Io {
+                operation: "remove",
+                path: plugin_root.clone(),
+                source,
+            })?;
+        }
+    } else {
+        preflight_output_paths(&target_paths, overwrite)?;
+    }
+
+    // Build a generic host manifest
+    let host_manifest = serde_json::json!({
+        "schemaVersion": "elegy-host-projection/v1",
+        "host": host_name,
+        "package": {
+            "packageId": package.identity.package_id,
+            "name": package.identity.name,
+            "version": package.identity.version,
+            "displayName": package.identity.display_name
+        },
+        "skills": package.components.skill_definitions.iter().map(|sd| {
+            serde_json::json!({
+                "id": sd.id,
+                "hasDefinition": sd.definition.is_some(),
+                "hasDefinitionRef": sd.definition_ref.is_some()
+            })
+        }).collect::<Vec<_>>(),
+        "capabilityProjections": package.components.capability_projections.iter().map(|cp| {
+            serde_json::json!({
+                "id": cp.id,
+                "skill": cp.skill,
+                "capability": cp.capability,
+                "lane": cp.lane,
+                "functionName": cp.projection.as_ref().and_then(|p| p.function_name.clone())
+            })
+        }).collect::<Vec<_>>(),
+        "toolRequirements": package.components.tool_requirements.iter().map(|tr| {
+            serde_json::json!({
+                "toolName": tr.tool_name,
+                "cliBinary": tr.cli_binary
+            })
+        }).collect::<Vec<_>>()
+    });
+
+    write_json_file(&manifest_path, &host_manifest, overwrite)?;
+
+    let written_files = vec![display_path(&manifest_path)];
+
+    Ok(GeneratedCodexPluginArtifacts {
+        source_package: display_path(package_path),
+        plugin_name: plugin_output_name.to_string(),
+        plugin_version: package.identity.version.clone(),
+        emitted_components: GeneratedCodexPluginComponents {
+            plugin_manifest: display_path(&manifest_path),
+            skills_dir: String::new(),
+            skills_count: 0,
             apps_emitted: false,
             mcp_servers_emitted: false,
             hooks_emitted: false,
@@ -1579,6 +2651,346 @@ mod tests {
             .join("SKILL.md")
             .is_file());
         assert_eq!(generated.emitted_components.skills_count, 4);
+    }
+
+    #[test]
+    fn plugin_install_check_receipt_binary_path_succeeds_when_not_on_path() {
+        use super::check_plugin_installation;
+        use std::process::Command;
+
+        let temp_dir = unique_temp_dir("elegy-tooling-install-check-receipt");
+
+        // Find a real binary path that exists on disk
+        let cargo_path = if cfg!(windows) {
+            let output = Command::new("where")
+                .arg("cargo")
+                .output()
+                .expect("run where cargo");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout.lines().next().unwrap_or("cargo").trim().to_string()
+        } else {
+            let output = Command::new("which")
+                .arg("cargo")
+                .output()
+                .expect("run which cargo");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        let package_path = temp_dir.join("plugin.json");
+        fs::write(
+            &package_path,
+            r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.test-plugin",
+    "name": "test-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "toolRequirements": [
+      {
+        "toolName": "nonexistent-tool",
+        "cliBinary": "nonexistent-binary-xyz-never-on-path",
+        "probeCommand": "--version"
+      }
+    ]
+  }
+}
+"#,
+        )
+        .expect("write package fixture");
+
+        let receipt_path = temp_dir.join("install-receipt.json");
+        fs::write(
+            &receipt_path,
+            format!(
+                r#"{{
+  "packageId": "elegy.test-plugin",
+  "installPath": "/tmp/test",
+  "installedBinaries": [
+    {{
+      "toolName": "nonexistent-tool",
+      "binaryPath": "{}"
+    }}
+  ]
+}}
+"#,
+                cargo_path.replace('\\', "\\\\")
+            ),
+        )
+        .expect("write receipt fixture");
+
+        let result = check_plugin_installation(
+            &package_path,
+            &receipt_path,
+            None,
+            false,
+            None,
+        )
+        .expect("install check should succeed");
+
+        assert_eq!(result.readiness, "ready");
+        assert_eq!(result.tool_statuses.len(), 1);
+        assert_eq!(result.tool_statuses[0].status, "present");
+        assert!(result.findings.is_empty());
+    }
+
+    #[test]
+    fn plugin_install_check_bin_dir_binary_succeeds_when_no_receipt_binary() {
+        use super::check_plugin_installation;
+
+        let temp_dir = unique_temp_dir("elegy-tooling-install-check-bindir");
+        let bin_dir = temp_dir.join("bin");
+        fs::create_dir_all(&bin_dir).expect("create bin dir");
+
+        // Create a stub script/batch that responds to --version
+        if cfg!(windows) {
+            let binary_path = bin_dir.join("stub-tool.cmd");
+            fs::write(&binary_path, "@echo off\necho stub 1.0\n").expect("write stub cmd");
+        } else {
+            let binary_path = bin_dir.join("stub-tool");
+            fs::write(&binary_path, "#!/bin/sh\necho stub 1.0\n").expect("write stub script");
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                fs::set_permissions(&binary_path, fs::Permissions::from_mode(0o755))
+                    .expect("set executable");
+            }
+        }
+
+        let cli_binary_name = if cfg!(windows) {
+            "stub-tool"
+        } else {
+            "stub-tool"
+        };
+
+        let package_path = temp_dir.join("plugin.json");
+        fs::write(
+            &package_path,
+            format!(
+                r#"{{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {{
+    "packageId": "elegy.test-plugin",
+    "name": "test-plugin",
+    "version": "0.1.0"
+  }},
+  "components": {{
+    "toolRequirements": [
+      {{
+        "toolName": "stub-tool",
+        "cliBinary": "{}",
+        "probeCommand": "--version"
+      }}
+    ]
+  }}
+}}
+"#,
+                cli_binary_name
+            ),
+        )
+        .expect("write package fixture");
+
+        let receipt_path = temp_dir.join("install-receipt.json");
+        fs::write(
+            &receipt_path,
+            r#"{
+  "packageId": "elegy.test-plugin",
+  "installPath": "/tmp/test",
+  "installedBinaries": []
+}
+"#,
+        )
+        .expect("write receipt fixture");
+
+        let result = check_plugin_installation(
+            &package_path,
+            &receipt_path,
+            Some(&bin_dir),
+            false,
+            None,
+        )
+        .expect("install check should succeed");
+
+        assert_eq!(result.readiness, "ready", "should find binary via bin_dir");
+        assert_eq!(result.tool_statuses.len(), 1);
+        assert_eq!(result.tool_statuses[0].status, "present");
+    }
+
+    #[test]
+    fn plugin_install_check_missing_binary_remains_blocked() {
+        use super::check_plugin_installation;
+
+        let temp_dir = unique_temp_dir("elegy-tooling-install-check-missing");
+
+        let package_path = temp_dir.join("plugin.json");
+        fs::write(
+            &package_path,
+            r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.test-plugin",
+    "name": "test-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "toolRequirements": [
+      {
+        "toolName": "ghost-tool",
+        "cliBinary": "ghost-binary-xyz-never-exists"
+      }
+    ]
+  }
+}
+"#,
+        )
+        .expect("write package fixture");
+
+        let receipt_path = temp_dir.join("install-receipt.json");
+        fs::write(
+            &receipt_path,
+            r#"{
+  "packageId": "elegy.test-plugin",
+  "installPath": "/tmp/test",
+  "installedBinaries": []
+}
+"#,
+        )
+        .expect("write receipt fixture");
+
+        let result = check_plugin_installation(
+            &package_path,
+            &receipt_path,
+            None,
+            false,
+            None,
+        )
+        .expect("install check should succeed even when binary is missing");
+
+        assert_eq!(result.readiness, "blocked");
+        assert_eq!(result.tool_statuses.len(), 1);
+        assert_eq!(result.tool_statuses[0].status, "missing");
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.code == "BIN-MISSING"));
+    }
+
+    #[test]
+    fn plugin_install_check_skip_probe_yields_partial() {
+        use super::check_plugin_installation;
+
+        let temp_dir = unique_temp_dir("elegy-tooling-install-check-skip-probe");
+
+        // Find a real binary
+        let cargo_path = if cfg!(windows) {
+            let output = std::process::Command::new("where")
+                .arg("cargo")
+                .output()
+                .expect("run where cargo");
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            stdout.lines().next().unwrap_or("cargo").trim().to_string()
+        } else {
+            let output = std::process::Command::new("which")
+                .arg("cargo")
+                .output()
+                .expect("run which cargo");
+            String::from_utf8_lossy(&output.stdout).trim().to_string()
+        };
+
+        let package_path = temp_dir.join("plugin.json");
+        fs::write(
+            &package_path,
+            r#"{
+  "schemaVersion": "elegy-plugin-package/v2",
+  "identity": {
+    "packageId": "elegy.test-plugin",
+    "name": "test-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "toolRequirements": [
+      {
+        "toolName": "cargo",
+        "cliBinary": "cargo"
+      }
+    ]
+  }
+}
+"#,
+        )
+        .expect("write package fixture");
+
+        let receipt_path = temp_dir.join("install-receipt.json");
+        fs::write(
+            &receipt_path,
+            format!(
+                r#"{{
+  "packageId": "elegy.test-plugin",
+  "installPath": "/tmp/test",
+  "installedBinaries": [
+    {{
+      "toolName": "cargo",
+      "binaryPath": "{}"
+    }}
+  ]
+}}
+"#,
+                cargo_path.replace('\\', "\\\\")
+            ),
+        )
+        .expect("write receipt fixture");
+
+        let result = check_plugin_installation(
+            &package_path,
+            &receipt_path,
+            None,
+            true,
+            None,
+        )
+        .expect("install check should succeed");
+
+        assert_eq!(result.readiness, "partial");
+        assert_eq!(result.tool_statuses.len(), 1);
+        assert_eq!(result.tool_statuses[0].status, "unprobed");
+        assert!(result
+            .findings
+            .iter()
+            .any(|f| f.code == "READINESS-PROBE-SKIPPED"));
+    }
+
+    #[test]
+    fn readiness_json_side_effect_summary_uses_snake_case_keys() {
+        use elegy_contracts::ElegyPluginReadinessSideEffectSummary;
+
+        let summary = ElegyPluginReadinessSideEffectSummary {
+            none: 1,
+            read_only: 2,
+            disk_read: 3,
+            disk_write: 4,
+            network_outbound: 5,
+            process_spawn: 6,
+            desktop_ui: 7,
+        };
+
+        let json = serde_json::to_string(&summary).expect("serialize summary");
+        let parsed: serde_json::Value = serde_json::from_str(&json).expect("parse summary JSON");
+
+        assert_eq!(parsed["none"], 1);
+        assert_eq!(parsed["read_only"], 2);
+        assert_eq!(parsed["disk_read"], 3);
+        assert_eq!(parsed["disk_write"], 4);
+        assert_eq!(parsed["network_outbound"], 5);
+        assert_eq!(parsed["process_spawn"], 6);
+        assert_eq!(parsed["desktop_ui"], 7);
+
+        // Verify camelCase variants are NOT present
+        assert!(parsed.get("readOnly").is_none());
+        assert!(parsed.get("diskRead").is_none());
+        assert!(parsed.get("diskWrite").is_none());
+        assert!(parsed.get("networkOutbound").is_none());
+        assert!(parsed.get("processSpawn").is_none());
+        assert!(parsed.get("desktopUi").is_none());
     }
 
     #[test]

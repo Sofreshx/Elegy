@@ -5,7 +5,7 @@ This file is for Claude Code. For universal instructions, see AGENTS.md.
 ## Context
 
 Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.
-Governed contracts and v2 skill definitions are the durable authority. Rust implements
+Governed contracts and skill definitions are the durable authority. Rust implements
 reusable executable behavior over those artifacts. CLI invocation templates are the
 default agent boundary, while MCP is an optional projection for MCP-native clients.
 
@@ -30,7 +30,7 @@ For elegy-memory specifically:
 
 - Use `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
 - Use `elegy-skills list/search/resolve/get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
-- V2 skill definitions in `contracts/fixtures/skill-definition-v2.*.json` are authoritative. Do not add v1 skill-definition files.
+- skill definitions in `contracts/fixtures/skill.*.json` are authoritative. Do not add v1 skill-definition files.
 - `elegy run` is the optional MCP stdio adapter over governed capabilities. Side-effecting MCP calls require explicit dry-run input or a host started with `--allow-side-effects`.
 - Profiles are allowlists, not approvals.
 

@@ -74,7 +74,7 @@
       },
       "existingSchemasUnchanged": [
         "planning-result",
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
@@ -99,11 +99,11 @@
         "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-skills/, and the wrapper surface under wrappers/elegy-skills/."
       },
       "existingArtifactsUnchanged": [
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
-        "contracts skill-definition-v2 authority",
+        "contracts skill authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
       ]
@@ -343,26 +343,26 @@
       ]
     },
     {
-      "name": "skill-definition-v2",
+      "name": "skill",
       "schemaVersion": "2.0.0",
-      "file": "skill-definition-v2.schema.json",
+      "file": "skill.schema.json",
       "fixtures": [
-        "fixtures/skill-definition-v2.minimal.json",
-        "fixtures/skill-definition-v2.elegy-data.json",
-        "fixtures/skill-definition-v2.elegy-desktop.json",
-        "fixtures/skill-definition-v2.elegy-diagram.json",
-        "fixtures/skill-definition-v2.elegy-documentation.json",
-        "fixtures/skill-definition-v2.elegy-memory.json",
-        "fixtures/skill-definition-v2.elegy-mcp.json",
-        "fixtures/skill-definition-v2.elegy-mermaid.json",
-        "fixtures/skill-definition-v2.elegy-notify.json",
-        "fixtures/skill-definition-v2.elegy-observe.json",
-        "fixtures/skill-definition-v2.elegy-obsidian.json",
-        "fixtures/skill-definition-v2.elegy-planning.json",
-        "fixtures/skill-definition-v2.elegy-repo.json",
-        "fixtures/skill-definition-v2.elegy-skill-router.json",
-        "fixtures/skill-definition-v2.elegy-skills.json",
-        "fixtures/skill-definition-v2.elegy-web.json"
+        "fixtures/skill.minimal.json",
+        "fixtures/skill.elegy-data.json",
+        "fixtures/skill.elegy-desktop.json",
+        "fixtures/skill.elegy-diagram.json",
+        "fixtures/skill.elegy-documentation.json",
+        "fixtures/skill.elegy-memory.json",
+        "fixtures/skill.elegy-mcp.json",
+        "fixtures/skill.elegy-mermaid.json",
+        "fixtures/skill.elegy-notify.json",
+        "fixtures/skill.elegy-observe.json",
+        "fixtures/skill.elegy-obsidian.json",
+        "fixtures/skill.elegy-planning.json",
+        "fixtures/skill.elegy-repo.json",
+        "fixtures/skill.elegy-skill-router.json",
+        "fixtures/skill.elegy-skills.json",
+        "fixtures/skill.elegy-web.json"
       ]
     },
     {

@@ -74,7 +74,7 @@ fn validate_command_reports_invalid_status_for_invalid_skill_fixture() {
         .join("..")
         .join("contracts")
         .join("fixtures")
-        .join("skill-definition-v2.negative-no-output-schema.json");
+        .join("skill.negative-no-output-schema.json");
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
         .args([
@@ -145,7 +145,7 @@ fn validate_dir_reports_invalid_status_for_semantically_invalid_skill() {
         .join("..")
         .join("contracts")
         .join("fixtures")
-        .join("skill-definition-v2.negative-no-output-schema.json");
+        .join("skill.negative-no-output-schema.json");
     fs::copy(&fixture, &bad_file).expect("copy invalid skill fixture into temp dir");
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))

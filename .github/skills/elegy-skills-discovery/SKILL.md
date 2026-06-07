@@ -33,7 +33,7 @@ elegy skills capability --capability-id <id> --json
 
 ## Rules
 
-- Treat v2 skill definitions as authoritative. They live in `contracts/fixtures/skill-definition-v2.*.json`.
+- Treat skill definitions as authoritative. They live in `contracts/fixtures/skill.*.json`.
 - Treat `elegy agent ...` as the host onboarding and discovery path.
 - Treat `elegy-skills` as the dedicated governed registry surface and `elegy skills ...` as the umbrella compatibility path.
 - Do not use or recreate v1 `skill-definition.*.json` files.
