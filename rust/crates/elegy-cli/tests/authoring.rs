@@ -1508,7 +1508,7 @@ fn plugin_pack_creates_valid_zip() {
     assert_eq!(parsed["status"], "ok");
     assert!(parsed["data"]["archivePath"]
         .as_str()
-        .unwrap()
+        .expect("archivePath should be a string")
         .contains("my-plugin.zip"));
 }
 
@@ -1599,13 +1599,13 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
     assert_eq!(parsed["data"]["pluginName"], "codex-test-plugin");
     assert!(!parsed["data"]["emittedComponents"]["appsEmitted"]
         .as_bool()
-        .unwrap());
+        .expect("appsEmitted should be a bool"));
     assert!(!parsed["data"]["emittedComponents"]["mcpServersEmitted"]
         .as_bool()
-        .unwrap());
+        .expect("mcpServersEmitted should be a bool"));
     assert!(!parsed["data"]["emittedComponents"]["hooksEmitted"]
         .as_bool()
-        .unwrap());
+        .expect("hooksEmitted should be a bool"));
 }
 
 #[test]
