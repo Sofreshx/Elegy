@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/web-result.schema.json",
+  "title": "WebResult",
+  "description": "Web operation result: FetchResponse with status, headers, body; or PingResult with reachability flag and elapsed milliseconds.",
+  "type": "object"
+}

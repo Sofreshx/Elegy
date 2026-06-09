@@ -12,7 +12,14 @@ summary: Contract for how elegy-plugin-package/v2 capability projections are ver
 
 # Plugin Tool Availability
 
-## Intent
+## Problem
+
+Hosts need a deterministic, machine-readable answer to "what can this plugin
+package actually do on disk right now?" without Elegy becoming a host,
+marketplace, or runtime authority. Today there is no single contract that
+covers tool availability, verify-only projection, and readiness receipts.
+
+## Goals
 
 This spec pins down a single, host-facing concept — **tool availability** — and
 the verify-only flow that produces it. The goal is to make it cheap and
@@ -79,7 +86,7 @@ host owns install, auth, approvals, and runtime enablement.
   ownership explicit. Piloting authority is now Holon's; this spec does not
   move that line.
 
-## Requirements
+## Behavior
 
 ### R1. Definitions
 
@@ -567,7 +574,7 @@ only the instruction-skill mirror changes.
   stdout and the host's downstream log; it is not mirrored into
   `install-receipt.json` or the contracts bundle.
 
-## Acceptance Checks
+## Acceptance Criteria
 
 Each item is observable and machine-checkable.
 
@@ -630,7 +637,7 @@ Each item is observable and machine-checkable.
   crate that hosts the verifier) includes the contract and CLI tests
   described in R7.4 plus the negative fixtures in the Test Plan below.
 
-## Implementation Links
+## Links
 
 - Pilot package:
   `contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json`
@@ -659,7 +666,7 @@ Each item is observable and machine-checkable.
   calls for "Resolve executable paths from an install receipt or
   manifest instead of only PATH/current executable heuristics").
 
-## Validation Evidence
+## Validation
 
 The following are the minimum validation commands for the pilot slice;
 they MUST stay green on `main` once the verifier is implemented.

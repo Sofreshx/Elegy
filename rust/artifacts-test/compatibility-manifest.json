@@ -362,7 +362,6 @@
         "fixtures/skill.elegy-repo.json",
         "fixtures/skill.elegy-skill-router.json",
         "fixtures/skill.elegy-skills.json",
-        "fixtures/skill.elegy-skill-authoring.json",
         "fixtures/skill.elegy-web.json"
       ]
     },
@@ -408,8 +407,7 @@
         "fixtures/skill-discovery-index.elegy-planning.json",
         "fixtures/skill-discovery-index.elegy-skills.json",
         "fixtures/skill-discovery-index.elegy-mermaid.json",
-        "fixtures/skill-discovery-index.elegy-obsidian.json",
-        "fixtures/skill-discovery-index.elegy-skill-authoring.json"
+        "fixtures/skill-discovery-index.elegy-obsidian.json"
       ]
     },
     {

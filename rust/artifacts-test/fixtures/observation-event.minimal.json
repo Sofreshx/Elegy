@@ -1,0 +1,22 @@
+{
+  "eventId": "obs-event-1",
+  "sessionId": "obs-session-1",
+  "sequence": 1,
+  "observedAtUtc": "2026-05-13T00:00:01Z",
+  "observationKind": "foregroundWindowChanged",
+  "summary": "Foreground window changed to Notepad.",
+  "window": {
+    "hwnd": 1234,
+    "title": "Untitled - Notepad",
+    "processId": 5678,
+    "bounds": {
+      "x": 100,
+      "y": 100,
+      "width": 800,
+      "height": 600
+    }
+  },
+  "metadata": {
+    "processName": "notepad.exe"
+  }
+}

@@ -1,0 +1,236 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.planning-plugin",
+    "name": "elegy-planning",
+    "version": "0.1.0",
+    "displayName": "Elegy Planning Plugin"
+  },
+  "metadata": {
+    "description": "Portable planning package fixture for downstream host projection from governed planning skill definitions, including work-point graph projection and project-run lease management.",
+    "tags": ["planning", "roadmap", "durable-state", "plugin", "work-point", "project-run", "lease", "graph", "next-runnable"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/elegy-planning-v1.md",
+    "subsetOf": [
+      "planning-goal-create", "planning-goal-show",
+      "planning-roadmap-create", "planning-plan-show",
+      "planning-validate-all", "planning-project-run-claim",
+      "planning-project-run-activate", "planning-project-run-release",
+      "planning-project-run-add-evidence", "planning-project-run-list",
+      "planning-project-run-show", "planning-work-point-next-runnable",
+      "planning-work-point-work-graph"
+    ]
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "planning-skill",
+        "definitionRef": "contracts/fixtures/skill.elegy-planning.json"
+      }
+    ],
+    "instructionSkills": [
+      {
+        "id": "planning-instructions",
+        "path": ".agents/skills/elegy-planning/SKILL.md",
+        "description": "Repo-local planning instruction bridge metadata."
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "planning-goal-create-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-goal-create",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_goal_create"
+        }
+      },
+      {
+        "id": "planning-goal-show-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-goal-show",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_goal_show"
+        }
+      },
+      {
+        "id": "planning-roadmap-create-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-roadmap-create",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_roadmap_create"
+        }
+      },
+      {
+        "id": "planning-plan-show-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-plan-show",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_plan_show"
+        }
+      },
+      {
+        "id": "planning-validate-all-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-validate-all",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_validate_all"
+        }
+      },
+      {
+        "id": "planning-project-run-claim-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-claim",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_claim"
+        }
+      },
+      {
+        "id": "planning-project-run-activate-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-activate",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_activate"
+        }
+      },
+      {
+        "id": "planning-project-run-release-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-release",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_release"
+        }
+      },
+      {
+        "id": "planning-project-run-add-evidence-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-add-evidence",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_add_evidence"
+        }
+      },
+      {
+        "id": "planning-project-run-list-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-list",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_list"
+        }
+      },
+      {
+        "id": "planning-project-run-show-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-project-run-show",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_project_run_show"
+        }
+      },
+      {
+        "id": "planning-work-point-next-runnable-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-work-point-next-runnable",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_work_point_next_runnable"
+        }
+      },
+      {
+        "id": "planning-work-point-work-graph-cli",
+        "skill": "elegy.planning",
+        "capability": "planning-work-point-work-graph",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_read",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "planning_work_point_work_graph"
+        }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-planning",
+        "cliBinary": "elegy-planning",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Planning CLI for durable planning operations."
+      }
+    ],
+    "hostCompatibility": [
+      {
+        "host": "opencode",
+        "versionRange": ">=0.1.0",
+        "notes": "OpenCode support via CLI invocation templates."
+      },
+      {
+        "host": "generic",
+        "versionRange": ">=0.1.0"
+      }
+    ],
+    "docs": [
+      {
+        "id": "planning-readme",
+        "path": "rust/crates/elegy-planning/README.md"
+      },
+      {
+        "id": "planning-architecture",
+        "path": "docs/architecture/elegy-planning-v1.md"
+      },
+      {
+        "id": "planning-spec",
+        "path": "docs/specs/elegy-planning.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "disk_write",
+    "requiresApproval": false,
+    "policyTags": ["planning-authority", "scope-aware", "sqlite-backed"]
+  }
+}

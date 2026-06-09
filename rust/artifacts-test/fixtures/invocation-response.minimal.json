@@ -1,0 +1,14 @@
+{
+  "requestId": "invoke-req-1",
+  "executionId": "exec-example-1",
+  "status": "completed",
+  "output": {
+    "message": "hello"
+  },
+  "failure": null,
+  "completedAt": "2026-03-31T17:00:01Z",
+  "traceRef": "trace-example-1",
+  "metadata": {
+    "surface": "elegy-cli"
+  }
+}
