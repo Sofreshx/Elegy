@@ -5,19 +5,18 @@ use elegy_contracts::{
     load_elegy_configuration_profile_fixture_from_dir,
     load_elegy_configuration_receipt_fixture_from_dir,
     load_elegy_configuration_template_fixture_from_dir, load_elegy_plugin_package_fixture_from_dir,
-    load_elegy_plugin_package_v2_fixture_from_dir, load_execution_event_fixture_from_dir,
-    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
-    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
-    load_observation_event_fixture_from_dir, load_observation_session_fixture_from_dir,
-    load_observation_summary_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
-    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
-    resolve_upstream_contracts_dir, validate_agent_capability_profile,
-    validate_capability_definition, validate_elegy_configuration_profile,
-    validate_elegy_configuration_receipt, validate_elegy_configuration_template,
-    validate_elegy_plugin_package, validate_execution_event, validate_invocation_request,
-    validate_invocation_response, validate_mcp_analysis_result, validate_mcp_server_descriptor,
-    validate_observation_event, validate_observation_session, validate_observation_summary,
-    validate_skill_definition_v2, validate_structured_failure,
+    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
+    load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
+    load_mcp_server_descriptor_fixture_from_dir, load_observation_event_fixture_from_dir,
+    load_observation_session_fixture_from_dir, load_observation_summary_fixture_from_dir,
+    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
+    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
+    validate_agent_capability_profile, validate_capability_definition,
+    validate_elegy_configuration_profile, validate_elegy_configuration_receipt,
+    validate_elegy_configuration_template, validate_elegy_plugin_package, validate_execution_event,
+    validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
+    validate_mcp_server_descriptor, validate_observation_event, validate_observation_session,
+    validate_observation_summary, validate_skill_definition_v2, validate_structured_failure,
     validate_support_manifest_against_upstream, CapabilityApprovalRequirement,
     CapabilityDefinition, CapabilityGovernance, CapabilitySource, CapabilitySourceKind,
     ExecutionEvent, ExecutionEventStatus, ExecutionEventType, InvocationRequest,
@@ -51,8 +50,7 @@ fn upstream_bundle_contains_supported_schema_entries() {
         .collect::<BTreeSet<_>>();
 
     assert!(schema_names.contains("skill"));
-    assert!(schema_names.contains("elegy-plugin-package-v1"));
-    assert!(schema_names.contains("elegy-plugin-package-v2"));
+    assert!(schema_names.contains("elegy-plugin-package"));
     assert!(schema_names.contains("skill-discovery-index"));
     assert!(schema_names.contains("mcp-tool-definition"));
     assert!(schema_names.contains("mcp-server-descriptor"));
@@ -255,7 +253,7 @@ fn builtin_skill_capability_projections_are_semantically_valid() {
 #[test]
 fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
-    let package = load_elegy_plugin_package_v2_fixture_from_dir(&contracts_dir)
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
         .expect("load upstream elegy-plugin-package fixture");
 
     let validation = validate_elegy_plugin_package(&package);
@@ -265,7 +263,7 @@ fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
         validation.issues
     );
 
-    assert_eq!(package.schema_version, "elegy-plugin-package/v2");
+    assert_eq!(package.schema_version, "elegy-plugin-package/v1");
     assert_eq!(
         package.identity.package_id,
         "elegy.demo-configuration-plugin"
@@ -276,9 +274,8 @@ fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
 
 #[test]
 fn plugin_package_validator_rejects_invalid_uri_fields() {
-    let mut package =
-        load_elegy_plugin_package_v2_fixture_from_dir(&resolve_upstream_contracts_dir())
-            .expect("load upstream elegy-plugin-package fixture");
+    let mut package = load_elegy_plugin_package_fixture_from_dir(&resolve_upstream_contracts_dir())
+        .expect("load upstream elegy-plugin-package fixture");
 
     package.metadata = Some(elegy_contracts::ElegyPluginPackageMetadata {
         homepage: Some("not-a-uri".to_string()),
@@ -303,25 +300,16 @@ fn plugin_package_validator_rejects_invalid_uri_fields() {
 }
 
 #[test]
-fn plugin_package_fixture_helpers_keep_v1_and_v2_separate() {
+fn plugin_package_fixture_has_unified_schema_version() {
     let contracts_dir = resolve_upstream_contracts_dir();
-    let package_v1 = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
-        .expect("load upstream v1 elegy-plugin-package fixture");
-    let package_v2 = load_elegy_plugin_package_v2_fixture_from_dir(&contracts_dir)
-        .expect("load upstream v2 elegy-plugin-package fixture");
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
+        .expect("load upstream elegy-plugin-package fixture");
 
-    assert_eq!(package_v1.schema_version, "elegy-plugin-package/v1");
-    assert_eq!(package_v1.identity.package_id, "elegy.demo-plugin");
-    assert!(package_v1.components.configuration_templates.is_empty());
-    assert!(package_v1.components.configuration_profiles.is_empty());
-
-    assert_eq!(package_v2.schema_version, "elegy-plugin-package/v2");
+    assert_eq!(package.schema_version, "elegy-plugin-package/v1");
     assert_eq!(
-        package_v2.identity.package_id,
+        package.identity.package_id,
         "elegy.demo-configuration-plugin"
     );
-    assert_eq!(package_v2.components.configuration_templates.len(), 1);
-    assert_eq!(package_v2.components.configuration_profiles.len(), 1);
 }
 
 #[test]
@@ -769,10 +757,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("capability-definition.schema.json")
         .is_file());
     assert!(output_path
-        .join("elegy-plugin-package-v1.schema.json")
+        .join("elegy-plugin-package.schema.json")
         .is_file());
     assert!(output_path
-        .join("elegy-plugin-package-v2.schema.json")
+        .join("elegy-plugin-package.schema.json")
         .is_file());
     assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path.join("invocation-request.schema.json").is_file());
@@ -793,11 +781,11 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .is_file());
     assert!(output_path
         .join("fixtures")
-        .join("elegy-plugin-package-v1.minimal.json")
+        .join("elegy-plugin-package.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
-        .join("elegy-plugin-package-v2.minimal.json")
+        .join("elegy-plugin-package.minimal.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -856,12 +844,8 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("agent-check.schema.json").is_ok());
         assert!(archive.by_name("agent-discovery.schema.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
-        assert!(archive
-            .by_name("elegy-plugin-package-v1.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("elegy-plugin-package-v2.schema.json")
-            .is_ok());
+        assert!(archive.by_name("elegy-plugin-package.schema.json").is_ok());
+        assert!(archive.by_name("elegy-plugin-package.schema.json").is_ok());
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive.by_name("invocation-request.schema.json").is_ok());
         assert!(archive.by_name("invocation-response.schema.json").is_ok());
@@ -873,10 +857,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
         assert!(archive
-            .by_name("fixtures/elegy-plugin-package-v1.minimal.json")
+            .by_name("fixtures/elegy-plugin-package.minimal.json")
             .is_ok());
         assert!(archive
-            .by_name("fixtures/elegy-plugin-package-v2.minimal.json")
+            .by_name("fixtures/elegy-plugin-package.minimal.json")
             .is_ok());
         assert!(archive
             .by_name("fixtures/configuration/demo-template.json")
@@ -1128,20 +1112,12 @@ fn load_dedicated_plugin_package(
 fn dedicated_elegy_plugin_package_fixtures_are_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
 
-    let v1_planning = load_dedicated_plugin_package(
-        &contracts_dir,
-        "elegy-plugin-package-v1.elegy-planning.json",
-    );
-    let v1_skills =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v1.elegy-skills.json");
-    let v2_planning = load_dedicated_plugin_package(
-        &contracts_dir,
-        "elegy-plugin-package-v2.elegy-planning.json",
-    );
-    let v2_skills =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-skills.json");
+    let planning_package =
+        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package.elegy-planning.json");
+    let skills_package =
+        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package.elegy-skills.json");
 
-    for package in [&v1_planning, &v1_skills, &v2_planning, &v2_skills] {
+    for package in [&planning_package, &skills_package] {
         let validation = validate_elegy_plugin_package(package);
         assert!(
             validation.is_valid(),
@@ -1151,124 +1127,18 @@ fn dedicated_elegy_plugin_package_fixtures_are_semantically_valid() {
         );
     }
 
-    assert_eq!(v1_planning.schema_version, "elegy-plugin-package/v1");
-    assert_eq!(v1_planning.identity.package_id, "elegy.planning-plugin");
-    assert_eq!(v1_skills.schema_version, "elegy-plugin-package/v1");
-    assert_eq!(v1_skills.identity.package_id, "elegy.skills-plugin");
-
-    assert_eq!(v2_planning.schema_version, "elegy-plugin-package/v2");
-    assert_eq!(v2_planning.identity.package_id, "elegy.planning-plugin");
-    assert!(!v2_planning.components.capability_projections.is_empty());
-    assert_eq!(v2_skills.schema_version, "elegy-plugin-package/v2");
-    assert_eq!(v2_skills.identity.package_id, "elegy.skills-plugin");
-    assert!(!v2_skills.components.capability_projections.is_empty());
-}
-
-#[test]
-fn v2_holon_packages_expose_callable_projections_directly_and_via_host_projection() {
-    let contracts_dir = resolve_upstream_contracts_dir();
-
-    let planning_package = load_dedicated_plugin_package(
-        &contracts_dir,
-        "elegy-plugin-package-v2.elegy-planning.json",
+    assert_eq!(planning_package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(
+        planning_package.identity.package_id,
+        "elegy.planning-plugin"
     );
-    let skills_package =
-        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package-v2.elegy-skills.json");
-
-    for package in [&planning_package, &skills_package] {
-        let projection_ids = package
-            .components
-            .capability_projections
-            .iter()
-            .map(|projection| projection.id.clone())
-            .collect::<BTreeSet<_>>();
-        assert!(
-            !projection_ids.is_empty(),
-            "v2 Holon package '{}' should expose at least one capabilityProjections entry",
-            package.identity.package_id
-        );
-        for projection in &package.components.capability_projections {
-            let function_name = projection
-                .projection
-                .as_ref()
-                .and_then(|metadata| metadata.function_name.as_deref())
-                .expect("v2 capabilityProjections must declare projection.functionName");
-            assert!(
-                !function_name.trim().is_empty(),
-                "v2 capabilityProjections functionName must be non-empty for '{}'",
-                projection.id
-            );
-        }
-    }
-
-    let planning_skill_path = contracts_dir
-        .join("fixtures")
-        .join("skill.elegy-planning.json");
-    let planning_skill: SkillDefinitionV2 = serde_json::from_str(
-        &fs::read_to_string(&planning_skill_path).expect("read planning skill"),
-    )
-    .expect("parse planning skill");
-    let planning_skill_projection = planning_skill
-        .host_projection
-        .as_ref()
-        .expect("planning skill should have host_projection");
-    let planning_skill_function_names = planning_skill_projection
-        .capability_projections
-        .iter()
-        .map(|projection| projection.function_name.clone())
-        .collect::<BTreeSet<_>>();
-    let planning_package_function_names = planning_package
+    assert_eq!(skills_package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(skills_package.identity.package_id, "elegy.skills-plugin");
+    assert!(!planning_package
         .components
         .capability_projections
-        .iter()
-        .filter_map(|projection| {
-            projection
-                .projection
-                .as_ref()
-                .and_then(|metadata| metadata.function_name.clone())
-        })
-        .collect::<BTreeSet<_>>();
-    for function_name in &planning_package_function_names {
-        assert!(
-            planning_skill_function_names.contains(function_name),
-            "v2 planning package function '{}' should also be declared on the host_projection of the planning skill",
-            function_name
-        );
-    }
-
-    let skills_skill_path = contracts_dir
-        .join("fixtures")
-        .join("skill.elegy-skills.json");
-    let skills_skill: SkillDefinitionV2 =
-        serde_json::from_str(&fs::read_to_string(&skills_skill_path).expect("read skills skill"))
-            .expect("parse skills skill");
-    let skills_skill_projection = skills_skill
-        .host_projection
-        .as_ref()
-        .expect("skills skill should have host_projection");
-    let skills_skill_function_names = skills_skill_projection
-        .capability_projections
-        .iter()
-        .map(|projection| projection.function_name.clone())
-        .collect::<BTreeSet<_>>();
-    let skills_package_function_names = skills_package
-        .components
-        .capability_projections
-        .iter()
-        .filter_map(|projection| {
-            projection
-                .projection
-                .as_ref()
-                .and_then(|metadata| metadata.function_name.clone())
-        })
-        .collect::<BTreeSet<_>>();
-    for function_name in &skills_package_function_names {
-        assert!(
-            skills_skill_function_names.contains(function_name),
-            "skills package function '{}' should also be declared on the host_projection of the skills skill",
-            function_name
-        );
-    }
+        .is_empty());
+    assert!(!skills_package.components.capability_projections.is_empty());
 }
 
 #[test]
@@ -1288,9 +1158,8 @@ fn exported_contract_bundle_includes_dedicated_plugin_package_fixtures() {
         .expect("export contracts bundle");
 
     for fixture in [
-        "fixtures/elegy-plugin-package-v1.elegy-skills.json",
-        "fixtures/elegy-plugin-package-v2.elegy-planning.json",
-        "fixtures/elegy-plugin-package-v2.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
     ] {
         let on_disk = output_path.join(fixture);
         assert!(
@@ -1307,9 +1176,8 @@ fn exported_contract_bundle_includes_dedicated_plugin_package_fixtures() {
     let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
     let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
     for entry in [
-        "fixtures/elegy-plugin-package-v1.elegy-skills.json",
-        "fixtures/elegy-plugin-package-v2.elegy-planning.json",
-        "fixtures/elegy-plugin-package-v2.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
     ] {
         assert!(
             archive.by_name(entry).is_ok(),

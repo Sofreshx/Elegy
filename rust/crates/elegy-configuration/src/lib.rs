@@ -7,7 +7,7 @@ use elegy_contracts::{
     ElegyConfigurationReceiptSourceKind, ElegyConfigurationReceiptSubjectKind,
     ElegyConfigurationReceiptSummary, ElegyConfigurationTemplate, ElegyPluginPackage,
     ELEGY_CONFIGURATION_RECEIPT_SCHEMA_VERSION, ELEGY_CONFIGURATION_TEMPLATE_SCHEMA_VERSION,
-    ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION,
+    ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -1274,10 +1274,10 @@ fn load_package_context(path: &Path) -> Result<PackageContext, ConfigurationErro
             issues: validation.issues,
         });
     }
-    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION {
+    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION {
         return Err(ConfigurationError::UnsupportedPluginPackageVersion {
             path: path.to_path_buf(),
-            required: ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION,
+            required: ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION,
         });
     }
 
@@ -2316,7 +2316,7 @@ mod tests {
         fs::write(
             package_dir.join("package.json"),
             r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.demo-config",
     "name": "demo-config",

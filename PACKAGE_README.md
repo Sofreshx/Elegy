@@ -47,7 +47,8 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
 - Repository: https://github.com/Sofreshx/Elegy
 - Main user-facing guide: `README.md`
 - Distribution authority and maintainer guidance: `docs/distribution.md`
-- Generic installer: `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
+- Generic installer (PowerShell): `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
+- Generic installer (Bash): `bash ./scripts/install-distribution.sh -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
 - Local artifact installer: `pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
 
 The installer resolves the release manifest and checksums first, verifies asset size, SHA-256, and required archive entries, then writes `install-receipt.json` into the destination root.

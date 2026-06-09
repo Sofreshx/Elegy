@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.test.negative-phantom-capability",
     "name": "negative-phantom-capability",

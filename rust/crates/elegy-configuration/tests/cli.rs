@@ -30,7 +30,7 @@ fn dedicated_configuration_cli_supports_package_profiles() {
     let package_path = repo_root()
         .join("contracts")
         .join("fixtures")
-        .join("elegy-plugin-package-v2.demo-config.json");
+        .join("elegy-plugin-package.demo-config.json");
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-configuration"))
         .args([
@@ -76,7 +76,7 @@ fn dedicated_configuration_cli_verifies_package_profiles() {
     let package_path = repo_root()
         .join("contracts")
         .join("fixtures")
-        .join("elegy-plugin-package-v2.demo-config.json");
+        .join("elegy-plugin-package.demo-config.json");
 
     let apply_output = Command::new(env!("CARGO_BIN_EXE_elegy-configuration"))
         .args([

@@ -11,8 +11,8 @@ Codex plugin folder without promoting Codex files into authority roots.
 
 The authority chain is one-way:
 
-1. `contracts/schemas/elegy-plugin-package-v1.schema.json` and `contracts/schemas/elegy-plugin-package-v2.schema.json` define the portable package contracts.
-2. `contracts/fixtures/elegy-plugin-package-v1.minimal.json`, `contracts/fixtures/elegy-plugin-package-v2.minimal.json`, and real package instances are the governed package inputs.
+1. `contracts/schemas/elegy-plugin-package.schema.json` and `contracts/schemas/elegy-plugin-package.schema.json` define the portable package contracts.
+2. `contracts/fixtures/elegy-plugin-package.minimal.json`, `contracts/fixtures/elegy-plugin-package.minimal.json`, and real package instances are the governed package inputs.
 3. Generated Codex plugin files are derived projections only.
 
 Codex plugin files do not become authored truth for Elegy behavior, package

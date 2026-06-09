@@ -87,12 +87,8 @@
       "generated": "artifacts/contracts/skill.schema.json"
     },
     {
-      "source": "contracts/schemas/elegy-plugin-package-v1.schema.json",
-      "generated": "artifacts/contracts/elegy-plugin-package-v1.schema.json"
-    },
-    {
-      "source": "contracts/schemas/elegy-plugin-package-v2.schema.json",
-      "generated": "artifacts/contracts/elegy-plugin-package-v2.schema.json"
+      "source": "contracts/schemas/elegy-plugin-package.schema.json",
+      "generated": "artifacts/contracts/elegy-plugin-package.schema.json"
     },
 
     {
@@ -280,16 +276,32 @@
       "generated": "artifacts/contracts/fixtures/skill.elegy-web.json"
     },
     {
-      "source": "contracts/fixtures/elegy-plugin-package-v1.minimal.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.minimal.json"
+      "source": "contracts/fixtures/elegy-plugin-package.minimal.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.minimal.json"
     },
     {
-      "source": "contracts/fixtures/elegy-plugin-package-v2.minimal.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.minimal.json"
+      "source": "contracts/fixtures/elegy-plugin-package.demo-config.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.demo-config.json"
     },
     {
-      "source": "contracts/fixtures/elegy-plugin-package-v2.demo-config.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.demo-config.json"
+      "source": "contracts/fixtures/elegy-plugin-package.elegy-planning.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.elegy-planning.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package.elegy-skills.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.elegy-skills.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package.negative-missing-subset-marker.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.negative-missing-subset-marker.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package.negative-side-effect-loosening.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.negative-side-effect-loosening.json"
+    },
+    {
+      "source": "contracts/fixtures/elegy-plugin-package.negative-phantom-capability.json",
+      "generated": "artifacts/contracts/fixtures/elegy-plugin-package.negative-phantom-capability.json"
     },
 
     {
@@ -303,22 +315,6 @@
     {
       "source": "contracts/fixtures/configuration/assets/demo.txt",
       "generated": "artifacts/contracts/fixtures/configuration/assets/demo.txt"
-    },
-    {
-      "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-planning.json"
-    },
-    {
-      "source": "contracts/fixtures/elegy-plugin-package-v1.elegy-skills.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v1.elegy-skills.json"
-    },
-    {
-      "source": "contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json"
-    },
-    {
-      "source": "contracts/fixtures/elegy-plugin-package-v2.elegy-skills.json",
-      "generated": "artifacts/contracts/fixtures/elegy-plugin-package-v2.elegy-skills.json"
     },
     {
       "source": "contracts/fixtures/skill-discovery-index.minimal.json",

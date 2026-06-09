@@ -366,24 +366,17 @@
       ]
     },
     {
-      "name": "elegy-plugin-package-v1",
+      "name": "elegy-plugin-package",
       "schemaVersion": "1.0.0",
-      "file": "elegy-plugin-package-v1.schema.json",
+      "file": "elegy-plugin-package.schema.json",
       "fixtures": [
-        "fixtures/elegy-plugin-package-v1.minimal.json",
-        "fixtures/elegy-plugin-package-v1.elegy-planning.json",
-        "fixtures/elegy-plugin-package-v1.elegy-skills.json"
-      ]
-    },
-    {
-      "name": "elegy-plugin-package-v2",
-      "schemaVersion": "1.0.0",
-      "file": "elegy-plugin-package-v2.schema.json",
-      "fixtures": [
-        "fixtures/elegy-plugin-package-v2.minimal.json",
-        "fixtures/elegy-plugin-package-v2.demo-config.json",
-        "fixtures/elegy-plugin-package-v2.elegy-planning.json",
-        "fixtures/elegy-plugin-package-v2.elegy-skills.json"
+        "fixtures/elegy-plugin-package.minimal.json",
+        "fixtures/elegy-plugin-package.demo-config.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.negative-missing-subset-marker.json",
+        "fixtures/elegy-plugin-package.negative-side-effect-loosening.json",
+        "fixtures/elegy-plugin-package.negative-phantom-capability.json"
       ]
     },
     {

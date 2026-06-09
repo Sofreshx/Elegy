@@ -63,7 +63,7 @@ elegy configuration show --template-id repo-opencode-agentic-minimal --json
 elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
 elegy configuration verify --profile-id repo-opencode-minimal --target . --json
 elegy-configuration list --json
-elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package-v2.demo-config.json --profile-id demo-profile --target . --dry-run --json
+elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
 ```
 
 Bindings remain explicit and overrideable:
