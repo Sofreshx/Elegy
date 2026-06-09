@@ -4,6 +4,7 @@ use std::io::{self, Read};
 use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::str::FromStr;
 use std::sync::OnceLock;
 use std::time::{SystemTime, UNIX_EPOCH};
 

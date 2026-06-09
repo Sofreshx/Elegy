@@ -883,8 +883,10 @@ pub enum PluginTemplateKind {
     Mixed,
 }
 
-impl PluginTemplateKind {
-    pub fn from_str(s: &str) -> Result<Self, ToolingError> {
+impl std::str::FromStr for PluginTemplateKind {
+    type Err = ToolingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
             "skill-only" => Ok(Self::SkillOnly),
             "cli-tool" => Ok(Self::CliTool),
@@ -1168,6 +1170,7 @@ fn walk_dir_for_pack(dir: &Path) -> Result<Vec<PathBuf>, ToolingError> {
     Ok(entries)
 }
 
+#[allow(clippy::only_used_in_recursion)]
 fn walk_dir_recursive(
     base: &Path,
     dir: &Path,
@@ -1200,8 +1203,10 @@ pub enum HostTarget {
     Generic,
 }
 
-impl HostTarget {
-    pub fn from_str(s: &str) -> Result<Self, ToolingError> {
+impl std::str::FromStr for HostTarget {
+    type Err = ToolingError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s.to_lowercase().as_str() {
             "codex" => Ok(Self::Codex),
             "opencode" => Ok(Self::OpenCode),
