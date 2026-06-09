@@ -2753,11 +2753,7 @@ mod tests {
             }
         }
 
-        let cli_binary_name = if cfg!(windows) {
-            "stub-tool"
-        } else {
-            "stub-tool"
-        };
+        let cli_binary_name = "stub-tool";
 
         let package_path = temp_dir.join("plugin.json");
         fs::write(
