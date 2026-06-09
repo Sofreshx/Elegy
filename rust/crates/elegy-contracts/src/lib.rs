@@ -42,19 +42,14 @@ pub enum ContractsError {
     Compatibility(String),
 }
 
-const SUPPLEMENTAL_FIXTURE_FILES: &[&str] = &[
-    "fixtures/mcp-server-descriptor.parity.json",
-    "fixtures/mcp-analysis-result.parity.json",
-    "fixtures/mcp-parity-expected.json",
-    "fixtures/configuration/assets/demo.txt",
-];
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CompatibilityManifest {
     pub manifest_version: String,
     pub package: ContractPackage,
     pub schemas: Vec<SchemaEntry>,
+    #[serde(default)]
+    pub supplemental_fixtures: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -2840,7 +2835,7 @@ pub fn export_contract_bundle(
         }
     }
 
-    for fixture in SUPPLEMENTAL_FIXTURE_FILES {
+    for fixture in &compatibility_manifest.supplemental_fixtures {
         relative_files.insert(PathBuf::from(fixture));
     }
 
@@ -2852,6 +2847,42 @@ pub fn export_contract_bundle(
             &contracts_source_dir,
             relative_path,
         ))?;
+    }
+
+    // Reverse-direction completeness check: every fixture on disk must be
+    // listed in the manifest or the supplemental set. This catches orphaned
+    // fixture files that would silently be excluded from the export.
+    let fixtures_dir = contracts_source_dir.join("fixtures");
+    if fixtures_dir.is_dir() {
+        let supplemental_set: std::collections::HashSet<&str> = compatibility_manifest
+            .supplemental_fixtures
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let mut orphans = Vec::new();
+        if let Ok(entries) = fs::read_dir(&fixtures_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
+                    continue;
+                }
+                if let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) {
+                    let relative = format!("fixtures/{name}");
+                    if !relative_files.contains(Path::new(&relative))
+                        && !supplemental_set.contains(relative.as_str())
+                    {
+                        orphans.push(relative);
+                    }
+                }
+            }
+        }
+        if !orphans.is_empty() {
+            orphans.sort();
+            return Err(ContractsError::Compatibility(format!(
+                "fixture(s) on disk not listed in compatibility manifest or supplemental set: {}",
+                orphans.join(", ")
+            )));
+        }
     }
 
     let output_path = output_dir
