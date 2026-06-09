@@ -307,10 +307,12 @@ pub fn verify_plugin_package(
             if let Some(hp) = &def.host_projection {
                 skill_host_projections.insert(key.clone(), hp.clone());
             }
-            readiness.verified_skills.push(ElegyPluginReadinessVerifiedSkill {
-                skill_id: key.clone(),
-                status: "valid".to_string(),
-            });
+            readiness
+                .verified_skills
+                .push(ElegyPluginReadinessVerifiedSkill {
+                    skill_id: key.clone(),
+                    status: "valid".to_string(),
+                });
             key
         } else if let Some(definition_ref) = &component.definition_ref {
             // Try to load referenced skill definition from package root
@@ -318,8 +320,7 @@ pub fn verify_plugin_package(
             let key = format!("ref:{}", component.id);
             match load_skill_definition_file(&skill_path) {
                 Ok(def) => {
-                    let skill_key =
-                        format!("{}.{}", def.identity.namespace, def.identity.name);
+                    let skill_key = format!("{}.{}", def.identity.namespace, def.identity.name);
                     let mut caps = std::collections::BTreeSet::new();
                     for cap in &def.capabilities {
                         caps.insert(cap.id.clone());
@@ -505,7 +506,10 @@ pub fn verify_plugin_package(
     // Compute side-effect summary
     let mut side_effect_summary = ElegyPluginReadinessSideEffectSummary::default();
     for projection in &package.components.capability_projections {
-        let se_class = projection.side_effect_class.as_deref().unwrap_or("read_only");
+        let se_class = projection
+            .side_effect_class
+            .as_deref()
+            .unwrap_or("read_only");
         match se_class {
             "none" => side_effect_summary.none += 1,
             "read_only" => side_effect_summary.read_only += 1,
@@ -581,12 +585,11 @@ fn load_skill_definition_file(path: &Path) -> Result<SkillDefinitionV2, ToolingE
         path: path.to_path_buf(),
         source,
     })?;
-    let skill: SkillDefinitionV2 = serde_json::from_str(&content).map_err(|source| {
-        ToolingError::Json {
+    let skill: SkillDefinitionV2 =
+        serde_json::from_str(&content).map_err(|source| ToolingError::Json {
             path: path.to_path_buf(),
             source,
-        }
-    })?;
+        })?;
     Ok(skill)
 }
 
@@ -735,10 +738,7 @@ pub fn check_plugin_installation(
                     findings.push(ElegyPluginReadinessFinding {
                         code: "BIN-MISSING".to_string(),
                         severity: "error".to_string(),
-                        message: format!(
-                            "Required tool '{}' not found",
-                            tool_req.tool_name
-                        ),
+                        message: format!("Required tool '{}' not found", tool_req.tool_name),
                         detail: None,
                     });
                 }
@@ -979,9 +979,7 @@ fn build_scaffold_plugin_json(
     let mut components = serde_json::json!({});
 
     match template {
-        PluginTemplateKind::SkillOnly
-        | PluginTemplateKind::CliTool
-        | PluginTemplateKind::Mixed => {
+        PluginTemplateKind::SkillOnly | PluginTemplateKind::CliTool | PluginTemplateKind::Mixed => {
             components["skillDefinitions"] = serde_json::json!([{
                 "id": format!("{}-skill", package_name),
                 "definition": {
@@ -1033,7 +1031,7 @@ fn build_scaffold_plugin_json(
     }]);
 
     serde_json::json!({
-        "schemaVersion": "elegy-plugin-package/v2",
+        "schemaVersion": "elegy-plugin-package/v1",
         "identity": {
             "packageId": package_id,
             "name": package_name,
@@ -1139,11 +1137,12 @@ pub fn pack_plugin_package(source_dir: &Path, output_zip: &Path) -> Result<Strin
                 path: entry_path.clone(),
                 source,
             })?;
-            f.read_to_end(&mut buffer).map_err(|source| ToolingError::Io {
-                operation: "read",
-                path: entry_path.clone(),
-                source,
-            })?;
+            f.read_to_end(&mut buffer)
+                .map_err(|source| ToolingError::Io {
+                    operation: "read",
+                    path: entry_path.clone(),
+                    source,
+                })?;
             zip_writer
                 .write_all(&buffer)
                 .map_err(|source| ToolingError::Io {
@@ -1197,7 +1196,6 @@ fn walk_dir_recursive(
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum HostTarget {
     Codex,
-    Holon,
     OpenCode,
     Generic,
 }
@@ -1206,13 +1204,12 @@ impl HostTarget {
     pub fn from_str(s: &str) -> Result<Self, ToolingError> {
         match s.to_lowercase().as_str() {
             "codex" => Ok(Self::Codex),
-            "holon" => Ok(Self::Holon),
             "opencode" => Ok(Self::OpenCode),
             "generic" => Ok(Self::Generic),
             _ => Err(ToolingError::InvalidPluginPackage {
                 path: PathBuf::from(s),
                 issues: vec![format!(
-                    "Unknown host target '{}'. Valid options: codex, holon, opencode, generic",
+                    "Unknown host target '{}'. Valid options: codex, opencode, generic",
                     s
                 )],
             }),
@@ -1232,7 +1229,7 @@ pub fn project_plugin_for_host(
         HostTarget::Codex => {
             generate_codex_plugin_from_package_file(package_path, output_dir, overwrite)
         }
-        HostTarget::Holon | HostTarget::OpenCode | HostTarget::Generic => {
+        HostTarget::OpenCode | HostTarget::Generic => {
             project_generic_host_plugin(package_path, host, output_dir, overwrite, package_root)
         }
     }
@@ -1250,7 +1247,6 @@ fn project_generic_host_plugin(
     let plugin_output_name = package.identity.name.trim();
 
     let host_name = match host {
-        HostTarget::Holon => "holon",
         HostTarget::OpenCode => "opencode",
         HostTarget::Generic => "generic",
         _ => "generic",
@@ -2680,7 +2676,7 @@ mod tests {
         fs::write(
             &package_path,
             r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.test-plugin",
     "name": "test-plugin",
@@ -2720,14 +2716,8 @@ mod tests {
         )
         .expect("write receipt fixture");
 
-        let result = check_plugin_installation(
-            &package_path,
-            &receipt_path,
-            None,
-            false,
-            None,
-        )
-        .expect("install check should succeed");
+        let result = check_plugin_installation(&package_path, &receipt_path, None, false, None)
+            .expect("install check should succeed");
 
         assert_eq!(result.readiness, "ready");
         assert_eq!(result.tool_statuses.len(), 1);
@@ -2769,7 +2759,7 @@ mod tests {
             &package_path,
             format!(
                 r#"{{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {{
     "packageId": "elegy.test-plugin",
     "name": "test-plugin",
@@ -2803,14 +2793,9 @@ mod tests {
         )
         .expect("write receipt fixture");
 
-        let result = check_plugin_installation(
-            &package_path,
-            &receipt_path,
-            Some(&bin_dir),
-            false,
-            None,
-        )
-        .expect("install check should succeed");
+        let result =
+            check_plugin_installation(&package_path, &receipt_path, Some(&bin_dir), false, None)
+                .expect("install check should succeed");
 
         assert_eq!(result.readiness, "ready", "should find binary via bin_dir");
         assert_eq!(result.tool_statuses.len(), 1);
@@ -2827,7 +2812,7 @@ mod tests {
         fs::write(
             &package_path,
             r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.test-plugin",
     "name": "test-plugin",
@@ -2858,22 +2843,13 @@ mod tests {
         )
         .expect("write receipt fixture");
 
-        let result = check_plugin_installation(
-            &package_path,
-            &receipt_path,
-            None,
-            false,
-            None,
-        )
-        .expect("install check should succeed even when binary is missing");
+        let result = check_plugin_installation(&package_path, &receipt_path, None, false, None)
+            .expect("install check should succeed even when binary is missing");
 
         assert_eq!(result.readiness, "blocked");
         assert_eq!(result.tool_statuses.len(), 1);
         assert_eq!(result.tool_statuses[0].status, "missing");
-        assert!(result
-            .findings
-            .iter()
-            .any(|f| f.code == "BIN-MISSING"));
+        assert!(result.findings.iter().any(|f| f.code == "BIN-MISSING"));
     }
 
     #[test]
@@ -2902,7 +2878,7 @@ mod tests {
         fs::write(
             &package_path,
             r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.test-plugin",
     "name": "test-plugin",
@@ -2941,14 +2917,8 @@ mod tests {
         )
         .expect("write receipt fixture");
 
-        let result = check_plugin_installation(
-            &package_path,
-            &receipt_path,
-            None,
-            true,
-            None,
-        )
-        .expect("install check should succeed");
+        let result = check_plugin_installation(&package_path, &receipt_path, None, true, None)
+            .expect("install check should succeed");
 
         assert_eq!(result.readiness, "partial");
         assert_eq!(result.tool_statuses.len(), 1);

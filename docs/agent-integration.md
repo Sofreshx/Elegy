@@ -239,8 +239,8 @@ umbrella wrappers. Holon and other hosts can consume these receipts to locate
 the installed binaries for subprocess invocation.
 
 The governed plugin package fixtures
-(`elegy-plugin-package-v2.elegy-planning.json` and
-`elegy-plugin-package-v2.elegy-skills.json`) carry self-sufficient
+(`elegy-plugin-package.elegy-planning.json` and
+`elegy-plugin-package.elegy-skills.json`) carry self-sufficient
 `capabilityProjections` for direct host consumption, alongside the
 `hostProjection` block on the underlying skill definition. To ship in a
 released contract bundle, every package fixture must be listed under its

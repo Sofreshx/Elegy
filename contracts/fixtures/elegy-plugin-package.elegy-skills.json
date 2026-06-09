@@ -7,7 +7,7 @@
     "displayName": "Elegy Skills Plugin"
   },
   "metadata": {
-    "description": "Portable skills registry package fixture for host projection from governed skill definitions.",
+    "description": "Portable skills registry package fixture for downstream host projection from governed skill definitions.",
     "tags": ["skills", "registry", "search", "resolve", "validation", "plugin"],
     "license": "Apache-2.0",
     "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/skill-core-v1.md"
@@ -32,24 +32,7 @@
         "skill": "elegy.skills",
         "capability": "skills-registry-search",
         "lane": "subprocess",
-        "supportsDryRun": false,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": { "type": "string" }
-          },
-          "required": ["query"],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "status": { "type": "string" },
-            "data": { "type": "object" }
-          },
-          "required": ["status"],
-          "additionalProperties": true
-        },
+        "supportsDryRun": true,
         "sideEffectClass": "read_only",
         "projection": {
           "projections": ["function_calling", "cli"],
@@ -61,24 +44,7 @@
         "skill": "elegy.skills",
         "capability": "skills-registry-resolve",
         "lane": "subprocess",
-        "supportsDryRun": false,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "query": { "type": "string" }
-          },
-          "required": ["query"],
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "status": { "type": "string" },
-            "data": { "type": "object" }
-          },
-          "required": ["status"],
-          "additionalProperties": true
-        },
+        "supportsDryRun": true,
         "sideEffectClass": "read_only",
         "projection": {
           "projections": ["function_calling", "cli"],
@@ -90,24 +56,7 @@
         "skill": "elegy.skills",
         "capability": "skills-registry-validate",
         "lane": "subprocess",
-        "supportsDryRun": false,
-        "inputSchema": {
-          "type": "object",
-          "properties": {
-            "file": { "type": "string" },
-            "dir": { "type": "string" }
-          },
-          "additionalProperties": false
-        },
-        "outputSchema": {
-          "type": "object",
-          "properties": {
-            "status": { "type": "string" },
-            "data": { "type": "object" }
-          },
-          "required": ["status"],
-          "additionalProperties": true
-        },
+        "supportsDryRun": true,
         "sideEffectClass": "read_only",
         "projection": {
           "projections": ["function_calling", "cli"],

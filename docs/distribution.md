@@ -29,6 +29,32 @@ Most users do not need every asset in the release:
 
 ## Asset model
 
+### Which Download To Use
+
+| If you want... | Download |
+| --- | --- |
+| Simplest verified install path | `elegy-installer-<bundleVersion>.zip` |
+| General-purpose `elegy` CLI | `elegy-cli-<cliVersion>-<target>.zip` |
+| Contracts only | `elegy-contracts-<bundleVersion>.zip` |
+| Dedicated memory CLI | `elegy-memory-<cliVersion>-<target>.zip` |
+| Dedicated MCP CLI | `elegy-mcp-<cliVersion>-<target>.zip` |
+| Dedicated planning CLI | `elegy-planning-<cliVersion>-<target>.zip` |
+| Dedicated skill registry CLI | `elegy-skills-<cliVersion>-<target>.zip` |
+| Dedicated documentation CLI | `elegy-documentation-<cliVersion>-<target>.zip` |
+| Wrapper surface for a dedicated tool family | `elegy-*-wrapper-<bundleVersion>.zip` |
+
+Direct release asset families include:
+
+- `elegy-cli-<cliVersion>-<target>.zip` - umbrella `elegy` binary
+- `elegy-memory-<cliVersion>-<target>.zip` - dedicated local memory CLI
+- `elegy-mcp-<cliVersion>-<target>.zip` - dedicated MCP CLI
+- `elegy-planning-<cliVersion>-<target>.zip` - dedicated planning CLI
+- `elegy-skills-<cliVersion>-<target>.zip` - dedicated skill registry CLI
+- `elegy-documentation-<cliVersion>-<target>.zip` - dedicated documentation authority CLI
+- `elegy-contracts-<bundleVersion>.zip` - governed contracts bundle
+- `elegy-installer-<bundleVersion>.zip` - installer bootstrap
+- `elegy-*-wrapper-<bundleVersion>.zip` - dedicated wrapper surfaces
+
 Tagged releases are configured to publish neutral asset families across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
 
 - governed contracts bundle: `elegy-contracts-<bundleVersion>.zip`
@@ -126,11 +152,9 @@ Current governed package artifacts in that bundle include the portable plugin
 package contracts. These are metadata and validation support for consuming hosts,
 plus conservative derived projection tooling support, not an Elegy plugin runtime:
 
-- `elegy-plugin-package-v1.schema.json`
-- `fixtures/elegy-plugin-package-v1.minimal.json`
-- `elegy-plugin-package-v2.schema.json`
-- `fixtures/elegy-plugin-package-v2.minimal.json`
-- `fixtures/elegy-plugin-package-v2.demo-config.json`
+- `elegy-plugin-package.schema.json`
+- `fixtures/elegy-plugin-package.minimal.json`
+- `fixtures/elegy-plugin-package.demo-config.json`
 
 Current governed dedicated-surface skill artifacts in that bundle include:
 
@@ -191,7 +215,7 @@ model:
   file materialization and drift verification for declared assets such as skill
   mirrors, instruction blocks, MCP config, hooks, agents, and bounded text,
   JSON, or TOML patches
-- local `elegy-plugin-package/v2` files may carry governed configuration
+- local `elegy-plugin-package/v1` files may carry governed configuration
   templates and profiles for package-backed apply/verify flows
 - consuming repos still own product-specific bootstrap, runtime auth/state,
   approvals, orchestration, and any host-local startup wiring
@@ -208,7 +232,7 @@ elegy configuration list --json
 elegy configuration show --template-id repo-opencode-agentic-minimal --json
 elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
 elegy configuration verify --profile-id repo-opencode-minimal --target . --json
-elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package-v2.demo-config.json --profile-id demo-profile --target . --dry-run --json
+elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
 ```
 
 Binding defaults are template-local and overrideable:
@@ -237,37 +261,6 @@ Outputs:
 Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
 
 Wrapper archives already embed the generic installer helper. Consumers that only need a dedicated wrapper surface can use the wrapper archive directly without separately downloading the standalone installer asset.
-
-## Holon-oriented quick start
-
-For Holon or any other downstream host that wants the simplest supported consumption path:
-
-1. Pick and pin an Elegy release tag in the downstream repository.
-2. Download the standalone installer asset or vendor the same `install-distribution.ps1` helper into a repo-local bootstrap directory such as `./tools/elegy-bootstrap`.
-3. Run the generic installer helper into a repo-local tools directory such as `./tools/elegy`.
-4. Consume the extracted `contracts` directory as the governed artifact surface and invoke the extracted binaries directly from `bin/<surface>/`.
-
-Example using the standalone installer asset after extraction into `./tools/elegy-bootstrap`:
-
-```powershell
-pwsh ./tools/elegy-bootstrap/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
-```
-
-Example using a checked-out or vendored installer helper against release assets:
-
-```powershell
-pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
-```
-
-Example using local artifacts only:
-
-```powershell
-pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
-pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-local -CliSurfaces elegy-memory -WrapperSurfaces elegy-memory -Force
-pwsh ./src/Elegy-memory/install.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-memory-wrapper -Force
-```
-
-The installer resolves either a release tag or a local artifacts directory, downloads or copies the manifest and checksums first, validates that every requested asset exists in the manifest, then verifies exact file size, SHA-256, and required archive entries before extracting the contracts bundle under `contracts/`, CLI assets under `bin/<surface>/`, and wrapper assets under `wrappers/<surface>/`. When `-LocalArtifactsRoot` is used, the root must contain exactly one manifest and checksum file plus the exact assets referenced by that manifest; the installer now fails on ambiguous or stale metadata instead of guessing between stale files. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
 
 ## Downstream guidance
 

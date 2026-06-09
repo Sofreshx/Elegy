@@ -1,13 +1,13 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elegy/contracts/schemas/elegy-plugin-package-v2.schema.json",
-  "title": "Elegy Plugin Package V2",
-  "description": "Portable package metadata for bundling Elegy skills, piloting contracts, deterministic configuration templates/profiles, MCP projection metadata, docs, assets, and Holon-compatible publishing metadata for host-governed import.",
+  "$id": "https://elegy/contracts/schemas/elegy-plugin-package.schema.json",
+  "title": "Elegy Plugin Package",
+  "description": "Portable package metadata for bundling Elegy skill definitions, instruction skills, deterministic configuration templates/profiles, MCP projection metadata, capability projections, docs, assets, tooling requirements, host compatibility, and neutral publishing/provenance metadata for host-governed import.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "identity", "components"],
   "properties": {
-    "schemaVersion": { "const": "elegy-plugin-package/v2" },
+    "schemaVersion": { "const": "elegy-plugin-package/v1" },
     "identity": {
       "type": "object",
       "additionalProperties": false,
@@ -77,39 +77,39 @@
         "skillDefinitions": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/skillDefinitionComponent" }
+          "items": { "$ref": "#/$defs/skillDefinitionComponent" }
         },
         "capabilityContracts": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "instructionSkills": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "evalPacks": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "resourcePacks": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "toolAdapterContracts": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "bridgeAdapterContracts": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "mcpProjections": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/mcpProjectionComponent" }
+          "items": { "$ref": "#/$defs/mcpProjectionComponent" }
         },
         "capabilityProjections": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/capabilityProjectionComponent" }
+          "items": { "$ref": "#/$defs/capabilityProjectionComponent" }
         },
         "pilotingAdapters": {
           "type": "array",
@@ -121,15 +121,15 @@
         },
         "docs": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "assets": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "cliHelpers": {
           "type": "array",
-          "items": { "$ref": "elegy-plugin-package-v1.schema.json#/$defs/pathComponent" }
+          "items": { "$ref": "#/$defs/pathComponent" }
         },
         "configurationTemplates": {
           "type": "array",
@@ -152,13 +152,165 @@
       }
     },
     "hostPolicyHints": {
-      "$ref": "elegy-plugin-package-v1.schema.json#/properties/hostPolicyHints"
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sideEffectClass": { "$ref": "#/$defs/sideEffectClass" },
+        "requiresApproval": {
+          "type": "boolean"
+        },
+        "policyTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
     },
     "publishing": {
       "$ref": "#/$defs/publishingMetadata"
     }
   },
   "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$))(?!.*(?:^|[/\\\\])(?:[/\\\\]|$)).+$"
+    },
+    "sideEffectClass": {
+      "type": "string",
+      "enum": ["none", "read_only", "disk_read", "disk_write", "network_outbound", "process_spawn", "desktop_ui"]
+    },
+    "pathComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "skillDefinitionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definitionRef": { "$ref": "#/$defs/relativePath" },
+        "definition": { "$ref": "skill.schema.json" }
+      },
+      "anyOf": [
+        { "required": ["definitionRef"] },
+        { "required": ["definition"] }
+      ]
+    },
+    "mcpProjectionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptorRef": { "$ref": "#/$defs/relativePath" },
+        "serverName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilityRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capabilityRef" },
+          "uniqueItems": true
+        }
+      },
+      "anyOf": [
+        { "required": ["descriptorRef"] },
+        { "required": ["serverName"] }
+      ]
+    },
+    "capabilityProjectionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "skill", "capability", "lane", "supportsDryRun"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "string",
+          "enum": ["api", "mcp", "plugin", "cli", "subprocess"]
+        },
+        "supportsDryRun": {
+          "type": "boolean"
+        },
+        "inputSchema": {
+          "type": "object"
+        },
+        "outputSchema": {
+          "type": "object"
+        },
+        "sideEffectClass": { "$ref": "#/$defs/sideEffectClass" },
+        "projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "projections": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["function_calling", "mcp", "cli"]
+              },
+              "uniqueItems": true
+            },
+            "functionName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mcpToolName": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "capabilityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill", "capability"],
+      "properties": {
+        "skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
     "configurationComponent": {
       "type": "object",
       "additionalProperties": false,
@@ -169,7 +321,7 @@
           "minLength": 1
         },
         "path": {
-          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          "$ref": "#/$defs/relativePath"
         },
         "description": {
           "type": "string",
@@ -187,7 +339,7 @@
           "minLength": 1
         },
         "manifestRef": {
-          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          "$ref": "#/$defs/relativePath"
         },
         "manifest": {
           "$ref": "piloting-adapter-manifest.schema.json"
@@ -208,7 +360,7 @@
           "minLength": 1
         },
         "fixturePackRef": {
-          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          "$ref": "#/$defs/relativePath"
         },
         "fixturePack": {
           "$ref": "piloting-fixture-pack.schema.json"
@@ -273,7 +425,7 @@
       "properties": {
         "marketplaceTarget": {
           "type": "string",
-          "enum": ["holon"]
+          "minLength": 1
         },
         "importMode": {
           "type": "string",
@@ -292,15 +444,15 @@
           "minLength": 1
         },
         "changelogRef": {
-          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          "$ref": "#/$defs/relativePath"
         },
         "provenanceRef": {
-          "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+          "$ref": "#/$defs/relativePath"
         },
         "signatureRefs": {
           "type": "array",
           "items": {
-            "$ref": "elegy-plugin-package-v1.schema.json#/$defs/relativePath"
+            "$ref": "#/$defs/relativePath"
           },
           "uniqueItems": true
         },

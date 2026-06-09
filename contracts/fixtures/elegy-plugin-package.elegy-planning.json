@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.planning-plugin",
     "name": "elegy-planning",
@@ -7,8 +7,8 @@
     "displayName": "Elegy Planning Plugin"
   },
   "metadata": {
-    "description": "Portable planning package fixture for Holon-compatible host projection from governed planning skill definitions, including work-point graph projection and project-run lease management.",
-    "tags": ["planning", "roadmap", "durable-state", "plugin", "holon", "work-point", "project-run", "lease", "graph", "next-runnable"],
+    "description": "Portable planning package fixture for downstream host projection from governed planning skill definitions, including work-point graph projection and project-run lease management.",
+    "tags": ["planning", "roadmap", "durable-state", "plugin", "work-point", "project-run", "lease", "graph", "next-runnable"],
     "license": "Apache-2.0",
     "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/elegy-planning-v1.md",
     "subsetOf": [
@@ -203,11 +203,6 @@
       }
     ],
     "hostCompatibility": [
-      {
-        "host": "holon",
-        "versionRange": ">=1.0.0",
-        "notes": "Full Holon host support for durable planning with work-point graphs."
-      },
       {
         "host": "opencode",
         "versionRange": ">=0.1.0",

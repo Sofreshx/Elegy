@@ -1672,11 +1672,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: PluginCommand::Inspect { package },
         } => execute_plugin_inspect_command(package, format),
         Command::Plugin {
-            command:
-                PluginCommand::Pack {
-                    source,
-                    output,
-                },
+            command: PluginCommand::Pack { source, output },
         } => execute_plugin_pack_command(source, output, format),
         Command::Plugin {
             command:
@@ -1702,7 +1698,12 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                         },
                 },
         } => execute_plugin_project_host_command(
-            host, package, output_dir, force, package_root, format,
+            host,
+            package,
+            output_dir,
+            force,
+            package_root,
+            format,
         ),
     }
 }
@@ -2261,9 +2262,7 @@ fn execute_plugin_new_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "new"], json!({}))
-        }
+        Err(error) => emit_tooling_error(error, format, vec!["plugin", "new"], json!({})),
     }
 }
 
@@ -2276,12 +2275,18 @@ fn execute_plugin_verify_command(
         Ok(readiness) => {
             match format {
                 OutputFormat::Text => {
-                    println!("Plugin: {} v{}", readiness.package_identity.name, readiness.package_identity.version);
+                    println!(
+                        "Plugin: {} v{}",
+                        readiness.package_identity.name, readiness.package_identity.version
+                    );
                     println!("Readiness: {}", readiness.readiness);
                     if !readiness.findings.is_empty() {
                         println!("Findings:");
                         for finding in &readiness.findings {
-                            println!("  [{}] {}: {}", finding.severity, finding.code, finding.message);
+                            println!(
+                                "  [{}] {}: {}",
+                                finding.severity, finding.code, finding.message
+                            );
                         }
                     }
                     if readiness.readiness == "ready" {
@@ -2302,9 +2307,7 @@ fn execute_plugin_verify_command(
                 Ok(ExitCode::SUCCESS)
             }
         }
-        Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "verify"], json!({}))
-        }
+        Err(error) => emit_tooling_error(error, format, vec!["plugin", "verify"], json!({})),
     }
 }
 
@@ -2326,7 +2329,10 @@ fn execute_plugin_install_check_command(
         Ok(readiness) => {
             match format {
                 OutputFormat::Text => {
-                    println!("Plugin: {} v{}", readiness.package_identity.name, readiness.package_identity.version);
+                    println!(
+                        "Plugin: {} v{}",
+                        readiness.package_identity.name, readiness.package_identity.version
+                    );
                     println!("Readiness: {}", readiness.readiness);
                     if !readiness.tool_statuses.is_empty() {
                         println!("Tool Statuses:");
@@ -2338,7 +2344,10 @@ fn execute_plugin_install_check_command(
                     if !readiness.findings.is_empty() {
                         println!("Findings:");
                         for finding in &readiness.findings {
-                            println!("  [{}] {}: {}", finding.severity, finding.code, finding.message);
+                            println!(
+                                "  [{}] {}: {}",
+                                finding.severity, finding.code, finding.message
+                            );
                         }
                     }
                 }
@@ -2356,12 +2365,7 @@ fn execute_plugin_install_check_command(
                 Ok(ExitCode::SUCCESS)
             }
         }
-        Err(error) => emit_tooling_error(
-            error,
-            format,
-            vec!["plugin", "install-check"],
-            json!({}),
-        ),
+        Err(error) => emit_tooling_error(error, format, vec!["plugin", "install-check"], json!({})),
     }
 }
 
@@ -2385,7 +2389,10 @@ fn execute_plugin_inspect_command(
                         identity["packageId"].as_str().unwrap_or("?")
                     );
                     println!("Skills: {}", summary["skillCount"]);
-                    println!("Capability Projections: {}", summary["capabilityProjectionCount"]);
+                    println!(
+                        "Capability Projections: {}",
+                        summary["capabilityProjectionCount"]
+                    );
                     println!("MCP Projections: {}", summary["mcpProjectionCount"]);
                     println!(
                         "Configuration Templates: {}",
@@ -2405,9 +2412,7 @@ fn execute_plugin_inspect_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "inspect"], json!({}))
-        }
+        Err(error) => emit_tooling_error(error, format, vec!["plugin", "inspect"], json!({})),
     }
 }
 
@@ -2435,9 +2440,7 @@ fn execute_plugin_pack_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "pack"], json!({}))
-        }
+        Err(error) => emit_tooling_error(error, format, vec!["plugin", "pack"], json!({})),
     }
 }
 
@@ -2456,7 +2459,13 @@ fn execute_plugin_project_host_command(
         }
     };
 
-    match project_plugin_for_host(&package, host_target, &output_dir, force, package_root.as_deref()) {
+    match project_plugin_for_host(
+        &package,
+        host_target,
+        &output_dir,
+        force,
+        package_root.as_deref(),
+    ) {
         Ok(result) => {
             match format {
                 OutputFormat::Text => print_generated_codex_plugin_text(&result),
@@ -2470,12 +2479,9 @@ fn execute_plugin_project_host_command(
             }
             Ok(ExitCode::SUCCESS)
         }
-        Err(error) => emit_tooling_error(
-            error,
-            format,
-            vec!["plugin", "project", "host"],
-            json!({}),
-        ),
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}))
+        }
     }
 }
 

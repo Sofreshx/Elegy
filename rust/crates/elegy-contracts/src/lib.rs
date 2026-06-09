@@ -329,7 +329,6 @@ pub fn validate_agent_capability_profile(
 }
 
 pub const ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
-pub const ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION: &str = "elegy-plugin-package/v2";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -558,12 +557,10 @@ pub fn validate_elegy_plugin_package(
 ) -> ElegyPluginPackageValidationResult {
     let mut issues = Vec::new();
 
-    let is_v1 = package.schema_version == ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION;
-    let is_v2 = package.schema_version == ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION;
-    if !is_v1 && !is_v2 {
+    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION {
         issues.push(format!(
-            "schemaVersion must be '{}' or '{}'.",
-            ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_PACKAGE_V2_SCHEMA_VERSION
+            "schemaVersion must be '{}'.",
+            ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION
         ));
     }
     if !is_package_id(&package.identity.package_id) {
@@ -727,74 +724,6 @@ pub fn validate_elegy_plugin_package(
             .map(|component| component.tool_name.as_str()),
         &mut issues,
     );
-
-    if is_v1 {
-        if !package.components.configuration_templates.is_empty() {
-            issues.push(
-                "components.configurationTemplates requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.configuration_profiles.is_empty() {
-            issues.push(
-                "components.configurationProfiles requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.capability_contracts.is_empty() {
-            issues.push(
-                "components.capabilityContracts requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.eval_packs.is_empty() {
-            issues.push(
-                "components.evalPacks requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.resource_packs.is_empty() {
-            issues.push(
-                "components.resourcePacks requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.tool_adapter_contracts.is_empty() {
-            issues.push(
-                "components.toolAdapterContracts requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.bridge_adapter_contracts.is_empty() {
-            issues.push(
-                "components.bridgeAdapterContracts requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.cli_helpers.is_empty() {
-            issues.push(
-                "components.cliHelpers requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if package.publishing.is_some() {
-            issues.push(
-                "publishing metadata requires schemaVersion 'elegy-plugin-package/v2'.".to_string(),
-            );
-        }
-        if !package.components.tool_requirements.is_empty() {
-            issues.push(
-                "components.toolRequirements requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-        if !package.components.host_compatibility.is_empty() {
-            issues.push(
-                "components.hostCompatibility requires schemaVersion 'elegy-plugin-package/v2'."
-                    .to_string(),
-            );
-        }
-    }
 
     let mut capability_refs = BTreeSet::new();
     for component in &package.components.skill_definitions {
@@ -2506,15 +2435,11 @@ pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
     },
     BuiltinSkillDefinition {
         id: "documentation",
-        json: include_str!(
-            "../../../../contracts/fixtures/skill.elegy-documentation.json"
-        ),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-documentation.json"),
     },
     BuiltinSkillDefinition {
         id: "skill-router",
-        json: include_str!(
-            "../../../../contracts/fixtures/skill.elegy-skill-router.json"
-        ),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-skill-router.json"),
     },
     BuiltinSkillDefinition {
         id: "memory",
@@ -2538,9 +2463,7 @@ pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
     },
     BuiltinSkillDefinition {
         id: "planning",
-        json: include_str!(
-            "../../../../contracts/fixtures/skill.elegy-planning.json"
-        ),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-planning.json"),
     },
     BuiltinSkillDefinition {
         id: "desktop",
@@ -3080,10 +3003,7 @@ pub fn load_agent_capability_profile_fixture_from_dir(
 pub fn load_skill_definition_v2_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDefinitionV2, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("skill.minimal.json"),
-    )
+    load_json_file(&dir.join("fixtures").join("skill.minimal.json"))
 }
 
 pub fn load_elegy_plugin_package_fixture_from_dir(
@@ -3091,16 +3011,7 @@ pub fn load_elegy_plugin_package_fixture_from_dir(
 ) -> Result<ElegyPluginPackage, ContractsError> {
     load_json_file(
         &dir.join("fixtures")
-            .join("elegy-plugin-package-v1.minimal.json"),
-    )
-}
-
-pub fn load_elegy_plugin_package_v2_fixture_from_dir(
-    dir: &Path,
-) -> Result<ElegyPluginPackage, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("elegy-plugin-package-v2.minimal.json"),
+            .join("elegy-plugin-package.minimal.json"),
     )
 }
 
@@ -4102,7 +4013,7 @@ fn validate_package_capability_ref(
 }
 
 fn validate_plugin_package_publishing_metadata(
-    package: &ElegyPluginPackage,
+    _package: &ElegyPluginPackage,
     publishing: &ElegyPluginPackagePublishingMetadata,
     issues: &mut Vec<String>,
 ) {
@@ -4115,85 +4026,12 @@ fn validate_plugin_package_publishing_metadata(
             issues
                 .push("publishing.marketplaceTarget must not be empty when provided.".to_string());
         }
-        if marketplace_target != "holon" {
-            issues.push(
-                "publishing.marketplaceTarget must currently be 'holon' when provided.".to_string(),
-            );
-        }
     }
 
     if let Some(import_mode) = &publishing.import_mode {
         if !matches!(import_mode.as_str(), "package" | "dry_run") {
             issues.push(
                 "publishing.importMode must be 'package' or 'dry_run' when provided.".to_string(),
-            );
-        }
-    }
-
-    if publishing.marketplace_target.as_deref() == Some("holon") {
-        if publishing.import_mode.as_deref() != Some("package") {
-            issues.push(
-                "Holon publishing requires publishing.importMode to be 'package'; one-off feature import is not supported."
-                    .to_string(),
-            );
-        }
-        if publishing
-            .source_repository
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires publishing.sourceRepository.".to_string());
-        }
-        if publishing
-            .source_ref
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires publishing.sourceRef.".to_string());
-        }
-        if publishing
-            .source_commit
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires publishing.sourceCommit.".to_string());
-        }
-        if package
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.license.as_deref())
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires metadata.license.".to_string());
-        }
-        if publishing
-            .changelog_ref
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires publishing.changelogRef.".to_string());
-        } else if let Some(changelog_ref) = &publishing.changelog_ref {
-            validate_portable_relative_path("publishing.changelogRef", changelog_ref, issues);
-        }
-        if publishing
-            .provenance_ref
-            .as_deref()
-            .is_none_or(|value| value.trim().is_empty())
-        {
-            issues.push("Holon publishing requires publishing.provenanceRef.".to_string());
-        } else if let Some(provenance_ref) = &publishing.provenance_ref {
-            validate_portable_relative_path("publishing.provenanceRef", provenance_ref, issues);
-        }
-        if publishing.signature_refs.is_empty() {
-            issues.push(
-                "Holon publishing requires at least one publishing.signatureRefs entry."
-                    .to_string(),
-            );
-        }
-        if publishing.compatibility.is_empty() {
-            issues.push(
-                "Holon publishing requires at least one publishing.compatibility entry."
-                    .to_string(),
             );
         }
     }
@@ -4346,7 +4184,7 @@ mod tests {
     }
 
     #[test]
-     fn parse_minimal_skill_fixture() {
+    fn parse_minimal_skill_fixture() {
         let json = include_str!("../../../../contracts/fixtures/skill.minimal.json");
         let def: SkillDefinitionV2 =
             serde_json::from_str(json).expect("minimal skill fixture should parse");
@@ -4359,8 +4197,7 @@ mod tests {
 
     #[test]
     fn parse_v2_diagram_fixture() {
-        let json =
-            include_str!("../../../../contracts/fixtures/skill.elegy-diagram.json");
+        let json = include_str!("../../../../contracts/fixtures/skill.elegy-diagram.json");
         let def: SkillDefinitionV2 =
             serde_json::from_str(json).expect("diagram skill fixture should parse");
         assert_eq!(def.identity.namespace, "elegy");
@@ -4456,9 +4293,8 @@ mod tests {
 
     #[test]
     fn strict_validation_rejects_subprocess_capability_without_output_schema_ref() {
-        let json = include_str!(
-            "../../../../contracts/fixtures/skill.negative-no-output-schema.json"
-        );
+        let json =
+            include_str!("../../../../contracts/fixtures/skill.negative-no-output-schema.json");
         let def: SkillDefinitionV2 =
             serde_json::from_str(json).expect("negative fixture should parse");
         // Base validation should pass (it doesn't enforce output.schemaRef)

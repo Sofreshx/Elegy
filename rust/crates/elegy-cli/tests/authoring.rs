@@ -562,7 +562,7 @@ fn configuration_apply_command_supports_package_profiles() {
         .expect("repo root")
         .join("contracts")
         .join("fixtures")
-        .join("elegy-plugin-package-v2.demo-config.json");
+        .join("elegy-plugin-package.demo-config.json");
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
@@ -611,7 +611,7 @@ fn configuration_verify_command_supports_package_profiles() {
         .expect("repo root")
         .join("contracts")
         .join("fixtures")
-        .join("elegy-plugin-package-v2.demo-config.json");
+        .join("elegy-plugin-package.demo-config.json");
 
     let apply_output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
@@ -1216,7 +1216,7 @@ fn plugin_verify_reports_ready_for_valid_package() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.test-plugin",
     "name": "test-plugin",
@@ -1295,7 +1295,7 @@ fn plugin_verify_reports_blocked_for_invalid_package() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.bad-plugin",
     "name": "bad-plugin",
@@ -1369,7 +1369,7 @@ fn plugin_inspect_reports_package_summary() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.inspect-plugin",
     "name": "inspect-plugin",
@@ -1443,7 +1443,7 @@ fn plugin_pack_creates_valid_zip() {
     fs::write(
         source_dir.join("plugin.json"),
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.packed-plugin",
     "name": "packed-plugin",
@@ -1506,12 +1506,10 @@ fn plugin_pack_creates_valid_zip() {
     let parsed: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("parse pack JSON output");
     assert_eq!(parsed["status"], "ok");
-    assert!(
-        parsed["data"]["archivePath"]
-            .as_str()
-            .unwrap()
-            .contains("my-plugin.zip")
-    );
+    assert!(parsed["data"]["archivePath"]
+        .as_str()
+        .unwrap()
+        .contains("my-plugin.zip"));
 }
 
 #[test]
@@ -1584,9 +1582,10 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
     );
 
     let plugin_root = output_dir.join("codex-test-plugin");
-    assert!(
-        plugin_root.join(".codex-plugin").join("plugin.json").is_file()
-    );
+    assert!(plugin_root
+        .join(".codex-plugin")
+        .join("plugin.json")
+        .is_file());
     assert!(plugin_root.join("skills").is_dir());
 
     // Verify no unexpected MCP/app/hooks files
@@ -1618,7 +1617,7 @@ fn plugin_project_host_rejects_bad_host_name() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.host-test",
     "name": "host-test",
@@ -1679,7 +1678,7 @@ fn plugin_project_host_generic_emits_host_manifest() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.generic-test",
     "name": "generic-test",
@@ -1755,12 +1754,10 @@ fn plugin_project_host_generic_emits_host_manifest() {
     );
 
     let plugin_root = output_dir.join("generic-test");
-    assert!(
-        plugin_root
-            .join(".elegy-host-generic")
-            .join("plugin.json")
-            .is_file()
-    );
+    assert!(plugin_root
+        .join(".elegy-host-generic")
+        .join("plugin.json")
+        .is_file());
 
     let parsed: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("parse host project JSON output");
@@ -1810,7 +1807,7 @@ fn plugin_verify_reports_partial_for_incomplete_subset() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v2",
+  "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.subset-plugin",
     "name": "subset-plugin",

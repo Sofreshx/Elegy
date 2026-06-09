@@ -38,7 +38,7 @@ The authority chain is explicit and one-way:
    governed skill definition source of truth.
 3. `contracts/fixtures/skill-discovery-index.elegy-planning.json` is the
    governed discovery projection derived from that definition.
-4. `contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json` is the
+4. `contracts/fixtures/elegy-plugin-package.elegy-planning.json` is the
    portable Holon plugin package that carries capability projections for
    package-level consumers.
 5. `.agents/skills/elegy-planning/SKILL.md` and
