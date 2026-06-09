@@ -1,0 +1,64 @@
+{
+  "id": "wf.order-approval",
+  "name": "Order Approval",
+  "specVersion": "1.0",
+  "canonicalAuthority": "blueprint",
+  "conflictPolicy": "reconcile",
+  "blueprint": {
+    "blueprintId": "bp.sales.order-approval",
+    "version": "2026.01",
+    "isPinned": true
+  },
+  "triggers": [
+    {
+      "id": "trigger.order-created",
+      "name": "Order Created",
+      "type": "event",
+      "targetStepId": "step.review"
+    }
+  ],
+  "steps": [
+    {
+      "id": "step.review",
+      "name": "Review Order",
+      "type": "human-task"
+    },
+    {
+      "id": "step.fulfill",
+      "name": "Fulfill Order",
+      "type": "service-task"
+    }
+  ],
+  "connections": [
+    {
+      "id": "conn.review-to-fulfill",
+      "fromStepId": "step.review",
+      "toStepId": "step.fulfill",
+      "label": "approved"
+    }
+  ],
+  "layout": {
+    "groups": [
+      {
+        "id": "group.main",
+        "name": "Main Lane",
+        "x": 0,
+        "y": 0,
+        "width": 1200,
+        "height": 400
+      }
+    ],
+    "positions": [
+      {
+        "stepId": "step.review",
+        "x": 200,
+        "y": 120
+      },
+      {
+        "stepId": "step.fulfill",
+        "x": 600,
+        "y": 120
+      }
+    ]
+  }
+}

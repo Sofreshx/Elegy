@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-configuration-profile/v1",
+  "profileId": "repo-opencode-minimal",
+  "displayName": "Repo OpenCode Minimal",
+  "description": "Minimal repo-local OpenCode-facing configuration using configurable skill authority.",
+  "bindings": {
+    "authority.skills": ".github/skills",
+    "target.skills": ".opencode/skills"
+  },
+  "templates": [
+    {
+      "templateId": "repo-skill-mirror-minimal",
+      "bindings": {}
+    }
+  ]
+}

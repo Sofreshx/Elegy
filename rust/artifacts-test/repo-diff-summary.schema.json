@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/repo-diff-summary.schema.json",
+  "title": "RepoDiffSummary",
+  "description": "Structured read-only diff summary with file counts, per-file insertions, and deletions.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["comparedAgainst", "filesChanged", "insertions", "deletions", "files"],
+  "properties": {
+    "baseRef": { "type": ["string", "null"] },
+    "comparedAgainst": { "type": "string", "minLength": 1 },
+    "filesChanged": { "type": "integer", "minimum": 0 },
+    "insertions": { "type": "integer", "minimum": 0 },
+    "deletions": { "type": "integer", "minimum": 0 },
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["path", "insertions", "deletions"],
+        "properties": {
+          "path": { "type": "string", "minLength": 1 },
+          "insertions": { "type": "integer", "minimum": 0 },
+          "deletions": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "artifactKind": "governed-memory-record",
+  "recordId": "memory-record-1",
+  "sessionContext": {
+    "scope": "workspace",
+    "representation": "summary-only",
+    "summary": "Workspace context persists only bounded summaries for instruction assembly and follow-on agent runs.",
+    "salientFacts": [
+      "Persist summary and context artifacts only.",
+      "Raw execution logs remain transient and are not stored durably."
+    ],
+    "instructionContext": [
+      "Use this summary context when assembling workspace-level instructions."
+    ],
+    "rawTranscriptPersisted": false
+  },
+  "provenance": {
+    "sourceArtifactKind": "summary-only-session-context-envelope",
+    "requestId": "request-1",
+    "runId": "run-1",
+    "capturedAtUtc": "2026-03-22T00:00:00Z",
+    "importedAtUtc": "2026-03-23T00:00:00Z",
+    "projectionRulesVersion": "1.0.0"
+  },
+  "localLifecycle": {
+    "state": "active"
+  },
+  "deterministicSortKeys": {
+    "scopeCapturedAtRecordId": "workspace|2026-03-22T00:00:00Z|memory-record-1",
+    "lifecycleStateRecordId": "active|workspace|memory-record-1",
+    "supersededByRecordIdOrSelf": "workspace|memory-record-1|memory-record-1"
+  }
+}
