@@ -656,5 +656,13 @@
         "fixtures/elegy-configuration-receipt-v1.minimal.json"
       ]
     }
+  ],
+  "supplementalFixtures": [
+    "fixtures/mcp-server-descriptor.parity.json",
+    "fixtures/mcp-analysis-result.parity.json",
+    "fixtures/mcp-parity-expected.json",
+    "fixtures/configuration/assets/demo.txt",
+    "fixtures/skill.negative-no-output-schema.json",
+    "fixtures/install-receipt.elegy-planning.json"
   ]
 }
