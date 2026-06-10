@@ -4,7 +4,9 @@ param(
     [string]$Tag = '',
     [string]$Repository = 'Sofreshx/Elegy',
     [string]$LocalArtifactsRoot = '',
-    [switch]$Force
+    [switch]$Force,
+    [switch]$AddToPath,
+    [switch]$NoCommandShims
 )
 
 $ErrorActionPreference = 'Stop'
@@ -41,6 +43,14 @@ if (-not [string]::IsNullOrWhiteSpace($LocalArtifactsRoot)) {
 
 if ($Force) {
     $invokeArgs.Force = $true
+}
+
+if ($AddToPath) {
+    $invokeArgs.AddToPath = $true
+}
+
+if ($NoCommandShims) {
+    $invokeArgs.NoCommandShims = $true
 }
 
 & $installerPath @invokeArgs

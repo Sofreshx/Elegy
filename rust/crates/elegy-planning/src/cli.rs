@@ -7,12 +7,13 @@ use thiserror::Error;
 
 use crate::{
     ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
-    ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
-    EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus, InsightStatus,
-    InsightType, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectRunEvidence,
-    ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput,
-    RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
+    AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput,
+    CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput,
+    EffortTier, EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus,
+    InsightStatus, InsightType, IssueStatus, PlanStatus, PlanningStore, Priority,
+    ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput,
+    ReviewPointStatus, RevisePlanInput, RoadmapStatus, SearchInput, Severity,
+    TodoStatus, UpdateStatusInput, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -134,6 +135,11 @@ enum Command {
         #[command(subcommand)]
         command: ProjectRunCommand,
     },
+    #[command(about = "Manage registered worktrees")]
+    Worktree {
+        #[command(subcommand)]
+        command: WorktreeCommand,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -215,6 +221,8 @@ enum SessionCommand {
     Init(SessionInitArgs),
     Use(SessionUseArgs),
     Show,
+    Resume(SessionResumeArgs),
+    List(SessionListArgs),
 }
 
 #[derive(Args, Debug)]
@@ -227,6 +235,18 @@ struct SessionInitArgs {
 struct SessionUseArgs {
     #[arg(long = "session-id")]
     session_id: String,
+}
+
+#[derive(Args, Debug)]
+struct SessionResumeArgs {
+    #[arg(long)]
+    session_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct SessionListArgs {
+    #[arg(long, default_value = "10")]
+    limit: i64,
 }
 
 #[derive(Args, Debug)]
@@ -755,6 +775,57 @@ struct ProjectRunShowArgs {
     project_run_id: String,
 }
 
+#[derive(Subcommand, Debug)]
+enum WorktreeCommand {
+    List(WorktreeListArgs),
+    Show(WorktreeShowArgs),
+    Attach(WorktreeAttachArgs),
+    Archive(WorktreeArchiveArgs),
+    CleanupIntent(WorktreeCleanupIntentArgs),
+}
+
+#[derive(Args, Debug)]
+struct WorktreeListArgs {
+    #[arg(long)]
+    status: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeShowArgs {
+    #[arg(long)]
+    id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeAttachArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long = "repo-uri")]
+    repo_uri: Option<String>,
+    #[arg(long)]
+    branch: Option<String>,
+    #[arg(long = "worktree-path")]
+    worktree_path: Option<String>,
+    #[arg(long = "project-run-id")]
+    project_run_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
+    #[arg(long = "correlation-id")]
+    correlation_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeArchiveArgs {
+    #[arg(long)]
+    id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeCleanupIntentArgs {
+    #[arg(long)]
+    id: String,
+}
+
 #[derive(Args, Debug)]
 struct ProjectRenderArgs {
     #[arg(long = "entity-type", value_enum)]
@@ -858,12 +929,13 @@ where
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
         Command::Project { command } => execute_project(command, &store, &context),
-        Command::Session { command } => execute_session(command, &context),
+        Command::Session { command } => execute_session(command, &store, &context),
         Command::Search(args) => execute_search(args, &store, &context),
         Command::Insight { command } => execute_insight(command, &store, &context),
         Command::Context(args) => execute_context(args, &store, &context),
         Command::Tags(args) => execute_tags(args, &store, &context),
         Command::ProjectRun { command } => execute_project_run(command, &store, &context),
+        Command::Worktree { command } => execute_worktree(command, &store, &context),
     }
 }
 
@@ -1565,6 +1637,7 @@ fn execute_project(
 
 fn execute_session(
     command: SessionCommand,
+    store: &PlanningStore,
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
@@ -1579,6 +1652,94 @@ fn execute_session(
         SessionCommand::Show => {
             let session = crate::session::show_session()?;
             emit_success(context, vec!["session", "show"], session)
+        }
+        SessionCommand::Resume(args) => {
+            if let Some(ref sid) = args.session_id {
+                let session = crate::session::update_session_file(sid, &context.scope_key)?;
+                let summary = serde_json::json!({
+                    "sessionId": session.session_id,
+                    "scope": session.scope,
+                    "action": "resumed-specific",
+                    "message": format!("Resumed session {}", session.session_id)
+                });
+                emit_success(context, vec!["session", "resume"], summary)
+            } else {
+                match crate::session::read_session_file()? {
+                    Some(session) => {
+                        let active_runs =
+                            store.count_active_runs_for_session(&session.session_id)?;
+                        let summary = serde_json::json!({
+                            "sessionId": session.session_id,
+                            "scope": session.scope,
+                            "action": "resumed-current",
+                            "message": format!(
+                                "Current session: {} (created: {}, active project runs: {})",
+                                session.session_id, session.created_at, active_runs
+                            )
+                        });
+                        emit_success(context, vec!["session", "resume"], summary)
+                    }
+                    None => emit_error(
+                        context,
+                        vec!["session", "resume"],
+                        "No active session found. Use 'session init' to create one.".to_string(),
+                        true,
+                    ),
+                }
+            }
+        }
+        SessionCommand::List(args) => {
+            let sessions = store.list_sessions(args.limit)?;
+            emit_success(
+                context,
+                vec!["session", "list"],
+                serde_json::json!({ "sessions": sessions }),
+            )
+        }
+    }
+}
+
+fn execute_worktree(
+    command: WorktreeCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        WorktreeCommand::List(args) => {
+            let status = args.status.as_deref();
+            let worktrees = store.list_worktrees(status)?;
+            emit_success(
+                context,
+                vec!["worktree", "list"],
+                serde_json::json!({ "worktrees": worktrees }),
+            )
+        }
+        WorktreeCommand::Show(args) => {
+            let worktree = store.get_worktree(&args.id)?;
+            emit_success(context, vec!["worktree", "show"], worktree)
+        }
+        WorktreeCommand::Attach(args) => {
+            let input = AttachWorktreeInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                repo_uri: args.repo_uri,
+                branch: args.branch,
+                worktree_path: args.worktree_path,
+                project_run_id: args.project_run_id,
+                session_id: args.session_id,
+                correlation_id: args.correlation_id,
+            };
+            let worktree = store.attach_worktree(input)?;
+            emit_success(context, vec!["worktree", "attach"], worktree)
+        }
+        WorktreeCommand::Archive(args) => {
+            let worktree = store.update_worktree_status(&args.id, WorktreeStatus::Archived)?;
+            emit_success(context, vec!["worktree", "archive"], worktree)
+        }
+        WorktreeCommand::CleanupIntent(args) => {
+            let worktree =
+                store.update_worktree_status(&args.id, WorktreeStatus::CleanupIntent)?;
+            emit_success(context, vec!["worktree", "cleanup-intent"], worktree)
         }
     }
 }
@@ -1971,6 +2132,10 @@ fn command_path(command: &Command) -> Vec<String> {
             "project-run".to_string(),
             project_run_command_name(command).to_string(),
         ],
+        Command::Worktree { command } => vec![
+            "worktree".to_string(),
+            worktree_command_name(command).to_string(),
+        ],
     }
 }
 
@@ -2022,6 +2187,16 @@ fn project_run_command_name(command: &ProjectRunCommand) -> &'static str {
         ProjectRunCommand::AddEvidence(_) => "add-evidence",
         ProjectRunCommand::List => "list",
         ProjectRunCommand::Show(_) => "show",
+    }
+}
+
+fn worktree_command_name(command: &WorktreeCommand) -> &'static str {
+    match command {
+        WorktreeCommand::List(_) => "list",
+        WorktreeCommand::Show(_) => "show",
+        WorktreeCommand::Attach(_) => "attach",
+        WorktreeCommand::Archive(_) => "archive",
+        WorktreeCommand::CleanupIntent(_) => "cleanup-intent",
     }
 }
 
@@ -2090,6 +2265,8 @@ fn session_command_name(command: &SessionCommand) -> &'static str {
         SessionCommand::Init(_) => "init",
         SessionCommand::Use(_) => "use",
         SessionCommand::Show => "show",
+        SessionCommand::Resume(_) => "resume",
+        SessionCommand::List(_) => "list",
     }
 }
 

@@ -686,3 +686,73 @@ pub struct SearchResult {
     pub updated_at: String,
     pub created_at: String,
 }
+
+/// A registered worktree tracked by the planning system.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct WorktreeRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub repo_uri: Option<String>,
+    pub branch: Option<String>,
+    pub worktree_path: Option<String>,
+    pub project_run_id: Option<String>,
+    pub session_id: Option<String>,
+    pub status: WorktreeStatus,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "lowercase")]
+pub enum WorktreeStatus {
+    Active,
+    Archived,
+    CleanupIntent,
+}
+
+impl std::fmt::Display for WorktreeStatus {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            WorktreeStatus::Active => write!(f, "active"),
+            WorktreeStatus::Archived => write!(f, "archived"),
+            WorktreeStatus::CleanupIntent => write!(f, "cleanup-intent"),
+        }
+    }
+}
+
+/// Input for attaching/registering a worktree.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AttachWorktreeInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub repo_uri: Option<String>,
+    pub branch: Option<String>,
+    pub worktree_path: Option<String>,
+    pub project_run_id: Option<String>,
+    pub session_id: Option<String>,
+    pub correlation_id: Option<String>,
+}
+
+/// Session summary for listing.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SessionSummary {
+    pub session_id: String,
+    pub scope: String,
+    pub created_at: Option<String>,
+    pub last_seen: Option<String>,
+    pub event_count: i64,
+    pub active_project_runs: i64,
+}
+
+/// Helper to parse worktree status from string.
+pub fn parse_worktree_status(s: &str) -> WorktreeStatus {
+    match s {
+        "archived" => WorktreeStatus::Archived,
+        "cleanup-intent" => WorktreeStatus::CleanupIntent,
+        _ => WorktreeStatus::Active,
+    }
+}

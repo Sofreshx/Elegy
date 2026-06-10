@@ -66,6 +66,36 @@ pub fn resolve_session_correlation_id() -> Result<Option<String>, PlanningStoreE
     Ok(read_session()?.map(|s| s.session_id))
 }
 
+pub fn update_session_file(
+    session_id: &str,
+    scope: &str,
+) -> Result<PlanningSession, PlanningStoreError> {
+    let mut session = read_session()?.unwrap_or(PlanningSession {
+        session_id: uuid::Uuid::new_v4().to_string(),
+        scope: scope.to_string(),
+        created_at: String::new(),
+        last_used: String::new(),
+    });
+
+    let now = time::OffsetDateTime::now_utc()
+        .format(&time::format_description::well_known::Rfc3339)
+        .map_err(|_| PlanningStoreError::TimeFormat)?;
+
+    session.session_id = session_id.to_string();
+    session.scope = scope.to_string();
+    session.last_used = now.clone();
+    if session.created_at.is_empty() {
+        session.created_at = now;
+    }
+
+    write_session(&session)?;
+    Ok(session)
+}
+
+pub fn read_session_file() -> Result<Option<PlanningSession>, PlanningStoreError> {
+    read_session()
+}
+
 fn read_session() -> Result<Option<PlanningSession>, PlanningStoreError> {
     let path = session_file_path();
     if !path.exists() {
