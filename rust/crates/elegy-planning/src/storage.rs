@@ -93,6 +93,15 @@ pub struct AddWorkPointInput {
 }
 
 #[derive(Clone, Debug)]
+pub struct ReviseWorkPointInput {
+    pub work_point_id: String,
+    pub active_scope_key: Option<String>,
+    pub dependency_ids: Option<Vec<String>>,
+    pub clear_dependencies: bool,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
 pub struct CreatePlanInput {
     pub id: Option<String>,
     pub scope_key: Option<String>,
@@ -559,6 +568,27 @@ impl PlanningStore {
             )?;
             ensure_section_belongs_to_roadmap(&transaction, section_id, &input.roadmap_id)?;
         }
+        // Reject cross-roadmap work-point dependencies
+        for dep_id in &input.dependency_ids {
+            let trimmed = dep_id.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match load_work_point(&transaction, trimmed) {
+                Ok(dep) => {
+                    if dep.roadmap_id != input.roadmap_id {
+                        return Err(PlanningStoreError::InvalidInput(format!(
+                            "dependency work point `{}` belongs to roadmap `{}`, not `{}`. Cross-roadmap work-point dependencies are not supported.",
+                            trimmed, dep.roadmap_id, input.roadmap_id
+                        )));
+                    }
+                }
+                Err(PlanningStoreError::NotFound { .. }) => {
+                    // Non-existent deps are advisory validation findings, not write-time blockers
+                }
+                Err(e) => return Err(e),
+            }
+        }
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let ordering = input.ordering.unwrap_or(next_ordering(
@@ -663,6 +693,117 @@ impl PlanningStore {
             &record.title,
             &record.summary,
         )?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn revise_work_point(
+        &self,
+        input: ReviseWorkPointInput,
+    ) -> Result<MutationResult<WorkPointRecord>, PlanningStoreError> {
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+
+        // Load existing record
+        let mut record = load_work_point(&transaction, &input.work_point_id)?;
+
+        // Scope enforcement: if active_scope_key is provided, ensure it matches
+        if let Some(ref active_scope) = input.active_scope_key {
+            let active_scope = normalized_scope_key(Some(active_scope.clone()));
+            if record.scope_key != active_scope {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "work point `{}` is in scope `{}`, not `{}`",
+                    input.work_point_id, record.scope_key, active_scope
+                )));
+            }
+        }
+
+        // Validate mutual exclusivity
+        if input.clear_dependencies && input.dependency_ids.is_some() {
+            return Err(PlanningStoreError::InvalidInput(
+                "--clear-dependencies cannot be combined with providing new dependency IDs".to_string(),
+            ));
+        }
+
+        // Compute new dependencies
+        let new_deps = if input.clear_dependencies {
+            Vec::new()
+        } else if let Some(ref dep_ids) = input.dependency_ids {
+            let trimmed: Vec<String> = dep_ids
+                .iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            // Validate all deps exist
+            for dep_id in &trimmed {
+                match load_work_point(&transaction, dep_id) {
+                    Err(PlanningStoreError::NotFound { .. }) => {
+                        return Err(PlanningStoreError::InvalidInput(format!(
+                            "dependency work point `{}` does not exist",
+                            dep_id
+                        )));
+                    }
+                    Err(e) => return Err(e),
+                    Ok(_) => {}
+                }
+            }
+
+            // Reject cross-roadmap dependencies
+            for dep_id in &trimmed {
+                let dep = load_work_point(&transaction, dep_id)?;
+                if dep.roadmap_id != record.roadmap_id {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "dependency work point `{}` belongs to roadmap `{}`, not `{}`. Cross-roadmap work-point dependencies are not supported.",
+                        dep_id, dep.roadmap_id, record.roadmap_id
+                    )));
+                }
+            }
+
+            trimmed
+        } else {
+            record.dependency_ids.clone()
+        };
+
+        let now = now_string()?;
+
+        transaction.execute(
+            "UPDATE work_points SET dependency_ids_json = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
+            params![to_json_text(&new_deps)?, now, record.id],
+        )?;
+
+        record.dependency_ids = new_deps;
+        record.revision += 1;
+        record.updated_at = now.clone();
+
+        // Record event
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::WorkPoint,
+                &record.id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &roadmap_correlation_id(&transaction, &record.roadmap_id)?,
+                input.run_id,
+                "work-point.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        // Re-validate
+        let _ = refresh_validation_target(&transaction, EntityType::WorkPoint, &record.id)?;
+        for dependent_id in list_work_point_dependents(&transaction, &record.id)? {
+            let _ =
+                refresh_validation_target(&transaction, EntityType::WorkPoint, &dependent_id)?;
+        }
+        for plan_id in list_plans_targeting_work_point(&transaction, &record.id)? {
+            let _ = refresh_validation_target(&transaction, EntityType::Plan, &plan_id)?;
+        }
+        let validation =
+            refresh_validation_target(&transaction, EntityType::Roadmap, &record.roadmap_id)?;
+
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -1257,6 +1398,35 @@ impl PlanningStore {
     ) -> Result<Vec<InsightRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         list_insights_for_entity_in_scope(&connection, entity_type, entity_id, scope_key)
+    }
+
+    pub fn list_insights_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<InsightRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let scope_key = normalized_scope_key(Some(scope_key.to_string()));
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, correlation_id, title, content, insight_type, parent_entity_type, parent_entity_id, tags_json, status, revision, created_at, updated_at FROM insights WHERE scope_key = ?1 ORDER BY created_at DESC",
+        )?;
+        let rows = statement.query_map(params![scope_key], |row| {
+            Ok(InsightRecord {
+                id: row.get(0)?,
+                scope_key: row.get(1)?,
+                correlation_id: row.get(2)?,
+                title: row.get(3)?,
+                content: row.get(4)?,
+                insight_type: parse_insight_type(row.get::<_, String>(5)?)?,
+                parent_entity_type: parse_entity_type(row.get::<_, String>(6)?)?,
+                parent_entity_id: row.get(7)?,
+                tags: parse_json_column(row.get::<_, String>(8)?)?,
+                status: parse_insight_status(row.get::<_, String>(9)?)?,
+                revision: row.get(10)?,
+                created_at: row.get(11)?,
+                updated_at: row.get(12)?,
+            })
+        })?;
+        collect_rows(rows)
     }
 
     pub fn search_insights(
@@ -3085,6 +3255,38 @@ impl PlanningStore {
 
         Ok(ValidationRunReport {
             status: ValidationReport::from_findings(all_findings.clone()).status,
+            scope_mode: "all".to_string(),
+            scope_key: "all".to_string(),
+            findings: all_findings,
+            entity_reports,
+        })
+    }
+
+    pub fn validate_all_in_scope(
+        &self,
+        scope_key: &str,
+    ) -> Result<ValidationRunReport, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let entities = collect_entities_in_scope(&connection, scope_key)?;
+        let mut entity_reports = Vec::with_capacity(entities.len());
+        let mut all_findings = Vec::new();
+
+        for (entity_type, entity_id) in entities {
+            let findings = validate_entity(&connection, entity_type, &entity_id)?;
+            persist_validation_findings(&connection, entity_type, &entity_id, &findings)?;
+            let validation = ValidationReport::from_findings(findings.clone());
+            all_findings.extend(findings);
+            entity_reports.push(crate::EntityValidationView {
+                entity_type,
+                entity_id,
+                validation,
+            });
+        }
+
+        Ok(ValidationRunReport {
+            status: ValidationReport::from_findings(all_findings.clone()).status,
+            scope_mode: "single".to_string(),
+            scope_key: scope_key.to_string(),
             findings: all_findings,
             entity_reports,
         })
@@ -3397,6 +3599,8 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             severity TEXT NOT NULL,
             code TEXT NOT NULL,
             message TEXT NOT NULL,
+            scope_key TEXT NOT NULL DEFAULT '',
+            fingerprint TEXT NOT NULL DEFAULT '',
             created_at TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS idx_validation_findings_entity ON validation_findings(entity_type, entity_id);
@@ -4376,8 +4580,8 @@ pub(crate) fn persist_validation_findings(
         connection.execute(
             r#"
             INSERT INTO validation_findings (
-                finding_id, entity_type, entity_id, severity, code, message, created_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)
+                finding_id, entity_type, entity_id, severity, code, message, scope_key, fingerprint, created_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)
             "#,
             params![
                 finding.finding_id,
@@ -4386,6 +4590,8 @@ pub(crate) fn persist_validation_findings(
                 finding.severity.as_str(),
                 finding.code,
                 finding.message,
+                finding.scope_key,
+                finding.fingerprint,
                 finding.created_at,
             ],
         )?;
@@ -4399,7 +4605,7 @@ pub(crate) fn load_validation_report(
     entity_id: &str,
 ) -> Result<ValidationReport, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT finding_id, entity_type, entity_id, severity, code, message, created_at FROM validation_findings WHERE entity_type = ?1 AND entity_id = ?2 ORDER BY severity ASC, code ASC, created_at ASC",
+        "SELECT finding_id, entity_type, entity_id, severity, code, message, scope_key, fingerprint, created_at FROM validation_findings WHERE entity_type = ?1 AND entity_id = ?2 ORDER BY severity ASC, code ASC, created_at ASC",
     )?;
     let rows = statement.query_map(
         params![entity_type.as_str(), entity_id],
@@ -4693,6 +4899,38 @@ pub(crate) fn collect_entities(
         EntityType::ProjectRun,
     )?);
     Ok(entities)
+}
+
+pub(crate) fn collect_entities_in_scope(
+    connection: &Connection,
+    scope_key: &str,
+) -> Result<Vec<(EntityType, String)>, PlanningStoreError> {
+    let mut entities = Vec::new();
+    entities.extend(entity_ids_in_scope(connection, "goals", "scope_key", EntityType::Goal, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "roadmaps", "scope_key", EntityType::Roadmap, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "roadmap_sections", "scope_key", EntityType::RoadmapSection, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "work_points", "scope_key", EntityType::WorkPoint, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "plans", "scope_key", EntityType::Plan, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "todos", "scope_key", EntityType::Todo, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "issues", "scope_key", EntityType::Issue, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "review_points", "scope_key", EntityType::ReviewPoint, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "insights", "scope_key", EntityType::Insight, scope_key)?);
+    entities.extend(entity_ids_in_scope(connection, "project_runs", "scope_key", EntityType::ProjectRun, scope_key)?);
+    Ok(entities)
+}
+
+fn entity_ids_in_scope(
+    connection: &Connection,
+    table: &str,
+    scope_column: &str,
+    entity_type: EntityType,
+    scope_key: &str,
+) -> Result<Vec<(EntityType, String)>, PlanningStoreError> {
+    let sql = format!("SELECT id FROM {table} WHERE {scope_column} = ?1 ORDER BY id ASC");
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(params![scope_key], |row| row.get::<_, String>(0))?;
+    let ids = collect_rows(rows)?;
+    Ok(ids.into_iter().map(|id| (entity_type, id)).collect())
 }
 
 fn entity_ids(
@@ -5221,7 +5459,9 @@ fn row_to_validation_finding(row: &Row<'_>) -> Result<ValidationFinding, rusqlit
         severity: parse_validation_severity(row.get::<_, String>(3)?)?,
         code: row.get(4)?,
         message: row.get(5)?,
-        created_at: row.get(6)?,
+        scope_key: row.get::<_, String>(6).unwrap_or_default(),
+        fingerprint: row.get::<_, String>(7).unwrap_or_default(),
+        created_at: row.get(8)?,
     })
 }
 

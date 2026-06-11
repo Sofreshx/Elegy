@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 
 macro_rules! string_enum {
     ($name:ident { $($variant:ident => $value:literal),+ $(,)? }) => {
-        #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, ValueEnum)]
+        #[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, ValueEnum, schemars::JsonSchema)]
         #[serde(rename_all = "kebab-case")]
         pub enum $name {
             $($variant),+
@@ -183,7 +183,7 @@ string_enum!(ProjectRunStatus {
     Released => "released"
 });
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WarningRecord {
     pub level: String,
@@ -191,7 +191,7 @@ pub struct WarningRecord {
     pub source: Option<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRunEvidence {
     pub implementation_run_refs: Vec<String>,
@@ -202,7 +202,7 @@ pub struct ProjectRunEvidence {
     pub linked_spec_ids: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRunRecord {
     pub id: String,
@@ -225,7 +225,7 @@ pub struct ProjectRunRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectRunView {
     pub project_run: ProjectRunRecord,
@@ -233,7 +233,7 @@ pub struct ProjectRunView {
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnableWorkPointCandidate {
     pub work_point: WorkPointRecord,
@@ -243,14 +243,14 @@ pub struct RunnableWorkPointCandidate {
     pub reasons: Vec<String>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RunnableCandidates {
     pub roadmap_id: String,
     pub candidates: Vec<RunnableWorkPointCandidate>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkGraphNode {
     pub work_point: WorkPointRecord,
@@ -258,21 +258,21 @@ pub struct WorkGraphNode {
     pub has_active_lease: bool,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkGraphEdge {
     pub source_id: String,
     pub target_id: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkGraph {
     pub nodes: Vec<WorkGraphNode>,
     pub edges: Vec<WorkGraphEdge>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopeRecord {
     pub scope_key: String,
@@ -285,7 +285,7 @@ pub struct ScopeRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalRecord {
     pub id: String,
@@ -302,7 +302,7 @@ pub struct GoalRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoadmapRecord {
     pub id: String,
@@ -318,7 +318,7 @@ pub struct RoadmapRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoadmapSectionRecord {
     pub id: String,
@@ -333,7 +333,7 @@ pub struct RoadmapSectionRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkPointRecord {
     pub id: String,
@@ -354,7 +354,7 @@ pub struct WorkPointRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanRecord {
     pub id: String,
@@ -380,7 +380,7 @@ pub struct PlanRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TodoRecord {
     pub id: String,
@@ -401,7 +401,7 @@ pub struct TodoRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct FileScopeRecord {
     pub selector_type: FileScopeSelectorType,
@@ -409,7 +409,7 @@ pub struct FileScopeRecord {
     pub intent: FileScopeIntent,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IssueRecord {
     pub id: String,
@@ -427,7 +427,7 @@ pub struct IssueRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ReviewPointRecord {
     pub id: String,
@@ -443,7 +443,7 @@ pub struct ReviewPointRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightRecord {
     pub id: String,
@@ -461,21 +461,21 @@ pub struct InsightRecord {
     pub updated_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InsightView {
     pub insight: InsightRecord,
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TagInfo {
     pub tag: String,
     pub entity_count: i64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TokenEstimate {
     pub entity_tokens: usize,
@@ -484,7 +484,7 @@ pub struct TokenEstimate {
     pub total_tokens: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityContextBundle {
     pub entity_type: EntityType,
@@ -499,7 +499,7 @@ pub struct EntityContextBundle {
     pub token_estimate: TokenEstimate,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionContextBundle {
     pub session_id: Option<String>,
@@ -510,14 +510,14 @@ pub struct SessionContextBundle {
     pub token_estimate: TokenEstimate,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionValidationSummary {
     pub error_count: usize,
     pub warning_count: usize,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanningEvent {
     pub event_id: String,
@@ -536,7 +536,7 @@ pub struct PlanningEvent {
     pub payload: serde_json::Value,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationFinding {
     pub finding_id: String,
@@ -545,10 +545,12 @@ pub struct ValidationFinding {
     pub severity: ValidationSeverity,
     pub code: String,
     pub message: String,
+    pub scope_key: String,
+    pub fingerprint: String,
     pub created_at: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationReport {
     pub status: ValidationStatus,
@@ -580,7 +582,8 @@ impl ValidationReport {
     }
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[schemars(bound = "T: schemars::JsonSchema")]
 #[serde(rename_all = "camelCase")]
 pub struct MutationResult<T>
 where
@@ -590,7 +593,7 @@ where
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GoalView {
     pub goal: GoalRecord,
@@ -598,7 +601,7 @@ pub struct GoalView {
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RoadmapView {
     pub roadmap: RoadmapRecord,
@@ -607,14 +610,14 @@ pub struct RoadmapView {
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorkPointView {
     pub work_point: WorkPointRecord,
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanView {
     pub plan: PlanRecord,
@@ -623,14 +626,14 @@ pub struct PlanView {
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct IssueView {
     pub issue: IssueRecord,
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EntityValidationView {
     pub entity_type: EntityType,
@@ -638,15 +641,17 @@ pub struct EntityValidationView {
     pub validation: ValidationReport,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ValidationRunReport {
     pub status: ValidationStatus,
+    pub scope_mode: String,
+    pub scope_key: String,
     pub findings: Vec<ValidationFinding>,
     pub entity_reports: Vec<EntityValidationView>,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanningHealthReport {
     pub db_path: String,
@@ -666,7 +671,7 @@ pub struct PlanningHealthReport {
     pub project_run_count: i64,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RenderedProjection {
     pub entity_type: EntityType,
@@ -676,7 +681,7 @@ pub struct RenderedProjection {
     pub output_path: String,
 }
 
-#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SearchResult {
     pub entity_type: String,
@@ -688,7 +693,7 @@ pub struct SearchResult {
 }
 
 /// A registered worktree tracked by the planning system.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WorktreeRecord {
     pub id: String,
@@ -704,7 +709,7 @@ pub struct WorktreeRecord {
     pub updated_at: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
 #[serde(rename_all = "lowercase")]
 pub enum WorktreeStatus {
     Active,
@@ -737,7 +742,7 @@ pub struct AttachWorktreeInput {
 }
 
 /// Session summary for listing.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SessionSummary {
     pub session_id: String,

@@ -51,6 +51,9 @@ next-runnable)
 - `work-graph` and `next-runnable` are read-only but can return
   large payloads; always pass `--limit` for `next-runnable` to avoid
   pulling the whole work queue.
+- `insight list --all` lists all insights in the active scope.
+  Omit `--all` and pass `--parent-type` + `--parent-id` for
+  parent-specific listing (existing behavior).
 - Side-effect class: `read_only`.
 - Approval posture: `none`.
 
@@ -74,6 +77,13 @@ next-runnable)
   recommended for plan and todo authoring. Valid values are
   `fast`, `balanced`, `deep`. The value affects validation depth,
   not the durable record.
+- `roadmap add-work-point --dependency-id <id>` only accepts dependencies
+  that belong to the same roadmap. Cross-roadmap dependencies are
+  rejected at write time with `"status": "invalid"` and a
+  descriptive `error` message.
+- Use `work-point revise --work-point-id <id> --dependency-id <id>...`
+  to add, replace, or `--clear-dependencies` to remove work-point
+  dependencies. Do not attempt direct SQLite repair.
 - File-scope selector grammar: `<type>:<intent>:<selector>`. Types
   are `exact` or `glob`. Intents are `primary`, `review`, or
   `affected`. Example: `--file-scope glob:primary:rust/crates/elegy-contracts/**`.
@@ -82,6 +92,9 @@ next-runnable)
   `invalidated`, `superseded`, `abandoned` for goals). Do not
   transition to a state the entity is not currently allowed to
   leave.
+- `scope create --metadata-file <path>` reads metadata from a JSON
+  file. Mutually exclusive with `--metadata-json`. Errors include
+  the file path for faster diagnosis.
 - Side-effect class: `disk_write` against the SQLite database.
 - Approval posture: `advisory`. The host may require approval for
   specific transitions (e.g. `validated`, `invalidated`).
@@ -103,8 +116,12 @@ next-runnable)
 ### Validation / health / export (validate all, health, project-export,
 project-render)
 
-- `validate all` and `health` are read-only but expensive on large
-  databases. Schedule them, do not run them per-keystroke.
+- `validate all` validates only the active scope by default. Use
+  `validate all --all-scopes` for explicit global audits across
+  every scope. The output includes `scopeMode` (`"single"` or
+  `"all"`) and `scopeKey` to confirm which scope(s) were checked.
+- `health` is read-only but expensive on large databases. Schedule
+  it, do not run it per-keystroke.
 - `project-export` and `project-render` write to disk under the path
   passed via `--output <path>`. Confirm the path with the user
   before invoking; the file is overwritten if it exists.
@@ -161,6 +178,7 @@ project-render)
 | `planning-work-point-show` | read-only | Show one work point with file scopes |
 | `planning-work-point-update-status` | disk_write | Transition a work point |
 | `planning-work-point-next-runnable` | read-only | List runnable work points ordered by effort and readiness |
+| `planning-work-point-revise` | disk_write | Revise a work point's dependency list or other fields |
 | `planning-work-point-work-graph` | read-only | Render the work graph for the active scope |
 | `planning-todo-create` | disk_write | Create a todo under a plan |
 | `planning-todo-list` | read-only | List todos in the active scope |
@@ -204,6 +222,13 @@ project-render)
   Use this for cross-call lineage.
 - `error`: machine-readable error code plus human message. The
   machine code is in `error.code`; the message is in `error.message`.
+- `data.scopeMode` (for `validate all`): `"single"` or `"all"`,
+  indicating validation scope.
+- `data.scopeKey`: the active scope key, or `"all"` for global audits.
+- `data.insights`: list of insight records (for `insight list --all`).
+- `data.scopeKey` in each finding: the scope the finding belongs to.
+- `data.fingerprint` in each finding: stable identifier for
+  deduplication (`entityType::entityId::scopeKey::code`).
 
 ## Common issues
 
@@ -220,6 +245,8 @@ project-render)
 | `project-export` overwrites an existing file the user cared about. | `--output` points at an existing path and the CLI does not prompt in non-interactive mode. | Confirm the path with the user before invoking. Pick a fresh `--output` path for each export. |
 | `health` shows FTS5 index drift. | The FTS5 mirror was not updated after a bulk insert. | Run the FTS5 rebuild command documented in the planning health reference, or recreate the FTS5 mirror from the source table. |
 | `next-runnable` returns work points that look ready but are blocked. | The work point's upstream dependencies have not all reached `validated`. | Inspect the work graph with `work-graph`; the ready-set excludes unvalidated upstream by default but a `--include-blocked` flag changes that. |
+| `roadmap add-work-point --dependency-id` is rejected even though the work point exists. | The dependency work point belongs to a different roadmap. | Use only same-roadmap dependencies for now. Cross-roadmap sequencing is deferred to a later model. |
+| `validate all` returns findings from a different scope. | `--all-scopes` was passed (or omitted unintentionally). | By default, `validate all` only validates the active scope. Pass `--all-scopes` to include all scopes. |
 
 ## Version compatibility
 
@@ -281,6 +308,38 @@ elegy-planning --scope repo:elegy --json --non-interactive \
 
 Expected: `status: "ok"`, `data.plan.fileScopes = []`. Re-running
 `plan show` should confirm the empty list.
+
+### Example 4 — revise work-point dependencies
+
+```text
+elegy-planning --scope repo:elegy --json --non-interactive \
+  --correlation-id $(uuidgen) \
+  work-point revise \
+  --work-point-id wp-b \
+  --clear-dependencies
+```
+
+Expected: `status: "ok"`, `data.record.dependencyIds = []`.
+
+### Example 5 — validate specific scope
+
+```text
+elegy-planning --scope repo:elegy --json --non-interactive \
+  --correlation-id $(uuidgen) \
+  validate all
+```
+
+Expected: `status: "ok"`, `data.scopeMode = "single"`, `data.scopeKey = "repo:elegy"`, findings include only `repo:elegy` entities.
+
+### Example 6 — global validation audit
+
+```text
+elegy-planning --json --non-interactive \
+  --correlation-id $(uuidgen) \
+  validate all --all-scopes
+```
+
+Expected: `status: "ok"`, `data.scopeMode = "all"`, `data.scopeKey = "all"`, findings span all known scopes.
 
 ## Boundaries
 

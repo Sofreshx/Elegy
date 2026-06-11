@@ -3,7 +3,7 @@ title: elegy-planning Spec
 status: active
 owner: Elegy
 created: 2026-05-25
-updated: 2026-06-02
+updated: 2026-06-11
 doc_kind: spec
 summary: Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.
 schema_version: elegy-planning/v1
