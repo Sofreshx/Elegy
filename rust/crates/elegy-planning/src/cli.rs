@@ -5,6 +5,7 @@ use serde::Serialize;
 use serde_json::json;
 use thiserror::Error;
 
+use crate::envelope::{MachineEnvelope, MachineStatus};
 use crate::{
     ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
     AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput,
@@ -12,13 +13,13 @@ use crate::{
     EffortTier, EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus,
     InsightStatus, InsightType, IssueStatus, PlanStatus, PlanningStore, Priority,
     ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput,
-    ReviewPointStatus, RevisePlanInput, RoadmapStatus, SearchInput, Severity,
+    ReviewPointStatus, RevisePlanInput, ReviseWorkPointInput, RoadmapStatus, SearchInput, Severity,
     TodoStatus, UpdateStatusInput, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
-const RESULT_SCHEMA_VERSION: &str = "planning-result/v1";
+pub(crate) const RESULT_SCHEMA_VERSION: &str = "planning-result/v1";
 
 static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
 
@@ -169,6 +170,7 @@ enum WorkPointCommand {
     UpdateStatus(WorkPointUpdateStatusArgs),
     NextRunnable(WorkPointNextRunnableArgs),
     WorkGraph(WorkPointWorkGraphArgs),
+    Revise(WorkPointReviseArgs),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -207,7 +209,13 @@ enum ReviewPointCommand {
 
 #[derive(Subcommand, Debug)]
 enum ValidateCommand {
-    All,
+    All(ValidateAllArgs),
+}
+
+#[derive(Args, Debug)]
+struct ValidateAllArgs {
+    #[arg(long = "all-scopes")]
+    all_scopes: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -314,10 +322,12 @@ struct InsightRecordArgs {
 
 #[derive(Args, Debug)]
 struct InsightListArgs {
+    #[arg(long = "all")]
+    all: bool,
     #[arg(long = "parent-type", value_enum)]
-    parent_entity_type: EntityType,
+    parent_entity_type: Option<EntityType>,
     #[arg(long = "parent-id")]
-    parent_entity_id: String,
+    parent_entity_id: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -383,6 +393,8 @@ struct ScopeCreateArgs {
     parent_scope_key: Option<String>,
     #[arg(long = "metadata-json")]
     metadata_json: Option<String>,
+    #[arg(long = "metadata-file")]
+    metadata_file: Option<PathBuf>,
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -711,6 +723,16 @@ struct WorkPointWorkGraphArgs {
     roadmap_id: String,
 }
 
+#[derive(Args, Debug)]
+struct WorkPointReviseArgs {
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+    #[arg(long = "dependency-id")]
+    dependency_ids: Vec<String>,
+    #[arg(long = "clear-dependencies")]
+    clear_dependencies: bool,
+}
+
 #[derive(Subcommand, Debug)]
 enum ProjectRunCommand {
     Claim(ProjectRunClaimArgs),
@@ -838,25 +860,6 @@ struct ProjectRenderArgs {
     output: PathBuf,
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MachineEnvelope<T>
-where
-    T: Serialize,
-{
-    schema_version: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    correlation_id: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
-    non_interactive: bool,
-    command: Vec<String>,
-    status: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
 #[derive(Clone, Debug)]
 struct MachineContext {
     format: OutputFormat,
@@ -873,15 +876,16 @@ pub fn run_from_env() -> ExitCode {
         Err(error) => {
             if let Some(context) = CLI_MACHINE_CONTEXT.get() {
                 if context.format == OutputFormat::Json
-                    && print_json(&MachineEnvelope::<serde_json::Value> {
-                        schema_version: RESULT_SCHEMA_VERSION,
-                        correlation_id: context.correlation_id.clone(),
-                        non_interactive: context.non_interactive,
-                        command: context.command.clone(),
-                        status: error.status(),
-                        data: None,
-                        error: Some(error.to_string()),
-                    })
+                    && print_json(&MachineEnvelope::<serde_json::Value>::error(
+                        context.correlation_id.clone(),
+                        context.non_interactive,
+                        context.command.clone(),
+                        match error.status() {
+                            "invalid" => MachineStatus::Invalid,
+                            _ => MachineStatus::Error,
+                        },
+                        error.to_string(),
+                    ))
                     .is_ok()
                 {
                     return error.exit_code();
@@ -1037,15 +1041,13 @@ fn handle_parse_error(error: clap::Error, raw_args: &[OsString]) -> Result<ExitC
             ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
         )
     {
-        print_json(&MachineEnvelope::<serde_json::Value> {
-            schema_version: RESULT_SCHEMA_VERSION,
+        print_json(&MachineEnvelope::<serde_json::Value>::error(
             correlation_id,
             non_interactive,
             command,
-            status: "invalid",
-            data: None,
-            error: Some(error.to_string()),
-        })?;
+            MachineStatus::Invalid,
+            error.to_string(),
+        ))?;
         return Ok(exit_invalid());
     }
 
@@ -1078,18 +1080,71 @@ fn execute_scope(
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
-        ScopeCommand::Create(args) => emit_success(
-            context,
-            vec!["scope", "create"],
-            store.create_scope(CreateScopeInput {
-                scope_key: args.scope_key,
-                scope_type: args.scope_type,
-                parent_scope_key: args.parent_scope_key,
-                metadata: parse_optional_json_object(args.metadata_json)?,
-                tags: args.tags,
-                run_id: context.correlation_id.clone(),
-            })?,
-        ),
+        ScopeCommand::Create(args) => {
+            if args.metadata_json.is_some() && args.metadata_file.is_some() {
+                return emit_error(
+                    context,
+                    vec!["scope", "create"],
+                    "--metadata-json and --metadata-file are mutually exclusive".to_string(),
+                    true,
+                );
+            }
+
+            let metadata = if let Some(ref path) = args.metadata_file {
+                let content = match std::fs::read_to_string(path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        return emit_error(
+                            context,
+                            vec!["scope", "create"],
+                            format!("failed to read metadata file `{}`: {e}", path.display()),
+                            true,
+                        );
+                    }
+                };
+                let parsed: serde_json::Value = match serde_json::from_str(&content) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return emit_error(
+                            context,
+                            vec!["scope", "create"],
+                            format!(
+                                "invalid JSON in metadata file `{}`: {e}",
+                                path.display()
+                            ),
+                            true,
+                        );
+                    }
+                };
+                if !parsed.is_object() {
+                    return emit_error(
+                        context,
+                        vec!["scope", "create"],
+                        format!(
+                            "metadata file `{}` must contain a JSON object",
+                            path.display()
+                        ),
+                        true,
+                    );
+                }
+                Some(parsed)
+            } else {
+                parse_optional_json_object(args.metadata_json)?
+            };
+
+            emit_success(
+                context,
+                vec!["scope", "create"],
+                store.create_scope(CreateScopeInput {
+                    scope_key: args.scope_key,
+                    scope_type: args.scope_type,
+                    parent_scope_key: args.parent_scope_key,
+                    metadata,
+                    tags: args.tags,
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
         ScopeCommand::List => emit_success(
             context,
             vec!["scope", "list"],
@@ -1315,6 +1370,31 @@ fn execute_work_point(
                 context,
                 vec!["work-point", "work-graph"],
                 store.build_work_graph(&args.roadmap_id)?,
+            )
+        }
+        WorkPointCommand::Revise(args) => {
+            if args.clear_dependencies && !args.dependency_ids.is_empty() {
+                return emit_error(
+                    context,
+                    vec!["work-point", "revise"],
+                    "--clear-dependencies cannot be combined with --dependency-id".to_string(),
+                    true,
+                );
+            }
+            emit_success(
+                context,
+                vec!["work-point", "revise"],
+                store.revise_work_point(ReviseWorkPointInput {
+                    work_point_id: args.work_point_id,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    dependency_ids: if !args.dependency_ids.is_empty() {
+                        Some(args.dependency_ids)
+                    } else {
+                        None
+                    },
+                    clear_dependencies: args.clear_dependencies,
+                    run_id: context.correlation_id.clone(),
+                })?,
             )
         }
     }
@@ -1586,8 +1666,16 @@ fn execute_validate(
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
-        ValidateCommand::All => {
-            emit_success(context, vec!["validate", "all"], store.validate_all()?)
+        ValidateCommand::All(args) => {
+            if args.all_scopes {
+                emit_success(context, vec!["validate", "all"], store.validate_all()?)
+            } else {
+                emit_success(
+                    context,
+                    vec!["validate", "all"],
+                    store.validate_all_in_scope(&context.scope_key)?,
+                )
+            }
         }
     }
 }
@@ -1824,11 +1912,34 @@ fn execute_insight(
                 })?,
             )
         }
-        InsightCommand::List(args) => emit_success(
-            context,
-            vec!["insight", "list"],
-            json!({ "insights": store.list_insights_for_entity(args.parent_entity_type, &args.parent_entity_id, &context.scope_key)? }),
-        ),
+        InsightCommand::List(args) => {
+            if args.all {
+                emit_success(
+                    context,
+                    vec!["insight", "list"],
+                    json!({ "insights": store.list_insights_in_scope(&context.scope_key)? }),
+                )
+            } else {
+                let parent_type = args.parent_entity_type.ok_or_else(|| {
+                    CliError::Store(crate::PlanningStoreError::InvalidInput(
+                        "either --all or --parent-type and --parent-id are required for insight list"
+                            .to_string(),
+                    ))
+                })?;
+                let parent_id = args.parent_entity_id.ok_or_else(|| {
+                    CliError::Store(crate::PlanningStoreError::InvalidInput(
+                        "either --all or --parent-type and --parent-id are required for insight list"
+                            .to_string(),
+                    ))
+                })?;
+                emit_success(
+                    context,
+                    vec!["insight", "list"],
+                    json!({ "insights": store
+                        .list_insights_for_entity(parent_type, &parent_id, &context.scope_key)? }),
+                )
+            }
+        }
         InsightCommand::Show(args) => {
             let view = store.insight(&args.insight_id)?;
             if view.insight.scope_key != context.scope_key {
@@ -1931,15 +2042,12 @@ where
             let text = serde_json::to_string_pretty(&data)?;
             println!("{text}");
         }
-        OutputFormat::Json => print_json(&MachineEnvelope {
-            schema_version: RESULT_SCHEMA_VERSION,
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: command.iter().map(|item| (*item).to_string()).collect(),
-            status: "ok",
-            data: Some(data),
-            error: None,
-        })?,
+        OutputFormat::Json => print_json(&MachineEnvelope::ok(
+            context.correlation_id.clone(),
+            context.non_interactive,
+            command.iter().map(|item| (*item).to_string()).collect(),
+            data,
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -1952,15 +2060,13 @@ fn emit_error(
 ) -> Result<ExitCode, CliError> {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
-            schema_version: RESULT_SCHEMA_VERSION,
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: command.iter().map(|item| (*item).to_string()).collect(),
-            status: if invalid { "invalid" } else { "error" },
-            data: None,
-            error: Some(message),
-        })?,
+        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value>::error(
+            context.correlation_id.clone(),
+            context.non_interactive,
+            command.iter().map(|item| (*item).to_string()).collect(),
+            if invalid { MachineStatus::Invalid } else { MachineStatus::Error },
+            message,
+        ))?,
     }
     Ok(if invalid {
         exit_invalid()
@@ -2176,6 +2282,7 @@ fn work_point_command_name(command: &WorkPointCommand) -> &'static str {
         WorkPointCommand::UpdateStatus(_) => "update-status",
         WorkPointCommand::NextRunnable(_) => "next-runnable",
         WorkPointCommand::WorkGraph(_) => "work-graph",
+        WorkPointCommand::Revise(_) => "revise",
     }
 }
 
@@ -2249,7 +2356,7 @@ fn insight_command_name(command: &InsightCommand) -> &'static str {
 
 fn validate_command_name(command: &ValidateCommand) -> &'static str {
     match command {
-        ValidateCommand::All => "all",
+        ValidateCommand::All(_) => "all",
     }
 }
 
@@ -2360,10 +2467,6 @@ fn default_db_path() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
     home.join(".elegy").join("planning.db")
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
 }
 
 fn exit_invalid() -> ExitCode {

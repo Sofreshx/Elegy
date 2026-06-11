@@ -47,6 +47,7 @@ fn validate_project_run(
         findings.push(warning(
             EntityType::ProjectRun,
             project_run_id,
+            &run.scope_key,
             "PROJECT-RUN-GOAL-NOT-ACTIVE",
             "project run references a goal that is no longer active",
         )?);
@@ -60,6 +61,7 @@ fn validate_project_run(
         findings.push(error(
             EntityType::ProjectRun,
             project_run_id,
+            &run.scope_key,
             "PROJECT-RUN-WORK-POINT-INVALID",
             "project run references a work point that has been cancelled or invalidated",
         )?);
@@ -75,6 +77,7 @@ fn validate_project_run(
             findings.push(warning(
                 EntityType::ProjectRun,
                 project_run_id,
+                &run.scope_key,
                 "PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE",
                 "project run is completed but has no evidence refs",
             )?);
@@ -95,6 +98,7 @@ fn validate_goal(
         findings.push(error(
             EntityType::Goal,
             goal_id,
+            &goal.scope_key,
             "GOAL-ACCEPTANCE-MISSING",
             "goal should define at least one acceptance criterion",
         )?);
@@ -103,6 +107,7 @@ fn validate_goal(
         findings.push(error(
             EntityType::Goal,
             goal_id,
+            &goal.scope_key,
             "GOAL-REJECTION-MISSING",
             "goal should define at least one rejection criterion",
         )?);
@@ -118,6 +123,7 @@ fn validate_goal(
             findings.push(warning(
                 EntityType::Goal,
                 goal_id,
+                &goal.scope_key,
                 "GOAL-VALIDATED-WITHOUT-ROADMAP",
                 "validated goal has no linked roadmaps yet",
             )?);
@@ -140,6 +146,7 @@ fn validate_roadmap(
         findings.push(warning(
             EntityType::Roadmap,
             roadmap_id,
+            &roadmap.scope_key,
             "ROADMAP-NO-WORK-POINTS",
             "roadmap has no work points yet",
         )?);
@@ -152,6 +159,7 @@ fn validate_roadmap(
         findings.push(error(
             EntityType::Roadmap,
             roadmap_id,
+            &roadmap.scope_key,
             "ROADMAP-GOAL-NOT-ACTIVE",
             "roadmap links to a goal that is invalidated, superseded, or abandoned",
         )?);
@@ -165,6 +173,7 @@ fn validate_roadmap(
         findings.push(error(
             EntityType::Roadmap,
             roadmap_id,
+            &roadmap.scope_key,
             "ROADMAP-COMPLETED-WITH-OPEN-WORK",
             "completed roadmap still has non-completed work points",
         )?);
@@ -179,9 +188,9 @@ fn validate_roadmap_section(
 ) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
     let section = connection
         .query_row(
-            "SELECT roadmap_id, slug FROM roadmap_sections WHERE id = ?1",
+            "SELECT roadmap_id, slug, scope_key FROM roadmap_sections WHERE id = ?1",
             params![section_id],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
         )
         .map_err(|error| match error {
             rusqlite::Error::QueryReturnedNoRows => PlanningStoreError::NotFound {
@@ -202,6 +211,7 @@ fn validate_roadmap_section(
         findings.push(warning(
             EntityType::RoadmapSection,
             section_id,
+            &section.2,
             "ROADMAP-SECTION-EMPTY",
             &format!("roadmap section `{}` has no work points yet", section.1),
         )?);
@@ -230,12 +240,14 @@ fn validate_work_point(
             Some(roadmap_id) if roadmap_id != work_point.roadmap_id => findings.push(error(
                 EntityType::WorkPoint,
                 work_point_id,
+                &work_point.scope_key,
                 "WORK-POINT-SECTION-MISMATCH",
                 "work point section belongs to a different roadmap",
             )?),
             None => findings.push(error(
                 EntityType::WorkPoint,
                 work_point_id,
+                &work_point.scope_key,
                 "WORK-POINT-SECTION-MISSING",
                 "work point references a missing roadmap section",
             )?),
@@ -247,6 +259,7 @@ fn validate_work_point(
         findings.push(warning(
             EntityType::WorkPoint,
             work_point_id,
+            &work_point.scope_key,
             "WORK-POINT-NO-VALIDATION",
             "work point has no validation expectations yet",
         )?);
@@ -260,6 +273,7 @@ fn validate_work_point(
                     findings.push(error(
                         EntityType::WorkPoint,
                         work_point_id,
+                        &work_point.scope_key,
                         "WORK-POINT-DEPENDENCY-CROSS-ROADMAP",
                         &format!("dependency `{dependency_id}` belongs to a different roadmap"),
                     )?);
@@ -270,6 +284,7 @@ fn validate_work_point(
                     findings.push(error(
                         EntityType::WorkPoint,
                         work_point_id,
+                        &work_point.scope_key,
                         "WORK-POINT-COMPLETED-WITH-OPEN-DEPENDENCY",
                         &format!(
                             "completed work point still depends on non-completed work point `{dependency_id}`"
@@ -280,6 +295,7 @@ fn validate_work_point(
             Err(PlanningStoreError::NotFound { .. }) => findings.push(error(
                 EntityType::WorkPoint,
                 work_point_id,
+                &work_point.scope_key,
                 "WORK-POINT-DEPENDENCY-MISSING",
                 &format!("dependency `{dependency_id}` does not exist"),
             )?),
@@ -295,6 +311,7 @@ fn validate_work_point(
                 findings.push(error(
                     EntityType::WorkPoint,
                     work_point_id,
+                    &work_point.scope_key,
                     "WORK-POINT-DEPENDENCY-CYCLE",
                     "work point dependency graph contains a cycle",
                 )?);
@@ -324,6 +341,7 @@ fn validate_plan(
         findings.push(error(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-GOAL-ROADMAP-MISMATCH",
             "plan goal does not match roadmap goal",
         )?);
@@ -333,6 +351,7 @@ fn validate_plan(
         findings.push(warning(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-NO-TARGETED-WORK",
             "plan does not target any work points yet",
         )?);
@@ -342,6 +361,7 @@ fn validate_plan(
         findings.push(warning(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-NO-VALIDATION-STEPS",
             "plan does not define validation steps yet",
         )?);
@@ -355,6 +375,7 @@ fn validate_plan(
                     findings.push(error(
                         EntityType::Plan,
                         plan_id,
+                        &plan.scope_key,
                         "PLAN-WORK-POINT-ROADMAP-MISMATCH",
                         &format!(
                             "targeted work point `{work_point_id}` belongs to a different roadmap"
@@ -365,6 +386,7 @@ fn validate_plan(
             Err(PlanningStoreError::NotFound { .. }) => findings.push(error(
                 EntityType::Plan,
                 plan_id,
+                &plan.scope_key,
                 "PLAN-WORK-POINT-MISSING",
                 &format!("targeted work point `{work_point_id}` does not exist"),
             )?),
@@ -377,6 +399,7 @@ fn validate_plan(
         findings.push(warning(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-NO-TODOS",
             "plan has no todo records yet",
         )?);
@@ -390,6 +413,7 @@ fn validate_plan(
         findings.push(error(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-COMPLETED-WITH-OPEN-TODOS",
             "completed plan still has incomplete todos",
         )?);
@@ -411,6 +435,7 @@ fn validate_plan(
         findings.push(error(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-BLOCKING-ISSUES",
             "plan has unresolved high-severity or critical issues attached",
         )?);
@@ -426,6 +451,7 @@ fn validate_plan(
         findings.push(error(
             EntityType::Plan,
             plan_id,
+            &plan.scope_key,
             "PLAN-OPEN-REVIEW-POINTS",
             "plan has unresolved high-severity or critical review points",
         )?);
@@ -445,6 +471,7 @@ fn validate_todo(
         findings.push(warning(
             EntityType::Todo,
             todo_id,
+            &todo.scope_key,
             "TODO-STANDALONE",
             "todo is standalone and should be linked to a plan or work point when possible",
         )?);
@@ -454,6 +481,7 @@ fn validate_todo(
         findings.push(warning(
             EntityType::Todo,
             todo_id,
+            &todo.scope_key,
             "TODO-COMPLETED-WITHOUT-EVIDENCE",
             "completed todo has no evidence references",
         )?);
@@ -469,6 +497,7 @@ fn validate_todo(
             findings.push(warning(
                 EntityType::Todo,
                 todo_id,
+                &todo.scope_key,
                 "TODO-PLAN-WORK-POINT-MISMATCH",
                 "todo links to both a plan and work point, but the plan does not target that work point",
             )?);
@@ -489,6 +518,7 @@ fn validate_issue(
         (Some(_), None) | (None, Some(_)) => findings.push(warning(
             EntityType::Issue,
             issue_id,
+            &issue.scope_key,
             "ISSUE-PARTIAL-ENTITY-LINK",
             "issue should declare both related entity type and related entity id when linking to another record",
         )?),
@@ -499,6 +529,7 @@ fn validate_issue(
                 findings.push(error(
                     EntityType::Issue,
                     issue_id,
+                    &issue.scope_key,
                     "ISSUE-RELATED-ENTITY-MISSING",
                     "issue references a missing related entity",
                 )?);
@@ -513,6 +544,7 @@ fn validate_issue(
         findings.push(warning(
             EntityType::Issue,
             issue_id,
+            &issue.scope_key,
             "ISSUE-BLOCKED-LOW-SEVERITY",
             "blocked issue should usually be medium severity or higher",
         )?);
@@ -527,14 +559,15 @@ fn validate_review_point(
 ) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
     let review_point = connection
         .query_row(
-            "SELECT attached_entity_type, attached_entity_id, status, severity FROM review_points WHERE id = ?1",
+            "SELECT attached_entity_type, attached_entity_id, scope_key, status, severity FROM review_points WHERE id = ?1",
             params![review_point_id],
             |row| {
                 Ok((
                     crate::EntityType::from_str(&row.get::<_, String>(0)?).map_err(sql_string_err)?,
                     row.get::<_, String>(1)?,
-                    crate::ReviewPointStatus::from_str(&row.get::<_, String>(2)?).map_err(sql_string_err)?,
-                    crate::Severity::from_str(&row.get::<_, String>(3)?).map_err(sql_string_err)?,
+                    row.get::<_, String>(2)?,
+                    crate::ReviewPointStatus::from_str(&row.get::<_, String>(3)?).map_err(sql_string_err)?,
+                    crate::Severity::from_str(&row.get::<_, String>(4)?).map_err(sql_string_err)?,
                 ))
             },
         )
@@ -553,17 +586,19 @@ fn validate_review_point(
         findings.push(error(
             EntityType::ReviewPoint,
             review_point_id,
+            &review_point.2,
             "REVIEW-POINT-ATTACHED-ENTITY-MISSING",
             "review point references a missing attached entity",
         )?);
     }
 
-    if matches!(review_point.2, ReviewPointStatus::Open)
-        && matches!(review_point.3, Severity::Critical)
+    if matches!(review_point.3, ReviewPointStatus::Open)
+        && matches!(review_point.4, Severity::Critical)
     {
         findings.push(warning(
             EntityType::ReviewPoint,
             review_point_id,
+            &review_point.2,
             "REVIEW-POINT-CRITICAL-OPEN",
             "critical review point remains open and should be resolved or explicitly accepted",
         )?);
@@ -583,6 +618,7 @@ fn validate_insight(
         findings.push(error(
             EntityType::Insight,
             insight_id,
+            &insight.scope_key,
             "INSIGHT-EMPTY-CONTENT",
             "insight content must not be empty",
         )?);
@@ -592,6 +628,7 @@ fn validate_insight(
         findings.push(warning(
             EntityType::Insight,
             insight_id,
+            &insight.scope_key,
             "INSIGHT-TAG-ORPHAN",
             "insight has no tags; add tags for discoverability",
         )?);
@@ -605,6 +642,7 @@ fn validate_insight(
         findings.push(error(
             EntityType::Insight,
             insight_id,
+            &insight.scope_key,
             "INSIGHT-NO-PARENT",
             &format!(
                 "insight references missing parent {} `{}`",
@@ -620,12 +658,14 @@ fn validate_insight(
 fn warning(
     entity_type: EntityType,
     entity_id: &str,
+    scope_key: &str,
     code: &str,
     message: &str,
 ) -> Result<ValidationFinding, PlanningStoreError> {
     finding(
         entity_type,
         entity_id,
+        scope_key,
         ValidationSeverity::Warning,
         code,
         message,
@@ -635,12 +675,14 @@ fn warning(
 fn error(
     entity_type: EntityType,
     entity_id: &str,
+    scope_key: &str,
     code: &str,
     message: &str,
 ) -> Result<ValidationFinding, PlanningStoreError> {
     finding(
         entity_type,
         entity_id,
+        scope_key,
         ValidationSeverity::Error,
         code,
         message,
@@ -650,10 +692,18 @@ fn error(
 fn finding(
     entity_type: EntityType,
     entity_id: &str,
+    scope_key: &str,
     severity: ValidationSeverity,
     code: &str,
     message: &str,
 ) -> Result<ValidationFinding, PlanningStoreError> {
+    let fingerprint = format!(
+        "{}::{}::{}::{}",
+        entity_type.as_str(),
+        entity_id,
+        scope_key,
+        code
+    );
     Ok(ValidationFinding {
         finding_id: uuid::Uuid::new_v4().to_string(),
         entity_type,
@@ -661,6 +711,8 @@ fn finding(
         severity,
         code: code.to_string(),
         message: message.to_string(),
+        scope_key: scope_key.to_string(),
+        fingerprint,
         created_at: time::OffsetDateTime::now_utc()
             .format(&time::format_description::well_known::Rfc3339)
             .map_err(|_| PlanningStoreError::TimeFormat)?,
