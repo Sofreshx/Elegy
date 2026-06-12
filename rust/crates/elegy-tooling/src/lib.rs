@@ -881,6 +881,8 @@ pub enum PluginTemplateKind {
     McpTool,
     Configuration,
     Mixed,
+    RustCli,
+    RustHarness,
 }
 
 impl std::str::FromStr for PluginTemplateKind {
@@ -893,10 +895,12 @@ impl std::str::FromStr for PluginTemplateKind {
             "mcp-tool" => Ok(Self::McpTool),
             "configuration" => Ok(Self::Configuration),
             "mixed" => Ok(Self::Mixed),
+            "rust-cli" => Ok(Self::RustCli),
+            "rust-harness" => Ok(Self::RustHarness),
             _ => Err(ToolingError::InvalidPluginPackage {
                 path: PathBuf::from(s),
                 issues: vec![format!(
-                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, mcp-tool, configuration, mixed",
+                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness",
                     s
                 )],
             }),
@@ -927,7 +931,7 @@ pub fn scaffold_plugin_package(
     write_json_file(&plugin_json_path, &plugin_json, false)?;
     written_files.push(display_path(&plugin_json_path));
 
-    // Create common directories
+    // Create template-specific directories
     let dirs_to_create = match template {
         PluginTemplateKind::SkillOnly => vec!["skills", "docs"],
         PluginTemplateKind::CliTool => vec!["skills", "docs", "contracts"],
@@ -936,9 +940,28 @@ pub fn scaffold_plugin_package(
         PluginTemplateKind::Mixed => {
             vec!["skills", "docs", "contracts", "mcp", "configuration"]
         }
+        PluginTemplateKind::RustCli => {
+            vec!["skills", "docs", "contracts", "rust", "rust/src"]
+        }
+        PluginTemplateKind::RustHarness => {
+            vec!["skills", "docs", "contracts", "rust", "rust/src"]
+        }
     };
 
-    for dir in &dirs_to_create {
+    // Common directories created for all template kinds
+    let common_dirs = vec![
+        "contracts/fixtures",
+        "contracts/schemas",
+        ".github/workflows",
+    ];
+
+    let all_dirs: Vec<&str> = dirs_to_create
+        .iter()
+        .chain(common_dirs.iter())
+        .copied()
+        .collect();
+
+    for dir in &all_dirs {
         let dir_path = output_dir.join(dir);
         fs::create_dir_all(&dir_path).map_err(|source| ToolingError::Io {
             operation: "create directory",
@@ -948,18 +971,20 @@ pub fn scaffold_plugin_package(
     }
 
     // Create a README.md
+    let readme_description = match template {
+        PluginTemplateKind::SkillOnly => "A skill-only plugin package.",
+        PluginTemplateKind::CliTool => "A CLI tool plugin package.",
+        PluginTemplateKind::McpTool => "An MCP tool plugin package.",
+        PluginTemplateKind::Configuration => "A configuration plugin package.",
+        PluginTemplateKind::Mixed => {
+            "A mixed plugin package with skills, tools, and configurations."
+        }
+        PluginTemplateKind::RustCli => "A Rust CLI plugin package.",
+        PluginTemplateKind::RustHarness => "A Rust harness adapter plugin package.",
+    };
     let readme_content = format!(
         "# {}\n\n{}\n\n## Overview\n\nThis is an Elegy plugin package.\n\n## Components\n\n",
-        package_name,
-        match template {
-            PluginTemplateKind::SkillOnly => "A skill-only plugin package.",
-            PluginTemplateKind::CliTool => "A CLI tool plugin package.",
-            PluginTemplateKind::McpTool => "An MCP tool plugin package.",
-            PluginTemplateKind::Configuration => "A configuration plugin package.",
-            PluginTemplateKind::Mixed => {
-                "A mixed plugin package with skills, tools, and configurations."
-            }
-        }
+        package_name, readme_description,
     );
     let readme_path = output_dir.join("README.md");
     fs::write(&readme_path, &readme_content).map_err(|source| ToolingError::Io {
@@ -968,6 +993,169 @@ pub fn scaffold_plugin_package(
         source,
     })?;
     written_files.push(display_path(&readme_path));
+
+    // ── Common generated files (all templates) ──────────────────────────
+
+    // elegy-plugin.lock.json
+    let lock = serde_json::json!({
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x"
+        },
+        "generatedAt": "2026-06-12T00:00:00Z",
+        "generatedBy": "elegy-cli",
+        "pluginPackageRef": "elegy-plugin-package.json"
+    });
+    let lock_path = output_dir.join("elegy-plugin.lock.json");
+    write_json_file(&lock_path, &lock, false)?;
+    written_files.push(display_path(&lock_path));
+
+    // contracts/fixtures/skill.<package-name>.json — minimal skill fixture
+    let skill_fixture = serde_json::json!({
+        "schemaVersion": "elegy-skill-definition",
+        "skillVersion": 2,
+        "identity": {
+            "namespace": "elegy",
+            "name": package_name,
+            "version": package_version
+        },
+        "capabilities": [
+            {
+                "id": format!("{}.default", package_name),
+                "name": "Default capability",
+                "description": "Scaffolded default capability for the plugin package."
+            }
+        ],
+        "lifecycleState": "draft"
+    });
+    let skill_fixture_path = output_dir.join(format!(
+        "contracts/fixtures/skill.{}.json",
+        package_name
+    ));
+    write_json_file(&skill_fixture_path, &skill_fixture, false)?;
+    written_files.push(display_path(&skill_fixture_path));
+
+    // .github/workflows/plugin-ci.yml
+    let ci_workflow = format!(
+        concat!(
+            "name: Plugin CI\n",
+            "on: [push, pull_request]\n",
+            "jobs:\n",
+            "  validate:\n",
+            "    runs-on: ubuntu-latest\n",
+            "    steps:\n",
+            "      - uses: actions/checkout@v4\n",
+            "      - name: Verify plugin\n",
+            "        run: elegy plugin verify --package elegy-plugin-package.json\n",
+        )
+    );
+    let ci_path = output_dir.join(".github/workflows/plugin-ci.yml");
+    fs::write(&ci_path, &ci_workflow).map_err(|source| ToolingError::Io {
+        operation: "write",
+        path: ci_path.clone(),
+        source,
+    })?;
+    written_files.push(display_path(&ci_path));
+
+    // ── Template-specific generated files ───────────────────────────────
+
+    match template {
+        PluginTemplateKind::RustCli => {
+            // rust/Cargo.toml
+            let cargo_toml = format!(
+                concat!(
+                    "[package]\n",
+                    "name = \"{}-cli\"\n",
+                    "version = \"0.1.0\"\n",
+                    "edition = \"2021\"\n",
+                    "\n",
+                    "[dependencies]\n",
+                    "clap = {{ version = \"4\", features = [\"derive\"] }}\n",
+                    "serde = {{ version = \"1\", features = [\"derive\"] }}\n",
+                    "serde_json = \"1\"\n",
+                    "\n",
+                    "[[bin]]\n",
+                    "name = \"{}\"\n",
+                    "path = \"src/main.rs\"\n",
+                ),
+                package_name, package_name,
+            );
+            let cargo_path = output_dir.join("rust/Cargo.toml");
+            fs::write(&cargo_path, &cargo_toml).map_err(|source| ToolingError::Io {
+                operation: "write",
+                path: cargo_path.clone(),
+                source,
+            })?;
+            written_files.push(display_path(&cargo_path));
+
+            // rust/src/main.rs
+            let main_rs = format!(
+                "fn main() {{\n    println!(\"{} CLI v0.1.0\");\n}}\n",
+                package_name
+            );
+            let main_path = output_dir.join("rust/src/main.rs");
+            fs::write(&main_path, &main_rs).map_err(|source| ToolingError::Io {
+                operation: "write",
+                path: main_path.clone(),
+                source,
+            })?;
+            written_files.push(display_path(&main_path));
+        }
+        PluginTemplateKind::RustHarness => {
+            // rust/Cargo.toml
+            let cargo_toml = format!(
+                concat!(
+                    "[package]\n",
+                    "name = \"{}-adapter\"\n",
+                    "version = \"0.1.0\"\n",
+                    "edition = \"2021\"\n",
+                    "\n",
+                    "[dependencies]\n",
+                    "serde = {{ version = \"1\", features = [\"derive\"] }}\n",
+                    "serde_json = \"1\"\n",
+                    "\n",
+                    "[lib]\n",
+                    "name = \"{}_adapter\"\n",
+                    "path = \"src/lib.rs\"\n",
+                ),
+                package_name, package_name,
+            );
+            let cargo_path = output_dir.join("rust/Cargo.toml");
+            fs::write(&cargo_path, &cargo_toml).map_err(|source| ToolingError::Io {
+                operation: "write",
+                path: cargo_path.clone(),
+                source,
+            })?;
+            written_files.push(display_path(&cargo_path));
+
+            // rust/src/lib.rs
+            let lib_rs = format!(
+                concat!(
+                    "/// Register tool adapters for the host harness.\n",
+                    "/// Called by the host during harness initialization.\n",
+                    "pub fn register_tools() -> Vec<ToolAdapter> {{\n",
+                    "    vec![]\n",
+                    "}}\n",
+                    "\n",
+                    "/// A tool adapter registered by this plugin.\n",
+                    "pub struct ToolAdapter {{\n",
+                    "    pub name: String,\n",
+                    "    pub handler: String,\n",
+                    "}}\n",
+                )
+            );
+            let lib_path = output_dir.join("rust/src/lib.rs");
+            fs::write(&lib_path, &lib_rs).map_err(|source| ToolingError::Io {
+                operation: "write",
+                path: lib_path.clone(),
+                source,
+            })?;
+            written_files.push(display_path(&lib_path));
+        }
+        _ => {}
+    }
 
     Ok(written_files)
 }
@@ -1024,6 +1212,61 @@ fn build_scaffold_plugin_json(
                 "description": format!("Default configuration template for {}", package_name)
             }]);
         }
+        PluginTemplateKind::RustCli => {
+            components["skillDefinitions"] = serde_json::json!([{
+                "id": format!("{}-skill", package_name),
+                "definition": {
+                    "skillFormat": "elegy-skill-definition",
+                    "skillVersion": 2,
+                    "identity": {
+                        "namespace": "elegy",
+                        "name": package_name,
+                        "version": package_version
+                    },
+                    "capabilities": [],
+                    "lifecycleState": "draft"
+                }
+            }]);
+            components["cliHelpers"] = serde_json::json!([{
+                "id": format!("{}-cli", package_name),
+                "description": format!("{} CLI helper", package_name),
+                "binary": package_name
+            }]);
+            components["capabilityProjections"] = serde_json::json!([{
+                "id": format!("{}-cli-projection", package_name),
+                "capabilityRef": format!("{}.default", package_name),
+                "lane": "subprocess",
+                "help": format!("{}-cli", package_name)
+            }]);
+        }
+        PluginTemplateKind::RustHarness => {
+            components["skillDefinitions"] = serde_json::json!([{
+                "id": format!("{}-skill", package_name),
+                "definition": {
+                    "skillFormat": "elegy-skill-definition",
+                    "skillVersion": 2,
+                    "identity": {
+                        "namespace": "elegy",
+                        "name": package_name,
+                        "version": package_version
+                    },
+                    "capabilities": [],
+                    "lifecycleState": "draft"
+                }
+            }]);
+            components["rustToolAdapters"] = serde_json::json!([{
+                "id": format!("{}-adapter", package_name),
+                "crateName": format!("{}-adapter", package_name),
+                "adapterPath": "rust/src/lib.rs",
+                "registerFn": "register_tools"
+            }]);
+            components["capabilityProjections"] = serde_json::json!([{
+                "id": format!("{}-rust-projection", package_name),
+                "capabilityRef": format!("{}.default", package_name),
+                "lane": "rust",
+                "adapterId": format!("{}-adapter", package_name)
+            }]);
+        }
     }
 
     // Add docs
@@ -1047,8 +1290,14 @@ fn build_scaffold_plugin_json(
                 PluginTemplateKind::McpTool => "MCP tool",
                 PluginTemplateKind::Configuration => "configuration",
                 PluginTemplateKind::Mixed => "mixed",
+                PluginTemplateKind::RustCli => "Rust CLI",
+                PluginTemplateKind::RustHarness => "Rust harness",
             }),
             "license": "MIT"
+        },
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x"
         },
         "components": components
     })

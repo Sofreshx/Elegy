@@ -272,7 +272,7 @@ enum ConfigurationCommand {
 enum PluginCommand {
     /// Create a new plugin package from a template
     New {
-        /// Template kind: skill-only, cli-tool, mcp-tool, configuration, mixed
+        /// Template kind: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness
         #[arg(long)]
         template: String,
         /// Output directory for the new plugin package
