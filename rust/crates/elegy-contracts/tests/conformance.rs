@@ -1439,3 +1439,113 @@ fn plugin_lock_v1_round_trips() {
         lock.elegy_compatibility.checksum
     );
 }
+
+#[test]
+fn plugin_package_with_rust_lane_and_adapter_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.rust-plugin", "name": "test-rust-plugin", "version": "0.1.0" },
+        "components": {
+            "skillDefinitions": [{
+                "id": "test-skill",
+                "definitionRef": "contracts/fixtures/skill.minimal.json"
+            }],
+            "capabilityProjections": [{
+                "id": "test-cap-rust",
+                "skill": "elegy.test",
+                "capability": "test_capability",
+                "lane": "rust",
+                "supportsDryRun": false,
+                "projection": {
+                    "projections": ["function_calling"],
+                    "functionName": "test_function"
+                }
+            }],
+            "rustToolAdapters": [{
+                "id": "test-adapter",
+                "crateName": "elegy-test-adapter",
+                "crateVersion": "0.1.0",
+                "registrySymbol": "register_test_tools"
+            }]
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with rust lane and adapter");
+
+    assert_eq!(package.components.capability_projections.len(), 1);
+    assert_eq!(
+        package.components.capability_projections[0].lane,
+        "rust"
+    );
+    assert_eq!(package.components.rust_tool_adapters.len(), 1);
+    assert_eq!(
+        package.components.rust_tool_adapters[0].crate_name,
+        "elegy-test-adapter"
+    );
+    assert_eq!(
+        package.components.rust_tool_adapters[0].registry_symbol,
+        "register_test_tools"
+    );
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "rust lane package should validate: {:?}",
+        validation.issues
+    );
+}
+
+#[test]
+fn rust_tool_adapter_with_optional_fields_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.rust-opt", "name": "test-rust-opt", "version": "0.1.0" },
+        "components": {
+            "skillDefinitions": [{
+                "id": "test-skill",
+                "definitionRef": "contracts/fixtures/skill.minimal.json"
+            }],
+            "rustToolAdapters": [{
+                "id": "adapter-with-feature",
+                "crateName": "elegy-feature-adapter",
+                "crateVersion": "0.2.0",
+                "registrySymbol": "register_feature_tools",
+                "feature": "native-tools",
+                "manifestRef": "rust/adapter-manifest.json"
+            }]
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse adapter with optional fields");
+
+    let adapter = &package.components.rust_tool_adapters[0];
+    assert_eq!(adapter.feature.as_deref(), Some("native-tools"));
+    assert_eq!(
+        adapter.manifest_ref.as_deref(),
+        Some("rust/adapter-manifest.json")
+    );
+}
+
+#[test]
+fn rust_tool_adapter_round_trips() {
+    let adapter = elegy_contracts::ElegyPluginPackageRustToolAdapterComponent {
+        id: "round-trip-adapter".to_string(),
+        crate_name: "elegy-roundtrip".to_string(),
+        crate_version: "0.3.0".to_string(),
+        feature: Some("harness".to_string()),
+        registry_symbol: "register_harness_tools".to_string(),
+        manifest_ref: Some("rust/manifest.json".to_string()),
+    };
+
+    let json = serde_json::to_string(&adapter).expect("serialize adapter");
+    let parsed: elegy_contracts::ElegyPluginPackageRustToolAdapterComponent =
+        serde_json::from_str(&json).expect("deserialize adapter");
+    assert_eq!(parsed.id, adapter.id);
+    assert_eq!(parsed.crate_name, adapter.crate_name);
+    assert_eq!(parsed.crate_version, adapter.crate_version);
+    assert_eq!(parsed.feature, adapter.feature);
+    assert_eq!(parsed.registry_symbol, adapter.registry_symbol);
+    assert_eq!(parsed.manifest_ref, adapter.manifest_ref);
+}

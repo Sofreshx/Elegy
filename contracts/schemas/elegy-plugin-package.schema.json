@@ -139,6 +139,11 @@
           "type": "array",
           "items": { "$ref": "#/$defs/configurationComponent" }
         },
+        "rustToolAdapters": {
+          "type": "array",
+          "description": "Native Rust harness tool adapters for compile-time or harness-load-time integration. Each entry registers a crate adapter that exposes governed capabilities as native tools.",
+          "items": { "$ref": "#/$defs/rustToolAdapterComponent" }
+        },
         "toolRequirements": {
           "type": "array",
           "description": "Required CLI tools and MCP surfaces this package needs installed and probeable.",
@@ -263,7 +268,7 @@
         },
         "lane": {
           "type": "string",
-          "enum": ["api", "mcp", "plugin", "cli", "subprocess"]
+          "enum": ["api", "mcp", "plugin", "cli", "subprocess", "rust"]
         },
         "supportsDryRun": {
           "type": "boolean"
@@ -352,6 +357,41 @@
         { "required": ["manifestRef"] },
         { "required": ["manifest"] }
       ]
+    },
+    "rustToolAdapterComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "crateName", "crateVersion", "registrySymbol"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "crateName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Rust crate name (e.g. 'elegy-planning-adapter')."
+        },
+        "crateVersion": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Semver version of the adapter crate."
+        },
+        "feature": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional Cargo feature flag to enable this adapter."
+        },
+        "registrySymbol": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Rust symbol name for tool registration (e.g. 'register_planning_tools')."
+        },
+        "manifestRef": {
+          "$ref": "#/$defs/relativePath",
+          "description": "Optional relative path to the adapter's manifest file."
+        }
+      }
     },
     "fixturePackComponent": {
       "type": "object",

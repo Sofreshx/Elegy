@@ -415,6 +415,8 @@ pub struct ElegyPluginPackageComponents {
     pub tool_requirements: Vec<ElegyPluginPackageToolRequirement>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub host_compatibility: Vec<ElegyPluginPackageCompatibilityMetadata>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rust_tool_adapters: Vec<ElegyPluginPackageRustToolAdapterComponent>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -548,6 +550,19 @@ pub struct ElegyPluginPackageToolRequirement {
     pub probe_command: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageRustToolAdapterComponent {
+    pub id: String,
+    pub crate_name: String,
+    pub crate_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature: Option<String>,
+    pub registry_symbol: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_ref: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -842,7 +857,7 @@ pub fn validate_elegy_plugin_package(
     for projection in &package.components.capability_projections {
         if !matches!(
             projection.lane.as_str(),
-            "api" | "mcp" | "plugin" | "cli" | "subprocess"
+            "api" | "mcp" | "plugin" | "cli" | "subprocess" | "rust"
         ) {
             issues.push(format!(
                 "components.capabilityProjections entry '{}' uses unsupported lane '{}'.",
