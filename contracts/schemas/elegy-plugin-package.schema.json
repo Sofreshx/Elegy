@@ -171,6 +171,9 @@
     },
     "publishing": {
       "$ref": "#/$defs/publishingMetadata"
+    },
+    "elegyCompatibility": {
+      "$ref": "#/$defs/elegyCompatibility"
     }
   },
   "$defs": {
@@ -461,6 +464,29 @@
           "items": {
             "$ref": "#/$defs/compatibilityMetadata"
           }
+        }
+      }
+    },
+    "elegyCompatibility": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["contractBundleVersion", "schemaLine"],
+      "properties": {
+        "contractBundleVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "schemaLine": {
+          "type": "string",
+          "minLength": 1
+        },
+        "minimumElegyToolingVersion": {
+          "type": "string",
+          "minLength": 1
+        },
+        "contractsSource": {
+          "type": "string",
+          "format": "uri"
         }
       }
     }

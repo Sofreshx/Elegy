@@ -1270,3 +1270,172 @@ fn readiness_side_effect_summary_round_trips_through_deserialization() {
         "network_outbound must survive round-trip as snake_case"
     );
 }
+
+#[test]
+fn plugin_package_with_elegy_compatibility_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.plugin", "name": "test-plugin", "version": "0.1.0" },
+        "components": {},
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "minimumElegyToolingVersion": "1.8.0",
+            "contractsSource": "https://example.com/contracts/bundle-v1.8.0.zip"
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with elegyCompatibility");
+
+    let compat = package
+        .elegy_compatibility
+        .expect("elegyCompatibility should be present");
+    assert_eq!(compat.contract_bundle_version, "1.8.0");
+    assert_eq!(compat.schema_line, "1.x");
+    assert_eq!(
+        compat.minimum_elegy_tooling_version.as_deref(),
+        Some("1.8.0")
+    );
+    assert!(compat.contracts_source.is_some());
+}
+
+#[test]
+fn plugin_package_without_elegy_compatibility_still_parses() {
+    // Existing packages should still parse without elegyCompatibility
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
+        .expect("load upstream elegy-plugin-package fixture");
+
+    assert!(package.elegy_compatibility.is_none());
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "existing packages without elegyCompatibility should still validate: {:?}",
+        validation.issues
+    );
+}
+
+#[test]
+fn elegy_compatibility_uri_validation() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.plugin", "name": "test-plugin", "version": "0.1.0" },
+        "components": {},
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "contractsSource": "not-a-uri"
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with invalid contractsSource");
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(validation
+        .issues
+        .contains(&"elegyCompatibility.contractsSource must be a valid URI.".to_string()));
+}
+
+#[test]
+fn plugin_lock_v1_parses_valid_lock() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "sourceAsset": "https://example.com/bundles/elegy-contracts-1.8.0.zip",
+            "checksum": "sha256:abc123def456"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z",
+        "generatedBy": "elegy-cli/1.8.0",
+        "pluginPackageRef": "elegy-plugin-package.json"
+    }"#;
+
+    let lock: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(json).expect("parse valid lock file");
+
+    assert_eq!(lock.schema_version, "elegy-plugin-lock/v1");
+    assert_eq!(lock.lock_version, 1);
+    assert_eq!(
+        lock.elegy_compatibility.contract_bundle_version,
+        "1.8.0"
+    );
+    assert_eq!(lock.elegy_compatibility.schema_line, "1.x");
+    assert!(lock.elegy_compatibility.source_asset.is_some());
+    assert!(lock.elegy_compatibility.checksum.is_some());
+    assert_eq!(lock.generated_at, "2026-06-12T10:00:00Z");
+}
+
+#[test]
+fn plugin_lock_v1_rejects_missing_required_fields() {
+    // Missing contractBundleVersion
+    let json_missing_version = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "schemaLine": "1.x"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z"
+    }"#;
+
+    let result: Result<elegy_contracts::ElegyPluginLockV1, _> =
+        serde_json::from_str(json_missing_version);
+    assert!(
+        result.is_err(),
+        "lock file with missing required fields should fail to parse"
+    );
+
+    // Missing checksum is optional - should parse fine
+    let json_no_checksum = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z"
+    }"#;
+
+    let lock: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(json_no_checksum).expect("parse lock without checksum");
+    assert!(lock.elegy_compatibility.checksum.is_none());
+}
+
+#[test]
+fn plugin_lock_v1_round_trips() {
+    let lock = elegy_contracts::ElegyPluginLockV1 {
+        schema_version: "elegy-plugin-lock/v1".to_string(),
+        lock_version: 1,
+        elegy_compatibility: elegy_contracts::ElegyPluginLockCompatibility {
+            contract_bundle_version: "1.8.0".to_string(),
+            schema_line: "1.x".to_string(),
+            source_asset: Some("https://example.com/bundle.zip".to_string()),
+            checksum: Some("sha256:abc".to_string()),
+        },
+        generated_at: "2026-06-12T10:00:00Z".to_string(),
+        generated_by: Some("elegy-cli/1.8.0".to_string()),
+        plugin_package_ref: Some("elegy-plugin-package.json".to_string()),
+    };
+
+    let json = serde_json::to_string(&lock).expect("serialize lock");
+    let parsed: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(&json).expect("deserialize lock");
+    assert_eq!(parsed.schema_version, lock.schema_version);
+    assert_eq!(parsed.lock_version, lock.lock_version);
+    assert_eq!(
+        parsed.elegy_compatibility.contract_bundle_version,
+        lock.elegy_compatibility.contract_bundle_version
+    );
+    assert_eq!(
+        parsed.elegy_compatibility.schema_line,
+        lock.elegy_compatibility.schema_line
+    );
+    assert_eq!(
+        parsed.elegy_compatibility.checksum,
+        lock.elegy_compatibility.checksum
+    );
+}

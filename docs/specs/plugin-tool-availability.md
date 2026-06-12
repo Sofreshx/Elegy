@@ -5,9 +5,9 @@ status: draft
 type: contract
 owner: Elegy
 created: 2026-06-04
-updated: 2026-06-04
+updated: 2026-06-12
 doc_kind: spec
-summary: Contract for how elegy-plugin-package/v2 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, and the Codex projection conservatism rules.
+summary: Contract for how elegy-plugin-package/v1 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, and the Codex projection conservatism rules.
 ---
 
 # Plugin Tool Availability
@@ -29,8 +29,8 @@ answer, without Elegy becoming a host, a marketplace, or a runtime authority.
 
 Three durable definitions and three durable rules cover that goal:
 
-- **Plugin package** is the portable bundle. `elegy-plugin-package/v2` is the
-  authority.
+- **Plugin package** is the portable bundle. `elegy-plugin-package/v1` is the
+  current authority. `elegy-plugin-package/v2` is planned future work.
 - **Skill definition v2** is the capability contract. `skill` is
   the authority, and `hostProjection` is the part a host cares about.
 - **App/connector** is host-owned. It is not an Elegy package-owned runtime and
@@ -47,16 +47,15 @@ host owns install, auth, approvals, and runtime enablement.
 
 ## Context Evidence
 
-- `contracts/schemas/elegy-plugin-package-v1.schema.json` and
-  `contracts/schemas/elegy-plugin-package-v2.schema.json` define the portable
-  package contract. v2 adds configuration components on top of v1, but
-  `components.capabilityProjections` already exists in v1.
+- `contracts/schemas/elegy-plugin-package.schema.json` defines the portable
+  package contract at `elegy-plugin-package/v1`.
+  `components.capabilityProjections` is a first-class field.
 - `contracts/schemas/skill.schema.json` defines the unified skill
   contract. `hostProjection` (lines 181-232) carries per-capability function
   names and side-effect overrides that are the contract authority for
   function-calling surfaces.
-- `contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json` is the pilot
-  package. Its `components.capabilityProjections` (13 entries, lines 29-186)
+- `contracts/fixtures/elegy-plugin-package.elegy-planning.json` is the pilot
+  package. Its `components.capabilityProjections` (13 entries)
   must remain consistent with
   `contracts/fixtures/skill.elegy-planning.json`'s
   `hostProjection.capabilityProjections`.
@@ -94,7 +93,7 @@ The spec fixes the following terms for every later reference inside Elegy
 contracts, fixtures, CLI output, and codex projections.
 
 - **Plugin package** — A portable bundle whose identity, components, and
-  publishing metadata are declared under `elegy-plugin-package/v2`. The
+  publishing metadata are declared under `elegy-plugin-package/v1`. The
   package carries metadata, schemas, fixtures, and references; it does not
   own install, auth, approval, or runtime.
 - **Tool availability** — The verifiable projection of a package's
@@ -107,7 +106,7 @@ contracts, fixtures, CLI output, and codex projections.
   entirely outside the portable package. A portable package MAY reference
   apps conceptually (for example, to hint at a required connector), but it
   MUST NOT carry app launch, auth, secrets, lease state, or runtime sessions.
-- **Capability projection** — Per `elegy-plugin-package/v2`, an entry in
+- **Capability projection** — Per `elegy-plugin-package/v1`, an entry in
   `components.capabilityProjections[]` that re-states one skill capability in
   host-projection terms (lane, function name, MCP tool name, side-effect
   class, dry-run support).
@@ -126,7 +125,7 @@ contracts, fixtures, CLI output, and codex projections.
 
 ### R2. Package consistency rules for `components.capabilityProjections`
 
-`elegy-plugin-package/v2.components.capabilityProjections` MUST be derivable
+`elegy-plugin-package/v1.components.capabilityProjections` MUST be derivable
 from one of two declared sources. A package that violates this rule fails
 contract validation with a precise finding, not a generic schema error.
 
@@ -149,11 +148,12 @@ The derivation is per-entry and per-field:
 
 **R2.2 Deliberate subset source.** A package MAY carry a `capabilityProjections[]`
 that omits capabilities present in the referenced skill. When it does, the
-package MUST set `metadata.subsetOf: { skill: "<namespace>.<name>", version:
-"<version>", omitted: ["<capability-id>", ...], reason: "<non-empty>" }` at
-the package level. A subset without the marker is a contract violation. The
-marker is intentionally at package level, not per-entry, so reviewers see the
-whole omission set in one place.
+package MUST set `metadata.subsetOf` at the package level — currently a flat
+array of capability IDs (`elegy-plugin-package/v1`). A future `v2` revision
+will replace this with a structured object `{ skill, version, omitted[], reason }`.
+A subset without the marker is a contract violation. The marker is intentionally
+at package level, not per-entry, so reviewers see the whole omission set in one
+place.
 
 **R2.3 Inverse rule.** Every `hostProjection.capabilityProjections[].capabilityId`
 on a referenced skill MUST either appear in `components.capabilityProjections[]`
@@ -198,7 +198,7 @@ emits findings the next step can consume; the final step emits the readiness
 receipt.
 
 **R3.1 Schema and reference validation.** Validate the package against
-`contracts/schemas/elegy-plugin-package-v2.schema.json`. For every entry in
+`contracts/schemas/elegy-plugin-package.schema.json`. For every entry in
 `components.skillDefinitions[]`:
 
 - If `definitionRef` is set, load the JSON and validate it against
@@ -301,7 +301,7 @@ output envelope MUST be byte-equal across both surfaces.
 
 **R4.3 Inputs.** All inputs are local file paths; no network calls. The
 command MUST refuse to run if `--package` is missing or not a JSON file
-that validates against `elegy-plugin-package/v2`. The command MUST NOT
+that validates against `elegy-plugin-package/v1`. The command MUST NOT
 write to disk.
 
 **R4.4 Exit codes.** `0` for `ready`, `1` for `partial`, `2` for `blocked`.
@@ -327,7 +327,7 @@ authority for downstream hosts; later schemas MUST keep this layout.
     "name": "elegy-planning",
     "version": "0.1.0",
     "displayName": "Elegy Planning Plugin",
-    "schemaVersion": "elegy-plugin-package/v2"
+    "schemaVersion": "elegy-plugin-package/v1"
   },
   "verifiedSkills": [
     {
@@ -482,7 +482,7 @@ the package's `publishing.*` fields exactly.
 ### R7. Pilot: `elegy-planning`
 
 The pilot package is
-`contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json`. The
+`contracts/fixtures/elegy-plugin-package.elegy-planning.json`. The
 pilot exercises the contract without changing the governed skill
 contract surface.
 
@@ -523,11 +523,12 @@ only the instruction-skill mirror changes.
   `metadata.subsetOf.omitted = [<the 33 capability ids not currently in
   components.capabilityProjections[]>]`, and
   `metadata.subsetOf.reason = "<non-empty rationale>"`. The
-  `elegy-plugin-package/v2` schema revision that adds
-  `metadata.subsetOf` is a sibling change to this spec and MUST land
-  before the verifier can run against the pilot.
-- `elegy configuration package-verify --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+  `elegy-plugin-package/v1` schema already supports `metadata.subsetOf`
+  as a flat array. The structured object form (`{ skill, version, omitted[], reason }`)
+  is planned for a future `v2` schema revision. When v2 lands, the pilot package
+  MUST adopt the new structure.
+- `elegy plugin verify --package
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --install-receipt <fixture> --json` returns `status: ready` against
   a fixture install receipt that lists `elegy-planning` in
   `installedAssets[]`.
@@ -536,7 +537,7 @@ only the instruction-skill mirror changes.
 - The same command returns `status: partial` when the receipt is
   absent.
 - `elegy generate codex-plugin --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` continues to emit only
   `.codex-plugin/plugin.json` and `skills/`; no `.mcp.json`,
   `.app.json`, or `hooks/hooks.json` is emitted because the package
@@ -593,14 +594,14 @@ Each item is observable and machine-checkable.
   `omitted[]` and a non-empty `reason` passes projection consistency
   even when fewer entries are present in
   `components.capabilityProjections[]`.
-- **AC5** `elegy configuration package-verify --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+- **AC5** `elegy plugin verify --package
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --install-receipt <fixture> --json` returns `status: ready` against
   a fixture install receipt that lists `elegy-planning` in
   `installedAssets[]`. This AC depends on R7.4 — the pilot package MUST
   declare `metadata.subsetOf` covering the 33 hostProjection entries it
-  does not project, and the `elegy-plugin-package/v2` schema MUST
-  support the field, before this AC can be exercised.
+  does not project, and the `elegy-plugin-package/v1` schema already
+  supports the field as a flat array, before this AC can be exercised.
 - **AC6** The same command returns `status: blocked` with a
   `BINARY-BROKEN` finding when the receipt points to an executable
   path that exists on disk but the binary probe exits non-zero,
@@ -619,7 +620,7 @@ Each item is observable and machine-checkable.
   `sideEffectClass` counts; a `disk_read` capability shows up under
   `disk_read` and never under `disk_write`.
 - **AC10** `elegy generate codex-plugin --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` emits only `.codex-plugin/plugin.json`
   and `skills/`. No `.mcp.json`, `.app.json`, `apps/`,
   `hooks/hooks.json`, or marketplace metadata is emitted.
@@ -640,7 +641,7 @@ Each item is observable and machine-checkable.
 ## Links
 
 - Pilot package:
-  `contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json`
+  `contracts/fixtures/elegy-plugin-package.elegy-planning.json`
 - Pilot skill definition:
   `contracts/fixtures/skill.elegy-planning.json`
   (specifically the `hostProjection` block at line 1928)
@@ -657,8 +658,8 @@ Each item is observable and machine-checkable.
   module if the verifier is reused beyond `elegy-configuration`. The
   command is read-only, so it is safe to add to either surface.
 - Schemas that the verifier consumes:
-  `contracts/schemas/elegy-plugin-package-v1.schema.json`,
-  `contracts/schemas/elegy-plugin-package-v2.schema.json`,
+  `contracts/schemas/elegy-plugin-package.schema.json`,
+  `contracts/schemas/elegy-plugin.lock.json`,
   `contracts/schemas/skill.schema.json`.
 - Companion roadmap:
   `docs/roadmaps/ai-agent-integration-roadmap.md` (P2 "MCP subprocess
@@ -678,15 +679,14 @@ they MUST stay green on `main` once the verifier is implemented.
 - `cargo test -p elegy-configuration` — runs the new
   `package-verify` unit and integration tests described in the Test
   Plan.
-- `elegy configuration package-verify --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+- `elegy plugin verify --package
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --install-receipt <fixture> --json` — emits a `ready` receipt.
-- `elegy configuration package-verify --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json --json`
-  (no receipt) — emits a `partial` receipt with
-  `READINESS-NO-INSTALL-RECEIPT`.
+- `elegy plugin verify --package
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json --json`
+  (no receipt) — reports `blocked` with unpinned compatibility.
 - `elegy generate codex-plugin --package
-  contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json
+  contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` — emits only
   `.codex-plugin/plugin.json` and `skills/`.
 - `cargo fmt --all`, `cargo clippy --all-targets --all-features -- -D warnings`,
@@ -695,39 +695,31 @@ they MUST stay green on `main` once the verifier is implemented.
 ## Drift Notes
 
 - This spec is `status: draft`. It is the durable home for the
-  "plugin tool availability" contract and supersedes ad-hoc discussion
-  of the same idea in the plan document. Once the verifier is
-  implemented and the pilot fixtures carry the matching receipt, the
-  spec should be re-tagged `status: implemented` together with the
-  implementation PR.
+  "plugin tool availability" contract. The current implementation
+  uses `elegy plugin verify` (not `elegy configuration package-verify`),
+  and the spec text has been updated to match. If the CLI surface
+  moves later, update the spec together with the code.
+- `elegy-plugin-package/v1` is the current authority. The planned
+  `elegy-plugin-package/v2` revision will introduce a structured
+  `metadata.subsetOf` object (`{ skill, version, omitted[], reason }`)
+  replacing the current `string[]`. When v2 lands, update R2.2, R7.4,
+  AC3, AC4, AC5, the pilot package, and these drift notes together.
+- `elegy-plugin.lock.json` (`elegy-plugin-lock/v1`) is the new lock
+  file contract (added 2026-06-12). All standard publishable plugin
+  packages must carry this file alongside `elegy-plugin-package.json`.
+- `elegyCompatibility` is an optional top-level field in
+  `elegy-plugin-package/v1` that pins contract bundle version, schema
+  line, and optional tooling/contracts source. `elegy plugin verify`
+  reports `blocked` for publishable packages that omit it.
 - `.mcp.json` emission depends on a future `mcp-server-descriptor`
   schema revision that adds truthful launch fields (`command`, `args`,
   `cwd`/`env` policy, transport details). The current schema only
-  carries descriptor and tool metadata. Until this schema revision
-  lands, R6.2 blocks `.mcp.json` emission and the Non-Goals entry
-  reflects the blocked posture. When the schema revision lands, update
-  R6.2, the Non-Goals entry, AC10, and the Validation Evidence block
-  together. Do not widen the generator alone.
-- The `elegy-plugin-package/v2` schema currently does not declare a
-  `metadata.subsetOf` block. Adding it is the next schema revision and
-  should land before the verifier is implemented; otherwise the
-  contract's R2.2 / R2.3 / AC3 / AC4 cannot be enforced. Track the
-  schema addition as a sibling change to this spec.
+  carries descriptor and tool metadata. When the schema revision lands,
+  update R6.2, the Non-Goals entry, AC10, and the Validation Evidence
+  block together. Do not widen the generator alone.
 - The pilot package
-  `contracts/fixtures/elegy-plugin-package-v2.elegy-planning.json`
+  `contracts/fixtures/elegy-plugin-package.elegy-planning.json`
   currently projects 13 capabilities while its referenced
   `skill.elegy-planning.json` `hostProjection` declares
-  46. Under R2.3 the package MUST declare `metadata.subsetOf` covering
-  the 33 omitted capabilities, or AC5 cannot pass. The schema gap
-  above blocks this update, so the two changes are co-dependent.
-  Treat the schema addition, the package update, and the verifier
-  implementation as one pilot slice.
-- The CLI command's name is `elegy configuration package-verify`. The
-  alternate `elegy agent package-check` is allowed for parity but is
-  not the canonical placement. Do not ship both with different
-  output envelopes; if both ship, R4.2's byte-equal requirement is the
-  contract.
-- The readiness receipt schema `elegy-plugin-readiness/v1` is a
-  brand-new envelope. It belongs in
-  `contracts/schemas/elegy-plugin-readiness.schema.json` once the
-  verifier lands; this spec is the prose authority until then.
+  46. Under R2.3 the package declares `metadata.subsetOf` covering
+  the 33 omitted capabilities using the v1 string array form.
