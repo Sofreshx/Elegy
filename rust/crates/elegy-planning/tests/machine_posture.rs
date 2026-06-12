@@ -692,15 +692,86 @@ fn scoped_validate_all_excludes_findings_from_other_scopes() {
     let db_arg = db_path.to_str().expect("utf-8 db path");
 
     // Create scope A with a goal (no acceptance criteria -> validation finding)
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "scope-a", "goal", "create", "--id", "goal-a", "--title", "Goal A", "--description", "Test"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-a",
+        "--title",
+        "Goal A",
+        "--description",
+        "Test",
+    ]);
 
     // Create scope B with a goal (no acceptance criteria -> validation finding)
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "scope-b", "scope", "create", "--scope-key", "scope-b"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "--scope", "scope-b", "goal", "create", "--id", "goal-b", "--title", "Goal B", "--description", "Test"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-b",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-b",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-b",
+        "goal",
+        "create",
+        "--id",
+        "goal-b",
+        "--title",
+        "Goal B",
+        "--description",
+        "Test",
+    ]);
 
     // Validate scope A only
-    let result_a = command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c5", "--scope", "scope-a", "validate", "all"]);
+    let result_a = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "validate",
+        "all",
+    ]);
 
     assert_eq!(result_a["status"], "ok");
     assert_eq!(result_a["data"]["scopeMode"], "single");
@@ -709,16 +780,35 @@ fn scoped_validate_all_excludes_findings_from_other_scopes() {
     // All findings should be for scope-a entities
     if let Some(findings) = result_a["data"]["findings"].as_array() {
         for finding in findings {
-            assert_eq!(finding["scopeKey"], "scope-a", "finding {:?} should be in scope-a", finding["code"]);
+            assert_eq!(
+                finding["scopeKey"], "scope-a",
+                "finding {:?} should be in scope-a",
+                finding["code"]
+            );
             assert!(
-                finding["fingerprint"].as_str().unwrap_or("").contains("scope-a"),
+                finding["fingerprint"]
+                    .as_str()
+                    .unwrap_or("")
+                    .contains("scope-a"),
                 "fingerprint should contain scope key"
             );
         }
     }
 
     // Validate all scopes
-    let result_all = command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c6", "--scope", "scope-a", "validate", "all", "--all-scopes"]);
+    let result_all = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c6",
+        "--scope",
+        "scope-a",
+        "validate",
+        "all",
+        "--all-scopes",
+    ]);
 
     assert_eq!(result_all["status"], "ok");
     assert_eq!(result_all["data"]["scopeMode"], "all");
@@ -740,17 +830,131 @@ fn cross_roadmap_work_point_dependency_rejected_at_write_time() {
     let db_arg = db_path.to_str().expect("utf-8 db path");
 
     // Setup: goal + two roadmaps
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "scope-a", "goal", "create", "--id", "goal-x", "--title", "Goal X", "--description", "Test", "--acceptance", "done"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "scope-a", "roadmap", "create", "--id", "rm-a", "--goal-id", "goal-x", "--title", "Roadmap A", "--summary", "First"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "--scope", "scope-a", "roadmap", "create", "--id", "rm-b", "--goal-id", "goal-x", "--title", "Roadmap B", "--summary", "Second"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-x",
+        "--title",
+        "Goal X",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "rm-a",
+        "--goal-id",
+        "goal-x",
+        "--title",
+        "Roadmap A",
+        "--summary",
+        "First",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "rm-b",
+        "--goal-id",
+        "goal-x",
+        "--title",
+        "Roadmap B",
+        "--summary",
+        "Second",
+    ]);
 
     // Add work point to rm-a
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c5", "--scope", "scope-a", "roadmap", "add-work-point", "--roadmap-id", "rm-a", "--id", "wp-a", "--title", "WP A", "--summary", "First work point", "--effort-tier", "fast"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-a",
+        "--id",
+        "wp-a",
+        "--title",
+        "WP A",
+        "--summary",
+        "First work point",
+        "--effort-tier",
+        "fast",
+    ]);
 
     // Try to add wp-b to rm-b with dependency on wp-a (cross-roadmap) — should fail
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
-        .args(["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c6", "--scope", "scope-a", "roadmap", "add-work-point", "--roadmap-id", "rm-b", "--id", "wp-b", "--title", "WP B", "--summary", "Second work point", "--dependency-id", "wp-a", "--effort-tier", "fast"])
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c6",
+            "--scope",
+            "scope-a",
+            "roadmap",
+            "add-work-point",
+            "--roadmap-id",
+            "rm-b",
+            "--id",
+            "wp-b",
+            "--title",
+            "WP B",
+            "--summary",
+            "Second work point",
+            "--dependency-id",
+            "wp-a",
+            "--effort-tier",
+            "fast",
+        ])
         .output()
         .expect("run add-work-point");
 
@@ -759,7 +963,10 @@ fn cross_roadmap_work_point_dependency_rejected_at_write_time() {
     let result: Value = serde_json::from_str(&stdout).expect("valid json");
     assert_eq!(result["status"], "invalid");
     assert!(
-        result["error"].as_str().unwrap_or("").contains("Cross-roadmap"),
+        result["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Cross-roadmap"),
         "error should mention cross-roadmap: {}",
         result["error"]
     );
@@ -772,28 +979,167 @@ fn work_point_revise_clear_dependencies() {
     let db_arg = db_path.to_str().expect("utf-8 db path");
 
     // Setup
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "scope-a", "goal", "create", "--id", "goal-x", "--title", "Goal X", "--description", "Test", "--acceptance", "done"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "scope-a", "roadmap", "create", "--id", "rm-a", "--goal-id", "goal-x", "--title", "Roadmap A", "--summary", "First"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-x",
+        "--title",
+        "Goal X",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "rm-a",
+        "--goal-id",
+        "goal-x",
+        "--title",
+        "Roadmap A",
+        "--summary",
+        "First",
+    ]);
 
     // Add two work points, wp-b depends on wp-a
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "--scope", "scope-a", "roadmap", "add-work-point", "--roadmap-id", "rm-a", "--id", "wp-a", "--title", "WP A", "--summary", "First", "--effort-tier", "fast"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c5", "--scope", "scope-a", "roadmap", "add-work-point", "--roadmap-id", "rm-a", "--id", "wp-b", "--title", "WP B", "--summary", "Second", "--dependency-id", "wp-a", "--effort-tier", "fast"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-a",
+        "--id",
+        "wp-a",
+        "--title",
+        "WP A",
+        "--summary",
+        "First",
+        "--effort-tier",
+        "fast",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-a",
+        "--id",
+        "wp-b",
+        "--title",
+        "WP B",
+        "--summary",
+        "Second",
+        "--dependency-id",
+        "wp-a",
+        "--effort-tier",
+        "fast",
+    ]);
 
     // Verify wp-b has dependency on wp-a
-    let show1 = command_json(&["--db", db_arg, "--json", "--non-interactive", "--scope", "scope-a", "work-point", "show", "--work-point-id", "wp-b"]);
-    let deps1 = show1["data"]["workPoint"]["dependencyIds"].as_array().expect("deps array");
+    let show1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "work-point",
+        "show",
+        "--work-point-id",
+        "wp-b",
+    ]);
+    let deps1 = show1["data"]["workPoint"]["dependencyIds"]
+        .as_array()
+        .expect("deps array");
     assert!(!deps1.is_empty(), "wp-b should have dependencies");
     assert!(deps1.iter().any(|d| d.as_str() == Some("wp-a")));
 
     // Revise wp-b to clear dependencies
-    let revise = command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c6", "--scope", "scope-a", "work-point", "revise", "--work-point-id", "wp-b", "--clear-dependencies"]);
+    let revise = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c6",
+        "--scope",
+        "scope-a",
+        "work-point",
+        "revise",
+        "--work-point-id",
+        "wp-b",
+        "--clear-dependencies",
+    ]);
     assert_eq!(revise["status"], "ok");
 
     // Verify wp-b has no dependencies now
-    let show2 = command_json(&["--db", db_arg, "--json", "--non-interactive", "--scope", "scope-a", "work-point", "show", "--work-point-id", "wp-b"]);
-    let deps2 = show2["data"]["workPoint"]["dependencyIds"].as_array().expect("deps array");
-    assert!(deps2.is_empty(), "wp-b should have no dependencies after clear: {:?}", deps2);
+    let show2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "work-point",
+        "show",
+        "--work-point-id",
+        "wp-b",
+    ]);
+    let deps2 = show2["data"]["workPoint"]["dependencyIds"]
+        .as_array()
+        .expect("deps array");
+    assert!(
+        deps2.is_empty(),
+        "wp-b should have no dependencies after clear: {:?}",
+        deps2
+    );
 }
 
 #[test]
@@ -803,13 +1149,101 @@ fn work_point_revise_rejects_conflicting_clear_flags() {
     let db_arg = db_path.to_str().expect("utf-8 db path");
 
     // Setup
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "scope-a", "goal", "create", "--id", "goal-x", "--title", "Goal X", "--description", "Test", "--acceptance", "done"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "scope-a", "roadmap", "create", "--id", "rm-a", "--goal-id", "goal-x", "--title", "Roadmap A", "--summary", "First"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "--scope", "scope-a", "roadmap", "add-work-point", "--roadmap-id", "rm-a", "--id", "wp-a", "--title", "WP A", "--summary", "First", "--effort-tier", "fast"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-x",
+        "--title",
+        "Goal X",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "rm-a",
+        "--goal-id",
+        "goal-x",
+        "--title",
+        "Roadmap A",
+        "--summary",
+        "First",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-a",
+        "--id",
+        "wp-a",
+        "--title",
+        "WP A",
+        "--summary",
+        "First",
+        "--effort-tier",
+        "fast",
+    ]);
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
-        .args(["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c5", "--scope", "scope-a", "work-point", "revise", "--work-point-id", "wp-a", "--clear-dependencies", "--dependency-id", "other"])
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c5",
+            "--scope",
+            "scope-a",
+            "work-point",
+            "revise",
+            "--work-point-id",
+            "wp-a",
+            "--clear-dependencies",
+            "--dependency-id",
+            "other",
+        ])
         .output()
         .expect("run revise");
 
@@ -829,12 +1263,38 @@ fn scope_create_metadata_file() {
     let meta_path = temp_dir.join("meta.json");
     fs::write(&meta_path, r#"{"key": "value", "count": 42}"#).expect("write metadata file");
 
-    let result = command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a", "--metadata-file", meta_path.to_str().expect("utf-8 path")]);
+    let result = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+        "--metadata-file",
+        meta_path.to_str().expect("utf-8 path"),
+    ]);
 
     assert_eq!(result["status"], "ok");
 
     // Verify metadata was stored
-    let show = command_json(&["--db", db_arg, "--json", "--non-interactive", "--scope", "scope-a", "scope", "show", "--scope-key", "scope-a"]);
+    let show = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "scope",
+        "show",
+        "--scope-key",
+        "scope-a",
+    ]);
     let metadata = &show["data"]["scope"]["metadata"];
     assert_eq!(metadata["key"], "value");
     assert_eq!(metadata["count"], 42);
@@ -850,7 +1310,22 @@ fn scope_create_metadata_file_rejects_bad_json_with_path_aware_error() {
     fs::write(&meta_path, "not valid json!!!").expect("write bad metadata");
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
-        .args(["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a", "--metadata-file", meta_path.to_str().expect("utf-8 path")])
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c1",
+            "--scope",
+            "scope-a",
+            "scope",
+            "create",
+            "--scope-key",
+            "scope-a",
+            "--metadata-file",
+            meta_path.to_str().expect("utf-8 path"),
+        ])
         .output()
         .expect("run scope create");
 
@@ -873,28 +1348,166 @@ fn insight_list_all_lists_only_active_scope_insights() {
     let db_arg = db_path.to_str().expect("utf-8 db path");
 
     // Create scope A and scope B
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "scope-a", "scope", "create", "--scope-key", "scope-a"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "scope-b", "scope", "create", "--scope-key", "scope-b"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-b",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-b",
+    ]);
 
     // Create goals in each scope (needed as parent for insights)
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "scope-a", "goal", "create", "--id", "goal-a", "--title", "Goal A", "--description", "Test", "--acceptance", "done"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "--scope", "scope-b", "goal", "create", "--id", "goal-b", "--title", "Goal B", "--description", "Test", "--acceptance", "done"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-a",
+        "--title",
+        "Goal A",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-b",
+        "goal",
+        "create",
+        "--id",
+        "goal-b",
+        "--title",
+        "Goal B",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
 
     // Record insights in both scopes
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c5", "--scope", "scope-a", "insight", "record", "--id", "insight-a", "--title", "Insight A", "--content", "Scope A content", "--insight-type", "context", "--parent-type", "goal", "--parent-id", "goal-a", "--tag", "test"]);
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c6", "--scope", "scope-b", "insight", "record", "--id", "insight-b", "--title", "Insight B", "--content", "Scope B content", "--insight-type", "context", "--parent-type", "goal", "--parent-id", "goal-b", "--tag", "test"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "insight",
+        "record",
+        "--id",
+        "insight-a",
+        "--title",
+        "Insight A",
+        "--content",
+        "Scope A content",
+        "--insight-type",
+        "context",
+        "--parent-type",
+        "goal",
+        "--parent-id",
+        "goal-a",
+        "--tag",
+        "test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c6",
+        "--scope",
+        "scope-b",
+        "insight",
+        "record",
+        "--id",
+        "insight-b",
+        "--title",
+        "Insight B",
+        "--content",
+        "Scope B content",
+        "--insight-type",
+        "context",
+        "--parent-type",
+        "goal",
+        "--parent-id",
+        "goal-b",
+        "--tag",
+        "test",
+    ]);
 
     // List all insights in scope-a
-    let result = command_json(&["--db", db_arg, "--json", "--non-interactive", "--scope", "scope-a", "insight", "list", "--all"]);
+    let result = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "insight",
+        "list",
+        "--all",
+    ]);
 
     assert_eq!(result["status"], "ok");
-    let insights = result["data"]["insights"].as_array().expect("insights array");
+    let insights = result["data"]["insights"]
+        .as_array()
+        .expect("insights array");
     assert_eq!(insights.len(), 1);
     assert_eq!(insights[0]["title"], "Insight A");
 
     // List all insights in scope-b
-    let result_b = command_json(&["--db", db_arg, "--json", "--non-interactive", "--scope", "scope-b", "insight", "list", "--all"]);
-    let insights_b = result_b["data"]["insights"].as_array().expect("insights array");
+    let result_b = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-b",
+        "insight",
+        "list",
+        "--all",
+    ]);
+    let insights_b = result_b["data"]["insights"]
+        .as_array()
+        .expect("insights array");
     assert_eq!(insights_b.len(), 1);
     assert_eq!(insights_b[0]["title"], "Insight B");
 }
@@ -908,25 +1521,56 @@ fn machine_output_conforms_to_planning_result_schema() {
     // Load the schema
     let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .unwrap()
+        .expect("CARGO_MANIFEST_DIR should have a parent (crate root)")
         .parent()
-        .unwrap()
+        .expect("crate root should have a parent (workspace root)")
         .parent()
-        .unwrap()
+        .expect("workspace root should have a parent (repo root)")
         .join("contracts")
         .join("schemas")
         .join("planning-result.schema.json");
-    let schema_json: Value = serde_json::from_str(
-        &std::fs::read_to_string(&schema_path).expect("read schema file"),
-    )
-    .expect("parse schema");
+    let schema_json: Value =
+        serde_json::from_str(&std::fs::read_to_string(&schema_path).expect("read schema file"))
+            .expect("parse schema");
     let schema = jsonschema::validator_for(&schema_json).expect("compile schema");
 
     // Test 1: goal create output
-    command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c1", "--scope", "default", "scope", "create", "--scope-key", "default"]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "default",
+        "scope",
+        "create",
+        "--scope-key",
+        "default",
+    ]);
 
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
-        .args(["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c2", "--scope", "default", "goal", "create", "--id", "goal-schema", "--title", "Schema Goal", "--description", "Test", "--acceptance", "done"])
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c2",
+            "--scope",
+            "default",
+            "goal",
+            "create",
+            "--id",
+            "goal-schema",
+            "--title",
+            "Schema Goal",
+            "--description",
+            "Test",
+            "--acceptance",
+            "done",
+        ])
         .output()
         .expect("run");
     let instance: Value = serde_json::from_slice(&output.stdout).expect("parse output");
@@ -937,8 +1581,18 @@ fn machine_output_conforms_to_planning_result_schema() {
     }
 
     // Test 2: validate all output with new fields
-    let validate_output =
-        command_json(&["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c3", "--scope", "default", "validate", "all"]);
+    let validate_output = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "default",
+        "validate",
+        "all",
+    ]);
     if let Err(error) = schema.validate(&validate_output) {
         eprintln!("Schema validation error on validate output: {}", error);
         panic!("validate output does not conform to schema");
@@ -946,7 +1600,22 @@ fn machine_output_conforms_to_planning_result_schema() {
 
     // Test 3: error output (invalid command)
     let err_output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
-        .args(["--db", db_arg, "--json", "--non-interactive", "--correlation-id", "c4", "goal", "create", "--id", "nonexistent", "--title", "X", "--description", "X"])
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c4",
+            "goal",
+            "create",
+            "--id",
+            "nonexistent",
+            "--title",
+            "X",
+            "--description",
+            "X",
+        ])
         .output()
         .expect("run");
     // Might succeed or fail - if it has json output, validate it

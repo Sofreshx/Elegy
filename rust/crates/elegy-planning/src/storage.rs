@@ -721,7 +721,8 @@ impl PlanningStore {
         // Validate mutual exclusivity
         if input.clear_dependencies && input.dependency_ids.is_some() {
             return Err(PlanningStoreError::InvalidInput(
-                "--clear-dependencies cannot be combined with providing new dependency IDs".to_string(),
+                "--clear-dependencies cannot be combined with providing new dependency IDs"
+                    .to_string(),
             ));
         }
 
@@ -795,8 +796,7 @@ impl PlanningStore {
         // Re-validate
         let _ = refresh_validation_target(&transaction, EntityType::WorkPoint, &record.id)?;
         for dependent_id in list_work_point_dependents(&transaction, &record.id)? {
-            let _ =
-                refresh_validation_target(&transaction, EntityType::WorkPoint, &dependent_id)?;
+            let _ = refresh_validation_target(&transaction, EntityType::WorkPoint, &dependent_id)?;
         }
         for plan_id in list_plans_targeting_work_point(&transaction, &record.id)? {
             let _ = refresh_validation_target(&transaction, EntityType::Plan, &plan_id)?;
@@ -2960,21 +2960,39 @@ impl PlanningStore {
         let rows: Vec<WorktreeRecord> = if status_filter.is_some() {
             stmt.query_map(params![scope_key, status_val], |row| {
                 Ok(WorktreeRecord {
-                    id: row.get(0)?, scope_key: row.get(1)?, repo_uri: row.get(2)?,
-                    branch: row.get(3)?, worktree_path: row.get(4)?, project_run_id: row.get(5)?,
-                    session_id: row.get(6)?, status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
-                    revision: row.get(8)?, created_at: row.get(9)?, updated_at: row.get(10)?,
+                    id: row.get(0)?,
+                    scope_key: row.get(1)?,
+                    repo_uri: row.get(2)?,
+                    branch: row.get(3)?,
+                    worktree_path: row.get(4)?,
+                    project_run_id: row.get(5)?,
+                    session_id: row.get(6)?,
+                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    revision: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
-            })?.filter_map(|r| r.ok()).collect()
+            })?
+            .filter_map(|r| r.ok())
+            .collect()
         } else {
             stmt.query_map(params![scope_key], |row| {
                 Ok(WorktreeRecord {
-                    id: row.get(0)?, scope_key: row.get(1)?, repo_uri: row.get(2)?,
-                    branch: row.get(3)?, worktree_path: row.get(4)?, project_run_id: row.get(5)?,
-                    session_id: row.get(6)?, status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
-                    revision: row.get(8)?, created_at: row.get(9)?, updated_at: row.get(10)?,
+                    id: row.get(0)?,
+                    scope_key: row.get(1)?,
+                    repo_uri: row.get(2)?,
+                    branch: row.get(3)?,
+                    worktree_path: row.get(4)?,
+                    project_run_id: row.get(5)?,
+                    session_id: row.get(6)?,
+                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    revision: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
                 })
-            })?.filter_map(|r| r.ok()).collect()
+            })?
+            .filter_map(|r| r.ok())
+            .collect()
         };
 
         Ok(rows)
@@ -4906,16 +4924,76 @@ pub(crate) fn collect_entities_in_scope(
     scope_key: &str,
 ) -> Result<Vec<(EntityType, String)>, PlanningStoreError> {
     let mut entities = Vec::new();
-    entities.extend(entity_ids_in_scope(connection, "goals", "scope_key", EntityType::Goal, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "roadmaps", "scope_key", EntityType::Roadmap, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "roadmap_sections", "scope_key", EntityType::RoadmapSection, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "work_points", "scope_key", EntityType::WorkPoint, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "plans", "scope_key", EntityType::Plan, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "todos", "scope_key", EntityType::Todo, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "issues", "scope_key", EntityType::Issue, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "review_points", "scope_key", EntityType::ReviewPoint, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "insights", "scope_key", EntityType::Insight, scope_key)?);
-    entities.extend(entity_ids_in_scope(connection, "project_runs", "scope_key", EntityType::ProjectRun, scope_key)?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "goals",
+        "scope_key",
+        EntityType::Goal,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "roadmaps",
+        "scope_key",
+        EntityType::Roadmap,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "roadmap_sections",
+        "scope_key",
+        EntityType::RoadmapSection,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "work_points",
+        "scope_key",
+        EntityType::WorkPoint,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "plans",
+        "scope_key",
+        EntityType::Plan,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "todos",
+        "scope_key",
+        EntityType::Todo,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "issues",
+        "scope_key",
+        EntityType::Issue,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "review_points",
+        "scope_key",
+        EntityType::ReviewPoint,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "insights",
+        "scope_key",
+        EntityType::Insight,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "project_runs",
+        "scope_key",
+        EntityType::ProjectRun,
+        scope_key,
+    )?);
     Ok(entities)
 }
 

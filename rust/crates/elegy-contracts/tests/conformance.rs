@@ -1360,10 +1360,7 @@ fn plugin_lock_v1_parses_valid_lock() {
 
     assert_eq!(lock.schema_version, "elegy-plugin-lock/v1");
     assert_eq!(lock.lock_version, 1);
-    assert_eq!(
-        lock.elegy_compatibility.contract_bundle_version,
-        "1.8.0"
-    );
+    assert_eq!(lock.elegy_compatibility.contract_bundle_version, "1.8.0");
     assert_eq!(lock.elegy_compatibility.schema_line, "1.x");
     assert!(lock.elegy_compatibility.source_asset.is_some());
     assert!(lock.elegy_compatibility.checksum.is_some());
@@ -1474,10 +1471,7 @@ fn plugin_package_with_rust_lane_and_adapter_parses() {
         serde_json::from_str(json).expect("parse package with rust lane and adapter");
 
     assert_eq!(package.components.capability_projections.len(), 1);
-    assert_eq!(
-        package.components.capability_projections[0].lane,
-        "rust"
-    );
+    assert_eq!(package.components.capability_projections[0].lane, "rust");
     assert_eq!(package.components.rust_tool_adapters.len(), 1);
     assert_eq!(
         package.components.rust_tool_adapters[0].crate_name,

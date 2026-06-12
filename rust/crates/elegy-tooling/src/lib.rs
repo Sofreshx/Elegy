@@ -962,7 +962,7 @@ pub fn scaffold_plugin_package(
     };
 
     // Common directories created for all template kinds
-    let common_dirs = vec![
+    let common_dirs = [
         "contracts/fixtures",
         "contracts/schemas",
         ".github/workflows",
@@ -1043,27 +1043,24 @@ pub fn scaffold_plugin_package(
         ],
         "lifecycleState": "draft"
     });
-    let skill_fixture_path = output_dir.join(format!(
-        "contracts/fixtures/skill.{}.json",
-        package_name
-    ));
+    let skill_fixture_path =
+        output_dir.join(format!("contracts/fixtures/skill.{}.json", package_name));
     write_json_file(&skill_fixture_path, &skill_fixture, false)?;
     written_files.push(display_path(&skill_fixture_path));
 
     // .github/workflows/plugin-ci.yml
-    let ci_workflow = format!(
-        concat!(
-            "name: Plugin CI\n",
-            "on: [push, pull_request]\n",
-            "jobs:\n",
-            "  validate:\n",
-            "    runs-on: ubuntu-latest\n",
-            "    steps:\n",
-            "      - uses: actions/checkout@v4\n",
-            "      - name: Verify plugin\n",
-            "        run: elegy plugin verify --package elegy-plugin-package.json\n",
-        )
-    );
+    let ci_workflow = concat!(
+        "name: Plugin CI\n",
+        "on: [push, pull_request]\n",
+        "jobs:\n",
+        "  validate:\n",
+        "    runs-on: ubuntu-latest\n",
+        "    steps:\n",
+        "      - uses: actions/checkout@v4\n",
+        "      - name: Verify plugin\n",
+        "        run: elegy plugin verify --package elegy-plugin-package.json\n",
+    )
+    .to_string();
     let ci_path = output_dir.join(".github/workflows/plugin-ci.yml");
     fs::write(&ci_path, &ci_workflow).map_err(|source| ToolingError::Io {
         operation: "write",
@@ -1144,21 +1141,20 @@ pub fn scaffold_plugin_package(
             written_files.push(display_path(&cargo_path));
 
             // rust/src/lib.rs
-            let lib_rs = format!(
-                concat!(
-                    "/// Register tool adapters for the host harness.\n",
-                    "/// Called by the host during harness initialization.\n",
-                    "pub fn register_tools() -> Vec<ToolAdapter> {{\n",
-                    "    vec![]\n",
-                    "}}\n",
-                    "\n",
-                    "/// A tool adapter registered by this plugin.\n",
-                    "pub struct ToolAdapter {{\n",
-                    "    pub name: String,\n",
-                    "    pub handler: String,\n",
-                    "}}\n",
-                )
-            );
+            let lib_rs = concat!(
+                "/// Register tool adapters for the host harness.\n",
+                "/// Called by the host during harness initialization.\n",
+                "pub fn register_tools() -> Vec<ToolAdapter> {{\n",
+                "    vec![]\n",
+                "}}\n",
+                "\n",
+                "/// A tool adapter registered by this plugin.\n",
+                "pub struct ToolAdapter {{\n",
+                "    pub name: String,\n",
+                "    pub handler: String,\n",
+                "}}\n",
+            )
+            .to_string();
             let lib_path = output_dir.join("rust/src/lib.rs");
             fs::write(&lib_path, &lib_rs).map_err(|source| ToolingError::Io {
                 operation: "write",
