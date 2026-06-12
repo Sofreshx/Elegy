@@ -84,6 +84,8 @@ struct CodexPluginManifest {
     homepage: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     license: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    documentation_uri: Option<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     keywords: Vec<String>,
     skills: String,
@@ -1712,6 +1714,10 @@ fn build_codex_plugin_manifest(package: &ElegyPluginPackage) -> CodexPluginManif
             .metadata
             .as_ref()
             .and_then(|metadata| metadata.license.clone()),
+        documentation_uri: package
+            .metadata
+            .as_ref()
+            .and_then(|metadata| metadata.documentation_uri.clone()),
         keywords: package
             .metadata
             .as_ref()
