@@ -324,6 +324,7 @@ pub fn validate_agent_capability_profile(
 }
 
 pub const ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+pub const ELEGY_PLUGIN_LOCK_V1_SCHEMA_VERSION: &str = "elegy-plugin-lock/v1";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -337,6 +338,19 @@ pub struct ElegyPluginPackage {
     pub host_policy_hints: Option<ElegyPluginPackagePolicyHints>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub publishing: Option<ElegyPluginPackagePublishingMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elegy_compatibility: Option<ElegyPluginPackageElegyCompatibility>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageElegyCompatibility {
+    pub contract_bundle_version: String,
+    pub schema_line: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum_elegy_tooling_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contracts_source: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -581,6 +595,11 @@ pub fn validate_elegy_plugin_package(
         }
         if let Some(documentation_uri) = &metadata.documentation_uri {
             validate_uri("metadata.documentationUri", documentation_uri, &mut issues);
+        }
+    }
+    if let Some(compat) = &package.elegy_compatibility {
+        if let Some(source) = &compat.contracts_source {
+            validate_uri("elegyCompatibility.contractsSource", source, &mut issues);
         }
     }
 
@@ -956,6 +975,32 @@ pub struct ElegyPluginInstallReceiptV1 {
 pub struct ElegyPluginInstallReceiptBinary {
     pub tool_name: String,
     pub binary_path: String,
+}
+
+/// Lock file that pins Elegy contract bundle version for a plugin package.
+/// Schema: elegy-plugin-lock/v1
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginLockV1 {
+    pub schema_version: String,
+    pub lock_version: u32,
+    pub elegy_compatibility: ElegyPluginLockCompatibility,
+    pub generated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_package_ref: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginLockCompatibility {
+    pub contract_bundle_version: String,
+    pub schema_line: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_asset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
 }
 
 fn validate_uri(field: &str, value: &str, issues: &mut Vec<String>) {
@@ -4200,6 +4245,7 @@ mod tests {
                 },
                 host_policy_hints: None,
                 publishing: None,
+                elegy_compatibility: None,
             };
 
             let validation = validate_elegy_plugin_package(&package);
