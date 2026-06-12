@@ -232,5 +232,9 @@
     "sideEffectClass": "disk_write",
     "requiresApproval": false,
     "policyTags": ["planning-authority", "scope-aware", "sqlite-backed"]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
   }
 }

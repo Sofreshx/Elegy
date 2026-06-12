@@ -287,6 +287,17 @@ pub fn verify_plugin_package(
 
     let mut findings: Vec<ElegyPluginReadinessFinding> = Vec::new();
 
+    // R3: elegyCompatibility check
+    // Standard publishable packages must declare an Elegy contract bundle version.
+    if package.elegy_compatibility.is_none() {
+        findings.push(ElegyPluginReadinessFinding {
+            code: "PKG-COMPAT-MISSING".to_string(),
+            severity: "error".to_string(),
+            message: "publishable plugin package is missing elegyCompatibility. Standard packages must declare contractBundleVersion and schemaLine.".to_string(),
+            detail: None,
+        });
+    }
+
     // Collect all capabilities from inlined skill definitions (keyed by "namespace.name")
     // and from referenced definition files.
     let mut known_capabilities: std::collections::BTreeMap<
