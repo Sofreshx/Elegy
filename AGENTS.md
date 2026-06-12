@@ -10,18 +10,21 @@ authority surface.
 
 ## Authority Centers
 
-- `contracts/`, `governance/`, `schemas/`, and `policies/` are the neutral authority roots for contracts, compatibility, schemas, and policy.
+- `contracts/`, `governance/`, root `schemas/`, and `policies/` are the neutral authority roots for contracts, compatibility, schema-line metadata, and policy.
 - `contracts/fixtures/skill.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
 - `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
 - `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs configured by `.elegy/docs.yaml`.
-- `src/Elegy-memory`, `src/Elegy-mcp`, `src/Elegy-skills`, `src/Elegy-planning`, `src/Elegy-configuration`, `src/Elegy-documentation`, and `src/Elegy-mermaid` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release surfaces.
+- `src/Elegy-memory`, `src/Elegy-mcp`, `src/Elegy-skills`, `src/Elegy-planning`, `src/Elegy-configuration`, `src/Elegy-documentation`, and `src/Elegy-obsidian` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release orchestration surfaces.
+- `src/Elegy-obsidian` delegates to the official Obsidian Desktop CLI. Do not describe it as a Rust binary or as durable planning authority.
 
 ## Start Here
 
-- Read `README.md`, then the smallest relevant doc under `docs/architecture/`, `docs/adr/`, or `docs/specs/`.
+- Read `README.md`, then `docs/architecture/ecosystem-topology.md` or `docs/architecture/substrate-governance.md` when changing repo ownership, authority boundaries, or public positioning.
+- Read the smallest relevant doc under `docs/architecture/`, `docs/adr/`, or `docs/specs/` before changing behavior in that lane.
 - Use `docs/agent-integration.md` before changing host onboarding, discovery, invocation envelopes, profiles, MCP projection, side-effect posture, or other agent-facing JSON.
 - Use `docs/architecture/mcp-skill-tooling-placement.md` before changing MCP authoring, analysis, skill generation, portable plugin packages, or ownership boundaries.
 - Use `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` before changing ADR/spec doctrine, docs config, or docs validation behavior.
+- Use `docs/specs/obsidian-skill-and-cli.md` before changing the Obsidian skill, wrapper, result envelope, or vault-boundary guidance.
 - Use `docs/spec-baseline.md` before changing MCP protocol baseline language.
 
 ## Boundary Rules
@@ -32,6 +35,7 @@ authority surface.
 - CLI invocation templates are the default integration contract. Use MCP only when the host specifically needs an MCP protocol boundary.
 - Mermaid reverse projection is bounded analysis. Do not describe it as canonical workflow reconstruction.
 - Portable plugin packages are metadata envelopes, not runtime sessions, approval records, secret stores, or host policy containers.
+- Obsidian is a non-authoritative vault bridge. Do not make it a source of truth for plans, roadmaps, goals, todos, or review state.
 
 ## Documentation Rules
 
@@ -47,6 +51,7 @@ authority surface.
 - Run validation from `rust/` for Rust behavior and use repo-root scripts for governed/export boundaries.
 - If docs or fixtures changed without code, inspect emitted JSON or generated contract output instead of only proofreading Markdown.
 - When capability behavior changes, verify both the Rust implementation and the governed fixture/projection that exposes it to agents.
+- When skill mirrors, wrapper roots, or generated projections change, verify the canonical-output or package-boundary path that covers that generated surface.
 
 ## Rust Style
 
@@ -78,7 +83,10 @@ authority surface.
 - If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work.
 - After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle.
 - After a clean local promotion cycle, push `main`, `dev`, and `roro` to `origin` immediately so the remote stays aligned with the validated local state. Prefer a single atomic push when available.
-- The following `roro` rules apply only when the current branch is `roro`:
+### `roro` Branch Rules
+
+The following rules apply only when the current branch is `roro`:
+
 - Merge a topic branch into `roro` only after the relevant validation passes and the branch is ready to promote.
 - Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes.
 - Never force-push or rewrite history on `main` or `dev`.

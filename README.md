@@ -11,10 +11,27 @@ default execution boundary.
 
 Core model:
 
-- governed contracts are the durable authority
-- skill definitions are the discovery authority
+- governed artifacts are the durable authority
+- Rust implements reusable executable behavior over those artifacts
+- skill definitions are the discovery authority for agent capabilities
 - CLI invocation templates are the default execution boundary
+- generated mirrors, wrapper roots, Codex plugin projections, and MCP tool
+  lists are derived adapter surfaces
 - MCP is an optional projection for MCP-native clients
+
+## Repository Model
+
+| Area | Purpose |
+| --- | --- |
+| `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
+| `governance/`, `schemas/`, `policies/` | Version, inventory, schema-line, boundary, and formalization policy. |
+| `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
+| `src/Elegy-*` | Contributor-navigation and wrapper-package overlays, not implementation roots. |
+| `.agents/skills/**`, `.github/skills/**` | Rendered skill mirrors for host and contributor routing. |
+| `artifacts/` | Generated bundles, archives, and validation outputs. |
+
+When those surfaces disagree, prefer the governed artifact roots and the
+smallest relevant architecture or spec document under `docs/`.
 
 ## Install
 
@@ -43,7 +60,7 @@ pwsh ./install-distribution.ps1 -Destination ./tools/elegy -CliSurfaces elegy-cl
 Pin a specific release:
 
 ```powershell
-pwsh ./install-distribution.ps1 -Tag v1.4.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning -Force
+pwsh ./install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning -Force
 ```
 
 Track the rolling `main-snapshot` prerelease:
@@ -60,7 +77,7 @@ a repo checkout.
 On Linux or macOS, use the Bash installer from a repo checkout:
 
 ```bash
-bash ./scripts/install-distribution.sh -Tag v1.4.0 -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
 ```
 
 ### Installed layout
@@ -108,6 +125,21 @@ arguments.
 | `elegy-configuration` | Dedicated deterministic configuration materialization CLI. |
 | `elegy-documentation` | Dedicated documentation authority CLI. |
 
+## Wrapper and Skill Surfaces
+
+Wrapper roots under `src/Elegy-*` package bounded handoff surfaces for
+downstream repositories. They are not authority roots and they do not replace
+the Rust crates or governed JSON contracts.
+
+Most wrappers delegate to dedicated `elegy-*` Rust binaries. The current
+`elegy-obsidian` wrapper is different: it wraps the official Obsidian Desktop
+CLI and keeps Obsidian vault content non-authoritative. Durable planning state
+continues to live in `elegy-planning` and SQLite.
+
+Rendered `SKILL.md` files under `.agents/skills/**`, `.github/skills/**`, and
+wrapper-local `skills/**` directories are routing mirrors. The governed
+`contracts/fixtures/skill.*.json` files remain the skill authority.
+
 ## Configuration Materialization
 
 The umbrella CLI and dedicated `elegy-configuration` binary support
@@ -151,6 +183,8 @@ for one-off invocations.
 - [Agent integration guide](docs/agent-integration.md)
 - [Distribution and downstream consumption](docs/distribution.md)
 - [Architecture index](docs/architecture/README.md)
+- [Ecosystem topology](docs/architecture/ecosystem-topology.md)
+- [Substrate governance](docs/architecture/substrate-governance.md)
 - [Contributing guide](CONTRIBUTING.md) | [Security policy](SECURITY.md)
 - [Code of conduct](CODE_OF_CONDUCT.md) | [Changelog](CHANGELOG.md)
 
@@ -164,6 +198,12 @@ cargo test --workspace --all-targets --all-features
 
 When touching governed artifacts, packaging, or release workflows, also use the
 repo-root validation commands below.
+
+For documentation-only changes, prefer the dedicated documentation checker:
+
+```bash
+elegy-documentation check --project . --json
+```
 
 ## Development
 

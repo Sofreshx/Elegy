@@ -135,8 +135,8 @@ $checkResults['check1'] = @{
 $check2Issues = [System.Collections.Generic.List[string]]::new()
 
 $fixturesDir = Join-Path $RepoRoot 'contracts/fixtures'
-$governedFixtures = @(Get-ChildItem -Path $fixturesDir -Filter 'skill-definition-v2.elegy-*.json' -File |
-    Where-Object { $_.Name -ne 'skill-definition-v2.minimal.json' -and $_.Name -ne 'skill-definition-v2.negative-no-output-schema.json' } |
+$governedFixtures = @(Get-ChildItem -Path $fixturesDir -Filter 'skill.elegy-*.json' -File |
+    Where-Object { $_.Name -ne 'skill.minimal.json' -and $_.Name -ne 'skill.negative-no-output-schema.json' } |
     ForEach-Object { $_.Name })
 
 $referencedFilenames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
@@ -195,8 +195,8 @@ foreach ($indexFile in $discoveryIndexes) {
 
         # Check both naming patterns
         $fixtureCandidates = @(
-            "skill-definition-v2.$skillId.json",
-            "skill-definition-v2.elegy-$skillId.json"
+            "skill.$skillId.json",
+            "skill.elegy-$skillId.json"
         )
         $found = $false
         foreach ($candidate in $fixtureCandidates) {
@@ -211,7 +211,7 @@ foreach ($indexFile in $discoveryIndexes) {
         if (-not $found) {
             # Try without double prefix
             if ($skillId -like 'elegy-*') {
-                $plainName = "skill-definition-v2.$skillId.json"
+                $plainName = "skill.$skillId.json"
                 $plainPath = Join-Path $fixturesDir $plainName
                 if (Test-Path $plainPath) {
                     $found = $true
