@@ -190,7 +190,13 @@ fn validate_roadmap_section(
         .query_row(
             "SELECT roadmap_id, slug, scope_key FROM roadmap_sections WHERE id = ?1",
             params![section_id],
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?)),
+            |row| {
+                Ok((
+                    row.get::<_, String>(0)?,
+                    row.get::<_, String>(1)?,
+                    row.get::<_, String>(2)?,
+                ))
+            },
         )
         .map_err(|error| match error {
             rusqlite::Error::QueryReturnedNoRows => PlanningStoreError::NotFound {

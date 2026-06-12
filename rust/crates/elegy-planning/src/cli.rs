@@ -8,13 +8,14 @@ use thiserror::Error;
 use crate::envelope::{MachineEnvelope, MachineStatus};
 use crate::{
     ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
-    AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput,
-    CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput,
-    EffortTier, EntityType, FileScopeIntent, FileScopeRecord, FileScopeSelectorType, GoalStatus,
-    InsightStatus, InsightType, IssueStatus, PlanStatus, PlanningStore, Priority,
-    ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput,
-    ReviewPointStatus, RevisePlanInput, ReviseWorkPointInput, RoadmapStatus, SearchInput, Severity,
-    TodoStatus, UpdateStatusInput, WorkPointStatus, WorktreeStatus,
+    AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
+    FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
+    PlanningStore, Priority, ProjectRunEvidence, ProjectRunStatus, ProjectionFormat,
+    ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput, ReviseWorkPointInput,
+    RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
+    WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -1108,10 +1109,7 @@ fn execute_scope(
                         return emit_error(
                             context,
                             vec!["scope", "create"],
-                            format!(
-                                "invalid JSON in metadata file `{}`: {e}",
-                                path.display()
-                            ),
+                            format!("invalid JSON in metadata file `{}`: {e}", path.display()),
                             true,
                         );
                     }
@@ -1825,8 +1823,7 @@ fn execute_worktree(
             emit_success(context, vec!["worktree", "archive"], worktree)
         }
         WorktreeCommand::CleanupIntent(args) => {
-            let worktree =
-                store.update_worktree_status(&args.id, WorktreeStatus::CleanupIntent)?;
+            let worktree = store.update_worktree_status(&args.id, WorktreeStatus::CleanupIntent)?;
             emit_success(context, vec!["worktree", "cleanup-intent"], worktree)
         }
     }
@@ -2064,7 +2061,11 @@ fn emit_error(
             context.correlation_id.clone(),
             context.non_interactive,
             command.iter().map(|item| (*item).to_string()).collect(),
-            if invalid { MachineStatus::Invalid } else { MachineStatus::Error },
+            if invalid {
+                MachineStatus::Invalid
+            } else {
+                MachineStatus::Error
+            },
             message,
         ))?,
     }
