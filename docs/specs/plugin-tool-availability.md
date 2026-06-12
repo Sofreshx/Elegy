@@ -123,6 +123,64 @@ contracts, fixtures, CLI output, and codex projections.
   tools, missing binaries, side-effect classes, host-policy hints, and one
   status of `ready` | `partial` | `blocked`.
 
+### R1a. Tool Projection Chain
+
+Every native tool exposed to an agent host follows this invariant chain:
+
+```
+governed skill capability
+  (skill.schema.json: capabilities[].id + hostProjection)
+    ↓
+package capability projection
+  (elegy-plugin-package/v1: components.capabilityProjections[])
+    ↓
+host native tool registry entry
+  (host-specific: function registry, tool manifest, MCP tool list)
+    ↓
+provider function/tool-calling schema
+  (agent-facing: function name, description, input/output schema)
+```
+
+The chain is one-directional: authority flows from the governed skill
+capability outward, never the reverse. A host tool is always a projection
+of a governed capability; a governed capability is never defined by
+what a host happens to expose.
+
+**R1a.1 Lane determines projection type.** Each `capabilityProjections[].lane`
+maps to a specific host integration:
+
+| Lane | Projection type | How host binds it |
+|---|---|---|
+| `subprocess` | CLI binary invocation | Installed binary resolved from install receipt |
+| `cli` | CLI binary invocation (alias) | Same as `subprocess`; kept for compatibility |
+| `mcp` | MCP tool call | Host MCP client connects to server descriptor |
+| `rust` | Compile-time Rust adapter | Host compiles/link against the adapter crate |
+| `api` | Host-specific API binding | Host provides its own resolver (unsupported by default) |
+| `plugin` | Host-specific plugin binding | Host provides its own resolver (unsupported by default) |
+
+**R1a.2 Function calling is a projection, not contract authority.**
+The agent-facing function name, description, input schema, and output
+schema are derived from the governed skill capability's `hostProjection`
+block. The package MAY narrow or rename these via its
+`capabilityProjections[].projection` block, but MUST NOT invent
+capabilities, change side-effect class upward, or claim a capability
+exists where the underlying skill does not define one.
+
+**R1a.3 Host binding boundaries.** Each lane carries a distinct trust
+boundary:
+
+- `subprocess`/`cli`: The host runs a subprocess. The binary is
+  resolved from the install receipt. The host owns the environment,
+  timeout, and sandboxing.
+- `rust`: The host compiles or links against a Rust crate. Integration
+  is at compile time or harness-load time. No dynamic loading, ABI,
+  WASM, or shared-library semantics are defined for `rust` lane in v1.
+- `mcp`: The host connects to an MCP server via a governed descriptor.
+  The host owns transport, auth, and session lifecycle.
+- `api`/`plugin`: Out of scope for Elegy v1. The host must provide its
+  own resolver and binding. These lanes are reported as
+  `unsupportedCapabilities` in the readiness receipt.
+
 ### R2. Package consistency rules for `components.capabilityProjections`
 
 `elegy-plugin-package/v1.components.capabilityProjections` MUST be derivable
