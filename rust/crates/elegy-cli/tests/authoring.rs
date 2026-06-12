@@ -1259,6 +1259,10 @@ fn plugin_verify_reports_ready_for_valid_package() {
         "supportsDryRun": false
       }
     ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
   }
 }
 "#,
@@ -1860,6 +1864,10 @@ fn plugin_verify_reports_partial_for_incomplete_subset() {
         "supportsDryRun": false
       }
     ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
   }
 }
 "#,
