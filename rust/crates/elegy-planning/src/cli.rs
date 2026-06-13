@@ -12,10 +12,10 @@ use crate::{
     CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
     CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
     FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
-    PlanningStore, Priority, ProjectRunEvidence, ProjectRunStatus, ProjectionFormat,
-    ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput, ReviseWorkPointInput,
-    RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput, WorkPointStatus,
-    WorktreeStatus,
+    PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunStatus,
+    ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput,
+    ReviseWorkPointInput, RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput,
+    WorkPointKind, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -359,6 +359,10 @@ struct InsightUpdateStatusArgs {
     insight_id: String,
     #[arg(long, value_enum)]
     status: InsightStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -432,6 +436,10 @@ struct GoalUpdateStatusArgs {
     goal_id: String,
     #[arg(long, value_enum)]
     status: GoalStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -500,6 +508,16 @@ struct RoadmapAddWorkPointArgs {
     file_scopes: Vec<String>,
     #[arg(long = "tag")]
     tags: Vec<String>,
+    #[arg(long, value_enum)]
+    kind: Option<WorkPointKind>,
+    #[arg(long, value_enum)]
+    priority: Option<Priority>,
+    #[arg(long = "repairs-work-point-id")]
+    repairs_work_point_ids: Vec<String>,
+    #[arg(long = "supersedes-work-point-id")]
+    supersedes_work_point_ids: Vec<String>,
+    #[arg(long = "blocks-work-point-id")]
+    blocks_work_point_ids: Vec<String>,
 }
 
 #[derive(Args, Debug)]
@@ -514,6 +532,10 @@ struct RoadmapUpdateStatusArgs {
     roadmap_id: String,
     #[arg(long, value_enum)]
     status: RoadmapStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -596,6 +618,10 @@ struct PlanUpdateStatusArgs {
     plan_id: String,
     #[arg(long, value_enum)]
     status: PlanStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -634,6 +660,10 @@ struct TodoUpdateStatusArgs {
     status: TodoStatus,
     #[arg(long = "evidence-ref")]
     evidence_refs: Vec<String>,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -670,6 +700,10 @@ struct IssueUpdateStatusArgs {
     issue_id: String,
     #[arg(long, value_enum)]
     status: IssueStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -696,6 +730,10 @@ struct ReviewPointUpdateStatusArgs {
     review_point_id: String,
     #[arg(long, value_enum)]
     status: ReviewPointStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -710,6 +748,10 @@ struct WorkPointUpdateStatusArgs {
     work_point_id: String,
     #[arg(long, value_enum)]
     status: WorkPointStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -732,6 +774,10 @@ struct WorkPointReviseArgs {
     dependency_ids: Vec<String>,
     #[arg(long = "clear-dependencies")]
     clear_dependencies: bool,
+    #[arg(long = "blocks-work-point-id")]
+    blocks_work_point_ids: Vec<String>,
+    #[arg(long = "clear-blocks")]
+    clear_blocks: bool,
 }
 
 #[derive(Subcommand, Debug)]
@@ -920,6 +966,32 @@ where
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
     let store = PlanningStore::new(&context.db_path);
     store.init()?;
+
+    // Phase 3: Scope gate for machine-mode mutations
+    if context.format == OutputFormat::Json
+        && context.non_interactive
+        && !is_command_exempt_from_scope_gate(&cli.command)
+        && is_command_mutation(&cli.command)
+    {
+        let scope = &context.scope_key;
+        let has_active_session = crate::session::read_session_file()
+            .unwrap_or(None)
+            .is_some();
+        if scope == "default" && !has_active_session {
+            let error = serde_json::json!({
+                "status": "invalid",
+                "code": "SCOPE_REQUIRED",
+                "message": "Machine-mode mutations require an explicit --scope or an active session. Use `--scope <key>` or run `elegy-planning session init --scope <key>` first.",
+                "scope": scope,
+                "hasActiveSession": false,
+            });
+            return Err(CliError::Store(PlanningStoreError::InvalidInput(
+                serde_json::to_string_pretty(&error).unwrap_or_else(|_| {
+                    "Machine-mode mutations require an explicit --scope or an active session. Use `--scope <key>` or run `elegy-planning session init --scope <key>` first.".to_string()
+                }),
+            )));
+        }
+    }
 
     match cli.command {
         Command::Scope { command } => execute_scope(command, &store, &context),
@@ -1191,6 +1263,8 @@ fn execute_goal(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         GoalCommand::List => emit_success(
@@ -1256,6 +1330,8 @@ fn execute_roadmap(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         RoadmapCommand::AddSection(args) => emit_success(
@@ -1287,6 +1363,11 @@ fn execute_roadmap(
                 dependency_ids: args.dependency_ids,
                 validation_expectations: args.validation_expectations,
                 effort_tier: args.effort_tier,
+                kind: args.kind,
+                priority: args.priority,
+                repairs_work_point_ids: args.repairs_work_point_ids,
+                supersedes_work_point_ids: args.supersedes_work_point_ids,
+                blocks_work_point_ids: args.blocks_work_point_ids,
                 file_scopes: parse_file_scopes(args.file_scopes)?,
                 tags: args.tags,
                 run_id: context.correlation_id.clone(),
@@ -1352,6 +1433,8 @@ fn execute_work_point(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         WorkPointCommand::NextRunnable(args) => {
@@ -1391,6 +1474,12 @@ fn execute_work_point(
                         None
                     },
                     clear_dependencies: args.clear_dependencies,
+                    blocks_work_point_ids: if !args.blocks_work_point_ids.is_empty() {
+                        Some(args.blocks_work_point_ids)
+                    } else {
+                        None
+                    },
+                    clear_blocks: args.clear_blocks,
                     run_id: context.correlation_id.clone(),
                 })?,
             )
@@ -1484,6 +1573,8 @@ fn execute_plan(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         PlanCommand::List => emit_success(
@@ -1546,6 +1637,8 @@ fn execute_todo(
                 evidence_refs: optional_vec(args.evidence_refs),
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         TodoCommand::List => emit_success(
@@ -1596,6 +1689,8 @@ fn execute_issue(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         IssueCommand::List => emit_success(
@@ -1653,6 +1748,8 @@ fn execute_review_point(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
     }
@@ -1793,7 +1890,7 @@ fn execute_worktree(
     match command {
         WorktreeCommand::List(args) => {
             let status = args.status.as_deref();
-            let worktrees = store.list_worktrees(status)?;
+            let worktrees = store.list_worktrees(&context.scope_key, status)?;
             emit_success(
                 context,
                 vec!["worktree", "list"],
@@ -1801,7 +1898,7 @@ fn execute_worktree(
             )
         }
         WorktreeCommand::Show(args) => {
-            let worktree = store.get_worktree(&args.id)?;
+            let worktree = store.get_worktree(&args.id, &context.scope_key)?;
             emit_success(context, vec!["worktree", "show"], worktree)
         }
         WorktreeCommand::Attach(args) => {
@@ -1819,11 +1916,19 @@ fn execute_worktree(
             emit_success(context, vec!["worktree", "attach"], worktree)
         }
         WorktreeCommand::Archive(args) => {
-            let worktree = store.update_worktree_status(&args.id, WorktreeStatus::Archived)?;
+            let worktree = store.update_worktree_status(
+                &args.id,
+                &context.scope_key,
+                WorktreeStatus::Archived,
+            )?;
             emit_success(context, vec!["worktree", "archive"], worktree)
         }
         WorktreeCommand::CleanupIntent(args) => {
-            let worktree = store.update_worktree_status(&args.id, WorktreeStatus::CleanupIntent)?;
+            let worktree = store.update_worktree_status(
+                &args.id,
+                &context.scope_key,
+                WorktreeStatus::CleanupIntent,
+            )?;
             emit_success(context, vec!["worktree", "cleanup-intent"], worktree)
         }
     }
@@ -1979,6 +2084,8 @@ fn execute_insight(
                 evidence_refs: None,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
     }
@@ -2468,6 +2575,77 @@ fn default_db_path() -> PathBuf {
         .map(PathBuf::from)
         .unwrap_or_else(|| PathBuf::from("."));
     home.join(".elegy").join("planning.db")
+}
+
+/// Returns true if the command is a mutation (write operation) that requires scope in machine mode.
+fn is_command_mutation(command: &Command) -> bool {
+    match command {
+        Command::Scope { command } => matches!(command, ScopeCommand::Create(_)),
+        Command::Goal { command } => matches!(
+            command,
+            GoalCommand::Create(_) | GoalCommand::UpdateStatus(_)
+        ),
+        Command::Roadmap { command } => matches!(
+            command,
+            RoadmapCommand::Create(_)
+                | RoadmapCommand::UpdateStatus(_)
+                | RoadmapCommand::AddSection(_)
+                | RoadmapCommand::AddWorkPoint(_)
+        ),
+        Command::WorkPoint { command } => matches!(
+            command,
+            WorkPointCommand::UpdateStatus(_) | WorkPointCommand::Revise(_)
+        ),
+        Command::Plan { command } => matches!(
+            command,
+            PlanCommand::Create(_) | PlanCommand::Revise(_) | PlanCommand::UpdateStatus(_)
+        ),
+        Command::Todo { command } => matches!(
+            command,
+            TodoCommand::Create(_) | TodoCommand::UpdateStatus(_)
+        ),
+        Command::Issue { command } => matches!(
+            command,
+            IssueCommand::Record(_) | IssueCommand::UpdateStatus(_)
+        ),
+        Command::ReviewPoint { command } => matches!(
+            command,
+            ReviewPointCommand::Record(_) | ReviewPointCommand::UpdateStatus(_)
+        ),
+        Command::Insight { command } => matches!(
+            command,
+            InsightCommand::Record(_) | InsightCommand::UpdateStatus(_)
+        ),
+        Command::ProjectRun { command } => matches!(
+            command,
+            ProjectRunCommand::Claim(_)
+                | ProjectRunCommand::Activate(_)
+                | ProjectRunCommand::Release(_)
+                | ProjectRunCommand::AddEvidence(_)
+        ),
+        Command::Worktree { command } => matches!(
+            command,
+            WorktreeCommand::Attach(_)
+                | WorktreeCommand::Archive(_)
+                | WorktreeCommand::CleanupIntent(_)
+        ),
+        // Read-only commands
+        Command::Validate { .. }
+        | Command::Events
+        | Command::Health
+        | Command::Project { .. }
+        | Command::Search(_)
+        | Command::Context(_)
+        | Command::Tags(_) => false,
+        // Session commands have their own exemption check (session init is exempt)
+        Command::Session { .. } => false,
+    }
+}
+
+/// Returns true if the command is exempt from the scope gate check.
+/// Currently only `session init` is exempt — it needs to run without scope to create a session.
+fn is_command_exempt_from_scope_gate(command: &Command) -> bool {
+    matches!(command, Command::Session { command } if matches!(command, SessionCommand::Init(_)))
 }
 
 fn exit_invalid() -> ExitCode {

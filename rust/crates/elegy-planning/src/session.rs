@@ -9,11 +9,27 @@ const SESSION_FILE_NAME: &str = "planning-session.json";
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+pub struct ActiveProjectRunState {
+    pub project_run_id: String,
+    pub goal_id: String,
+    pub roadmap_id: String,
+    pub work_point_id: String,
+    pub status: String,
+    pub claimed_at: String,
+    pub activated_at: Option<String>,
+    pub evidence_refs: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct PlanningSession {
     pub session_id: String,
     pub scope: String,
     pub created_at: String,
     pub last_used: String,
+    pub active_project_run: Option<ActiveProjectRunState>,
+    pub last_active_work_point_id: Option<String>,
+    pub last_completed_work_point_id: Option<String>,
 }
 
 pub fn session_file_path() -> PathBuf {
@@ -34,6 +50,9 @@ pub fn init_session(scope: &str) -> Result<PlanningSession, PlanningStoreError> 
         scope: scope.to_string(),
         created_at: now.clone(),
         last_used: now,
+        active_project_run: None,
+        last_active_work_point_id: None,
+        last_completed_work_point_id: None,
     };
 
     write_session(&session)?;
@@ -75,6 +94,9 @@ pub fn update_session_file(
         scope: scope.to_string(),
         created_at: String::new(),
         last_used: String::new(),
+        active_project_run: None,
+        last_active_work_point_id: None,
+        last_completed_work_point_id: None,
     });
 
     let now = time::OffsetDateTime::now_utc()
@@ -119,7 +141,46 @@ fn write_session(session: &PlanningSession) -> Result<(), PlanningStoreError> {
         })?;
     }
     let content = serde_json::to_string_pretty(session)?;
-    fs::write(&path, content)
+    let tmp_path = path.with_extension("json.tmp");
+    fs::write(&tmp_path, &content).map_err(|source| PlanningStoreError::CreateDirectory {
+        path: tmp_path.clone(),
+        source,
+    })?;
+    fs::rename(&tmp_path, &path)
         .map_err(|source| PlanningStoreError::CreateDirectory { path, source })?;
+    Ok(())
+}
+
+pub fn set_active_project_run(state: ActiveProjectRunState) -> Result<(), PlanningStoreError> {
+    let mut session = match read_session()? {
+        Some(s) => s,
+        None => PlanningSession {
+            session_id: uuid::Uuid::new_v4().to_string(),
+            scope: "default".to_string(),
+            created_at: String::new(),
+            last_used: String::new(),
+            active_project_run: None,
+            last_active_work_point_id: None,
+            last_completed_work_point_id: None,
+        },
+    };
+    session.active_project_run = Some(state.clone());
+    session.last_active_work_point_id = Some(state.work_point_id.clone());
+    write_session(&session)?;
+    Ok(())
+}
+
+pub fn clear_active_project_run(
+    last_completed_work_point_id: Option<String>,
+) -> Result<(), PlanningStoreError> {
+    let mut session = match read_session()? {
+        Some(s) => s,
+        None => return Ok(()),
+    };
+    session.active_project_run = None;
+    if let Some(id) = last_completed_work_point_id {
+        session.last_completed_work_point_id = Some(id);
+    }
+    write_session(&session)?;
     Ok(())
 }

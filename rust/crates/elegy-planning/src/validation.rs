@@ -9,7 +9,7 @@ use crate::{
         load_project_run, load_roadmap, load_todo, load_work_point,
     },
     EntityType, GoalStatus, IssueStatus, PlanningStoreError, ProjectRunStatus, ReviewPointStatus,
-    Severity, TodoStatus, ValidationFinding, ValidationSeverity, WorkPointStatus,
+    Severity, TodoStatus, ValidationFinding, ValidationSeverity, WorkPointKind, WorkPointStatus,
 };
 
 pub(crate) fn validate_entity(
@@ -67,6 +67,23 @@ fn validate_project_run(
         )?);
     }
 
+    // PROJECT-RUN-ON-COMPLETED-CANCELLED-WORK: active project run on terminated work point
+    if matches!(
+        run.status,
+        ProjectRunStatus::Claimed | ProjectRunStatus::Active | ProjectRunStatus::Interrupted
+    ) && matches!(
+        work_point.status,
+        WorkPointStatus::Completed | WorkPointStatus::Cancelled | WorkPointStatus::Invalidated
+    ) {
+        findings.push(error(
+            EntityType::ProjectRun,
+            project_run_id,
+            &run.scope_key,
+            "PROJECT-RUN-ON-COMPLETED-CANCELLED-WORK",
+            "active project run references a work point that has been completed, cancelled, or invalidated",
+        )?);
+    }
+
     if run.status == ProjectRunStatus::Completed {
         let has_evidence = !run.evidence.implementation_run_refs.is_empty()
             || !run.evidence.validation_finding_refs.is_empty()
@@ -80,6 +97,66 @@ fn validate_project_run(
                 &run.scope_key,
                 "PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE",
                 "project run is completed but has no evidence refs",
+            )?);
+        }
+    }
+
+    // CROSS-SCOPE-REFERENCE: verify referenced entities share the same scope
+    if let Ok(goal) = load_goal(connection, &run.goal_id) {
+        if goal.scope_key != run.scope_key {
+            findings.push(error(
+                EntityType::ProjectRun,
+                project_run_id,
+                &run.scope_key,
+                "CROSS-SCOPE-REFERENCE",
+                &format!(
+                    "references goal `{}` in scope `{}` but project run is in scope `{}`",
+                    run.goal_id, goal.scope_key, run.scope_key
+                ),
+            )?);
+        }
+    }
+    if work_point.scope_key != run.scope_key {
+        findings.push(error(
+            EntityType::ProjectRun,
+            project_run_id,
+            &run.scope_key,
+            "CROSS-SCOPE-REFERENCE",
+            &format!(
+                "references work point `{}` in scope `{}` but project run is in scope `{}`",
+                run.work_point_id, work_point.scope_key, run.scope_key
+            ),
+        )?);
+    }
+
+    // PROJECT-RUN-GOAL-ROADMAP-MISMATCH
+    if let Ok(roadmap) = load_roadmap(connection, &run.roadmap_id) {
+        if roadmap.goal_id != run.goal_id {
+            findings.push(error(
+                EntityType::ProjectRun,
+                project_run_id,
+                &run.scope_key,
+                "PROJECT-RUN-GOAL-ROADMAP-MISMATCH",
+                &format!(
+                    "roadmap '{}' belongs to goal '{}', but project run references goal '{}'",
+                    run.roadmap_id, roadmap.goal_id, run.goal_id
+                ),
+            )?);
+        }
+    }
+
+    // PROJECT-RUN-WORK-POINT-ROADMAP-MISMATCH
+    if let Ok(wp) = load_work_point(connection, &run.work_point_id) {
+        if wp.roadmap_id != run.roadmap_id {
+            findings.push(error(
+                EntityType::ProjectRun,
+                project_run_id,
+                &run.scope_key,
+                "PROJECT-RUN-WORK-POINT-ROADMAP-MISMATCH",
+                &format!(
+                    "work point '{}' belongs to roadmap '{}', but project run references roadmap '{}'",
+                    run.work_point_id, wp.roadmap_id, run.roadmap_id
+                ),
             )?);
         }
     }
@@ -127,6 +204,52 @@ fn validate_goal(
                 "GOAL-VALIDATED-WITHOUT-ROADMAP",
                 "validated goal has no linked roadmaps yet",
             )?);
+        }
+    }
+
+    // GOAL-INVALIDATED-WITH-ACTIVE-WORK: goal is invalidated/abandoned but has active work points or plans
+    if matches!(goal.status, GoalStatus::Invalidated | GoalStatus::Abandoned) {
+        let active_wp_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM work_points wp JOIN roadmaps r ON wp.roadmap_id = r.id WHERE r.goal_id = ?1 AND wp.status NOT IN ('completed', 'cancelled', 'invalidated')",
+            params![goal_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        let active_plan_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM plans WHERE goal_id = ?1 AND status NOT IN ('completed', 'cancelled', 'invalidated')",
+            params![goal_id],
+            |row| row.get(0),
+        ).unwrap_or(0);
+        if active_wp_count > 0 || active_plan_count > 0 {
+            findings.push(error(
+                EntityType::Goal,
+                goal_id,
+                &goal.scope_key,
+                "GOAL-INVALIDATED-WITH-ACTIVE-WORK",
+                &format!(
+                    "goal has been invalidated or abandoned but has {} active work point(s) and {} active plan(s)",
+                    active_wp_count, active_plan_count
+                ),
+            )?);
+        }
+    }
+
+    // CROSS-SCOPE-REFERENCE: verify referenced roadmaps share the same scope
+    {
+        let mut stmt = connection.prepare("SELECT scope_key FROM roadmaps WHERE goal_id = ?1")?;
+        let rows = stmt.query_map(params![goal_id], |row| row.get::<_, String>(0))?;
+        for r_scope in rows.flatten() {
+            if r_scope != goal.scope_key {
+                findings.push(error(
+                    EntityType::Goal,
+                    goal_id,
+                    &goal.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!(
+                        "linked roadmap is in scope `{r_scope}` but goal is in scope `{}`",
+                        goal.scope_key
+                    ),
+                )?);
+            }
         }
     }
 
@@ -332,6 +455,108 @@ fn validate_work_point(
         }
     }
 
+    // WORK-POINT-CORRECTIVE-NO-TARGET: kind != Feature but no corrective targets
+    if work_point.kind != WorkPointKind::Feature
+        && work_point.repairs_work_point_ids.is_empty()
+        && work_point.supersedes_work_point_ids.is_empty()
+        && work_point.blocks_work_point_ids.is_empty()
+    {
+        findings.push(warning(
+            EntityType::WorkPoint,
+            work_point_id,
+            &work_point.scope_key,
+            "WORK-POINT-CORRECTIVE-NO-TARGET",
+            "corrective work point (non-feature) has no repairs, supersedes, or blocks targets",
+        )?);
+    }
+
+    // WORK-POINT-BLOCKED-DOWNSTREAM-ACTIVE: this WP is blocked by another active corrective WP
+    {
+        let mut stmt = connection.prepare(
+            "SELECT id FROM work_points WHERE scope_key = ?1 AND kind != 'feature' AND status NOT IN ('completed', 'cancelled', 'invalidated')",
+        )?;
+        let rows = stmt.query_map(params![work_point.scope_key], |row| row.get::<_, String>(0))?;
+        for wp_id in rows.flatten() {
+            if wp_id == work_point_id {
+                continue;
+            }
+            if let Ok(other_wp) = load_work_point(connection, &wp_id) {
+                if other_wp
+                    .blocks_work_point_ids
+                    .contains(&work_point_id.to_string())
+                {
+                    findings.push(error(
+                        EntityType::WorkPoint,
+                        work_point_id,
+                        &work_point.scope_key,
+                        "WORK-POINT-BLOCKED-DOWNSTREAM-ACTIVE",
+                        &format!(
+                            "work point is blocked by active corrective work point `{}`",
+                            other_wp.title
+                        ),
+                    )?);
+                }
+            }
+        }
+    }
+
+    // CROSS-SCOPE-REFERENCE: verify referenced entities share the same scope
+    for dep_id in &work_point.dependency_ids {
+        if let Ok(dep) = load_work_point(connection, dep_id) {
+            if dep.scope_key != work_point.scope_key {
+                findings.push(error(
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    &work_point.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!(
+                        "dependency `{dep_id}` is in scope `{}` but work point is in scope `{}`",
+                        dep.scope_key, work_point.scope_key
+                    ),
+                )?);
+            }
+        }
+    }
+    for repair_id in &work_point.repairs_work_point_ids {
+        if let Ok(repair) = load_work_point(connection, repair_id) {
+            if repair.scope_key != work_point.scope_key {
+                findings.push(error(
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    &work_point.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!("repairs target `{repair_id}` is in scope `{}` but work point is in scope `{}`", repair.scope_key, work_point.scope_key),
+                )?);
+            }
+        }
+    }
+    for supersede_id in &work_point.supersedes_work_point_ids {
+        if let Ok(supersede) = load_work_point(connection, supersede_id) {
+            if supersede.scope_key != work_point.scope_key {
+                findings.push(error(
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    &work_point.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!("supersedes target `{supersede_id}` is in scope `{}` but work point is in scope `{}`", supersede.scope_key, work_point.scope_key),
+                )?);
+            }
+        }
+    }
+    for block_id in &work_point.blocks_work_point_ids {
+        if let Ok(blocked) = load_work_point(connection, block_id) {
+            if blocked.scope_key != work_point.scope_key {
+                findings.push(error(
+                    EntityType::WorkPoint,
+                    work_point_id,
+                    &work_point.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!("blocks target `{block_id}` is in scope `{}` but work point is in scope `{}`", blocked.scope_key, work_point.scope_key),
+                )?);
+            }
+        }
+    }
+
     Ok(findings)
 }
 
@@ -422,6 +647,36 @@ fn validate_plan(
             &plan.scope_key,
             "PLAN-COMPLETED-WITH-OPEN-TODOS",
             "completed plan still has incomplete todos",
+        )?);
+    }
+
+    // CROSS-SCOPE-REFERENCE: verify targeted work points share the same scope
+    for wp_id in &plan.targeted_work_point_ids {
+        if let Ok(wp) = load_work_point(connection, wp_id) {
+            if wp.scope_key != plan.scope_key {
+                findings.push(error(
+                    EntityType::Plan,
+                    plan_id,
+                    &plan.scope_key,
+                    "CROSS-SCOPE-REFERENCE",
+                    &format!(
+                        "targeted work point `{wp_id}` is in scope `{}` but plan is in scope `{}`",
+                        wp.scope_key, plan.scope_key
+                    ),
+                )?);
+            }
+        }
+    }
+    if roadmap.scope_key != plan.scope_key {
+        findings.push(error(
+            EntityType::Plan,
+            plan_id,
+            &plan.scope_key,
+            "CROSS-SCOPE-REFERENCE",
+            &format!(
+                "linked roadmap is in scope `{}` but plan is in scope `{}`",
+                roadmap.scope_key, plan.scope_key
+            ),
         )?);
     }
 

@@ -183,6 +183,14 @@ string_enum!(ProjectRunStatus {
     Released => "released"
 });
 
+string_enum!(WorkPointKind {
+    Feature => "feature",
+    Corrective => "corrective",
+    ReviewFix => "review-fix",
+    ValidationFix => "validation-fix",
+    FollowUp => "follow-up"
+});
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WarningRecord {
@@ -241,6 +249,17 @@ pub struct RunnableWorkPointCandidate {
     pub roadmap_title: String,
     pub dependency_titles: Vec<String>,
     pub reasons: Vec<String>,
+    pub required_reason: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockedCandidate {
+    pub work_point_id: String,
+    pub work_point_title: String,
+    pub blocker_id: String,
+    pub blocker_title: String,
+    pub reason: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -248,6 +267,7 @@ pub struct RunnableWorkPointCandidate {
 pub struct RunnableCandidates {
     pub roadmap_id: String,
     pub candidates: Vec<RunnableWorkPointCandidate>,
+    pub blocked: Vec<BlockedCandidate>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -347,6 +367,11 @@ pub struct WorkPointRecord {
     pub dependency_ids: Vec<String>,
     pub validation_expectations: Vec<String>,
     pub effort_tier: EffortTier,
+    pub kind: WorkPointKind,
+    pub priority: Priority,
+    pub repairs_work_point_ids: Vec<String>,
+    pub supersedes_work_point_ids: Vec<String>,
+    pub blocks_work_point_ids: Vec<String>,
     pub file_scopes: Vec<FileScopeRecord>,
     pub tags: Vec<String>,
     pub revision: i64,
@@ -508,6 +533,14 @@ pub struct SessionContextBundle {
     pub insights_recorded: Vec<InsightRecord>,
     pub validation_summary: SessionValidationSummary,
     pub token_estimate: TokenEstimate,
+    pub active_project_runs: Vec<ProjectRunRecord>,
+    pub active_work_points: Vec<WorkPointRecord>,
+    pub active_plans: Vec<PlanRecord>,
+    pub next_pending_todos: Vec<TodoRecord>,
+    pub open_blocking_issues: Vec<IssueRecord>,
+    pub open_blocking_review_points: Vec<ReviewPointRecord>,
+    pub recommended_next_action: Option<String>,
+    pub context_warnings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -753,11 +786,21 @@ pub struct SessionSummary {
     pub active_project_runs: i64,
 }
 
-/// Helper to parse worktree status from string.
+/// Helper to parse worktree status from string (lenient — defaults to Active).
 pub fn parse_worktree_status(s: &str) -> WorktreeStatus {
     match s {
         "archived" => WorktreeStatus::Archived,
         "cleanup-intent" => WorktreeStatus::CleanupIntent,
         _ => WorktreeStatus::Active,
+    }
+}
+
+/// Strict worktree status parser for storage row deserialisation.
+pub fn parse_worktree_status_strict(s: &str) -> Result<WorktreeStatus, String> {
+    match s {
+        "active" => Ok(WorktreeStatus::Active),
+        "archived" => Ok(WorktreeStatus::Archived),
+        "cleanup-intent" => Ok(WorktreeStatus::CleanupIntent),
+        other => Err(format!("invalid worktree status: {other}")),
     }
 }

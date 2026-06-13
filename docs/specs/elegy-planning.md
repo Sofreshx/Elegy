@@ -3,7 +3,7 @@ title: elegy-planning Spec
 status: active
 owner: Elegy
 created: 2026-05-25
-updated: 2026-06-11
+updated: 2026-06-13
 doc_kind: spec
 summary: Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.
 schema_version: elegy-planning/v1
@@ -28,7 +28,7 @@ See [What and Why](#what-and-why) for the full problem breakdown.
 ## Non-Goals
 
 - Do not replace `elegy-memory`. Planning addresses forward execution intent; memory handles distilled retrospective observations. See [Relationship to elegy-memory](#relationship-to-elegy-memory).
-- Do not enforce lifecycle state transitions at the type level in the MVP (deferred to v1).
+- Lifecycle state transitions are now enforced in v1.1 (see `docs/specs/agent-safe-planning-core/spec.md`). The `--override-transition --reason` flag provides an escape hatch for exceptional recovery.
 - Do not provide event replay or subscription/push APIs in the MVP.
 - Do not auto-score prose quality or architectural soundness.
 - Do not provide compatibility import from `instruction-engine` Markdown conventions.
@@ -134,6 +134,7 @@ The validation engine runs automatically after every mutation. See [Validation E
 
 - Source crate: `rust/crates/elegy-planning/`
 - Spec: This document
+- Agent-Safe Planning Core spec: [agent-safe-planning-core](agent-safe-planning-core/spec.md)
 - Architecture: [elegy-planning-v1](../architecture/elegy-planning-v1.md)
 
 ---
@@ -212,6 +213,8 @@ stateDiagram-v2
         Interrupted --> Released
     }
 }
+
+**Note:** Status transitions are now enforced at the storage layer. Invalid transitions are rejected at write time with error `INVALID_STATUS_TRANSITION`. The `--override-transition --reason <text>` flag on `*-update-status` commands provides an explicit override path that records the reason and emits a `STATUS-TRANSITION-OVERRIDDEN` validation warning. See `docs/specs/agent-safe-planning-core/spec.md` for the full transition tables and enforcement rules.
 ```
 
 ### Key Relationship Rules
@@ -421,6 +424,8 @@ flowchart LR
 | `PROJECT-RUN-WORK-POINT-INVALID` | Error | Project run is attached to a cancelled or invalidated work point |
 | `PROJECT-RUN-GOAL-NOT-ACTIVE` | Warning | Project run references a goal that is no longer active |
 
+**Note:** 13 structural-integrity findings (dangling references, cross-scope links, missing parents) are now preflight rejections rather than stored validation warnings. See `docs/specs/agent-safe-planning-core/spec.md` for the promoted findings and promotion principle.
+
 ---
 
 ## Critical Analysis
@@ -466,12 +471,11 @@ flowchart LR
    guidance or a `PlanView.status` computed from both the lifecycle and the validation
    findings.
 
-3. **No lifecycle transition enforcement.** Valid status values are constrained per
-   entity type, but the system does not enforce valid transitions (e.g., it allows
-   `Draft → Completed` skipping `Active`). This was explicitly deferred to v1, which
-   is fine, but it means the status field is closer to a free-text tag than a state
-   machine until the enforcement lands. Anyone building workflow logic on top has to
-   handle impossible transitions themselves.
+3. **Lifecycle transition enforcement is now delivered.** Transition tables for all 8
+   entity types (Goal, Roadmap, WorkPoint, Plan, Todo, Issue, ReviewPoint, Insight) are
+   enforced at the storage layer. Invalid transitions are rejected at write time. The
+   `--override-transition --reason` flag provides a documented escape hatch for human/agent
+   recovery. See `docs/specs/agent-safe-planning-core/spec.md` for details.
 
 4. **SQLite-as-authority has a synchronization problem.** There's no push mechanism
    when the database changes. An agent running `elegy-planning` in one session has no
