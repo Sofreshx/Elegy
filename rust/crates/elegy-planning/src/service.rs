@@ -519,6 +519,11 @@ mod tests {
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
                 effort_tier: crate::EffortTier::Balanced,
+                kind: None,
+                priority: None,
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
                 file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: None,
@@ -583,6 +588,8 @@ mod tests {
                     evidence_refs: Some(vec!["proof://ci".to_string()]),
                     active_scope_key: None,
                     run_id: None,
+                    override_transition: false,
+                    reason: None,
                 },
             )
             .expect_err("out-of-scope transition should fail");
@@ -638,6 +645,8 @@ mod tests {
                     evidence_refs: Some(vec!["proof://ci".to_string()]),
                     active_scope_key: None,
                     run_id: None,
+                    override_transition: false,
+                    reason: None,
                 },
             )
             .expect("in-scope transition succeeds");

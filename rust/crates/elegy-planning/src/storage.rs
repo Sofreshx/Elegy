@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fs,
     path::{Path, PathBuf},
     time::Duration,
@@ -12,19 +12,20 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
-    validation::validate_entity, AttachWorktreeInput, EffortTier, EntityType, FileScopeRecord,
-    FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, InsightRecord, InsightStatus,
-    InsightType, InsightView, IssueRecord, IssueStatus, IssueView, MutationResult, PlanRecord,
-    PlanStatus, PlanView, PlanningEvent, PlanningHealthReport, PlanningStoreError, Priority,
-    ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat,
-    RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord,
-    RoadmapStatus, RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord,
-    SessionSummary, Severity, TagInfo, TodoRecord, TodoStatus, ValidationFinding, ValidationReport,
-    ValidationRunReport, ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode,
-    WorkPointRecord, WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
+    validation::validate_entity, AttachWorktreeInput, BlockedCandidate, EffortTier, EntityType,
+    FileScopeRecord, FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, InsightRecord,
+    InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView, MutationResult,
+    PlanRecord, PlanStatus, PlanView, PlanningEvent, PlanningHealthReport, PlanningStoreError,
+    Priority, ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView,
+    ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord,
+    RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
+    RunnableWorkPointCandidate, ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord,
+    TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity,
+    WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord, WorkPointStatus,
+    WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "7";
+pub const CURRENT_SCHEMA_VERSION: &str = "8";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 const SQLITE_MAX_VARIABLES: usize = 999;
@@ -87,6 +88,11 @@ pub struct AddWorkPointInput {
     pub dependency_ids: Vec<String>,
     pub validation_expectations: Vec<String>,
     pub effort_tier: EffortTier,
+    pub kind: Option<WorkPointKind>,
+    pub priority: Option<Priority>,
+    pub repairs_work_point_ids: Vec<String>,
+    pub supersedes_work_point_ids: Vec<String>,
+    pub blocks_work_point_ids: Vec<String>,
     pub file_scopes: Vec<FileScopeRecord>,
     pub tags: Vec<String>,
     pub run_id: Option<String>,
@@ -98,6 +104,8 @@ pub struct ReviseWorkPointInput {
     pub active_scope_key: Option<String>,
     pub dependency_ids: Option<Vec<String>>,
     pub clear_dependencies: bool,
+    pub blocks_work_point_ids: Option<Vec<String>>,
+    pub clear_blocks: bool,
     pub run_id: Option<String>,
 }
 
@@ -254,6 +262,8 @@ pub struct UpdateStatusInput {
     pub evidence_refs: Option<Vec<String>>,
     pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
+    pub override_transition: bool,
+    pub reason: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -390,6 +400,25 @@ impl PlanningStore {
             "goalId",
             &active_scope_key,
         )?;
+        // Preflight: GOAL-NOT-ACTIVE — reject if goal is not active
+        {
+            let goal = load_goal(&transaction, &input.goal_id)?;
+            if matches!(
+                goal.status,
+                GoalStatus::Invalidated | GoalStatus::Superseded | GoalStatus::Abandoned
+            ) {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "{}",
+                    serde_json::json!({
+                        "code": "GOAL_NOT_ACTIVE",
+                        "message": format!("goal `{}` is not active (status: {})", input.goal_id, goal.status.as_str()),
+                        "goalId": input.goal_id,
+                        "status": "invalid",
+                    })
+                )));
+            }
+        }
+
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = RoadmapRecord {
@@ -540,6 +569,28 @@ impl PlanningStore {
         Ok(MutationResult { record, validation })
     }
 
+    fn would_create_cycle(
+        current: &str,
+        target: &str,
+        graph: &HashMap<String, Vec<String>>,
+        visited: &mut HashSet<String>,
+    ) -> bool {
+        if current == target {
+            return true;
+        }
+        if !visited.insert(current.to_string()) {
+            return false;
+        }
+        if let Some(blocked) = graph.get(current) {
+            for next in blocked {
+                if Self::would_create_cycle(next, target, graph, visited) {
+                    return true;
+                }
+            }
+        }
+        false
+    }
+
     pub fn add_work_point(
         &self,
         input: AddWorkPointInput,
@@ -609,6 +660,11 @@ impl PlanningStore {
             dependency_ids: normalize_string_list(input.dependency_ids),
             validation_expectations: normalize_string_list(input.validation_expectations),
             effort_tier: input.effort_tier,
+            kind: input.kind.unwrap_or(WorkPointKind::Feature),
+            priority: input.priority.unwrap_or(Priority::Medium),
+            repairs_work_point_ids: normalize_string_list(input.repairs_work_point_ids),
+            supersedes_work_point_ids: normalize_string_list(input.supersedes_work_point_ids),
+            blocks_work_point_ids: normalize_string_list(input.blocks_work_point_ids),
             file_scopes: normalize_file_scopes(input.file_scopes),
             tags: normalize_string_list(input.tags),
             revision: 1,
@@ -616,13 +672,58 @@ impl PlanningStore {
             updated_at: now.clone(),
         };
 
+        // Cycle detection for blocks_work_point_ids
+        if !record.blocks_work_point_ids.is_empty() {
+            // Collect all blocks_work_point_ids relationships in the scope
+            let mut all_blocks: HashMap<String, Vec<String>> = HashMap::new();
+            {
+                let mut stmt = transaction.prepare(
+                    "SELECT id, blocks_work_point_ids FROM work_points WHERE scope_key = ?1 AND blocks_work_point_ids != '[]'",
+                )?;
+                let rows = stmt.query_map(params![record.scope_key], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?;
+                for row in rows {
+                    let (wid, blocks_json) = row?;
+                    let blocked: Vec<String> =
+                        serde_json::from_str(&blocks_json).unwrap_or_default();
+                    if !blocked.is_empty() {
+                        all_blocks.insert(wid, blocked);
+                    }
+                }
+            }
+            // Add the current work point's blocks
+            all_blocks.insert(record.id.clone(), record.blocks_work_point_ids.clone());
+
+            // Check: if any blocked ID can reach back to this work point via transitive blocks, it's a cycle
+            for blocked_id in &record.blocks_work_point_ids {
+                if Self::would_create_cycle(
+                    blocked_id,
+                    &record.id,
+                    &all_blocks,
+                    &mut HashSet::new(),
+                ) {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "{}",
+                        serde_json::json!({
+                            "code": "INVALID_BLOCK_CYCLE",
+                            "message": format!("blocking work point '{}' would create a cycle via '{}'", record.id, blocked_id),
+                            "workPointId": record.id,
+                            "blockedId": blocked_id,
+                        })
+                    )));
+                }
+            }
+        }
+
         transaction.execute(
             r#"
             INSERT INTO work_points (
                 id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index,
-                dependency_ids_json, validation_expectations_json, effort_tier, tags_json,
+                dependency_ids_json, validation_expectations_json, effort_tier, kind, priority,
+                repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json,
                 revision, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20)
             "#,
             params![
                 record.id,
@@ -636,6 +737,11 @@ impl PlanningStore {
                 to_json_text(&record.dependency_ids)?,
                 to_json_text(&record.validation_expectations)?,
                 record.effort_tier.as_str(),
+                record.kind.as_str(),
+                record.priority.as_str(),
+                to_json_text(&record.repairs_work_point_ids)?,
+                to_json_text(&record.supersedes_work_point_ids)?,
+                to_json_text(&record.blocks_work_point_ids)?,
                 to_json_text(&record.tags)?,
                 record.revision,
                 record.created_at,
@@ -725,6 +831,12 @@ impl PlanningStore {
                     .to_string(),
             ));
         }
+        if input.clear_blocks && input.blocks_work_point_ids.is_some() {
+            return Err(PlanningStoreError::InvalidInput(
+                "--clear-blocks cannot be combined with providing new blocked work point IDs"
+                    .to_string(),
+            ));
+        }
 
         // Compute new dependencies
         let new_deps = if input.clear_dependencies {
@@ -766,14 +878,93 @@ impl PlanningStore {
             record.dependency_ids.clone()
         };
 
+        // Compute new blocks
+        let new_blocks = if input.clear_blocks {
+            Vec::new()
+        } else if let Some(ref block_ids) = input.blocks_work_point_ids {
+            let trimmed: Vec<String> = block_ids
+                .iter()
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            // Validate all blocked work points exist
+            for blocked_id in &trimmed {
+                match load_work_point(&transaction, blocked_id) {
+                    Err(PlanningStoreError::NotFound { .. }) => {
+                        return Err(PlanningStoreError::InvalidInput(format!(
+                            "blocked work point `{}` does not exist",
+                            blocked_id
+                        )));
+                    }
+                    Err(e) => return Err(e),
+                    Ok(dep) => {
+                        if dep.roadmap_id != record.roadmap_id {
+                            return Err(PlanningStoreError::InvalidInput(format!(
+                                "blocked work point `{}` belongs to roadmap `{}`, not `{}`. Cross-roadmap block relationships are not supported.",
+                                blocked_id, dep.roadmap_id, record.roadmap_id
+                            )));
+                        }
+                    }
+                }
+            }
+
+            trimmed
+        } else {
+            record.blocks_work_point_ids.clone()
+        };
+
+        // Cycle detection for blocks_work_point_ids (only when blocks changed)
+        if new_blocks != record.blocks_work_point_ids && !new_blocks.is_empty() {
+            let mut all_blocks: HashMap<String, Vec<String>> = HashMap::new();
+            {
+                let mut stmt = transaction.prepare(
+                    "SELECT id, blocks_work_point_ids FROM work_points WHERE scope_key = ?1 AND blocks_work_point_ids != '[]'",
+                )?;
+                let rows = stmt.query_map(params![record.scope_key], |row| {
+                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                })?;
+                for row in rows {
+                    let (wid, blocks_json) = row?;
+                    let blocked: Vec<String> =
+                        serde_json::from_str(&blocks_json).unwrap_or_default();
+                    if !blocked.is_empty() {
+                        all_blocks.insert(wid, blocked);
+                    }
+                }
+            }
+            // Use the new blocks for the current work point
+            all_blocks.insert(record.id.clone(), new_blocks.clone());
+
+            for blocked_id in &new_blocks {
+                if Self::would_create_cycle(
+                    blocked_id,
+                    &record.id,
+                    &all_blocks,
+                    &mut HashSet::new(),
+                ) {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "{}",
+                        serde_json::json!({
+                            "code": "INVALID_BLOCK_CYCLE",
+                            "message": format!("blocking work point '{}' would create a cycle via '{}'", record.id, blocked_id),
+                            "workPointId": record.id,
+                            "blockedId": blocked_id,
+                        })
+                    )));
+                }
+            }
+        }
+
         let now = now_string()?;
 
         transaction.execute(
-            "UPDATE work_points SET dependency_ids_json = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
-            params![to_json_text(&new_deps)?, now, record.id],
+            "UPDATE work_points SET dependency_ids_json = ?1, blocks_work_point_ids = ?2, revision = revision + 1, updated_at = ?3 WHERE id = ?4",
+            params![to_json_text(&new_deps)?, to_json_text(&new_blocks)?, now, record.id],
         )?;
 
         record.dependency_ids = new_deps;
+        record.blocks_work_point_ids = new_blocks;
         record.revision += 1;
         record.updated_at = now.clone();
 
@@ -836,6 +1027,57 @@ impl PlanningStore {
             "roadmapId",
             &active_scope_key,
         )?;
+
+        // Preflight: GOAL-ROADMAP-MISMATCH
+        {
+            let roadmap = load_roadmap(&transaction, &input.roadmap_id)?;
+            if roadmap.goal_id != input.goal_id {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "{}",
+                    serde_json::json!({
+                        "code": "GOAL_ROADMAP_MISMATCH",
+                        "message": format!("plan goal `{}` does not match roadmap goal `{}`", input.goal_id, roadmap.goal_id),
+                        "status": "invalid",
+                    })
+                )));
+            }
+        }
+
+        // Preflight: WORK-POINT-MISSING and WORK-POINT-ROADMAP-MISMATCH
+        for wp_id in &input.targeted_work_point_ids {
+            let trimmed = wp_id.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match load_work_point(&transaction, trimmed) {
+                Ok(wp) => {
+                    if wp.roadmap_id != input.roadmap_id {
+                        return Err(PlanningStoreError::InvalidInput(format!(
+                            "{}",
+                            serde_json::json!({
+                                "code": "WORK_POINT_ROADMAP_MISMATCH",
+                                "message": format!("targeted work point `{}` belongs to roadmap `{}`, not `{}`", trimmed, wp.roadmap_id, input.roadmap_id),
+                                "workPointId": trimmed,
+                                "status": "invalid",
+                            })
+                        )));
+                    }
+                }
+                Err(PlanningStoreError::NotFound { .. }) => {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "{}",
+                        serde_json::json!({
+                            "code": "WORK_POINT_MISSING",
+                            "message": format!("targeted work point `{}` does not exist", trimmed),
+                            "workPointId": trimmed,
+                            "status": "invalid",
+                        })
+                    )));
+                }
+                Err(e) => return Err(e),
+            }
+        }
+
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let record = PlanRecord {
@@ -1287,6 +1529,17 @@ impl PlanningStore {
         require_non_empty("correlationId", &input.correlation_id)?;
         require_non_empty("title", &input.title)?;
         require_non_empty("content", &input.content)?;
+        // Preflight: EMPTY-CONTENT — reject whitespace-only content
+        if input.content.trim().is_empty() {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "{}",
+                serde_json::json!({
+                    "code": "EMPTY_CONTENT",
+                    "message": "insight content must not be empty or whitespace-only",
+                    "status": "invalid",
+                })
+            )));
+        }
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
@@ -1688,6 +1941,165 @@ impl PlanningStore {
             .map(|i| estimate_tokens(&i.content))
             .sum();
         let total_tokens = entity_tokens + insight_tokens;
+
+        // Phase 6: Extended session context fields
+
+        // Active project runs for this scope
+        let mut project_run_stmt = connection.prepare(
+            "SELECT id FROM project_runs WHERE scope_key = ?1 AND status IN ('claimed', 'active', 'interrupted') AND session_id IS NOT NULL ORDER BY claimed_at DESC LIMIT 10",
+        )?;
+        let run_rows =
+            project_run_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut active_project_runs = Vec::new();
+        for run_id in run_rows.flatten() {
+            if let Ok(run) = load_project_run(&connection, &run_id) {
+                active_project_runs.push(run);
+            }
+        }
+
+        // Active work points
+        let mut wp_stmt = connection.prepare(
+            "SELECT id FROM work_points WHERE scope_key = ?1 AND status = 'active' ORDER BY ordering_index ASC LIMIT 10",
+        )?;
+        let wp_rows = wp_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut active_work_points = Vec::new();
+        for wp_id in wp_rows.flatten() {
+            if let Ok(wp) = load_work_point(&connection, &wp_id) {
+                active_work_points.push(wp);
+            }
+        }
+
+        // Active plans
+        let mut plan_stmt = connection.prepare(
+            "SELECT id FROM plans WHERE scope_key = ?1 AND status = 'active' ORDER BY created_at DESC LIMIT 10",
+        )?;
+        let plan_rows = plan_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut active_plans = Vec::new();
+        for plan_id in plan_rows.flatten() {
+            if let Ok(plan) = load_plan(&connection, &plan_id) {
+                active_plans.push(plan);
+            }
+        }
+
+        // Next pending todos
+        let mut todo_stmt = connection.prepare(
+            "SELECT id FROM todos WHERE scope_key = ?1 AND status = 'pending' ORDER BY ordering_index ASC, id ASC LIMIT 10",
+        )?;
+        let todo_rows = todo_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut next_pending_todos = Vec::new();
+        for todo_id in todo_rows.flatten() {
+            if let Ok(todo) = load_todo(&connection, &todo_id) {
+                next_pending_todos.push(todo);
+            }
+        }
+
+        // Open blocking issues (severity high/critical)
+        let mut issue_stmt = connection.prepare(
+            "SELECT id FROM issues WHERE scope_key = ?1 AND status IN ('open', 'reopened') AND severity IN ('high', 'critical') ORDER BY CASE severity WHEN 'critical' THEN 0 ELSE 1 END, created_at DESC LIMIT 10",
+        )?;
+        let issue_rows =
+            issue_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut open_blocking_issues = Vec::new();
+        for issue_id in issue_rows.flatten() {
+            if let Ok(issue) = load_issue(&connection, &issue_id) {
+                open_blocking_issues.push(issue);
+            }
+        }
+
+        // Open blocking review points (severity high/critical)
+        let mut rp_stmt = connection.prepare(
+            "SELECT id FROM review_points WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical') ORDER BY CASE severity WHEN 'critical' THEN 0 ELSE 1 END, created_at DESC LIMIT 10",
+        )?;
+        let rp_rows = rp_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut open_blocking_review_points = Vec::new();
+        for rp_id in rp_rows.flatten() {
+            if let Ok(rp) = load_review_point(&connection, &rp_id) {
+                open_blocking_review_points.push(rp);
+            }
+        }
+
+        // Recommended next action
+        let incomplete_todo_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM todos WHERE scope_key = ?1 AND status IN ('pending', 'in-progress', 'blocked')",
+            params![normalized],
+            |row| row.get(0),
+        )?;
+
+        let recommended_next_action =
+            if !active_project_runs.is_empty() && incomplete_todo_count > 0 {
+                let run_title = active_project_runs
+                    .first()
+                    .and_then(|r| {
+                        load_work_point(&connection, &r.work_point_id)
+                            .ok()
+                            .map(|wp| wp.title)
+                    })
+                    .unwrap_or_default();
+                let todo_title = next_pending_todos
+                    .first()
+                    .map(|t| t.title.clone())
+                    .unwrap_or_default();
+                Some(format!("continue {}: {}", run_title, todo_title))
+            } else if active_project_runs.is_empty() {
+                // Check for runnable work points - try first roadmap
+                let roadmap_result: Option<String> = connection
+                    .query_row(
+                        "SELECT id FROM roadmaps WHERE scope_key = ?1 LIMIT 1",
+                        params![normalized],
+                        |row| row.get(0),
+                    )
+                    .ok();
+                if let Some(rid) = roadmap_result {
+                    if let Ok(runnable) = self.find_runnable_work_points(&rid) {
+                        runnable
+                            .candidates
+                            .first()
+                            .map(|first| format!("claim {}", first.work_point.title))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            } else {
+                None
+            };
+
+        let recommended_next_action = recommended_next_action.or_else(|| {
+            if !open_blocking_issues.is_empty() || !open_blocking_review_points.is_empty() {
+                let blocker_title = open_blocking_issues
+                    .first()
+                    .map(|i| i.title.clone())
+                    .or_else(|| {
+                        open_blocking_review_points
+                            .first()
+                            .map(|rp| rp.title.clone())
+                    })
+                    .unwrap_or_default();
+                Some(format!("resolve {}", blocker_title))
+            } else {
+                Some("review open goals or create a new plan".to_string())
+            }
+        });
+
+        // Context warnings
+        let mut context_warnings = Vec::new();
+        if active_project_runs.is_empty() {
+            context_warnings
+                .push("No active project run. Use project-run claim to start work.".to_string());
+        }
+        if active_plans.is_empty() {
+            context_warnings.push("No active plan. Create a plan with plan create.".to_string());
+        }
+        let issue_count = open_blocking_issues.len();
+        let rp_count = open_blocking_review_points.len();
+        if issue_count > 0 || rp_count > 0 {
+            context_warnings.push(format!(
+                "Blocked: {} unresolved high/critical issue(s) and {} open review point(s).",
+                issue_count, rp_count
+            ));
+        }
+
         Ok(crate::SessionContextBundle {
             session_id: None,
             correlation_id: Some(correlation_id.to_string()),
@@ -1700,6 +2112,14 @@ impl PlanningStore {
                 insight_tokens,
                 total_tokens,
             },
+            active_project_runs,
+            active_work_points,
+            active_plans,
+            next_pending_todos,
+            open_blocking_issues,
+            open_blocking_review_points,
+            recommended_next_action,
+            context_warnings,
         })
     }
 
@@ -1845,7 +2265,129 @@ impl PlanningStore {
         let rows = statement.query_map([], row_to_scope)?;
         collect_rows(rows)
     }
+}
 
+fn allowed_transitions(
+    entity_type: EntityType,
+    current: &str,
+) -> Result<Vec<&'static str>, PlanningStoreError> {
+    let allowed: Vec<&str> = match entity_type {
+        EntityType::Goal => match current {
+            "draft" => vec!["proposed", "abandoned"],
+            "proposed" => vec!["active", "abandoned"],
+            "active" => vec!["validated", "invalidated", "abandoned"],
+            "validated" => vec!["superseded"],
+            "invalidated" => vec!["active", "abandoned"],
+            "superseded" => vec![],
+            "abandoned" => vec!["draft"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown goal status: {other}"
+                )))
+            }
+        },
+        EntityType::Roadmap => match current {
+            "draft" => vec!["proposed", "cancelled"],
+            "proposed" => vec!["active", "cancelled"],
+            "active" => vec!["blocked", "completed", "cancelled"],
+            "blocked" => vec!["active", "cancelled"],
+            "completed" => vec![],
+            "cancelled" => vec!["draft"],
+            "invalidated" => vec!["draft"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown roadmap status: {other}"
+                )))
+            }
+        },
+        EntityType::WorkPoint => match current {
+            "draft" => vec!["proposed", "cancelled"],
+            "proposed" => vec!["active", "cancelled"],
+            "active" => vec!["blocked", "completed", "cancelled"],
+            "blocked" => vec!["active", "cancelled"],
+            "completed" => vec![],
+            "cancelled" => vec!["draft"],
+            "invalidated" => vec!["draft"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown work point status: {other}"
+                )))
+            }
+        },
+        EntityType::Plan => match current {
+            "draft" => vec!["proposed", "cancelled"],
+            "proposed" => vec!["active", "cancelled"],
+            "active" => vec!["blocked", "completed", "cancelled"],
+            "blocked" => vec!["active", "cancelled"],
+            "completed" => vec![],
+            "cancelled" => vec!["draft"],
+            "invalidated" => vec!["draft"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown plan status: {other}"
+                )))
+            }
+        },
+        EntityType::Todo => match current {
+            "pending" => vec!["in-progress", "cancelled"],
+            "in-progress" => vec!["blocked", "completed", "cancelled"],
+            "blocked" => vec!["pending", "in-progress", "cancelled"],
+            "completed" => vec![],
+            "cancelled" => vec!["pending"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown todo status: {other}"
+                )))
+            }
+        },
+        EntityType::Issue => match current {
+            "open" => vec!["blocked", "resolved"],
+            "blocked" => vec!["open", "resolved"],
+            "resolved" => vec!["reopened"],
+            "reopened" => vec!["open", "blocked", "resolved"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown issue status: {other}"
+                )))
+            }
+        },
+        EntityType::ReviewPoint => match current {
+            "open" => vec!["resolved", "accepted-risk"],
+            "resolved" => vec![],
+            "accepted-risk" => vec![],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown review point status: {other}"
+                )))
+            }
+        },
+        EntityType::Insight => match current {
+            "active" => vec!["superseded", "archived"],
+            "superseded" => vec!["active", "archived"],
+            "archived" => vec!["active"],
+            other => {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "unknown insight status: {other}"
+                )))
+            }
+        },
+        EntityType::RoadmapSection | EntityType::Scope => {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "status transitions are not supported for {}",
+                entity_type.as_str()
+            )));
+        }
+        other => {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "unsupported entity type: {}",
+                other.as_str()
+            )))
+        }
+    };
+    Ok(allowed)
+}
+
+impl PlanningStore {
     pub fn update_status(
         &self,
         input: UpdateStatusInput,
@@ -1875,6 +2417,24 @@ impl PlanningStore {
         let result = match input.entity_type {
             EntityType::Goal => {
                 let status = parse_goal_status(input.status.clone())?;
+                let old_record = load_goal(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Goal, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "goal",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "goals",
@@ -1883,6 +2443,16 @@ impl PlanningStore {
                     &now,
                 )?;
                 let record = load_goal(&transaction, &input.entity_id)?;
+                let event_type = if input.override_transition {
+                    "goal.status-overridden"
+                } else {
+                    "goal.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -1893,8 +2463,8 @@ impl PlanningStore {
                         &record.id,
                         &record.correlation_id,
                         input.run_id.clone(),
-                        "goal.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -1903,6 +2473,24 @@ impl PlanningStore {
             }
             EntityType::Roadmap => {
                 let status = parse_roadmap_status(input.status.clone())?;
+                let old_record = load_roadmap(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Roadmap, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "roadmap",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "roadmaps",
@@ -1911,6 +2499,16 @@ impl PlanningStore {
                     &now,
                 )?;
                 let record = load_roadmap(&transaction, &input.entity_id)?;
+                let event_type = if input.override_transition {
+                    "roadmap.status-overridden"
+                } else {
+                    "roadmap.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -1921,8 +2519,8 @@ impl PlanningStore {
                         &record.id,
                         &record.correlation_id,
                         input.run_id.clone(),
-                        "roadmap.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -1931,6 +2529,24 @@ impl PlanningStore {
             }
             EntityType::WorkPoint => {
                 let status = parse_work_point_status(input.status.clone())?;
+                let old_record = load_work_point(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::WorkPoint, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "work-point",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "work_points",
@@ -1940,6 +2556,16 @@ impl PlanningStore {
                 )?;
                 let record = load_work_point(&transaction, &input.entity_id)?;
                 let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+                let event_type = if input.override_transition {
+                    "work-point.status-overridden"
+                } else {
+                    "work-point.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -1950,8 +2576,8 @@ impl PlanningStore {
                         &record.roadmap_id,
                         &correlation_id,
                         input.run_id.clone(),
-                        "work-point.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -1965,6 +2591,24 @@ impl PlanningStore {
             }
             EntityType::Plan => {
                 let status = parse_plan_status(input.status.clone())?;
+                let old_record = load_plan(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Plan, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "plan",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "plans",
@@ -1973,6 +2617,16 @@ impl PlanningStore {
                     &now,
                 )?;
                 let record = load_plan(&transaction, &input.entity_id)?;
+                let event_type = if input.override_transition {
+                    "plan.status-overridden"
+                } else {
+                    "plan.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -1983,8 +2637,8 @@ impl PlanningStore {
                         &record.id,
                         &record.correlation_id,
                         input.run_id.clone(),
-                        "plan.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -1993,6 +2647,24 @@ impl PlanningStore {
             }
             EntityType::Todo => {
                 let status = parse_todo_status(input.status.clone())?;
+                let old_record = load_todo(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Todo, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "todo",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_todo_status_row(
                     &transaction,
                     &input.entity_id,
@@ -2008,6 +2680,20 @@ impl PlanningStore {
                 } else {
                     format!("corr-{}", record.id)
                 };
+                let event_type = if input.override_transition {
+                    "todo.status-overridden"
+                } else {
+                    "todo.status-updated"
+                };
+                let mut payload = serde_json::json!({
+                    "status": record.status.as_str(),
+                    "evidenceRefs": record.evidence_refs,
+                    "revision": record.revision
+                });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -2018,12 +2704,8 @@ impl PlanningStore {
                         &record.id,
                         &correlation_id,
                         input.run_id.clone(),
-                        "todo.status-updated",
-                        serde_json::json!({
-                            "status": record.status.as_str(),
-                            "evidenceRefs": record.evidence_refs,
-                            "revision": record.revision
-                        }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -2035,6 +2717,24 @@ impl PlanningStore {
             }
             EntityType::Issue => {
                 let status = parse_issue_status(input.status.clone())?;
+                let old_record = load_issue(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Issue, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "issue",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "issues",
@@ -2043,6 +2743,16 @@ impl PlanningStore {
                     &now,
                 )?;
                 let record = load_issue(&transaction, &input.entity_id)?;
+                let event_type = if input.override_transition {
+                    "issue.status-overridden"
+                } else {
+                    "issue.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -2053,8 +2763,8 @@ impl PlanningStore {
                         &record.id,
                         &record.correlation_id,
                         input.run_id.clone(),
-                        "issue.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -2072,6 +2782,24 @@ impl PlanningStore {
             }
             EntityType::ReviewPoint => {
                 let status = parse_review_point_status(input.status.clone())?;
+                let old_record = load_review_point(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::ReviewPoint, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "review-point",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "review_points",
@@ -2085,6 +2813,16 @@ impl PlanningStore {
                     record.attached_entity_type,
                     &record.attached_entity_id,
                 )?;
+                let event_type = if input.override_transition {
+                    "review-point.status-overridden"
+                } else {
+                    "review-point.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -2095,8 +2833,8 @@ impl PlanningStore {
                         &record.attached_entity_id,
                         &correlation_id,
                         input.run_id.clone(),
-                        "review-point.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -2110,6 +2848,24 @@ impl PlanningStore {
             }
             EntityType::Insight => {
                 let status = parse_insight_status(input.status.clone())?;
+                let old_record = load_insight(&transaction, &input.entity_id)?;
+                if !input.override_transition {
+                    let allowed =
+                        allowed_transitions(EntityType::Insight, old_record.status.as_str())?;
+                    if !allowed.contains(&status.as_str()) {
+                        return Err(PlanningStoreError::InvalidInput(
+                            serde_json::to_string_pretty(&serde_json::json!({
+                                "code": "INVALID_STATUS_TRANSITION",
+                                "entityType": "insight",
+                                "entityId": input.entity_id,
+                                "currentStatus": old_record.status.as_str(),
+                                "requestedStatus": status.as_str(),
+                                "allowedTransitions": allowed,
+                            }))
+                            .unwrap_or_default(),
+                        ));
+                    }
+                }
                 update_status_row(
                     &transaction,
                     "insights",
@@ -2123,6 +2879,16 @@ impl PlanningStore {
                     record.parent_entity_type,
                     &record.parent_entity_id,
                 )?;
+                let event_type = if input.override_transition {
+                    "insight.status-overridden"
+                } else {
+                    "insight.status-updated"
+                };
+                let mut payload = serde_json::json!({ "status": record.status.as_str(), "revision": record.revision });
+                if input.override_transition {
+                    payload["reason"] = serde_json::json!(input.reason.clone().unwrap_or_default());
+                    payload["overridden"] = serde_json::json!(true);
+                }
                 append_event(
                     &transaction,
                     build_event(
@@ -2133,8 +2899,8 @@ impl PlanningStore {
                         &record.parent_entity_id,
                         &correlation_id,
                         input.run_id.clone(),
-                        "insight.status-updated",
-                        serde_json::json!({ "status": record.status.as_str(), "revision": record.revision }),
+                        event_type,
+                        payload,
                     )?,
                 )?;
                 let validation =
@@ -2416,7 +3182,7 @@ impl PlanningStore {
     pub fn list_work_points(&self) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at FROM work_points ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_work_point)?;
         let mut items = collect_rows(rows)?;
@@ -2435,7 +3201,7 @@ impl PlanningStore {
     ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at FROM work_points WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map(
             params![normalize_scope_key_value(scope_key)],
@@ -2578,6 +3344,36 @@ impl PlanningStore {
             &scope_key,
         )?;
 
+        // Graph consistency: roadmap must belong to the goal
+        let roadmap = load_roadmap(&transaction, &input.roadmap_id)?;
+        if roadmap.goal_id != input.goal_id {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "{}",
+                serde_json::json!({
+                    "code": "PROJECT-RUN-GOAL-ROADMAP-MISMATCH",
+                    "message": format!("roadmap '{}' belongs to goal '{}', not goal '{}'", input.roadmap_id, roadmap.goal_id, input.goal_id),
+                    "roadmapId": input.roadmap_id,
+                    "expectedGoalId": input.goal_id,
+                    "actualGoalId": roadmap.goal_id,
+                })
+            )));
+        }
+
+        // Graph consistency: work point must belong to the roadmap
+        let work_point = load_work_point(&transaction, &input.work_point_id)?;
+        if work_point.roadmap_id != input.roadmap_id {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "{}",
+                serde_json::json!({
+                    "code": "PROJECT-RUN-WORK-POINT-ROADMAP-MISMATCH",
+                    "message": format!("work point '{}' belongs to roadmap '{}', not roadmap '{}'", input.work_point_id, work_point.roadmap_id, input.roadmap_id),
+                    "workPointId": input.work_point_id,
+                    "expectedRoadmapId": input.roadmap_id,
+                    "actualRoadmapId": work_point.roadmap_id,
+                })
+            )));
+        }
+
         let active_count: i64 = transaction.query_row(
             "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
             params![input.work_point_id],
@@ -2663,6 +3459,26 @@ impl PlanningStore {
         let _ =
             refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
         transaction.commit()?;
+        // Update session with active project run state
+        if record.session_id.is_some() {
+            let session_state = crate::session::ActiveProjectRunState {
+                project_run_id: record.id.clone(),
+                goal_id: record.goal_id.clone(),
+                roadmap_id: record.roadmap_id.clone(),
+                work_point_id: record.work_point_id.clone(),
+                status: record.status.as_str().to_string(),
+                claimed_at: record.claimed_at.clone().unwrap_or_default(),
+                activated_at: None,
+                evidence_refs: {
+                    let mut refs = Vec::new();
+                    refs.extend(record.evidence.implementation_run_refs.iter().cloned());
+                    refs.extend(record.evidence.validation_finding_refs.iter().cloned());
+                    refs.extend(record.evidence.linked_spec_ids.iter().cloned());
+                    refs
+                },
+            };
+            let _ = crate::session::set_active_project_run(session_state);
+        }
         Ok(MutationResult { record, validation })
     }
 
@@ -2724,6 +3540,27 @@ impl PlanningStore {
         let _ =
             refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
         transaction.commit()?;
+        // Update session with activated state
+        if record.session_id.is_some() {
+            let now_str = now_string().unwrap_or_default();
+            let session_state = crate::session::ActiveProjectRunState {
+                project_run_id: record.id.clone(),
+                goal_id: record.goal_id.clone(),
+                roadmap_id: record.roadmap_id.clone(),
+                work_point_id: record.work_point_id.clone(),
+                status: "active".to_string(),
+                claimed_at: record.claimed_at.clone().unwrap_or_default(),
+                activated_at: Some(now_str),
+                evidence_refs: {
+                    let mut evidence_refs = Vec::new();
+                    evidence_refs.extend(record.evidence.implementation_run_refs.iter().cloned());
+                    evidence_refs.extend(record.evidence.validation_finding_refs.iter().cloned());
+                    evidence_refs.extend(record.evidence.linked_spec_ids.iter().cloned());
+                    evidence_refs
+                },
+            };
+            let _ = crate::session::set_active_project_run(session_state);
+        }
         Ok(MutationResult { record, validation })
     }
 
@@ -2802,6 +3639,13 @@ impl PlanningStore {
         let _ =
             refresh_validation_target(&transaction, EntityType::WorkPoint, &record.work_point_id)?;
         transaction.commit()?;
+        // Clear active project run from session
+        let completed_wp_id = if input.status == ProjectRunStatus::Completed {
+            Some(record.work_point_id.clone())
+        } else {
+            None
+        };
+        let _ = crate::session::clear_active_project_run(completed_wp_id);
         Ok(MutationResult { record, validation })
     }
 
@@ -2862,6 +3706,23 @@ impl PlanningStore {
 
         let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
         transaction.commit()?;
+        // Update session evidence refs
+        let _ = crate::session::set_active_project_run(crate::session::ActiveProjectRunState {
+            project_run_id: record.id.clone(),
+            goal_id: record.goal_id.clone(),
+            roadmap_id: record.roadmap_id.clone(),
+            work_point_id: record.work_point_id.clone(),
+            status: record.status.as_str().to_string(),
+            claimed_at: record.claimed_at.clone().unwrap_or_default(),
+            activated_at: record.completed_at.clone(),
+            evidence_refs: {
+                let mut evidence_refs = Vec::new();
+                evidence_refs.extend(record.evidence.implementation_run_refs.iter().cloned());
+                evidence_refs.extend(record.evidence.validation_finding_refs.iter().cloned());
+                evidence_refs.extend(record.evidence.linked_spec_ids.iter().cloned());
+                evidence_refs
+            },
+        });
         Ok(MutationResult { record, validation })
     }
 
@@ -2879,13 +3740,63 @@ impl PlanningStore {
     }
 
     /// Attach/register a worktree.
+    /// Internal helper: query worktree by ID only (no scope filter).
+    fn get_worktree_by_id_only(
+        conn: &Connection,
+        id: &str,
+    ) -> Result<WorktreeRecord, PlanningStoreError> {
+        conn.query_row(
+            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE id = ?1",
+            params![id],
+            |row| {
+                Ok(WorktreeRecord {
+                    id: row.get(0)?,
+                    scope_key: row.get(1)?,
+                    repo_uri: row.get(2)?,
+                    branch: row.get(3)?,
+                    worktree_path: row.get(4)?,
+                    project_run_id: row.get(5)?,
+                    session_id: row.get(6)?,
+                    status: crate::parse_worktree_status_strict(&row.get::<_, String>(7)?).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(std::io::Error::other(e)))
+                    })?,
+                    revision: row.get(8)?,
+                    created_at: row.get(9)?,
+                    updated_at: row.get(10)?,
+                })
+            },
+        )
+        .map_err(|e| {
+            PlanningStoreError::InvalidInput(format!("worktree not found: {id}: {e}"))
+        })
+    }
+
     pub fn attach_worktree(
         &self,
         input: AttachWorktreeInput,
     ) -> Result<WorktreeRecord, PlanningStoreError> {
-        let id = input.id.unwrap_or_else(new_id);
+        let id = input.id.clone().unwrap_or_else(new_id);
         let scope_key = normalized_scope_key(input.scope_key.clone());
         let now = now_string()?;
+
+        // Scope match check: if re-attaching an existing worktree ID, verify scope
+        if let Some(ref existing_id) = input.id {
+            let conn = self.open_connection()?;
+            if let Ok(existing) = Self::get_worktree_by_id_only(&conn, existing_id) {
+                if existing.scope_key != scope_key {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "{}",
+                        serde_json::json!({
+                            "code": "CROSS_SCOPE_MUTATION",
+                            "message": format!("worktree '{}' already exists in scope '{}', cannot re-attach from scope '{}'", existing_id, existing.scope_key, scope_key),
+                            "worktreeId": existing_id,
+                            "existingScope": existing.scope_key,
+                            "requestedScope": scope_key,
+                        })
+                    )));
+                }
+            }
+        }
 
         let conn = self.open_connection()?;
         conn.execute(
@@ -2911,15 +3822,20 @@ impl PlanningStore {
             ],
         )?;
 
-        self.get_worktree(&id)
+        self.get_worktree(&id, &scope_key)
     }
 
-    /// Get a worktree by ID.
-    pub fn get_worktree(&self, id: &str) -> Result<WorktreeRecord, PlanningStoreError> {
+    /// Get a worktree by ID, scoped to the given scope.
+    pub fn get_worktree(
+        &self,
+        id: &str,
+        scope_key: &str,
+    ) -> Result<WorktreeRecord, PlanningStoreError> {
         let conn = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
         conn.query_row(
-            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE id = ?1",
-            params![id],
+            "SELECT id, scope_key, repo_uri, branch, worktree_path, project_run_id, session_id, status, revision, created_at, updated_at FROM worktrees WHERE id = ?1 AND scope_key = ?2",
+            params![id, normalized],
             |row| {
                 Ok(WorktreeRecord {
                     id: row.get(0)?,
@@ -2929,7 +3845,9 @@ impl PlanningStore {
                     worktree_path: row.get(4)?,
                     project_run_id: row.get(5)?,
                     session_id: row.get(6)?,
-                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    status: crate::parse_worktree_status_strict(&row.get::<_, String>(7)?).map_err(|e| {
+                        rusqlite::Error::FromSqlConversionFailure(7, rusqlite::types::Type::Text, Box::new(std::io::Error::other(e)))
+                    })?,
                     revision: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
@@ -2941,13 +3859,14 @@ impl PlanningStore {
         })
     }
 
-    /// List worktrees in the current scope, with optional status filter.
+    /// List worktrees in the given scope, with optional status filter.
     pub fn list_worktrees(
         &self,
+        scope_key: &str,
         status_filter: Option<&str>,
     ) -> Result<Vec<WorktreeRecord>, PlanningStoreError> {
         let conn = self.open_connection()?;
-        let scope_key = normalized_scope_key(None);
+        let normalized = normalize_scope_key_value(scope_key);
         let status_val = status_filter.unwrap_or("active");
 
         let sql = if status_filter.is_some() {
@@ -2957,8 +3876,8 @@ impl PlanningStore {
         };
 
         let mut stmt = conn.prepare(&sql)?;
-        let rows: Vec<WorktreeRecord> = if status_filter.is_some() {
-            stmt.query_map(params![scope_key, status_val], |row| {
+        let rows = if status_filter.is_some() {
+            collect_rows(stmt.query_map(params![normalized, status_val], |row| {
                 Ok(WorktreeRecord {
                     id: row.get(0)?,
                     scope_key: row.get(1)?,
@@ -2967,16 +3886,21 @@ impl PlanningStore {
                     worktree_path: row.get(4)?,
                     project_run_id: row.get(5)?,
                     session_id: row.get(6)?,
-                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    status: crate::parse_worktree_status_strict(&row.get::<_, String>(7)?)
+                        .map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                7,
+                                rusqlite::types::Type::Text,
+                                Box::new(std::io::Error::other(e)),
+                            )
+                        })?,
                     revision: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
                 })
-            })?
-            .filter_map(|r| r.ok())
-            .collect()
+            })?)?
         } else {
-            stmt.query_map(params![scope_key], |row| {
+            collect_rows(stmt.query_map(params![normalized], |row| {
                 Ok(WorktreeRecord {
                     id: row.get(0)?,
                     scope_key: row.get(1)?,
@@ -2985,32 +3909,50 @@ impl PlanningStore {
                     worktree_path: row.get(4)?,
                     project_run_id: row.get(5)?,
                     session_id: row.get(6)?,
-                    status: crate::parse_worktree_status(&row.get::<_, String>(7)?),
+                    status: crate::parse_worktree_status_strict(&row.get::<_, String>(7)?)
+                        .map_err(|e| {
+                            rusqlite::Error::FromSqlConversionFailure(
+                                7,
+                                rusqlite::types::Type::Text,
+                                Box::new(std::io::Error::other(e)),
+                            )
+                        })?,
                     revision: row.get(8)?,
                     created_at: row.get(9)?,
                     updated_at: row.get(10)?,
                 })
-            })?
-            .filter_map(|r| r.ok())
-            .collect()
+            })?)?
         };
 
         Ok(rows)
     }
 
-    /// Update worktree status.
+    /// Update worktree status, scoped to the given scope.
     pub fn update_worktree_status(
         &self,
         id: &str,
+        scope_key: &str,
         status: WorktreeStatus,
     ) -> Result<WorktreeRecord, PlanningStoreError> {
         let conn = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
         let now = now_string()?;
-        conn.execute(
-            "UPDATE worktrees SET status = ?1, updated_at = ?2, revision = revision + 1 WHERE id = ?3",
-            params![status.to_string(), now, id],
+        let rows_affected = conn.execute(
+            "UPDATE worktrees SET status = ?1, updated_at = ?2, revision = revision + 1 WHERE id = ?3 AND scope_key = ?4",
+            params![status.to_string(), now, id, normalized],
         )?;
-        self.get_worktree(id)
+        if rows_affected == 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "{}",
+                serde_json::json!({
+                    "code": "SCOPE_MISMATCH_OR_NOT_FOUND",
+                    "message": format!("worktree '{}' not found in scope '{}'", id, scope_key),
+                    "worktreeId": id,
+                    "scopeKey": scope_key,
+                })
+            )));
+        }
+        self.get_worktree(id, scope_key)
     }
 
     /// List recent sessions from the events table.
@@ -3040,7 +3982,7 @@ impl PlanningStore {
             })
         })?;
 
-        Ok(rows.filter_map(|r| r.ok()).collect())
+        collect_rows(rows)
     }
 
     pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
@@ -3088,9 +4030,77 @@ impl PlanningStore {
         let connection = self.open_connection()?;
         let roadmap = load_roadmap(&connection, roadmap_id)?;
         let all_work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
+        let scope_key = &roadmap.scope_key;
+
+        // Pre-load: all open high/critical issues for the scope
+        let mut open_blocker_issues: HashMap<String, Vec<String>> = HashMap::new();
+        {
+            let mut stmt = connection.prepare(
+                "SELECT related_entity_id, id FROM issues WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical') AND related_entity_id IS NOT NULL",
+            )?;
+            let rows = stmt.query_map(params![scope_key], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            for row in rows {
+                let (entity_id, issue_id) = row?;
+                open_blocker_issues
+                    .entry(entity_id)
+                    .or_default()
+                    .push(issue_id);
+            }
+        }
+
+        // Pre-load: all open high/critical review points for the scope
+        let mut open_blocker_review_points: HashMap<String, Vec<String>> = HashMap::new();
+        {
+            let mut stmt = connection.prepare(
+                "SELECT attached_entity_id, id FROM review_points WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical')",
+            )?;
+            let rows = stmt.query_map(params![scope_key], |row| {
+                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+            })?;
+            for row in rows {
+                let (entity_id, rp_id) = row?;
+                open_blocker_review_points
+                    .entry(entity_id)
+                    .or_default()
+                    .push(rp_id);
+            }
+        }
+
+        // Collect active corrective blockers for this scope
+        let mut active_blockers: Vec<(String, String, Vec<String>)> = Vec::new(); // (blocker_id, blocker_title, blocked_ids)
+        for wp in &all_work_points {
+            if wp.kind != WorkPointKind::Feature
+                && !wp.blocks_work_point_ids.is_empty()
+                && !matches!(
+                    wp.status,
+                    WorkPointStatus::Completed
+                        | WorkPointStatus::Cancelled
+                        | WorkPointStatus::Invalidated
+                )
+            {
+                active_blockers.push((
+                    wp.id.clone(),
+                    wp.title.clone(),
+                    wp.blocks_work_point_ids.clone(),
+                ));
+            }
+        }
+
+        // Build set of all blocked work point IDs
+        let mut blocked_set: HashMap<String, (String, String)> = HashMap::new(); // blocked_id -> (blocker_id, blocker_title)
+        for (blocker_id, blocker_title, blocked_ids) in &active_blockers {
+            for bid in blocked_ids {
+                blocked_set.insert(bid.clone(), (blocker_id.clone(), blocker_title.clone()));
+            }
+        }
+
         let mut candidates = Vec::new();
+        let mut blocked_candidates = Vec::new();
 
         for wp in &all_work_points {
+            // Skip terminal statuses
             if matches!(
                 wp.status,
                 WorkPointStatus::Completed
@@ -3101,6 +4111,19 @@ impl PlanningStore {
                 continue;
             }
 
+            // Check if blocked by active corrective work
+            if let Some((blocker_id, blocker_title)) = blocked_set.get(&wp.id) {
+                blocked_candidates.push(BlockedCandidate {
+                    work_point_id: wp.id.clone(),
+                    work_point_title: wp.title.clone(),
+                    blocker_id: blocker_id.clone(),
+                    blocker_title: blocker_title.clone(),
+                    reason: format!("blocked_by:{}", blocker_id),
+                });
+                continue;
+            }
+
+            // Check active leases
             let active_lease_count: i64 = connection.query_row(
                 "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
                 params![wp.id],
@@ -3110,6 +4133,7 @@ impl PlanningStore {
                 continue;
             }
 
+            // Check dependencies exist and are completed
             let mut all_deps_exist = true;
             let mut all_deps_completed = true;
             let mut dependency_titles = Vec::new();
@@ -3146,25 +4170,51 @@ impl PlanningStore {
                 reasons.push("all dependencies completed".to_string());
             }
 
+            // Determine required_reason based on ranking tier
+            let required_reason = if wp.kind != WorkPointKind::Feature
+                && (wp.priority == Priority::Urgent || wp.priority == Priority::High)
+            {
+                Some("urgent_fix".to_string())
+            } else if wp.repairs_work_point_ids.iter().any(|id| {
+                open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
+            }) || wp.supersedes_work_point_ids.iter().any(|id| {
+                open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
+            }) {
+                Some("resolves_blocker".to_string())
+            } else {
+                Some("ready".to_string())
+            };
+
             candidates.push(RunnableWorkPointCandidate {
                 work_point: wp.clone(),
                 roadmap_id: roadmap_id.to_string(),
                 roadmap_title: roadmap.title.clone(),
                 dependency_titles,
                 reasons,
+                required_reason,
             });
         }
 
+        // Sort by ranking tiers: urgent_fix > resolves_blocker > ready, then by ordering
+        fn tier_rank(reason: &Option<String>) -> u8 {
+            match reason.as_deref() {
+                Some("urgent_fix") => 0,
+                Some("resolves_blocker") => 1,
+                _ => 2,
+            }
+        }
+
         candidates.sort_by(|a, b| {
-            a.work_point
-                .ordering
-                .cmp(&b.work_point.ordering)
+            tier_rank(&a.required_reason)
+                .cmp(&tier_rank(&b.required_reason))
+                .then_with(|| a.work_point.ordering.cmp(&b.work_point.ordering))
                 .then_with(|| a.work_point.id.cmp(&b.work_point.id))
         });
 
         Ok(RunnableCandidates {
             roadmap_id: roadmap_id.to_string(),
             candidates,
+            blocked: blocked_candidates,
         })
     }
 
@@ -3728,25 +4778,41 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v2_to_v3(connection)?;
             migrate_v3_to_v4(connection)?;
             migrate_v4_to_v5(connection)?;
-            migrate_v5_to_v6(connection)
+            migrate_v5_to_v6(connection)?;
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
         }
         Some("2") => {
             migrate_v2_to_v3(connection)?;
             migrate_v3_to_v4(connection)?;
             migrate_v4_to_v5(connection)?;
-            migrate_v5_to_v6(connection)
+            migrate_v5_to_v6(connection)?;
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
         }
         Some("3") => {
             migrate_v3_to_v4(connection)?;
             migrate_v4_to_v5(connection)?;
-            migrate_v5_to_v6(connection)
+            migrate_v5_to_v6(connection)?;
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
         }
         Some("4") => {
             migrate_v4_to_v5(connection)?;
-            migrate_v5_to_v6(connection)
+            migrate_v5_to_v6(connection)?;
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
         }
-        Some("5") => migrate_v5_to_v6(connection),
-        Some("6") => migrate_v6_to_v7(connection),
+        Some("5") => {
+            migrate_v5_to_v6(connection)?;
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
+        }
+        Some("6") => {
+            migrate_v6_to_v7(connection)?;
+            migrate_v7_to_v8(connection)
+        }
+        Some("7") => migrate_v7_to_v8(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -3797,8 +4863,8 @@ fn migrate_v2_to_v3(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     create_scope_indexes(connection)?;
     ensure_event_scope_support(connection)?;
     connection.execute(
-        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        "UPDATE planning_config SET value = '3' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
 }
@@ -3866,8 +4932,8 @@ fn migrate_v3_to_v4(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     )?;
 
     connection.execute(
-        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        "UPDATE planning_config SET value = '4' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
 }
@@ -3966,8 +5032,8 @@ fn migrate_v4_to_v5(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     }
 
     connection.execute(
-        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        "UPDATE planning_config SET value = '5' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
 }
@@ -4001,8 +5067,8 @@ fn migrate_v5_to_v6(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     )?;
 
     connection.execute(
-        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        "UPDATE planning_config SET value = '6' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
 }
@@ -4030,8 +5096,38 @@ fn migrate_v6_to_v7(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     )?;
 
     connection.execute(
-        "UPDATE planning_config SET value = ?2 WHERE key = ?1",
-        params![SCHEMA_VERSION_KEY, CURRENT_SCHEMA_VERSION],
+        "UPDATE planning_config SET value = '7' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
+    )?;
+    Ok(())
+}
+
+fn migrate_v7_to_v8(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    for col in [
+        "kind",
+        "priority",
+        "repairs_work_point_ids",
+        "supersedes_work_point_ids",
+        "blocks_work_point_ids",
+    ] {
+        if !table_has_column(connection, "work_points", col)? {
+            let default = match col {
+                "kind" => "Feature",
+                "priority" => "Medium",
+                _ => "[]",
+            };
+            connection.execute(
+                &format!(
+                    "ALTER TABLE work_points ADD COLUMN {col} TEXT NOT NULL DEFAULT '{default}'"
+                ),
+                [],
+            )?;
+        }
+    }
+
+    connection.execute(
+        "UPDATE planning_config SET value = '8' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
 }
@@ -4692,7 +5788,7 @@ pub(crate) fn load_work_point(
 ) -> Result<WorkPointRecord, PlanningStoreError> {
     let mut record = connection
         .query_row(
-            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
+            "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at FROM work_points WHERE id = ?1",
             params![id],
             row_to_work_point,
         )
@@ -4773,7 +5869,7 @@ pub(crate) fn list_work_points_for_roadmap(
     roadmap_id: &str,
 ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id], row_to_work_point)?;
     let mut items = collect_rows(rows)?;
@@ -4792,7 +5888,7 @@ pub(crate) fn list_work_points_for_roadmap_in_scope(
     scope_key: &str,
 ) -> Result<Vec<WorkPointRecord>, PlanningStoreError> {
     let mut statement = connection.prepare(
-        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
+        "SELECT id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at FROM work_points WHERE roadmap_id = ?1 AND scope_key = ?2 ORDER BY ordering_index ASC, id ASC",
     )?;
     let rows = statement.query_map(params![roadmap_id, scope_key], row_to_work_point)?;
     let mut items = collect_rows(rows)?;
@@ -5395,11 +6491,16 @@ fn row_to_work_point(row: &Row<'_>) -> Result<WorkPointRecord, rusqlite::Error> 
         dependency_ids: parse_json_column(row.get::<_, String>(8)?)?,
         validation_expectations: parse_json_column(row.get::<_, String>(9)?)?,
         effort_tier: parse_effort_tier(row.get::<_, String>(10)?)?,
+        kind: parse_work_point_kind(row.get::<_, String>(11)?)?,
+        priority: parse_priority(row.get::<_, String>(12)?)?,
+        repairs_work_point_ids: parse_json_column(row.get::<_, String>(13)?)?,
+        supersedes_work_point_ids: parse_json_column(row.get::<_, String>(14)?)?,
+        blocks_work_point_ids: parse_json_column(row.get::<_, String>(15)?)?,
         file_scopes: Vec::new(),
-        tags: parse_json_column(row.get::<_, String>(11)?)?,
-        revision: row.get(12)?,
-        created_at: row.get(13)?,
-        updated_at: row.get(14)?,
+        tags: parse_json_column(row.get::<_, String>(16)?)?,
+        revision: row.get(17)?,
+        created_at: row.get(18)?,
+        updated_at: row.get(19)?,
     })
 }
 
@@ -5760,6 +6861,10 @@ fn parse_roadmap_status(value: String) -> Result<RoadmapStatus, rusqlite::Error>
 }
 
 fn parse_work_point_status(value: String) -> Result<WorkPointStatus, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_work_point_kind(value: String) -> Result<WorkPointKind, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
 
@@ -6312,6 +7417,11 @@ mod tests {
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
                 effort_tier: crate::EffortTier::Balanced,
+                kind: None,
+                priority: None,
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
                 file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: None,
@@ -6454,6 +7564,11 @@ mod tests {
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["health command passes".to_string()],
                 effort_tier: crate::EffortTier::Balanced,
+                kind: None,
+                priority: None,
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
                 file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: Some("run-wp".to_string()),
@@ -6649,6 +7764,11 @@ mod tests {
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
                 effort_tier: crate::EffortTier::Balanced,
+                kind: None,
+                priority: None,
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
                 file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: Some("run-wp-issue".to_string()),
@@ -6847,6 +7967,8 @@ mod tests {
                     evidence_refs,
                     active_scope_key: Some("default".to_string()),
                     run_id: None,
+                    override_transition: false,
+                    reason: None,
                 })
                 .expect_err("out-of-scope update should fail");
 
@@ -7390,6 +8512,11 @@ mod tests {
                 dependency_ids: Vec::new(),
                 validation_expectations: vec!["proof".to_string()],
                 effort_tier: crate::EffortTier::Balanced,
+                kind: None,
+                priority: None,
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
                 file_scopes: Vec::new(),
                 tags: Vec::new(),
                 run_id: None,
@@ -7445,6 +8572,8 @@ mod tests {
                 evidence_refs: Some(vec!["proof://ci".to_string()]),
                 active_scope_key: None,
                 run_id: Some("run-life".to_string()),
+                override_transition: false,
+                reason: None,
             })
             .expect("complete todo");
         let revise = store

@@ -1629,3 +1629,700 @@ fn machine_output_conforms_to_planning_result_schema() {
         }
     }
 }
+
+// ===================================================================
+// FIX 4: Worktree scope isolation tests
+// ===================================================================
+
+#[test]
+fn worktree_scope_isolation_list() {
+    let temp_dir = unique_temp_dir("elegy-planning-wt-scope-list");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    // Create two scopes
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-b",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-b",
+    ]);
+
+    // Attach worktree in scope-a with ID "wt-1"
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-1",
+        "--repo-uri",
+        "https://example.com/repo.git",
+    ]);
+
+    // Attach worktree in scope-b with ID "wt-2"
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-b",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-2",
+        "--repo-uri",
+        "https://example.com/other.git",
+    ]);
+
+    // List in scope-a — should see wt-1 but not wt-2
+    let list_a = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "list",
+    ]);
+    let wt_a_ids: Vec<&str> = list_a["data"]["worktrees"]
+        .as_array()
+        .expect("worktrees array")
+        .iter()
+        .filter_map(|w| w["id"].as_str())
+        .collect();
+    assert!(
+        wt_a_ids.contains(&"wt-1"),
+        "scope-a should contain wt-1: {:?}",
+        wt_a_ids
+    );
+    assert!(
+        !wt_a_ids.contains(&"wt-2"),
+        "scope-a should NOT contain wt-2: {:?}",
+        wt_a_ids
+    );
+
+    // List in scope-b — should see wt-2 but not wt-1
+    let list_b = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-b",
+        "worktree",
+        "list",
+    ]);
+    let wt_b_ids: Vec<&str> = list_b["data"]["worktrees"]
+        .as_array()
+        .expect("worktrees array")
+        .iter()
+        .filter_map(|w| w["id"].as_str())
+        .collect();
+    assert!(
+        wt_b_ids.contains(&"wt-2"),
+        "scope-b should contain wt-2: {:?}",
+        wt_b_ids
+    );
+    assert!(
+        !wt_b_ids.contains(&"wt-1"),
+        "scope-b should NOT contain wt-1: {:?}",
+        wt_b_ids
+    );
+}
+
+#[test]
+fn worktree_scope_show_rejects_wrong_scope() {
+    let temp_dir = unique_temp_dir("elegy-planning-wt-scope-show");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-1",
+        "--repo-uri",
+        "https://example.com/repo.git",
+    ]);
+
+    // Try show in scope-b — expect status "invalid"
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "scope-b",
+            "worktree",
+            "show",
+            "--id",
+            "wt-1",
+        ])
+        .output()
+        .expect("run worktree show in wrong scope");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "show in wrong scope should be invalid: {}",
+        stdout
+    );
+}
+
+#[test]
+fn worktree_scope_archive_rejects_wrong_scope() {
+    let temp_dir = unique_temp_dir("elegy-planning-wt-scope-archive");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-1",
+        "--repo-uri",
+        "https://example.com/repo.git",
+    ]);
+
+    // Try archive in scope-b — expect status "invalid"
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c3",
+            "--scope",
+            "scope-b",
+            "worktree",
+            "archive",
+            "--id",
+            "wt-1",
+        ])
+        .output()
+        .expect("run worktree archive in wrong scope");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "archive in wrong scope should be invalid: {}",
+        stdout
+    );
+}
+
+#[test]
+fn worktree_scope_cleanup_intent_rejects_wrong_scope() {
+    let temp_dir = unique_temp_dir("elegy-planning-wt-scope-cleanup");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-1",
+        "--repo-uri",
+        "https://example.com/repo.git",
+    ]);
+
+    // Try cleanup-intent in scope-b
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c3",
+            "--scope",
+            "scope-b",
+            "worktree",
+            "cleanup-intent",
+            "--id",
+            "wt-1",
+        ])
+        .output()
+        .expect("run worktree cleanup-intent in wrong scope");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "cleanup-intent in wrong scope should be invalid: {}",
+        stdout
+    );
+}
+
+#[test]
+fn worktree_reattach_cross_scope_rejected() {
+    let temp_dir = unique_temp_dir("elegy-planning-wt-reattach");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "attach",
+        "--id",
+        "wt-1",
+        "--repo-uri",
+        "https://example.com/repo.git",
+    ]);
+
+    // Try to attach same ID from scope-b
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c3",
+            "--scope",
+            "scope-b",
+            "worktree",
+            "attach",
+            "--id",
+            "wt-1",
+            "--repo-uri",
+            "https://example.com/other.git",
+        ])
+        .output()
+        .expect("run worktree attach cross-scope");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "cross-scope reattach should be invalid: {}",
+        stdout
+    );
+    let error = result["error"].as_str().unwrap_or("");
+    assert!(
+        error.contains("CROSS_SCOPE_MUTATION") || error.contains("scope"),
+        "error should mention cross-scope: {}",
+        error
+    );
+
+    // Verify scope-a worktree still intact
+    let show = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "worktree",
+        "show",
+        "--id",
+        "wt-1",
+    ]);
+    assert_eq!(show["status"], "ok");
+    assert_eq!(show["data"]["repoUri"], "https://example.com/repo.git");
+}
+
+// ===================================================================
+// FIX 4: Project run graph consistency tests
+// ===================================================================
+
+#[test]
+fn project_run_claim_rejects_wrong_goal_roadmap() {
+    let temp_dir = unique_temp_dir("elegy-planning-pr-wrong-goal");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    // Setup: scope, goal-g1, goal-g2, roadmap-r1 (under g1), wp-1 in r1
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-g1",
+        "--title",
+        "Goal G1",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-g2",
+        "--title",
+        "Goal G2",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-r1",
+        "--goal-id",
+        "goal-g1",
+        "--title",
+        "RM R1",
+        "--summary",
+        "Test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "roadmap-r1",
+        "--id",
+        "wp-1",
+        "--title",
+        "WP 1",
+        "--summary",
+        "Test",
+        "--effort-tier",
+        "fast",
+    ]);
+
+    // Try claim with goal-g2 + roadmap-r1 + wp-1 — should fail (roadmap belongs to goal-g1)
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c6",
+            "--scope",
+            "scope-a",
+            "project-run",
+            "claim",
+            "--goal-id",
+            "goal-g2",
+            "--roadmap-id",
+            "roadmap-r1",
+            "--work-point-id",
+            "wp-1",
+        ])
+        .output()
+        .expect("run claim with wrong goal");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "claim with wrong goal should fail: {}",
+        stdout
+    );
+    let error = result["error"].as_str().unwrap_or("");
+    assert!(
+        error.contains("PROJECT-RUN-GOAL-ROADMAP-MISMATCH") || error.contains("MISMATCH"),
+        "error should mention mismatch: {}",
+        error
+    );
+}
+
+#[test]
+fn project_run_claim_rejects_wrong_work_point_roadmap() {
+    let temp_dir = unique_temp_dir("elegy-planning-pr-wrong-wp");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    // Setup
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2",
+        "--scope",
+        "scope-a",
+        "goal",
+        "create",
+        "--id",
+        "goal-g1",
+        "--title",
+        "Goal G1",
+        "--description",
+        "Test",
+        "--acceptance",
+        "done",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-r1",
+        "--goal-id",
+        "goal-g1",
+        "--title",
+        "RM R1",
+        "--summary",
+        "Test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c4",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-r2",
+        "--goal-id",
+        "goal-g1",
+        "--title",
+        "RM R2",
+        "--summary",
+        "Test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c5",
+        "--scope",
+        "scope-a",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "roadmap-r1",
+        "--id",
+        "wp-1",
+        "--title",
+        "WP 1",
+        "--summary",
+        "Test",
+        "--effort-tier",
+        "fast",
+    ]);
+
+    // Try claim with goal-g1 + roadmap-r2 + wp-1 — should fail (wp-1 belongs to roadmap-r1)
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c6",
+            "--scope",
+            "scope-a",
+            "project-run",
+            "claim",
+            "--goal-id",
+            "goal-g1",
+            "--roadmap-id",
+            "roadmap-r2",
+            "--work-point-id",
+            "wp-1",
+        ])
+        .output()
+        .expect("run claim with wrong roadmap");
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(
+        result["status"], "invalid",
+        "claim with wrong roadmap should fail: {}",
+        stdout
+    );
+    let error = result["error"].as_str().unwrap_or("");
+    assert!(
+        error.contains("PROJECT-RUN-WORK-POINT-ROADMAP-MISMATCH") || error.contains("MISMATCH"),
+        "error should mention mismatch: {}",
+        error
+    );
+}
