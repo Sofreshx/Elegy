@@ -105,6 +105,29 @@ fn corrective_work_metadata() {
 
     setup_scope_goal_roadmap(&temp_dir, db_arg, scope, "goal-ac1", "rm-ac1", "c1");
 
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c1-target",
+        "--scope",
+        scope,
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-ac1",
+        "--id",
+        "block-target",
+        "--title",
+        "Block Target",
+        "--summary",
+        "Valid block target for metadata coverage",
+        "--effort-tier",
+        "fast",
+    ]);
+
     // Create a work point with kind, priority, repairs, supersedes
     command_json(&[
         "--db",
@@ -438,7 +461,7 @@ fn downstream_blocking() {
 
     setup_scope_goal_roadmap(&temp_dir, db_arg, scope, "goal-ac4", "rm-ac4", "c1");
 
-    // Create wp-a (corrective, blocks wp-b)
+    // Create wp-b (blocked by wp-a)
     command_json(&[
         "--db",
         db_arg,
@@ -446,6 +469,30 @@ fn downstream_blocking() {
         "--non-interactive",
         "--correlation-id",
         "c2",
+        "--scope",
+        scope,
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "rm-ac4",
+        "--id",
+        "wp-b",
+        "--title",
+        "WP B",
+        "--summary",
+        "Blocked by wp-a",
+        "--effort-tier",
+        "fast",
+    ]);
+
+    // Create wp-a (corrective, blocks wp-b)
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c3",
         "--scope",
         scope,
         "roadmap",
@@ -466,30 +513,6 @@ fn downstream_blocking() {
         "high",
         "--blocks-work-point-id",
         "wp-b",
-    ]);
-
-    // Create wp-b (blocked by wp-a)
-    command_json(&[
-        "--db",
-        db_arg,
-        "--json",
-        "--non-interactive",
-        "--correlation-id",
-        "c3",
-        "--scope",
-        scope,
-        "roadmap",
-        "add-work-point",
-        "--roadmap-id",
-        "rm-ac4",
-        "--id",
-        "wp-b",
-        "--title",
-        "WP B",
-        "--summary",
-        "Blocked by wp-a",
-        "--effort-tier",
-        "fast",
     ]);
 
     // Call next-runnable and verify wp-a is a candidate, wp-b is blocked
