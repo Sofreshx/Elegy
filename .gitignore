@@ -51,6 +51,9 @@ elegy-memory-mvp-test-plan.md
 
 # Local agent session artifacts
 /.copilot/
+!/.copilot/
+/.copilot/*
+!/.copilot/commit-checks.json
 /target/agent-artifacts/
 
 # elegy-memory-mcp local auth state

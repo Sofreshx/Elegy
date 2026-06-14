@@ -640,6 +640,31 @@ impl PlanningStore {
                 Err(e) => return Err(e),
             }
         }
+        // Reject missing or cross-roadmap block targets. Block relationships are structural:
+        // unlike dependencies, dangling block edges would make runnable selection misleading.
+        for blocked_id in &input.blocks_work_point_ids {
+            let trimmed = blocked_id.trim();
+            if trimmed.is_empty() {
+                continue;
+            }
+            match load_work_point(&transaction, trimmed) {
+                Err(PlanningStoreError::NotFound { .. }) => {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "blocked work point `{}` does not exist",
+                        trimmed
+                    )));
+                }
+                Err(e) => return Err(e),
+                Ok(blocked) => {
+                    if blocked.roadmap_id != input.roadmap_id {
+                        return Err(PlanningStoreError::InvalidInput(format!(
+                            "blocked work point `{}` belongs to roadmap `{}`, not `{}`. Cross-roadmap block relationships are not supported.",
+                            trimmed, blocked.roadmap_id, input.roadmap_id
+                        )));
+                    }
+                }
+            }
+        }
         let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
         let ordering = input.ordering.unwrap_or(next_ordering(
@@ -5112,8 +5137,8 @@ fn migrate_v7_to_v8(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
     ] {
         if !table_has_column(connection, "work_points", col)? {
             let default = match col {
-                "kind" => "Feature",
-                "priority" => "Medium",
+                "kind" => "feature",
+                "priority" => "medium",
                 _ => "[]",
             };
             connection.execute(
@@ -8290,6 +8315,45 @@ mod tests {
     }
 
     #[test]
+    fn add_work_point_rejects_missing_block_target() {
+        let temp = tempdir().expect("temp dir");
+        let store = PlanningStore::new(temp.path().join("planning.db"));
+        store.init().expect("init store");
+        ensure_scope(&store, "workspace-a");
+        let fixture = seed_scoped_fixture(&store, "workspace-a", "block-target");
+
+        let error = store
+            .add_work_point(AddWorkPointInput {
+                id: Some("block-target-blocker".to_string()),
+                scope_key: Some("workspace-a".to_string()),
+                roadmap_id: fixture.roadmap_id,
+                section_id: None,
+                title: "Blocker".to_string(),
+                summary: "Attempts to block a missing work point".to_string(),
+                status: WorkPointStatus::Draft,
+                ordering: None,
+                dependency_ids: Vec::new(),
+                validation_expectations: vec!["missing target rejected".to_string()],
+                effort_tier: crate::EffortTier::Balanced,
+                kind: Some(WorkPointKind::Corrective),
+                priority: Some(Priority::High),
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: vec!["missing-block-target".to_string()],
+                file_scopes: Vec::new(),
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect_err("missing block target should be rejected");
+
+        let message = error.to_string();
+        assert!(
+            message.contains("blocked work point `missing-block-target` does not exist"),
+            "unexpected error: {message}"
+        );
+    }
+
+    #[test]
     fn init_migrates_v1_schema_and_assigns_default_scope() {
         let temp = tempdir().expect("temp dir");
         let db_path = temp.path().join("planning-v1.db");
@@ -8463,6 +8527,78 @@ mod tests {
             )
             .expect("load backfilled event scope");
         assert_eq!(scope_key, "default");
+    }
+
+    #[test]
+    fn init_migrates_v7_work_points_with_readable_v8_defaults() {
+        let temp = tempdir().expect("temp dir");
+        let db_path = temp.path().join("planning-v7.db");
+
+        {
+            let connection = rusqlite::Connection::open(&db_path).expect("open sqlite");
+            connection
+                .execute_batch(
+                    r#"
+                    CREATE TABLE planning_config (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                    INSERT INTO planning_config (key, value) VALUES ('schema_version', '7');
+                    CREATE TABLE work_points (
+                        id TEXT PRIMARY KEY,
+                        scope_key TEXT NOT NULL,
+                        roadmap_id TEXT NOT NULL,
+                        section_id TEXT,
+                        title TEXT NOT NULL,
+                        summary TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        ordering_index INTEGER NOT NULL,
+                        dependency_ids_json TEXT NOT NULL,
+                        validation_expectations_json TEXT NOT NULL,
+                        effort_tier TEXT NOT NULL,
+                        tags_json TEXT NOT NULL,
+                        revision INTEGER NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL
+                    );
+                    "#,
+                )
+                .expect("create v7 schema");
+            connection
+                .execute(
+                    r#"
+                    INSERT INTO work_points (
+                        id, scope_key, roadmap_id, section_id, title, summary, status,
+                        ordering_index, dependency_ids_json, validation_expectations_json,
+                        effort_tier, tags_json, revision, created_at, updated_at
+                    ) VALUES (?1, ?2, ?3, NULL, ?4, ?5, ?6, 1, ?7, ?8, ?9, ?10, 1, ?11, ?11)
+                    "#,
+                    params![
+                        "wp-v7",
+                        "default",
+                        "roadmap-v7",
+                        "Work point before v8",
+                        "Existing row should receive readable defaults",
+                        "draft",
+                        "[]",
+                        "[\"proof\"]",
+                        "balanced",
+                        "[]",
+                        "2026-01-01T00:00:00Z",
+                    ],
+                )
+                .expect("insert v7 work point");
+        }
+
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("migrate v7 store");
+
+        let work_point = store
+            .work_point("wp-v7")
+            .expect("load migrated work point")
+            .work_point;
+        assert_eq!(work_point.kind, WorkPointKind::Feature);
+        assert_eq!(work_point.priority, Priority::Medium);
+        assert!(work_point.repairs_work_point_ids.is_empty());
+        assert!(work_point.supersedes_work_point_ids.is_empty());
+        assert!(work_point.blocks_work_point_ids.is_empty());
     }
 
     #[test]

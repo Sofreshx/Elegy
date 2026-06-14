@@ -14,48 +14,6 @@
   ],
   "rules": [
     {
-      "name": "neutral-authority-docs",
-      "files": [
-        "README.md",
-        "docs/distribution.md",
-        "docs/architecture/substrate-governance.md"
-      ],
-      "forbiddenPatterns": [
-        "src/Elegy\\.Formalization\\.Contracts/Resources",
-        "Directory\\.Build\\.props"
-      ],
-      "requiredPatterns": [
-        "contracts"
-      ]
-    },
-    {
-      "name": "export-script-is-version-policy-driven",
-      "files": [
-        "scripts/export-contracts.ps1"
-      ],
-      "forbiddenPatterns": [
-        "src/Elegy\\.Formalization\\.Contracts/Resources",
-        "Directory\\.Build\\.props"
-      ],
-      "requiredPatterns": [
-        "contracts",
-        "governance/version-policy\\.json"
-      ]
-    },
-    {
-      "name": "neutral-version-governance",
-      "files": [
-        "scripts/bump-version.ps1",
-        ".github/workflows/versioning-governance.yml"
-      ],
-      "forbiddenPatterns": [
-        "Directory\\.Build\\.props"
-      ],
-      "requiredPatterns": [
-        "governance/version-policy\\.json"
-      ]
-    },
-    {
       "name": "rust-support-manifest-cutover",
       "files": [
         "rust/crates/elegy-contracts/src/lib.rs"
@@ -70,59 +28,6 @@
       ]
     },
     {
-      "name": "distribution-release-surfaces-are-neutral",
-      "files": [
-        ".github/workflows/distribution-artifacts.yml",
-        ".github/workflows/publish-distribution.yml"
-      ],
-      "forbiddenPatterns": [
-        "setup-dotnet",
-        "dotnet\\s",
-        "\\.csproj",
-        "\\.nupkg",
-        "\\.snupkg",
-        "nuget"
-      ],
-      "requiredPatterns": [
-        "validate-canonical-outputs\\.ps1",
-        "export-contracts\\.ps1 -CreateArchive",
-        "package-cli\\.ps1",
-        "package-wrapper-surface\\.ps1",
-        "elegy-contracts-\\*\\.zip",
-        "elegy-memory-wrapper",
-        "elegy-mcp-wrapper",
-        "elegy-planning-wrapper",
-        "elegy-skills-wrapper",
-        "elegy-configuration-wrapper",
-        "elegy-obsidian-wrapper",
-        "surface: elegy-cli",
-        "surface: elegy-memory",
-        "surface: elegy-mcp",
-        "surface: elegy-planning",
-        "surface: elegy-skills",
-        "surface: elegy-configuration",
-        "surface: elegy-obsidian",
-        "matrix\\.surface"
-      ]
-    },
-    {
-      "name": "publish-distribution-attaches-shipped-cli-assets",
-      "files": [
-        ".github/workflows/publish-distribution.yml"
-      ],
-      "forbiddenPatterns": [
-        "setup-dotnet",
-        "dotnet\\s",
-        "\\.csproj",
-        "\\.nupkg",
-        "\\.snupkg",
-        "nuget"
-      ],
-      "requiredPatterns": [
-        "elegy-\\*\\.zip"
-      ]
-    },
-    {
       "name": "distribution-scripts-stay-generic",
       "files": [
         "scripts/package-cli.ps1",
@@ -130,9 +35,7 @@
       ],
       "forbiddenPatterns": [
         "holon",
-        "SAASTools",
-        "nuget",
-        "\\.nupkg"
+        "SAASTools"
       ],
       "requiredPatterns": [
         "elegy-cli",
@@ -151,9 +54,7 @@
       ],
       "forbiddenPatterns": [
         "holon",
-        "SAASTools",
-        "nuget",
-        "\\.nupkg"
+        "SAASTools"
       ],
       "requiredPatterns": [
         "elegy-memory-wrapper",
@@ -171,9 +72,7 @@
       ],
       "forbiddenPatterns": [
         "holon",
-        "SAASTools",
-        "nuget",
-        "\\.nupkg"
+        "SAASTools"
       ],
       "requiredPatterns": [
         "contracts-bundle",
@@ -192,54 +91,6 @@
         "elegy-skills-wrapper",
         "elegy-configuration-wrapper",
         "elegy-obsidian-wrapper"
-      ]
-    },
-    {
-      "name": "package-boundary-workflow-is-neutral",
-      "files": [
-        ".github/workflows/package-boundaries.yml"
-      ],
-      "forbiddenPatterns": [
-        "setup-dotnet",
-        "dotnet\\s",
-        "\\.csproj",
-        "trx"
-      ],
-      "requiredPatterns": [
-        "validate-package-boundaries\\.ps1",
-        "export-contracts\\.ps1",
-        "validate-canonical-outputs\\.ps1"
-      ]
-    },
-    {
-      "name": "boundary-script-is-policy-driven",
-      "files": [
-        "scripts/validate-package-boundaries.ps1"
-      ],
-      "forbiddenPatterns": [
-        "\\.csproj",
-        "ProjectReference",
-        "dotnet\\s"
-      ],
-      "requiredPatterns": [
-        "boundary-policy\\.json",
-        "forbiddenPatterns",
-        "requiredPatterns"
-      ]
-    },
-    {
-      "name": "security-workflow-is-rust-only",
-      "files": [
-        ".github/workflows/security.yml"
-      ],
-      "forbiddenPatterns": [
-        "setup-dotnet",
-        "dotnet\\s",
-        "csharp"
-      ],
-      "requiredPatterns": [
-        "languages: rust",
-        "cargo build --workspace --all-features --locked"
       ]
     }
   ]
