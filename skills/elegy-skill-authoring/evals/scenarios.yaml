@@ -1,0 +1,92 @@
+- id: well-formed-skill
+  skillPath: skills/elegy-skill-authoring/SKILL.md
+  expectedFindings: []
+
+- id: command-list-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. The body is "Here are the commands:" plus a
+    code block. No Quick start, no guardrails, no Common issues.
+  expectedFindings:
+    - severity: high
+      section: "## Quick start"
+      rule: "quick-start-missing"
+    - severity: high
+      section: "## Tool-call guardrails"
+      rule: "guardrails-missing"
+    - severity: high
+      section: "## Common issues"
+      rule: "common-issues-missing"
+    - severity: high
+      section: "## Examples"
+      rule: "examples-missing"
+    - severity: medium
+      section: "<whole file>"
+      rule: "anti-pattern-ap1-command-list"
+
+- id: install-page-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. The body is "./install.ps1" plus a one-line
+    "and then call elegy-X list." The skill never describes operations.
+  expectedFindings:
+    - severity: medium
+      section: "<whole file>"
+      rule: "anti-pattern-ap2-install-page"
+    - severity: high
+      section: "## Workflow"
+      rule: "workflow-missing"
+
+- id: missing-guardrails-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. Quick start and Common issues exist, but
+    Tool-call guardrails is a single bullet list, not per-family
+    sub-sections.
+  expectedFindings:
+    - severity: high
+      section: "## Tool-call guardrails"
+      rule: "guardrails-not-per-family"
+
+- id: marketing-description-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. Frontmatter description is 350 characters of
+    marketing prose that does not start with "Use when".
+  expectedFindings:
+    - severity: high
+      section: "frontmatter.description"
+      rule: "description-not-trigger-style"
+    - severity: high
+      section: "frontmatter.description"
+      rule: "description-too-long"
+
+- id: empty-common-issues-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. The Common issues table exists but has zero
+    data rows.
+  expectedFindings:
+    - severity: high
+      section: "## Common issues"
+      rule: "common-issues-empty"
+
+- id: capability-table-mismatch-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. The Capability index table has 4 rows; the
+    governed fixture declares 7 capabilities.
+  expectedFindings:
+    - severity: high
+      section: "## Capability index"
+      rule: "capability-table-row-count-mismatch"
+
+- id: fuzzy-examples-anti-pattern
+  skillPath: "<not-applicable>"
+  description: |
+    Synthetic anti-pattern. Examples say "expected output depends on
+    your environment."
+  expectedFindings:
+    - severity: high
+      section: "## Examples"
+      rule: "examples-not-literal"

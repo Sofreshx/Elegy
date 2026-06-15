@@ -5,17 +5,22 @@ use serde::Serialize;
 use serde_json::json;
 use thiserror::Error;
 
+use crate::envelope::{MachineEnvelope, MachineStatus};
 use crate::{
-    AddRoadmapSectionInput, AddWorkPointInput, CreateGoalInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EntityType,
-    GoalStatus, IssueStatus, PlanStatus, PlanningStore, Priority, ProjectionFormat,
-    RevisePlanInput, ReviewPointStatus, RoadmapStatus, Severity, TodoStatus, UpdateStatusInput,
-    WorkPointStatus,
+    ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
+    AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
+    FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
+    PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunStatus,
+    ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput,
+    ReviseWorkPointInput, RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput,
+    WorkPointKind, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
 const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
-const RESULT_SCHEMA_VERSION: &str = "planning-result/v1";
+pub(crate) const RESULT_SCHEMA_VERSION: &str = "planning-result/v1";
 
 static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
 
@@ -57,47 +62,85 @@ enum OutputFormat {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    #[command(about = "Manage planning scopes")]
     Scope {
         #[command(subcommand)]
         command: ScopeCommand,
     },
+    #[command(about = "Create and manage goals with acceptance criteria")]
     Goal {
         #[command(subcommand)]
         command: GoalCommand,
     },
+    #[command(about = "Manage roadmaps linked to goals")]
     Roadmap {
         #[command(subcommand)]
         command: RoadmapCommand,
     },
+    #[command(about = "Manage work points within plans")]
     WorkPoint {
         #[command(subcommand)]
         command: WorkPointCommand,
     },
+    #[command(about = "Create and manage plans with scope and roadmap references")]
     Plan {
         #[command(subcommand)]
         command: PlanCommand,
     },
+    #[command(about = "Manage actionable todo items")]
     Todo {
         #[command(subcommand)]
         command: TodoCommand,
     },
+    #[command(about = "Track and manage issues")]
     Issue {
         #[command(subcommand)]
         command: IssueCommand,
     },
+    #[command(about = "Manage review points for quality gates")]
     ReviewPoint {
         #[command(subcommand)]
         command: ReviewPointCommand,
     },
+    #[command(about = "Run validation checks across planning entities")]
     Validate {
         #[command(subcommand)]
         command: ValidateCommand,
     },
+    #[command(about = "View and manage event history")]
     Events,
+    #[command(about = "Check planning database health")]
     Health,
+    #[command(about = "Manage project-level configuration")]
     Project {
         #[command(subcommand)]
         command: ProjectCommand,
+    },
+    #[command(about = "Manage operational sessions")]
+    Session {
+        #[command(subcommand)]
+        command: SessionCommand,
+    },
+    #[command(about = "Search across planning entities")]
+    Search(SearchArgs),
+    #[command(about = "Manage retrospective insights")]
+    Insight {
+        #[command(subcommand)]
+        command: InsightCommand,
+    },
+    #[command(about = "Manage contextual information")]
+    Context(ContextArgs),
+    #[command(about = "Manage tagging across entities")]
+    Tags(TagsArgs),
+    #[command(about = "Manage project run records")]
+    ProjectRun {
+        #[command(subcommand)]
+        command: ProjectRunCommand,
+    },
+    #[command(about = "Manage registered worktrees")]
+    Worktree {
+        #[command(subcommand)]
+        command: WorktreeCommand,
     },
 }
 
@@ -107,6 +150,7 @@ enum GoalCommand {
     UpdateStatus(GoalUpdateStatusArgs),
     List,
     Show(GoalShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -117,6 +161,7 @@ enum RoadmapCommand {
     AddWorkPoint(RoadmapAddWorkPointArgs),
     List,
     Show(RoadmapShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -124,6 +169,9 @@ enum WorkPointCommand {
     List,
     Show(WorkPointShowArgs),
     UpdateStatus(WorkPointUpdateStatusArgs),
+    NextRunnable(WorkPointNextRunnableArgs),
+    WorkGraph(WorkPointWorkGraphArgs),
+    Revise(WorkPointReviseArgs),
 }
 
 #[allow(clippy::large_enum_variant)]
@@ -134,6 +182,7 @@ enum PlanCommand {
     UpdateStatus(PlanUpdateStatusArgs),
     List,
     Show(PlanShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -141,6 +190,7 @@ enum TodoCommand {
     Create(TodoCreateArgs),
     UpdateStatus(TodoUpdateStatusArgs),
     List,
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -149,6 +199,7 @@ enum IssueCommand {
     UpdateStatus(IssueUpdateStatusArgs),
     List,
     Show(IssueShowArgs),
+    Search(EntitySearchArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -159,13 +210,175 @@ enum ReviewPointCommand {
 
 #[derive(Subcommand, Debug)]
 enum ValidateCommand {
-    All,
+    All(ValidateAllArgs),
+}
+
+#[derive(Args, Debug)]
+struct ValidateAllArgs {
+    #[arg(long = "all-scopes")]
+    all_scopes: bool,
 }
 
 #[derive(Subcommand, Debug)]
 enum ProjectCommand {
     Export(ProjectRenderArgs),
     Render(ProjectRenderArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum SessionCommand {
+    Init(SessionInitArgs),
+    Use(SessionUseArgs),
+    Show,
+    Resume(SessionResumeArgs),
+    List(SessionListArgs),
+}
+
+#[derive(Args, Debug)]
+struct SessionInitArgs {
+    #[arg(long, default_value = "default")]
+    scope: String,
+}
+
+#[derive(Args, Debug)]
+struct SessionUseArgs {
+    #[arg(long = "session-id")]
+    session_id: String,
+}
+
+#[derive(Args, Debug)]
+struct SessionResumeArgs {
+    #[arg(long)]
+    session_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct SessionListArgs {
+    #[arg(long, default_value = "10")]
+    limit: i64,
+}
+
+#[derive(Args, Debug)]
+struct EntitySearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct SearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Subcommand, Debug)]
+enum InsightCommand {
+    Record(InsightRecordArgs),
+    List(InsightListArgs),
+    Show(InsightShowArgs),
+    Search(InsightSearchArgs),
+    UpdateStatus(InsightUpdateStatusArgs),
+}
+
+#[derive(Args, Debug)]
+struct InsightRecordArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    title: String,
+    #[arg(long)]
+    content: String,
+    #[arg(long, value_enum)]
+    insight_type: InsightType,
+    #[arg(long = "parent-type", value_enum)]
+    parent_entity_type: EntityType,
+    #[arg(long = "parent-id")]
+    parent_entity_id: String,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, value_enum, default_value_t = InsightStatus::Active)]
+    status: InsightStatus,
+}
+
+#[derive(Args, Debug)]
+struct InsightListArgs {
+    #[arg(long = "all")]
+    all: bool,
+    #[arg(long = "parent-type", value_enum)]
+    parent_entity_type: Option<EntityType>,
+    #[arg(long = "parent-id")]
+    parent_entity_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct InsightShowArgs {
+    #[arg(long = "insight-id")]
+    insight_id: String,
+}
+
+#[derive(Args, Debug)]
+struct InsightSearchArgs {
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long)]
+    since: Option<String>,
+    #[arg(long)]
+    latest: Option<usize>,
+    #[arg(long)]
+    tag: Option<String>,
+    #[arg(long)]
+    fts: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct InsightUpdateStatusArgs {
+    #[arg(long = "insight-id")]
+    insight_id: String,
+    #[arg(long, value_enum)]
+    status: InsightStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ContextArgs {
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: Option<EntityType>,
+    #[arg(long = "entity-id")]
+    entity_id: Option<String>,
+    #[arg(long)]
+    session: bool,
+}
+
+#[derive(Args, Debug)]
+struct TagsArgs {
+    #[arg(long = "entity-type")]
+    entity_type: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -185,6 +398,8 @@ struct ScopeCreateArgs {
     parent_scope_key: Option<String>,
     #[arg(long = "metadata-json")]
     metadata_json: Option<String>,
+    #[arg(long = "metadata-file")]
+    metadata_file: Option<PathBuf>,
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -221,6 +436,10 @@ struct GoalUpdateStatusArgs {
     goal_id: String,
     #[arg(long, value_enum)]
     status: GoalStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -283,8 +502,22 @@ struct RoadmapAddWorkPointArgs {
     dependency_ids: Vec<String>,
     #[arg(long = "validation")]
     validation_expectations: Vec<String>,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long = "tag")]
     tags: Vec<String>,
+    #[arg(long, value_enum)]
+    kind: Option<WorkPointKind>,
+    #[arg(long, value_enum)]
+    priority: Option<Priority>,
+    #[arg(long = "repairs-work-point-id")]
+    repairs_work_point_ids: Vec<String>,
+    #[arg(long = "supersedes-work-point-id")]
+    supersedes_work_point_ids: Vec<String>,
+    #[arg(long = "blocks-work-point-id")]
+    blocks_work_point_ids: Vec<String>,
 }
 
 #[derive(Args, Debug)]
@@ -299,6 +532,10 @@ struct RoadmapUpdateStatusArgs {
     roadmap_id: String,
     #[arg(long, value_enum)]
     status: RoadmapStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -325,6 +562,14 @@ struct PlanCreateArgs {
     validation_steps: Vec<String>,
     #[arg(long = "target-work-point-id")]
     targeted_work_point_ids: Vec<String>,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "routing-hint")]
+    routing_hint: Option<String>,
+    #[arg(long, default_value_t = false)]
+    allow_parallel_overlap: bool,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long, value_enum, default_value_t = PlanStatus::Draft)]
     status: PlanStatus,
     #[arg(long = "tag")]
@@ -351,6 +596,18 @@ struct PlanReviseArgs {
     validation_steps: Vec<String>,
     #[arg(long = "target-work-point-id")]
     targeted_work_point_ids: Vec<String>,
+    #[arg(long, value_enum)]
+    effort_tier: Option<EffortTier>,
+    #[arg(long = "routing-hint")]
+    routing_hint: Option<String>,
+    #[arg(long, default_value_t = false)]
+    clear_routing_hint: bool,
+    #[arg(long)]
+    allow_parallel_overlap: Option<bool>,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
+    #[arg(long, default_value_t = false)]
+    clear_file_scopes: bool,
     #[arg(long = "tag")]
     tags: Vec<String>,
 }
@@ -361,6 +618,10 @@ struct PlanUpdateStatusArgs {
     plan_id: String,
     #[arg(long, value_enum)]
     status: PlanStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -379,6 +640,10 @@ struct TodoCreateArgs {
     status: TodoStatus,
     #[arg(long, value_enum, default_value_t = Priority::Medium)]
     priority: Priority,
+    #[arg(long, value_enum, default_value_t = EffortTier::Balanced)]
+    effort_tier: EffortTier,
+    #[arg(long = "file-scope")]
+    file_scopes: Vec<String>,
     #[arg(long = "evidence-ref")]
     evidence_refs: Vec<String>,
     #[arg(long = "tag")]
@@ -395,6 +660,10 @@ struct TodoUpdateStatusArgs {
     status: TodoStatus,
     #[arg(long = "evidence-ref")]
     evidence_refs: Vec<String>,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -431,6 +700,10 @@ struct IssueUpdateStatusArgs {
     issue_id: String,
     #[arg(long, value_enum)]
     status: IssueStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -457,6 +730,10 @@ struct ReviewPointUpdateStatusArgs {
     review_point_id: String,
     #[arg(long, value_enum)]
     status: ReviewPointStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
 }
 
 #[derive(Args, Debug)]
@@ -471,6 +748,151 @@ struct WorkPointUpdateStatusArgs {
     work_point_id: String,
     #[arg(long, value_enum)]
     status: WorkPointStatus,
+    #[arg(long)]
+    override_transition: bool,
+    #[arg(long)]
+    reason: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointNextRunnableArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointWorkGraphArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkPointReviseArgs {
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+    #[arg(long = "dependency-id")]
+    dependency_ids: Vec<String>,
+    #[arg(long = "clear-dependencies")]
+    clear_dependencies: bool,
+    #[arg(long = "blocks-work-point-id")]
+    blocks_work_point_ids: Vec<String>,
+    #[arg(long = "clear-blocks")]
+    clear_blocks: bool,
+}
+
+#[derive(Subcommand, Debug)]
+enum ProjectRunCommand {
+    Claim(ProjectRunClaimArgs),
+    Activate(ProjectRunActivateArgs),
+    Release(ProjectRunReleaseArgs),
+    AddEvidence(ProjectRunAddEvidenceArgs),
+    List,
+    Show(ProjectRunShowArgs),
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunClaimArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long = "goal-id")]
+    goal_id: String,
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+    #[arg(long = "work-point-id")]
+    work_point_id: String,
+    #[arg(long = "repo-id")]
+    repo_id: Option<String>,
+    #[arg(long)]
+    branch: Option<String>,
+    #[arg(long = "worktree-id")]
+    worktree_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
+    #[arg(long = "profile-id")]
+    profile_id: Option<String>,
+    #[arg(long = "correlation-id")]
+    correlation_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunActivateArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunReleaseArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+    #[arg(long, value_enum)]
+    status: ProjectRunStatus,
+    #[arg(long = "evidence-json")]
+    evidence_json: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunAddEvidenceArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+    #[arg(long = "evidence-json")]
+    evidence_json: String,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunShowArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+}
+
+#[derive(Subcommand, Debug)]
+enum WorktreeCommand {
+    List(WorktreeListArgs),
+    Show(WorktreeShowArgs),
+    Attach(WorktreeAttachArgs),
+    Archive(WorktreeArchiveArgs),
+    CleanupIntent(WorktreeCleanupIntentArgs),
+}
+
+#[derive(Args, Debug)]
+struct WorktreeListArgs {
+    #[arg(long)]
+    status: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeShowArgs {
+    #[arg(long)]
+    id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeAttachArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long = "repo-uri")]
+    repo_uri: Option<String>,
+    #[arg(long)]
+    branch: Option<String>,
+    #[arg(long = "worktree-path")]
+    worktree_path: Option<String>,
+    #[arg(long = "project-run-id")]
+    project_run_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
+    #[arg(long = "correlation-id")]
+    correlation_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeArchiveArgs {
+    #[arg(long)]
+    id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorktreeCleanupIntentArgs {
+    #[arg(long)]
+    id: String,
 }
 
 #[derive(Args, Debug)]
@@ -483,25 +905,6 @@ struct ProjectRenderArgs {
     projection_format: ProjectionFormat,
     #[arg(long)]
     output: PathBuf,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MachineEnvelope<T>
-where
-    T: Serialize,
-{
-    schema_version: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    correlation_id: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
-    non_interactive: bool,
-    command: Vec<String>,
-    status: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -520,15 +923,16 @@ pub fn run_from_env() -> ExitCode {
         Err(error) => {
             if let Some(context) = CLI_MACHINE_CONTEXT.get() {
                 if context.format == OutputFormat::Json
-                    && print_json(&MachineEnvelope::<serde_json::Value> {
-                        schema_version: RESULT_SCHEMA_VERSION,
-                        correlation_id: context.correlation_id.clone(),
-                        non_interactive: context.non_interactive,
-                        command: context.command.clone(),
-                        status: error.status(),
-                        data: None,
-                        error: Some(error.to_string()),
-                    })
+                    && print_json(&MachineEnvelope::<serde_json::Value>::error(
+                        context.correlation_id.clone(),
+                        context.non_interactive,
+                        context.command.clone(),
+                        match error.status() {
+                            "invalid" => MachineStatus::Invalid,
+                            _ => MachineStatus::Error,
+                        },
+                        error.to_string(),
+                    ))
                     .is_ok()
                 {
                     return error.exit_code();
@@ -563,6 +967,32 @@ where
     let store = PlanningStore::new(&context.db_path);
     store.init()?;
 
+    // Phase 3: Scope gate for machine-mode mutations
+    if context.format == OutputFormat::Json
+        && context.non_interactive
+        && !is_command_exempt_from_scope_gate(&cli.command)
+        && is_command_mutation(&cli.command)
+    {
+        let scope = &context.scope_key;
+        let has_active_session = crate::session::read_session_file()
+            .unwrap_or(None)
+            .is_some();
+        if scope == "default" && !has_active_session {
+            let error = serde_json::json!({
+                "status": "invalid",
+                "code": "SCOPE_REQUIRED",
+                "message": "Machine-mode mutations require an explicit --scope or an active session. Use `--scope <key>` or run `elegy-planning session init --scope <key>` first.",
+                "scope": scope,
+                "hasActiveSession": false,
+            });
+            return Err(CliError::Store(PlanningStoreError::InvalidInput(
+                serde_json::to_string_pretty(&error).unwrap_or_else(|_| {
+                    "Machine-mode mutations require an explicit --scope or an active session. Use `--scope <key>` or run `elegy-planning session init --scope <key>` first.".to_string()
+                }),
+            )));
+        }
+    }
+
     match cli.command {
         Command::Scope { command } => execute_scope(command, &store, &context),
         Command::Goal { command } => execute_goal(command, &store, &context),
@@ -576,6 +1006,99 @@ where
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
         Command::Project { command } => execute_project(command, &store, &context),
+        Command::Session { command } => execute_session(command, &store, &context),
+        Command::Search(args) => execute_search(args, &store, &context),
+        Command::Insight { command } => execute_insight(command, &store, &context),
+        Command::Context(args) => execute_context(args, &store, &context),
+        Command::Tags(args) => execute_tags(args, &store, &context),
+        Command::ProjectRun { command } => execute_project_run(command, &store, &context),
+        Command::Worktree { command } => execute_worktree(command, &store, &context),
+    }
+}
+
+fn execute_project_run(
+    command: ProjectRunCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        ProjectRunCommand::Claim(args) => emit_success(
+            context,
+            vec!["project-run", "claim"],
+            store.claim_project_run(ClaimProjectRunInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                goal_id: args.goal_id,
+                roadmap_id: args.roadmap_id,
+                work_point_id: args.work_point_id,
+                repo_id: args.repo_id,
+                branch: args.branch,
+                worktree_id: args.worktree_id,
+                session_id: args.session_id,
+                run_id: context.correlation_id.clone(),
+                profile_id: args.profile_id,
+                correlation_id: args.correlation_id,
+            })?,
+        ),
+        ProjectRunCommand::Activate(args) => emit_success(
+            context,
+            vec!["project-run", "activate"],
+            store.activate_project_run(ActivateProjectRunInput {
+                project_run_id: args.project_run_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                run_id: context.correlation_id.clone(),
+            })?,
+        ),
+        ProjectRunCommand::Release(args) => {
+            let evidence = match args.evidence_json {
+                Some(json_str) => Some(serde_json::from_str::<ProjectRunEvidence>(&json_str)?),
+                None => None,
+            };
+            emit_success(
+                context,
+                vec!["project-run", "release"],
+                store.release_project_run(ReleaseProjectRunInput {
+                    project_run_id: args.project_run_id,
+                    status: args.status,
+                    evidence,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        ProjectRunCommand::AddEvidence(args) => {
+            let evidence: ProjectRunEvidence = serde_json::from_str(&args.evidence_json)?;
+            emit_success(
+                context,
+                vec!["project-run", "add-evidence"],
+                store.add_project_run_evidence(AddEvidenceInput {
+                    project_run_id: args.project_run_id,
+                    evidence,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        ProjectRunCommand::List => emit_success(
+            context,
+            vec!["project-run", "list"],
+            json!({ "projectRuns": store.list_project_runs_in_scope(&context.scope_key)? }),
+        ),
+        ProjectRunCommand::Show(args) => {
+            let view = store.project_run(&args.project_run_id)?;
+            if view.project_run.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["project-run", "show"],
+                    format!(
+                        "project run `{}` is in scope `{}`, not `{}`",
+                        args.project_run_id, view.project_run.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["project-run", "show"], view)
+        }
     }
 }
 
@@ -591,15 +1114,13 @@ fn handle_parse_error(error: clap::Error, raw_args: &[OsString]) -> Result<ExitC
             ErrorKind::DisplayHelp | ErrorKind::DisplayVersion
         )
     {
-        print_json(&MachineEnvelope::<serde_json::Value> {
-            schema_version: RESULT_SCHEMA_VERSION,
+        print_json(&MachineEnvelope::<serde_json::Value>::error(
             correlation_id,
             non_interactive,
             command,
-            status: "invalid",
-            data: None,
-            error: Some(error.to_string()),
-        })?;
+            MachineStatus::Invalid,
+            error.to_string(),
+        ))?;
         return Ok(exit_invalid());
     }
 
@@ -632,18 +1153,68 @@ fn execute_scope(
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
-        ScopeCommand::Create(args) => emit_success(
-            context,
-            vec!["scope", "create"],
-            store.create_scope(CreateScopeInput {
-                scope_key: args.scope_key,
-                scope_type: args.scope_type,
-                parent_scope_key: args.parent_scope_key,
-                metadata: parse_optional_json_object(args.metadata_json)?,
-                tags: args.tags,
-                run_id: context.correlation_id.clone(),
-            })?,
-        ),
+        ScopeCommand::Create(args) => {
+            if args.metadata_json.is_some() && args.metadata_file.is_some() {
+                return emit_error(
+                    context,
+                    vec!["scope", "create"],
+                    "--metadata-json and --metadata-file are mutually exclusive".to_string(),
+                    true,
+                );
+            }
+
+            let metadata = if let Some(ref path) = args.metadata_file {
+                let content = match std::fs::read_to_string(path) {
+                    Ok(c) => c,
+                    Err(e) => {
+                        return emit_error(
+                            context,
+                            vec!["scope", "create"],
+                            format!("failed to read metadata file `{}`: {e}", path.display()),
+                            true,
+                        );
+                    }
+                };
+                let parsed: serde_json::Value = match serde_json::from_str(&content) {
+                    Ok(v) => v,
+                    Err(e) => {
+                        return emit_error(
+                            context,
+                            vec!["scope", "create"],
+                            format!("invalid JSON in metadata file `{}`: {e}", path.display()),
+                            true,
+                        );
+                    }
+                };
+                if !parsed.is_object() {
+                    return emit_error(
+                        context,
+                        vec!["scope", "create"],
+                        format!(
+                            "metadata file `{}` must contain a JSON object",
+                            path.display()
+                        ),
+                        true,
+                    );
+                }
+                Some(parsed)
+            } else {
+                parse_optional_json_object(args.metadata_json)?
+            };
+
+            emit_success(
+                context,
+                vec!["scope", "create"],
+                store.create_scope(CreateScopeInput {
+                    scope_key: args.scope_key,
+                    scope_type: args.scope_type,
+                    parent_scope_key: args.parent_scope_key,
+                    metadata,
+                    tags: args.tags,
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
         ScopeCommand::List => emit_success(
             context,
             vec!["scope", "list"],
@@ -690,7 +1261,10 @@ fn execute_goal(
                 entity_id: args.goal_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         GoalCommand::List => emit_success(
@@ -713,6 +1287,7 @@ fn execute_goal(
             }
             emit_success(context, vec!["goal", "show"], view)
         }
+        GoalCommand::Search(args) => execute_entity_search(args, store, context, "goal"),
     }
 }
 
@@ -753,7 +1328,10 @@ fn execute_roadmap(
                 entity_id: args.roadmap_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         RoadmapCommand::AddSection(args) => emit_success(
@@ -784,6 +1362,13 @@ fn execute_roadmap(
                 ordering: args.ordering,
                 dependency_ids: args.dependency_ids,
                 validation_expectations: args.validation_expectations,
+                effort_tier: args.effort_tier,
+                kind: args.kind,
+                priority: args.priority,
+                repairs_work_point_ids: args.repairs_work_point_ids,
+                supersedes_work_point_ids: args.supersedes_work_point_ids,
+                blocks_work_point_ids: args.blocks_work_point_ids,
+                file_scopes: parse_file_scopes(args.file_scopes)?,
                 tags: args.tags,
                 run_id: context.correlation_id.clone(),
             })?,
@@ -808,6 +1393,7 @@ fn execute_roadmap(
             }
             emit_success(context, vec!["roadmap", "show"], view)
         }
+        RoadmapCommand::Search(args) => execute_entity_search(args, store, context, "roadmap"),
     }
 }
 
@@ -845,9 +1431,59 @@ fn execute_work_point(
                 entity_id: args.work_point_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
+        WorkPointCommand::NextRunnable(args) => {
+            let _ = store.validate_all()?;
+            emit_success(
+                context,
+                vec!["work-point", "next-runnable"],
+                store.find_runnable_work_points(&args.roadmap_id)?,
+            )
+        }
+        WorkPointCommand::WorkGraph(args) => {
+            let _ = store.validate_all()?;
+            emit_success(
+                context,
+                vec!["work-point", "work-graph"],
+                store.build_work_graph(&args.roadmap_id)?,
+            )
+        }
+        WorkPointCommand::Revise(args) => {
+            if args.clear_dependencies && !args.dependency_ids.is_empty() {
+                return emit_error(
+                    context,
+                    vec!["work-point", "revise"],
+                    "--clear-dependencies cannot be combined with --dependency-id".to_string(),
+                    true,
+                );
+            }
+            emit_success(
+                context,
+                vec!["work-point", "revise"],
+                store.revise_work_point(ReviseWorkPointInput {
+                    work_point_id: args.work_point_id,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    dependency_ids: if !args.dependency_ids.is_empty() {
+                        Some(args.dependency_ids)
+                    } else {
+                        None
+                    },
+                    clear_dependencies: args.clear_dependencies,
+                    blocks_work_point_ids: if !args.blocks_work_point_ids.is_empty() {
+                        Some(args.blocks_work_point_ids)
+                    } else {
+                        None
+                    },
+                    clear_blocks: args.clear_blocks,
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
     }
 }
 
@@ -878,26 +1514,55 @@ fn execute_plan(
                     stop_conditions: args.stop_conditions,
                     validation_steps: args.validation_steps,
                     targeted_work_point_ids: args.targeted_work_point_ids,
+                    effort_tier: args.effort_tier,
+                    routing_hint: args.routing_hint,
+                    allow_parallel_overlap: args.allow_parallel_overlap,
+                    file_scopes: parse_file_scopes(args.file_scopes)?,
                     status: args.status,
                     tags: args.tags,
                     run_id: context.correlation_id.clone(),
                 })?,
             )
         }
-        PlanCommand::Revise(args) => emit_success(
-            context,
-            vec!["plan", "revise"],
-            store.revise_plan(RevisePlanInput {
-                plan_id: args.plan_id,
-                scope_key: args.scope_key,
-                assumptions: optional_vec(args.assumptions),
-                stop_conditions: optional_vec(args.stop_conditions),
-                validation_steps: optional_vec(args.validation_steps),
-                targeted_work_point_ids: optional_vec(args.targeted_work_point_ids),
-                tags: optional_vec(args.tags),
-                run_id: context.correlation_id.clone(),
-            })?,
-        ),
+        PlanCommand::Revise(args) => {
+            if args.clear_routing_hint && args.routing_hint.is_some() {
+                return emit_error(
+                    context,
+                    vec!["plan", "revise"],
+                    "--clear-routing-hint cannot be combined with --routing-hint".to_string(),
+                    true,
+                );
+            }
+            if args.clear_file_scopes && !args.file_scopes.is_empty() {
+                return emit_error(
+                    context,
+                    vec!["plan", "revise"],
+                    "--clear-file-scopes cannot be combined with --file-scope".to_string(),
+                    true,
+                );
+            }
+            emit_success(
+                context,
+                vec!["plan", "revise"],
+                store.revise_plan(RevisePlanInput {
+                    plan_id: args.plan_id,
+                    active_scope_key: Some(context.scope_key.clone()),
+                    scope_key: args.scope_key,
+                    assumptions: optional_vec(args.assumptions),
+                    stop_conditions: optional_vec(args.stop_conditions),
+                    validation_steps: optional_vec(args.validation_steps),
+                    targeted_work_point_ids: optional_vec(args.targeted_work_point_ids),
+                    effort_tier: args.effort_tier,
+                    routing_hint: args.routing_hint,
+                    clear_routing_hint: args.clear_routing_hint,
+                    allow_parallel_overlap: args.allow_parallel_overlap,
+                    file_scopes: optional_file_scopes(args.file_scopes)?,
+                    clear_file_scopes: args.clear_file_scopes,
+                    tags: optional_vec(args.tags),
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
         PlanCommand::UpdateStatus(args) => emit_success(
             context,
             vec!["plan", "update-status"],
@@ -906,7 +1571,10 @@ fn execute_plan(
                 entity_id: args.plan_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         PlanCommand::List => emit_success(
@@ -929,6 +1597,7 @@ fn execute_plan(
             }
             emit_success(context, vec!["plan", "show"], view)
         }
+        PlanCommand::Search(args) => execute_entity_search(args, store, context, "plan"),
     }
 }
 
@@ -950,6 +1619,8 @@ fn execute_todo(
                 summary: args.summary,
                 status: args.status,
                 priority: args.priority,
+                effort_tier: args.effort_tier,
+                file_scopes: parse_file_scopes(args.file_scopes)?,
                 evidence_refs: args.evidence_refs,
                 tags: args.tags,
                 ordering: args.ordering,
@@ -964,7 +1635,10 @@ fn execute_todo(
                 entity_id: args.todo_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: optional_vec(args.evidence_refs),
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         TodoCommand::List => emit_success(
@@ -972,6 +1646,7 @@ fn execute_todo(
             vec!["todo", "list"],
             json!({ "todos": store.list_todos_in_scope(&context.scope_key)? }),
         ),
+        TodoCommand::Search(args) => execute_entity_search(args, store, context, "todo"),
     }
 }
 
@@ -1012,7 +1687,10 @@ fn execute_issue(
                 entity_id: args.issue_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
         IssueCommand::List => emit_success(
@@ -1035,6 +1713,7 @@ fn execute_issue(
             }
             emit_success(context, vec!["issue", "show"], view)
         }
+        IssueCommand::Search(args) => execute_entity_search(args, store, context, "issue"),
     }
 }
 
@@ -1067,7 +1746,10 @@ fn execute_review_point(
                 entity_id: args.review_point_id,
                 status: args.status.as_str().to_string(),
                 evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
             })?,
         ),
     }
@@ -1079,8 +1761,16 @@ fn execute_validate(
     context: &MachineContext,
 ) -> Result<ExitCode, CliError> {
     match command {
-        ValidateCommand::All => {
-            emit_success(context, vec!["validate", "all"], store.validate_all()?)
+        ValidateCommand::All(args) => {
+            if args.all_scopes {
+                emit_success(context, vec!["validate", "all"], store.validate_all()?)
+            } else {
+                emit_success(
+                    context,
+                    vec!["validate", "all"],
+                    store.validate_all_in_scope(&context.scope_key)?,
+                )
+            }
         }
     }
 }
@@ -1089,7 +1779,7 @@ fn execute_events(store: &PlanningStore, context: &MachineContext) -> Result<Exi
     emit_success(
         context,
         vec!["events", "list"],
-        json!({ "events": store.list_events()? }),
+        json!({ "events": store.list_events_in_scope(&context.scope_key)? }),
     )
 }
 
@@ -1106,7 +1796,8 @@ fn execute_project(
         ProjectCommand::Export(args) => emit_success(
             context,
             vec!["project", "export"],
-            store.render_projection(
+            store.render_projection_in_scope(
+                &context.scope_key,
                 args.entity_type,
                 &args.entity_id,
                 args.projection_format,
@@ -1116,7 +1807,8 @@ fn execute_project(
         ProjectCommand::Render(args) => emit_success(
             context,
             vec!["project", "render"],
-            store.render_projection(
+            store.render_projection_in_scope(
+                &context.scope_key,
                 args.entity_type,
                 &args.entity_id,
                 args.projection_format,
@@ -1124,6 +1816,321 @@ fn execute_project(
             )?,
         ),
     }
+}
+
+fn execute_session(
+    command: SessionCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        SessionCommand::Init(args) => {
+            let session = crate::session::init_session(&args.scope)?;
+            emit_success(context, vec!["session", "init"], session)
+        }
+        SessionCommand::Use(args) => {
+            let session = crate::session::use_session(&args.session_id)?;
+            emit_success(context, vec!["session", "use"], session)
+        }
+        SessionCommand::Show => {
+            let session = crate::session::show_session()?;
+            emit_success(context, vec!["session", "show"], session)
+        }
+        SessionCommand::Resume(args) => {
+            if let Some(ref sid) = args.session_id {
+                let session = crate::session::update_session_file(sid, &context.scope_key)?;
+                let summary = serde_json::json!({
+                    "sessionId": session.session_id,
+                    "scope": session.scope,
+                    "action": "resumed-specific",
+                    "message": format!("Resumed session {}", session.session_id)
+                });
+                emit_success(context, vec!["session", "resume"], summary)
+            } else {
+                match crate::session::read_session_file()? {
+                    Some(session) => {
+                        let active_runs =
+                            store.count_active_runs_for_session(&session.session_id)?;
+                        let summary = serde_json::json!({
+                            "sessionId": session.session_id,
+                            "scope": session.scope,
+                            "action": "resumed-current",
+                            "message": format!(
+                                "Current session: {} (created: {}, active project runs: {})",
+                                session.session_id, session.created_at, active_runs
+                            )
+                        });
+                        emit_success(context, vec!["session", "resume"], summary)
+                    }
+                    None => emit_error(
+                        context,
+                        vec!["session", "resume"],
+                        "No active session found. Use 'session init' to create one.".to_string(),
+                        true,
+                    ),
+                }
+            }
+        }
+        SessionCommand::List(args) => {
+            let sessions = store.list_sessions(args.limit)?;
+            emit_success(
+                context,
+                vec!["session", "list"],
+                serde_json::json!({ "sessions": sessions }),
+            )
+        }
+    }
+}
+
+fn execute_worktree(
+    command: WorktreeCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        WorktreeCommand::List(args) => {
+            let status = args.status.as_deref();
+            let worktrees = store.list_worktrees(&context.scope_key, status)?;
+            emit_success(
+                context,
+                vec!["worktree", "list"],
+                serde_json::json!({ "worktrees": worktrees }),
+            )
+        }
+        WorktreeCommand::Show(args) => {
+            let worktree = store.get_worktree(&args.id, &context.scope_key)?;
+            emit_success(context, vec!["worktree", "show"], worktree)
+        }
+        WorktreeCommand::Attach(args) => {
+            let input = AttachWorktreeInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                repo_uri: args.repo_uri,
+                branch: args.branch,
+                worktree_path: args.worktree_path,
+                project_run_id: args.project_run_id,
+                session_id: args.session_id,
+                correlation_id: args.correlation_id,
+            };
+            let worktree = store.attach_worktree(input)?;
+            emit_success(context, vec!["worktree", "attach"], worktree)
+        }
+        WorktreeCommand::Archive(args) => {
+            let worktree = store.update_worktree_status(
+                &args.id,
+                &context.scope_key,
+                WorktreeStatus::Archived,
+            )?;
+            emit_success(context, vec!["worktree", "archive"], worktree)
+        }
+        WorktreeCommand::CleanupIntent(args) => {
+            let worktree = store.update_worktree_status(
+                &args.id,
+                &context.scope_key,
+                WorktreeStatus::CleanupIntent,
+            )?;
+            emit_success(context, vec!["worktree", "cleanup-intent"], worktree)
+        }
+    }
+}
+
+fn execute_search(
+    args: SearchArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let input = SearchInput {
+        scope_key: Some(context.scope_key.clone()),
+        title: args.title,
+        status: args.status,
+        since: args.since,
+        latest: args.latest,
+        tag: args.tag,
+        fts: args.fts,
+    };
+    let results = store.search_all(&input)?;
+    emit_success(context, vec!["search"], json!({ "results": results }))
+}
+
+fn execute_entity_search(
+    args: EntitySearchArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+    entity_type: &str,
+) -> Result<ExitCode, CliError> {
+    let input = SearchInput {
+        scope_key: Some(context.scope_key.clone()),
+        title: args.title,
+        status: args.status,
+        since: args.since,
+        latest: args.latest,
+        tag: args.tag,
+        fts: args.fts,
+    };
+    let results = match entity_type {
+        "goal" => store.search_goals(&input)?,
+        "roadmap" => store.search_roadmaps(&input)?,
+        "plan" => store.search_plans(&input)?,
+        "todo" => store.search_todos(&input)?,
+        "issue" => store.search_issues(&input)?,
+        "insight" => store.search_insights(&input)?,
+        _ => Vec::new(),
+    };
+    emit_success(
+        context,
+        vec![entity_type, "search"],
+        json!({ "results": results }),
+    )
+}
+
+fn execute_insight(
+    command: InsightCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        InsightCommand::Record(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["insight", "record"], message, true)
+                }
+            };
+            emit_success(
+                context,
+                vec!["insight", "record"],
+                store.create_insight(CreateInsightInput {
+                    id: args.id,
+                    scope_key: Some(context.scope_key.clone()),
+                    correlation_id,
+                    title: args.title,
+                    content: args.content,
+                    insight_type: args.insight_type,
+                    parent_entity_type: args.parent_entity_type,
+                    parent_entity_id: args.parent_entity_id,
+                    tags: args.tags,
+                    status: args.status,
+                    run_id: context.correlation_id.clone(),
+                })?,
+            )
+        }
+        InsightCommand::List(args) => {
+            if args.all {
+                emit_success(
+                    context,
+                    vec!["insight", "list"],
+                    json!({ "insights": store.list_insights_in_scope(&context.scope_key)? }),
+                )
+            } else {
+                let parent_type = args.parent_entity_type.ok_or_else(|| {
+                    CliError::Store(crate::PlanningStoreError::InvalidInput(
+                        "either --all or --parent-type and --parent-id are required for insight list"
+                            .to_string(),
+                    ))
+                })?;
+                let parent_id = args.parent_entity_id.ok_or_else(|| {
+                    CliError::Store(crate::PlanningStoreError::InvalidInput(
+                        "either --all or --parent-type and --parent-id are required for insight list"
+                            .to_string(),
+                    ))
+                })?;
+                emit_success(
+                    context,
+                    vec!["insight", "list"],
+                    json!({ "insights": store
+                        .list_insights_for_entity(parent_type, &parent_id, &context.scope_key)? }),
+                )
+            }
+        }
+        InsightCommand::Show(args) => {
+            let view = store.insight(&args.insight_id)?;
+            if view.insight.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["insight", "show"],
+                    format!(
+                        "insight `{}` is in scope `{}`, not `{}`",
+                        args.insight_id, view.insight.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["insight", "show"], view)
+        }
+        InsightCommand::Search(args) => {
+            let input = SearchInput {
+                scope_key: Some(context.scope_key.clone()),
+                title: args.title,
+                status: args.status,
+                since: args.since,
+                latest: args.latest,
+                tag: args.tag,
+                fts: args.fts,
+            };
+            let results = store.search_insights(&input)?;
+            emit_success(
+                context,
+                vec!["insight", "search"],
+                json!({ "results": results }),
+            )
+        }
+        InsightCommand::UpdateStatus(args) => emit_success(
+            context,
+            vec!["insight", "update-status"],
+            store.update_status(UpdateStatusInput {
+                entity_type: EntityType::Insight,
+                entity_id: args.insight_id,
+                status: args.status.as_str().to_string(),
+                evidence_refs: None,
+                active_scope_key: Some(context.scope_key.clone()),
+                run_id: context.correlation_id.clone(),
+                override_transition: args.override_transition,
+                reason: args.reason,
+            })?,
+        ),
+    }
+}
+
+fn execute_context(
+    args: ContextArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    if args.session {
+        let correlation_id = context.correlation_id.clone().unwrap_or_default();
+        if correlation_id.is_empty() {
+            return emit_error(
+                context,
+                vec!["context"],
+                "session context requires --correlation-id or an active session".to_string(),
+                true,
+            );
+        }
+        let bundle = store.session_context(&correlation_id, &context.scope_key)?;
+        return emit_success(context, vec!["context"], bundle);
+    }
+
+    match (args.entity_type, args.entity_id) {
+        (Some(entity_type), Some(entity_id)) => {
+            let bundle = store.context_bundle(entity_type, &entity_id, &context.scope_key)?;
+            emit_success(context, vec!["context"], bundle)
+        }
+        _ => emit_error(
+            context,
+            vec!["context"],
+            "context requires --entity-type and --entity-id, or --session".to_string(),
+            true,
+        ),
+    }
+}
+
+fn execute_tags(
+    args: TagsArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let tags = store.list_tags(&context.scope_key, args.entity_type.as_deref())?;
+    emit_success(context, vec!["tags", "list"], json!({ "tags": tags }))
 }
 
 fn emit_success<T>(
@@ -1139,15 +2146,12 @@ where
             let text = serde_json::to_string_pretty(&data)?;
             println!("{text}");
         }
-        OutputFormat::Json => print_json(&MachineEnvelope {
-            schema_version: RESULT_SCHEMA_VERSION,
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: command.iter().map(|item| (*item).to_string()).collect(),
-            status: "ok",
-            data: Some(data),
-            error: None,
-        })?,
+        OutputFormat::Json => print_json(&MachineEnvelope::ok(
+            context.correlation_id.clone(),
+            context.non_interactive,
+            command.iter().map(|item| (*item).to_string()).collect(),
+            data,
+        ))?,
     }
     Ok(ExitCode::SUCCESS)
 }
@@ -1160,15 +2164,17 @@ fn emit_error(
 ) -> Result<ExitCode, CliError> {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
-            schema_version: RESULT_SCHEMA_VERSION,
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: command.iter().map(|item| (*item).to_string()).collect(),
-            status: if invalid { "invalid" } else { "error" },
-            data: None,
-            error: Some(message),
-        })?,
+        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value>::error(
+            context.correlation_id.clone(),
+            context.non_interactive,
+            command.iter().map(|item| (*item).to_string()).collect(),
+            if invalid {
+                MachineStatus::Invalid
+            } else {
+                MachineStatus::Error
+            },
+            message,
+        ))?,
     }
     Ok(if invalid {
         exit_invalid()
@@ -1325,6 +2331,25 @@ fn command_path(command: &Command) -> Vec<String> {
             "project".to_string(),
             project_command_name(command).to_string(),
         ],
+        Command::Session { command } => vec![
+            "session".to_string(),
+            session_command_name(command).to_string(),
+        ],
+        Command::Search(_) => vec!["search".to_string()],
+        Command::Insight { command } => vec![
+            "insight".to_string(),
+            insight_command_name(command).to_string(),
+        ],
+        Command::Context(_) => vec!["context".to_string()],
+        Command::Tags(_) => vec!["tags".to_string()],
+        Command::ProjectRun { command } => vec![
+            "project-run".to_string(),
+            project_run_command_name(command).to_string(),
+        ],
+        Command::Worktree { command } => vec![
+            "worktree".to_string(),
+            worktree_command_name(command).to_string(),
+        ],
     }
 }
 
@@ -1342,6 +2367,7 @@ fn goal_command_name(command: &GoalCommand) -> &'static str {
         GoalCommand::UpdateStatus(_) => "update-status",
         GoalCommand::List => "list",
         GoalCommand::Show(_) => "show",
+        GoalCommand::Search(_) => "search",
     }
 }
 
@@ -1353,6 +2379,7 @@ fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
         RoadmapCommand::AddWorkPoint(_) => "add-work-point",
         RoadmapCommand::List => "list",
         RoadmapCommand::Show(_) => "show",
+        RoadmapCommand::Search(_) => "search",
     }
 }
 
@@ -1361,6 +2388,30 @@ fn work_point_command_name(command: &WorkPointCommand) -> &'static str {
         WorkPointCommand::List => "list",
         WorkPointCommand::Show(_) => "show",
         WorkPointCommand::UpdateStatus(_) => "update-status",
+        WorkPointCommand::NextRunnable(_) => "next-runnable",
+        WorkPointCommand::WorkGraph(_) => "work-graph",
+        WorkPointCommand::Revise(_) => "revise",
+    }
+}
+
+fn project_run_command_name(command: &ProjectRunCommand) -> &'static str {
+    match command {
+        ProjectRunCommand::Claim(_) => "claim",
+        ProjectRunCommand::Activate(_) => "activate",
+        ProjectRunCommand::Release(_) => "release",
+        ProjectRunCommand::AddEvidence(_) => "add-evidence",
+        ProjectRunCommand::List => "list",
+        ProjectRunCommand::Show(_) => "show",
+    }
+}
+
+fn worktree_command_name(command: &WorktreeCommand) -> &'static str {
+    match command {
+        WorktreeCommand::List(_) => "list",
+        WorktreeCommand::Show(_) => "show",
+        WorktreeCommand::Attach(_) => "attach",
+        WorktreeCommand::Archive(_) => "archive",
+        WorktreeCommand::CleanupIntent(_) => "cleanup-intent",
     }
 }
 
@@ -1371,6 +2422,7 @@ fn plan_command_name(command: &PlanCommand) -> &'static str {
         PlanCommand::UpdateStatus(_) => "update-status",
         PlanCommand::List => "list",
         PlanCommand::Show(_) => "show",
+        PlanCommand::Search(_) => "search",
     }
 }
 
@@ -1379,6 +2431,7 @@ fn todo_command_name(command: &TodoCommand) -> &'static str {
         TodoCommand::Create(_) => "create",
         TodoCommand::UpdateStatus(_) => "update-status",
         TodoCommand::List => "list",
+        TodoCommand::Search(_) => "search",
     }
 }
 
@@ -1388,6 +2441,7 @@ fn issue_command_name(command: &IssueCommand) -> &'static str {
         IssueCommand::UpdateStatus(_) => "update-status",
         IssueCommand::List => "list",
         IssueCommand::Show(_) => "show",
+        IssueCommand::Search(_) => "search",
     }
 }
 
@@ -1398,9 +2452,19 @@ fn review_point_command_name(command: &ReviewPointCommand) -> &'static str {
     }
 }
 
+fn insight_command_name(command: &InsightCommand) -> &'static str {
+    match command {
+        InsightCommand::Record(_) => "record",
+        InsightCommand::List(_) => "list",
+        InsightCommand::Show(_) => "show",
+        InsightCommand::Search(_) => "search",
+        InsightCommand::UpdateStatus(_) => "update-status",
+    }
+}
+
 fn validate_command_name(command: &ValidateCommand) -> &'static str {
     match command {
-        ValidateCommand::All => "all",
+        ValidateCommand::All(_) => "all",
     }
 }
 
@@ -1411,18 +2475,38 @@ fn project_command_name(command: &ProjectCommand) -> &'static str {
     }
 }
 
+fn session_command_name(command: &SessionCommand) -> &'static str {
+    match command {
+        SessionCommand::Init(_) => "init",
+        SessionCommand::Use(_) => "use",
+        SessionCommand::Show => "show",
+        SessionCommand::Resume(_) => "resume",
+        SessionCommand::List(_) => "list",
+    }
+}
+
 fn resolve_correlation_id(
     command_value: Option<String>,
     context: &MachineContext,
 ) -> Result<String, String> {
-    command_value
-        .or_else(|| context.correlation_id.clone())
-        .map(|value| value.trim().to_string())
-        .filter(|value| !value.is_empty())
-        .ok_or_else(|| {
-            "correlation id is required; pass --correlation-id globally or on the command"
-                .to_string()
-        })
+    if let Some(value) = command_value {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(trimmed);
+        }
+    }
+    if let Some(value) = &context.correlation_id {
+        let trimmed = value.trim().to_string();
+        if !trimmed.is_empty() {
+            return Ok(trimmed);
+        }
+    }
+    if let Ok(Some(session_id)) = crate::session::resolve_session_correlation_id() {
+        if !session_id.is_empty() {
+            return Ok(session_id);
+        }
+    }
+    Err("correlation id is required; pass --correlation-id globally, on the command, or run `elegy-planning session init` first".to_string())
 }
 
 fn optional_vec(values: Vec<String>) -> Option<Vec<String>> {
@@ -1431,6 +2515,43 @@ fn optional_vec(values: Vec<String>) -> Option<Vec<String>> {
     } else {
         Some(values)
     }
+}
+
+fn optional_file_scopes(values: Vec<String>) -> Result<Option<Vec<FileScopeRecord>>, CliError> {
+    if values.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(parse_file_scopes(values)?))
+    }
+}
+
+fn parse_file_scopes(values: Vec<String>) -> Result<Vec<FileScopeRecord>, CliError> {
+    let mut scopes = Vec::new();
+    for raw in values {
+        let mut segments = raw.splitn(3, ':');
+        let selector_type = segments.next().unwrap_or_default().trim();
+        let intent = segments.next().unwrap_or_default().trim();
+        let selector = segments.next().unwrap_or_default().trim();
+        if selector_type.is_empty() || intent.is_empty() || selector.is_empty() {
+            return Err(CliError::Store(crate::PlanningStoreError::InvalidInput(
+                "file scope must match '<selector-type>:<intent>:<selector>'".to_string(),
+            )));
+        }
+        let selector_type = selector_type
+            .parse::<FileScopeSelectorType>()
+            .map_err(|error| {
+                CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
+            })?;
+        let intent = intent.parse::<FileScopeIntent>().map_err(|error| {
+            CliError::Store(crate::PlanningStoreError::InvalidInput(error.to_string()))
+        })?;
+        scopes.push(FileScopeRecord {
+            selector_type,
+            selector: selector.to_string(),
+            intent,
+        });
+    }
+    Ok(scopes)
 }
 
 fn parse_optional_json_object(
@@ -1456,8 +2577,75 @@ fn default_db_path() -> PathBuf {
     home.join(".elegy").join("planning.db")
 }
 
-fn is_false(value: &bool) -> bool {
-    !*value
+/// Returns true if the command is a mutation (write operation) that requires scope in machine mode.
+fn is_command_mutation(command: &Command) -> bool {
+    match command {
+        Command::Scope { command } => matches!(command, ScopeCommand::Create(_)),
+        Command::Goal { command } => matches!(
+            command,
+            GoalCommand::Create(_) | GoalCommand::UpdateStatus(_)
+        ),
+        Command::Roadmap { command } => matches!(
+            command,
+            RoadmapCommand::Create(_)
+                | RoadmapCommand::UpdateStatus(_)
+                | RoadmapCommand::AddSection(_)
+                | RoadmapCommand::AddWorkPoint(_)
+        ),
+        Command::WorkPoint { command } => matches!(
+            command,
+            WorkPointCommand::UpdateStatus(_) | WorkPointCommand::Revise(_)
+        ),
+        Command::Plan { command } => matches!(
+            command,
+            PlanCommand::Create(_) | PlanCommand::Revise(_) | PlanCommand::UpdateStatus(_)
+        ),
+        Command::Todo { command } => matches!(
+            command,
+            TodoCommand::Create(_) | TodoCommand::UpdateStatus(_)
+        ),
+        Command::Issue { command } => matches!(
+            command,
+            IssueCommand::Record(_) | IssueCommand::UpdateStatus(_)
+        ),
+        Command::ReviewPoint { command } => matches!(
+            command,
+            ReviewPointCommand::Record(_) | ReviewPointCommand::UpdateStatus(_)
+        ),
+        Command::Insight { command } => matches!(
+            command,
+            InsightCommand::Record(_) | InsightCommand::UpdateStatus(_)
+        ),
+        Command::ProjectRun { command } => matches!(
+            command,
+            ProjectRunCommand::Claim(_)
+                | ProjectRunCommand::Activate(_)
+                | ProjectRunCommand::Release(_)
+                | ProjectRunCommand::AddEvidence(_)
+        ),
+        Command::Worktree { command } => matches!(
+            command,
+            WorktreeCommand::Attach(_)
+                | WorktreeCommand::Archive(_)
+                | WorktreeCommand::CleanupIntent(_)
+        ),
+        // Read-only commands
+        Command::Validate { .. }
+        | Command::Events
+        | Command::Health
+        | Command::Project { .. }
+        | Command::Search(_)
+        | Command::Context(_)
+        | Command::Tags(_) => false,
+        // Session commands have their own exemption check (session init is exempt)
+        Command::Session { .. } => false,
+    }
+}
+
+/// Returns true if the command is exempt from the scope gate check.
+/// Currently only `session init` is exempt — it needs to run without scope to create a session.
+fn is_command_exempt_from_scope_gate(command: &Command) -> bool {
+    matches!(command, Command::Session { command } if matches!(command, SessionCommand::Init(_)))
 }
 
 fn exit_invalid() -> ExitCode {

@@ -39,6 +39,7 @@ fn direct_skills_binary_lists_builtin_registry() {
     let skills = stdout["data"]["skills"].as_array().expect("skills array");
     assert!(skills.iter().any(|skill| skill["id"] == "repo"));
     assert!(skills.iter().any(|skill| skill["id"] == "skills"));
+    assert!(skills.iter().any(|skill| skill["id"] == "documentation"));
 }
 
 #[test]
@@ -62,6 +63,31 @@ fn direct_skills_binary_resolves_repo_status() {
         .as_array()
         .expect("results array")
         .is_empty());
+}
+
+#[test]
+fn direct_skills_binary_resolves_agent_readable_docs() {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
+        .args([
+            "--format",
+            "json",
+            "resolve",
+            "--query",
+            "agent readable docs",
+        ])
+        .output()
+        .expect("run elegy-skills resolve for documentation");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let stdout: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
+    assert_eq!(stdout["status"], "ok");
+    assert_eq!(stdout["data"]["topSkill"]["id"], "documentation");
 }
 
 #[test]
@@ -234,7 +260,7 @@ fn invalid_profile_is_rejected() {
     let stdout: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("list stdout should be valid json");
     assert_eq!(stdout["status"], "invalid");
-    assert!(stdout["error"]
+    assert!(stdout["failure"]["message"]
         .as_str()
         .expect("error string")
         .contains("unknown skill 'not-a-skill'"));

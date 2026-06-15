@@ -1,0 +1,83 @@
+{
+  "schemaVersion": "elegy-configuration-template/v1",
+  "templateId": "repo-opencode-agentic-minimal",
+  "displayName": "Repo OpenCode Agentic Minimal",
+  "description": "Mirror repo-local skills, patch AGENTS.md, add deterministic hook configuration, and merge a minimal VS Code MCP config.",
+  "harness": "opencode",
+  "scope": "repo",
+  "bindings": {
+    "authority.skills": {
+      "defaultValue": ".github/skills",
+      "required": true,
+      "description": "Canonical repo-local skill authority root."
+    },
+    "target.skills": {
+      "defaultValue": ".opencode/skills",
+      "required": true,
+      "description": "Repo-local OpenCode mirror root."
+    },
+    "target.instructions": {
+      "defaultValue": "AGENTS.md",
+      "required": true,
+      "description": "Repo instruction overlay file."
+    }
+  },
+  "operations": [
+    {
+      "operationType": "mirrorDirectory",
+      "operationId": "mirror-opencode-skills",
+      "family": "skill",
+      "source": {
+        "base": "target-root",
+        "path": "${authority.skills}"
+      },
+      "destination": {
+        "base": "target-root",
+        "path": "${target.skills}"
+      },
+      "prune": true
+    },
+    {
+      "operationType": "patchTextBlock",
+      "operationId": "patch-agents-block",
+      "family": "instruction",
+      "destination": {
+        "base": "target-root",
+        "path": "${target.instructions}"
+      },
+      "startMarker": "<!-- elegy-configuration:begin opencode-agentic -->",
+      "endMarker": "<!-- elegy-configuration:end opencode-agentic -->",
+      "contentPath": {
+        "base": "template-root",
+        "path": "assets/opencode-agentic-agents-block.md"
+      },
+      "createIfMissing": true
+    },
+    {
+      "operationType": "mergeJson",
+      "operationId": "merge-vscode-mcp",
+      "family": "mcp",
+      "destination": {
+        "base": "target-root",
+        "path": ".vscode/mcp.json"
+      },
+      "source": {
+        "base": "template-root",
+        "path": "assets/vscode-mcp.json"
+      }
+    },
+    {
+      "operationType": "copyFile",
+      "operationId": "copy-hooks-config",
+      "family": "hook",
+      "source": {
+        "base": "template-root",
+        "path": "assets/hooks.json"
+      },
+      "destination": {
+        "base": "target-root",
+        "path": ".github/hooks/opencode-agentic.json"
+      }
+    }
+  ]
+}

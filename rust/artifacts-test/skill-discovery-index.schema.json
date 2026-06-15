@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/skill-discovery-index.schema.json",
+  "title": "Skill Discovery Index",
+  "description": "Projection of canonical skill definitions for governed discovery and safe content resolution.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "entries"],
+  "properties": {
+    "schemaVersion": { "type": "integer" },
+    "builtAt": { "type": "string", "format": "date-time" },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["skillId", "name", "description", "lifecycleState", "triggersOn", "manifest"],
+        "properties": {
+          "skillId": { "type": "string", "minLength": 1 },
+          "name": { "type": "string", "minLength": 1 },
+          "description": { "type": "string" },
+          "lifecycleState": {
+            "type": "string",
+            "enum": ["draft", "active", "deprecated", "archived"]
+          },
+          "triggersOn": { "type": "array", "items": { "type": "string" } },
+          "keywords": { "type": "array", "items": { "type": "string" } },
+          "capabilityHints": { "type": "array", "items": { "type": "string" } },
+          "manifest": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["id", "loadMode"],
+            "properties": {
+              "id": { "type": "string", "minLength": 1 },
+              "loadMode": { "type": "string", "enum": ["always", "onDemand"] },
+              "vaultRef": { "type": ["string", "null"] },
+              "sourceKind": { "type": "string", "enum": ["manual", "imported", "generated"] },
+              "materializationKind": { "type": "string", "enum": ["declared", "dynamic"] }
+            }
+          }
+        }
+      }
+    }
+  }
+}

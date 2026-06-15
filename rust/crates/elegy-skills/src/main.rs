@@ -1,4 +1,8 @@
 use clap::{Parser, Subcommand, ValueEnum};
+use elegy_contracts::{
+    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
+    CliFailureKind, CliMachineContext, CliMachineEnvelope,
+};
 use elegy_skills::{
     validate_skill_directory, validate_skill_file, AgentCapabilityProfile,
     RegistryProfileSelection, SkillRegistry, SkillRegistryQuery,
@@ -41,29 +45,10 @@ enum OutputFormat {
     Json,
 }
 
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct MachineEnvelope<T>
-where
-    T: Serialize,
-{
-    #[serde(skip_serializing_if = "Option::is_none")]
-    correlation_id: Option<String>,
-    #[serde(skip_serializing_if = "is_false")]
-    non_interactive: bool,
-    command: Vec<String>,
-    status: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    data: Option<T>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    error: Option<String>,
-}
-
 #[derive(Clone, Debug)]
 struct MachineContext {
     format: OutputFormat,
-    non_interactive: bool,
-    correlation_id: Option<String>,
+    machine: CliMachineContext,
     command: Vec<String>,
 }
 
@@ -79,6 +64,15 @@ impl RegistryLoadError {
         match self {
             RegistryLoadError::Runtime(_) => "error",
             RegistryLoadError::InvalidInput(_) | RegistryLoadError::InvalidProfile(_) => "invalid",
+        }
+    }
+
+    fn failure_kind(&self) -> CliFailureKind {
+        match self {
+            RegistryLoadError::Runtime(_) => CliFailureKind::Runtime,
+            RegistryLoadError::InvalidInput(_) | RegistryLoadError::InvalidProfile(_) => {
+                CliFailureKind::InvalidInput
+            }
         }
     }
 
@@ -157,14 +151,13 @@ fn main() -> ExitCode {
         Err(error) => {
             if let Some(context) = CLI_MACHINE_CONTEXT.get() {
                 if context.format == OutputFormat::Json
-                    && print_json(&MachineEnvelope::<serde_json::Value> {
-                        correlation_id: context.correlation_id.clone(),
-                        non_interactive: context.non_interactive,
-                        command: context.command.clone(),
-                        status: "error",
-                        data: None,
-                        error: Some(error.to_string()),
-                    })
+                    && print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+                        &context.machine,
+                        context.command.clone(),
+                        CliFailureKind::Runtime,
+                        error.to_string(),
+                        None,
+                    ))
                     .is_ok()
                 {
                     return exit_runtime();
@@ -180,8 +173,7 @@ fn run() -> Result<ExitCode, serde_json::Error> {
     let cli = Cli::parse();
     let context = MachineContext {
         format: resolve_output_format(cli.json, cli.format),
-        non_interactive: cli.non_interactive,
-        correlation_id: cli.correlation_id,
+        machine: build_cli_machine_context(cli.non_interactive, cli.correlation_id, "elegy-skills"),
         command: vec![command_name(&cli.command).to_string()],
     };
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
@@ -389,7 +381,7 @@ fn execute_capability(
         Ok(registry) => registry,
         Err(error) => return emit_registry_load_error(context, error),
     };
-    let Some(capability) = registry.capability(&capability_id) else {
+    let Some(capability_definition) = registry.capability_definition(&capability_id) else {
         return emit_error(
             context,
             format!("capability '{capability_id}' not found"),
@@ -399,13 +391,18 @@ fn execute_capability(
 
     match context.format {
         OutputFormat::Text => {
-            println!("Capability: {}", capability.capability_name);
-            println!("Skill: {}", capability.skill_name);
-            println!("Side effects: {}", capability.has_side_effects);
+            println!("Capability: {}", capability_definition.display_name);
+            println!("ID: {}", capability_definition.id);
+            println!(
+                "Side effects: {:?}",
+                capability_definition.execution.side_effect_class
+            );
         }
-        OutputFormat::Json => {
-            print_json(&build_success_envelope(context, ["capability"], capability))?
-        }
+        OutputFormat::Json => print_json(&build_success_envelope(
+            context,
+            ["capability"],
+            capability_definition,
+        ))?,
     }
 
     Ok(ExitCode::SUCCESS)
@@ -430,7 +427,7 @@ fn execute_validate(
         }
     };
 
-    let status = if report.valid { "ok" } else { "error" };
+    let status = if report.valid { "ok" } else { "invalid" };
     let code = if report.valid {
         ExitCode::SUCCESS
     } else {
@@ -448,13 +445,9 @@ fn execute_validate(
                 }
             }
         }
-        OutputFormat::Json => print_json(&MachineEnvelope {
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: vec!["validate".to_string()],
-            status,
-            data: Some(report),
-            error: None,
+        OutputFormat::Json => print_json(&CliMachineEnvelope {
+            status: status.to_string(),
+            ..build_cli_success_envelope(&context.machine, ["validate"], report)
         })?,
     }
 
@@ -585,7 +578,10 @@ impl SkillRegistryWithProfile {
         self.registry.skill_definition(skill_id)
     }
 
-    fn capability(&self, capability_id: &str) -> Option<elegy_skills::RegistryCapabilityCard> {
+    fn capability_definition(
+        &self,
+        capability_id: &str,
+    ) -> Option<elegy_skills::CapabilityDefinition> {
         if self.selection.profile_provided
             && !self
                 .selection
@@ -594,7 +590,7 @@ impl SkillRegistryWithProfile {
         {
             return None;
         }
-        self.registry.capability(capability_id)
+        self.registry.capability_definition(capability_id)
     }
 }
 
@@ -605,14 +601,17 @@ fn emit_error(
 ) -> Result<ExitCode, serde_json::Error> {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&MachineEnvelope::<serde_json::Value> {
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: context.command.clone(),
-            status: "error",
-            data: None,
-            error: Some(message),
-        })?,
+        OutputFormat::Json => print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
+            &context.machine,
+            context.command.clone(),
+            if code == exit_invalid() {
+                CliFailureKind::InvalidInput
+            } else {
+                CliFailureKind::Runtime
+            },
+            message,
+            None,
+        ))?,
     }
 
     Ok(code)
@@ -639,14 +638,18 @@ fn emit_registry_load_error(
                 eprintln!("{}", error.message())
             }
         },
-        OutputFormat::Json => print_json(&MachineEnvelope {
-            correlation_id: context.correlation_id.clone(),
-            non_interactive: context.non_interactive,
-            command: context.command.clone(),
-            status: error.status(),
-            data: error.data(),
-            error: Some(error.message()),
-        })?,
+        OutputFormat::Json => {
+            let mut envelope = build_cli_failure_envelope(
+                &context.machine,
+                context.command.clone(),
+                error.failure_kind(),
+                error.message(),
+                None,
+            );
+            envelope.status = error.status().to_string();
+            envelope.data = error.data();
+            print_json(&envelope)?;
+        }
     }
 
     Ok(error.exit_code())
@@ -685,23 +688,12 @@ fn build_success_envelope<T, S>(
     context: &MachineContext,
     command: impl IntoIterator<Item = S>,
     data: T,
-) -> MachineEnvelope<T>
+) -> CliMachineEnvelope<T>
 where
     T: Serialize,
     S: Into<String>,
 {
-    MachineEnvelope {
-        correlation_id: context.correlation_id.clone(),
-        non_interactive: context.non_interactive,
-        command: command.into_iter().map(Into::into).collect(),
-        status: "ok",
-        data: Some(data),
-        error: None,
-    }
-}
-
-fn is_false(value: &bool) -> bool {
-    !*value
+    build_cli_success_envelope(&context.machine, command, data)
 }
 
 fn exit_invalid() -> ExitCode {

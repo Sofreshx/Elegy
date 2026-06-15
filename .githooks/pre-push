@@ -1,0 +1,17 @@
+#!/usr/bin/env bash
+# Pre-push hook: full validation (registry-alignment + Rust fmt + clippy).
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+RUST_DIR="$REPO_ROOT/rust"
+
+echo "[pre-push] registry-alignment"
+pwsh -NoProfile -NonInteractive -Command "& '$REPO_ROOT/scripts/validate-registry-alignment.ps1' -RepoRoot '$REPO_ROOT'"
+
+echo "[pre-push] cargo fmt --all --check"
+(cd "$RUST_DIR" && cargo fmt --all --check)
+
+echo "[pre-push] cargo clippy --workspace --all-targets --all-features -- -D warnings"
+(cd "$RUST_DIR" && cargo clippy --workspace --all-targets --all-features -- -D warnings)
+
+echo "[pre-push] OK"

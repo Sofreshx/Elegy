@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.test.negative-missing-subset-marker",
+    "name": "negative-missing-subset-marker",
+    "version": "0.1.0",
+    "displayName": "Negative Test: Missing Subset Marker"
+  },
+  "metadata": {
+    "description": "Negative fixture: capabilityProjections declare a subset but metadata.subsetOf is not declared.",
+    "tags": ["test", "negative"],
+    "license": "MIT"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "multi-cap-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "test",
+            "name": "multi-cap-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "cap-a",
+              "name": "Capability A",
+              "description": "First capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "multi-cap-tool",
+                "arguments": []
+              }
+            },
+            {
+              "id": "cap-b",
+              "name": "Capability B",
+              "description": "Second capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "multi-cap-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active",
+          "hostProjection": {
+            "cliName": "multi-cap-tool",
+            "outputContractId": "multi-cap-v1",
+            "defaultSideEffectClass": "read_only",
+            "capabilityProjections": [
+              {
+                "capabilityId": "cap-a",
+                "functionName": "cap_a_func"
+              },
+              {
+                "capabilityId": "cap-b",
+                "functionName": "cap_b_func"
+              }
+            ]
+          }
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "subset-projection-a",
+        "skill": "test.multi-cap-skill",
+        "capability": "cap-a",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  }
+}

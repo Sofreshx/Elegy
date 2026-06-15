@@ -1,15 +1,19 @@
 use elegy_contracts::{
-    default_support_manifest_path, export_contract_bundle,
+    builtin_capability_definitions, default_support_manifest_path, export_contract_bundle,
     load_agent_capability_profile_fixture_from_dir, load_capability_definition_fixture_from_dir,
     load_compatibility_manifest_from_dir, load_consumer_support_manifest,
-    load_elegy_plugin_package_fixture_from_dir, load_execution_event_fixture_from_dir,
-    load_invocation_request_fixture_from_dir, load_invocation_response_fixture_from_dir,
-    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
-    load_observation_event_fixture_from_dir, load_observation_session_fixture_from_dir,
-    load_observation_summary_fixture_from_dir, load_skill_definition_v2_fixture_from_dir,
-    load_skill_discovery_index_fixture_from_dir, load_structured_failure_fixture_from_dir,
-    resolve_upstream_contracts_dir, validate_agent_capability_profile,
-    validate_capability_definition, validate_elegy_plugin_package, validate_execution_event,
+    load_elegy_configuration_profile_fixture_from_dir,
+    load_elegy_configuration_receipt_fixture_from_dir,
+    load_elegy_configuration_template_fixture_from_dir, load_elegy_plugin_package_fixture_from_dir,
+    load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
+    load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
+    load_mcp_server_descriptor_fixture_from_dir, load_observation_event_fixture_from_dir,
+    load_observation_session_fixture_from_dir, load_observation_summary_fixture_from_dir,
+    load_skill_definition_v2_fixture_from_dir, load_skill_discovery_index_fixture_from_dir,
+    load_structured_failure_fixture_from_dir, resolve_upstream_contracts_dir,
+    validate_agent_capability_profile, validate_capability_definition,
+    validate_elegy_configuration_profile, validate_elegy_configuration_receipt,
+    validate_elegy_configuration_template, validate_elegy_plugin_package, validate_execution_event,
     validate_invocation_request, validate_invocation_response, validate_mcp_analysis_result,
     validate_mcp_server_descriptor, validate_observation_event, validate_observation_session,
     validate_observation_summary, validate_skill_definition_v2, validate_structured_failure,
@@ -45,8 +49,8 @@ fn upstream_bundle_contains_supported_schema_entries() {
         .map(|entry| entry.name.as_str())
         .collect::<BTreeSet<_>>();
 
-    assert!(schema_names.contains("skill-definition-v2"));
-    assert!(schema_names.contains("elegy-plugin-package-v1"));
+    assert!(schema_names.contains("skill"));
+    assert!(schema_names.contains("elegy-plugin-package"));
     assert!(schema_names.contains("skill-discovery-index"));
     assert!(schema_names.contains("mcp-tool-definition"));
     assert!(schema_names.contains("mcp-server-descriptor"));
@@ -220,9 +224,30 @@ fn upstream_capability_definition_fixture_is_semantically_valid() {
 fn upstream_skill_definition_fixture_is_semantically_valid() {
     let contracts_dir = resolve_upstream_contracts_dir();
     let definition = load_skill_definition_v2_fixture_from_dir(&contracts_dir)
-        .expect("load upstream skill-definition-v2 fixture");
+        .expect("load upstream skill fixture");
 
     validate_skill_definition_v2(&definition).expect("fixture should validate");
+}
+
+#[test]
+fn builtin_skill_capability_projections_are_semantically_valid() {
+    let definitions = builtin_capability_definitions()
+        .expect("built-in capability definitions should project cleanly");
+
+    assert!(
+        !definitions.is_empty(),
+        "expected at least one built-in capability definition"
+    );
+
+    for definition in definitions {
+        let validation = validate_capability_definition(&definition);
+        assert!(
+            validation.is_valid(),
+            "unexpected issues for {}: {:?}",
+            definition.id,
+            validation.issues
+        );
+    }
 }
 
 #[test]
@@ -239,9 +264,91 @@ fn upstream_elegy_plugin_package_fixture_is_semantically_valid() {
     );
 
     assert_eq!(package.schema_version, "elegy-plugin-package/v1");
-    assert_eq!(package.identity.package_id, "elegy.demo-plugin");
-    assert_eq!(package.components.skill_definitions.len(), 1);
-    assert_eq!(package.components.capability_projections.len(), 1);
+    assert_eq!(
+        package.identity.package_id,
+        "elegy.demo-configuration-plugin"
+    );
+    assert_eq!(package.components.configuration_templates.len(), 1);
+    assert_eq!(package.components.configuration_profiles.len(), 1);
+}
+
+#[test]
+fn plugin_package_validator_rejects_invalid_uri_fields() {
+    let mut package = load_elegy_plugin_package_fixture_from_dir(&resolve_upstream_contracts_dir())
+        .expect("load upstream elegy-plugin-package fixture");
+
+    package.metadata = Some(elegy_contracts::ElegyPluginPackageMetadata {
+        homepage: Some("not-a-uri".to_string()),
+        documentation_uri: Some("also-not-a-uri".to_string()),
+        ..package.metadata.unwrap_or_default()
+    });
+    package.publishing = Some(elegy_contracts::ElegyPluginPackagePublishingMetadata {
+        source_repository: Some("still-not-a-uri".to_string()),
+        ..package.publishing.unwrap_or_default()
+    });
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(validation
+        .issues
+        .contains(&"metadata.homepage must be a valid URI.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"metadata.documentationUri must be a valid URI.".to_string()));
+    assert!(validation
+        .issues
+        .contains(&"publishing.sourceRepository must be a valid URI.".to_string()));
+}
+
+#[test]
+fn plugin_package_fixture_has_unified_schema_version() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
+        .expect("load upstream elegy-plugin-package fixture");
+
+    assert_eq!(package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(
+        package.identity.package_id,
+        "elegy.demo-configuration-plugin"
+    );
+}
+
+#[test]
+fn upstream_elegy_configuration_fixtures_are_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let template = load_elegy_configuration_template_fixture_from_dir(&contracts_dir)
+        .expect("load upstream configuration template fixture");
+    let profile = load_elegy_configuration_profile_fixture_from_dir(&contracts_dir)
+        .expect("load upstream configuration profile fixture");
+    let receipt = load_elegy_configuration_receipt_fixture_from_dir(&contracts_dir)
+        .expect("load upstream configuration receipt fixture");
+
+    let template_validation = validate_elegy_configuration_template(&template);
+    assert!(
+        template_validation.is_valid(),
+        "unexpected template issues: {:?}",
+        template_validation.issues
+    );
+
+    let profile_validation = validate_elegy_configuration_profile(&profile);
+    assert!(
+        profile_validation.is_valid(),
+        "unexpected profile issues: {:?}",
+        profile_validation.issues
+    );
+
+    let receipt_validation = validate_elegy_configuration_receipt(&receipt);
+    assert!(
+        receipt_validation.is_valid(),
+        "unexpected receipt issues: {:?}",
+        receipt_validation.issues
+    );
+
+    assert_eq!(template.template_id, "repo-skill-mirror-minimal");
+    assert_eq!(profile.profile_id, "repo-opencode-minimal");
+    assert_eq!(
+        receipt.mode,
+        elegy_contracts::ElegyConfigurationReceiptMode::DryRun
+    );
 }
 
 #[test]
@@ -269,6 +376,10 @@ fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
         .to_path_buf();
     let fixtures = [
         (
+            "contracts/fixtures/skill-discovery-index.elegy-documentation.json",
+            ".agents/skills/elegy-documentation/SKILL.md",
+        ),
+        (
             "contracts/fixtures/skill-discovery-index.elegy-memory.json",
             ".agents/skills/elegy-memory/SKILL.md",
         ),
@@ -287,6 +398,10 @@ fn dedicated_skill_discovery_fixtures_reference_agents_skill_mirrors() {
         (
             "contracts/fixtures/skill-discovery-index.elegy-mermaid.json",
             ".agents/skills/elegy-mermaid/SKILL.md",
+        ),
+        (
+            "contracts/fixtures/skill-discovery-index.elegy-obsidian.json",
+            ".agents/skills/elegy-obsidian/SKILL.md",
         ),
     ];
 
@@ -642,7 +757,10 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("capability-definition.schema.json")
         .is_file());
     assert!(output_path
-        .join("elegy-plugin-package-v1.schema.json")
+        .join("elegy-plugin-package.schema.json")
+        .is_file());
+    assert!(output_path
+        .join("elegy-plugin-package.schema.json")
         .is_file());
     assert!(output_path.join("structured-failure.schema.json").is_file());
     assert!(output_path.join("invocation-request.schema.json").is_file());
@@ -663,7 +781,27 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .is_file());
     assert!(output_path
         .join("fixtures")
-        .join("elegy-plugin-package-v1.minimal.json")
+        .join("elegy-plugin-package.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("elegy-plugin-package.minimal.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("configuration")
+        .join("demo-template.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("configuration")
+        .join("demo-profile.json")
+        .is_file());
+    assert!(output_path
+        .join("fixtures")
+        .join("configuration")
+        .join("assets")
+        .join("demo.txt")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -706,9 +844,8 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive.by_name("agent-check.schema.json").is_ok());
         assert!(archive.by_name("agent-discovery.schema.json").is_ok());
         assert!(archive.by_name("capability-definition.schema.json").is_ok());
-        assert!(archive
-            .by_name("elegy-plugin-package-v1.schema.json")
-            .is_ok());
+        assert!(archive.by_name("elegy-plugin-package.schema.json").is_ok());
+        assert!(archive.by_name("elegy-plugin-package.schema.json").is_ok());
         assert!(archive.by_name("structured-failure.schema.json").is_ok());
         assert!(archive.by_name("invocation-request.schema.json").is_ok());
         assert!(archive.by_name("invocation-response.schema.json").is_ok());
@@ -720,7 +857,19 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
             .by_name("fixtures/capability-definition.minimal.json")
             .is_ok());
         assert!(archive
-            .by_name("fixtures/elegy-plugin-package-v1.minimal.json")
+            .by_name("fixtures/elegy-plugin-package.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/elegy-plugin-package.minimal.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/configuration/demo-template.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/configuration/demo-profile.json")
+            .is_ok());
+        assert!(archive
+            .by_name("fixtures/configuration/assets/demo.txt")
             .is_ok());
         assert!(archive
             .by_name("fixtures/structured-failure.minimal.json")
@@ -747,4 +896,650 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     }
 
     fs::remove_dir_all(&temp_root).expect("remove temp export root");
+}
+
+#[test]
+fn upstream_dedicated_skill_definitions_round_trip_host_projection() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let planning_path = contracts_dir
+        .join("fixtures")
+        .join("skill.elegy-planning.json");
+    let skills_path = contracts_dir
+        .join("fixtures")
+        .join("skill.elegy-skills.json");
+
+    let planning: SkillDefinitionV2 =
+        serde_json::from_str(&fs::read_to_string(&planning_path).expect("read planning fixture"))
+            .expect("parse planning fixture");
+    let skills: SkillDefinitionV2 =
+        serde_json::from_str(&fs::read_to_string(&skills_path).expect("read skills fixture"))
+            .expect("parse skills fixture");
+
+    let planning_projection = planning
+        .host_projection
+        .as_ref()
+        .expect("planning host_projection should be populated");
+    let skills_projection = skills
+        .host_projection
+        .as_ref()
+        .expect("skills host_projection should be populated");
+
+    assert_eq!(planning_projection.cli_name, "elegy-planning");
+    assert_eq!(planning_projection.output_contract_id, "elegy-planning-v1");
+    assert_eq!(skills_projection.cli_name, "elegy-skills");
+    assert_eq!(skills_projection.output_contract_id, "elegy-skills-v1");
+
+    validate_skill_definition_v2(&planning).expect("planning fixture should validate");
+    validate_skill_definition_v2(&skills).expect("skills fixture should validate");
+
+    let planning_reserialized =
+        serde_json::to_string(&planning).expect("re-serialize planning fixture");
+    let planning_reparsed: SkillDefinitionV2 =
+        serde_json::from_str(&planning_reserialized).expect("reparse planning fixture");
+    assert_eq!(planning, planning_reparsed);
+    assert!(
+        planning_reserialized.contains("\"hostProjection\""),
+        "re-serialized planning fixture should preserve hostProjection"
+    );
+
+    let skills_reserialized = serde_json::to_string(&skills).expect("re-serialize skills fixture");
+    let skills_reparsed: SkillDefinitionV2 =
+        serde_json::from_str(&skills_reserialized).expect("reparse skills fixture");
+    assert_eq!(skills, skills_reparsed);
+    assert!(
+        skills_reserialized.contains("\"hostProjection\""),
+        "re-serialized skills fixture should preserve hostProjection"
+    );
+}
+
+#[test]
+fn skill_definition_validator_rejects_invalid_host_projection() {
+    let make_capability = |id: &str| elegy_contracts::SkillCapability {
+        id: id.to_string(),
+        name: "Sample".to_string(),
+        description: "Sample capability".to_string(),
+        implementation: Some(SkillImplementation {
+            execution_type: "subprocess".to_string(),
+            executable_name: "sample".to_string(),
+            arguments: Vec::new(),
+        }),
+        ..elegy_contracts::SkillCapability::default()
+    };
+
+    let base_skill = || SkillDefinitionV2 {
+        skill_format: "elegy-skill-definition".to_string(),
+        skill_version: 2,
+        identity: SkillIdentityV2 {
+            namespace: "example".to_string(),
+            name: "host-projection-skill".to_string(),
+            version: "0.1.0".to_string(),
+            ..SkillIdentityV2::default()
+        },
+        capabilities: vec![
+            make_capability("example-cap"),
+            make_capability("example-other-cap"),
+        ],
+        lifecycle_state: "active".to_string(),
+        ..SkillDefinitionV2::default()
+    };
+
+    let unknown_capability = base_skill();
+    let mut bad = unknown_capability.clone();
+    bad.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: "example-cli".to_string(),
+        output_contract_id: "example-v1".to_string(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: vec![elegy_contracts::SkillHostCapabilityProjection {
+            capability_id: "missing-capability".to_string(),
+            function_name: "example_fn".to_string(),
+            side_effect_class: None,
+            is_deterministic: None,
+        }],
+    });
+    let error = validate_skill_definition_v2(&bad)
+        .expect_err("unknown capability id should fail validation");
+    assert!(error.to_string().contains(
+        "hostProjection.capabilityProjections[].capabilityId 'missing-capability' does not match any capability"
+    ));
+
+    let mut duplicate_function = base_skill();
+    duplicate_function.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: "example-cli".to_string(),
+        output_contract_id: "example-v1".to_string(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: vec![
+            elegy_contracts::SkillHostCapabilityProjection {
+                capability_id: "example-cap".to_string(),
+                function_name: "duplicate_fn".to_string(),
+                side_effect_class: None,
+                is_deterministic: None,
+            },
+            elegy_contracts::SkillHostCapabilityProjection {
+                capability_id: "example-other-cap".to_string(),
+                function_name: "duplicate_fn".to_string(),
+                side_effect_class: None,
+                is_deterministic: None,
+            },
+        ],
+    });
+    let error = validate_skill_definition_v2(&duplicate_function)
+        .expect_err("duplicate function name should fail validation");
+    assert!(error
+        .to_string()
+        .contains("functionName 'duplicate_fn' is duplicated"));
+
+    let mut duplicate_capability = base_skill();
+    duplicate_capability.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: "example-cli".to_string(),
+        output_contract_id: "example-v1".to_string(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: vec![
+            elegy_contracts::SkillHostCapabilityProjection {
+                capability_id: "example-cap".to_string(),
+                function_name: "first_fn".to_string(),
+                side_effect_class: None,
+                is_deterministic: None,
+            },
+            elegy_contracts::SkillHostCapabilityProjection {
+                capability_id: "EXAMPLE-CAP".to_string(),
+                function_name: "second_fn".to_string(),
+                side_effect_class: None,
+                is_deterministic: None,
+            },
+        ],
+    });
+    let error = validate_skill_definition_v2(&duplicate_capability)
+        .expect_err("duplicate capability id should fail validation");
+    assert!(error
+        .to_string()
+        .contains("capabilityId 'EXAMPLE-CAP' is duplicated"));
+
+    let mut blank_function = base_skill();
+    blank_function.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: "example-cli".to_string(),
+        output_contract_id: "example-v1".to_string(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: vec![elegy_contracts::SkillHostCapabilityProjection {
+            capability_id: "example-cap".to_string(),
+            function_name: "   ".to_string(),
+            side_effect_class: None,
+            is_deterministic: None,
+        }],
+    });
+    let error = validate_skill_definition_v2(&blank_function)
+        .expect_err("blank function name should fail validation");
+    assert!(error
+        .to_string()
+        .contains("functionName for capability 'example-cap' must not be empty"));
+
+    let mut blank_cli = base_skill();
+    blank_cli.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: String::new(),
+        output_contract_id: "example-v1".to_string(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: Vec::new(),
+    });
+    let error =
+        validate_skill_definition_v2(&blank_cli).expect_err("blank cliName should fail validation");
+    assert!(error
+        .to_string()
+        .contains("hostProjection.cliName must not be empty"));
+
+    let mut blank_output = base_skill();
+    blank_output.host_projection = Some(elegy_contracts::SkillHostProjection {
+        cli_name: "example-cli".to_string(),
+        output_contract_id: String::new(),
+        default_side_effect_class: elegy_contracts::HostSideEffectClass::ReadOnly,
+        capability_projections: Vec::new(),
+    });
+    let error = validate_skill_definition_v2(&blank_output)
+        .expect_err("blank outputContractId should fail validation");
+    assert!(error
+        .to_string()
+        .contains("hostProjection.outputContractId must not be empty"));
+}
+
+fn load_dedicated_plugin_package(
+    contracts_dir: &Path,
+    file_name: &str,
+) -> elegy_contracts::ElegyPluginPackage {
+    let path = contracts_dir.join("fixtures").join(file_name);
+    serde_json::from_str(&fs::read_to_string(&path).expect("read dedicated plugin package"))
+        .expect("parse dedicated plugin package")
+}
+
+#[test]
+fn dedicated_elegy_plugin_package_fixtures_are_semantically_valid() {
+    let contracts_dir = resolve_upstream_contracts_dir();
+
+    let planning_package =
+        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package.elegy-planning.json");
+    let skills_package =
+        load_dedicated_plugin_package(&contracts_dir, "elegy-plugin-package.elegy-skills.json");
+
+    for package in [&planning_package, &skills_package] {
+        let validation = validate_elegy_plugin_package(package);
+        assert!(
+            validation.is_valid(),
+            "unexpected issues for {}: {:?}",
+            package.identity.package_id,
+            validation.issues
+        );
+    }
+
+    assert_eq!(planning_package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(
+        planning_package.identity.package_id,
+        "elegy.planning-plugin"
+    );
+    assert_eq!(skills_package.schema_version, "elegy-plugin-package/v1");
+    assert_eq!(skills_package.identity.package_id, "elegy.skills-plugin");
+    assert!(!planning_package
+        .components
+        .capability_projections
+        .is_empty());
+    assert!(!skills_package.components.capability_projections.is_empty());
+}
+
+#[test]
+fn exported_contract_bundle_includes_dedicated_plugin_package_fixtures() {
+    let temp_root = env::temp_dir().join(format!(
+        "elegy-contracts-dedicated-export-{}-{}",
+        process::id(),
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("unix epoch")
+            .as_nanos()
+    ));
+    let output_path = temp_root.join("contracts");
+    let archive_path = temp_root.join("distribution").join("bundle.zip");
+
+    let export = export_contract_bundle(Some(&output_path), true, Some(&archive_path))
+        .expect("export contracts bundle");
+
+    for fixture in [
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
+    ] {
+        let on_disk = output_path.join(fixture);
+        assert!(
+            on_disk.is_file(),
+            "exported bundle directory must contain {fixture} (path={})",
+            on_disk.display()
+        );
+        assert!(
+            export.files.iter().any(|path| path == &on_disk),
+            "export manifest should report {fixture}"
+        );
+    }
+
+    let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
+    let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
+    for entry in [
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
+    ] {
+        assert!(
+            archive.by_name(entry).is_ok(),
+            "bundle archive must contain {entry}"
+        );
+    }
+
+    fs::remove_dir_all(&temp_root).expect("remove temp export root");
+}
+
+#[test]
+fn readiness_side_effect_summary_serializes_with_schema_snake_case_keys() {
+    let summary = elegy_contracts::ElegyPluginReadinessSideEffectSummary {
+        none: 1,
+        read_only: 2,
+        disk_read: 3,
+        disk_write: 4,
+        network_outbound: 5,
+        process_spawn: 6,
+        desktop_ui: 7,
+    };
+
+    let json = serde_json::to_string(&summary).expect("serialize side effect summary");
+    let parsed: serde_json::Value =
+        serde_json::from_str(&json).expect("parse side effect summary JSON");
+
+    // Schema expects snake_case keys
+    assert_eq!(parsed["none"], 1);
+    assert_eq!(parsed["read_only"], 2);
+    assert_eq!(parsed["disk_read"], 3);
+    assert_eq!(parsed["disk_write"], 4);
+    assert_eq!(parsed["network_outbound"], 5);
+    assert_eq!(parsed["process_spawn"], 6);
+    assert_eq!(parsed["desktop_ui"], 7);
+
+    // Verify camelCase variants are NOT produced
+    assert!(
+        parsed.get("readOnly").is_none(),
+        "read_only must not serialize as readOnly"
+    );
+    assert!(
+        parsed.get("diskRead").is_none(),
+        "disk_read must not serialize as diskRead"
+    );
+    assert!(
+        parsed.get("diskWrite").is_none(),
+        "disk_write must not serialize as diskWrite"
+    );
+    assert!(
+        parsed.get("networkOutbound").is_none(),
+        "network_outbound must not serialize as networkOutbound"
+    );
+    assert!(
+        parsed.get("processSpawn").is_none(),
+        "process_spawn must not serialize as processSpawn"
+    );
+    assert!(
+        parsed.get("desktopUi").is_none(),
+        "desktop_ui must not serialize as desktopUi"
+    );
+}
+
+#[test]
+fn readiness_side_effect_summary_round_trips_through_deserialization() {
+    let json = r#"{"none":0,"read_only":1,"disk_read":2,"disk_write":3,"network_outbound":4,"process_spawn":5,"desktop_ui":6}"#;
+    let summary: elegy_contracts::ElegyPluginReadinessSideEffectSummary =
+        serde_json::from_str(json).expect("deserialize snake_case JSON");
+
+    assert_eq!(summary.none, 0);
+    assert_eq!(summary.read_only, 1);
+    assert_eq!(summary.disk_read, 2);
+    assert_eq!(summary.disk_write, 3);
+    assert_eq!(summary.network_outbound, 4);
+    assert_eq!(summary.process_spawn, 5);
+    assert_eq!(summary.desktop_ui, 6);
+
+    let reserialized = serde_json::to_string(&summary).expect("re-serialize");
+    let reparsed: serde_json::Value =
+        serde_json::from_str(&reserialized).expect("re-parse serialized");
+    assert_eq!(
+        reparsed["read_only"], 1,
+        "read_only must survive round-trip as snake_case"
+    );
+    assert_eq!(
+        reparsed["disk_read"], 2,
+        "disk_read must survive round-trip as snake_case"
+    );
+    assert_eq!(
+        reparsed["network_outbound"], 4,
+        "network_outbound must survive round-trip as snake_case"
+    );
+}
+
+#[test]
+fn plugin_package_with_elegy_compatibility_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.plugin", "name": "test-plugin", "version": "0.1.0" },
+        "components": {},
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "minimumElegyToolingVersion": "1.8.0",
+            "contractsSource": "https://example.com/contracts/bundle-v1.8.0.zip"
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with elegyCompatibility");
+
+    let compat = package
+        .elegy_compatibility
+        .expect("elegyCompatibility should be present");
+    assert_eq!(compat.contract_bundle_version, "1.8.0");
+    assert_eq!(compat.schema_line, "1.x");
+    assert_eq!(
+        compat.minimum_elegy_tooling_version.as_deref(),
+        Some("1.8.0")
+    );
+    assert!(compat.contracts_source.is_some());
+}
+
+#[test]
+fn plugin_package_without_elegy_compatibility_still_parses() {
+    // Existing packages should still parse without elegyCompatibility
+    let contracts_dir = resolve_upstream_contracts_dir();
+    let package = load_elegy_plugin_package_fixture_from_dir(&contracts_dir)
+        .expect("load upstream elegy-plugin-package fixture");
+
+    assert!(package.elegy_compatibility.is_none());
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "existing packages without elegyCompatibility should still validate: {:?}",
+        validation.issues
+    );
+}
+
+#[test]
+fn elegy_compatibility_uri_validation() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.plugin", "name": "test-plugin", "version": "0.1.0" },
+        "components": {},
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "contractsSource": "not-a-uri"
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with invalid contractsSource");
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(validation
+        .issues
+        .contains(&"elegyCompatibility.contractsSource must be a valid URI.".to_string()));
+}
+
+#[test]
+fn plugin_lock_v1_parses_valid_lock() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x",
+            "sourceAsset": "https://example.com/bundles/elegy-contracts-1.8.0.zip",
+            "checksum": "sha256:abc123def456"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z",
+        "generatedBy": "elegy-cli/1.8.0",
+        "pluginPackageRef": "elegy-plugin-package.json"
+    }"#;
+
+    let lock: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(json).expect("parse valid lock file");
+
+    assert_eq!(lock.schema_version, "elegy-plugin-lock/v1");
+    assert_eq!(lock.lock_version, 1);
+    assert_eq!(lock.elegy_compatibility.contract_bundle_version, "1.8.0");
+    assert_eq!(lock.elegy_compatibility.schema_line, "1.x");
+    assert!(lock.elegy_compatibility.source_asset.is_some());
+    assert!(lock.elegy_compatibility.checksum.is_some());
+    assert_eq!(lock.generated_at, "2026-06-12T10:00:00Z");
+}
+
+#[test]
+fn plugin_lock_v1_rejects_missing_required_fields() {
+    // Missing contractBundleVersion
+    let json_missing_version = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "schemaLine": "1.x"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z"
+    }"#;
+
+    let result: Result<elegy_contracts::ElegyPluginLockV1, _> =
+        serde_json::from_str(json_missing_version);
+    assert!(
+        result.is_err(),
+        "lock file with missing required fields should fail to parse"
+    );
+
+    // Missing checksum is optional - should parse fine
+    let json_no_checksum = r#"{
+        "schemaVersion": "elegy-plugin-lock/v1",
+        "lockVersion": 1,
+        "elegyCompatibility": {
+            "contractBundleVersion": "1.8.0",
+            "schemaLine": "1.x"
+        },
+        "generatedAt": "2026-06-12T10:00:00Z"
+    }"#;
+
+    let lock: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(json_no_checksum).expect("parse lock without checksum");
+    assert!(lock.elegy_compatibility.checksum.is_none());
+}
+
+#[test]
+fn plugin_lock_v1_round_trips() {
+    let lock = elegy_contracts::ElegyPluginLockV1 {
+        schema_version: "elegy-plugin-lock/v1".to_string(),
+        lock_version: 1,
+        elegy_compatibility: elegy_contracts::ElegyPluginLockCompatibility {
+            contract_bundle_version: "1.8.0".to_string(),
+            schema_line: "1.x".to_string(),
+            source_asset: Some("https://example.com/bundle.zip".to_string()),
+            checksum: Some("sha256:abc".to_string()),
+        },
+        generated_at: "2026-06-12T10:00:00Z".to_string(),
+        generated_by: Some("elegy-cli/1.8.0".to_string()),
+        plugin_package_ref: Some("elegy-plugin-package.json".to_string()),
+    };
+
+    let json = serde_json::to_string(&lock).expect("serialize lock");
+    let parsed: elegy_contracts::ElegyPluginLockV1 =
+        serde_json::from_str(&json).expect("deserialize lock");
+    assert_eq!(parsed.schema_version, lock.schema_version);
+    assert_eq!(parsed.lock_version, lock.lock_version);
+    assert_eq!(
+        parsed.elegy_compatibility.contract_bundle_version,
+        lock.elegy_compatibility.contract_bundle_version
+    );
+    assert_eq!(
+        parsed.elegy_compatibility.schema_line,
+        lock.elegy_compatibility.schema_line
+    );
+    assert_eq!(
+        parsed.elegy_compatibility.checksum,
+        lock.elegy_compatibility.checksum
+    );
+}
+
+#[test]
+fn plugin_package_with_rust_lane_and_adapter_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.rust-plugin", "name": "test-rust-plugin", "version": "0.1.0" },
+        "components": {
+            "skillDefinitions": [{
+                "id": "test-skill",
+                "definitionRef": "contracts/fixtures/skill.minimal.json"
+            }],
+            "capabilityProjections": [{
+                "id": "test-cap-rust",
+                "skill": "elegy.test",
+                "capability": "test_capability",
+                "lane": "rust",
+                "supportsDryRun": false,
+                "projection": {
+                    "projections": ["function_calling"],
+                    "functionName": "test_function"
+                }
+            }],
+            "rustToolAdapters": [{
+                "id": "test-adapter",
+                "crateName": "elegy-test-adapter",
+                "crateVersion": "0.1.0",
+                "registrySymbol": "register_test_tools"
+            }]
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse package with rust lane and adapter");
+
+    assert_eq!(package.components.capability_projections.len(), 1);
+    assert_eq!(package.components.capability_projections[0].lane, "rust");
+    assert_eq!(package.components.rust_tool_adapters.len(), 1);
+    assert_eq!(
+        package.components.rust_tool_adapters[0].crate_name,
+        "elegy-test-adapter"
+    );
+    assert_eq!(
+        package.components.rust_tool_adapters[0].registry_symbol,
+        "register_test_tools"
+    );
+
+    let validation = validate_elegy_plugin_package(&package);
+    assert!(
+        validation.is_valid(),
+        "rust lane package should validate: {:?}",
+        validation.issues
+    );
+}
+
+#[test]
+fn rust_tool_adapter_with_optional_fields_parses() {
+    let json = r#"{
+        "schemaVersion": "elegy-plugin-package/v1",
+        "identity": { "packageId": "test.rust-opt", "name": "test-rust-opt", "version": "0.1.0" },
+        "components": {
+            "skillDefinitions": [{
+                "id": "test-skill",
+                "definitionRef": "contracts/fixtures/skill.minimal.json"
+            }],
+            "rustToolAdapters": [{
+                "id": "adapter-with-feature",
+                "crateName": "elegy-feature-adapter",
+                "crateVersion": "0.2.0",
+                "registrySymbol": "register_feature_tools",
+                "feature": "native-tools",
+                "manifestRef": "rust/adapter-manifest.json"
+            }]
+        }
+    }"#;
+
+    let package: elegy_contracts::ElegyPluginPackage =
+        serde_json::from_str(json).expect("parse adapter with optional fields");
+
+    let adapter = &package.components.rust_tool_adapters[0];
+    assert_eq!(adapter.feature.as_deref(), Some("native-tools"));
+    assert_eq!(
+        adapter.manifest_ref.as_deref(),
+        Some("rust/adapter-manifest.json")
+    );
+}
+
+#[test]
+fn rust_tool_adapter_round_trips() {
+    let adapter = elegy_contracts::ElegyPluginPackageRustToolAdapterComponent {
+        id: "round-trip-adapter".to_string(),
+        crate_name: "elegy-roundtrip".to_string(),
+        crate_version: "0.3.0".to_string(),
+        feature: Some("harness".to_string()),
+        registry_symbol: "register_harness_tools".to_string(),
+        manifest_ref: Some("rust/manifest.json".to_string()),
+    };
+
+    let json = serde_json::to_string(&adapter).expect("serialize adapter");
+    let parsed: elegy_contracts::ElegyPluginPackageRustToolAdapterComponent =
+        serde_json::from_str(&json).expect("deserialize adapter");
+    assert_eq!(parsed.id, adapter.id);
+    assert_eq!(parsed.crate_name, adapter.crate_name);
+    assert_eq!(parsed.crate_version, adapter.crate_version);
+    assert_eq!(parsed.feature, adapter.feature);
+    assert_eq!(parsed.registry_symbol, adapter.registry_symbol);
+    assert_eq!(parsed.manifest_ref, adapter.manifest_ref);
 }

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/memory-list-result.schema.json",
+  "title": "MemoryListResult",
+  "description": "List of memory rows matching requested filters with scope and count metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["scope", "count", "memories"],
+  "properties": {
+    "scope": { "type": "string", "minLength": 1 },
+    "count": { "type": "integer", "minimum": 0 },
+    "memories": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "state", "memoryType", "provenance", "importance", "updatedAt", "preview"],
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "state": { "type": "string" },
+          "memoryType": { "type": "string" },
+          "provenance": { "type": "string" },
+          "importance": { "type": "number" },
+          "updatedAt": { "type": "string", "format": "date-time" },
+          "preview": { "type": "string" }
+        }
+      }
+    }
+  }
+}
