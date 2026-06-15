@@ -4,7 +4,9 @@
 //! structural summary queries.
 
 use crate::error::Result;
+use crate::ir::EdgeKind;
 use crate::ir::Entity;
+use crate::store::Direction;
 use crate::store::Store;
 use serde::Serialize;
 
@@ -101,11 +103,49 @@ impl QueryEngine {
         }
     }
 
-    /// Get neighbors of an entity (deferred to wp-query-neighbors).
-    pub fn neighbors(&self, _id: &str, _direction: &str) -> Result<String> {
-        Ok(serde_json::to_string_pretty(&QueryResult::<()>::error(
-            "neighbors query not yet implemented (wp-query-neighbors)".to_string(),
-        ))?)
+    /// Get neighbors of an entity.
+    ///
+    /// Returns all entities connected to the given entity by edges,
+    /// in the specified direction (`in` or `out`). Each result includes
+    /// the neighbor entity and the edge kind.
+    pub fn neighbors(&self, id: &str, direction: &str) -> Result<String> {
+        let dir = match direction {
+            "out" | "outgoing" => Direction::Outgoing,
+            "in" | "incoming" => Direction::Incoming,
+            other => {
+                return Ok(serde_json::to_string_pretty(
+                    &QueryResult::<()>::error(format!(
+                        "Invalid direction '{}'. Use 'in' or 'out'.",
+                        other
+                    )),
+                )?);
+            }
+        };
+
+        let results = self.store.get_neighbors(&id.to_string(), dir)?;
+
+        if results.is_empty() {
+            Ok(serde_json::to_string_pretty(
+                &QueryResult::<Vec<(crate::ir::Entity, EdgeKind)>>::not_found(format!(
+                    "No neighbors found for entity '{}' in direction '{}'",
+                    id, direction
+                )),
+            )?)
+        } else {
+            // Serialize as array of {entity, edgeKind}
+            let output: Vec<serde_json::Value> = results
+                .iter()
+                .map(|(entity, kind)| {
+                    serde_json::json!({
+                        "entity": entity,
+                        "edgeKind": kind,
+                    })
+                })
+                .collect();
+            Ok(serde_json::to_string_pretty(
+                &QueryResult::ok(&output),
+            )?)
+        }
     }
 
     /// Analyze impact of changes to a file (deferred to wp-query-impact).
@@ -206,5 +246,48 @@ mod tests {
             .as_str()
             .unwrap()
             .contains("ts"));
+    }
+
+    #[test]
+    fn test_neighbors_query() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.redb");
+        let store = Store::open(db_path.to_str().unwrap()).unwrap();
+
+        let src = make_entity("src1", "caller", "elegy-codegraph-ts");
+        let dst = make_entity("dst1", "callee", "elegy-codegraph-ts");
+        store.insert_entity(&src).unwrap();
+        store.insert_entity(&dst).unwrap();
+
+        store.insert_edge(&crate::ir::Edge {
+            src: "src1".into(),
+            dst: "dst1".into(),
+            kind: crate::ir::EdgeKind::Calls,
+            provenance: crate::ir::Provenance {
+                extractor: "test".into(),
+                confidence: crate::ir::Confidence::Exact,
+                evidence_refs: vec![],
+            },
+        }).unwrap();
+
+        let engine = QueryEngine::new(store);
+        let output = engine.neighbors("src1", "out").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["status"], "ok");
+        assert_eq!(parsed["data"].as_array().unwrap().len(), 1);
+        assert_eq!(parsed["data"][0]["entity"]["name"], "callee");
+        assert_eq!(parsed["data"][0]["edgeKind"], "calls");
+    }
+
+    #[test]
+    fn test_neighbors_invalid_direction() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.redb");
+        let store = Store::open(db_path.to_str().unwrap()).unwrap();
+        let engine = QueryEngine::new(store);
+
+        let output = engine.neighbors("any", "sideways").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["status"], "error");
     }
 }
