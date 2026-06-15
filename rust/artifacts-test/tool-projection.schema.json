@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/tool-projection.schema.json",
+  "title": "ToolProjection",
+  "description": "Callable view of a governed capability for a specific host surface (CLI, MCP, OpenAI function calling, HTTP, etc.). A projection is one possible incarnation of a capability — not the canonical authority for the underlying contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["projectionKind", "name", "description", "inputSchemaRef", "outputSchemaRef", "sideEffectClass", "provenance"],
+  "properties": {
+    "projectionKind": {
+      "type": "string",
+      "enum": ["cli", "mcp", "openai-function", "http", "grpc", "other"],
+      "description": "The host-interface category for this projection."
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Tool/model name exposed to the agent or model (e.g. 'memory-search', 'repo-status')."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Human-readable description of what the tool does."
+    },
+    "inputSchemaRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to a JSON Schema that defines the tool's input shape (e.g. 'https://elegy/contracts/schemas/memory-search-input.schema.json'). Required for machine-invokable projections."
+    },
+    "outputSchemaRef": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Reference to a JSON Schema that defines the tool's expected output shape. Required for machine-invokable projections."
+    },
+    "invocationEnvelope": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "How the tool is invoked and how results are returned.",
+      "properties": {
+        "requestSchemaRef": {
+          "type": "string",
+          "description": "Reference to the invocation-request schema envelope used by this projection."
+        },
+        "responseSchemaRef": {
+          "type": "string",
+          "description": "Reference to the invocation-response schema envelope used by this projection."
+        }
+      }
+    },
+    "sideEffectClass": {
+      "type": "string",
+      "enum": ["none", "read", "write", "external", "destructive"],
+      "description": "Side-effect classification for host policy evaluation."
+    },
+    "isDeterministic": {
+      "type": "boolean",
+      "default": false,
+      "description": "Whether this tool always produces the same output for the same input."
+    },
+    "dependencyRequirements": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "External dependencies or secrets this tool needs to operate.",
+      "properties": {
+        "secrets": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Secret keys or environment variables required."
+        },
+        "services": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "External services this tool depends on (e.g. 'ollama', 'git')."
+        },
+        "filesystem": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "File paths or patterns this tool reads or writes."
+        }
+      }
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceCapabilityId", "generatedBy", "generatedAt"],
+      "description": "How this projection was created and what capability it derives from.",
+      "properties": {
+        "sourceCapabilityId": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The governed capability id this projection was derived from."
+        },
+        "generatedBy": {
+          "type": "string",
+          "enum": ["elegy-host-mcp", "elegy-cli", "elegy-forge", "manual", "other"],
+          "description": "What system or process generated this projection."
+        },
+        "generatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO-8601 timestamp when this projection was generated."
+        },
+        "projectionVersion": {
+          "type": "string",
+          "description": "Semver version of the projection rules used."
+        }
+      }
+    },
+    "frozenTool": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Metadata for promoted deterministic tools with validation evidence.",
+      "properties": {
+        "isFrozen": { "type": "boolean" },
+        "frozenAt": { "type": "string", "format": "date-time" },
+        "inputExamples": {
+          "type": "array",
+          "items": { "type": "object" },
+          "description": "Validated example inputs with expected outputs."
+        },
+        "validationEvidence": {
+          "type": "string",
+          "description": "Reference to validation evidence (test run, contract test output)."
+        },
+        "fallbackBehavior": {
+          "type": "string",
+          "description": "What to do when this tool fails: retry, degrade, abort."
+        }
+      }
+    }
+  }
+}

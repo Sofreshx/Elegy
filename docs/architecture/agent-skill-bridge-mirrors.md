@@ -12,7 +12,7 @@ without promoting either markdown lane into an authority root.
 
 The authority chain remains one-way:
 
-1. Governed skill definitions under `contracts/fixtures/skill-definition-v2.*.json` are the discovery authority.
+1. Governed skill definitions under `contracts/fixtures/skill.*.json` are the discovery authority.
 2. Governed discovery projections under `contracts/fixtures/skill-discovery-index.*.json` are derived contract outputs over those definitions.
 3. Repo-local `SKILL.md` files are rendered mirrors only.
 

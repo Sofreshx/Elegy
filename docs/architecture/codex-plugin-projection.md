@@ -11,8 +11,8 @@ Codex plugin folder without promoting Codex files into authority roots.
 
 The authority chain is one-way:
 
-1. `contracts/schemas/elegy-plugin-package-v1.schema.json` defines the portable package contract.
-2. `contracts/fixtures/elegy-plugin-package-v1.minimal.json` and real package instances are the governed package inputs.
+1. `contracts/schemas/elegy-plugin-package.schema.json` and `contracts/schemas/elegy-plugin-package.schema.json` define the portable package contracts.
+2. `contracts/fixtures/elegy-plugin-package.minimal.json`, `contracts/fixtures/elegy-plugin-package.minimal.json`, and real package instances are the governed package inputs.
 3. Generated Codex plugin files are derived projections only.
 
 Codex plugin files do not become authored truth for Elegy behavior, package
@@ -51,7 +51,7 @@ The current slice does not generate:
 
 Reason:
 
-- `elegy-plugin-package/v1` currently carries portable MCP projection metadata, but it does not yet carry enough Codex-runnable MCP launch information to emit a truthful `.mcp.json`.
+- `elegy-plugin-package/v1` and `elegy-plugin-package/v2` carry portable MCP projection metadata, and v2 additionally carries configuration components, but neither contract yet carries enough Codex-runnable MCP launch information to emit a truthful `.mcp.json`.
 - Connector identity, auth, state, trust, and install/runtime UX remain host-owned and are therefore outside the first derived projection slice.
 - Hook packaging and execution policy are also host/runtime concerns and remain out of scope for this first projection pass.
 

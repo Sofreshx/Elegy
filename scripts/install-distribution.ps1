@@ -6,7 +6,9 @@ param(
     [string[]]$CliSurfaces = @('elegy-cli'),
     [string[]]$WrapperSurfaces = @(),
     [string]$LocalArtifactsRoot = '',
-    [switch]$Force
+    [switch]$Force,
+    [switch]$AddToPath,
+    [switch]$NoCommandShims
 )
 
 $ErrorActionPreference = 'Stop'
@@ -74,6 +76,16 @@ function Get-CliSurfaceMetadata {
             AssetPrefix = 'elegy-skills'
             Binary = 'elegy-skills'
         }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration'
+            Binary = 'elegy-configuration'
+        }
+        'elegy-documentation' = @{
+            Surface = 'elegy-documentation'
+            AssetPrefix = 'elegy-documentation'
+            Binary = 'elegy-documentation'
+        }
     }
 }
 
@@ -102,6 +114,24 @@ function Get-WrapperSurfaceMetadata {
             AssetPrefix = 'elegy-skills-wrapper'
             Installer = 'install.ps1'
             SkillBridge = 'skills/elegy-skills/SKILL.md'
+        }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-configuration/SKILL.md'
+        }
+        'elegy-documentation' = @{
+            Surface = 'elegy-documentation'
+            AssetPrefix = 'elegy-documentation-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-documentation/SKILL.md'
+        }
+        'elegy-obsidian' = @{
+            Surface = 'elegy-obsidian'
+            AssetPrefix = 'elegy-obsidian-wrapper'
+            Installer = 'install.ps1'
+            SkillBridge = 'skills/elegy-obsidian/SKILL.md'
         }
     }
 }
@@ -862,10 +892,66 @@ foreach ($surface in $resolvedWrapperSurfaces) {
     }) | Out-Null
 }
 
+# Tool resolution contract (host-neutral):
+# Priority order for agents, MCP hosts, and verifiers:
+# 1. Install receipt commandShims[].shimPath
+# 2. Install receipt commandShims[].targetExecutablePath
+# 3. Explicit --bin-dir argument
+# 4. PATH fallback
+
+if (-not $NoCommandShims -and $installedCliReports.Count -gt 0) {
+    $shimRoot = Join-Path $binRoot 'shims'
+    New-Item -ItemType Directory -Path $shimRoot -Force | Out-Null
+    $commandShims = [System.Collections.Generic.List[object]]::new()
+    foreach ($report in $installedCliReports) {
+        $shimPath = Join-Path $shimRoot "$($report.Surface).ps1"
+        $shimContent = @"
+& `"$($report.ExecutablePath)`" @args
+"@
+        Set-Content -Path $shimPath -Value $shimContent -Encoding utf8
+        $commandShims.Add([pscustomobject]@{
+            toolName = $report.Surface
+            shimPath = $shimPath
+            targetExecutablePath = $report.ExecutablePath
+        })
+    }
+}
+else {
+    $shimRoot = $null
+    $commandShims = @()
+}
+
+$pathUpdate = $null
+if ($AddToPath -and $NoCommandShims) {
+    Write-Warning 'AddToPath requires command shims. Ignoring -AddToPath.'
+}
+elseif ($AddToPath -and -not $NoCommandShims -and $shimRoot) {
+    $normalizedShimRoot = $shimRoot.TrimEnd('\')
+    $currentUserPath = [Environment]::GetEnvironmentVariable('PATH', 'User')
+    $paths = $currentUserPath -split ';' | Where-Object { $_ } | ForEach-Object { $_.TrimEnd('\') }
+    if ($normalizedShimRoot -notin $paths) {
+        [Environment]::SetEnvironmentVariable('PATH', "$currentUserPath;$normalizedShimRoot", 'User')
+        $pathUpdate = [ordered]@{
+            variable = 'PATH'
+            scope    = 'User'
+            appendedPath = $normalizedShimRoot
+            alreadyPresent = $false
+        }
+    }
+    else {
+        $pathUpdate = [ordered]@{
+            variable = 'PATH'
+            scope    = 'User'
+            appendedPath = $normalizedShimRoot
+            alreadyPresent = $true
+        }
+    }
+}
+
 $destinationRoot = (Resolve-Path -Path $Destination).Path
 $receiptPath = Join-Path $destinationRoot 'install-receipt.json'
 $installReceipt = [ordered]@{
-    schemaVersion = '1.0.0'
+    schemaVersion = '1.1.0'
     documentType = 'elegy-install-receipt'
     installedAtUtc = (Get-Date).ToUniversalTime().ToString('o')
     request = [ordered]@{
@@ -890,6 +976,9 @@ $installReceipt = [ordered]@{
         files = @($verifiedFiles)
     }
     installedAssets = @($installedAssets)
+    commandShimRoot = if ($shimRoot) { $shimRoot } else { $null }
+    commandShims = @($commandShims)
+    pathUpdate = $pathUpdate
 }
 
 $installReceipt | ConvertTo-Json -Depth 8 | Set-Content -Path $receiptPath -Encoding utf8
@@ -921,3 +1010,20 @@ if ($resolvedCliSurfaces -contains 'elegy-cli') {
     Write-Host " - compatibility cli path: $legacyCliPath"
 }
 Write-Host " - install receipt: $receiptPath"
+if (-not $NoCommandShims -and $installedCliReports.Count -gt 0) {
+    Write-Host ''
+    Write-Host "Command shims created at: $shimRoot"
+    if (-not $AddToPath) {
+        Write-Host 'Add this directory to your PATH to invoke Elegy tools directly:'
+        Write-Host "  [Environment]::SetEnvironmentVariable('PATH', `"`$env:PATH;$shimRoot`", 'User')"
+        Write-Host 'Or re-run with -AddToPath.'
+        Write-Host '(Note: PATH changes take effect in new PowerShell sessions.)'
+    }
+    elseif ($pathUpdate -and -not $pathUpdate.alreadyPresent) {
+        Write-Host "Added to user PATH: $shimRoot"
+        Write-Host '(Note: PATH changes take effect in new PowerShell sessions.)'
+    }
+    elseif ($pathUpdate -and $pathUpdate.alreadyPresent) {
+        Write-Host "PATH already contains: $shimRoot (skipped)"
+    }
+}

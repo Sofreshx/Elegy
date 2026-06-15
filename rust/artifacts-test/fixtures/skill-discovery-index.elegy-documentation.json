@@ -1,0 +1,38 @@
+{
+  "schemaVersion": 1,
+  "builtAt": "2026-05-28T00:00:00Z",
+  "entries": [
+    {
+      "skillId": "elegy-documentation",
+      "name": "Elegy Documentation Authority",
+      "description": "Derived projection of the governed Elegy documentation definition for loading the repo-local non-authoritative documentation authority skill mirror.",
+      "lifecycleState": "active",
+      "triggersOn": [
+        "agent readable docs",
+        "documentation map",
+        "check docs objectively"
+      ],
+      "keywords": [
+        "documentation",
+        "docs",
+        "authority",
+        "map",
+        "check",
+        "llms",
+        "bundle"
+      ],
+      "capabilityHints": [
+        "documentation-authority-inspection",
+        "documentation-objective-validation",
+        "documentation-derived-export"
+      ],
+      "manifest": {
+        "id": "elegy-documentation",
+        "loadMode": "onDemand",
+        "vaultRef": ".agents/skills/elegy-documentation/SKILL.md",
+        "sourceKind": "generated",
+        "materializationKind": "declared"
+      }
+    }
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "schemaVersion": "elegy-configuration-profile/v1",
+  "profileId": "demo-profile",
+  "templates": [
+    {
+      "templatePath": "demo-template.json"
+    }
+  ]
+}

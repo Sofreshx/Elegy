@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
+  "title": "SkillDiscoveryResult",
+  "description": "Registry-oriented skill discovery, resolution, and validation payload used by the dedicated skill registry surfaces.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "query": { "type": ["string", "null"] },
+    "results": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "topSkill": { "type": ["object", "null"] },
+    "topCapability": { "type": ["object", "null"] },
+    "skills": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "issues": {
+      "type": "array",
+      "items": { "type": "object" }
+    },
+    "valid": { "type": "boolean" },
+    "disclosureLevel": { "type": "string" }
+  }
+}

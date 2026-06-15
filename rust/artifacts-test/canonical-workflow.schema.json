@@ -1,0 +1,258 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/canonical-workflow.schema.json",
+  "title": "CanonicalWorkflowDefinition",
+  "description": "Canonical workflow contract consumed by non-.NET engines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "name",
+    "specVersion",
+    "canonicalAuthority",
+    "conflictPolicy",
+    "blueprint",
+    "triggers",
+    "steps",
+    "connections",
+    "layout"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "specVersion": {
+      "const": "1.0"
+    },
+    "canonicalAuthority": {
+      "type": "string",
+      "enum": [
+        "blueprint",
+        "tenant",
+        "runtime"
+      ]
+    },
+    "conflictPolicy": {
+      "type": "string",
+      "enum": [
+        "reject",
+        "reconcile",
+        "override"
+      ]
+    },
+    "blueprint": {
+      "$ref": "#/$defs/blueprintMetadata"
+    },
+    "triggers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/workflowTrigger"
+      }
+    },
+    "steps": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/workflowStep"
+      }
+    },
+    "connections": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/workflowConnection"
+      }
+    },
+    "layout": {
+      "$ref": "#/$defs/workflowLayout"
+    }
+  },
+  "$defs": {
+    "blueprintMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "blueprintId",
+        "version",
+        "isPinned"
+      ],
+      "properties": {
+        "blueprintId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "isPinned": {
+          "type": "boolean"
+        }
+      }
+    },
+    "workflowTrigger": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        },
+        "targetStepId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "workflowStep": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "type"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "type": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "workflowConnection": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "fromStepId",
+        "toStepId"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fromStepId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "toStepId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "label": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "workflowLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "groups",
+        "positions"
+      ],
+      "properties": {
+        "groups": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workflowGroupLayout"
+          }
+        },
+        "positions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/workflowStepPosition"
+          }
+        }
+      }
+    },
+    "workflowGroupLayout": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "name",
+        "x",
+        "y",
+        "width",
+        "height"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        }
+      }
+    },
+    "workflowStepPosition": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "stepId",
+        "x",
+        "y"
+      ],
+      "properties": {
+        "stepId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "x": {
+          "type": "number"
+        },
+        "y": {
+          "type": "number"
+        }
+      }
+    }
+  }
+}

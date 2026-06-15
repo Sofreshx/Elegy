@@ -22,9 +22,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
+      - uses: dtolnay/rust-toolchain@1.95.0
       - uses: taiki-e/install-action@cargo-deny
       - name: cargo deny check
         working-directory: ./rust
@@ -35,9 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
+      - uses: dtolnay/rust-toolchain@1.95.0
       - uses: taiki-e/install-action@cargo-audit
       - name: cargo audit
         working-directory: ./rust
@@ -63,9 +59,7 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
+      - uses: dtolnay/rust-toolchain@1.95.0
       - name: Initialize CodeQL
         uses: github/codeql-action/init@v3
         with:

@@ -15,6 +15,7 @@ path = "src/main.rs"
 async-trait.workspace = true
 clap.workspace = true
 chrono = { version = "0.4.44", features = ["serde"] }
+elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 reqwest = { workspace = true, features = ["json"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde.workspace = true

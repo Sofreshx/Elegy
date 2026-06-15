@@ -1,0 +1,10 @@
+{
+  "packageId": "elegy.planning-plugin",
+  "installPath": "/usr/local/lib/elegy/plugins/elegy-planning",
+  "installedBinaries": [
+    {
+      "toolName": "elegy-planning",
+      "binaryPath": "elegy-planning"
+    }
+  ]
+}

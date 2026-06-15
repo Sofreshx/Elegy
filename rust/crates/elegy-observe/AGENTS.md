@@ -3,7 +3,7 @@
 ## Start Here
 
 - Read `../../../docs/architecture/observe-cli.md` before changing command model, output contracts, or capture lifecycle.
-- Inspect `../../../contracts/fixtures/skill-definition-v2.elegy-observe.json` when changing agent-visible discovery semantics.
+- Inspect `../../../contracts/fixtures/skill.elegy-observe.json` when changing agent-visible discovery semantics.
 
 ## Boundaries
 

@@ -7,7 +7,10 @@ pub use elegy_contracts::{
     ContractsError, SkillCapability, SkillCapabilityExecution, SkillCapabilityInput,
     SkillDefinitionV2, AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION,
 };
-use elegy_contracts::{validate_agent_capability_profile, validate_skill_definition_v2_strict};
+use elegy_contracts::{
+    project_skill_capability_definition, validate_agent_capability_profile,
+    validate_skill_definition_v2_strict,
+};
 use serde::Serialize;
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
@@ -282,6 +285,11 @@ impl SkillRegistry {
         })
     }
 
+    pub fn capability_definition(&self, capability_id: &str) -> Option<CapabilityDefinition> {
+        self.capability(capability_id)
+            .map(|capability| capability.capability_definition)
+    }
+
     pub fn profile_selection(
         &self,
         profile: Option<&AgentCapabilityProfile>,
@@ -368,6 +376,19 @@ impl SkillRegistry {
     }
 
     pub fn build_mcp_tools(&self) -> Vec<RegistryMcpTool> {
+        self.build_mcp_tool_bindings()
+            .into_iter()
+            .map(|binding| RegistryMcpTool {
+                capability_id: binding.capability_id,
+                description: binding.description,
+                input_schema: binding.input_schema,
+                read_only_hint: binding.read_only_hint,
+                idempotent_hint: binding.idempotent_hint,
+            })
+            .collect()
+    }
+
+    pub fn build_mcp_tool_bindings(&self) -> Vec<RegistryMcpToolBinding> {
         self.skills
             .iter()
             .flat_map(|skill| {
@@ -375,15 +396,20 @@ impl SkillRegistry {
                     .definition
                     .capabilities
                     .iter()
-                    .map(|capability| RegistryMcpTool {
-                        capability_id: capability.id.clone(),
-                        description: capability.description.clone(),
-                        input_schema: capability_input_schema(capability),
-                        read_only_hint: Some(!capability_has_side_effects(capability)),
-                        idempotent_hint: Some(capability_is_deterministic(capability)),
-                    })
+                    .filter_map(mcp_tool_binding)
             })
             .collect()
+    }
+
+    pub fn mcp_tool_binding(&self, capability_id: &str) -> Option<RegistryMcpToolBinding> {
+        self.skills.iter().find_map(|skill| {
+            skill
+                .definition
+                .capabilities
+                .iter()
+                .find(|capability| capability.id == capability_id)
+                .and_then(mcp_tool_binding)
+        })
     }
 }
 
@@ -413,6 +439,23 @@ pub struct RegistryMcpTool {
     pub idempotent_hint: Option<bool>,
 }
 
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct RegistryMcpToolBinding {
+    pub capability_id: String,
+    pub description: String,
+    pub executable_name: String,
+    pub execution_type: String,
+    pub argument_template: Vec<String>,
+    pub input_schema: Value,
+    pub stdin_format: Option<String>,
+    pub timeout_seconds: Option<u64>,
+    pub has_side_effects: bool,
+    pub supports_dry_run: bool,
+    pub read_only_hint: Option<bool>,
+    pub idempotent_hint: Option<bool>,
+}
+
 impl RegistryProfileSelection {
     pub fn has_errors(&self) -> bool {
         self.issues
@@ -422,27 +465,58 @@ impl RegistryProfileSelection {
 }
 
 pub fn validate_skill_file(path: &Path) -> Result<RegistryValidationReport, SkillsSurfaceError> {
-    let definition = load_skill_definition_from_file(path)?;
-    Ok(validate_definition_report(
-        &definition,
-        path.display().to_string(),
-    ))
+    match load_skill_definition_from_file(path) {
+        Ok(definition) => Ok(validate_definition_report(
+            &definition,
+            path.display().to_string(),
+        )),
+        Err(SkillsSurfaceError::Json { source, .. }) => Ok(RegistryValidationReport {
+            valid: false,
+            source: path.display().to_string(),
+            skills: Vec::new(),
+            issues: vec![RegistryValidationIssue {
+                code: "REGISTRY-SKILL-001".to_string(),
+                message: format!("failed to parse JSON in {}: {source}", path.display()),
+                path: Some(path.display().to_string()),
+                skill_id: None,
+                capability_id: None,
+            }],
+        }),
+        Err(error) => Err(error),
+    }
 }
 
 pub fn validate_skill_directory(
     path: &Path,
 ) -> Result<RegistryValidationReport, SkillsSurfaceError> {
-    let definitions = load_skill_definitions_from_dir(path)?;
     let mut issues = Vec::new();
     let mut skills = Vec::new();
-    for definition in definitions {
-        let skill_id = definition.identity.name.clone();
-        let report = validate_definition_report(&definition, path.display().to_string());
-        skills.push(skill_id);
-        issues.extend(report.issues);
+    let mut definitions = Vec::new();
+
+    for entry in walk_skill_definition_files(path)? {
+        match load_skill_definition_from_file(&entry) {
+            Ok(definition) => {
+                skills.push(definition.identity.name.clone());
+                issues.extend(
+                    validate_definition_report(&definition, entry.display().to_string()).issues,
+                );
+                definitions.push(definition);
+            }
+            Err(SkillsSurfaceError::Json { source, .. }) => {
+                issues.push(RegistryValidationIssue {
+                    code: "REGISTRY-SKILL-001".to_string(),
+                    message: format!("failed to parse JSON in {}: {source}", entry.display()),
+                    path: Some(entry.display().to_string()),
+                    skill_id: None,
+                    capability_id: None,
+                });
+            }
+            Err(error) => return Err(error),
+        }
     }
+
     if issues.is_empty() {
-        let loaded = skills_from_definitions(load_skill_definitions_from_dir(path)?)?;
+        let loaded = skills_from_definitions(definitions)?;
         if let Err(error) = validate_registry_invariants(&loaded) {
             issues.push(RegistryValidationIssue {
                 code: "REGISTRY-SKILL-001".to_string(),
@@ -587,7 +661,14 @@ fn skills_from_definitions(
 fn load_skill_definitions_from_dir(
     path: &Path,
 ) -> Result<Vec<SkillDefinitionV2>, SkillsSurfaceError> {
-    let mut definitions = Vec::new();
+    walk_skill_definition_files(path)?
+        .into_iter()
+        .map(|entry| load_skill_definition_from_file_strict(&entry))
+        .collect()
+}
+
+fn walk_skill_definition_files(path: &Path) -> Result<Vec<PathBuf>, SkillsSurfaceError> {
+    let mut files = Vec::new();
     for entry in fs::read_dir(path).map_err(|source| SkillsSurfaceError::Io {
         path: path.to_path_buf(),
         source,
@@ -598,15 +679,15 @@ fn load_skill_definitions_from_dir(
         })?;
         let entry_path = entry.path();
         if entry.file_type().map(|ft| ft.is_dir()).unwrap_or(false) {
-            definitions.extend(load_skill_definitions_from_dir(&entry_path)?);
+            files.extend(walk_skill_definition_files(&entry_path)?);
             continue;
         }
         if entry_path.extension().and_then(|ext| ext.to_str()) != Some("json") {
             continue;
         }
-        definitions.push(load_skill_definition_from_file(&entry_path)?);
+        files.push(entry_path);
     }
-    Ok(definitions)
+    Ok(files)
 }
 
 fn load_skill_definition_from_file(path: &Path) -> Result<SkillDefinitionV2, SkillsSurfaceError> {
@@ -620,6 +701,13 @@ fn load_skill_definition_from_file(path: &Path) -> Result<SkillDefinitionV2, Ski
             source,
         }
     })?;
+    Ok(definition)
+}
+
+fn load_skill_definition_from_file_strict(
+    path: &Path,
+) -> Result<SkillDefinitionV2, SkillsSurfaceError> {
+    let definition = load_skill_definition_from_file(path)?;
     validate_skill_definition_v2_strict(&definition)?;
     Ok(definition)
 }
@@ -1060,109 +1148,7 @@ fn capability_card(skill: &LoadedSkill, capability: &SkillCapability) -> Registr
             .as_ref()
             .map(|implementation| implementation.arguments.clone())
             .unwrap_or_default(),
-        capability_definition: project_capability_definition(skill, capability),
-    }
-}
-
-fn project_capability_definition(
-    skill: &LoadedSkill,
-    capability: &SkillCapability,
-) -> CapabilityDefinition {
-    CapabilityDefinition {
-        id: capability.id.clone(),
-        display_name: capability.name.clone(),
-        version: skill.definition.identity.version.clone(),
-        description: Some(capability.description.clone()),
-        family: CapabilityFamily::Skill,
-        tags: skill
-            .definition
-            .metadata
-            .as_ref()
-            .map(|metadata| metadata.tags.clone())
-            .unwrap_or_default(),
-        input: CapabilitySchemaReference {
-            schema: None,
-            schema_ref: capability
-                .input
-                .as_ref()
-                .and_then(|input| input.schema_ref.clone()),
-            description: capability
-                .input
-                .as_ref()
-                .map(|_| capability.description.clone()),
-        },
-        output: CapabilitySchemaReference {
-            schema: None,
-            schema_ref: capability
-                .output
-                .as_ref()
-                .and_then(|output| output.schema_ref.clone()),
-            description: capability
-                .output
-                .as_ref()
-                .and_then(|output| output.description.clone()),
-        },
-        execution: CapabilityExecutionContract {
-            side_effect_class: if capability_has_side_effects(capability) {
-                CapabilitySideEffectClass::Write
-            } else if capability_is_deterministic(capability) {
-                CapabilitySideEffectClass::None
-            } else {
-                CapabilitySideEffectClass::Read
-            },
-            auth_mode: CapabilityAuthMode::None,
-            idempotence: if capability_is_deterministic(capability) {
-                CapabilityIdempotenceHint::Always
-            } else {
-                CapabilityIdempotenceHint::Conditional
-            },
-            cost_hint: CapabilityCostHint::Low,
-            latency_hint: CapabilityLatencyHint::Interactive,
-            timeout_seconds: capability
-                .execution
-                .as_ref()
-                .and_then(|execution| execution.timeout_seconds)
-                .map(|timeout| timeout as i32),
-        },
-        governance: CapabilityGovernance {
-            trust_level: CapabilityTrustLevel::Trusted,
-            approval_requirement: match skill
-                .definition
-                .governance
-                .as_ref()
-                .and_then(|governance| governance.approval_requirement.as_deref())
-            {
-                Some("required") => CapabilityApprovalRequirement::Required,
-                Some("advisory") => CapabilityApprovalRequirement::Advisory,
-                _ => CapabilityApprovalRequirement::None,
-            },
-            policy_refs: skill
-                .definition
-                .governance
-                .as_ref()
-                .map(|governance| governance.policy_refs.clone())
-                .unwrap_or_default(),
-        },
-        source: CapabilitySource {
-            source_kind: CapabilitySourceKind::Projected,
-            source_ref: skill
-                .definition
-                .origin
-                .as_ref()
-                .and_then(|origin| origin.source_ref.clone()),
-            artifact_ref: Some(format!("skill:{}#{}", skill.summary.id, capability.id)),
-        },
-        observability: CapabilityObservability {
-            labels: vec![skill.summary.id.clone(), capability.id.clone()],
-            correlation_required: true,
-            emits_execution_events: false,
-        },
-        lifecycle_state: match skill.definition.lifecycle_state.as_str() {
-            "active" => CapabilityLifecycleState::Active,
-            "deprecated" => CapabilityLifecycleState::Deprecated,
-            "archived" => CapabilityLifecycleState::Archived,
-            _ => CapabilityLifecycleState::Draft,
-        },
+        capability_definition: project_skill_capability_definition(&skill.definition, capability),
     }
 }
 
@@ -1393,6 +1379,27 @@ fn capability_input_schema(capability: &SkillCapability) -> Value {
     Value::Object(schema)
 }
 
+fn capability_supports_dry_run(capability: &SkillCapability) -> bool {
+    let declares_parameter = capability.input.as_ref().is_some_and(|input| {
+        input
+            .parameters
+            .iter()
+            .any(|parameter| parameter.name == "dry_run" || parameter.name == "dryRun")
+    });
+
+    let template_uses_parameter =
+        capability
+            .implementation
+            .as_ref()
+            .is_some_and(|implementation| {
+                implementation.arguments.iter().any(|argument| {
+                    argument.contains("${dry_run}") || argument.contains("${dryRun}")
+                })
+            });
+
+    declares_parameter && template_uses_parameter
+}
+
 fn capability_has_side_effects(capability: &SkillCapability) -> bool {
     capability
         .execution
@@ -1409,6 +1416,32 @@ fn capability_is_deterministic(capability: &SkillCapability) -> bool {
         .unwrap_or(false)
 }
 
+fn mcp_tool_binding(capability: &SkillCapability) -> Option<RegistryMcpToolBinding> {
+    let implementation = capability.implementation.as_ref()?;
+
+    Some(RegistryMcpToolBinding {
+        capability_id: capability.id.clone(),
+        description: capability.description.clone(),
+        executable_name: implementation.executable_name.clone(),
+        execution_type: implementation.execution_type.clone(),
+        argument_template: implementation.arguments.clone(),
+        input_schema: capability_input_schema(capability),
+        stdin_format: capability
+            .input
+            .as_ref()
+            .and_then(|input| input.stdin_format.clone()),
+        timeout_seconds: capability
+            .execution
+            .as_ref()
+            .and_then(|execution| execution.timeout_seconds)
+            .map(u64::from),
+        has_side_effects: capability_has_side_effects(capability),
+        supports_dry_run: capability_supports_dry_run(capability),
+        read_only_hint: Some(!capability_has_side_effects(capability)),
+        idempotent_hint: Some(capability_is_deterministic(capability)),
+    })
+}
+
 fn placeholder_name(argument: &str) -> Option<String> {
     if argument.starts_with("${") && argument.ends_with('}') {
         Some(argument[2..argument.len() - 1].to_ascii_lowercase())
@@ -1420,6 +1453,7 @@ fn placeholder_name(argument: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use elegy_contracts::validate_capability_definition;
 
     #[test]
     fn builtin_registry_search_finds_repo_status() {
@@ -1448,6 +1482,24 @@ mod tests {
             capability.capability_definition.family,
             CapabilityFamily::Skill
         );
+    }
+
+    #[test]
+    fn all_builtin_capability_projections_validate_as_capability_definitions() {
+        let registry = SkillRegistry::builtin().expect("builtin registry should load");
+
+        for capability in registry.build_mcp_tool_bindings() {
+            let definition = registry
+                .capability_definition(&capability.capability_id)
+                .expect("capability definition should exist");
+            let validation = validate_capability_definition(&definition);
+            assert!(
+                validation.is_valid(),
+                "unexpected capability-definition issues for {}: {:?}",
+                capability.capability_id,
+                validation.issues
+            );
+        }
     }
 
     #[test]

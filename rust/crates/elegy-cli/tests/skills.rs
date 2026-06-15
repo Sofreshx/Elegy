@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 use std::process::Command;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 fn elegy() -> Command {
     Command::new(env!("CARGO_BIN_EXE_elegy"))
@@ -15,8 +16,18 @@ fn governed_skill_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
+fn unique_temp_dir(prefix: &str) -> PathBuf {
+    let unique = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .expect("current time should be after unix epoch")
+        .as_nanos();
+    let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
+    std::fs::create_dir_all(&dir).expect("create temp directory");
+    dir
+}
+
 #[test]
-fn skills_list_uses_builtin_v2_registry() {
+fn skills_list_uses_builtin_skill_registry() {
     let output = elegy()
         .args(["--json", "skills", "list"])
         .output()
@@ -33,7 +44,8 @@ fn skills_list_uses_builtin_v2_registry() {
         .as_array()
         .expect("skills should be an array");
 
-    assert!(skills.len() >= 13);
+    assert!(skills.len() >= 14);
+    assert!(skills.iter().any(|skill| skill["id"] == "documentation"));
     assert!(skills.iter().any(|skill| skill["id"] == "memory"));
     assert!(skills.iter().any(|skill| skill["id"] == "mermaid"));
     assert!(skills.iter().any(|skill| skill["id"] == "planning"));
@@ -104,7 +116,32 @@ fn skills_resolve_returns_planning_for_roadmap_queries() {
 }
 
 #[test]
-fn skills_capability_returns_projected_capability_card() {
+fn skills_resolve_returns_documentation_for_agent_readable_docs() {
+    let output = elegy()
+        .args([
+            "--json",
+            "skills",
+            "resolve",
+            "--query",
+            "agent readable docs",
+        ])
+        .output()
+        .expect("run elegy skills resolve for documentation");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body = parse_stdout(&output);
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["data"]["topSkill"]["id"], "documentation");
+    assert_eq!(body["data"]["results"][0]["id"], "documentation");
+}
+
+#[test]
+fn skills_capability_returns_projected_capability_definition() {
     let output = elegy()
         .args([
             "--json",
@@ -124,14 +161,16 @@ fn skills_capability_returns_projected_capability_card() {
 
     let body = parse_stdout(&output);
     assert_eq!(body["status"], "ok");
-    assert_eq!(body["data"]["skillId"], "repo");
-    assert_eq!(body["data"]["capabilityId"], "repo-status");
-    assert_eq!(body["data"]["capabilityDefinition"]["id"], "repo-status");
+    assert_eq!(body["data"]["id"], "repo-status");
+    assert_eq!(body["data"]["displayName"], "Repository Status");
+    assert_eq!(body["data"]["family"], "skill");
+    assert_eq!(body["data"]["execution"]["sideEffectClass"], "read");
+    assert_eq!(body["data"]["governance"]["approvalRequirement"], "none");
 }
 
 #[test]
 fn skills_validate_accepts_governed_skill_fixture() {
-    let fixture = governed_skill_fixture("skill-definition-v2.elegy-planning.json");
+    let fixture = governed_skill_fixture("skill.elegy-documentation.json");
     let output = elegy()
         .args([
             "--json",
@@ -156,4 +195,67 @@ fn skills_validate_accepts_governed_skill_fixture() {
         .as_array()
         .expect("issues array")
         .is_empty());
+}
+
+#[test]
+fn skills_validate_reports_invalid_fixture_with_summary_and_diagnostics() {
+    let fixture = governed_skill_fixture("skill.negative-no-output-schema.json");
+    let output = elegy()
+        .args([
+            "--json",
+            "skills",
+            "validate",
+            "--file",
+            fixture.to_str().expect("utf-8 fixture path"),
+        ])
+        .output()
+        .expect("run elegy skills validate invalid fixture");
+
+    assert!(!output.status.success());
+    let body = parse_stdout(&output);
+    assert_eq!(body["status"], "invalid");
+    assert_eq!(body["data"]["valid"], false);
+    assert!(body["summary"]["errors"]
+        .as_u64()
+        .is_some_and(|count| count >= 1));
+    assert!(body["diagnostics"]
+        .as_array()
+        .expect("diagnostics array")
+        .iter()
+        .any(|diagnostic| diagnostic["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("must declare output.schemaRef"))));
+}
+
+#[test]
+fn skills_validate_reports_malformed_json_as_invalid() {
+    let temp_dir = unique_temp_dir("elegy-cli-skills-invalid-json");
+    let bad_file = temp_dir.join("bad.json");
+    std::fs::write(&bad_file, "{not-json").expect("write malformed fixture");
+
+    let output = elegy()
+        .args([
+            "--json",
+            "skills",
+            "validate",
+            "--file",
+            bad_file.to_str().expect("utf-8 fixture path"),
+        ])
+        .output()
+        .expect("run elegy skills validate malformed json");
+
+    assert!(!output.status.success());
+    let body = parse_stdout(&output);
+    assert_eq!(body["status"], "invalid");
+    assert_eq!(body["data"]["valid"], false);
+    assert!(body["summary"]["errors"]
+        .as_u64()
+        .is_some_and(|count| count >= 1));
+    assert!(body["diagnostics"]
+        .as_array()
+        .expect("diagnostics array")
+        .iter()
+        .any(|diagnostic| diagnostic["message"]
+            .as_str()
+            .is_some_and(|message| message.contains("failed to parse JSON"))));
 }

@@ -1,0 +1,19 @@
+{
+  "artifactKind": "summary-only-session-context-envelope",
+  "requestId": "request-1",
+  "runId": "run-1",
+  "capturedAtUtc": "2026-03-22T00:00:00Z",
+  "sessionContext": {
+    "scope": "workspace",
+    "representation": "summary-only",
+    "summary": "Workspace context persists only bounded summaries for instruction assembly and follow-on agent runs.",
+    "salientFacts": [
+      "Persist summary and context artifacts only.",
+      "Raw execution logs remain transient and are not stored durably."
+    ],
+    "instructionContext": [
+      "Use this summary context when assembling workspace-level instructions."
+    ],
+    "rawTranscriptPersisted": false
+  }
+}

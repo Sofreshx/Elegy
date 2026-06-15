@@ -63,6 +63,11 @@ const DEFAULT_AGENT_BUDGET: f32 = 200.0;
 const VECTOR_SIMILARITY_BLEND_WEIGHT: f32 = 0.7;
 const KEYWORD_SIMILARITY_BLEND_WEIGHT: f32 = 0.3;
 const ACCESS_SIGNAL_HALF_SATURATION: f32 = 8.0;
+// WU16: secondaries now fade out continuously as the similarity gap to the best candidate grows.
+// The fade threshold remains canary-fitted to the observed fr_q07 hot gap (~0.03147), but the
+// smooth decay makes the exact threshold less brittle than a hard band cutoff.
+const RETRIEVAL_SECONDARY_FADE_THRESHOLD: f32 = 0.03;
+const RETRIEVAL_SECONDARY_REFINEMENT_RATIO: f32 = 0.49;
 const RETRIEVAL_SCORING_MODE_ENV: &str = "ELEGY_RETRIEVAL_SCORING_MODE";
 const EXPLAIN_RETRIEVAL_SCORING_ENV: &str = "ELEGY_EXPLAIN_RETRIEVAL_SCORING";
 const ESTIMATED_CHARS_PER_TOKEN: usize = 4;
@@ -83,7 +88,9 @@ const LEARNING_MIN_CLASS_FEEDBACK: usize = 3;
 const LEARNING_FULL_CONFIDENCE_FEEDBACK: usize = 48;
 const LEARNING_WEIGHT_FLOOR: f64 = 0.05;
 const LEARNING_SIMILARITY_WEIGHT_CEILING: f64 = 0.70;
-const LEARNING_SECONDARY_WEIGHT_CEILING: f64 = 0.45;
+const LEARNING_RECENCY_WEIGHT_CEILING: f64 = 0.45;
+const LEARNING_ACCESS_WEIGHT_CEILING: f64 = 0.05;
+const LEARNING_PRIORITY_WEIGHT_CEILING: f64 = 0.45;
 
 /// SQLite-backed [`MemoryStore`] implementation for the MVP memory schema.
 #[derive(Clone)]
@@ -150,39 +157,39 @@ impl LearnedWeightValues {
         }
     }
 
-    fn normalize(self) -> Self {
-        let sum = self.similarity_weight
-            + self.recency_weight
-            + self.access_weight
-            + self.priority_weight;
-        if sum <= f64::EPSILON {
-            return Self::defaults();
-        }
-
-        Self {
-            similarity_weight: self.similarity_weight / sum,
-            recency_weight: self.recency_weight / sum,
-            access_weight: self.access_weight / sum,
-            priority_weight: self.priority_weight / sum,
-        }
-    }
-
     fn clamp(self) -> Self {
+        let floors = [LEARNING_WEIGHT_FLOOR; 4];
+        let ceilings = [
+            LEARNING_SIMILARITY_WEIGHT_CEILING,
+            LEARNING_RECENCY_WEIGHT_CEILING,
+            LEARNING_ACCESS_WEIGHT_CEILING,
+            LEARNING_PRIORITY_WEIGHT_CEILING,
+        ];
+        let normalized = normalize_weight_vector_with_bounds(
+            [
+                self.similarity_weight,
+                self.recency_weight,
+                self.access_weight,
+                self.priority_weight,
+            ],
+            floors,
+            ceilings,
+        )
+        .unwrap_or_else(|| {
+            let defaults = Self::defaults();
+            [
+                defaults.similarity_weight,
+                defaults.recency_weight,
+                defaults.access_weight,
+                defaults.priority_weight,
+            ]
+        });
         Self {
-            similarity_weight: self
-                .similarity_weight
-                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SIMILARITY_WEIGHT_CEILING),
-            recency_weight: self
-                .recency_weight
-                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
-            access_weight: self
-                .access_weight
-                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
-            priority_weight: self
-                .priority_weight
-                .clamp(LEARNING_WEIGHT_FLOOR, LEARNING_SECONDARY_WEIGHT_CEILING),
+            similarity_weight: normalized[0],
+            recency_weight: normalized[1],
+            access_weight: normalized[2],
+            priority_weight: normalized[3],
         }
-        .normalize()
     }
 
     fn blend(self, other: Self, factor: f64) -> Self {
@@ -232,6 +239,69 @@ impl LearnedWeightValues {
             ("similarity_weight".to_string(), self.similarity_weight),
         ])
     }
+}
+
+fn normalize_weight_vector_with_bounds(
+    mut values: [f64; 4],
+    floors: [f64; 4],
+    ceilings: [f64; 4],
+) -> Option<[f64; 4]> {
+    for index in 0..values.len() {
+        if !values[index].is_finite() {
+            return None;
+        }
+        values[index] = values[index].clamp(floors[index], ceilings[index]);
+    }
+
+    for _ in 0..8 {
+        let total = values.iter().sum::<f64>();
+        let delta = 1.0 - total;
+        if delta.abs() <= 1.0e-9 {
+            return Some(values);
+        }
+
+        if delta > 0.0 {
+            let slack = (0..values.len())
+                .map(|index| (ceilings[index] - values[index]).max(0.0))
+                .sum::<f64>();
+            if slack <= f64::EPSILON {
+                break;
+            }
+
+            for index in 0..values.len() {
+                let local_slack = (ceilings[index] - values[index]).max(0.0);
+                if local_slack <= f64::EPSILON {
+                    continue;
+                }
+                values[index] =
+                    (values[index] + (delta * (local_slack / slack))).min(ceilings[index]);
+            }
+        } else {
+            let reducible = (0..values.len())
+                .map(|index| (values[index] - floors[index]).max(0.0))
+                .sum::<f64>();
+            if reducible <= f64::EPSILON {
+                break;
+            }
+
+            let excess = -delta;
+            for index in 0..values.len() {
+                let local_reducible = (values[index] - floors[index]).max(0.0);
+                if local_reducible <= f64::EPSILON {
+                    continue;
+                }
+                values[index] =
+                    (values[index] - (excess * (local_reducible / reducible))).max(floors[index]);
+            }
+        }
+    }
+
+    let total = values.iter().sum::<f64>();
+    if (total - 1.0).abs() <= 1.0e-6 {
+        return Some(values);
+    }
+
+    None
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -583,9 +653,7 @@ impl SqliteMemoryStore {
 
             sort_memory_ids(&mut report.quarantined_ids);
             sort_memory_ids(&mut report.skipped_ids);
-            report
-                .actions
-                .sort_by(|left, right| left.memory_id.cmp(&right.memory_id));
+            report.actions.sort_by_key(|left| left.memory_id);
             transaction.commit()?;
             Ok(report)
         })
@@ -4371,7 +4439,7 @@ fn upsert_encoded_embedding(
 }
 
 fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>, StoreError> {
-    if bytes.len() % std::mem::size_of::<f32>() != 0 {
+    if !bytes.len().is_multiple_of(std::mem::size_of::<f32>()) {
         return Err(StoreError::Serialization(format!(
             "embedding blob length {} is not aligned to f32 components",
             bytes.len()
@@ -4716,6 +4784,10 @@ struct RetrievalScoreBreakdown {
     weighted_access: f32,
     weighted_priority: f32,
     total_score: f32,
+    ranking_score: f32,
+    secondary_refinement_score: f32,
+    similarity_gap_to_best: f32,
+    secondary_fade_factor: f32,
 }
 
 type RankedSearchCandidate = (ScoredMemory, RetrievalScoreBreakdown);
@@ -4824,17 +4896,119 @@ fn rank_search_candidates(
         ));
     }
 
-    ranked_candidates.sort_by(|left, right| {
-        right
-            .0
-            .score
-            .total_cmp(&left.0.score)
-            .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
-            .then_with(|| right.0.memory.updated_at.cmp(&left.0.memory.updated_at))
-            .then_with(|| right.0.memory.id.cmp(&left.0.memory.id))
-    });
+    assign_continuous_secondary_fade_ranking(&mut ranked_candidates, &scope_config, scoring_mode);
 
     Ok(ranked_candidates)
+}
+
+fn assign_continuous_secondary_fade_ranking(
+    ranked_candidates: &mut [RankedSearchCandidate],
+    scope_config: &ScopeConfig,
+    scoring_mode: RetrievalScoringMode,
+) {
+    if ranked_candidates.is_empty() {
+        return;
+    }
+
+    ranked_candidates.sort_by(compare_ranked_candidates_by_similarity_then_total);
+    let best_similarity = ranked_candidates[0].0.similarity;
+
+    if scoring_mode == RetrievalScoringMode::SimilarityOnly {
+        for (scored_memory, breakdown) in ranked_candidates.iter_mut() {
+            breakdown.ranking_score = breakdown.total_score;
+            breakdown.secondary_refinement_score = 0.0;
+            breakdown.similarity_gap_to_best =
+                (best_similarity - breakdown.blended_similarity).max(0.0);
+            breakdown.secondary_fade_factor = 0.0;
+            scored_memory.score = breakdown.ranking_score;
+        }
+        ranked_candidates.sort_by(compare_ranked_candidates_by_ranking);
+        return;
+    }
+
+    let max_secondary_score = maximum_possible_secondary_score(scope_config, scoring_mode);
+    for (scored_memory, breakdown) in ranked_candidates.iter_mut() {
+        let similarity_gap = (best_similarity - breakdown.blended_similarity).max(0.0);
+        let fade_factor = compute_secondary_fade_factor(similarity_gap);
+        let secondary_score =
+            breakdown.weighted_recency + breakdown.weighted_access + breakdown.weighted_priority;
+        let refinement =
+            normalize_secondary_score_for_ranking(secondary_score, max_secondary_score)
+                * fade_factor;
+        breakdown.ranking_score = breakdown.blended_similarity + refinement;
+        breakdown.secondary_refinement_score = refinement;
+        breakdown.similarity_gap_to_best = similarity_gap;
+        breakdown.secondary_fade_factor = fade_factor;
+        scored_memory.score = breakdown.ranking_score;
+    }
+    ranked_candidates.sort_by(compare_ranked_candidates_by_ranking);
+}
+
+fn maximum_possible_secondary_score(
+    scope_config: &ScopeConfig,
+    scoring_mode: RetrievalScoringMode,
+) -> f32 {
+    match scoring_mode {
+        RetrievalScoringMode::Default => {
+            scope_config.recency_weight.max(0.0)
+                + scope_config.access_weight.max(0.0)
+                + scope_config.priority_weight.max(0.0)
+        }
+        RetrievalScoringMode::SimilarityOnly => 0.0,
+    }
+}
+
+fn normalize_secondary_score_for_ranking(secondary_score: f32, max_secondary_score: f32) -> f32 {
+    if max_secondary_score <= f32::EPSILON {
+        return 0.0;
+    }
+
+    ((secondary_score.max(0.0) / max_secondary_score).clamp(0.0, 1.0))
+        * RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        * RETRIEVAL_SECONDARY_REFINEMENT_RATIO
+}
+
+fn compute_secondary_fade_factor(similarity_gap: f32) -> f32 {
+    let normalized_gap = (similarity_gap.max(0.0)
+        / RETRIEVAL_SECONDARY_FADE_THRESHOLD.max(f32::EPSILON))
+    .clamp(0.0, 1.0);
+    1.0 - (normalized_gap * normalized_gap * (3.0 - 2.0 * normalized_gap))
+}
+
+fn compare_ranked_candidates_by_similarity_then_total(
+    left: &RankedSearchCandidate,
+    right: &RankedSearchCandidate,
+) -> std::cmp::Ordering {
+    right
+        .0
+        .similarity
+        .total_cmp(&left.0.similarity)
+        .then_with(|| compare_ranked_candidates_by_total(left, right))
+}
+
+fn compare_ranked_candidates_by_total(
+    left: &RankedSearchCandidate,
+    right: &RankedSearchCandidate,
+) -> std::cmp::Ordering {
+    right
+        .1
+        .total_score
+        .total_cmp(&left.1.total_score)
+        .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
+        .then_with(|| right.0.memory.updated_at.cmp(&left.0.memory.updated_at))
+        .then_with(|| right.0.memory.id.cmp(&left.0.memory.id))
+}
+
+fn compare_ranked_candidates_by_ranking(
+    left: &RankedSearchCandidate,
+    right: &RankedSearchCandidate,
+) -> std::cmp::Ordering {
+    right
+        .1
+        .ranking_score
+        .total_cmp(&left.1.ranking_score)
+        .then_with(|| right.0.similarity.total_cmp(&left.0.similarity))
+        .then_with(|| compare_ranked_candidates_by_total(left, right))
 }
 
 fn compute_retrieval_score_breakdown_with_mode(
@@ -4876,6 +5050,10 @@ fn compute_retrieval_score_breakdown_with_mode(
         weighted_access,
         weighted_priority,
         total_score: weighted_similarity + weighted_recency + weighted_access + weighted_priority,
+        ranking_score: weighted_similarity + weighted_recency + weighted_access + weighted_priority,
+        secondary_refinement_score: 0.0,
+        similarity_gap_to_best: 0.0,
+        secondary_fade_factor: 0.0,
     }
 }
 
@@ -4922,11 +5100,15 @@ fn emit_search_score_explanations(
 
     for (rank, (scored_memory, breakdown)) in ranked_candidates.iter().take(limit).enumerate() {
         eprintln!(
-            "  rank={} id={} score={:.3} similarity={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
+            "  rank={} id={} score={:.3} raw_total_score={:.3} similarity={:.3} gap_to_best={:.3} secondary_fade={:.3} secondary_refinement={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
             rank + 1,
             scored_memory.memory.id,
             scored_memory.score,
+            breakdown.total_score,
             scored_memory.similarity,
+            breakdown.similarity_gap_to_best,
+            breakdown.secondary_fade_factor,
+            breakdown.secondary_refinement_score,
             format_optional_retrieval_score(breakdown.vector_similarity),
             format_optional_retrieval_score(breakdown.keyword_similarity),
             breakdown.weighted_similarity,
@@ -6987,6 +7169,415 @@ mod tests {
         assert_eq!(warmed_hub.access_count, 4);
     }
 
+    #[tokio::test]
+    async fn fr_q07_hot_canary_keeps_semantic_winner_ahead_outside_similarity_band() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "access_weight", "0.45");
+
+        let mut target = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        target.content =
+            "Une grande ouverture a f1.8 garde le visage net et floute le fond.".to_string();
+        let target_id = target.id;
+
+        let mut hub = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        hub.content = "Le cafe filtre V60 coule lentement a travers un papier rince.".to_string();
+        let hub_id = hub.id;
+
+        let mut portrait_alt = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        portrait_alt.content = "Le 85 mm isole le sujet pour un portrait flatteur.".to_string();
+        let portrait_alt_id = portrait_alt.id;
+
+        let mut soup = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        soup.content = "La soupe miso du soir melange dashi, tofu et algues.".to_string();
+        let soup_id = soup.id;
+
+        for memory in [target, hub, portrait_alt, soup] {
+            fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store canary memory");
+        }
+
+        fixture
+            .store
+            .store_embedding(
+                &target_id,
+                &embedding_with_query_similarities(&[
+                    0.05,
+                    0.05,
+                    0.05,
+                    0.05,
+                    0.05,
+                    0.05,
+                    0.614_608_9,
+                ]),
+            )
+            .await
+            .expect("store target embedding");
+        fixture
+            .store
+            .store_embedding(
+                &hub_id,
+                &embedding_with_query_similarities(&[
+                    0.30,
+                    0.29,
+                    0.28,
+                    0.27,
+                    0.26,
+                    0.25,
+                    0.583_138_6,
+                ]),
+            )
+            .await
+            .expect("store hub embedding");
+        fixture
+            .store
+            .store_embedding(
+                &portrait_alt_id,
+                &embedding_with_query_similarities(&[
+                    0.10,
+                    0.10,
+                    0.10,
+                    0.10,
+                    0.10,
+                    0.10,
+                    0.594_978_6,
+                ]),
+            )
+            .await
+            .expect("store alternate portrait embedding");
+        fixture
+            .store
+            .store_embedding(
+                &soup_id,
+                &embedding_with_query_similarities(&[
+                    0.08,
+                    0.08,
+                    0.08,
+                    0.08,
+                    0.08,
+                    0.08,
+                    0.563_142_36,
+                ]),
+            )
+            .await
+            .expect("store soup embedding");
+
+        for query_index in 0..6 {
+            let warm_results = fixture
+                .store
+                .search(SearchQuery {
+                    text: String::new(),
+                    embedding: Some(query_basis_embedding(query_index, 7)),
+                    scope: MemoryScope::Workspace,
+                    state_filter: None,
+                    type_filter: None,
+                    max_results: 4,
+                    context_config: None,
+                    session_id: None,
+                    agent_id: None,
+                })
+                .await
+                .expect("run warm-up search");
+            assert_eq!(warm_results[0].memory.id, hub_id);
+        }
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = super::format_timestamp(Utc::now());
+                connection.execute(
+                    "UPDATE memories SET access_count = 6, last_accessed_at = ?2 WHERE id = ?1",
+                    [hub_id.to_string(), now.clone()],
+                )?;
+                for memory_id in [target_id, portrait_alt_id, soup_id] {
+                    connection.execute(
+                        "UPDATE memories SET access_count = 0, last_accessed_at = ?2 WHERE id = ?1",
+                        [memory_id.to_string(), now.clone()],
+                    )?;
+                }
+                Ok(())
+            })
+            .expect("freeze hot canary access state");
+
+        let ranked = rank_search_with_embedding(&fixture.store, query_basis_embedding(6, 7), 5);
+        let target_ranked = find_ranked_candidate(&ranked, &target_id);
+        let hub_ranked = find_ranked_candidate(&ranked, &hub_id);
+
+        assert_eq!(ranked[0].0.memory.id, target_id);
+        assert!(target_ranked.0.similarity > hub_ranked.0.similarity);
+        assert!(
+            (target_ranked.0.similarity - hub_ranked.0.similarity)
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        );
+        assert!(
+            target_ranked.1.total_score < hub_ranked.1.total_score,
+            "raw score should still favor the warmed hub to prove the fade guard is active"
+        );
+        assert!(target_ranked.0.score > hub_ranked.0.score);
+        assert_eq!(target_ranked.1.secondary_fade_factor, 1.0);
+        assert_eq!(hub_ranked.1.secondary_fade_factor, 0.0);
+    }
+
+    #[tokio::test]
+    async fn continuous_fade_neutralizes_recency_only_overrides_past_threshold() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "similarity_weight", "0.4");
+        set_scope_config(&fixture.store, "recency_weight", "1.0");
+        set_scope_config(&fixture.store, "access_weight", "0.0");
+        set_scope_config(&fixture.store, "priority_weight", "0.0");
+
+        let mut semantic_winner =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        semantic_winner.content = "semantic winner".to_string();
+        let semantic_winner_id = semantic_winner.id;
+
+        let mut fresh_runner_up =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        fresh_runner_up.content = "fresh runner up".to_string();
+        let fresh_runner_up_id = fresh_runner_up.id;
+
+        fixture
+            .store
+            .store(semantic_winner)
+            .await
+            .expect("store semantic winner");
+        fixture
+            .store
+            .store(fresh_runner_up)
+            .await
+            .expect("store fresh runner up");
+
+        fixture
+            .store
+            .store_embedding(&semantic_winner_id, &embedding_with_similarity(0.64))
+            .await
+            .expect("store semantic winner embedding");
+        fixture
+            .store
+            .store_embedding(&fresh_runner_up_id, &embedding_with_similarity(0.60))
+            .await
+            .expect("store fresh runner up embedding");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = Utc::now();
+                let stale_time = now - chrono::Duration::days(30);
+                connection.execute(
+                    "UPDATE memories SET updated_at = ?2, last_accessed_at = ?2, access_count = 0 WHERE id = ?1",
+                    [semantic_winner_id.to_string(), super::format_timestamp(stale_time)],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET updated_at = ?2, last_accessed_at = ?2, access_count = 0 WHERE id = ?1",
+                    [fresh_runner_up_id.to_string(), super::format_timestamp(now)],
+                )?;
+                Ok(())
+            })
+            .expect("seed recency inversion fixture");
+
+        let ranked = rank_search_with_embedding(&fixture.store, query_embedding(), 5);
+        let semantic_ranked = find_ranked_candidate(&ranked, &semantic_winner_id);
+        let fresh_ranked = find_ranked_candidate(&ranked, &fresh_runner_up_id);
+
+        assert_eq!(ranked[0].0.memory.id, semantic_winner_id);
+        assert!(semantic_ranked.0.similarity > fresh_ranked.0.similarity);
+        assert!(
+            (semantic_ranked.0.similarity - fresh_ranked.0.similarity)
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        );
+        assert!(
+            semantic_ranked.1.total_score < fresh_ranked.1.total_score,
+            "raw score should favor recency to prove the structural guard is active"
+        );
+        assert!(semantic_ranked.0.score > fresh_ranked.0.score);
+        assert_eq!(fresh_ranked.1.secondary_fade_factor, 0.0);
+    }
+
+    #[tokio::test]
+    async fn continuous_fade_still_allows_recency_refinement_inside_threshold() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "similarity_weight", "0.4");
+        set_scope_config(&fixture.store, "recency_weight", "1.0");
+        set_scope_config(&fixture.store, "access_weight", "0.0");
+        set_scope_config(&fixture.store, "priority_weight", "0.0");
+
+        let mut slightly_better_but_old =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        slightly_better_but_old.content = "slightly better but old".to_string();
+        let slightly_better_but_old_id = slightly_better_but_old.id;
+
+        let mut fresh_quasi_tie =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        fresh_quasi_tie.content = "fresh quasi tie".to_string();
+        let fresh_quasi_tie_id = fresh_quasi_tie.id;
+
+        fixture
+            .store
+            .store(slightly_better_but_old)
+            .await
+            .expect("store old candidate");
+        fixture
+            .store
+            .store(fresh_quasi_tie)
+            .await
+            .expect("store fresh candidate");
+
+        fixture
+            .store
+            .store_embedding(
+                &slightly_better_but_old_id,
+                &embedding_with_similarity(0.62),
+            )
+            .await
+            .expect("store old candidate embedding");
+        fixture
+            .store
+            .store_embedding(&fresh_quasi_tie_id, &embedding_with_similarity(0.615))
+            .await
+            .expect("store fresh candidate embedding");
+
+        fixture
+            .store
+            .with_connection(|connection| {
+                let now = Utc::now();
+                let stale_time = now - chrono::Duration::days(30);
+                connection.execute(
+                    "UPDATE memories SET updated_at = ?2, last_accessed_at = ?2, access_count = 0 WHERE id = ?1",
+                    [
+                        slightly_better_but_old_id.to_string(),
+                        super::format_timestamp(stale_time),
+                    ],
+                )?;
+                connection.execute(
+                    "UPDATE memories SET updated_at = ?2, last_accessed_at = ?2, access_count = 0 WHERE id = ?1",
+                    [fresh_quasi_tie_id.to_string(), super::format_timestamp(now)],
+                )?;
+                Ok(())
+            })
+            .expect("seed quasi-tie recency fixture");
+
+        let ranked = rank_search_with_embedding(&fixture.store, query_embedding(), 5);
+        let old_ranked = find_ranked_candidate(&ranked, &slightly_better_but_old_id);
+        let fresh_ranked = find_ranked_candidate(&ranked, &fresh_quasi_tie_id);
+
+        assert_eq!(ranked[0].0.memory.id, fresh_quasi_tie_id);
+        assert!(
+            (old_ranked.0.similarity - fresh_ranked.0.similarity)
+                < super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        );
+        assert_eq!(old_ranked.1.secondary_fade_factor, 1.0);
+        assert!(fresh_ranked.1.secondary_fade_factor > 0.0);
+    }
+
+    #[tokio::test]
+    async fn continuous_fade_neutralizes_priority_only_overrides_past_threshold() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "similarity_weight", "0.1");
+        set_scope_config(&fixture.store, "recency_weight", "0.0");
+        set_scope_config(&fixture.store, "access_weight", "0.0");
+        set_scope_config(&fixture.store, "priority_weight", "0.9");
+
+        let mut semantic_winner =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        semantic_winner.content = "semantic winner".to_string();
+        semantic_winner.importance_score = 0.5;
+        semantic_winner.reliability_score = 1.0;
+        let semantic_winner_id = semantic_winner.id;
+
+        let mut boosted_runner_up =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        boosted_runner_up.content = "boosted runner up".to_string();
+        boosted_runner_up.importance_score = 1.0;
+        boosted_runner_up.reliability_score = 1.0;
+        let boosted_runner_up_id = boosted_runner_up.id;
+
+        fixture
+            .store
+            .store(semantic_winner)
+            .await
+            .expect("store semantic winner");
+        fixture
+            .store
+            .store(boosted_runner_up)
+            .await
+            .expect("store boosted runner up");
+
+        fixture
+            .store
+            .store_embedding(&semantic_winner_id, &embedding_with_similarity(0.64))
+            .await
+            .expect("store semantic winner embedding");
+        fixture
+            .store
+            .store_embedding(&boosted_runner_up_id, &embedding_with_similarity(0.60))
+            .await
+            .expect("store boosted runner up embedding");
+
+        let ranked = rank_search_with_embedding(&fixture.store, query_embedding(), 5);
+        let semantic_ranked = find_ranked_candidate(&ranked, &semantic_winner_id);
+        let boosted_ranked = find_ranked_candidate(&ranked, &boosted_runner_up_id);
+
+        assert_eq!(ranked[0].0.memory.id, semantic_winner_id);
+        assert!(semantic_ranked.0.similarity > boosted_ranked.0.similarity);
+        assert!(
+            (semantic_ranked.0.similarity - boosted_ranked.0.similarity)
+                > super::RETRIEVAL_SECONDARY_FADE_THRESHOLD
+        );
+        assert!(
+            semantic_ranked.1.total_score < boosted_ranked.1.total_score,
+            "raw score should favor the priority-heavy runner up to prove the structural guard is active"
+        );
+        assert!(semantic_ranked.0.score > boosted_ranked.0.score);
+        assert_eq!(boosted_ranked.1.secondary_fade_factor, 0.0);
+    }
+
+    #[test]
+    fn continuous_secondary_fade_is_monotonic_and_zero_at_threshold() {
+        let quarter =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.25);
+        let half =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.5);
+        let three_quarters =
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 0.75);
+
+        assert_eq!(super::compute_secondary_fade_factor(0.0), 1.0);
+        assert!(quarter < 1.0 && quarter > half);
+        assert!(half > three_quarters);
+        assert!(three_quarters > 0.0);
+        assert_eq!(
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD),
+            0.0
+        );
+        assert_eq!(
+            super::compute_secondary_fade_factor(super::RETRIEVAL_SECONDARY_FADE_THRESHOLD * 1.5),
+            0.0
+        );
+    }
+
+    #[test]
+    fn learned_weight_clamp_keeps_access_within_safe_ceiling_after_normalization() {
+        let clamped = super::LearnedWeightValues {
+            similarity_weight: 0.01,
+            recency_weight: 0.01,
+            access_weight: 10.0,
+            priority_weight: 0.01,
+        }
+        .clamp();
+
+        assert!(
+            (clamped.similarity_weight
+                + clamped.recency_weight
+                + clamped.access_weight
+                + clamped.priority_weight
+                - 1.0)
+                .abs()
+                < 1.0e-9
+        );
+        assert!(clamped.access_weight <= super::LEARNING_ACCESS_WEIGHT_CEILING + 1.0e-9);
+    }
+
     #[test]
     fn retrieval_score_breakdown_can_neutralize_non_similarity_contributions() {
         let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
@@ -7978,6 +8569,46 @@ mod tests {
                 super::rank_search_candidates(connection, &search_query, query, None, scoring_mode)
             })
             .expect("rank realistic benchmark case")
+    }
+
+    fn rank_search_with_embedding(
+        store: &SqliteMemoryStore,
+        embedding: Vec<f32>,
+        max_results: usize,
+    ) -> Vec<super::RankedSearchCandidate> {
+        let search_query = SearchQuery {
+            text: String::new(),
+            embedding: Some(embedding),
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results,
+            context_config: None,
+            session_id: None,
+            agent_id: None,
+        };
+
+        store
+            .with_connection(|connection| {
+                super::rank_search_candidates(
+                    connection,
+                    &search_query,
+                    "",
+                    None,
+                    super::RetrievalScoringMode::Default,
+                )
+            })
+            .expect("rank search with embedding")
+    }
+
+    fn find_ranked_candidate<'a>(
+        ranked: &'a [super::RankedSearchCandidate],
+        id: &MemoryId,
+    ) -> &'a super::RankedSearchCandidate {
+        ranked
+            .iter()
+            .find(|(scored_memory, _)| scored_memory.memory.id == *id)
+            .expect("candidate should exist in ranked results")
     }
 
     fn label_for_scored_memory(
@@ -9007,7 +9638,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn feedback_learning_updates_live_search_ranking_via_scope_config() {
+    async fn feedback_learning_updates_live_search_scoring_via_scope_config() {
         let fixture = test_fixture();
 
         let mut similarity_favored =
@@ -9062,25 +9693,15 @@ mod tests {
             })
             .expect("seed deterministic ranking baseline");
 
-        let before = fixture
-            .store
-            .search(SearchQuery {
-                text: String::new(),
-                embedding: Some(query_embedding()),
-                scope: MemoryScope::Workspace,
-                state_filter: None,
-                type_filter: None,
-                max_results: 5,
-                context_config: None,
-                session_id: None,
-                agent_id: None,
-            })
-            .await
-            .expect("baseline search");
+        let before = rank_search_with_embedding(&fixture.store, query_embedding(), 5);
 
         assert_eq!(before.len(), 2);
-        assert_eq!(before[0].memory.id, priority_favored_id);
-        assert_eq!(before[1].memory.id, similarity_favored_id);
+        assert_eq!(before[0].0.memory.id, similarity_favored_id);
+        assert_eq!(before[1].0.memory.id, priority_favored_id);
+        let before_similarity = find_ranked_candidate(&before, &similarity_favored_id);
+        let before_priority = find_ranked_candidate(&before, &priority_favored_id);
+        assert_eq!(before_similarity.1.secondary_fade_factor, 1.0);
+        assert_eq!(before_priority.1.secondary_fade_factor, 0.0);
 
         fixture
             .store
@@ -9131,28 +9752,20 @@ mod tests {
             learned_scope_config.similarity_weight,
         );
 
-        let after = fixture
-            .store
-            .search(SearchQuery {
-                text: String::new(),
-                embedding: Some(query_embedding()),
-                scope: MemoryScope::Workspace,
-                state_filter: None,
-                type_filter: None,
-                max_results: 5,
-                context_config: None,
-                session_id: None,
-                agent_id: None,
-            })
-            .await
-            .expect("search after learning");
+        let after = rank_search_with_embedding(&fixture.store, query_embedding(), 5);
 
         assert_eq!(after.len(), 2);
-        assert_eq!(after[0].memory.id, similarity_favored_id);
-        assert_eq!(after[1].memory.id, priority_favored_id);
+        assert_eq!(after[0].0.memory.id, similarity_favored_id);
+        assert_eq!(after[1].0.memory.id, priority_favored_id);
+        let after_similarity = find_ranked_candidate(&after, &similarity_favored_id);
+        let after_priority = find_ranked_candidate(&after, &priority_favored_id);
         assert!(
-            after[0].score > after[1].score,
-            "learned weights should make the more relevant memory rank first",
+            after_similarity.1.weighted_similarity > before_similarity.1.weighted_similarity,
+            "persisted learned weights should raise the live similarity contribution"
+        );
+        assert!(
+            after_priority.1.weighted_priority < before_priority.1.weighted_priority,
+            "persisted learned weights should reduce the live priority contribution"
         );
     }
 
