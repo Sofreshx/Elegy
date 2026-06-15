@@ -1,31 +1,37 @@
 name: Publish Crate
 
 on:
-  workflow_call:
+  release:
+    types:
+      - published
+  workflow_dispatch:
     inputs:
       crate-path:
-        required: true
-        type: string
-        description: Path from repo root to the crate directory (e.g. rust/crates/elegy-memory)
-      crate-name:
-        required: true
-        type: string
-        description: Crate name as published on crates.io
-      dry-run:
+        description: Path from repo root to the crate directory
         required: false
+        default: rust/crates/elegy-memory
+        type: string
+      crate-name:
+        description: Crate name as published on crates.io
+        required: false
+        default: elegy-memory
+        type: string
+      dry-run:
+        description: Run cargo publish --dry-run without publishing
+        required: false
+        default: true
         type: boolean
-        default: false
-        description: If true, runs cargo publish --dry-run without publishing
-    secrets:
-      cargo-registry-token:
-        required: true
-        description: crates.io API token (CARGO_REGISTRY_TOKEN)
+
+env:
+  CRATE_PATH: ${{ github.event.inputs.crate-path || 'rust/crates/elegy-memory' }}
+  CRATE_NAME: ${{ github.event.inputs.crate-name || 'elegy-memory' }}
+  DRY_RUN: ${{ github.event.inputs.dry-run == 'true' || false }}
 
 permissions:
   contents: read
 
 jobs:
-  publish:
+  verify-and-publish:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -39,26 +45,41 @@ jobs:
         with:
           workspaces: rust -> rust/target
 
-      - name: Verify crate version
+      - name: Verify crate manifest
         shell: bash
-        working-directory: ${{ inputs.crate-path }}
+        working-directory: rust
+        run: |
+          cargo verify-project --manifest-path "${{ env.CRATE_PATH }}/Cargo.toml"
+          echo "Manifest for ${{ env.CRATE_NAME }} is valid"
+
+      - name: Run crate tests
+        shell: bash
+        working-directory: rust
+        run: |
+          cargo test -p "${{ env.CRATE_NAME }}"
+
+      - name: Check crate version
+        id: version
+        shell: bash
+        working-directory: "${{ env.CRATE_PATH }}"
         run: |
           VERSION="$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')"
-          echo "crate_version=${VERSION}" >> "$GITHUB_OUTPUT"
-          echo "Preparing to publish ${{ inputs.crate-name }} v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Preparing ${{ env.CRATE_NAME }} v${VERSION}"
 
-      - name: Publish to crates.io
-        if: ${{ !inputs.dry-run }}
+      - name: Run cargo publish (dry-run)
         shell: bash
-        working-directory: ${{ inputs.crate-path }}
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.cargo-registry-token }}
-        run: |
-          cargo publish
-
-      - name: Dry-run publish
-        if: ${{ inputs.dry-run }}
-        shell: bash
-        working-directory: ${{ inputs.crate-path }}
+        working-directory: "${{ env.CRATE_PATH }}"
         run: |
           cargo publish --dry-run
+          echo "Dry-run passed — package is ready to publish"
+
+      - name: Publish to crates.io
+        if: ${{ !env.DRY_RUN && github.event_name == 'release' }}
+        shell: bash
+        working-directory: "${{ env.CRATE_PATH }}"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish
+          echo "Published ${{ env.CRATE_NAME }} v${{ steps.version.outputs.version }} to crates.io"
