@@ -1,0 +1,468 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/elegy-plugin-package.schema.json",
+  "title": "Elegy Plugin Package",
+  "description": "Portable package metadata for bundling Elegy skill definitions, instruction skills, deterministic configuration templates/profiles, MCP projection metadata, capability projections, docs, assets, tooling requirements, host compatibility, and neutral publishing/provenance metadata for host-governed import.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "identity", "components"],
+  "properties": {
+    "schemaVersion": { "const": "elegy-plugin-package/v1" },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["packageId", "name", "version"],
+      "properties": {
+        "packageId": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9._-]+$"
+        },
+        "name": {
+          "type": "string",
+          "pattern": "^[a-z0-9-]+$"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        },
+        "license": {
+          "type": "string",
+          "minLength": 1
+        },
+        "homepage": {
+          "type": "string",
+          "format": "uri"
+        },
+        "documentationUri": {
+          "type": "string",
+          "format": "uri"
+        },
+        "subsetOf": {
+          "type": "array",
+          "description": "Capability IDs that this package deliberately subsets from the underlying skill definitions. When declared, every capabilityProjection must reference only capabilities in this set.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "components": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "skillDefinitions": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/skillDefinitionComponent" }
+        },
+        "capabilityContracts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "instructionSkills": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "evalPacks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "resourcePacks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "toolAdapterContracts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "bridgeAdapterContracts": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "mcpProjections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/mcpProjectionComponent" }
+        },
+        "capabilityProjections": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capabilityProjectionComponent" }
+        },
+        "pilotingAdapters": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pilotingAdapterComponent" }
+        },
+        "fixturePacks": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/fixturePackComponent" }
+        },
+        "docs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "assets": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "cliHelpers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/pathComponent" }
+        },
+        "configurationTemplates": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/configurationComponent" }
+        },
+        "configurationProfiles": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/configurationComponent" }
+        },
+        "toolRequirements": {
+          "type": "array",
+          "description": "Required CLI tools and MCP surfaces this package needs installed and probeable.",
+          "items": { "$ref": "#/$defs/toolRequirementComponent" }
+        },
+        "hostCompatibility": {
+          "type": "array",
+          "description": "Host compatibility hints for target harnesses and version ranges.",
+          "items": { "$ref": "#/$defs/compatibilityMetadata" }
+        }
+      }
+    },
+    "hostPolicyHints": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "sideEffectClass": { "$ref": "#/$defs/sideEffectClass" },
+        "requiresApproval": {
+          "type": "boolean"
+        },
+        "policyTags": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
+        }
+      }
+    },
+    "publishing": {
+      "$ref": "#/$defs/publishingMetadata"
+    }
+  },
+  "$defs": {
+    "relativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$))(?!.*(?:^|[/\\\\])(?:[/\\\\]|$)).+$"
+    },
+    "sideEffectClass": {
+      "type": "string",
+      "enum": ["none", "read_only", "disk_read", "disk_write", "network_outbound", "process_spawn", "desktop_ui"]
+    },
+    "pathComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": { "$ref": "#/$defs/relativePath" },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "skillDefinitionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "definitionRef": { "$ref": "#/$defs/relativePath" },
+        "definition": { "$ref": "skill.schema.json" }
+      },
+      "anyOf": [
+        { "required": ["definitionRef"] },
+        { "required": ["definition"] }
+      ]
+    },
+    "mcpProjectionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "descriptorRef": { "$ref": "#/$defs/relativePath" },
+        "serverName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capabilityRefs": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/capabilityRef" },
+          "uniqueItems": true
+        }
+      },
+      "anyOf": [
+        { "required": ["descriptorRef"] },
+        { "required": ["serverName"] }
+      ]
+    },
+    "capabilityProjectionComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "skill", "capability", "lane", "supportsDryRun"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        },
+        "lane": {
+          "type": "string",
+          "enum": ["api", "mcp", "plugin", "cli", "subprocess"]
+        },
+        "supportsDryRun": {
+          "type": "boolean"
+        },
+        "inputSchema": {
+          "type": "object"
+        },
+        "outputSchema": {
+          "type": "object"
+        },
+        "sideEffectClass": { "$ref": "#/$defs/sideEffectClass" },
+        "projection": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "projections": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["function_calling", "mcp", "cli"]
+              },
+              "uniqueItems": true
+            },
+            "functionName": {
+              "type": "string",
+              "minLength": 1
+            },
+            "mcpToolName": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        }
+      }
+    },
+    "capabilityRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["skill", "capability"],
+      "properties": {
+        "skill": {
+          "type": "string",
+          "minLength": 1
+        },
+        "capability": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "configurationComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "path"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "pilotingAdapterComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "manifestRef": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "manifest": {
+          "$ref": "piloting-adapter-manifest.schema.json"
+        }
+      },
+      "anyOf": [
+        { "required": ["manifestRef"] },
+        { "required": ["manifest"] }
+      ]
+    },
+    "fixturePackComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "fixturePackRef": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "fixturePack": {
+          "$ref": "piloting-fixture-pack.schema.json"
+        }
+      },
+      "anyOf": [
+        { "required": ["fixturePackRef"] },
+        { "required": ["fixturePack"] }
+      ]
+    },
+    "toolRequirementComponent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["toolName", "cliBinary"],
+      "properties": {
+        "toolName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable tool name for this requirement (e.g. 'elegy-planning')."
+        },
+        "cliBinary": {
+          "type": "string",
+          "minLength": 1,
+          "description": "CLI binary name to resolve and probe (e.g. 'elegy-planning')."
+        },
+        "minVersion": {
+          "type": "string",
+          "description": "Optional minimum version string."
+        },
+        "probeCommand": {
+          "type": "string",
+          "description": "Optional override for the probe command (defaults to '--version')."
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "compatibilityMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["host", "versionRange"],
+      "properties": {
+        "host": {
+          "type": "string",
+          "minLength": 1
+        },
+        "versionRange": {
+          "type": "string",
+          "minLength": 1
+        },
+        "notes": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "publishingMetadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "marketplaceTarget": {
+          "type": "string",
+          "minLength": 1
+        },
+        "importMode": {
+          "type": "string",
+          "enum": ["package", "dry_run"]
+        },
+        "sourceRepository": {
+          "type": "string",
+          "format": "uri"
+        },
+        "sourceRef": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceCommit": {
+          "type": "string",
+          "minLength": 1
+        },
+        "changelogRef": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "provenanceRef": {
+          "$ref": "#/$defs/relativePath"
+        },
+        "signatureRefs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/relativePath"
+          },
+          "uniqueItems": true
+        },
+        "compatibility": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/compatibilityMetadata"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,334 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "observe",
+    "version": "0.1.0",
+    "displayName": "Desktop & OS Observation",
+    "aliases": ["observe", "desktop-observe", "os-observe"]
+  },
+  "metadata": {
+    "displayName": "Desktop & OS Observation",
+    "description": "Observe desktop and OS state for agentic workflows. Snapshot running processes, track foreground and visible windows, capture screen, read clipboard, diff filesystem changes, and query system information.",
+    "summary": "Desktop and OS observation — process snapshots, window tracking, screen capture, clipboard, filesystem diff, system info.",
+    "category": "observation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["observation", "desktop", "os", "processes", "windows", "screen", "clipboard", "filesystem", "system"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/architecture/observe-cli.md"
+  },
+  "capabilities": [
+    {
+      "id": "observe-processes",
+      "name": "Snapshot Processes",
+      "description": "Take a snapshot of running processes with PID, name, memory usage, and CPU percentage. Optionally filter by name pattern.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "processes", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "string",
+            "description": "Case-insensitive substring filter on process name.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "ProcessSnapshot with processes array and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-window",
+      "name": "Foreground Window",
+      "description": "Get information about the current foreground (active) window including title, PID, and bounds. Windows only.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "window", "--json"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "WindowInfo with hwnd, title, process_id, and bounds rectangle."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-windows",
+      "name": "List Windows",
+      "description": "List all visible top-level windows with title, PID, and bounds. Optionally filter by title pattern. Windows only.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "windows", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "filter",
+            "type": "string",
+            "description": "Case-insensitive substring filter on window title.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "Array of WindowInfo objects with count."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-screen",
+      "name": "Screen Capture",
+      "description": "Capture the current screen as PNG. Returns base64-encoded PNG in JSON or saves to a file path. Windows only (GDI BitBlt — may not capture hardware-accelerated content).",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "screen", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "monitor",
+            "type": "integer",
+            "description": "Monitor index (0 = primary). Currently only monitor 0 is supported.",
+            "required": false,
+            "default": 0
+          },
+          {
+            "name": "output",
+            "type": "string",
+            "description": "File path to save PNG. When omitted, PNG is returned as base64 in the JSON response.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "ScreenCaptureResult with dimensions, monitor index, output path or base64 PNG, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "observe-clipboard",
+      "name": "Read Clipboard",
+      "description": "Read the current system clipboard contents. Returns text content and whether an image is present.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "clipboard", "--json"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "ClipboardContents with optional text, image flag, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-filesystem",
+      "name": "Filesystem Diff",
+      "description": "Observe a directory for changes over a bounded time window using snapshot diff. Takes before/after snapshots and returns created, modified, and deleted files.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "filesystem", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "string",
+            "description": "Directory path to observe.",
+            "required": true
+          },
+          {
+            "name": "timeout_seconds",
+            "type": "integer",
+            "description": "Observation duration in seconds.",
+            "required": false,
+            "default": 5
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "FsDiffResult with watched path, duration, changes array, and start/end UTC timestamps."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-system",
+      "name": "System Info",
+      "description": "Snapshot system hardware and OS information including OS name/version, hostname, memory, and CPU count.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "system", "--json"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObserveResult",
+        "schemaRef": "https://elegy/contracts/schemas/observe-result.schema.json",
+        "description": "SystemSnapshot with OS details, hostname, memory stats, CPU count, and UTC timestamp."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "observe-record",
+      "name": "Bounded Observation Record",
+      "description": "Record bounded foreground-window activity for a short session and return a compact observation-session artifact with preview events and summary output.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["observe", "record", "--duration-seconds", "${duration_seconds}", "--poll-interval-ms", "${poll_interval_ms}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "duration_seconds",
+            "type": "integer",
+            "description": "Bounded recorder duration in seconds.",
+            "required": false,
+            "default": 5
+          },
+          {
+            "name": "poll_interval_ms",
+            "type": "integer",
+            "description": "Polling interval in milliseconds for foreground-window checks.",
+            "required": false,
+            "default": 250
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObservationSession",
+        "schemaRef": "https://elegy/contracts/schemas/observation-session.schema.json",
+        "description": "ObservationSession with compact summary, preview events, and bounded foreground-window recording metadata."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "windows-only-capabilities",
+      "description": "Window observation (observe-window, observe-windows), bounded foreground-window recording (observe-record), and screen capture (observe-screen) require Windows. They return an 'unsupported' error on other platforms. Process, clipboard, filesystem, and system commands are cross-platform.",
+      "required": true
+    },
+    {
+      "constraintId": "screen-capture-limitations",
+      "description": "Screen capture uses GDI BitBlt and may not capture hardware-accelerated or DRM-protected content. Only the primary monitor (index 0) is currently supported.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [],
+    "allowedContexts": ["contributor-routing", "local-cli", "desktop-observation"]
+  },
+  "discovery": {
+    "keywords": ["observe", "desktop", "processes", "window", "screen", "capture", "clipboard", "filesystem", "system", "monitor", "snapshot", "record", "timeline", "focus"],
+    "triggers": [
+      {
+        "pattern": "what is running",
+        "description": "When an agent needs to see running processes."
+      },
+      {
+        "pattern": "active window",
+        "description": "When an agent needs to know the current foreground window."
+      },
+      {
+        "pattern": "screenshot",
+        "description": "When an agent needs to capture the screen."
+      },
+      {
+        "pattern": "clipboard contents",
+        "description": "When an agent needs to read clipboard."
+      },
+      {
+        "pattern": "file changes",
+        "description": "When an agent needs to detect filesystem changes."
+      },
+      {
+        "pattern": "system info",
+        "description": "When an agent needs hardware/OS information."
+      },
+      {
+        "pattern": "record desktop activity",
+        "description": "When an agent needs a bounded focus-recording session artifact."
+      }
+    ],
+    "capabilityHints": [
+      "process-snapshot",
+      "foreground-window-info",
+      "visible-window-list",
+      "screen-capture-png",
+      "clipboard-read",
+      "filesystem-diff",
+      "system-hardware-info",
+      "foreground-window-recording"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill.elegy-observe.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

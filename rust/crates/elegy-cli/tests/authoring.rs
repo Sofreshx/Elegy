@@ -554,6 +554,139 @@ fn generate_codex_plugin_command_rejects_unsafe_plugin_output_name() {
 }
 
 #[test]
+fn configuration_apply_command_supports_package_profiles() {
+    let temp_dir = unique_temp_dir("elegy-cli-config-package-apply");
+    let target_dir = temp_dir.join("target");
+    let package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package.demo-config.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "apply",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration apply --package");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "apply"]));
+    assert_eq!(body["data"]["sourceKind"], "package");
+    assert_eq!(body["data"]["subjectKind"], "profile");
+    assert_eq!(body["data"]["subjectId"], "demo-profile");
+    assert_eq!(body["data"]["verified"], true);
+    assert_eq!(body["data"]["summary"]["created"], 1);
+    assert!(body["data"]["sourceRef"]
+        .as_str()
+        .expect("sourceRef string")
+        .contains("#demo-profile"));
+    let generated =
+        fs::read_to_string(target_dir.join("generated").join("demo.txt")).expect("generated file");
+    assert_eq!(generated.trim_end_matches(['\r', '\n']), "demo");
+}
+
+#[test]
+fn configuration_verify_command_supports_package_profiles() {
+    let temp_dir = unique_temp_dir("elegy-cli-config-package-verify");
+    let target_dir = temp_dir.join("target");
+    let package_path = rust_workspace_root()
+        .parent()
+        .expect("repo root")
+        .join("contracts")
+        .join("fixtures")
+        .join("elegy-plugin-package.demo-config.json");
+
+    let apply_output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "apply",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration apply before verify");
+
+    assert!(
+        apply_output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&apply_output.stderr)
+    );
+
+    let verify_output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "configuration",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--profile-id",
+            "demo-profile",
+            "--target",
+            target_dir.to_str().expect("utf-8 target path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy configuration verify --package");
+
+    assert!(
+        verify_output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&verify_output.stderr)
+    );
+
+    let body: Value =
+        serde_json::from_slice(&verify_output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "verify"]));
+    assert_eq!(body["data"]["sourceKind"], "package");
+    assert_eq!(body["data"]["subjectKind"], "profile");
+    assert_eq!(body["data"]["subjectId"], "demo-profile");
+    assert_eq!(body["data"]["verified"], true);
+    assert_eq!(body["data"]["summary"]["verified"], 1);
+    assert_eq!(body["data"]["summary"]["mismatched"], 0);
+}
+
+#[test]
+fn configuration_list_command_does_not_claim_missing_catalog_schema() {
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args(["configuration", "list", "--json"])
+        .output()
+        .expect("run elegy configuration list --json");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let body: Value = serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "ok");
+    assert_eq!(body["command"], json!(["configuration", "list"]));
+    assert!(body.get("dataSchema").is_none());
+}
+
+#[test]
 fn run_dry_run_command_matches_http_example_catalog() {
     let example = rust_workspace_root().join("examples/http-minimal");
     let expected: serde_json::Value = serde_json::from_str(
@@ -1073,4 +1206,688 @@ fn local_cli_is_deterministic_and_hides_non_active_records_by_default() {
         .join("record-b.summary-only-session-context-envelope.json");
     let exported_contents = fs::read_to_string(export_path).expect("read exported artifact");
     assert!(exported_contents.contains("summary-only-session-context-envelope"));
+}
+
+#[test]
+fn plugin_verify_reports_ready_for_valid_package() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-ready");
+    let package_path = temp_dir.join("test-plugin.json");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.test-plugin",
+    "name": "test-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "test-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "test",
+            "name": "test-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "test-cap",
+              "name": "Test Cap",
+              "description": "A test capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "test-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "test-cap-proj",
+        "skill": "test.test-skill",
+        "capability": "test-cap",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}
+"#,
+    )
+    .expect("write test plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    assert!(
+        output.status.success(),
+        "verify should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["readiness"], "ready");
+}
+
+#[test]
+fn plugin_verify_reports_blocked_for_invalid_package() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-blocked");
+    let package_path = temp_dir.join("bad-plugin.json");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.bad-plugin",
+    "name": "bad-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "bad-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "bad",
+            "name": "bad-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "real-cap",
+              "name": "Real Cap",
+              "description": "A real capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "bad-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "phantom-proj",
+        "skill": "bad.bad-skill",
+        "capability": "nonexistent-cap",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write bad plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    // Phantom projection causes an invalid status (not a blocked readiness)
+    assert_eq!(parsed["status"], "invalid");
+}
+
+#[test]
+fn plugin_inspect_reports_package_summary() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-inspect");
+    let package_path = temp_dir.join("test-plugin.json");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.inspect-plugin",
+    "name": "inspect-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "inspect-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "inspect-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "inspect-cap",
+              "name": "Inspect Cap",
+              "description": "An inspect capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "inspect-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write test plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "inspect",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin inspect");
+
+    assert!(
+        output.status.success(),
+        "inspect should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse inspect JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["identity"]["name"], "inspect-plugin");
+    assert_eq!(parsed["data"]["summary"]["skillCount"], 1);
+    assert_eq!(parsed["data"]["summary"]["docCount"], 0);
+}
+
+#[test]
+fn plugin_pack_creates_valid_zip() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-pack");
+    let source_dir = temp_dir.join("my-plugin");
+    let output_zip = temp_dir.join("my-plugin.zip");
+
+    fs::create_dir_all(&source_dir).expect("create source directory");
+    fs::write(
+        source_dir.join("plugin.json"),
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.packed-plugin",
+    "name": "packed-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "packed-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "packed-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "packed-cap",
+              "name": "Packed Cap",
+              "description": "A packed capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "packed-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write plugin.json");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "pack",
+            "--source",
+            source_dir.to_str().expect("utf-8 source dir"),
+            "--output",
+            output_zip.to_str().expect("utf-8 output path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin pack");
+
+    assert!(
+        output.status.success(),
+        "pack should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_zip.exists(), "zip archive should exist");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse pack JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert!(parsed["data"]["archivePath"]
+        .as_str()
+        .expect("archivePath should be a string")
+        .contains("my-plugin.zip"));
+}
+
+#[test]
+fn plugin_project_codex_generates_valid_codex_plugin() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-codex");
+    let package_path = temp_dir.join("test-plugin.json");
+    let output_dir = temp_dir.join("codex-output");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.codex-test-plugin",
+    "name": "codex-test-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "codex-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "codex-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "codex-cap",
+              "name": "Codex Cap",
+              "description": "A codex capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "codex-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write test plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "project",
+            "codex",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--output-dir",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin project codex");
+
+    assert!(
+        output.status.success(),
+        "project codex should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let plugin_root = output_dir.join("codex-test-plugin");
+    assert!(plugin_root
+        .join(".codex-plugin")
+        .join("plugin.json")
+        .is_file());
+    assert!(plugin_root.join("skills").is_dir());
+
+    // Verify no unexpected MCP/app/hooks files
+    assert!(!plugin_root.join(".mcp.json").exists());
+    assert!(!plugin_root.join(".app.json").exists());
+    assert!(!plugin_root.join("hooks").exists());
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse project codex JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["pluginName"], "codex-test-plugin");
+    assert!(!parsed["data"]["emittedComponents"]["appsEmitted"]
+        .as_bool()
+        .expect("appsEmitted should be a bool"));
+    assert!(!parsed["data"]["emittedComponents"]["mcpServersEmitted"]
+        .as_bool()
+        .expect("mcpServersEmitted should be a bool"));
+    assert!(!parsed["data"]["emittedComponents"]["hooksEmitted"]
+        .as_bool()
+        .expect("hooksEmitted should be a bool"));
+}
+
+#[test]
+fn plugin_project_host_rejects_bad_host_name() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-bad-host");
+    let package_path = temp_dir.join("test-plugin.json");
+    let output_dir = temp_dir.join("host-output");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.host-test",
+    "name": "host-test",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "host-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "host-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [],
+          "lifecycleState": "active"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write test plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "project",
+            "host",
+            "--host",
+            "nonexistent-host",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--output-dir",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin project host with bad host");
+
+    assert!(
+        !output.status.success(),
+        "bad host should fail but stderr was: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
+
+#[test]
+fn plugin_project_host_generic_emits_host_manifest() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-generic");
+    let package_path = temp_dir.join("test-plugin.json");
+    let output_dir = temp_dir.join("host-output");
+
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.generic-test",
+    "name": "generic-test",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "generic-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "elegy",
+            "name": "generic-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "gen-cap",
+              "name": "Gen Cap",
+              "description": "A generic capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "gen-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "gen-cap-proj",
+        "skill": "elegy.generic-skill",
+        "capability": "gen-cap",
+        "lane": "cli",
+        "supportsDryRun": false,
+        "projection": {
+          "projections": ["cli"],
+          "functionName": "gen_cap"
+        }
+      }
+    ]
+  }
+}
+"#,
+    )
+    .expect("write test plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "project",
+            "host",
+            "--host",
+            "generic",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--output-dir",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin project host generic");
+
+    assert!(
+        output.status.success(),
+        "host project should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let plugin_root = output_dir.join("generic-test");
+    assert!(plugin_root
+        .join(".elegy-host-generic")
+        .join("plugin.json")
+        .is_file());
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse host project JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["pluginName"], "generic-test");
+}
+
+#[test]
+fn plugin_new_scaffolds_skill_only_template() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-new");
+    let output_dir = temp_dir.join("my-skill-plugin");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "new",
+            "--template",
+            "skill-only",
+            "--output",
+            output_dir.to_str().expect("utf-8 output dir"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin new");
+
+    assert!(
+        output.status.success(),
+        "plugin new should succeed: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(output_dir.join("plugin.json").is_file());
+    assert!(output_dir.join("README.md").is_file());
+    assert!(output_dir.join("skills").is_dir());
+    assert!(output_dir.join("docs").is_dir());
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse new JSON output");
+    assert_eq!(parsed["status"], "ok");
+}
+
+#[test]
+fn plugin_verify_reports_partial_for_incomplete_subset() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-partial");
+    let package_path = temp_dir.join("subset-plugin.json");
+
+    // Package has 1 capability projected from a skill with 2 capabilities, no subsetOf declared
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.subset-plugin",
+    "name": "subset-plugin",
+    "version": "0.1.0"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "multi-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "test",
+            "name": "multi-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "cap-a",
+              "name": "Cap A",
+              "description": "First capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "multi-tool",
+                "arguments": []
+              }
+            },
+            {
+              "id": "cap-b",
+              "name": "Cap B",
+              "description": "Second capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "multi-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "only-cap-a",
+        "skill": "test.multi-skill",
+        "capability": "cap-a",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}
+"#,
+    )
+    .expect("write subset plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    assert_eq!(parsed["status"], "ok");
+    // Should be "partial" because only 1 of 2 capabilities projected without subsetOf
+    assert_eq!(parsed["data"]["readiness"], "partial");
 }

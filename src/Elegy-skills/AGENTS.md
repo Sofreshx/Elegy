@@ -9,11 +9,11 @@
 
 - Governed skill truth remains under `contracts/`.
 - `rust/crates/elegy-skills` owns the reusable registry API and dedicated CLI behavior.
-- `.github/skills/elegy-skills/SKILL.md` and `skills/elegy-skills/SKILL.md` are non-authoritative routing outputs.
+- `.agents/skills/elegy-skills/SKILL.md` and `.github/skills/elegy-skills/SKILL.md` are non-authoritative routing outputs.
 
 ## What This Surface Represents
 
-- The dedicated skill tools are registry-first: search, resolve, inspect, and validate governed skills.
+- The dedicated skill tools are registry-first: list, search, resolve, get, capability, and validate governed skills.
 - The same behavior is mirrored by the umbrella `elegy skills ...` commands.
 - MCP-to-skill generation is lower-level contributor tooling and is not the main story for this wrapper surface.
 

@@ -10,8 +10,8 @@ Use it to explain how the wrapper delegates skill-facing guidance:
 - `governance/` for version and release policy.
 - `rust/crates/elegy-skills` for the current dedicated in-repo skill-registry CLI and shared registry API surface.
 - `rust/crates/elegy-tooling` and the existing `elegy` CLI surface for lower-level MCP-to-skill generation when contributor tooling still needs it.
-- `.github/skills/elegy-skills/SKILL.md` for the repo-local non-authoritative contributor-routing output.
+- `.agents/skills/elegy-skills/SKILL.md` and `.github/skills/elegy-skills/SKILL.md` for repo-local non-authoritative contributor-routing outputs.
 - `elegy-skills/SKILL.md` for the shipped surface-local bridge used by wrapper archive consumers.
 - `.github/skills/` for repo-local non-authoritative contributor-routing outputs.
 
-The current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`.
+The current operator CLI surfaces include `elegy` plus dedicated bounded binaries such as `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`.

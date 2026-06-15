@@ -583,9 +583,7 @@ impl SqliteMemoryStore {
 
             sort_memory_ids(&mut report.quarantined_ids);
             sort_memory_ids(&mut report.skipped_ids);
-            report
-                .actions
-                .sort_by(|left, right| left.memory_id.cmp(&right.memory_id));
+            report.actions.sort_by_key(|left| left.memory_id);
             transaction.commit()?;
             Ok(report)
         })
@@ -4371,7 +4369,7 @@ fn upsert_encoded_embedding(
 }
 
 fn decode_embedding(bytes: &[u8], expected_dimensions: usize) -> Result<Vec<f32>, StoreError> {
-    if bytes.len() % std::mem::size_of::<f32>() != 0 {
+    if !bytes.len().is_multiple_of(std::mem::size_of::<f32>()) {
         return Err(StoreError::Serialization(format!(
             "embedding blob length {} is not aligned to f32 components",
             bytes.len()

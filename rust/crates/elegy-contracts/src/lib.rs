@@ -1,11 +1,18 @@
-use serde::{Deserialize, Serialize};
-use serde_json::Value;
+mod configuration;
+
+pub use configuration::*;
+
 use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
+use std::time::{SystemTime, UNIX_EPOCH};
+
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use thiserror::Error;
+use url::Url;
 use zip::write::SimpleFileOptions;
 use zip::CompressionMethod;
 
@@ -35,18 +42,14 @@ pub enum ContractsError {
     Compatibility(String),
 }
 
-const SUPPLEMENTAL_FIXTURE_FILES: &[&str] = &[
-    "fixtures/mcp-server-descriptor.parity.json",
-    "fixtures/mcp-analysis-result.parity.json",
-    "fixtures/mcp-parity-expected.json",
-];
-
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct CompatibilityManifest {
     pub manifest_version: String,
     pub package: ContractPackage,
     pub schemas: Vec<SchemaEntry>,
+    #[serde(default)]
+    pub supplemental_fixtures: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq)]
@@ -74,6 +77,172 @@ pub struct ConsumerSupportManifest {
 }
 
 pub const AGENT_CAPABILITY_PROFILE_SCHEMA_VERSION: &str = "agent-capability-profile/v1";
+
+/// Schema version constant for all Elegy CLI machine-readable envelopes.
+pub const CLI_SCHEMA_VERSION: &str = "elegy.cli/v1";
+
+/// Shared JSON envelope for all Elegy CLI machine-readable output.
+///
+/// Every dedicated CLI surface (`elegy-skills`, `elegy-mcp`, `elegy-planning`, etc.)
+/// emits this envelope when `--json` or `--format json` is active. The envelope
+/// carries the schema version, a correlation ID for event tracing, the command
+/// that produced the result, and either [`data`] on success or [`failure`] on error.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CliMachineEnvelope<T>
+where
+    T: Serialize,
+{
+    pub schema_version: &'static str,
+    pub correlation_id: String,
+    #[serde(skip_serializing_if = "is_false")]
+    pub non_interactive: bool,
+    pub command: Vec<String>,
+    pub status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data_schema: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub failure: Option<StructuredFailure>,
+}
+
+/// Resolved machine-mode context shared across all Elegy CLI surfaces.
+///
+/// Holds the `non_interactive` flag and a resolved correlation ID (either
+/// user-provided or auto-generated). Built by [`build_cli_machine_context`].
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct CliMachineContext {
+    pub non_interactive: bool,
+    pub correlation_id: String,
+}
+
+/// Classifies the kind of CLI failure for structured error envelopes.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CliFailureKind {
+    /// The request was invalid (bad input, missing required field, scope mismatch).
+    InvalidInput,
+    /// An internal runtime error occurred.
+    Runtime,
+    /// The requested operation is not supported by this surface.
+    Unsupported,
+}
+
+impl CliFailureKind {
+    fn status(self) -> &'static str {
+        match self {
+            CliFailureKind::InvalidInput => "invalid",
+            CliFailureKind::Runtime | CliFailureKind::Unsupported => "error",
+        }
+    }
+
+    fn category(self) -> StructuredFailureCategory {
+        match self {
+            CliFailureKind::InvalidInput => StructuredFailureCategory::InvalidInput,
+            CliFailureKind::Runtime => StructuredFailureCategory::Internal,
+            CliFailureKind::Unsupported => StructuredFailureCategory::Unavailable,
+        }
+    }
+
+    fn code(self) -> &'static str {
+        match self {
+            CliFailureKind::InvalidInput => "CLI-INVALID-INPUT",
+            CliFailureKind::Runtime => "CLI-RUNTIME-FAILURE",
+            CliFailureKind::Unsupported => "CLI-UNSUPPORTED",
+        }
+    }
+}
+
+/// Resolves a correlation ID from user input, falling back to an auto-generated
+/// value with the given `prefix` when the input is `None` or blank.
+pub fn resolve_cli_correlation_id(correlation_id: Option<String>, prefix: &str) -> String {
+    if let Some(value) = correlation_id {
+        let trimmed = value.trim();
+        if !trimmed.is_empty() {
+            return trimmed.to_string();
+        }
+    }
+
+    let timestamp_nanos = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|duration| duration.as_nanos())
+        .unwrap_or(0);
+
+    format!("{prefix}-{}-{timestamp_nanos}", std::process::id())
+}
+
+/// Builds a [`CliMachineContext`] from CLI flags, auto-generating a correlation
+/// ID with the given `prefix` when one is not provided.
+pub fn build_cli_machine_context(
+    non_interactive: bool,
+    correlation_id: Option<String>,
+    prefix: &str,
+) -> CliMachineContext {
+    CliMachineContext {
+        non_interactive,
+        correlation_id: resolve_cli_correlation_id(correlation_id, prefix),
+    }
+}
+
+/// Builds a success [`CliMachineEnvelope`] with `status: "ok"` and the given data.
+pub fn build_cli_success_envelope<T, S>(
+    context: &CliMachineContext,
+    command: impl IntoIterator<Item = S>,
+    data: T,
+) -> CliMachineEnvelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
+    CliMachineEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: context.correlation_id.clone(),
+        non_interactive: context.non_interactive,
+        command: command.into_iter().map(Into::into).collect(),
+        status: "ok".to_string(),
+        data_schema: None,
+        data: Some(data),
+        failure: None,
+    }
+}
+
+/// Builds a failure [`CliMachineEnvelope`] with a [`StructuredFailure`] payload
+/// classified by the given [`CliFailureKind`].
+pub fn build_cli_failure_envelope<T, S>(
+    context: &CliMachineContext,
+    command: impl IntoIterator<Item = S>,
+    kind: CliFailureKind,
+    message: impl Into<String>,
+    details: Option<Value>,
+) -> CliMachineEnvelope<T>
+where
+    T: Serialize,
+    S: Into<String>,
+{
+    let message = message.into();
+    CliMachineEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: context.correlation_id.clone(),
+        non_interactive: context.non_interactive,
+        command: command.into_iter().map(Into::into).collect(),
+        status: kind.status().to_string(),
+        data_schema: None,
+        data: None,
+        failure: Some(StructuredFailure {
+            code: kind.code().to_string(),
+            message,
+            category: kind.category(),
+            retryable: false,
+            correlation_id: Some(context.correlation_id.clone()),
+            details,
+            cause: None,
+        }),
+    }
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
 
 fn default_agent_profile_always_include_router() -> bool {
     true
@@ -154,7 +323,8 @@ pub fn validate_agent_capability_profile(
     AgentCapabilityProfileValidationResult { issues }
 }
 
-pub const ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+pub const ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION: &str = "elegy-plugin-package/v1";
+pub const ELEGY_PLUGIN_LOCK_V1_SCHEMA_VERSION: &str = "elegy-plugin-lock/v1";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -166,6 +336,21 @@ pub struct ElegyPluginPackage {
     pub components: ElegyPluginPackageComponents,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_policy_hints: Option<ElegyPluginPackagePolicyHints>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub publishing: Option<ElegyPluginPackagePublishingMetadata>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elegy_compatibility: Option<ElegyPluginPackageElegyCompatibility>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageElegyCompatibility {
+    pub contract_bundle_version: String,
+    pub schema_line: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub minimum_elegy_tooling_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contracts_source: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -191,6 +376,8 @@ pub struct ElegyPluginPackageMetadata {
     pub homepage: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub documentation_uri: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub subset_of: Vec<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -199,7 +386,17 @@ pub struct ElegyPluginPackageComponents {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skill_definitions: Vec<ElegyPluginPackageSkillDefinitionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_contracts: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instruction_skills: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub eval_packs: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resource_packs: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_adapter_contracts: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub bridge_adapter_contracts: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_projections: Vec<ElegyPluginPackageMcpProjectionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -208,6 +405,18 @@ pub struct ElegyPluginPackageComponents {
     pub docs: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub assets: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub cli_helpers: Vec<ElegyPluginPackagePathComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configuration_templates: Vec<ElegyPluginPackageConfigurationComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub configuration_profiles: Vec<ElegyPluginPackageConfigurationComponent>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_requirements: Vec<ElegyPluginPackageToolRequirement>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub host_compatibility: Vec<ElegyPluginPackageCompatibilityMetadata>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub rust_tool_adapters: Vec<ElegyPluginPackageRustToolAdapterComponent>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -223,6 +432,15 @@ pub struct ElegyPluginPackageSkillDefinitionComponent {
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ElegyPluginPackagePathComponent {
+    pub id: String,
+    pub path: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageConfigurationComponent {
     pub id: String,
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -288,6 +506,65 @@ pub struct ElegyPluginPackagePolicyHints {
     pub policy_tags: Vec<String>,
 }
 
+/// Publishing metadata for an Elegy plugin package (marketplace, provenance, signatures).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackagePublishingMetadata {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketplace_target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub import_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_commit: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub changelog_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provenance_ref: Option<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub signature_refs: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub compatibility: Vec<ElegyPluginPackageCompatibilityMetadata>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageCompatibilityMetadata {
+    pub host: String,
+    pub version_range: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageToolRequirement {
+    pub tool_name: String,
+    pub cli_binary: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub min_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe_command: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginPackageRustToolAdapterComponent {
+    pub id: String,
+    pub crate_name: String,
+    pub crate_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub feature: Option<String>,
+    pub registry_symbol: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_ref: Option<String>,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ElegyPluginPackageValidationResult {
     pub issues: Vec<String>,
@@ -304,9 +581,10 @@ pub fn validate_elegy_plugin_package(
 ) -> ElegyPluginPackageValidationResult {
     let mut issues = Vec::new();
 
-    if package.schema_version != ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION {
+    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION {
         issues.push(format!(
-            "schemaVersion must be '{ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION}'."
+            "schemaVersion must be '{}'.",
+            ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION
         ));
     }
     if !is_package_id(&package.identity.package_id) {
@@ -326,6 +604,19 @@ pub fn validate_elegy_plugin_package(
     if package.identity.version.trim().is_empty() {
         issues.push("identity.version must not be empty.".to_string());
     }
+    if let Some(metadata) = &package.metadata {
+        if let Some(homepage) = &metadata.homepage {
+            validate_uri("metadata.homepage", homepage, &mut issues);
+        }
+        if let Some(documentation_uri) = &metadata.documentation_uri {
+            validate_uri("metadata.documentationUri", documentation_uri, &mut issues);
+        }
+    }
+    if let Some(compat) = &package.elegy_compatibility {
+        if let Some(source) = &compat.contracts_source {
+            validate_uri("elegyCompatibility.contractsSource", source, &mut issues);
+        }
+    }
 
     validate_component_ids(
         "components.skillDefinitions",
@@ -337,10 +628,55 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
+        "components.capabilityContracts",
+        package
+            .components
+            .capability_contracts
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
         "components.instructionSkills",
         package
             .components
             .instruction_skills
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.evalPacks",
+        package
+            .components
+            .eval_packs
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.resourcePacks",
+        package
+            .components
+            .resource_packs
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.toolAdapterContracts",
+        package
+            .components
+            .tool_adapter_contracts
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.bridgeAdapterContracts",
+        package
+            .components
+            .bridge_adapter_contracts
             .iter()
             .map(|component| component.id.as_str()),
         &mut issues,
@@ -381,6 +717,42 @@ pub fn validate_elegy_plugin_package(
             .map(|component| component.id.as_str()),
         &mut issues,
     );
+    validate_component_ids(
+        "components.cliHelpers",
+        package
+            .components
+            .cli_helpers
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.configurationTemplates",
+        package
+            .components
+            .configuration_templates
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.configurationProfiles",
+        package
+            .components
+            .configuration_profiles
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
+        "components.toolRequirements",
+        package
+            .components
+            .tool_requirements
+            .iter()
+            .map(|component| component.tool_name.as_str()),
+        &mut issues,
+    );
 
     let mut capability_refs = BTreeSet::new();
     for component in &package.components.skill_definitions {
@@ -419,10 +791,29 @@ pub fn validate_elegy_plugin_package(
 
     for component in package
         .components
-        .instruction_skills
+        .capability_contracts
         .iter()
+        .chain(package.components.instruction_skills.iter())
+        .chain(package.components.eval_packs.iter())
+        .chain(package.components.resource_packs.iter())
+        .chain(package.components.tool_adapter_contracts.iter())
+        .chain(package.components.bridge_adapter_contracts.iter())
         .chain(package.components.docs.iter())
         .chain(package.components.assets.iter())
+        .chain(package.components.cli_helpers.iter())
+    {
+        validate_portable_relative_path(
+            &format!("component path '{}'", component.id),
+            &component.path,
+            &mut issues,
+        );
+    }
+
+    for component in package
+        .components
+        .configuration_templates
+        .iter()
+        .chain(package.components.configuration_profiles.iter())
     {
         validate_portable_relative_path(
             &format!("component path '{}'", component.id),
@@ -466,7 +857,7 @@ pub fn validate_elegy_plugin_package(
     for projection in &package.components.capability_projections {
         if !matches!(
             projection.lane.as_str(),
-            "api" | "mcp" | "plugin" | "cli" | "subprocess"
+            "api" | "mcp" | "plugin" | "cli" | "subprocess" | "rust"
         ) {
             issues.push(format!(
                 "components.capabilityProjections entry '{}' uses unsupported lane '{}'.",
@@ -485,7 +876,158 @@ pub fn validate_elegy_plugin_package(
         );
     }
 
+    if let Some(publishing) = &package.publishing {
+        validate_plugin_package_publishing_metadata(package, publishing, &mut issues);
+    }
+
     ElegyPluginPackageValidationResult { issues }
+}
+
+pub const ELEGY_PLUGIN_READINESS_V1_SCHEMA_VERSION: &str = "elegy-plugin-readiness/v1";
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessV1 {
+    pub schema_version: String,
+    pub package_identity: ElegyPluginReadinessPackageIdentity,
+    pub readiness: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub verified_skills: Vec<ElegyPluginReadinessVerifiedSkill>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub projected_tools: Vec<ElegyPluginReadinessProjectedTool>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub tool_statuses: Vec<ElegyPluginReadinessToolStatus>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub omitted_capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unsupported_capabilities: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_effect_summary: Option<ElegyPluginReadinessSideEffectSummary>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub findings: Vec<ElegyPluginReadinessFinding>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessPackageIdentity {
+    pub package_id: String,
+    pub name: String,
+    pub version: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessVerifiedSkill {
+    pub skill_id: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessProjectedTool {
+    pub tool_name: String,
+    pub function_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_id: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lane: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessToolStatus {
+    pub tool_name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cli_binary: Option<String>,
+    pub status: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub probe_output: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessSideEffectSummary {
+    #[serde(default)]
+    pub none: i32,
+    #[serde(default, rename = "read_only")]
+    pub read_only: i32,
+    #[serde(default, rename = "disk_read")]
+    pub disk_read: i32,
+    #[serde(default, rename = "disk_write")]
+    pub disk_write: i32,
+    #[serde(default, rename = "network_outbound")]
+    pub network_outbound: i32,
+    #[serde(default, rename = "process_spawn")]
+    pub process_spawn: i32,
+    #[serde(default, rename = "desktop_ui")]
+    pub desktop_ui: i32,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginReadinessFinding {
+    pub code: String,
+    pub severity: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub detail: Option<String>,
+}
+
+/// Install receipt parsed from a host-generated install-receipt.json.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginInstallReceiptV1 {
+    pub package_id: String,
+    pub install_path: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub installed_binaries: Vec<ElegyPluginInstallReceiptBinary>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginInstallReceiptBinary {
+    pub tool_name: String,
+    pub binary_path: String,
+}
+
+/// Lock file that pins Elegy contract bundle version for a plugin package.
+/// Schema: elegy-plugin-lock/v1
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginLockV1 {
+    pub schema_version: String,
+    pub lock_version: u32,
+    pub elegy_compatibility: ElegyPluginLockCompatibility,
+    pub generated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated_by: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub plugin_package_ref: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginLockCompatibility {
+    pub contract_bundle_version: String,
+    pub schema_line: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub source_asset: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum: Option<String>,
+}
+
+fn validate_uri(field: &str, value: &str, issues: &mut Vec<String>) {
+    let value = value.trim();
+    if value.is_empty() {
+        return;
+    }
+
+    match Url::parse(value) {
+        Ok(url) if !url.scheme().is_empty() => {}
+        _ => issues.push(format!("{field} must be a valid URI.")),
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -639,6 +1181,7 @@ pub struct AgentEventEnvelope {
     pub payload: AgentEventPayload,
 }
 
+/// Structured failure payload embedded in [`CliMachineEnvelope`] on error.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct StructuredFailure {
@@ -652,6 +1195,7 @@ pub struct StructuredFailure {
     pub cause: Option<StructuredFailureCause>,
 }
 
+/// High-level classification of a [`StructuredFailure`].
 #[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub enum StructuredFailureCategory {
@@ -668,6 +1212,7 @@ pub enum StructuredFailureCategory {
     Unknown,
 }
 
+/// Optional upstream cause chain for a [`StructuredFailure`].
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct StructuredFailureCause {
@@ -1361,9 +1906,88 @@ pub struct SkillDefinitionV2 {
     pub origin: Option<SkillOriginV2>,
     /// Lifecycle state of the skill.
     pub lifecycle_state: String,
+    /// Optional explicit host projection metadata describing how runtime hosts
+    /// (such as Holon) should register this skill's capabilities as callable
+    /// tools, including the CLI binary, output contract family, default
+    /// side-effect class, and per-capability function-calling projections.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_projection: Option<SkillHostProjection>,
 }
 
-/// Identity block for a v2 skill definition.
+/// Side-effect class advertised by [`SkillHostProjection`] for runtime host
+/// tool registration. Distinct from [`CapabilitySideEffectClass`] so that
+/// host-facing vocabulary stays aligned with the governed JSON schema and
+/// does not change when capability-side classification changes.
+#[derive(Clone, Copy, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum HostSideEffectClass {
+    #[default]
+    None,
+    ReadOnly,
+    DiskRead,
+    DiskWrite,
+    NetworkOutbound,
+    ProcessSpawn,
+    DesktopUi,
+}
+
+impl HostSideEffectClass {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HostSideEffectClass::None => "none",
+            HostSideEffectClass::ReadOnly => "read_only",
+            HostSideEffectClass::DiskRead => "disk_read",
+            HostSideEffectClass::DiskWrite => "disk_write",
+            HostSideEffectClass::NetworkOutbound => "network_outbound",
+            HostSideEffectClass::ProcessSpawn => "process_spawn",
+            HostSideEffectClass::DesktopUi => "desktop_ui",
+        }
+    }
+}
+
+/// Host-facing function-calling projection for a single capability within a
+/// [`SkillHostProjection`].
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillHostCapabilityProjection {
+    /// Governed capability id this projection derives from. Must match an
+    /// existing capability in the parent skill definition.
+    pub capability_id: String,
+    /// Stable function-calling name for runtime host tool registration.
+    pub function_name: String,
+    /// Optional capability-level side-effect class override. When absent the
+    /// projection falls back to the parent host projection's default class.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub side_effect_class: Option<HostSideEffectClass>,
+    /// Whether this capability always produces the same output for the same
+    /// input. Used by hosts to enable caching or simplify reasoning.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub is_deterministic: Option<bool>,
+}
+
+/// Explicit host projection metadata describing how a skill definition's
+/// capabilities map to runtime host tool surfaces (CLI subprocess, function
+/// calling, etc.).
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct SkillHostProjection {
+    /// Stable CLI binary name for subprocess invocation (e.g.
+    /// `"elegy-planning"`, `"elegy-skills"`).
+    pub cli_name: String,
+    /// Versioned output contract family identifier used by hosts for
+    /// envelope validation (e.g. `"elegy-planning-v1"`,
+    /// `"elegy-skills-v1"`).
+    pub output_contract_id: String,
+    /// Skill-level default side-effect class. Individual capabilities may
+    /// override this with a more specific class.
+    pub default_side_effect_class: HostSideEffectClass,
+    /// Per-capability function-calling projections, including stable
+    /// function names and optional side-effect class overrides.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub capability_projections: Vec<SkillHostCapabilityProjection>,
+}
+
+/// Identity block for a skill definition.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillIdentityV2 {
@@ -1381,7 +2005,7 @@ pub struct SkillIdentityV2 {
     pub aliases: Vec<String>,
 }
 
-/// Display and categorization metadata for a v2 skill.
+/// Display and categorization metadata for a Skill.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillMetadataV2 {
@@ -1414,7 +2038,7 @@ pub struct SkillMetadataV2 {
     pub documentation_uri: Option<String>,
 }
 
-/// A single capability within a v2 skill definition.
+/// A single capability within a skill definition.
 ///
 /// Each capability maps to a specific CLI invocation or MCP tool
 /// that an agent can call.
@@ -1543,7 +2167,7 @@ pub struct SkillComposition {
     pub output_consumed_by: Vec<String>,
 }
 
-/// Governance posture for a v2 skill.
+/// Governance posture for a Skill.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillGovernance {
@@ -1561,7 +2185,7 @@ pub struct SkillGovernance {
     pub allowed_contexts: Vec<String>,
 }
 
-/// Discovery metadata for agents to find a v2 skill.
+/// Discovery metadata for agents to find a Skill.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillDiscovery {
@@ -1579,7 +2203,7 @@ pub struct SkillDiscovery {
     pub is_hidden: bool,
 }
 
-/// Origin/provenance of a v2 skill definition.
+/// Origin/provenance of a skill definition.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct SkillOriginV2 {
@@ -1597,7 +2221,7 @@ pub struct SkillOriginV2 {
     pub source_version: Option<String>,
 }
 
-/// Validate a v2 skill definition for structural correctness.
+/// Validate a skill definition for structural correctness.
 ///
 /// Checks required fields and basic invariants without performing
 /// schema validation against the JSON Schema.
@@ -1751,17 +2375,79 @@ pub fn validate_skill_definition_v2(def: &SkillDefinitionV2) -> Result<(), Contr
             }
         }
     }
+    if let Some(host_projection) = &def.host_projection {
+        validate_skill_host_projection(def, host_projection)?;
+    }
     Ok(())
 }
 
-/// Strict validation for v2 skill definitions that additionally enforces
+fn validate_skill_host_projection(
+    def: &SkillDefinitionV2,
+    host_projection: &SkillHostProjection,
+) -> Result<(), ContractsError> {
+    if host_projection.cli_name.trim().is_empty() {
+        return Err(ContractsError::Compatibility(
+            "hostProjection.cliName must not be empty".to_string(),
+        ));
+    }
+    if host_projection.output_contract_id.trim().is_empty() {
+        return Err(ContractsError::Compatibility(
+            "hostProjection.outputContractId must not be empty".to_string(),
+        ));
+    }
+
+    let capability_ids = def
+        .capabilities
+        .iter()
+        .map(|cap| cap.id.to_ascii_lowercase())
+        .collect::<BTreeSet<_>>();
+
+    let mut seen_capability_ids = BTreeSet::new();
+    let mut seen_function_names = BTreeSet::new();
+    for projection in &host_projection.capability_projections {
+        if projection.capability_id.trim().is_empty() {
+            return Err(ContractsError::Compatibility(
+                "hostProjection.capabilityProjections[].capabilityId must not be empty".to_string(),
+            ));
+        }
+        let normalized_capability = projection.capability_id.to_ascii_lowercase();
+        if !capability_ids.contains(&normalized_capability) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].capabilityId '{}' does not match any capability declared on skill '{}'",
+                projection.capability_id, def.identity.name
+            )));
+        }
+        if !seen_capability_ids.insert(normalized_capability) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].capabilityId '{}' is duplicated",
+                projection.capability_id
+            )));
+        }
+
+        if projection.function_name.trim().is_empty() {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].functionName for capability '{}' must not be empty",
+                projection.capability_id
+            )));
+        }
+        if !seen_function_names.insert(projection.function_name.to_ascii_lowercase()) {
+            return Err(ContractsError::Compatibility(format!(
+                "hostProjection.capabilityProjections[].functionName '{}' is duplicated",
+                projection.function_name
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Strict validation for skill definitions that additionally enforces
 /// output.schemaRef on every subprocess machine-invokable capability.
 ///
 /// Policy: every subprocess machine-invokable capability MUST declare
 /// output.schemaRef. Capabilities without it are rejected.
 ///
-/// See `contracts/schemas/skill-definition-v2.schema.json` comment and
-/// `contracts/fixtures/skill-definition-v2.negative-no-output-schema.json`.
+/// See `contracts/schemas/skill.schema.json` comment and
+/// `contracts/fixtures/skill.negative-no-output-schema.json`.
 pub fn validate_skill_definition_v2_strict(def: &SkillDefinitionV2) -> Result<(), ContractsError> {
     validate_skill_definition_v2(def)?;
 
@@ -1792,76 +2478,80 @@ pub fn validate_skill_definition_v2_strict(def: &SkillDefinitionV2) -> Result<()
 pub struct BuiltinSkillDefinition {
     /// Runtime skill identifier, matching `identity.name`.
     pub id: &'static str,
-    /// UTF-8 JSON text for the v2 skill definition.
+    /// UTF-8 JSON text for the skill definition.
     pub json: &'static str,
 }
 
-/// Built-in v2 skill definitions available for runtime discovery.
+/// Built-in skill definitions available for runtime discovery.
 pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
     BuiltinSkillDefinition {
         id: "diagram",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-diagram.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "documentation",
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-documentation.json"),
     },
     BuiltinSkillDefinition {
         id: "skill-router",
-        json: include_str!(
-            "../../../../contracts/fixtures/skill-definition-v2.elegy-skill-router.json"
-        ),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-skill-router.json"),
     },
     BuiltinSkillDefinition {
         id: "memory",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-memory.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-memory.json"),
     },
     BuiltinSkillDefinition {
         id: "mcp",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-mcp.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-mcp.json"),
     },
     BuiltinSkillDefinition {
         id: "skills",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-skills.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-skills.json"),
     },
     BuiltinSkillDefinition {
         id: "mermaid",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-mermaid.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-mermaid.json"),
     },
     BuiltinSkillDefinition {
         id: "observe",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-observe.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-observe.json"),
     },
     BuiltinSkillDefinition {
         id: "planning",
-        json: include_str!(
-            "../../../../contracts/fixtures/skill-definition-v2.elegy-planning.json"
-        ),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-planning.json"),
     },
     BuiltinSkillDefinition {
         id: "desktop",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-desktop.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-desktop.json"),
     },
     BuiltinSkillDefinition {
         id: "repo",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-repo.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-repo.json"),
     },
     BuiltinSkillDefinition {
         id: "web",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-web.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-web.json"),
     },
     BuiltinSkillDefinition {
         id: "data",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-data.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-data.json"),
     },
     BuiltinSkillDefinition {
         id: "notify",
-        json: include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-notify.json"),
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-notify.json"),
+    },
+    BuiltinSkillDefinition {
+        id: "skill-authoring",
+        json: include_str!("../../../../contracts/fixtures/skill.elegy-skill-authoring.json"),
     },
 ];
 
-/// Return the built-in v2 skill registry.
+/// Return the built-in Skill registry.
 pub fn builtin_skill_definitions() -> &'static [BuiltinSkillDefinition] {
     BUILTIN_SKILL_DEFINITIONS
 }
 
-/// Parse and validate every built-in v2 skill definition.
+/// Parse and validate every built-in skill definition.
 ///
 /// Uses strict validation that enforces output.schemaRef on every
 /// subprocess machine-invokable capability. See
@@ -1883,7 +2573,7 @@ pub fn parse_builtin_skill_definitions() -> Result<Vec<SkillDefinitionV2>, Contr
         .collect()
 }
 
-/// Find a built-in v2 skill definition by `identity.name`.
+/// Find a built-in skill definition by `identity.name`.
 pub fn find_builtin_skill_definition(
     skill_id: &str,
 ) -> Result<Option<SkillDefinitionV2>, ContractsError> {
@@ -1895,7 +2585,7 @@ pub fn find_builtin_skill_definition(
     Ok(None)
 }
 
-/// Find a built-in capability and its parent v2 skill definition.
+/// Find a built-in capability and its parent skill definition.
 pub fn find_builtin_skill_capability(
     capability_id: &str,
 ) -> Result<Option<(SkillCapability, SkillDefinitionV2)>, ContractsError> {
@@ -1907,6 +2597,152 @@ pub fn find_builtin_skill_capability(
         }
     }
     Ok(None)
+}
+
+/// Returns [`CapabilityDefinition`] projections for all built-in skill capabilities.
+pub fn builtin_capability_definitions() -> Result<Vec<CapabilityDefinition>, ContractsError> {
+    let mut definitions = Vec::new();
+    for skill_definition in parse_builtin_skill_definitions()? {
+        for capability in &skill_definition.capabilities {
+            definitions.push(project_skill_capability_definition(
+                &skill_definition,
+                capability,
+            ));
+        }
+    }
+    Ok(definitions)
+}
+
+/// Looks up a single built-in capability by ID and returns its [`CapabilityDefinition`] projection.
+pub fn projected_builtin_capability_definition(
+    capability_id: &str,
+) -> Result<Option<CapabilityDefinition>, ContractsError> {
+    Ok(
+        find_builtin_skill_capability(capability_id)?.map(|(capability, skill_definition)| {
+            project_skill_capability_definition(&skill_definition, &capability)
+        }),
+    )
+}
+
+/// Projects a skill capability into a [`CapabilityDefinition`] for agent-facing consumption.
+pub fn project_skill_capability_definition(
+    skill_definition: &SkillDefinitionV2,
+    capability: &SkillCapability,
+) -> CapabilityDefinition {
+    CapabilityDefinition {
+        id: capability.id.clone(),
+        display_name: capability.name.clone(),
+        version: skill_definition.identity.version.clone(),
+        description: Some(capability.description.clone()),
+        family: CapabilityFamily::Skill,
+        tags: skill_definition
+            .metadata
+            .as_ref()
+            .map(|metadata| metadata.tags.clone())
+            .unwrap_or_default(),
+        input: CapabilitySchemaReference {
+            schema: None,
+            schema_ref: capability
+                .input
+                .as_ref()
+                .and_then(|input| input.schema_ref.clone()),
+            description: capability
+                .input
+                .as_ref()
+                .map(|_| capability.description.clone()),
+        },
+        output: CapabilitySchemaReference {
+            schema: None,
+            schema_ref: capability
+                .output
+                .as_ref()
+                .and_then(|output| output.schema_ref.clone()),
+            description: capability
+                .output
+                .as_ref()
+                .and_then(|output| output.description.clone()),
+        },
+        execution: CapabilityExecutionContract {
+            side_effect_class: if skill_capability_has_side_effects(capability) {
+                CapabilitySideEffectClass::Write
+            } else if skill_capability_is_deterministic(capability) {
+                CapabilitySideEffectClass::None
+            } else {
+                CapabilitySideEffectClass::Read
+            },
+            auth_mode: CapabilityAuthMode::None,
+            idempotence: if skill_capability_is_deterministic(capability) {
+                CapabilityIdempotenceHint::Always
+            } else {
+                CapabilityIdempotenceHint::Conditional
+            },
+            cost_hint: CapabilityCostHint::Low,
+            latency_hint: CapabilityLatencyHint::Interactive,
+            timeout_seconds: capability
+                .execution
+                .as_ref()
+                .and_then(|execution| execution.timeout_seconds)
+                .map(|timeout| timeout as i32),
+        },
+        governance: CapabilityGovernance {
+            trust_level: CapabilityTrustLevel::Trusted,
+            approval_requirement: match skill_definition
+                .governance
+                .as_ref()
+                .and_then(|governance| governance.approval_requirement.as_deref())
+            {
+                Some("required") => CapabilityApprovalRequirement::Required,
+                Some("advisory") => CapabilityApprovalRequirement::Advisory,
+                _ => CapabilityApprovalRequirement::None,
+            },
+            policy_refs: skill_definition
+                .governance
+                .as_ref()
+                .map(|governance| governance.policy_refs.clone())
+                .unwrap_or_default(),
+        },
+        source: CapabilitySource {
+            source_kind: CapabilitySourceKind::Projected,
+            source_ref: skill_definition
+                .origin
+                .as_ref()
+                .and_then(|origin| origin.source_ref.clone()),
+            artifact_ref: Some(format!(
+                "skill:{}#{}",
+                skill_definition.identity.name, capability.id
+            )),
+        },
+        observability: CapabilityObservability {
+            labels: vec![
+                skill_definition.identity.name.clone(),
+                capability.id.clone(),
+            ],
+            correlation_required: true,
+            emits_execution_events: false,
+        },
+        lifecycle_state: match skill_definition.lifecycle_state.as_str() {
+            "active" => CapabilityLifecycleState::Active,
+            "deprecated" => CapabilityLifecycleState::Deprecated,
+            "archived" => CapabilityLifecycleState::Archived,
+            _ => CapabilityLifecycleState::Draft,
+        },
+    }
+}
+
+fn skill_capability_has_side_effects(capability: &SkillCapability) -> bool {
+    capability
+        .execution
+        .as_ref()
+        .map(|execution| execution.has_side_effects)
+        .unwrap_or(false)
+}
+
+fn skill_capability_is_deterministic(capability: &SkillCapability) -> bool {
+    capability
+        .execution
+        .as_ref()
+        .map(|execution| execution.is_deterministic)
+        .unwrap_or(false)
 }
 
 pub fn default_support_manifest_path() -> PathBuf {
@@ -2059,7 +2895,7 @@ pub fn export_contract_bundle(
         }
     }
 
-    for fixture in SUPPLEMENTAL_FIXTURE_FILES {
+    for fixture in &compatibility_manifest.supplemental_fixtures {
         relative_files.insert(PathBuf::from(fixture));
     }
 
@@ -2071,6 +2907,42 @@ pub fn export_contract_bundle(
             &contracts_source_dir,
             relative_path,
         ))?;
+    }
+
+    // Reverse-direction completeness check: every fixture on disk must be
+    // listed in the manifest or the supplemental set. This catches orphaned
+    // fixture files that would silently be excluded from the export.
+    let fixtures_dir = contracts_source_dir.join("fixtures");
+    if fixtures_dir.is_dir() {
+        let supplemental_set: std::collections::HashSet<&str> = compatibility_manifest
+            .supplemental_fixtures
+            .iter()
+            .map(String::as_str)
+            .collect();
+        let mut orphans = Vec::new();
+        if let Ok(entries) = fs::read_dir(&fixtures_dir) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
+                    continue;
+                }
+                if let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) {
+                    let relative = format!("fixtures/{name}");
+                    if !relative_files.contains(Path::new(&relative))
+                        && !supplemental_set.contains(relative.as_str())
+                    {
+                        orphans.push(relative);
+                    }
+                }
+            }
+        }
+        if !orphans.is_empty() {
+            orphans.sort();
+            return Err(ContractsError::Compatibility(format!(
+                "fixture(s) on disk not listed in compatibility manifest or supplemental set: {}",
+                orphans.join(", ")
+            )));
+        }
     }
 
     let output_path = output_dir
@@ -2222,10 +3094,7 @@ pub fn load_agent_capability_profile_fixture_from_dir(
 pub fn load_skill_definition_v2_fixture_from_dir(
     dir: &Path,
 ) -> Result<SkillDefinitionV2, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("skill-definition-v2.minimal.json"),
-    )
+    load_json_file(&dir.join("fixtures").join("skill.minimal.json"))
 }
 
 pub fn load_elegy_plugin_package_fixture_from_dir(
@@ -2233,7 +3102,7 @@ pub fn load_elegy_plugin_package_fixture_from_dir(
 ) -> Result<ElegyPluginPackage, ContractsError> {
     load_json_file(
         &dir.join("fixtures")
-            .join("elegy-plugin-package-v1.minimal.json"),
+            .join("elegy-plugin-package.minimal.json"),
     )
 }
 
@@ -3234,6 +4103,60 @@ fn validate_package_capability_ref(
     }
 }
 
+fn validate_plugin_package_publishing_metadata(
+    _package: &ElegyPluginPackage,
+    publishing: &ElegyPluginPackagePublishingMetadata,
+    issues: &mut Vec<String>,
+) {
+    if let Some(source_repository) = &publishing.source_repository {
+        validate_uri("publishing.sourceRepository", source_repository, issues);
+    }
+
+    if let Some(marketplace_target) = &publishing.marketplace_target {
+        if marketplace_target.trim().is_empty() {
+            issues
+                .push("publishing.marketplaceTarget must not be empty when provided.".to_string());
+        }
+    }
+
+    if let Some(import_mode) = &publishing.import_mode {
+        if !matches!(import_mode.as_str(), "package" | "dry_run") {
+            issues.push(
+                "publishing.importMode must be 'package' or 'dry_run' when provided.".to_string(),
+            );
+        }
+    }
+
+    let mut seen_signatures = BTreeSet::new();
+    for signature_ref in &publishing.signature_refs {
+        validate_portable_relative_path("publishing.signatureRefs", signature_ref, issues);
+        let normalized = signature_ref.trim().to_ascii_lowercase();
+        if !normalized.is_empty() && !seen_signatures.insert(normalized) {
+            issues.push(format!(
+                "publishing.signatureRefs must not contain duplicate entry '{}'.",
+                signature_ref
+            ));
+        }
+    }
+
+    let mut compatibility_hosts = BTreeSet::new();
+    for compatibility in &publishing.compatibility {
+        if compatibility.host.trim().is_empty() {
+            issues.push("publishing.compatibility host must not be empty.".to_string());
+        }
+        if compatibility.version_range.trim().is_empty() {
+            issues.push("publishing.compatibility versionRange must not be empty.".to_string());
+        }
+        let normalized = compatibility.host.trim().to_ascii_lowercase();
+        if !normalized.is_empty() && !compatibility_hosts.insert(normalized) {
+            issues.push(format!(
+                "publishing.compatibility must not contain duplicate host '{}'.",
+                compatibility.host
+            ));
+        }
+    }
+}
+
 fn validate_agent_messages(messages: &[AgentMessage], label: &str, issues: &mut Vec<String>) {
     if messages
         .iter()
@@ -3297,7 +4220,7 @@ mod tests {
             "DemoPlugin",
         ] {
             let package = ElegyPluginPackage {
-                schema_version: ELEGY_PLUGIN_PACKAGE_SCHEMA_VERSION.to_string(),
+                schema_version: ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION.to_string(),
                 identity: ElegyPluginPackageIdentity {
                     package_id: "elegy.demo-plugin".to_string(),
                     name: invalid_name.to_string(),
@@ -3336,6 +4259,8 @@ mod tests {
                     ..Default::default()
                 },
                 host_policy_hints: None,
+                publishing: None,
+                elegy_compatibility: None,
             };
 
             let validation = validate_elegy_plugin_package(&package);
@@ -3351,23 +4276,22 @@ mod tests {
     }
 
     #[test]
-    fn parse_v2_minimal_fixture() {
-        let json = include_str!("../../../../contracts/fixtures/skill-definition-v2.minimal.json");
+    fn parse_minimal_skill_fixture() {
+        let json = include_str!("../../../../contracts/fixtures/skill.minimal.json");
         let def: SkillDefinitionV2 =
-            serde_json::from_str(json).expect("minimal v2 fixture should parse");
+            serde_json::from_str(json).expect("minimal skill fixture should parse");
         assert_eq!(def.skill_format, "elegy-skill-definition");
         assert_eq!(def.skill_version, 2);
-        assert_eq!(def.identity.name, "minimal-v2-example");
+        assert_eq!(def.identity.name, "minimal-example");
         assert_eq!(def.capabilities.len(), 1);
         validate_skill_definition_v2(&def).expect("minimal fixture should validate");
     }
 
     #[test]
     fn parse_v2_diagram_fixture() {
-        let json =
-            include_str!("../../../../contracts/fixtures/skill-definition-v2.elegy-diagram.json");
+        let json = include_str!("../../../../contracts/fixtures/skill.elegy-diagram.json");
         let def: SkillDefinitionV2 =
-            serde_json::from_str(json).expect("diagram v2 fixture should parse");
+            serde_json::from_str(json).expect("diagram skill fixture should parse");
         assert_eq!(def.identity.namespace, "elegy");
         assert_eq!(def.identity.name, "diagram");
         assert_eq!(def.capabilities.len(), 4);
@@ -3379,7 +4303,10 @@ mod tests {
     fn builtin_registry_contains_only_valid_v2_definitions() {
         let definitions =
             parse_builtin_skill_definitions().expect("built-in skill registry should parse");
-        assert_eq!(definitions.len(), 13);
+        assert_eq!(definitions.len(), 15);
+        assert!(definitions
+            .iter()
+            .any(|definition| definition.identity.name == "documentation"));
         assert!(definitions
             .iter()
             .any(|definition| definition.identity.name == "memory"));
@@ -3458,9 +4385,8 @@ mod tests {
 
     #[test]
     fn strict_validation_rejects_subprocess_capability_without_output_schema_ref() {
-        let json = include_str!(
-            "../../../../contracts/fixtures/skill-definition-v2.negative-no-output-schema.json"
-        );
+        let json =
+            include_str!("../../../../contracts/fixtures/skill.negative-no-output-schema.json");
         let def: SkillDefinitionV2 =
             serde_json::from_str(json).expect("negative fixture should parse");
         // Base validation should pass (it doesn't enforce output.schemaRef)

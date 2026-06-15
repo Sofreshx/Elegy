@@ -1,6 +1,6 @@
 ---
 created: 2026-03-30
-updated: 2026-03-30
+updated: 2026-05-28
 category: governance
 status: active
 doc_kind: reference
@@ -15,11 +15,11 @@ Track the small set of active, durable planning items that should drive the next
 ## Scope Boundaries
 
 - This slice is complete locally; no active backlog item remains for contributor-facing proof hardening or local distribution validation.
-- Remote publish and hosted release proof stay out of this backlog until the existing carryover item in [Unresolved Goals](issues/unresolved-goals.md) is reactivated.
+- Hosted release publication is now live on `main` and tags; ongoing remote verification stays tracked through [Unresolved Goals](issues/unresolved-goals.md) instead of reopening this backlog.
 
 ## Session Closeout
 
-No active backlog item remains from this slice. RB-001 and RB-002 both completed locally in this session, and only blocked remote publishing carries forward through [Unresolved Goals](issues/unresolved-goals.md).
+No active backlog item remains from this slice. RB-001 and RB-002 both completed locally in this session, and only ongoing hosted release verification carries forward through [Unresolved Goals](issues/unresolved-goals.md).
 
 ### RB-001
 
@@ -46,7 +46,7 @@ Covered By: [RM-distribution-proof-hardening-001](roadmaps/distribution-proof-ha
 
 Title: Local distribution validation for packaging, metadata, installer, and validation flows.
 
-Outcome: completed locally. Packaging and installer guidance now rest on repeatable local artifact and validation evidence without depending on blocked remote publishing.
+Outcome: completed locally. Packaging and installer guidance now rest on repeatable local artifact and validation evidence, and the hosted publish lane is now exercised separately through the live release workflow.
 
 Execution Slice: local archive production, release metadata composition, installer consumption, and canonical distribution checks completed from repo-supported scripts and the local distribution-artifacts workflow.
 

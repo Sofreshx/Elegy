@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/mcp-tool-definition.schema.json",
+  "title": "MCP Tool Definition",
+  "description": "Describes a single MCP tool with name, description, and input schema.",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" },
+    "description": { "type": "string" },
+    "inputSchema": { "type": "object" }
+  }
+}

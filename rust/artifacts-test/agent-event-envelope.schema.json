@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/agent-event-envelope.schema.json",
+  "title": "Agent Event Envelope",
+  "description": "Canonical streaming event envelope for provider-neutral agent request and response pipelines.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "runId", "streamId", "sequence", "timestamp", "ephemeral", "eventType", "source", "payload"],
+  "properties": {
+    "eventId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "streamId": { "type": "string", "minLength": 1 },
+    "sequence": { "type": "integer", "minimum": 1 },
+    "parentEventId": { "type": ["string", "null"] },
+    "timestamp": { "type": "string", "format": "date-time" },
+    "ephemeral": { "type": "boolean" },
+    "eventType": {
+      "type": "string",
+      "enum": [
+        "requestAccepted",
+        "runStarted",
+        "messageDelta",
+        "messageCompleted",
+        "reasoningDelta",
+        "reasoningCompleted",
+        "toolCallStarted",
+        "toolCallCompleted",
+        "warning",
+        "error",
+        "runCompleted",
+        "runFailed",
+        "runCancelled"
+      ]
+    },
+    "source": { "type": "string", "enum": ["client", "broker", "model", "tool", "system"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "messageId": { "type": ["string", "null"] },
+        "role": { "type": ["string", "null"], "enum": ["system", "user", "assistant", "tool", null] },
+        "toolCallId": { "type": ["string", "null"] },
+        "toolName": { "type": ["string", "null"] },
+        "content": { "type": ["string", "null"] },
+        "deltaContent": { "type": ["string", "null"] },
+        "errorCode": { "type": ["string", "null"] },
+        "errorMessage": { "type": ["string", "null"] },
+        "usage": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {
+            "inputTokens": { "type": ["integer", "null"], "minimum": 0 },
+            "outputTokens": { "type": ["integer", "null"], "minimum": 0 },
+            "totalTokens": { "type": ["integer", "null"], "minimum": 0 }
+          }
+        },
+        "metadata": {
+          "type": ["object", "null"],
+          "additionalProperties": { "type": "string" }
+        }
+      }
+    }
+  }
+}

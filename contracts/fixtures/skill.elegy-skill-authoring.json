@@ -1,0 +1,187 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "skill-authoring",
+    "version": "0.1.0",
+    "displayName": "Elegy Skill Authoring",
+    "aliases": ["elegy-skill-authoring", "skill-authoring", "skill-audit", "skill-template"]
+  },
+  "metadata": {
+    "displayName": "Elegy Skill Authoring",
+    "description": "Doctrine for drafting, auditing, and fixing Elegy skills. Use when creating a new skill, running an audit against an existing one, or triaging structural and content findings. Ships the canonical template, audit checklist, anti-pattern catalogue, and severity ladder.",
+    "summary": "Doctrinal guidance plus reference material for writing and reviewing Elegy SKILL.md bodies against the canonical template.",
+    "category": "meta",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["skills", "authoring", "audit", "template", "doctrine", "meta"],
+    "owners": ["elegy"],
+    "documentationUri": "skills/elegy-skill-authoring/SKILL.md"
+  },
+  "capabilities": [
+    {
+      "id": "skill-audit-checklist",
+      "name": "Walk Audit Checklist",
+      "description": "Walk the objective audit checks in references/audit-checklist.md against a SKILL.md body or fixture. Today this is a manual process; a future `elegy skill audit` command will back this capability with machine checks.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skill", "audit", "--path", "${skillPath}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "skillPath",
+            "type": "path",
+            "description": "Path to the SKILL.md body or governed fixture to audit.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "SkillAuditFindings",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
+        "description": "Findings list grouped by severity from references/severity-ladder.md."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "skill-anti-pattern-lookup",
+      "name": "Look Up Anti-Pattern",
+      "description": "Look up the canonical anti-pattern catalogue in references/anti-patterns.md by id and return the pattern, the failure mode, and the replacement.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skill", "anti-pattern", "--id", "${antiPatternId}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "antiPatternId",
+            "type": "string",
+            "description": "Anti-pattern id such as AP-1 (command list) or AP-7 (marketing description).",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "SkillAntiPattern",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
+        "description": "Anti-pattern entry with name, why it fails, and replacement."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "skill-template-emit",
+      "name": "Emit Skill Template",
+      "description": "Emit the canonical SKILL.md skeleton from assets/skill-template.md with placeholders preserved. Use as the starting point for new skills or as a target for diffing an existing skill against the canonical shape.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["skill", "template", "--format", "${format}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "format",
+            "type": "string",
+            "description": "Output format. `markdown` returns the literal template body; `outline` returns just the section headings.",
+            "required": false,
+            "default": "markdown"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "SkillTemplate",
+        "schemaRef": "https://elegy/contracts/schemas/skill-discovery-result.schema.json",
+        "description": "Canonical template body or outline."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "doctrine-only",
+      "description": "This skill is doctrine plus reference material. There is no Rust CLI implementation yet. Capabilities resolve to the in-tree references; the future `elegy skill audit` command will back the audit and lookup capabilities.",
+      "required": true
+    },
+    {
+      "constraintId": "non-authoritative-template",
+      "description": "assets/skill-template.md is the canonical SKILL.md skeleton. Section order is normative. References/audit-checklist.md is the contract that decides pass/fail.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": [
+      "docs/architecture/skill-core-v1.md",
+      "docs/architecture/agent-skill-bridge-mirrors.md"
+    ],
+    "allowedContexts": ["contributor-routing", "skill-authoring", "audit"]
+  },
+  "discovery": {
+    "keywords": ["skill", "authoring", "audit", "template", "anti-pattern", "doctrine", "review"],
+    "triggers": [
+      {
+        "pattern": "draft a new skill",
+        "description": "When an agent needs to create a new Elegy skill from scratch using the canonical template."
+      },
+      {
+        "pattern": "audit an existing skill",
+        "description": "When an agent needs to walk the audit checklist against a SKILL.md body and produce a findings list."
+      },
+      {
+        "pattern": "fix skill structure",
+        "description": "When an agent needs to address audit findings and rewrite a SKILL.md against the template."
+      }
+    ],
+    "capabilityHints": ["skill-audit-checklist", "skill-anti-pattern-lookup", "skill-template-emit"],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill.elegy-skill-authoring.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active",
+  "hostProjection": {
+    "cliName": "elegy",
+    "outputContractId": "elegy-skill-authoring-v1",
+    "defaultSideEffectClass": "read_only",
+    "capabilityProjections": [
+      {
+        "capabilityId": "skill-audit-checklist",
+        "functionName": "skill_audit_checklist",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "skill-anti-pattern-lookup",
+        "functionName": "skill_anti_pattern_lookup",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "skill-template-emit",
+        "functionName": "skill_template_emit",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      }
+    ]
+  }
+}

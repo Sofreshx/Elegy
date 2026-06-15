@@ -2,7 +2,7 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the four dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
+The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the six dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp`, `rust/crates/elegy-planning`, and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis, durable planning authority, and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
@@ -29,6 +29,32 @@ Most users do not need every asset in the release:
 
 ## Asset model
 
+### Which Download To Use
+
+| If you want... | Download |
+| --- | --- |
+| Simplest verified install path | `elegy-installer-<bundleVersion>.zip` |
+| General-purpose `elegy` CLI | `elegy-cli-<cliVersion>-<target>.zip` |
+| Contracts only | `elegy-contracts-<bundleVersion>.zip` |
+| Dedicated memory CLI | `elegy-memory-<cliVersion>-<target>.zip` |
+| Dedicated MCP CLI | `elegy-mcp-<cliVersion>-<target>.zip` |
+| Dedicated planning CLI | `elegy-planning-<cliVersion>-<target>.zip` |
+| Dedicated skill registry CLI | `elegy-skills-<cliVersion>-<target>.zip` |
+| Dedicated documentation CLI | `elegy-documentation-<cliVersion>-<target>.zip` |
+| Wrapper surface for a dedicated tool family | `elegy-*-wrapper-<bundleVersion>.zip` |
+
+Direct release asset families include:
+
+- `elegy-cli-<cliVersion>-<target>.zip` - umbrella `elegy` binary
+- `elegy-memory-<cliVersion>-<target>.zip` - dedicated local memory CLI
+- `elegy-mcp-<cliVersion>-<target>.zip` - dedicated MCP CLI
+- `elegy-planning-<cliVersion>-<target>.zip` - dedicated planning CLI
+- `elegy-skills-<cliVersion>-<target>.zip` - dedicated skill registry CLI
+- `elegy-documentation-<cliVersion>-<target>.zip` - dedicated documentation authority CLI
+- `elegy-contracts-<bundleVersion>.zip` - governed contracts bundle
+- `elegy-installer-<bundleVersion>.zip` - installer bootstrap
+- `elegy-*-wrapper-<bundleVersion>.zip` - dedicated wrapper surfaces
+
 Tagged releases are configured to publish neutral asset families across the contracts, installer, metadata, CLI, and dedicated wrapper lanes:
 
 - governed contracts bundle: `elegy-contracts-<bundleVersion>.zip`
@@ -40,18 +66,24 @@ Tagged releases are configured to publish neutral asset families across the cont
 - MCP CLI archive: `elegy-mcp-<cliVersion>-<target>.zip`
 - planning CLI archive: `elegy-planning-<cliVersion>-<target>.zip`
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
+- configuration CLI archive: `elegy-configuration-<cliVersion>-<target>.zip`
+- documentation CLI archive: `elegy-documentation-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
 - planning wrapper archive: `elegy-planning-wrapper-<bundleVersion>.zip`
 - skills wrapper archive: `elegy-skills-wrapper-<bundleVersion>.zip`
+- configuration wrapper archive: `elegy-configuration-wrapper-<bundleVersion>.zip`
+- documentation wrapper archive: `elegy-documentation-wrapper-<bundleVersion>.zip`
 
 The contracts bundle remains the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
 
 GitHub Releases are the primary downstream distribution lane. The standalone installer archive is a convenience bootstrap that carries the generic install helper only; it does not introduce a separate package-feed or runtime distribution path. Stable downstream consumption should continue to use explicit semver tags such as `v1.3.2`, while the rolling `main-snapshot` prerelease exists only as a continuously refreshed integration build.
 
+The repo intentionally keeps CI artifact assembly and GitHub Release publication as separate workflows. `.github/workflows/distribution-artifacts.yml` builds and uploads Actions artifacts for local and PR validation, while `.github/workflows/publish-distribution.yml` is the hosted publication lane that refreshes the downloadable `main-snapshot` prerelease on pushes to `main` and publishes matching release assets for tags and release events.
+
 Downloadable archives are self-describing. Packaging stages `PACKAGE_README.md` into every downloadable zip as archive-root `README.md`, and manifest validation treats that README as a required payload entry for the CLI, wrapper, and installer archive families.
 
-Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable surface for the umbrella feature families: Mermaid, diagram, skills registry, lower-level `generate skills`, `run`, observe, desktop, repo, web, data, and notify. The current published target set is intentionally narrow:
+Each CLI archive is a thin distribution of its corresponding executable plus archive-root `README.md` for one explicitly published host target. The umbrella `elegy-cli-<cliVersion>-<target>.zip` archive specifically carries the `elegy` binary and is the downloadable general-purpose surface for agent onboarding, skills compatibility, docs tooling, Mermaid and diagram tooling, repo/web/data/notify utilities, read-only observation and desktop automation, optional MCP hosting, contracts export, deterministic configuration materialization, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect` commands. The current published target set is intentionally narrow:
 
 - `x86_64-pc-windows-msvc`
 - `x86_64-unknown-linux-gnu`
@@ -117,25 +149,28 @@ Current governed workflow artifacts in that bundle include both the portable wor
 - `fixtures/canonical-workflow-graph.minimal.json`
 
 Current governed package artifacts in that bundle include the portable plugin
-package contract. This is metadata and validation support for consuming hosts,
+package contracts. These are metadata and validation support for consuming hosts,
 plus conservative derived projection tooling support, not an Elegy plugin runtime:
 
-- `elegy-plugin-package-v1.schema.json`
-- `fixtures/elegy-plugin-package-v1.minimal.json`
+- `elegy-plugin-package.schema.json`
+- `fixtures/elegy-plugin-package.minimal.json`
+- `fixtures/elegy-plugin-package.demo-config.json`
 
 Current governed dedicated-surface skill artifacts in that bundle include:
 
-- `fixtures/skill-definition-v2.elegy-memory.json`
+- `fixtures/skill.elegy-memory.json`
 - `fixtures/skill-discovery-index.elegy-memory.json`
-- `fixtures/skill-definition-v2.elegy-mcp.json`
+- `fixtures/skill.elegy-mcp.json`
 - `fixtures/skill-discovery-index.elegy-mcp.json`
-- `fixtures/skill-definition-v2.elegy-planning.json`
-- `fixtures/skill-definition-v2.elegy-skills.json`
+- `fixtures/skill.elegy-planning.json`
+- `fixtures/skill.elegy-skills.json`
 - `fixtures/skill-discovery-index.elegy-skills.json`
-- `fixtures/skill-definition-v2.elegy-mermaid.json`
+- `fixtures/skill.elegy-documentation.json`
+- `fixtures/skill-discovery-index.elegy-documentation.json`
+- `fixtures/skill.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-mermaid.json`
 
-The repo carries `.agents/skills/elegy-memory/SKILL.md`, `.agents/skills/elegy-mcp/SKILL.md`, `.agents/skills/elegy-skills/SKILL.md`, and `.agents/skills/elegy-mermaid/SKILL.md` as repo-local host-facing derived mirrors for those surfaces. The repo also carries matching `.github/skills/.../SKILL.md` files as repo-local non-authoritative contributor-routing mirrors. Those markdown files are not part of the governed contracts bundle.
+The repo carries `.agents/skills/elegy-memory/SKILL.md`, `.agents/skills/elegy-mcp/SKILL.md`, `.agents/skills/elegy-skills/SKILL.md`, `.agents/skills/elegy-documentation/SKILL.md`, and `.agents/skills/elegy-mermaid/SKILL.md` as repo-local host-facing derived mirrors for those surfaces. The repo also carries matching `.github/skills/.../SKILL.md` files as repo-local non-authoritative contributor-routing mirrors. Those markdown files are not part of the governed contracts bundle.
 
 The current lower-level contributor tooling also includes `elegy generate codex-plugin`, which projects a portable package into a conservative local Codex plugin folder containing `.codex-plugin/plugin.json` and `skills/`. That generated plugin folder is a derived local output and is not currently a release asset family.
 
@@ -149,6 +184,8 @@ pwsh ./scripts/package-cli.ps1 -Surface elegy-memory
 pwsh ./scripts/package-cli.ps1 -Surface elegy-mcp
 pwsh ./scripts/package-cli.ps1 -Surface elegy-planning
 pwsh ./scripts/package-cli.ps1 -Surface elegy-skills
+pwsh ./scripts/package-cli.ps1 -Surface elegy-configuration
+pwsh ./scripts/package-cli.ps1 -Surface elegy-documentation
 ```
 
 Output:
@@ -159,7 +196,50 @@ Release workflows publish the explicit target set above by calling `pwsh ./scrip
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
-For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for diagram, skills registry, lower-level `generate skills`, lower-level `generate codex-plugin`, `run`, observe, desktop, repo, web, data, and notify; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+For Mermaid tooling, use the umbrella `elegy` archive. The same umbrella archive is also the downloadable surface for agent onboarding, skills compatibility, docs tooling, diagram, `run`, observe, desktop, repo, web, data, notify, contracts export, `configuration`, and lower-level `author`/`analyze`/`generate`/`validate`/`inspect`; those commands remain general-surface commands under the existing `elegy` executable rather than dedicated release targets.
+
+## Configuration materialization
+
+The umbrella CLI carries `elegy configuration list|show|apply|verify` and the
+dedicated `elegy-configuration` archive carries `elegy-configuration
+list|show|apply|verify` for deterministic materialization and drift
+verification of repo-local or home-level agentic assets from governed templates
+and profiles.
+
+This is a post-install or from-source operator lane, not a new distribution
+model:
+
+- distribution install still owns release-tag selection, asset download,
+  checksum verification, and archive extraction
+- `elegy configuration ...` and `elegy-configuration ...` own deterministic
+  file materialization and drift verification for declared assets such as skill
+  mirrors, instruction blocks, MCP config, hooks, agents, and bounded text,
+  JSON, or TOML patches
+- local `elegy-plugin-package/v1` files may carry governed configuration
+  templates and profiles for package-backed apply/verify flows
+- consuming repos still own product-specific bootstrap, runtime auth/state,
+  approvals, orchestration, and any host-local startup wiring
+
+Current built-in templates and profiles live under `contracts/configuration/`.
+The current built-ins intentionally stay small: repo skill mirroring,
+repo-local OpenCode materialization, repo-local Codex skill mirroring, and a
+bounded Codex home template.
+
+Examples:
+
+```bash
+elegy configuration list --json
+elegy configuration show --template-id repo-opencode-agentic-minimal --json
+elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
+elegy configuration verify --profile-id repo-opencode-minimal --target . --json
+elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
+```
+
+Binding defaults are template-local and overrideable:
+
+```bash
+elegy configuration apply --template-id repo-skill-mirror-minimal --target . --binding authority.skills=.github/skills --binding target.skills=.agents/skills --json
+```
 
 ## Wrapper archive
 
@@ -175,41 +255,12 @@ Outputs:
 - `artifacts/distribution/elegy-mcp-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-planning-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-skills-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-configuration-wrapper-<bundleVersion>.zip`
+- `artifacts/distribution/elegy-documentation-wrapper-<bundleVersion>.zip`
 
 Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
 
 Wrapper archives already embed the generic installer helper. Consumers that only need a dedicated wrapper surface can use the wrapper archive directly without separately downloading the standalone installer asset.
-
-## Holon-oriented quick start
-
-For Holon or any other downstream host that wants the simplest supported consumption path:
-
-1. Pick and pin an Elegy release tag in the downstream repository.
-2. Download the standalone installer asset or vendor the same `install-distribution.ps1` helper into a repo-local bootstrap directory such as `./tools/elegy-bootstrap`.
-3. Run the generic installer helper into a repo-local tools directory such as `./tools/elegy`.
-4. Consume the extracted `contracts` directory as the governed artifact surface and invoke the extracted binaries directly from `bin/<surface>/`.
-
-Example using the standalone installer asset after extraction into `./tools/elegy-bootstrap`:
-
-```powershell
-pwsh ./tools/elegy-bootstrap/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
-```
-
-Example using a checked-out or vendored installer helper against release assets:
-
-```powershell
-pwsh ./scripts/install-distribution.ps1 -Tag v0.1.0 -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning,elegy-skills -WrapperSurfaces elegy-mcp,elegy-skills -Force
-```
-
-Example using local artifacts only:
-
-```powershell
-pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
-pwsh ./scripts/install-distribution.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-local -CliSurfaces elegy-memory -WrapperSurfaces elegy-memory -Force
-pwsh ./src/Elegy-memory/install.ps1 -LocalArtifactsRoot ./artifacts/distribution -Destination ./tools/elegy-memory-wrapper -Force
-```
-
-The installer resolves either a release tag or a local artifacts directory, downloads or copies the manifest and checksums first, validates that every requested asset exists in the manifest, then verifies exact file size, SHA-256, and required archive entries before extracting the contracts bundle under `contracts/`, CLI assets under `bin/<surface>/`, and wrapper assets under `wrappers/<surface>/`. When `-LocalArtifactsRoot` is used, the root must contain exactly one manifest and checksum file plus the exact assets referenced by that manifest; the installer now fails on ambiguous or stale metadata instead of guessing between stale files. For backward compatibility, selecting `elegy-cli` also populates the legacy `cli/` path. The installer does not assume sibling repositories, write Holon-specific configuration, or depend on package feeds.
 
 ## Downstream guidance
 
@@ -229,7 +280,7 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 
 1. Update bundle and manifest package metadata/version in `governance/version-policy.json` when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
-3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, and `elegy-skills`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
+3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
 4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
 5. Run `pwsh ./scripts/package-installer.ps1`.
 6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.

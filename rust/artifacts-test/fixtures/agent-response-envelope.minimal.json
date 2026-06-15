@@ -1,0 +1,33 @@
+{
+  "requestId": "request-1",
+  "runId": "run-1",
+  "status": "completed",
+  "messages": [
+    {
+      "messageId": "message-2",
+      "role": "assistant",
+      "content": "The API surface exposes three primary operations."
+    }
+  ],
+  "usage": {
+    "inputTokens": 32,
+    "outputTokens": 14,
+    "totalTokens": 46
+  },
+  "sessionContext": {
+    "scope": "workspace",
+    "representation": "summary-only",
+    "summary": "Workspace context persists only bounded summaries for instruction assembly and follow-on agent runs.",
+    "salientFacts": [
+      "Persist summary and context artifacts only.",
+      "Raw execution logs remain transient and are not stored durably."
+    ],
+    "instructionContext": [
+      "Use this summary context when assembling workspace-level instructions."
+    ],
+    "rawTranscriptPersisted": false
+  },
+  "metadata": {
+    "model": "neutral-test"
+  }
+}

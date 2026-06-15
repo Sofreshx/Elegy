@@ -21,6 +21,14 @@ Imported or added so far:
 - `elegy-core`
 - `elegy-host-mcp`
 - `elegy-cli`
+- `elegy-planning`
+- `elegy-configuration`
+- `elegy-documentation`
+- `elegy-observe`
+- `elegy-desktop`
+- `elegy-data`
+- `elegy-web`
+- `elegy-notify`
 
 These crates currently provide:
 
@@ -36,7 +44,7 @@ These crates currently provide:
 - family-neutral runtime composition and a caller-facing core facade over descriptor, policy, adapters, and MCP consumers
 - a thin stdio MCP host that serves runtime-composed resources from the imported core/runtime layers
 - a thin operator CLI for config validation, runtime validation, resource inspection, MCP descriptor authoring, MCP analysis, governed skill-registry access/validation, lower-level skill generation, and stdio host startup
-- dedicated thin CLIs for bounded local memory, dedicated MCP descriptor authoring/analysis, and dedicated governed skill-registry access/validation
+- dedicated thin CLIs for bounded local memory, MCP descriptor authoring/analysis, durable planning, governed skill-registry access/validation, deterministic configuration materialization, documentation inspection/check/export, observation, desktop automation, data helpers, web helpers, and notifications
 
 ## Direct system surfaces vs shared foundation crates
 
@@ -44,7 +52,10 @@ The preferred direct CLI/system surfaces in this workspace are:
 
 - `elegy-memory` for the bounded memory system
 - `elegy-mcp` for dedicated MCP descriptor authoring and analysis
-- `elegy-skills` for dedicated MCP-to-skill generation
+- `elegy-skills` for governed skill-registry list, search, resolve, get, capability, and validation behavior
+- `elegy-planning` for durable planning state and projections
+- `elegy-configuration` for deterministic configuration materialization and verification
+- `elegy-documentation` for authority-aware docs inspection, mapping, checking, and non-authoritative exports
 - `elegy` as the umbrella general/compatibility surface
 
 External agents outside Elegy should load the associated skill guidance and invoke the matching dedicated `elegy-*` CLI directly when one exists. Elegy itself should not be described as internally calling or orchestrating those agents.
@@ -59,7 +70,7 @@ The main shared internal foundation crates under those surfaces include:
 - `elegy-runtime`
 - `elegy-core`
 - `elegy-host-mcp`
-- `elegy-tooling` as shared helper and compatibility infrastructure for descriptor and skill workflows
+- `elegy-tooling` as shared helper and compatibility infrastructure for descriptor, generation, and documentation workflows
 
 ## Current posture
 

@@ -1,0 +1,10 @@
+{
+  "eventId": "evt-001",
+  "timestamp": "2026-03-06T00:00:00Z",
+  "entityKind": "skill",
+  "entityId": "skill-001",
+  "category": "lifecycle",
+  "severity": "info",
+  "message": "Example monitoring event.",
+  "metadata": null
+}

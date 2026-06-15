@@ -2,11 +2,15 @@
 applyTo: "rust/crates/elegy-memory/**"
 ---
 
-# elegy-memory — System-Specific Instructions
+# elegy-memory - System-Specific Instructions
 
 ## What This System Does
 
-elegy-memory is a **standalone memory engine for LLM agents**. It stores, retrieves, scores, and manages memories across sessions with semantic search, write-time filtering, and configurable decay. It is NOT a chatbot, NOT an agent framework, NOT a UI. It is a library (crate) + CLI.
+elegy-memory is the bounded local memory surface inside the Rust-first Elegy toolkit.
+It stores, retrieves, scores, and manages distilled memories with semantic search,
+write-time filtering, and configurable retention behavior. It is not a chatbot, agent
+framework, UI, host policy layer, or approval system. It is a library crate plus a
+dedicated CLI surface.
 
 > Current repo layout note: the crate currently lives at `rust/crates/elegy-memory/` and exposes `src/lib.rs`, `src/main.rs`, `src/cli.rs`, and `src/local_store.rs`. Treat the architecture docs under `rust/crates/elegy-memory/docs/architecture/` as the source of truth for planned types and traits referenced below.
 
@@ -46,3 +50,4 @@ elegy-memory is a **standalone memory engine for LLM agents**. It stores, retrie
 - Do NOT assume a single embedding provider. Always go through the `EmbeddingProvider` trait.
 - Do NOT forget to set `embedding_stale = true` when updating memory content.
 - Do NOT mix scopes in queries. Each scope is a separate storage unit.
+- Do NOT put host approvals, promotion rules, currentness policy, or cross-scope ranking policy in this crate.
