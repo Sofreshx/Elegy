@@ -5,7 +5,8 @@
 use crate::error::{Error, Result};
 use crate::ir::{Edge, EdgeKind, Entity, EntityId};
 use redb::{
-    Database, ReadableDatabase, ReadableTable, TableDefinition, WriteTransaction,
+    Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
+    WriteTransaction,
 };
 
 // ---------------------------------------------------------------------------
@@ -257,6 +258,40 @@ impl Store {
     pub fn compact(&mut self) -> Result<()> {
         self.db.compact().map_err(map_err)?;
         Ok(())
+    }
+
+    /// Count all entities in the store.
+    pub fn count_entities(&self) -> Result<usize> {
+        let txn = self.db.begin_read().map_err(map_err)?;
+        let table = txn.open_table(ENTITIES).map_err(map_err)?;
+        Ok(table.len().map_err(map_err)? as usize)
+    }
+
+    /// Count all edges in the store (sum of outgoing edge lists).
+    pub fn count_edges(&self) -> Result<usize> {
+        let txn = self.db.begin_read().map_err(map_err)?;
+        let table = txn.open_table(OUTGOING).map_err(map_err)?;
+        let iter = table.iter().map_err(map_err)?;
+        let mut count = 0usize;
+        for item in iter {
+            let (_key, value) = item.map_err(map_err)?;
+            let edges: Vec<(String, crate::ir::EdgeKind)> = serde_json::from_str(value.value())?;
+            count += edges.len();
+        }
+        Ok(count)
+    }
+
+    /// Get all entities in the store.
+    pub fn all_entities(&self) -> Result<Vec<crate::ir::Entity>> {
+        let txn = self.db.begin_read().map_err(map_err)?;
+        let table = txn.open_table(ENTITIES).map_err(map_err)?;
+        let iter = table.iter().map_err(map_err)?;
+        let mut entities = Vec::new();
+        for item in iter {
+            let (_key, value) = item.map_err(map_err)?;
+            entities.push(serde_json::from_str(value.value())?);
+        }
+        Ok(entities)
     }
 }
 

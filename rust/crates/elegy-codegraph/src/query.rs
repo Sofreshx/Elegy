@@ -148,18 +148,79 @@ impl QueryEngine {
         }
     }
 
-    /// Analyze impact of changes to a file (deferred to wp-query-impact).
-    pub fn impact(&self, _path: &str) -> Result<String> {
-        Ok(serde_json::to_string_pretty(&QueryResult::<()>::error(
-            "impact query not yet implemented (wp-query-impact)".to_string(),
-        ))?)
+    /// Analyze the impact of changes to a file.
+    ///
+    /// Returns all entities in the given file plus their immediate
+    /// outgoing neighbors (calls, references, exports). Delta-only in v0.
+    pub fn impact(&self, path: &str) -> Result<String> {
+        let all = self.store.all_entities()?;
+        let file_entities: Vec<_> = all.iter().filter(|e| e.file == path).collect();
+
+        if file_entities.is_empty() {
+            return Ok(serde_json::to_string_pretty(
+                &QueryResult::<()>::not_found(format!(
+                    "No entities found in file '{}'", path
+                )),
+            )?);
+        }
+
+        let mut impacted = Vec::new();
+        for entity in &file_entities {
+            let neighbors = self
+                .store
+                .get_neighbors(&entity.id, crate::store::Direction::Outgoing)?;
+            for (neighbor, kind) in &neighbors {
+                impacted.push(serde_json::json!({
+                    "source": entity,
+                    "target": neighbor,
+                    "relationship": kind,
+                }));
+            }
+        }
+
+        let output = serde_json::json!({
+            "file": path,
+            "entityCount": file_entities.len(),
+            "impactCount": impacted.len(),
+            "entities": file_entities,
+            "impacts": impacted,
+        });
+
+        Ok(serde_json::to_string_pretty(&QueryResult::ok(&output))?)
     }
 
-    /// Get a structural summary (deferred to wp-query-summary).
+    /// Get a structural summary of the repository.
+    ///
+    /// Returns counts by entity kind, edge kind, file count, and
+    /// extractor metadata — useful for agents to get a quick overview.
     pub fn summary(&self) -> Result<String> {
-        Ok(serde_json::to_string_pretty(&QueryResult::<()>::error(
-            "summary query not yet implemented (wp-query-summary)".to_string(),
-        ))?)
+        let entities = self.store.all_entities()?;
+        let total_entities = entities.len();
+        let total_edges = self.store.count_edges()?;
+
+        // Count entities by kind
+        let mut kind_counts: std::collections::HashMap<String, usize> =
+            std::collections::HashMap::new();
+        let mut file_set: std::collections::HashSet<String> =
+            std::collections::HashSet::new();
+        for entity in &entities {
+            let kind = serde_json::to_string(&entity.kind)
+                .unwrap_or_else(|_| "unknown".to_string())
+                .trim_matches('"')
+                .to_string();
+            *kind_counts.entry(kind).or_default() += 1;
+            file_set.insert(entity.file.clone());
+        }
+
+        let summary = serde_json::json!({
+            "entityCount": total_entities,
+            "edgeCount": total_edges,
+            "fileCount": file_set.len(),
+            "entitiesByKind": kind_counts,
+            "sampleEntities": entities.iter().take(5).collect::<Vec<_>>(),
+        });
+
+        Ok(serde_json::to_string_pretty(&QueryResult::ok(&summary))?)
     }
 }
 
@@ -289,5 +350,65 @@ mod tests {
         let output = engine.neighbors("any", "sideways").unwrap();
         let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
         assert_eq!(parsed["status"], "error");
+    }
+
+    #[test]
+    fn test_summary_query() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.redb");
+        let store = Store::open(db_path.to_str().unwrap()).unwrap();
+
+        store.insert_entity(&make_entity("e1", "add", "elegy-codegraph-ts")).unwrap();
+        store.insert_entity(&make_entity("e2", "sub", "elegy-codegraph-ts")).unwrap();
+
+        let engine = QueryEngine::new(store);
+        let output = engine.summary().unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["status"], "ok");
+        assert_eq!(parsed["data"]["entityCount"], 2);
+        assert_eq!(parsed["data"]["fileCount"], 1);
+    }
+
+    #[test]
+    fn test_impact_query() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.redb");
+        let store = Store::open(db_path.to_str().unwrap()).unwrap();
+
+        let src = make_entity("src1", "caller", "elegy-codegraph-ts");
+        let mut dst = make_entity("dst1", "callee", "elegy-codegraph-ts");
+        dst.file = "other.rs".to_string();
+        store.insert_entity(&src).unwrap();
+        store.insert_entity(&dst).unwrap();
+
+        store.insert_edge(&crate::ir::Edge {
+            src: "src1".into(),
+            dst: "dst1".into(),
+            kind: crate::ir::EdgeKind::Calls,
+            provenance: crate::ir::Provenance {
+                extractor: "test".into(),
+                confidence: crate::ir::Confidence::Exact,
+                evidence_refs: vec![],
+            },
+        }).unwrap();
+
+        let engine = QueryEngine::new(store);
+        let output = engine.impact("lib.rs").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["status"], "ok");
+        assert_eq!(parsed["data"]["entityCount"], 1);
+        assert_eq!(parsed["data"]["impactCount"], 1);
+    }
+
+    #[test]
+    fn test_impact_not_found() {
+        let dir = tempfile::tempdir().unwrap();
+        let db_path = dir.path().join("test.redb");
+        let store = Store::open(db_path.to_str().unwrap()).unwrap();
+        let engine = QueryEngine::new(store);
+
+        let output = engine.impact("nonexistent.ts").unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&output).unwrap();
+        assert_eq!(parsed["status"], "not_found");
     }
 }
