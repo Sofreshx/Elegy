@@ -73,6 +73,41 @@ authority surface.
 7. Scopes are isolated. Session, workspace, user, and agent scopes must not cross-query implicitly.
 8. SQLite is the MVP storage authority. PostgreSQL and broader provider surfaces stay later-scope unless the current memory docs say otherwise.
 
+## elegy-memory Integration (Agent)
+
+The `elegy-memory` MCP server is configured and connected. Use its tools to persist and recall session context across sessions.
+
+### When to store
+
+- **Decisions** (`decision`, importance ≥ 0.8, provenance `user-stated`): architecture choices, API contracts, scope cuts, technology selections.
+- **Preferences** (`preference`, importance 0.6–0.8, provenance `user-stated`): style, conventions, tooling preferences explicitly stated.
+- **Observations** (`observation`, importance 0.3–0.6, provenance `agent-observed`): important facts noticed during exploration.
+- **Procedures** (`procedure`, importance 0.6–0.9, provenance `user-stated`): multi-step workflows the user wants repeated.
+- Do NOT store raw transcripts, tool output, or conversation fragments. Distill to one or two sentences.
+
+### When to search
+
+- **Session start**: call `memory_search` with broad terms from the user's opening message to recall relevant context.
+- **Before asking**: if the user's question seems like something already covered, `memory_search` first.
+- **After important discoveries**: `memory_store` immediately so downstream steps and future sessions find it.
+
+### Scope guidance
+
+- The MCP tools are pinned to `MemoryScope::Agent` — all memories written via MCP are visible across all sessions for this agent.
+- For session-only or workspace-only isolation, use the CLI directly:
+  ```powershell
+  elegy-memory add "..." --scope session --provenance user-stated --format json
+  elegy-memory search "..." --scope workspace --limit 10 --format json
+  ```
+
+### Session resume pattern
+
+1. `memory_search` with terms from user's first message
+2. If results found, `memory_recall` the most relevant IDs
+3. Summarize recalled context before starting new work
+4. `memory_store` distillations as new decisions/observations arise
+5. Optional: `memory_stats` at end-of-session to confirm persistence
+
 ## Git Workflow
 
 - Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`.
