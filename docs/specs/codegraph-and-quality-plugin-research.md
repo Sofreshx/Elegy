@@ -143,7 +143,7 @@ Implemented in `extractor/rust_scip.rs`. Invoked when `--use-scip` is passed to 
 - `calls` edges with `confidence: "exact"` (method dispatch, trait resolution, generic instantiation resolved by rust-analyzer)
 - `references` edges with `confidence: "exact"` (every usage site across the workspace)
 
-**Graceful degradation:** When `rust-analyzer` is not on PATH, the SCIP layer emits a `provenance.warning` on the extraction result. The tree-sitter layer still produces a complete syntax-level graph; only semantic precision is reduced.
+**Graceful degradation:** When `rust-analyzer` is not on PATH, the SCIP layer emits a `provenance.warning` on the extraction result. The tree-sitter layer still produces a complete syntax-level graph; only semantic precision is reduced. The SCIP index is produced via `rust-analyzer scip --output -` (stdout), parsed with the `scip` 0.3 crate (protobuf v3), and merged by matching symbol names to IR entities. The `scip` and `protobuf` crates are compile-time dependencies of the `elegy-codegraph` crate.
 
 **Known gaps (v0):**
 - `#[cfg]` branches other than `test` are flattened; conditional compilation is not modeled.
