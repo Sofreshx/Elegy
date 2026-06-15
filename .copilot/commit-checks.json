@@ -21,6 +21,7 @@
       "cwd": ".",
       "timeoutMs": 60000,
       "blocking": true,
+      "defaultProfiles": ["commit", "ci-local", "release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "registry-alignment",
       "ciRequired": true,
@@ -33,6 +34,7 @@
       "cwd": "./rust",
       "timeoutMs": 60000,
       "blocking": true,
+      "defaultProfiles": ["commit", "ci-local", "release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "fmt",
       "ciRequired": true,
@@ -45,6 +47,7 @@
       "cwd": "./rust",
       "timeoutMs": 120000,
       "blocking": true,
+      "defaultProfiles": ["commit", "ci-local", "release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "clippy",
       "ciRequired": true,
@@ -57,6 +60,7 @@
       "cwd": "./rust",
       "timeoutMs": 120000,
       "blocking": false,
+      "defaultProfiles": ["release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "msrv",
       "ciRequired": false,
@@ -67,24 +71,13 @@
       "group": "push",
       "description": "Run all Rust workspace tests",
       "cwd": "./rust",
-      "timeoutMs": 180000,
+      "timeoutMs": 900000,
       "blocking": true,
+      "defaultProfiles": ["ci-local", "release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "test",
       "ciRequired": true,
       "commands": ["cargo test --workspace --all-targets --all-features"]
-    },
-    "docs-check": {
-      "enabled": true,
-      "group": "push",
-      "description": "Check documentation integrity (elegy-cli docs check)",
-      "cwd": "./rust",
-      "timeoutMs": 60000,
-      "blocking": false,
-      "ciWorkflow": "rust-ci.yml",
-      "ciJob": "docs-check",
-      "ciRequired": false,
-      "commands": ["cargo run -p elegy-cli -- --project .. docs check --json"]
     },
     "docs-check-v2": {
       "enabled": true,
@@ -93,6 +86,7 @@
       "cwd": "./rust",
       "timeoutMs": 60000,
       "blocking": true,
+      "defaultProfiles": ["ci-local", "release"],
       "ciWorkflow": "rust-ci.yml",
       "ciJob": "docs-check-v2",
       "ciRequired": true,
@@ -105,10 +99,11 @@
       "cwd": ".",
       "timeoutMs": 60000,
       "blocking": true,
+      "defaultProfiles": ["ci-local", "release"],
       "ciWorkflow": "package-boundaries.yml",
       "ciJob": "validate-package-boundaries",
       "ciRequired": true,
-      "commands": ["pwsh -NoProfile -NonInteractive -Command \"& ./scripts/validate-package-boundaries.ps1 -RepoRoot .\""]
+      "commands": ["pwsh -NoProfile -NonInteractive -Command \"& ./scripts/validate-package-boundaries.ps1\""]
     },
     "canonical-outputs": {
       "enabled": true,
@@ -117,10 +112,14 @@
       "cwd": ".",
       "timeoutMs": 60000,
       "blocking": true,
+      "defaultProfiles": ["ci-local", "release"],
       "ciWorkflow": "package-boundaries.yml",
       "ciJob": "validate-package-boundaries",
       "ciRequired": true,
-      "commands": ["pwsh -NoProfile -NonInteractive -Command \"& ./scripts/validate-canonical-outputs.ps1 -RepoRoot .\""]
+      "commands": [
+        "pwsh -NoProfile -NonInteractive -Command \"& ./scripts/export-contracts.ps1\"",
+        "pwsh -NoProfile -NonInteractive -Command \"& ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs\""
+      ]
     },
     "git-hooks-pre-commit": {
       "enabled": true,
@@ -134,9 +133,9 @@
     "git-hooks-pre-push": {
       "enabled": true,
       "group": "push",
-      "description": "Pre-push hook (registry-alignment + Rust fmt + clippy)",
+      "description": "Pre-push hook (registry-alignment + Rust fmt + clippy + authoritative docs + Rust tests)",
       "cwd": ".",
-      "timeoutMs": 120000,
+      "timeoutMs": 900000,
       "blocking": false,
       "commands": ["bash .githooks/pre-push"]
     }

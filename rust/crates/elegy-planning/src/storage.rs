@@ -15,17 +15,17 @@ use crate::{
     validation::validate_entity, AttachWorktreeInput, BlockedCandidate, EffortTier, EntityType,
     FileScopeRecord, FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, InsightRecord,
     InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView, MutationResult,
-    PlanRecord, PlanStatus, PlanView, PlanningEvent, PlanningHealthReport, PlanningStoreError,
-    Priority, ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView,
-    ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord,
-    RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
-    RunnableWorkPointCandidate, ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord,
-    TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity,
-    WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord, WorkPointStatus,
-    WorkPointView, WorktreeRecord, WorktreeStatus,
+    PlanRecord, PlanStatus, PlanView, PlanningEdgeKind, PlanningEvent, PlanningGraphEdge,
+    PlanningGraphNode, PlanningHealthReport, PlanningNodeKind, PlanningStoreError, Priority,
+    ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat,
+    RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord,
+    RoadmapStatus, RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord,
+    SessionSummary, Severity, TagInfo, TodoRecord, TodoStatus, ValidationFinding, ValidationReport,
+    ValidationRunReport, ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode,
+    WorkPointKind, WorkPointRecord, WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "8";
+pub const CURRENT_SCHEMA_VERSION: &str = "9";
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 const SQLITE_MAX_VARIABLES: usize = 999;
@@ -283,6 +283,29 @@ pub struct RevisePlanInput {
     pub clear_file_scopes: bool,
     pub tags: Option<Vec<String>>,
     pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateGraphNodeInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub kind: PlanningNodeKind,
+    pub title: String,
+    pub summary: String,
+    pub status: String,
+    pub payload: serde_json::Value,
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateGraphEdgeInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub kind: PlanningEdgeKind,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub status: String,
+    pub payload: serde_json::Value,
 }
 
 impl PlanningStore {
@@ -4496,6 +4519,300 @@ impl PlanningStore {
         transaction.commit()?;
         Ok(connection)
     }
+
+    // ── Graph node methods ──────────────────────────────────────────────────────
+
+    pub fn create_graph_node(
+        &self,
+        input: CreateGraphNodeInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("title", &input.title)?;
+        require_non_empty("summary", &input.summary)?;
+        require_non_empty("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        ensure_scope_exists(&transaction, &scope_key)?;
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+        let record = PlanningGraphNode {
+            id: id.clone(),
+            scope_key: scope_key.clone(),
+            kind: input.kind,
+            title: input.title.trim().to_string(),
+            summary: input.summary.trim().to_string(),
+            status: input.status.trim().to_string(),
+            payload: input.payload,
+            tags: normalize_string_list(input.tags),
+            revision: 1,
+            created_at: now.clone(),
+            updated_at: now.clone(),
+        };
+
+        transaction.execute(
+            r#"
+        INSERT INTO planning_nodes (
+            id, scope_key, kind, title, summary, status,
+            payload_json, tags_json, revision, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "#,
+            params![
+                record.id,
+                record.scope_key,
+                record.kind.as_str(),
+                record.title,
+                record.summary,
+                record.status,
+                to_json_text(&record.payload)?,
+                to_json_text(&record.tags)?,
+                record.revision,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+
+        // Phase 1: skip events, validation, and tag indexing for graph nodes
+        let validation = ValidationReport::from_findings(Vec::new());
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn graph_node(&self, id: &str) -> Result<PlanningGraphNode, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        load_graph_node(&connection, id)
+    }
+
+    pub fn list_graph_nodes(
+        &self,
+        scope_key: &str,
+        kind: Option<PlanningNodeKind>,
+    ) -> Result<Vec<PlanningGraphNode>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        if let Some(k) = kind {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE scope_key = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![normalized, k.as_str()], row_to_graph_node)?;
+            collect_rows(rows)
+        } else {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![normalized], row_to_graph_node)?;
+            collect_rows(rows)
+        }
+    }
+
+    // ── Graph edge methods ──────────────────────────────────────────────────────
+
+    pub fn create_graph_edge(
+        &self,
+        input: CreateGraphEdgeInput,
+    ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("source_node_id", &input.source_node_id)?;
+        require_non_empty("target_node_id", &input.target_node_id)?;
+        require_non_empty("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        ensure_scope_exists(&transaction, &scope_key)?;
+
+        // Preflight: load source and target nodes
+        let source = load_graph_node(&transaction, &input.source_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "sourceNodeId references missing node `{}`",
+                input.source_node_id
+            ))
+        })?;
+        let target = load_graph_node(&transaction, &input.target_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "targetNodeId references missing node `{}`",
+                input.target_node_id
+            ))
+        })?;
+
+        // Preflight: scopes must match
+        if source.scope_key != scope_key || target.scope_key != scope_key {
+            return Err(PlanningStoreError::InvalidInput(
+                "source and target nodes must belong to the same scope as the edge".to_string(),
+            ));
+        }
+
+        // Preflight: reject self-loops (edges from a node to itself)
+        if input.source_node_id == input.target_node_id {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "self-referential {} edge is not allowed: source and target must be different nodes",
+                input.kind.as_str(),
+            )));
+        }
+
+        // Preflight: valid source/target node kinds for this edge kind
+        validate_edge_kind_pair(&input.kind, &source.kind, &target.kind)?;
+
+        // Preflight: no duplicate active edge (also enforced by UNIQUE partial index)
+        let dup_count: i64 = transaction.query_row(
+            "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+            params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+            |row| row.get(0),
+        )?;
+        if dup_count > 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "duplicate active {} edge from `{}` to `{}` in scope `{}`",
+                input.kind.as_str(),
+                input.source_node_id,
+                input.target_node_id,
+                scope_key
+            )));
+        }
+
+        // Preflight: cycle detection for acyclic families
+        match input.kind {
+            PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
+                if would_create_graph_cycle(
+                    &transaction,
+                    &input.source_node_id,
+                    &input.target_node_id,
+                    &input.kind,
+                )? =>
+            {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "adding this {} edge from `{}` to `{}` would create a cycle",
+                    input.kind.as_str(),
+                    input.source_node_id,
+                    input.target_node_id
+                )));
+            }
+            _ => {}
+        }
+
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+        let record = PlanningGraphEdge {
+            id: id.clone(),
+            scope_key: scope_key.clone(),
+            kind: input.kind,
+            source_node_id: input.source_node_id.clone(),
+            target_node_id: input.target_node_id.clone(),
+            status: input.status.trim().to_string(),
+            payload: input.payload,
+            revision: 1,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+
+        transaction.execute(
+            r#"
+        INSERT INTO planning_edges (
+            id, scope_key, kind, source_node_id, target_node_id,
+            status, payload_json, revision, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "#,
+            params![
+                record.id,
+                record.scope_key,
+                record.kind.as_str(),
+                record.source_node_id,
+                record.target_node_id,
+                record.status,
+                to_json_text(&record.payload)?,
+                record.revision,
+                record.created_at,
+                record.updated_at,
+            ],
+        )?;
+
+        // Phase 1: skip events and validation
+        let validation = ValidationReport::from_findings(Vec::new());
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn graph_edge(&self, id: &str) -> Result<PlanningGraphEdge, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        connection
+            .query_row(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE id = ?1",
+                params![id],
+                row_to_graph_edge,
+            )
+            .map_err(|error| {
+                if matches!(error, rusqlite::Error::QueryReturnedNoRows) {
+                    PlanningStoreError::NotFound {
+                        entity_type: "graph-edge".to_string(),
+                        entity_id: id.to_string(),
+                    }
+                } else {
+                    PlanningStoreError::Sqlite(error)
+                }
+            })
+    }
+
+    pub fn list_graph_edges(
+        &self,
+        scope_key: &str,
+        kind: Option<PlanningEdgeKind>,
+    ) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        if let Some(k) = kind {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![normalized, k.as_str()], row_to_graph_edge)?;
+            collect_rows(rows)
+        } else {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![normalized], row_to_graph_edge)?;
+            collect_rows(rows)
+        }
+    }
+
+    pub fn list_outgoing_edges(
+        &self,
+        node_id: &str,
+        kind: Option<PlanningEdgeKind>,
+    ) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        if let Some(k) = kind {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE source_node_id = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![node_id, k.as_str()], row_to_graph_edge)?;
+            collect_rows(rows)
+        } else {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE source_node_id = ?1 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![node_id], row_to_graph_edge)?;
+            collect_rows(rows)
+        }
+    }
+
+    pub fn list_incoming_edges(
+        &self,
+        node_id: &str,
+        kind: Option<PlanningEdgeKind>,
+    ) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        if let Some(k) = kind {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE target_node_id = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![node_id, k.as_str()], row_to_graph_edge)?;
+            collect_rows(rows)
+        } else {
+            let mut stmt = connection.prepare(
+                "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE target_node_id = ?1 ORDER BY updated_at DESC, id ASC"
+            )?;
+            let rows = stmt.query_map(params![node_id], row_to_graph_edge)?;
+            collect_rows(rows)
+        }
+    }
 }
 
 fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
@@ -4757,6 +5074,38 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
         CREATE INDEX IF NOT EXISTS idx_project_runs_work_point ON project_runs(work_point_id, status);
         CREATE INDEX IF NOT EXISTS idx_project_runs_roadmap ON project_runs(roadmap_id, status);
 
+        CREATE TABLE IF NOT EXISTS planning_nodes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL REFERENCES scopes(scope_key) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_planning_nodes_scope_kind ON planning_nodes(scope_key, kind);
+
+        CREATE TABLE IF NOT EXISTS planning_edges (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL REFERENCES scopes(scope_key) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            source_node_id TEXT NOT NULL REFERENCES planning_nodes(id) ON DELETE CASCADE,
+            target_node_id TEXT NOT NULL REFERENCES planning_nodes(id) ON DELETE CASCADE,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_scope_kind ON planning_edges(scope_key, kind);
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_source ON planning_edges(source_node_id, kind);
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_target ON planning_edges(target_node_id, kind);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_planning_edges_unique_active ON planning_edges(scope_key, kind, source_node_id, target_node_id) WHERE status = 'active';
+
         CREATE TABLE IF NOT EXISTS tag_index (
             scope_key TEXT NOT NULL,
             entity_type TEXT NOT NULL,
@@ -4805,7 +5154,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v4_to_v5(connection)?;
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
         Some("2") => {
             migrate_v2_to_v3(connection)?;
@@ -4813,31 +5163,40 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v4_to_v5(connection)?;
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
         Some("3") => {
             migrate_v3_to_v4(connection)?;
             migrate_v4_to_v5(connection)?;
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
         Some("4") => {
             migrate_v4_to_v5(connection)?;
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
         Some("5") => {
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
         Some("6") => {
             migrate_v6_to_v7(connection)?;
-            migrate_v7_to_v8(connection)
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
         }
-        Some("7") => migrate_v7_to_v8(connection),
+        Some("7") => {
+            migrate_v7_to_v8(connection)?;
+            migrate_v8_to_v9(connection)
+        }
+        Some("8") => migrate_v8_to_v9(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -5152,6 +5511,50 @@ fn migrate_v7_to_v8(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
 
     connection.execute(
         "UPDATE planning_config SET value = '8' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
+    )?;
+    Ok(())
+}
+
+fn migrate_v8_to_v9(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS planning_nodes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL REFERENCES scopes(scope_key) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            title TEXT NOT NULL,
+            summary TEXT NOT NULL,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            tags_json TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_planning_nodes_scope_kind ON planning_nodes(scope_key, kind);
+
+        CREATE TABLE IF NOT EXISTS planning_edges (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL REFERENCES scopes(scope_key) ON DELETE CASCADE,
+            kind TEXT NOT NULL,
+            source_node_id TEXT NOT NULL REFERENCES planning_nodes(id) ON DELETE CASCADE,
+            target_node_id TEXT NOT NULL REFERENCES planning_nodes(id) ON DELETE CASCADE,
+            status TEXT NOT NULL,
+            payload_json TEXT NOT NULL,
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_scope_kind ON planning_edges(scope_key, kind);
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_source ON planning_edges(source_node_id, kind);
+        CREATE INDEX IF NOT EXISTS idx_planning_edges_target ON planning_edges(target_node_id, kind);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_planning_edges_unique_active ON planning_edges(scope_key, kind, source_node_id, target_node_id) WHERE status = 'active';
+        "#,
+    )?;
+
+    connection.execute(
+        "UPDATE planning_config SET value = '9' WHERE key = ?1",
         params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
@@ -6933,6 +7336,14 @@ fn parse_validation_severity(value: String) -> Result<ValidationSeverity, rusqli
     value.parse().map_err(text_parse_error)
 }
 
+fn parse_planning_node_kind(value: String) -> Result<PlanningNodeKind, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_planning_edge_kind(value: String) -> Result<PlanningEdgeKind, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
 fn text_parse_error(message: String) -> rusqlite::Error {
     rusqlite::Error::FromSqlConversionFailure(
         0,
@@ -7037,6 +7448,187 @@ pub(crate) fn list_insights_for_entity_in_scope(
         row_to_insight,
     )?;
     collect_rows(rows)
+}
+
+fn row_to_graph_node(row: &Row<'_>) -> Result<PlanningGraphNode, rusqlite::Error> {
+    Ok(PlanningGraphNode {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        kind: parse_planning_node_kind(row.get::<_, String>(2)?)?,
+        title: row.get(3)?,
+        summary: row.get(4)?,
+        status: row.get(5)?,
+        payload: serde_json::from_str(&row.get::<_, String>(6)?).map_err(to_sql_error)?,
+        tags: parse_json_column(row.get::<_, String>(7)?)?,
+        revision: row.get(8)?,
+        created_at: row.get(9)?,
+        updated_at: row.get(10)?,
+    })
+}
+
+fn row_to_graph_edge(row: &Row<'_>) -> Result<PlanningGraphEdge, rusqlite::Error> {
+    Ok(PlanningGraphEdge {
+        id: row.get(0)?,
+        scope_key: row.get(1)?,
+        kind: parse_planning_edge_kind(row.get::<_, String>(2)?)?,
+        source_node_id: row.get(3)?,
+        target_node_id: row.get(4)?,
+        status: row.get(5)?,
+        payload: serde_json::from_str(&row.get::<_, String>(6)?).map_err(to_sql_error)?,
+        revision: row.get(7)?,
+        created_at: row.get(8)?,
+        updated_at: row.get(9)?,
+    })
+}
+
+pub(crate) fn load_graph_node(
+    connection: &Connection,
+    id: &str,
+) -> Result<PlanningGraphNode, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE id = ?1",
+            params![id],
+            row_to_graph_node,
+        )
+        .map_err(|error| {
+            if matches!(error, rusqlite::Error::QueryReturnedNoRows) {
+                PlanningStoreError::NotFound {
+                    entity_type: "graph-node".to_string(),
+                    entity_id: id.to_string(),
+                }
+            } else {
+                PlanningStoreError::Sqlite(error)
+            }
+        })
+}
+
+// ── Graph edge preflight helpers ──────────────────────────────────────────
+
+fn validate_edge_kind_pair(
+    edge_kind: &PlanningEdgeKind,
+    source_kind: &PlanningNodeKind,
+    target_kind: &PlanningNodeKind,
+) -> Result<(), PlanningStoreError> {
+    use PlanningEdgeKind::*;
+    use PlanningNodeKind::*;
+
+    match edge_kind {
+        DecomposesTo => match (source_kind, target_kind) {
+            (Goal | Roadmap | Milestone | Work | Plan | Run, Roadmap | Milestone | Work | Task) => {
+                Ok(())
+            }
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        DependsOn => match (source_kind, target_kind) {
+            (Work | Task, Work | Task) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Blocks => match (source_kind, target_kind) {
+            (Work | Issue | Review, Work | Task | Acceptance) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        ParallelSafeWith => match (source_kind, target_kind) {
+            (Work, Work) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        PlannedBy => match (source_kind, target_kind) {
+            (Work, Plan) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        ExecutedBy => match (source_kind, target_kind) {
+            (Work | Plan, Run) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Contains => match (source_kind, target_kind) {
+            (Run | Plan, Task | Evidence | Issue | Review | Insight) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Requires => match (source_kind, target_kind) {
+            (Goal | Roadmap | Milestone | Work | Plan, Acceptance) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Satisfies => match (source_kind, target_kind) {
+            (Acceptance, Acceptance) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        EvidencedBy => match (source_kind, target_kind) {
+            (Acceptance | Work | Plan | Run | Issue | Review, Evidence) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Found => match (source_kind, target_kind) {
+            (Run | Work | Plan, Issue | Review) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        AddressedBy => match (source_kind, target_kind) {
+            (Issue | Review, Work | Plan) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Repairs => match (source_kind, target_kind) {
+            (Work, Work) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+        Supersedes => match (source_kind, target_kind) {
+            (Work | Plan | Acceptance, Work | Plan | Acceptance) => Ok(()),
+            _ => Err(kind_pair_error(edge_kind, source_kind, target_kind)),
+        },
+    }
+}
+
+fn kind_pair_error(
+    edge_kind: &PlanningEdgeKind,
+    source_kind: &PlanningNodeKind,
+    target_kind: &PlanningNodeKind,
+) -> PlanningStoreError {
+    PlanningStoreError::InvalidInput(format!(
+        "invalid edge: {} edge cannot connect source kind `{}` to target kind `{}`",
+        edge_kind.as_str(),
+        source_kind.as_str(),
+        target_kind.as_str(),
+    ))
+}
+
+fn would_create_graph_cycle(
+    connection: &Transaction<'_>,
+    source_node_id: &str,
+    target_node_id: &str,
+    edge_kind: &PlanningEdgeKind,
+) -> Result<bool, PlanningStoreError> {
+    let mut visited = std::collections::HashSet::new();
+    walk_graph_edges(
+        connection,
+        target_node_id,
+        source_node_id,
+        edge_kind,
+        &mut visited,
+    )
+}
+
+fn walk_graph_edges(
+    connection: &Transaction<'_>,
+    current: &str,
+    target: &str,
+    edge_kind: &PlanningEdgeKind,
+    visited: &mut std::collections::HashSet<String>,
+) -> Result<bool, PlanningStoreError> {
+    if current == target {
+        return Ok(true);
+    }
+    if !visited.insert(current.to_string()) {
+        return Ok(false);
+    }
+    let kind_str = edge_kind.as_str();
+    let mut stmt = connection.prepare(
+        "SELECT target_node_id FROM planning_edges WHERE source_node_id = ?1 AND kind = ?2 AND status = 'active'"
+    )?;
+    let rows = stmt.query_map(params![current, kind_str], |row| row.get::<_, String>(0))?;
+    for row in rows {
+        let next = row?;
+        if walk_graph_edges(connection, &next, target, edge_kind, visited)? {
+            return Ok(true);
+        }
+    }
+    Ok(false)
 }
 
 fn rebuild_tag_index_for_entity(
@@ -8748,5 +9340,715 @@ mod tests {
         assert!(events
             .iter()
             .any(|event| event.event_type == "plan.revised"));
+    }
+
+    #[test]
+    fn graph_schema_created_for_new_database() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Verify schema version is 9
+        let conn = store.open_connection().expect("open");
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM planning_config WHERE key = 'schema_version'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("get schema version");
+        assert_eq!(version, "9", "fresh database should have schema version 9");
+
+        // Verify graph tables exist and accept inserts
+        let node_input = CreateGraphNodeInput {
+            id: Some("gn-schema-1".to_string()),
+            scope_key: None,
+            kind: PlanningNodeKind::Goal,
+            title: "Test Goal Node".to_string(),
+            summary: "Schema verification".to_string(),
+            status: "active".to_string(),
+            payload: serde_json::json!({}),
+            tags: vec!["test".to_string()],
+        };
+        let result = store
+            .create_graph_node(node_input)
+            .expect("create graph node");
+        assert_eq!(result.record.id, "gn-schema-1");
+        assert_eq!(result.record.kind, PlanningNodeKind::Goal);
+        assert_eq!(result.validation.status, ValidationStatus::Valid);
+        assert!(result.validation.findings.is_empty());
+
+        // Verify tables are queryable
+        let loaded = store.graph_node("gn-schema-1").expect("load graph node");
+        assert_eq!(loaded.title, "Test Goal Node");
+    }
+
+    #[test]
+    fn graph_migrates_v8_to_v9_without_backfill() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+
+        // Create a database and manually set schema version to 8
+        {
+            let store = PlanningStore::new(&db_path);
+            store.init().expect("init");
+            // The init creates v9 tables, but we set version back to 8 to simulate
+            // a v8 database that hasn't been migrated yet
+            let conn = store.open_connection().expect("open");
+            conn.execute(
+                "UPDATE planning_config SET value = '8' WHERE key = 'schema_version'",
+                [],
+            )
+            .expect("set version to 8");
+        }
+
+        // Re-open: migration should kick in
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("re-init with migration");
+
+        let conn = store.open_connection().expect("open");
+        let version: String = conn
+            .query_row(
+                "SELECT value FROM planning_config WHERE key = 'schema_version'",
+                [],
+                |row| row.get(0),
+            )
+            .expect("get schema version");
+        assert_eq!(version, "9", "should have migrated to v9");
+
+        // Graph tables should exist but be empty
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM planning_nodes", [], |row| row.get(0))
+            .expect("count nodes");
+        assert_eq!(count, 0, "no nodes should be backfilled");
+
+        let count: i64 = conn
+            .query_row("SELECT COUNT(*) FROM planning_edges", [], |row| row.get(0))
+            .expect("count edges");
+        assert_eq!(count, 0, "no edges should be backfilled");
+    }
+
+    #[test]
+    fn graph_node_round_trips() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a scope first
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "roundtrip".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scope");
+
+        let payload = serde_json::json!({"key": "value", "nested": {"num": 42}});
+        let node_input = CreateGraphNodeInput {
+            id: Some("gn-round".to_string()),
+            scope_key: Some("roundtrip".to_string()),
+            kind: PlanningNodeKind::Work,
+            title: "Roundtrip Work".to_string(),
+            summary: "Testing roundtrip".to_string(),
+            status: "active".to_string(),
+            payload: payload.clone(),
+            tags: vec!["test".to_string(), "roundtrip".to_string()],
+        };
+        let result = store.create_graph_node(node_input).expect("create");
+        assert_eq!(result.record.id, "gn-round");
+        assert_eq!(result.record.kind, PlanningNodeKind::Work);
+        assert_eq!(result.record.status, "active");
+        assert_eq!(result.record.payload, payload);
+        assert_eq!(result.record.tags.len(), 2);
+        assert!(result.record.tags.contains(&"test".to_string()));
+        assert!(result.record.tags.contains(&"roundtrip".to_string()));
+        assert_eq!(result.record.revision, 1);
+
+        let loaded = store.graph_node("gn-round").expect("load");
+        assert_eq!(loaded, result.record, "roundtrip should match");
+    }
+
+    #[test]
+    fn graph_edge_round_trips() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two work nodes
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-w1".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Work 1".to_string(),
+                summary: "First work node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create w1");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-w2".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Work 2".to_string(),
+                summary: "Second work node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create w2");
+
+        // Create a depends-on edge
+        let edge_result = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dep".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-w1".to_string(),
+                target_node_id: "gn-w2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"priority": "high"}),
+            })
+            .expect("create edge");
+        assert_eq!(edge_result.record.id, "ge-dep");
+        assert_eq!(edge_result.record.kind, PlanningEdgeKind::DependsOn);
+
+        // Load by id
+        let loaded = store.graph_edge("ge-dep").expect("load edge");
+        assert_eq!(loaded.source_node_id, "gn-w1");
+        assert_eq!(loaded.target_node_id, "gn-w2");
+
+        // List outgoing from w1
+        let outgoing = store
+            .list_outgoing_edges("gn-w1", None)
+            .expect("list outgoing");
+        assert_eq!(outgoing.len(), 1);
+        assert_eq!(outgoing[0].target_node_id, "gn-w2");
+
+        // List incoming to w2
+        let incoming = store
+            .list_incoming_edges("gn-w2", None)
+            .expect("list incoming");
+        assert_eq!(incoming.len(), 1);
+        assert_eq!(incoming[0].source_node_id, "gn-w1");
+
+        // W2 should have no outgoing edges
+        let outgoing_w2 = store
+            .list_outgoing_edges("gn-w2", None)
+            .expect("list outgoing w2");
+        assert!(outgoing_w2.is_empty());
+    }
+
+    #[test]
+    fn graph_edge_rejects_missing_node() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create one node
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-missing-1".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Exists".to_string(),
+                summary: "Exists".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create node");
+
+        // Try edge to non-existent target
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-missing-1".to_string(),
+                target_node_id: "gn-nonexistent".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject missing target");
+        assert!(
+            err.to_string().contains("missing node"),
+            "error should mention missing node: {err}"
+        );
+
+        // Try edge from non-existent source
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-nonexistent".to_string(),
+                target_node_id: "gn-missing-1".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject missing source");
+        assert!(
+            err.to_string().contains("missing node"),
+            "error should mention missing node: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_cross_scope() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two scopes
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "scope-a".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scope a");
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "scope-b".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create scope b");
+
+        // Create node in scope A
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-sa".to_string()),
+                scope_key: Some("scope-a".to_string()),
+                kind: PlanningNodeKind::Work,
+                title: "Scope A Node".to_string(),
+                summary: "In scope A".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create node in scope a");
+        // Create node in scope B
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-sb".to_string()),
+                scope_key: Some("scope-b".to_string()),
+                kind: PlanningNodeKind::Work,
+                title: "Scope B Node".to_string(),
+                summary: "In scope B".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create node in scope b");
+
+        // Try cross-scope edge
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: Some("scope-a".to_string()),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-sa".to_string(),
+                target_node_id: "gn-sb".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject cross-scope edge");
+        assert!(
+            err.to_string().contains("same scope"),
+            "error should mention scope: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_invalid_kind_pair() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a goal node and a plan node
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-goal-invalid".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Goal,
+                title: "A Goal".to_string(),
+                summary: "Goal node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create goal");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-plan-invalid".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Plan,
+                title: "A Plan".to_string(),
+                summary: "Plan node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create plan");
+
+        // planned-by requires source Work, not Goal
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::PlannedBy,
+                source_node_id: "gn-goal-invalid".to_string(),
+                target_node_id: "gn-plan-invalid".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject invalid kind pair");
+        assert!(
+            err.to_string().contains("cannot connect"),
+            "error should mention invalid edge: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_dependency_cycle() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create three work nodes: A, B, C
+        for id in &["gn-a", "gn-b", "gn-c"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: format!("Node {id}").to_string(),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                })
+                .expect("create node");
+        }
+
+        // A depends-on B
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-a-b".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-a".to_string(),
+                target_node_id: "gn-b".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("A -> B");
+
+        // B depends-on C
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-b-c".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-b".to_string(),
+                target_node_id: "gn-c".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("B -> C");
+
+        // C depends-on A should be rejected (cycle: A -> B -> C -> A)
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-c".to_string(),
+                target_node_id: "gn-a".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject cycle");
+        assert!(
+            err.to_string().contains("cycle"),
+            "error should mention cycle: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_decomposition_cycle() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create goal, roadmap, milestone
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-goal-decomp".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Goal,
+                title: "Goal".to_string(),
+                summary: "Top-level goal".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create goal");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-roadmap-decomp".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Roadmap,
+                title: "Roadmap".to_string(),
+                summary: "Roadmap".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create roadmap");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-milestone-decomp".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Milestone,
+                title: "Milestone".to_string(),
+                summary: "Milestone".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create milestone");
+
+        // Goal decomposes-to Roadmap
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-g-r".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-goal-decomp".to_string(),
+                target_node_id: "gn-roadmap-decomp".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("Goal -> Roadmap");
+
+        // Roadmap decomposes-to Milestone
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-r-m".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-roadmap-decomp".to_string(),
+                target_node_id: "gn-milestone-decomp".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("Roadmap -> Milestone");
+
+        // Milestone decomposes-to Goal should be rejected (cycle)
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-milestone-decomp".to_string(),
+                target_node_id: "gn-goal-decomp".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject decomposition cycle");
+        assert!(
+            err.to_string().contains("invalid edge"),
+            "error should mention invalid edge: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_active_duplicate_rejected() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two work nodes
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-dup-1".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Work 1".to_string(),
+                summary: "First".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create w1");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-dup-2".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Work 2".to_string(),
+                summary: "Second".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create w2");
+
+        // Create first depends-on edge
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dup-1".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-dup-1".to_string(),
+                target_node_id: "gn-dup-2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("first edge");
+
+        // Try duplicate active edge
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dup-2".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-dup-1".to_string(),
+                target_node_id: "gn-dup-2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject duplicate active edge");
+        assert!(
+            err.to_string().contains("duplicate"),
+            "error should mention duplicate: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_decomposes_to_cycle_with_valid_kind_pairs() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create three work nodes — DecomposesTo allows Work -> Work
+        for id in &["gn-dc-a", "gn-dc-b", "gn-dc-c"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: format!("Decomposition test {id}").to_string(),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                })
+                .expect("create node");
+        }
+
+        // A decomposes-to B
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dc-a-b".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-dc-a".to_string(),
+                target_node_id: "gn-dc-b".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("A -> B");
+
+        // B decomposes-to C
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dc-b-c".to_string()),
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-dc-b".to_string(),
+                target_node_id: "gn-dc-c".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect("B -> C");
+
+        // C decomposes-to A should be rejected (cycle: A -> B -> C -> A)
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::DecomposesTo,
+                source_node_id: "gn-dc-c".to_string(),
+                target_node_id: "gn-dc-a".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject DecomposesTo cycle with valid kind pairs");
+        assert!(
+            err.to_string().contains("cycle"),
+            "error should mention cycle: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_rejects_self_loop() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-self".to_string()),
+                scope_key: None,
+                kind: PlanningNodeKind::Work,
+                title: "Self Node".to_string(),
+                summary: "Node for self-loop test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+            })
+            .expect("create node");
+
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: None,
+                scope_key: None,
+                kind: PlanningEdgeKind::Blocks,
+                source_node_id: "gn-self".to_string(),
+                target_node_id: "gn-self".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+            })
+            .expect_err("should reject self-referential edge");
+        assert!(
+            err.to_string().contains("self-referential"),
+            "error should mention self-referential: {err}"
+        );
     }
 }

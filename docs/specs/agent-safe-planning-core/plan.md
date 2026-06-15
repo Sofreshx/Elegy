@@ -1,3 +1,9 @@
+---
+title: "Implementation Plan: Agent-Safe Deterministic Planning Core"
+status: active
+owner: Elegy
+---
+
 # Implementation Plan: Agent-Safe Deterministic Planning Core
 
 ## Summary
