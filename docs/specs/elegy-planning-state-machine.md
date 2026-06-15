@@ -3,7 +3,7 @@ title: elegy-planning deterministic state machine
 status: draft
 owner: Elegy
 created: 2026-06-15
-updated: 2026-06-15
+updated: 2026-06-16
 doc_kind: spec
 summary: Command-handler and invariant model for deterministic graph mutations, clean rejection of impossible transformations, and atomic internal planning side effects.
 schema_version: elegy-planning-state-machine/v0
@@ -63,6 +63,7 @@ Typed command families:
 | Review | `review record-finding`, `finding resolve`, `finding reopen` |
 | Acceptance | `acceptance create`, `acceptance link`, `acceptance verify` |
 | Evidence | `evidence record`, `evidence attach` |
+| Graph finalization | `graph node finalize` |
 | Graph query | `graph runnable`, `graph parallel-groups`, `graph coverage` |
 
 The state machine rejects impossible transformations before write:
@@ -71,8 +72,13 @@ The state machine rejects impossible transformations before write:
 |---|---|
 | create dependency cycle | reject with `GRAPH_CYCLE` |
 | complete work with unresolved critical finding | reject with `OPEN_CRITICAL_FINDING` |
-| validate goal with uncovered abstract acceptance | reject with `ACCEPTANCE_COVERAGE_MISSING` |
-| attach concrete acceptance to unrelated abstract acceptance without rationale | reject with `COVERAGE_RATIONALE_REQUIRED` |
+| validate goal with uncovered abstract acceptance | reject with `ACCEPTANCE-COVERAGE-MISSING` |
+| attach concrete acceptance to unrelated abstract acceptance without rationale | reject with `ACCEPTANCE-RATIONALE-MISSING` |
+| finalize graph node with structural edge corruption | reject with `GRAPH-EDGE-*` (CYCLE, DUPLICATE-ACTIVE, MISSING-NODE, CROSS-SCOPE, KIND-MISMATCH) |
+| finalize graph node with acceptance/evidence gaps | reject unless `--accepted-risk` provided; event records rationale |
+| finalize graph node with malformed typed payloads | always reject; type integrity is never waivable |
+| finalize abstract acceptance with no concrete coverage | reject with `ACCEPTANCE-COVERAGE-MISSING` |
+| finalize concrete acceptance with missing required evidence | reject with `ACCEPTANCE-EVIDENCE-MISSING` |
 | resolve finding without evidence or accepted-risk rationale | reject with `FINDING_RESOLUTION_UNSUPPORTED` |
 | run parallel work with resource conflict | exclude from parallel group; reject if explicitly co-claimed |
 | mutate completed work directly | reject; require corrective or superseding work |
@@ -100,13 +106,16 @@ is enabled.
 ## Acceptance Criteria
 
 - [ ] Normal mutations are available through typed command handlers.
-- [ ] Commands reject known-invalid graph transformations before write.
+- [x] Commands reject known-invalid graph transformations before write.
 - [ ] State, events, derived effects, and validation refreshes commit atomically.
 - [ ] Clients do not need to call separate projection or blocker-refresh commands
   after normal mutations.
 - [ ] Completed work cannot be directly modified through normal commands.
 - [ ] Recovery from bad completion requires corrective or superseding work with
   traceable rationale.
+
+- [x] Graph node finalization gates structural corruption and type integrity
+  (always blocked); acceptance/evidence gaps are waivable with `--accepted-risk`.
 
 ## Validation
 
