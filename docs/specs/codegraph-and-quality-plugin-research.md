@@ -161,16 +161,16 @@ The language-specific extractors feed a language-neutral graph IR defined by the
 | `kind` | `EntityKind` enum | `file`, `module`, `function`, `class`, `method`, `trait`, `impl`, `interface`, `type`, `constant`, `enum`, `macro`, `test`, `doc` |
 | `layer` | `string` | `source`, `test`, `doc`, `build`, `config` |
 | `name` | `string` | Short name (e.g. `calculateTotal`) |
-| `qualified_name` | `string` | Fully qualified (e.g. `src::math::calculateTotal`) |
+| `qualifiedName` | `string` | Fully qualified (e.g. `src::math::calculateTotal`) |
 | `file` | `string` | Relative path from repo root |
 | `span` | `{ start: [line, col], end: [line, col] } \| null` | Source location when known |
-| `inputs` | `[{ name: string, type_hint: string \| null }]` | Parameter/input descriptions |
+| `inputs` | `[{ name: string, typeHint: string \| null }]` | Parameter/input descriptions |
 | `outputs` | `[{ type_hint: string \| null }]` | Return/output descriptions |
 | `sideEffects` | `SideEffect[]` | Closed enum: `fs.read`, `fs.write`, `net.http`, `net.grpc`, `process.exec`, `db.read`, `db.write`, `env.read`, `env.write`, `os.signal` |
 | `dependencies` | `string[]` (entity IDs) | Direct dependency references |
 | `tests` | `string[]` (entity IDs) | Test entities that cover this entity |
 | `docs` | `string[]` (entity IDs) | Doc entities that document this entity |
-| `provenance` | `Provenance` | **Required.** `{ extractor, confidence, evidence_refs }` |
+| `provenance` | `Provenance` | **Required.** `{ extractor, confidence, evidenceRefs }` |
 
 **Edge fields:**
 
@@ -179,7 +179,7 @@ The language-specific extractors feed a language-neutral graph IR defined by the
 | `src` | `string` (entity ID) | Source entity |
 | `dst` | `string` (entity ID) | Target entity |
 | `kind` | `EdgeKind` enum | `imports`, `exports`, `calls`, `references`, `reads`, `writes`, `validates`, `emits`, `owns`, `tests`, `documents` |
-| `provenance` | `Provenance` | **Required.** `{ extractor, confidence, evidence_refs }` |
+| `provenance` | `Provenance` | **Required.** `{ extractor, confidence, evidenceRefs }` |
 
 **Confidence enum (locked, closed):**
 

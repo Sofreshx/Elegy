@@ -16,4 +16,7 @@ Elegy-hosted plugin runtime.
 
 Do not treat `artifacts/contracts` as the authored source of truth. That directory is generated output for consumers and CI.
 
-No authored contract asset should live under a legacy implementation tree. If a governed schema, fixture, or manifest is kept, it belongs here or under `governance/`.
+Current governed schemas include:
+- `elegy-codegraph.graph.v0.json` — Normalized graph IR for elegy-codegraph (entities, edges, provenance, confidence)
+
+All other authored contract assets live here or under `governance/`.
