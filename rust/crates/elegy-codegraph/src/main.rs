@@ -9,8 +9,15 @@
 //! elegy-codegraph query   --graph <graph.bin> impact --path <file>
 //! elegy-codegraph query   --graph <graph.bin> summary
 //! ```
+//!
+//! ## Deferred commands (see docs/specs/codegraph-diff-slice.md)
+//! - `diff`  — structural diff between two graph snapshots
+//! - `review` — rule-pack-based code review
+//! - `validate` — graph freshness and schema compliance
 
 use clap::{Parser, Subcommand};
+use elegy_codegraph::query::QueryEngine;
+use elegy_codegraph::store::Store;
 
 #[derive(Parser)]
 #[command(name = "elegy-codegraph")]
@@ -77,39 +84,34 @@ fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Command::Extract { lang, repo, out, use_scip } => {
+        Command::Extract {
+            lang,
+            repo,
+            out,
+            use_scip,
+        } => {
             println!(
                 "{{ \"status\": \"not_implemented\", \"command\": \"extract\", \"lang\": \"{}\", \"repo\": \"{}\", \"out\": \"{}\", \"use_scip\": {} }}",
                 lang, repo, out, use_scip
             );
         }
-        Command::Query { graph, sub } => match sub {
-            QueryCommand::Symbol { name, lang } => {
-                println!(
-                    "{{ \"status\": \"not_implemented\", \"command\": \"query\", \"sub\": \"symbol\", \"graph\": \"{}\", \"name\": \"{}\" }}",
-                    graph, name
-                );
-                let _ = lang;
-            }
-            QueryCommand::Neighbors { id, direction } => {
-                println!(
-                    "{{ \"status\": \"not_implemented\", \"command\": \"query\", \"sub\": \"neighbors\", \"graph\": \"{}\", \"id\": \"{}\", \"direction\": \"{}\" }}",
-                    graph, id, direction
-                );
-            }
-            QueryCommand::Impact { path } => {
-                println!(
-                    "{{ \"status\": \"not_implemented\", \"command\": \"query\", \"sub\": \"impact\", \"graph\": \"{}\", \"path\": \"{}\" }}",
-                    graph, path
-                );
-            }
-            QueryCommand::Summary => {
-                println!(
-                    "{{ \"status\": \"not_implemented\", \"command\": \"query\", \"sub\": \"summary\", \"graph\": \"{}\" }}",
-                    graph
-                );
-            }
-        },
+        Command::Query { graph, sub } => {
+            let store = Store::open(&graph)?;
+            let engine = QueryEngine::new(store);
+
+            let output = match sub {
+                QueryCommand::Symbol { name, lang } => {
+                    engine.symbol(&name, lang.as_deref())?
+                }
+                QueryCommand::Neighbors { id, direction } => {
+                    engine.neighbors(&id, &direction)?
+                }
+                QueryCommand::Impact { path } => engine.impact(&path)?,
+                QueryCommand::Summary => engine.summary()?,
+            };
+
+            println!("{}", output);
+        }
     }
 
     Ok(())
