@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Pre-push hook: full validation (registry-alignment + Rust fmt + clippy).
+# Pre-push hook: prod Rust CI parity for required local checks.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -13,5 +13,11 @@ echo "[pre-push] cargo fmt --all --check"
 
 echo "[pre-push] cargo clippy --workspace --all-targets --all-features -- -D warnings"
 (cd "$RUST_DIR" && cargo clippy --workspace --all-targets --all-features -- -D warnings)
+
+echo "[pre-push] cargo run -p elegy-documentation -- check --project .."
+(cd "$RUST_DIR" && cargo run -p elegy-documentation -- check --project ..)
+
+echo "[pre-push] cargo test --workspace --all-targets --all-features"
+(cd "$RUST_DIR" && cargo test --workspace --all-targets --all-features)
 
 echo "[pre-push] OK"

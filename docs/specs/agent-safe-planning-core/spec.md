@@ -1,7 +1,8 @@
 ---
 spec_id: agent-safe-planning-core
 title: Agent-Safe Deterministic Planning Core
-status: implemented
+status: active
+owner: Elegy
 type: feature
 updated: 2026-06-13
 ---

@@ -292,6 +292,69 @@ pub struct WorkGraph {
     pub edges: Vec<WorkGraphEdge>,
 }
 
+string_enum!(PlanningNodeKind {
+    Goal => "goal",
+    Roadmap => "roadmap",
+    Milestone => "milestone",
+    Work => "work",
+    Plan => "plan",
+    Task => "task",
+    Run => "run",
+    Acceptance => "acceptance",
+    Evidence => "evidence",
+    Issue => "issue",
+    Review => "review",
+    Insight => "insight"
+});
+
+string_enum!(PlanningEdgeKind {
+    DecomposesTo => "decomposes-to",
+    DependsOn => "depends-on",
+    Blocks => "blocks",
+    ParallelSafeWith => "parallel-safe-with",
+    PlannedBy => "planned-by",
+    ExecutedBy => "executed-by",
+    Contains => "contains",
+    Requires => "requires",
+    Satisfies => "satisfies",
+    EvidencedBy => "evidenced-by",
+    Found => "found",
+    AddressedBy => "addressed-by",
+    Repairs => "repairs",
+    Supersedes => "supersedes"
+});
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanningGraphNode {
+    pub id: String,
+    pub scope_key: String,
+    pub kind: PlanningNodeKind,
+    pub title: String,
+    pub summary: String,
+    pub status: String,
+    pub payload: serde_json::Value,
+    pub tags: Vec<String>,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanningGraphEdge {
+    pub id: String,
+    pub scope_key: String,
+    pub kind: PlanningEdgeKind,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub status: String,
+    pub payload: serde_json::Value,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ScopeRecord {
