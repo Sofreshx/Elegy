@@ -13,6 +13,7 @@ members = [
     "crates/elegy-tooling",
     "crates/elegy-descriptor",
     "crates/elegy-configuration",
+    "crates/elegy-codegraph",
     "crates/elegy-adapter-fs",
     "crates/elegy-adapter-http",
     "crates/elegy-runtime",
