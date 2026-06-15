@@ -110,8 +110,11 @@ All `query` subcommands emit compact JSON with `provenance` and `confidence` on 
 - **Docs:** JSDoc tags and `@elegy-doc` comments produce `documents` edges to documented symbols.
 
 **Known gaps (v0):**
+- **External dependency:** requires Node.js and the `typescript` package (globally or in local `node_modules`). Extraction fails with a clear error if either is missing.
 - Cross-package monorepo resolution depends on `tsconfig.json` `paths`/`references`; walked best-effort. Unresolvable imports marked as `confidence: "inferred"`.
-- No runtime test-to-source binding (test runners are not executed); test detection is pattern-based.
+- No runtime test-to-source binding (test runners are not executed); test detection is pattern-based (`*.test.ts`, `*.spec.ts`, `__tests__/**`).
+- **No side-effect detection:** the v0 TS extractor does not infer side effects (e.g., `fs.readFile`, `fetch`). All entities have empty `sideEffects`.
+- **Call resolution is name-based:** calls are resolved within the same file by matching function names. Cross-file call resolution depends on the TypeScript type-checker and may miss calls when symbols are re-exported through barrel files.
 - Decorators and experimental TC39 proposals are not traced.
 - Dynamic `import()` expressions are recorded as `imports` edges when the argument is a literal string; otherwise not traced.
 
@@ -147,7 +150,10 @@ Implemented in `extractor/rust_scip.rs`. Invoked when `--use-scip` is passed to 
 - Trait method dispatch is recorded at the `impl` site, not the trait definition, unless SCIP is available and resolves the trait binding.
 - `async fn` is recorded as a regular function; the state machine transform is not traced.
 - Macro expansion is not performed; call sites inside macro invocations are invisible to the extractor.
+- **No side-effect detection:** the v0 Rust extractor does not infer side effects (e.g., `std::fs::read`, `std::process::Command`). All entities have empty `sideEffects`.
+- **Call resolution is AST-based:** call expressions are matched to function definitions by name within the same file. Cross-file and cross-crate call resolution requires the SCIP layer (`--use-scip`).
 - `build.rs` and proc-macro crates are parsed syntactically but their execution semantics are not modeled.
+- **Cargo metadata:** workspace member dependencies are recorded as crate-level metadata but inter-crate `imports` edges are deferred to the SCIP layer.
 
 ### Normalized Graph IR
 
