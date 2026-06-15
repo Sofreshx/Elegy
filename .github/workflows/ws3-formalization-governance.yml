@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout caller repository
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4.2.2
         with:
           path: caller-repo
 
@@ -67,7 +67,7 @@ jobs:
 
       - name: Checkout governance asset repository
         if: steps.workflow-source.outputs.same-repository != 'true'
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4.2.2
         with:
           repository: ${{ steps.workflow-source.outputs.repository }}
           ref: ${{ steps.workflow-source.outputs.ref }}
@@ -232,7 +232,7 @@ jobs:
 
       - name: Upload WS3 governance artifacts (compatibility artifact name retained)
         if: always()
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@v4
         with:
           name: ws3-formalization-governance
           path: caller-repo/artifacts/ws3/*.json

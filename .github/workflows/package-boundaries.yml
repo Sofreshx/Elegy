@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@v4.2.2
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@1.95.0
