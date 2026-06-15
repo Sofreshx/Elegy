@@ -108,6 +108,14 @@ The `elegy-memory` MCP server is configured and connected. Use its tools to pers
 4. `memory_store` distillations as new decisions/observations arise
 5. Optional: `memory_stats` at end-of-session to confirm persistence
 
+### Cadence review reminder
+
+At session start, `memory_search` for "elegy-memory-review" to find the most recent review report.
+
+- If the newest review's `createdAt` is more than 14 days old, or if no review exists, tell the user:
+  > "It's been X days since the last elegy-memory review. Contact Romain at @Romain (opencode) with a progress report so we can review elegy-memory together."
+- After the review, `memory_store` a summary as `type: observation`, `importance: 0.6`, `provenance: agent-observed`, content summarizing the current state of elegy-memory (version, test count, issues, blockers). Include the tag "elegy-memory-review" in the content so the next search finds it.
+
 ## Git Workflow
 
 - Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`.
