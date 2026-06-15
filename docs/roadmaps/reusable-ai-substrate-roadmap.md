@@ -1,9 +1,9 @@
 ---
 created: 2026-03-31
-updated: 2026-03-31
+updated: 2026-05-28
 category: governance
-status: proposed
-doc_kind: reference
+status: active
+doc_kind: roadmap
 ---
 
 # Reusable AI Substrate Roadmap
@@ -154,6 +154,25 @@ Normalize `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills` around:
 - correlation ID emission
 - stable structured error objects
 
+### Status note, 2026-05-28
+
+Implemented in this phase so far:
+
+- shared CLI machine-output and structured-failure helpers in
+  `rust/crates/elegy-contracts`
+- dedicated CLI normalization for `elegy-skills`, `elegy-configuration`, and
+  `elegy-memory`
+- real-output conformance coverage for those dedicated CLI surfaces
+- structured MCP success/failure projection in `elegy-host-mcp` for recognized
+  Elegy machine envelopes
+
+Remaining Phase 1 work:
+
+- normalize the dedicated `elegy-mcp` CLI onto the shared top-level `failure`
+  shape
+- finish any remaining runtime paths that still bypass the shared invocation or
+  failure normalization
+
 ### Why this phase comes first
 
 The research note’s strongest repeated theme is that reusable AI infrastructure fails when each surface invents its own tool model and execution payload. Phase 1 creates the common contract layer that later retrieval, workflow, and policy work can depend on.
@@ -205,6 +224,28 @@ Create a shared internal capability model and resolver so MCP-backed, generated,
 - map current `elegy-mcp` outputs into the capability model
 - map current skill-generation outputs into the capability model
 - support capability inspection through CLI JSON output
+
+### Status note, 2026-05-28
+
+Implemented in this phase so far:
+
+- `SkillRegistry::capability_definition(...)` plus semantic validation of all
+  built-in projected capability definitions
+- direct `CapabilityDefinition` output from `elegy skills capability` and
+  `elegy-skills capability`
+- typed `RegistryMcpToolBinding` data shared by `elegy-host-mcp tools/list` and
+  `tools/call`
+- initial `elegy agent discover` dedup onto shared registry filtering and
+  search
+
+Remaining Phase 2 work:
+
+- governed projected-capability fixtures or contract-level conformance coverage
+  without introducing crate cycles
+- further `elegy agent` helper consolidation around shared profile/selection
+  data
+- map the dedicated `elegy-mcp` CLI and any remaining generated outputs into
+  the same normalized capability model
 
 ### Why this phase matters
 
@@ -474,6 +515,42 @@ Phase 7 is complete when:
 
 Only after the earlier substrate is stable, add a separately governed desktop and OS automation family for cross-consumer reusable actioning.
 
+### Status note, 2026-05-28
+
+The first contracts-first piloting foundation slice is now implemented as a
+preparatory Phase 8 step under the existing `elegy` CLI and governed
+`elegy-plugin-package/v2` family.
+
+Implemented evidence:
+
+- governed piloting schemas and fixtures under `contracts/schemas/` and
+  `contracts/fixtures/`
+- Holon-oriented piloting package fixture
+- `elegy piloting validate-adapter`, `elegy piloting validate-fixtures`, and
+  `elegy piloting package --target holon`
+- conformance, CLI authoring, docs, and full workspace validation coverage in
+  the Rust workspace
+
+This slice intentionally stops short of live actuation, approval UX,
+bridge-session ownership, and host-owned evidence-capture authority.
+
+The initial post-implementation follow-ups for schema-format parity,
+dual-source package validation, and canonical export inventory alignment were
+also closed on 2026-05-28.
+
+A second additive contracts-first step is now implemented on top of that
+foundation:
+
+- typed `PolicyDecision`, `SimulationResult`, `ReplayCheckpoint`, and
+  `LifecycleEvent` contracts under `contracts/schemas/`
+- replay-style fixture-pack validation for policy, simulation, and checkpoint
+  references
+- Blender example fixtures and package metadata updated to carry the new
+  policy/replay prerequisites
+
+This still stops short of live actuation and keeps approvals, execution,
+leases, bridge sessions, and host evidence ownership downstream.
+
 ### Scope
 
 - intent and action-plan contracts
@@ -537,11 +614,13 @@ If conformance and evals lag behind new families, the repo will accumulate attra
 The best next slice is now runtime adoption of the contract families that
 already exist:
 
-1. keep hardening `elegy agent ...` as the canonical host onboarding surface
-2. project built-in v2 skills into capability definitions
-3. normalize all shipped CLIs around shared machine-output and failure semantics
-4. wire invocation request/response and execution-event contracts into real CLI
-   and optional MCP execution paths
+1. finish Phase 1 by normalizing the dedicated `elegy-mcp` CLI onto the shared
+   machine-output and failure semantics
+2. finish Phase 2 by adding governed projected-capability coverage and the
+   remaining `elegy agent` shared-registry cleanup
+3. wire invocation request/response context through real CLI and optional MCP
+   execution paths
+4. keep hardening `elegy agent ...` as the canonical host onboarding surface
 5. package memory retrieval results for agent hosts without storing raw
    transcripts
 

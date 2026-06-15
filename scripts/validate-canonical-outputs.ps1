@@ -13,12 +13,61 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
 $inventoryPath = Join-Path $repoRoot 'governance\canonical-output-inventory.json'
+$manifestPath = Join-Path $repoRoot 'contracts\manifests\compatibility-manifest.json'
 
 if (-not (Test-Path $inventoryPath)) {
     throw "Missing canonical output inventory: $inventoryPath"
 }
 
+if (-not (Test-Path $manifestPath)) {
+    throw "Missing compatibility manifest: $manifestPath"
+}
+
 $inventory = Get-Content -Raw -Path $inventoryPath | ConvertFrom-Json
+$manifest = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
+
+# Derive fixture-related mirrored outputs from the manifest.
+# This is the single source of truth for fixture-to-artifact mapping.
+$derivedOutputs = [System.Collections.Generic.List[object]]::new()
+
+foreach ($schema in $manifest.schemas) {
+    $schemaSource = "contracts/schemas/$($schema.file)"
+    $schemaGenerated = "artifacts/contracts/$($schema.file)"
+    $derivedOutputs.Add([pscustomobject]@{ source = $schemaSource; generated = $schemaGenerated }) | Out-Null
+
+    foreach ($fixture in $schema.fixtures) {
+        $source = "contracts/$fixture"
+        $generated = "artifacts/contracts/$fixture"
+        $derivedOutputs.Add([pscustomobject]@{ source = $source; generated = $generated }) | Out-Null
+    }
+}
+
+foreach ($fixture in $manifest.supplementalFixtures) {
+    $source = "contracts/$fixture"
+    $generated = "artifacts/contracts/$fixture"
+    $derivedOutputs.Add([pscustomobject]@{ source = $source; generated = $generated }) | Out-Null
+}
+
+# Add the manifest and matrix themselves.
+$derivedOutputs.Add([pscustomobject]@{
+    source    = "contracts/manifests/compatibility-manifest.json"
+    generated = "artifacts/contracts/compatibility-manifest.json"
+}) | Out-Null
+$derivedOutputs.Add([pscustomobject]@{
+    source    = "contracts/manifests/compatibility-matrix.json"
+    generated = "artifacts/contracts/compatibility-matrix.json"
+}) | Out-Null
+
+# Merge: derived fixture entries + hand-maintained inventory entries.
+# The inventory retains distribution metadata (archives, wrappers, etc.)
+# that is not derivable from the manifest.
+$allMirrored = [System.Collections.Generic.List[object]]::new()
+foreach ($entry in $derivedOutputs) {
+    $allMirrored.Add($entry) | Out-Null
+}
+foreach ($entry in $inventory.mirroredOutputs) {
+    $allMirrored.Add($entry) | Out-Null
+}
 
 $missingAuthority = [System.Collections.Generic.List[string]]::new()
 $missingSources = [System.Collections.Generic.List[string]]::new()
@@ -155,7 +204,7 @@ foreach ($relativePath in $inventory.authorityOnly) {
     }
 }
 
-foreach ($entry in $inventory.mirroredOutputs) {
+foreach ($entry in $allMirrored) {
     $sourcePath = Join-Path $repoRoot $entry.source
     $generatedPath = Join-Path $repoRoot $entry.generated
 
@@ -419,7 +468,7 @@ if ($invalidReleaseMetadata.Count -gt 0) {
 
 Write-Host 'Canonical output validation passed.'
 Write-Host " - authority-only files: $($inventory.authorityOnly.Count)"
-Write-Host " - mirrored outputs: $($inventory.mirroredOutputs.Count)"
+Write-Host " - mirrored outputs: $($allMirrored.Count)"
 if ($RequireArchive) {
     Write-Host " - archive patterns: $($inventory.archivePatterns.Count)"
 }

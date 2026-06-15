@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/observation-event.schema.json",
+  "title": "ObservationEvent",
+  "description": "Atomic observation record emitted by a bounded recorder session.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "sessionId",
+    "sequence",
+    "observedAtUtc",
+    "observationKind",
+    "summary"
+  ],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sessionId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "observedAtUtc": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "observationKind": {
+      "type": "string",
+      "enum": [
+        "foregroundWindowChanged",
+        "visibleWindowSnapshot",
+        "clipboardChanged",
+        "processSnapshot"
+      ]
+    },
+    "summary": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 280
+    },
+    "window": {
+      "type": ["object", "null"],
+      "additionalProperties": false,
+      "required": ["hwnd", "title", "processId", "bounds"],
+      "properties": {
+        "hwnd": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "title": {
+          "type": "string"
+        },
+        "processId": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "bounds": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["x", "y", "width", "height"],
+          "properties": {
+            "x": { "type": "integer" },
+            "y": { "type": "integer" },
+            "width": { "type": "integer" },
+            "height": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    }
+  }
+}

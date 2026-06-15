@@ -1,0 +1,59 @@
+{
+  "schemaVersion": "elegy-configuration-template/v1",
+  "templateId": "codex-home-minimal",
+  "displayName": "Codex Home Minimal",
+  "description": "Install a minimal Codex home surface with repo-local skills, one agent, and a bounded config TOML block.",
+  "harness": "codex",
+  "scope": "user-global",
+  "bindings": {
+    "target.codexHome": {
+      "defaultValue": ".codex",
+      "required": true,
+      "description": "Codex home root or an alternate target root for verification."
+    }
+  },
+  "operations": [
+    {
+      "operationType": "copyFile",
+      "operationId": "copy-home-instructions",
+      "family": "instruction",
+      "source": {
+        "base": "template-root",
+        "path": "assets/codex-AGENTS.md"
+      },
+      "destination": {
+        "base": "target-root",
+        "path": "AGENTS.md"
+      }
+    },
+    {
+      "operationType": "copyFile",
+      "operationId": "copy-reviewer-agent",
+      "family": "agent",
+      "source": {
+        "base": "template-root",
+        "path": "assets/reviewer.toml"
+      },
+      "destination": {
+        "base": "target-root",
+        "path": "agents/reviewer.toml"
+      }
+    },
+    {
+      "operationType": "patchTomlBlock",
+      "operationId": "patch-config-toml",
+      "family": "support-file",
+      "destination": {
+        "base": "target-root",
+        "path": "config.toml"
+      },
+      "startMarker": "# BEGIN elegy-configuration managed codex defaults",
+      "endMarker": "# END elegy-configuration managed codex defaults",
+      "contentPath": {
+        "base": "template-root",
+        "path": "assets/config-block.toml"
+      },
+      "createIfMissing": true
+    }
+  ]
+}

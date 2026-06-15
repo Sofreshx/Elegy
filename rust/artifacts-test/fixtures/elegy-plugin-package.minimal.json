@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.demo-configuration-plugin",
+    "name": "demo-configuration-plugin",
+    "version": "0.1.0",
+    "displayName": "Elegy Demo Configuration Plugin"
+  },
+  "metadata": {
+    "description": "Portable package fixture for governed deterministic configuration templates and profiles.",
+    "tags": ["plugin", "configuration", "demo"],
+    "license": "MIT",
+    "documentationUri": "https://elegy/contracts/docs/demo-configuration-plugin"
+  },
+  "components": {
+    "configurationTemplates": [
+      {
+        "id": "demo-template",
+        "path": "configuration/demo-template.json",
+        "description": "Deterministic demo template."
+      }
+    ],
+    "configurationProfiles": [
+      {
+        "id": "demo-profile",
+        "path": "configuration/demo-profile.json",
+        "description": "Deterministic demo profile."
+      }
+    ],
+    "docs": [
+      {
+        "id": "readme",
+        "path": "README.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "disk_write",
+    "requiresApproval": false,
+    "policyTags": ["deterministic-config"]
+  }
+}

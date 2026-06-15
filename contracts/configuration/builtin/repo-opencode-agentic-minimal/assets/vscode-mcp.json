@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "elegy-local": {
+      "command": "elegy",
+      "args": ["run"]
+    }
+  }
+}

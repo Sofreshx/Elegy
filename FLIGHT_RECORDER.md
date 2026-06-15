@@ -2608,3 +2608,39 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
   - The harness validates fixture integrity, runs each suite on a fresh TempDir-backed SQLite DB through `elegy-memory-mcp-stdio`, asserts `action=added`, `gateResult=accepted`, and `embeddingStatus=ready` for every store, checks `staleEmbeddingsCount=0`, and emits a structured JSON benchmark report for later Phase 2 analysis.
 - Next: STOP before Phase 2; wait for human go
 - Notes: the CLI-integrated MCP disconnect was intentionally left untouched because the benchmark now uses the repo-versioned stdio client harness directly
+## 2026-05-28 WU15 Structural ranking + scope_config migration
+- What changed:
+  - Replaced pure additive retrieval ordering with a leader-anchored similarity-band tiebreaker in `rust/crates/elegy-memory/src/storage/sqlite_store.rs` so recency, access, and priority only refine candidates that stay within a protected similarity band.
+  - Added safe retrieval-scoring defaults and a versioned `scope_config` migration in `rust/crates/elegy-memory/src/storage/schema.rs`, including `retrieval_scoring_version=2` and numeric clamps for persisted `*_weight` values without touching stored memories.
+  - Lowered the default `access_weight` in `rust/crates/elegy-memory/src/types.rs` to `0.05` and added regression coverage for hot fr_q07 plus recency/priority inversion analogues and learned-weight ceiling preservation.
+- Test status:
+  - `cargo fmt --all` passed from `rust/`.
+  - `cargo test -p elegy-memory` passed from `rust/` with 178 unit/integration tests green.
+  - `cargo clippy -p elegy-memory -- -D warnings` passed from `rust/`.
+  - `cargo test --release -p elegy-memory-mcp --test wu13_repro versioned_retrieval_benchmark_fixture_runs_through_stdio -- --exact --nocapture` passed with `ELEGY_EXPLAIN_RETRIEVAL_SCORING=1`.
+- Decisions:
+  - Use `T = 0.03` as the similarity protection threshold because the observed hot `fr_q07` semantic gap against the coffee hub is ~`0.03147`, which must stay outside the secondary-signal refinement band while still allowing genuine quasi-ties like `fr_portrait_f18` vs `fr_photo_85mm_portrait` (~`0.01963`) to compete inside the band.
+  - Keep a dedicated access ceiling (`0.05`) in both defaults and learned-weight normalization because the WU14 sweep showed higher persisted access weights reintroduced hub-driven inversions.
+  - Treat the scoring change as a retrieval-config semantic migration, not a memory-content migration: existing `scope_config` weights are clamped/version-bumped in place and fresh databases start directly on the safe defaults.
+## 2026-05-28 WU15 Migration invariant + tie-band caveats
+- Invariant:
+  - Retrieval scoring migration is preserve-only for source-of-truth rows: `memories` content and metadata are byte-identical before/after migration in the integrity fixture, including long content, tags, timestamps, scope, state, custom metadata, and access counters.
+  - Only derived and recalculable `scope_config` entries may change during the migration, and only when a persisted retrieval weight exceeds its new safe ceiling; `retrieval_scoring_version` is the only intentional new key.
+  - Version bump + retrieval-weight re-clamp are wrapped by the single outer SQLite transaction opened in `init_database`; the rollback test confirms that aborting before commit leaves the DB fully coherent with no partial clamp/version state.
+- Caveats:
+  - `T = 0.03` is currently fitted to the observed `fr_q07` hot canary gap and should be revisited against the real distribution of similarity gaps rather than treated as permanently universal.
+  - Structural protection is total only when the similarity gap is strictly greater than `T`; candidates inside the tie band remain quasi-equalities that the secondary blend is still allowed to refine.
+## 2026-05-28 WU16 Continuous secondary fade ranking
+- What changed:
+  - Replaced the WU15 hard similarity band in `rust/crates/elegy-memory/src/storage/sqlite_store.rs` with a continuous fade on secondary signals based on each candidate's similarity gap to the best semantic match.
+  - Ranking now uses `blended_similarity + faded_secondary_refinement`, where recency/access/priority influence decays smoothly to zero as the gap approaches `T = 0.03`, while the access clamp and learned-weight ceiling remain unchanged.
+  - Updated structural regressions from band-index assertions to fade semantics: outside-threshold candidates must see zero secondary fade, inside-threshold quasi-ties must still be refinable, and the fade function is explicitly tested for monotone decay.
+- Test status:
+  - `cargo fmt --all` passed from `rust/`.
+  - `cargo test -p elegy-memory` passed from `rust/` with 181 tests green.
+  - `cargo clippy -p elegy-memory -- -D warnings` passed from `rust/`.
+  - `cargo test --release -p elegy-memory-mcp --test wu13_repro versioned_retrieval_benchmark_fixture_runs_through_stdio -- --exact --nocapture` passed with `ELEGY_EXPLAIN_RETRIEVAL_SCORING=1`.
+- Decisions:
+  - Chose a smoothstep fade instead of a hard band or linear cutoff because it keeps the score contribution continuous and also flattens the derivative at `gap = 0` and `gap = T`, making the exact threshold less brittle around boundary cases.
+  - Faded only the secondary subtotal (`recency + access + priority`) rather than the full additive total so the fade governs exactly the signals it is supposed to attenuate; similarity remains the structural backbone of ranking.
+  - Kept `T = 0.03` and the existing refinement cap so the hot `fr_q07` canary stays protected while the coffee hub's top-3 concentration drops further without introducing new top-1 misses.

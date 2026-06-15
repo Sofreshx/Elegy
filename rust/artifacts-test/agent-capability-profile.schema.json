@@ -1,0 +1,50 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/agent-capability-profile.schema.json",
+  "title": "Elegy Agent Capability Profile",
+  "description": "Host-owned opt-in profile for selecting which Elegy skills and capabilities are visible to an AI-agent integration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "agent-capability-profile/v1"
+    },
+    "profileId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "includeSkills": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "includeCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "excludeCapabilities": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      },
+      "uniqueItems": true,
+      "default": []
+    },
+    "alwaysIncludeRouter": {
+      "type": "boolean",
+      "default": true
+    }
+  }
+}

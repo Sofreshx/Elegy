@@ -1,5 +1,7 @@
 name: Distribution Artifacts
 
+# surface: elegy-obsidian (wrapper-only; packaged via scripts/package-wrapper-surface.ps1, not the CLI matrix above)
+
 on:
   pull_request:
   push:
@@ -22,9 +24,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.95.0
+        uses: dtolnay/rust-toolchain@1.95.0
 
       - name: Validate canonical authority inventory
         shell: pwsh
@@ -79,6 +79,12 @@ jobs:
           - runner: ubuntu-24.04
             target: x86_64-unknown-linux-gnu
             surface: elegy-skills
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-configuration
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+            surface: elegy-documentation
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             surface: elegy-cli
@@ -94,6 +100,12 @@ jobs:
           - runner: windows-2022
             target: x86_64-pc-windows-msvc
             surface: elegy-skills
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-configuration
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+            surface: elegy-documentation
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-cli
@@ -109,13 +121,18 @@ jobs:
           - runner: macos-14
             target: aarch64-apple-darwin
             surface: elegy-skills
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-configuration
+          - runner: macos-14
+            target: aarch64-apple-darwin
+            surface: elegy-documentation
     steps:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
-          toolchain: 1.95.0
           targets: ${{ matrix.target }}
 
       - uses: Swatinem/rust-cache@v2.9.1
@@ -144,7 +161,7 @@ jobs:
       - name: Package wrapper archives
         shell: pwsh
         run: |
-          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills
+          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration,elegy-documentation,elegy-obsidian
 
       - name: Validate wrapper archives
         shell: pwsh
@@ -161,6 +178,9 @@ jobs:
             artifacts/distribution/elegy-mcp-wrapper-*.zip
             artifacts/distribution/elegy-planning-wrapper-*.zip
             artifacts/distribution/elegy-skills-wrapper-*.zip
+            artifacts/distribution/elegy-configuration-wrapper-*.zip
+            artifacts/distribution/elegy-documentation-wrapper-*.zip
+            artifacts/distribution/elegy-obsidian-wrapper-*.zip
 
   package-installer:
     runs-on: ubuntu-latest

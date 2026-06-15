@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/mcp-descriptor-result.schema.json",
+  "title": "McpDescriptorResult",
+  "description": "Authored MCP descriptor path and descriptor contents produced by mcp-author-descriptor.",
+  "type": "object"
+}

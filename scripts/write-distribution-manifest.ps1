@@ -62,6 +62,16 @@ function Get-CliSurfaceMetadata {
             AssetPrefix = 'elegy-skills'
             Binary = 'elegy-skills'
         }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration'
+            Binary = 'elegy-configuration'
+        }
+        'elegy-documentation' = @{
+            Surface = 'elegy-documentation'
+            AssetPrefix = 'elegy-documentation'
+            Binary = 'elegy-documentation'
+        }
     }
 }
 
@@ -86,6 +96,21 @@ function Get-WrapperSurfaceMetadata {
             Surface = 'elegy-skills'
             AssetPrefix = 'elegy-skills-wrapper'
             SkillBridge = 'skills/elegy-skills/SKILL.md'
+        }
+        'elegy-configuration' = @{
+            Surface = 'elegy-configuration'
+            AssetPrefix = 'elegy-configuration-wrapper'
+            SkillBridge = 'skills/elegy-configuration/SKILL.md'
+        }
+        'elegy-documentation' = @{
+            Surface = 'elegy-documentation'
+            AssetPrefix = 'elegy-documentation-wrapper'
+            SkillBridge = 'skills/elegy-documentation/SKILL.md'
+        }
+        'elegy-obsidian' = @{
+            Surface = 'elegy-obsidian'
+            AssetPrefix = 'elegy-obsidian-wrapper'
+            SkillBridge = 'skills/elegy-obsidian/SKILL.md'
         }
     }
 }

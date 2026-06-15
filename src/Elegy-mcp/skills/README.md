@@ -8,8 +8,8 @@ Use it to explain how the thin wrapper delegates skill-facing guidance and contr
 
 - `contracts/` and `governance/` for governed MCP and skill artifacts.
 - `rust/crates/elegy-mcp` for the current dedicated in-repo MCP CLI surface.
-- `rust/crates/elegy-skills` for the dedicated MCP-to-skill generation surface when generation work is needed.
-- `rust/crates/elegy-tooling` and related Rust crates as shared helper and compatibility infrastructure for descriptor and skill workflows.
+- `rust/crates/elegy-skills` for governed skill-registry list, search, resolve, get, capability, and validation behavior.
+- `rust/crates/elegy-tooling` and related Rust crates as shared helper and compatibility infrastructure for descriptor, generation, and skill workflows, including umbrella `elegy generate ...` flows when generation work is needed.
 - `.github/skills/elegy-mcp/SKILL.md` for the repo-local non-authoritative contributor-routing output.
 - `elegy-mcp/SKILL.md` for the shipped surface-local bridge used by wrapper archive consumers.
 - `docs/architecture/skill-core-v1.md` and `docs/architecture/mcp-skill-tooling-placement.md` for the canonical documentation.

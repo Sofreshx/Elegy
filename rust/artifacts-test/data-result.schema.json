@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/data-result.schema.json",
+  "title": "DataResult",
+  "description": "Data operation result: conversion metadata with rendered output, extraction result with JSON value, or ValidateResult with valid flag and error messages.",
+  "type": "object"
+}

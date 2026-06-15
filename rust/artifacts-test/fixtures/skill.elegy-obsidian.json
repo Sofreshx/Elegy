@@ -1,0 +1,789 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "obsidian",
+    "version": "0.1.0",
+    "displayName": "Elegy Obsidian Skill",
+    "aliases": ["elegy-obsidian", "obsidian", "obsidian-cli"]
+  },
+  "metadata": {
+    "displayName": "Elegy Obsidian Skill",
+    "description": "Thin skill that wraps the official Obsidian v1.12+ CLI for vault-aware file creation, search, navigation, task toggling, and tag inspection. Non-authoritative mirror foundation for future elegy-planning obsidian planning-mirror commands.",
+    "summary": "Drive the user's installed obsidian CLI from agent contexts with deterministic capability boundaries and a uniform result envelope.",
+    "category": "vault",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["obsidian", "vault", "notes", "search", "tasks", "tags", "cli", "non-authoritative-mirror"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/specs/obsidian-skill-and-cli.md"
+  },
+  "capabilities": [
+    {
+      "id": "obsidian-vault-list",
+      "name": "List Vaults",
+      "description": "List all Obsidian vaults registered with the desktop app.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["vault"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Vault list result with raw multi-line text; each line is one registered vault."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-file-read",
+      "name": "Read File",
+      "description": "Read the contents of a note by its path inside the active vault.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["read", "file=${file}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note to read (e.g. 'notes/foo.md' or 'daily/2026-06-02.md').",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "File contents; data contains the note text and rawOutput mirrors it for callers that want one source of truth."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-file-create",
+      "name": "Create File",
+      "description": "Create a new note in the active vault. Fails if the note already exists.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["create", "file=${file}", "content=${content}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note to create (e.g. 'notes/foo.md').",
+            "required": true
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "description": "Optional initial file content. Pass --content or pipe via stdin if the note is large.",
+            "required": false,
+            "default": ""
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Creation confirmation; status ok when the file was created."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-file-append",
+      "name": "Append To File",
+      "description": "Append text to the end of a note without rewriting the existing content.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["append", "file=${file}", "content=${content}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note to append to.",
+            "required": true
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "description": "Text to append.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Append confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-file-patch",
+      "name": "Patch File",
+      "description": "Apply a targeted patch to a note: insert, replace, or delete at a specific line range.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["patch", "file=${file}", "start-line=${start_line}", "end-line=${end_line}", "mode=${mode}", "content=${content}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note to patch.",
+            "required": true
+          },
+          {
+            "name": "start_line",
+            "type": "integer",
+            "description": "Inclusive start line for the patch window (1-based).",
+            "required": true
+          },
+          {
+            "name": "end_line",
+            "type": "integer",
+            "description": "Inclusive end line for the patch window. Use the same value as start_line to target a single line.",
+            "required": true
+          },
+          {
+            "name": "mode",
+            "type": "string",
+            "description": "Patch mode: 'replace' (default), 'insert-before', 'insert-after', or 'delete'.",
+            "required": false,
+            "default": "replace"
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "description": "Replacement or inserted content. Ignored when mode is 'delete'.",
+            "required": false,
+            "default": ""
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Patch confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-file-move",
+      "name": "Move Or Rename File",
+      "description": "Move or rename a note within the active vault, preserving Obsidian's wiki link rewrites when possible.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["move", "file=${file}", "to=${to}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Source vault-relative path.",
+            "required": true
+          },
+          {
+            "name": "to",
+            "type": "path",
+            "description": "Destination vault-relative path.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Move confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-file-delete",
+      "name": "Delete File",
+      "description": "Delete a note from the active vault. Destructive; agents must confirm scope before invoking.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["delete", "file=${file}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note to delete.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Delete confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-search",
+      "name": "Search Notes",
+      "description": "Search the active vault for a free-text query and return matching file paths with optional context lines.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["search", "query=${query}", "path=${path}", "limit=${limit}", "format=${format}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "query",
+            "type": "string",
+            "description": "Search query string.",
+            "required": true
+          },
+          {
+            "name": "path",
+            "type": "path",
+            "description": "Optional vault-relative path scope for the search.",
+            "required": false
+          },
+          {
+            "name": "limit",
+            "type": "integer",
+            "description": "Optional maximum number of matches to return.",
+            "required": false
+          },
+          {
+            "name": "format",
+            "type": "string",
+            "description": "Optional output format: 'text' (default) or 'json' for structured results when supported by the installed CLI build.",
+            "required": false,
+            "default": "text"
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Search hits. data is an array of file paths (and context when format=json); rawOutput mirrors text format."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-daily-read",
+      "name": "Read Daily Note",
+      "description": "Read today's daily note (or the daily note for a specific date) from the active vault.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["daily", "date=${date}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "date",
+            "type": "string",
+            "description": "Optional ISO date (YYYY-MM-DD). Omit for today's daily note.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Daily note contents."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-daily-append",
+      "name": "Append To Daily Note",
+      "description": "Append text to today's daily note (or the daily note for a specific date) in the active vault.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["daily", "date=${date}", "append=${content}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "date",
+            "type": "string",
+            "description": "Optional ISO date (YYYY-MM-DD). Omit for today's daily note.",
+            "required": false
+          },
+          {
+            "name": "content",
+            "type": "string",
+            "description": "Text to append.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Append confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-random-note",
+      "name": "Random Note",
+      "description": "Open or print a random note from the active vault.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["random", "path=${path}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "path",
+            "type": "path",
+            "description": "Optional vault-relative path scope to sample from.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Randomly selected note path and contents."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-tag-list",
+      "name": "List Tags",
+      "description": "List all tags used across the active vault, with occurrence counts when the CLI supports them.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["tags"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Tag list (one per line, often prefixed with counts)."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-tag-notes",
+      "name": "List Notes For Tag",
+      "description": "List all notes in the active vault that carry a specific tag.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["tag", "name=${tag}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "tag",
+            "type": "string",
+            "description": "Tag name to filter by, without the leading '#'.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "File paths of notes containing the tag."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-task-list",
+      "name": "List Tasks",
+      "description": "List tasks across the active vault. Filter by done/undone state and optional scope.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["tasks", "state=${state}", "path=${path}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "state",
+            "type": "string",
+            "description": "Optional filter: 'done', 'undone', or 'all' (default).",
+            "required": false,
+            "default": "all"
+          },
+          {
+            "name": "path",
+            "type": "path",
+            "description": "Optional vault-relative path scope.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Task list (one per line, including file:line provenance when supported)."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "obsidian-task-toggle",
+      "name": "Toggle Task",
+      "description": "Toggle the done state of a specific task identified by its file and line number.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["task", "file=${file}", "line=${line}", "state=${state}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "file",
+            "type": "path",
+            "description": "Vault-relative path of the note containing the task.",
+            "required": true
+          },
+          {
+            "name": "line",
+            "type": "integer",
+            "description": "1-based line number of the task bullet.",
+            "required": true
+          },
+          {
+            "name": "state",
+            "type": "string",
+            "description": "Target state: 'done' or 'undone'. Omit to toggle the current state.",
+            "required": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Toggle confirmation."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-command",
+      "name": "Run Obsidian Command",
+      "description": "Invoke a registered Obsidian command by its command id (e.g. 'app:reload', 'workspace:close').",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["command", "id=${command_id}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "command_id",
+            "type": "string",
+            "description": "Obsidian command identifier.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Command execution confirmation; data carries the resolved command id."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "obsidian-version",
+      "name": "Obsidian CLI Version",
+      "description": "Report the installed obsidian CLI version. Use as a precondition check before capabilities that need a minimum CLI build.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "obsidian",
+        "arguments": ["version"]
+      },
+      "input": {
+        "parameters": []
+      },
+      "output": {
+        "resultType": "ObsidianResult",
+        "schemaRef": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+        "description": "Version string; rawOutput carries the raw version line."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "external-binary-dependency",
+      "description": "All capabilities shell out to the official Obsidian v1.12+ CLI that ships with the user's installed Obsidian desktop application. The CLI must be enabled in Obsidian Desktop settings (Settings -> General -> Command line interface) and the 'obsidian' binary must be on PATH.",
+      "required": true
+    },
+    {
+      "constraintId": "non-authoritative-vault",
+      "description": "This skill is a non-canonical vault interface. It must never be the source of truth for plan/roadmap/goal state. SQLite via elegy-planning remains the durable authority. Obsidian content is a read mirror or a write surface for the user's own notes; durable planning data must continue to flow through elegy-planning and the SQLite database.",
+      "required": true
+    },
+    {
+      "constraintId": "no-projection-of-authority",
+      "description": "Capabilities must not create, update, or delete files that look like elegy-planning projections (e.g. notes inside '.copilot/backlogs' or any path that would shadow planning authority). Use a dedicated mirror folder, typically 'inbox/', 'notes/', or 'planning-mirror/', scoped to the user's vault policy.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "medium",
+    "approvalRequirement": "advisory",
+    "policyRefs": [
+      "docs/specs/obsidian-skill-and-cli.md",
+      "docs/research/obsidian-figma-and-vision-models-for-elegy.md"
+    ],
+    "allowedContexts": ["contributor-routing", "local-cli", "agent-vault-bridge"]
+  },
+  "discovery": {
+    "keywords": ["obsidian", "vault", "notes", "search", "tasks", "tags", "daily", "cli", "non-authoritative-mirror"],
+    "triggers": [
+      {
+        "pattern": "open obsidian vault",
+        "description": "When an agent needs to discover or operate against the user's Obsidian vault through the official CLI."
+      },
+      {
+        "pattern": "create note in obsidian",
+        "description": "When the user asks to create a new note in their vault."
+      },
+      {
+        "pattern": "search obsidian",
+        "description": "When the user asks to search inside their vault."
+      },
+      {
+        "pattern": "append to daily note",
+        "description": "When the user wants to log an entry in today's daily note."
+      },
+      {
+        "pattern": "toggle obsidian task",
+        "description": "When the user wants to mark a checkbox-style task done or undone in a vault note."
+      }
+    ],
+    "capabilityHints": [
+      "obsidian-vault-list",
+      "obsidian-file-read",
+      "obsidian-file-create",
+      "obsidian-file-append",
+      "obsidian-file-patch",
+      "obsidian-file-move",
+      "obsidian-file-delete",
+      "obsidian-search",
+      "obsidian-daily-read",
+      "obsidian-daily-append",
+      "obsidian-random-note",
+      "obsidian-tag-list",
+      "obsidian-tag-notes",
+      "obsidian-task-list",
+      "obsidian-task-toggle",
+      "obsidian-command",
+      "obsidian-version"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill.elegy-obsidian.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "draft",
+  "hostProjection": {
+    "cliName": "obsidian",
+    "outputContractId": "obsidian-result/v1",
+    "defaultSideEffectClass": "desktop_ui",
+    "capabilityProjections": [
+      {
+        "capabilityId": "obsidian-vault-list",
+        "functionName": "obsidian_vault_list",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-file-read",
+        "functionName": "obsidian_file_read",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-file-create",
+        "functionName": "obsidian_file_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-file-append",
+        "functionName": "obsidian_file_append",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-file-patch",
+        "functionName": "obsidian_file_patch",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-file-move",
+        "functionName": "obsidian_file_move",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-file-delete",
+        "functionName": "obsidian_file_delete",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-search",
+        "functionName": "obsidian_search",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-daily-read",
+        "functionName": "obsidian_daily_read",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-daily-append",
+        "functionName": "obsidian_daily_append",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-random-note",
+        "functionName": "obsidian_random_note",
+        "sideEffectClass": "read_only",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-tag-list",
+        "functionName": "obsidian_tag_list",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-tag-notes",
+        "functionName": "obsidian_tag_notes",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-task-list",
+        "functionName": "obsidian_task_list",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      },
+      {
+        "capabilityId": "obsidian-task-toggle",
+        "functionName": "obsidian_task_toggle",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-command",
+        "functionName": "obsidian_command",
+        "sideEffectClass": "process_spawn",
+        "isDeterministic": false
+      },
+      {
+        "capabilityId": "obsidian-version",
+        "functionName": "obsidian_version",
+        "sideEffectClass": "read_only",
+        "isDeterministic": true
+      }
+    ]
+  }
+}

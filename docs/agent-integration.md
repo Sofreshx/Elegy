@@ -100,16 +100,18 @@ elegy skills search --query "diagram" --json
 elegy skills describe --skill-id diagram --json
 ```
 
-The skill definitions in `contracts/fixtures/skill-definition-v2.*.json` remain
+The skill definitions in `contracts/fixtures/skill.*.json` remain
 the discovery authority. The contract schemas under `contracts/schemas/` remain
 the durable authority.
 
 ## Portable Plugin Packages
 
-`elegy-plugin-package/v1` is a portable package metadata contract for hosts that
-want one governed package surface over multiple components. A package can bundle
-or reference `skill-definition-v2` definitions, instruction skill files, MCP
-projection metadata, docs, and assets.
+`elegy-plugin-package/v1` and `elegy-plugin-package/v2` are portable package
+metadata contracts for hosts that want one governed package surface over
+multiple components. A package can bundle or reference `skill`
+definitions, instruction skill files, MCP projection metadata, docs, and
+assets. `elegy-plugin-package/v2` also adds local configuration template/profile
+components for deterministic `elegy-configuration` loading.
 
 The package contract is not a runtime. It must not contain host workspace ids,
 approval state, secret refs, runtime sessions, adapter handles, or local trust
@@ -124,6 +126,11 @@ skill schemas under `contracts/schemas/` remain the authority roots.
 Portable packages may also be projected into conservative Codex plugin folders
 through `elegy generate codex-plugin`, but those generated `.codex-plugin/`
 and `skills/` outputs remain derived adapter surfaces rather than authority.
+
+Local `elegy-plugin-package/v2` files may also be consumed directly by
+`elegy-configuration` or the umbrella `elegy configuration` commands for
+package-backed deterministic configuration apply/verify flows. The package file
+remains metadata plus packaged assets, not a runtime.
 
 ## Optional MCP Adapter
 
@@ -144,6 +151,103 @@ elegy run --profile ./tools/elegy-profile.json --allow-side-effects
 
 Use MCP only when it is the host's preferred protocol boundary. CLI templates
 remain the default integration contract.
+
+## Host Projection Metadata
+
+governed skill definitions may include a `hostProjection` block that gives
+runtime hosts explicit metadata for mapping capabilities to their own tool
+surfaces:
+
+```json
+{
+  "hostProjection": {
+    "cliName": "elegy-planning",
+    "outputContractId": "elegy-planning-v1",
+    "defaultSideEffectClass": "disk_write",
+    "capabilityProjections": [
+      {
+        "capabilityId": "planning-goal-create",
+        "functionName": "planning_goal_create",
+        "sideEffectClass": "disk_write",
+        "isDeterministic": false
+      }
+    ]
+  }
+}
+```
+
+Fields:
+
+- `cliName`: the dedicated CLI binary name for subprocess invocation.
+- `outputContractId`: versioned output contract family identifier for host
+  validation (e.g. `elegy-planning-v1`, `elegy-skills-v1`).
+- `defaultSideEffectClass`: the skill-level side-effect class. Individual
+  capabilities may override with `none`, `read_only`, `disk_read`,
+  `disk_write`, `network_outbound`, `process_spawn`, or `desktop_ui`.
+- `capabilityProjections[]`: per-capability function-calling metadata with
+  stable `functionName`, optional `sideEffectClass` override, and
+  `isDeterministic` flag.
+
+Hosts use this metadata to register runtime tools, apply side-effect policy,
+and validate output contracts without parsing CLI templates.
+
+`hostProjection` is part of the typed `elegy-contracts` model. The
+`SkillDefinitionV2` Rust type exposes it as `host_projection: Option<SkillHostProjection>`
+with typed child structs `SkillHostCapabilityProjection` and the
+`HostSideEffectClass` enum, so Rust consumers can read the metadata directly
+without re-parsing JSON. `validate_skill_definition_v2` enforces non-empty
+`cliName` and `outputContractId`, validates that every
+`capabilityProjections[].capabilityId` references an existing capability on
+the same skill, and rejects duplicate `functionName` and `capabilityId`
+collisions.
+
+## Runtime Tools (Holon Integration)
+
+Elegy tools become Holon runtime tools backed by receipt-installed `elegy-*`
+binaries. The integration pattern:
+
+1. **Discover**: the host reads `hostProjection` from the governed skill
+   definition to learn the CLI name, output contract, and side-effect classes.
+2. **Register**: the host registers each `capabilityProjection` as a callable
+   runtime tool with the advertised `functionName` and input/output schemas.
+   v2 Holon package fixtures additionally carry the same projections in
+   `components.capabilityProjections` so package-level consumers do not have
+   to dereference `skillDefinitions[].definitionRef` first.
+3. **Invoke**: the host constructs the CLI invocation from
+   `implementation.arguments` (shell-free argv), substitutes parameters, and
+   runs the subprocess.
+4. **Validate**: the host checks the JSON envelope status and validates against
+   the `outputContractId` schema.
+
+Provider function calling is only an allowlisted projection of these runtime
+tools. The runtime tool is the source of execution authority.
+
+## Release Assets and Install Receipts
+
+Tagged releases include dedicated CLI archives and wrapper archives for each
+runtime surface:
+
+- `elegy-planning` binary and `elegy-planning-wrapper` archive
+- `elegy-skills` binary and `elegy-skills-wrapper` archive
+- `elegy-memory` binary and `elegy-memory-wrapper` archive
+- `elegy-mcp` binary and `elegy-mcp-wrapper` archive
+- `elegy-configuration` binary and `elegy-configuration-wrapper` archive
+- `elegy-documentation` binary and `elegy-documentation-wrapper` archive
+
+Install receipts include executable paths for both dedicated binaries and
+umbrella wrappers. Holon and other hosts can consume these receipts to locate
+the installed binaries for subprocess invocation.
+
+The governed plugin package fixtures
+(`elegy-plugin-package.elegy-planning.json` and
+`elegy-plugin-package.elegy-skills.json`) carry self-sufficient
+`capabilityProjections` for direct host consumption, alongside the
+`hostProjection` block on the underlying skill definition. To ship in a
+released contract bundle, every package fixture must be listed under its
+schema entry in `contracts/manifests/compatibility-manifest.json` and
+mirrored in `governance/canonical-output-inventory.json`; otherwise the
+`export_contract_bundle` exporter omits it from the directory output and zip
+archive.
 
 ## Example Profiles
 

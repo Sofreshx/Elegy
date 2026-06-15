@@ -1,6 +1,7 @@
 [package]
 name = "elegy-tooling"
 version.workspace = true
+publish = false
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -12,7 +13,10 @@ elegy-contracts = { version = "0.1.0", path = "../elegy-contracts" }
 elegy-mcp = { version = "0.1.0", path = "../elegy-mcp" }
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml.workspace = true
+time.workspace = true
 thiserror.workspace = true
+zip = { workspace = true }
 
 [lints]
 workspace = true
