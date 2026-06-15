@@ -2643,4 +2643,74 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Decisions:
   - Chose a smoothstep fade instead of a hard band or linear cutoff because it keeps the score contribution continuous and also flattens the derivative at `gap = 0` and `gap = T`, making the exact threshold less brittle around boundary cases.
   - Faded only the secondary subtotal (`recency + access + priority`) rather than the full additive total so the fade governs exactly the signals it is supposed to attenuate; similarity remains the structural backbone of ranking.
-  - Kept `T = 0.03` and the existing refinement cap so the hot `fr_q07` canary stays protected while the coffee hub's top-3 concentration drops further without introducing new top-1 misses.
+   - Kept `T = 0.03` and the existing refinement cap so the hot `fr_q07` canary stays protected while the coffee hub's top-3 concentration drops further without introducing new top-1 misses.
+
+## WU17 Phase B (suite) — Reembed staging+cutover path
+
+- Timestamp: 2026-06-15
+- Branch: `wu17-reembed-path` (topic branch from `roro`)
+- Scope: Wire `ReembedMigration` into production CLI path, add 3 gaps (fail-fast, orphan cleanup, resume), new tests, doc update.
+
+### Pre-implementation baseline
+
+| Check | Result |
+|---|---|
+| `cargo test -p elegy-memory` | ✅ 272 passed; 0 failed |
+| `cargo clippy -p elegy-memory -- -D warnings` | ✅ Clean |
+| `cargo test -p elegy-memory reembed` | ✅ 12 passed |
+
+### What changed
+
+#### `rust/crates/elegy-memory/src/storage/schema.rs`
+- Made `ReembedMigration` and `run_migrations` public.
+- Added `scope_filter: Option<MemoryScope>` field with `with_scope()` builder.
+- Added `check_provider_health()` — calls generator with empty string before `run_staging()`; fails fast when provider is unreachable.
+- Added orphan staging cleanup at start of `run_staging()`: deletes `reembed_staging` and `reembed_pending_retry` entries referencing non-existent memories.
+- Added scope-aware query helpers (`stale_where_clause`, `query_stale`) used by `run_staging()`, `verify_staging()`, and `verify()`.
+- Added `scope_to_db()` helper.
+- On successful embedding generation, clears any prior `reembed_pending_retry` entry for that memory.
+
+#### `rust/crates/elegy-memory/src/storage/mod.rs`
+- Added `run_migrations` and `ReembedMigration` to public exports.
+
+#### `rust/crates/elegy-memory/src/cli.rs`
+- Replaced direct `reembed_stale_memories()` (sqlite_store path) with runner-based implementation using `ReembedMigration` + `run_migrations()`.
+- Added `From<rusqlite::Error>` for `CliError`.
+- Added `scope_to_db_cli()` helper.
+- Added `use rusqlite::Connection` and related imports.
+- Updated existing CLI tests for new behavior (fail-fast on provider down; all stale memories re-embedded regardless of limit).
+
+#### `rust/crates/elegy-memory/docs/architecture/migration-framework.md`
+- Section B rewritten from "Non implémenté" to "Reembed staging+cutover (implémenté WU17 Phase B suite)" with invariant table, integration notes, and usage procedure.
+
+### New tests (5 added in `schema.rs`)
+
+| Test | Covers |
+|---|---|
+| `reembed_migration_via_runner_succeeds` | Integration via `run_migrations()`, `migration_runs` idempotence |
+| `reembed_fails_fast_when_provider_unavailable_at_start` | Health check blocks before any staging |
+| `reembed_cleans_orphan_staging_at_start_of_run` | Orphan cleanup at start (FK-bypassed injection) |
+| `reembed_resumes_idempotently_after_partial_staging` | Partial staging → re-run succeeds, all stale cleared |
+| `reembed_mid_run_provider_failure_staging_not_promoted` | Provider fails mid-run: successful ones promoted, failed ones stay stale + re-queued; recovery re-run succeeds |
+
+### Design decisions
+- `check_provider_health()` uses empty string `""` as probe so stub-based tests can easily support it.
+- `process_batch()` now deletes `reembed_pending_retry` on successful embedding to keep verify counts correct across re-runs.
+- The CLI reembed no longer respects `limit` at the migration level (ReembedMigration processes all stale memories); `ReembedResponse` reports actual counts. The `limit` parameter is preserved in the response for caller visibility.
+- Auto-detection of profile change is documented as out-of-scope for this WU (noted, not implemented).
+
+### Validation
+
+| Check | Result |
+|---|---|
+| `cargo test -p elegy-memory` | ✅ **277 passed; 0 failed** (198 lib + 40 cli + 2 conf + 15 gov + 18 int + 4 local) |
+| `cargo clippy -p elegy-memory -- -D warnings` | ✅ Clean |
+
+### Test count delta
+- Before: 272 (193 lib + 40 cli + 2 conf + 15 gov + 18 int + 4 local)
+- After: **277** (+5 new lib tests in `schema.rs`)
+
+### Hors-scope, à arbitrer
+- Auto-detection d'un changement de profil d'embedding pour déclencher automatiquement le re-embedding.
+- Respect du paramètre `--limit` au niveau de `ReembedMigration` (traite toutes les mémoires stale, pas seulement `limit`).
+- `retry_limit` field on `ReembedMigration` remains unused (reserved for future automatic retry logic).
