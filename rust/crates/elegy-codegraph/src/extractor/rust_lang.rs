@@ -83,8 +83,7 @@ impl ExtractorState {
         let file_stem = self
             .file_path
             .trim_end_matches(".rs")
-            .replace('/', "::")
-            .replace('\\', "::");
+            .replace(['/', '\\'], "::");
         if mod_path.is_empty() {
             format!("{}::{}", file_stem, name)
         } else {
@@ -497,7 +496,7 @@ pub fn extract(repo_path: &str) -> Result<Graph> {
     // 2. Walk .rs files.
     for entry in walkdir::WalkDir::new(repo_path)
         .into_iter()
-        .filter_entry(|e| !e.file_name().to_str().map_or(false, |n| n == "target"))
+        .filter_entry(|e| e.file_name().to_str() != Some("target"))
     {
         let entry = match entry {
             Ok(e) => e,
@@ -512,7 +511,7 @@ pub fn extract(repo_path: &str) -> Result<Graph> {
         };
 
         let path = entry.path();
-        if path.extension().map_or(true, |ext| ext != "rs") {
+        if path.extension().is_none_or(|ext| ext != "rs") {
             continue;
         }
         if !entry.file_type().is_file() {
