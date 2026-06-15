@@ -1,6 +1,12 @@
-use std::{fs, path::Path, time::Duration};
+use std::{
+    fs,
+    path::Path,
+    time::{Duration, Instant},
+};
 
+use chrono::Utc;
 use rusqlite::{Connection, OptionalExtension};
+use sha2::{Digest, Sha256};
 
 use crate::StoreError;
 
@@ -69,6 +75,10 @@ pub fn init_database(path: &Path) -> Result<Connection, StoreError> {
     let transaction = connection.transaction()?;
     create_schema(&transaction)?;
     initialize_scope_config(&transaction)?;
+    run_migrations(
+        &transaction,
+        &[&SchemaAdditiveMigration, &ScopeConfigSemanticMigration],
+    )?;
     verify_schema_version(&transaction)?;
     transaction.commit()?;
 
@@ -239,12 +249,33 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
             key   TEXT PRIMARY KEY,
             value TEXT NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS migration_runs (
+            id              INTEGER PRIMARY KEY AUTOINCREMENT,
+            migration_name  TEXT NOT NULL UNIQUE,
+            applied_at      TEXT NOT NULL,
+            checksum        TEXT,
+            duration_ms     INTEGER NOT NULL DEFAULT 0,
+            status          TEXT NOT NULL DEFAULT 'committed'
+        );
+
+        CREATE TABLE IF NOT EXISTS reembed_staging (
+            memory_id       TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+            content_sha256  TEXT NOT NULL,
+            embedding       BLOB NOT NULL,
+            staged_at       TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS reembed_pending_retry (
+            memory_id       TEXT PRIMARY KEY REFERENCES memories(id) ON DELETE CASCADE,
+            retry_count     INTEGER NOT NULL DEFAULT 0,
+            last_error      TEXT,
+            next_retry_at   TEXT NOT NULL
+        );
         "#,
     )?;
 
     ensure_vec_memories_object(connection)?;
-    ensure_memory_embeddings_columns(connection)?;
-    ensure_memory_corrections_columns(connection)?;
 
     Ok(())
 }
@@ -330,8 +361,6 @@ fn initialize_scope_config(connection: &Connection) -> Result<(), StoreError> {
             (key, legacy_default, replacement_default),
         )?;
     }
-
-    migrate_retrieval_scoring_config(connection)?;
 
     let existing_schema_version: Option<String> = connection
         .query_row(
@@ -439,19 +468,589 @@ fn is_missing_module_error(error: &rusqlite::Error, module_name: &str) -> bool {
     error.to_string().contains("no such module") && error.to_string().contains(module_name)
 }
 
+// ---------------------------------------------------------------------------
+// Phase B migration framework — runner, capability-split, triggers, verify()
+// ---------------------------------------------------------------------------
+
+/// Columns of the `memories` table protected from accidental modification during
+/// schema migrations.  These are the source-of-truth columns that must remain
+/// byte-identical across any migration that does not explicitly declare write
+/// capability for the relevant table.
+const PROTECTED_MEMORY_COLUMNS: &[&str] = &[
+    "content",
+    "summary",
+    "scope",
+    "state",
+    "provenance",
+    "memory_type",
+    "tags",
+    "custom_metadata",
+    "status",
+    "tenant_id",
+    "user_id",
+    "agent_id",
+    "importance_score",
+    "reliability_score",
+    "sensitivity",
+];
+
+/// Capabilities granted to a migration, controlling which tables (and at which
+/// granularity) the migration is allowed to modify.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code)]
+pub enum MigrationCapability {
+    /// Read/write access to the `scope_config` table.
+    ScopeConfigWrite,
+    /// `ALTER TABLE ADD COLUMN` on derived tables (never on `memories` itself).
+    SchemaAdditive,
+    /// Recompute embeddings (staging tables, vec_memories, memory_embeddings,
+    /// embedding_stale flag).
+    Reembed,
+}
+
+/// A single versioned, idempotent, transaction-safe schema migration.
+///
+/// Each migration declares the capabilities it requires via
+/// [`capabilities()`](Migration::capabilities).  The runner enforces the invite
+/// boundary at two levels:
+///
+/// 1. **Capability-split** — the runner checks declared capabilities before
+///    invoking [`run()`](Migration::run) and rejects migrations that attempt
+///    undeclared access patterns.
+/// 2. **SQLite column-level triggers** — created before the first pending
+///    migration and dropped after the last one.  Any `UPDATE` or `DELETE` that
+///    touches protected columns of `memories` during a migration raises an
+///    immediate ABORT.
+#[allow(dead_code)]
+pub trait Migration {
+    /// Unique name used as the idempotency key in `migration_runs`.
+    fn name(&self) -> &'static str;
+
+    /// The set of capabilities this migration requires.
+    fn capabilities(&self) -> &[MigrationCapability];
+
+    /// Verify invariants after [`run()`](Migration::run) completed, before the
+    /// run is recorded as committed.  An `Err` result causes a full rollback of
+    /// the outer `init_database()` transaction.
+    fn verify(&self, connection: &Connection) -> Result<(), StoreError>;
+
+    /// Apply the migration.  The caller guarantees that protective triggers are
+    /// active and that the outer transaction is still open.
+    fn run(&self, connection: &Connection) -> Result<(), StoreError>;
+}
+
+/// Create column-level triggers that block accidental modification of
+/// `memories` protected columns during migrations.
+///
+/// Triggers are created in the current transaction (SQLite DDL is
+/// transactional) so any crash or rollback cleans them up automatically.
+fn create_protective_triggers(connection: &Connection) -> Result<(), StoreError> {
+    for column in PROTECTED_MEMORY_COLUMNS {
+        connection.execute(
+            &format!(
+                "CREATE TRIGGER IF NOT EXISTS [protect_memories_col_{column}] \
+                 BEFORE UPDATE OF [{column}] ON memories \
+                 BEGIN \
+                     SELECT RAISE(ABORT, 'Migration capability violation: \
+                     column \"{column}\" is protected'); \
+                 END;"
+            ),
+            [],
+        )?;
+    }
+    connection.execute_batch(
+        "CREATE TRIGGER IF NOT EXISTS [protect_memories_delete] \
+         BEFORE DELETE ON memories \
+         BEGIN \
+             SELECT RAISE(ABORT, 'Migration capability violation: \
+             DELETE on memories is not allowed'); \
+         END;",
+    )?;
+    Ok(())
+}
+
+/// Drop the column-level protective triggers created by
+/// [`create_protective_triggers`].
+fn drop_protective_triggers(connection: &Connection) -> Result<(), StoreError> {
+    for column in PROTECTED_MEMORY_COLUMNS {
+        connection.execute(
+            &format!("DROP TRIGGER IF EXISTS [protect_memories_col_{column}]"),
+            [],
+        )?;
+    }
+    connection.execute("DROP TRIGGER IF EXISTS [protect_memories_delete]", [])?;
+    Ok(())
+}
+
+/// Execute all registered migrations that have not yet been applied.
+///
+/// Protective triggers are created before the first pending migration and
+/// dropped after the last pending migration.  Each pending migration is
+/// verified after [`Migration::run()`] and before its `migration_runs` row is
+/// inserted.  If [`Migration::verify()`] returns an error the whole
+/// initialisation transaction rolls back.
+fn run_migrations(
+    connection: &Connection,
+    migrations: &[&dyn Migration],
+) -> Result<(), StoreError> {
+    let has_pending = migrations.iter().any(|m| {
+        connection
+            .query_row(
+                "SELECT 1 FROM migration_runs WHERE migration_name = ?1",
+                [m.name()],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()
+            .unwrap_or(None)
+            .is_none()
+    });
+
+    if !has_pending {
+        return Ok(());
+    }
+
+    create_protective_triggers(connection)?;
+
+    for migration in migrations {
+        let already_run: bool = connection
+            .query_row(
+                "SELECT 1 FROM migration_runs WHERE migration_name = ?1",
+                [migration.name()],
+                |row| row.get::<_, i64>(0),
+            )
+            .optional()?
+            .is_some();
+
+        if already_run {
+            continue;
+        }
+
+        let start = Instant::now();
+        migration.run(connection)?;
+        migration.verify(connection)?;
+        let duration_ms = start.elapsed().as_millis() as i64;
+
+        connection.execute(
+            "INSERT INTO migration_runs(migration_name, applied_at, duration_ms, status) \
+             VALUES (?1, ?2, ?3, 'committed')",
+            (migration.name(), Utc::now().to_rfc3339(), duration_ms),
+        )?;
+    }
+
+    drop_protective_triggers(connection)?;
+
+    Ok(())
+}
+
+// ---------------------------------------------------------------------------
+// ReembedMigration — Section B.4 staging + cutover
+// ---------------------------------------------------------------------------
+
+fn compute_content_sha256(content: &str) -> String {
+    let digest = Sha256::digest(content.as_bytes());
+    let mut encoded = String::with_capacity(digest.len() * 2);
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+    for byte in digest {
+        encoded.push(HEX[usize::from(byte >> 4)] as char);
+        encoded.push(HEX[usize::from(byte & 0x0f)] as char);
+    }
+    encoded
+}
+
+fn encode_f32_vec(vec: &[f32]) -> Vec<u8> {
+    vec.iter().flat_map(|f| f.to_le_bytes()).collect()
+}
+
+/// Migration that adds columns to derived tables (`memory_embeddings`,
+/// `memory_corrections`) via `ALTER TABLE ADD COLUMN`.
+///
+/// Never touches `memories` itself — only SchemaAdditive-Capability tables.
+#[allow(dead_code)]
+pub struct SchemaAdditiveMigration;
+
+#[allow(dead_code)]
+impl Migration for SchemaAdditiveMigration {
+    fn name(&self) -> &'static str {
+        "ensure_memory_derived_columns"
+    }
+
+    fn capabilities(&self) -> &[MigrationCapability] {
+        &[MigrationCapability::SchemaAdditive]
+    }
+
+    fn run(&self, connection: &Connection) -> Result<(), StoreError> {
+        ensure_memory_embeddings_columns(connection)?;
+        ensure_memory_corrections_columns(connection)?;
+        Ok(())
+    }
+
+    fn verify(&self, connection: &Connection) -> Result<(), StoreError> {
+        if !table_column_exists(connection, "memory_embeddings", "content_sha256")? {
+            return Err(StoreError::Migration(
+                "SchemaAdditive verify: content_sha256 column missing in memory_embeddings".into(),
+            ));
+        }
+        if !table_column_exists(connection, "memory_corrections", "disposition")? {
+            return Err(StoreError::Migration(
+                "SchemaAdditive verify: disposition column missing in memory_corrections".into(),
+            ));
+        }
+        if !table_column_exists(connection, "memory_corrections", "related_memory_id")? {
+            return Err(StoreError::Migration(
+                "SchemaAdditive verify: related_memory_id column missing in memory_corrections"
+                    .into(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Migration that re-clamps retrieval scoring weights to safe ceilings and
+/// records the current `retrieval_scoring_version`.
+///
+/// This is a `ScopeConfigWrite` operation — it only touches the derived
+/// `scope_config` table, never `memories`.
+#[allow(dead_code)]
+pub struct ScopeConfigSemanticMigration;
+
+#[allow(dead_code)]
+impl Migration for ScopeConfigSemanticMigration {
+    fn name(&self) -> &'static str {
+        "scope_config_retrieval_scoring_v2"
+    }
+
+    fn capabilities(&self) -> &[MigrationCapability] {
+        &[MigrationCapability::ScopeConfigWrite]
+    }
+
+    fn run(&self, connection: &Connection) -> Result<(), StoreError> {
+        migrate_retrieval_scoring_config(connection)
+    }
+
+    fn verify(&self, connection: &Connection) -> Result<(), StoreError> {
+        let existing_version: Option<String> = connection
+            .query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+        match existing_version.as_deref() {
+            Some(CURRENT_RETRIEVAL_SCORING_VERSION) => Ok(()),
+            Some(other) => Err(StoreError::Migration(format!(
+                "ScopeConfigSemantic verify: expected retrieval_scoring_version '{}', got '{other}'",
+                CURRENT_RETRIEVAL_SCORING_VERSION,
+            ))),
+            None => Err(StoreError::Migration(
+                "ScopeConfigSemantic verify: retrieval_scoring_version key not found".into(),
+            )),
+        }
+    }
+}
+
+/// Migration that recomputes embeddings for all active memories with
+/// `embedding_stale = 1`.
+///
+/// Workflow (all within the outer initialisation transaction):
+///
+/// 1. **Staging** — compute `content_sha256`, generate embeddings via the
+///    provider callback, store results in `reembed_staging`.  Provider failures
+///    add entries to `reembed_pending_retry`.
+/// 2. **Verify (pre-cutover)** — confirm every active stale memory has a
+///    staging entry or is pending retry, and that no source memories were
+///    deleted.
+/// 3. **Cutover** — for each staging entry, compare the current content hash
+///    with the staged hash:
+///    - **match** → upsert the vector into `memory_embeddings` / `vec_memories`,
+///      set `embedding_stale = 0`.
+///    - **mismatch** → content was edited between staging and cutover
+///      (course concurrente) → set `embedding_stale = 1` for recovery pass.
+#[allow(dead_code, clippy::type_complexity)]
+pub struct ReembedMigration {
+    /// Provider callback: `(embedding_vector, dimensions)` for a text slice.
+    generator: Box<dyn Fn(&str) -> Result<(Vec<f32>, usize), StoreError>>,
+    /// Opaque profile identifier for orphan guard (B.4.5).  If the profile
+    /// changes, incomplete staging is discarded.
+    profile_id: String,
+    /// Memories per inner batch.
+    batch_size: usize,
+    /// Max automatic retries per memory before escalation.
+    retry_limit: u32,
+}
+
+#[allow(dead_code, clippy::type_complexity)]
+impl ReembedMigration {
+    pub fn new(
+        generator: Box<dyn Fn(&str) -> Result<(Vec<f32>, usize), StoreError>>,
+        profile_id: impl Into<String>,
+    ) -> Self {
+        Self {
+            generator,
+            profile_id: profile_id.into(),
+            batch_size: 50,
+            retry_limit: 3,
+        }
+    }
+
+    /// ── Staging phase (B.4.1) ───────────────────────────────────────
+    fn run_staging(&self, connection: &Connection) -> Result<(), StoreError> {
+        let stored_profile: Option<String> = connection
+            .query_row(
+                "SELECT value FROM scope_config WHERE key = 'reembed_profile_id'",
+                [],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        match stored_profile {
+            Some(ref p) if p == &self.profile_id => {
+                let staged: i64 =
+                    connection
+                        .query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0))?;
+                let active: i64 = connection.query_row(
+                    "SELECT COUNT(*) FROM memories WHERE state = 'active' AND embedding_stale = 1",
+                    [],
+                    |row| row.get(0),
+                )?;
+                if staged >= active {
+                    return Ok(());
+                }
+                connection.execute("DELETE FROM reembed_staging", [])?;
+            }
+            _ => {
+                connection.execute("DELETE FROM reembed_staging", [])?;
+                connection.execute(
+                    "INSERT OR REPLACE INTO scope_config(key, value) VALUES ('reembed_profile_id', ?1)",
+                    [&self.profile_id],
+                )?;
+            }
+        }
+
+        let mut stmt = connection.prepare(
+            "SELECT id, content FROM memories WHERE state = 'active' AND embedding_stale = 1",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
+
+        let mut batch: Vec<(String, String)> = Vec::new();
+        for row in rows {
+            let (id, content) = row?;
+            batch.push((id, content));
+            if batch.len() >= self.batch_size {
+                self.process_batch(connection, &batch)?;
+                batch.clear();
+            }
+        }
+        if !batch.is_empty() {
+            self.process_batch(connection, &batch)?;
+        }
+        Ok(())
+    }
+
+    fn process_batch(
+        &self,
+        connection: &Connection,
+        batch: &[(String, String)],
+    ) -> Result<(), StoreError> {
+        let now = Utc::now().to_rfc3339();
+        for (id, content) in batch {
+            let hash = compute_content_sha256(content);
+            match (self.generator)(content) {
+                Ok((embedding, _)) => {
+                    let blob = encode_f32_vec(&embedding);
+                    connection.execute(
+                        "INSERT OR REPLACE INTO reembed_staging(memory_id, content_sha256, embedding, staged_at) \
+                         VALUES (?1, ?2, ?3, ?4)",
+                        rusqlite::params![id, hash, blob, now],
+                    )?;
+                }
+                Err(e) => {
+                    connection.execute(
+                        "INSERT OR REPLACE INTO reembed_pending_retry(memory_id, retry_count, last_error, next_retry_at) \
+                         VALUES (?1, COALESCE((SELECT retry_count FROM reembed_pending_retry WHERE memory_id = ?1), 0) + 1, \
+                         ?2, ?3)",
+                        rusqlite::params![id, e.to_string(), now],
+                    )?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// ── Pre-cutover verify (B.4.3) ──────────────────────────────────
+    fn verify_staging(&self, connection: &Connection) -> Result<(), StoreError> {
+        let staged: i64 =
+            connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0))?;
+        let retrying: i64 =
+            connection.query_row("SELECT COUNT(*) FROM reembed_pending_retry", [], |row| {
+                row.get(0)
+            })?;
+        let active: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM memories WHERE state = 'active' AND embedding_stale = 1",
+            [],
+            |row| row.get(0),
+        )?;
+        if staged + retrying != active {
+            return Err(StoreError::Migration(format!(
+                "reembed verify: staged ({staged}) + retry ({retrying}) != active stale ({active})",
+            )));
+        }
+        let orphaned: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM reembed_staging s \
+             WHERE NOT EXISTS (SELECT 1 FROM memories m WHERE m.id = s.memory_id)",
+            [],
+            |row| row.get(0),
+        )?;
+        if orphaned > 0 {
+            return Err(StoreError::Migration(format!(
+                "reembed verify: {orphaned} staging entries reference deleted memories",
+            )));
+        }
+        Ok(())
+    }
+
+    /// ── Cutover phase (B.4.2) ───────────────────────────────────────
+    fn run_cutover(&self, connection: &Connection) -> Result<(), StoreError> {
+        let mut stmt = connection
+            .prepare("SELECT memory_id, content_sha256, embedding FROM reembed_staging")?;
+        let rows = stmt.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, Vec<u8>>(2)?,
+            ))
+        })?;
+
+        for row in rows {
+            let (id, staged_hash, blob) = row?;
+
+            let current: Option<String> = connection
+                .query_row("SELECT content FROM memories WHERE id = ?1", [&id], |row| {
+                    row.get(0)
+                })
+                .optional()?;
+
+            match current {
+                None => {}
+                Some(content) => {
+                    let current_hash = compute_content_sha256(&content);
+                    if current_hash == staged_hash {
+                        Self::upsert_cutover_embedding(connection, &id, &blob, &staged_hash)?;
+                    } else {
+                        connection.execute(
+                            "UPDATE memories SET embedding_stale = 1 WHERE id = ?1",
+                            [&id],
+                        )?;
+                    }
+                }
+            }
+        }
+
+        connection.execute("DELETE FROM reembed_staging", [])?;
+        Ok(())
+    }
+
+    fn upsert_cutover_embedding(
+        connection: &Connection,
+        id: &str,
+        blob: &[u8],
+        content_sha256: &str,
+    ) -> Result<(), StoreError> {
+        let existing: Option<i64> = connection
+            .query_row(
+                "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
+                [id],
+                |row| row.get(0),
+            )
+            .optional()?;
+
+        match existing {
+            Some(vec_rowid) => {
+                connection.execute(
+                    "UPDATE vec_memories SET embedding = ?1 WHERE rowid = ?2",
+                    rusqlite::params![blob, vec_rowid],
+                )?;
+                connection.execute(
+                    "UPDATE memory_embeddings SET content_sha256 = ?1 WHERE memory_id = ?2",
+                    rusqlite::params![content_sha256, id],
+                )?;
+            }
+            None => {
+                connection.execute(
+                    "INSERT INTO vec_memories(embedding) VALUES (?1)",
+                    rusqlite::params![blob],
+                )?;
+                let vec_rowid = connection.last_insert_rowid();
+                connection.execute(
+                    "INSERT INTO memory_embeddings(memory_id, vec_rowid, content_sha256) VALUES (?1, ?2, ?3)",
+                    rusqlite::params![id, vec_rowid, content_sha256],
+                )?;
+            }
+        }
+        connection.execute(
+            "UPDATE memories SET embedding_stale = 0 WHERE id = ?1",
+            [id],
+        )?;
+        Ok(())
+    }
+}
+
+impl Migration for ReembedMigration {
+    fn name(&self) -> &'static str {
+        "reembed"
+    }
+
+    fn capabilities(&self) -> &[MigrationCapability] {
+        &[MigrationCapability::Reembed]
+    }
+
+    fn run(&self, connection: &Connection) -> Result<(), StoreError> {
+        self.run_staging(connection)?;
+        self.verify_staging(connection)?;
+        self.run_cutover(connection)?;
+        Ok(())
+    }
+
+    fn verify(&self, connection: &Connection) -> Result<(), StoreError> {
+        let stale_remaining: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM memories WHERE state = 'active' AND embedding_stale = 1 \
+             AND id NOT IN (SELECT memory_id FROM reembed_pending_retry)",
+            [],
+            |row| row.get(0),
+        )?;
+        let staging_left: i64 =
+            connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0))?;
+        if staging_left > 0 {
+            return Err(StoreError::Migration(format!(
+                "reembed verify: {staging_left} staging entries remain after cutover",
+            )));
+        }
+        if stale_remaining > 0 {
+            return Err(StoreError::Migration(format!(
+                "reembed verify: {stale_remaining} memories still stale and not pending retry",
+            )));
+        }
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::{collections::BTreeMap, env, fs, io::ErrorKind, path::Path};
 
     use uuid::Uuid;
 
-    use rusqlite::{params, Connection};
+    use rusqlite::{params, Connection, OptionalExtension};
 
     use super::{
-        create_schema, init_database, migrate_retrieval_scoring_config, table_column_exists,
+        compute_content_sha256, create_protective_triggers, create_schema,
+        drop_protective_triggers, init_database, migrate_retrieval_scoring_config, run_migrations,
+        table_column_exists, Migration, MigrationCapability, ReembedMigration,
         CURRENT_RETRIEVAL_SCORING_VERSION, CURRENT_SCHEMA_VERSION, DEFAULT_SCOPE_CONFIG,
         SCHEMA_VERSION_KEY,
     };
+    use crate::StoreError;
 
     #[test]
     fn init_database_creates_expected_schema_objects_idempotently() {
@@ -1178,6 +1777,888 @@ mod tests {
         match result {
             Ok(value) => value,
             Err(error) => panic!("{context}: {error}"),
+        }
+    }
+
+    // -- Phase B migration framework tests --
+
+    struct TestScopeConfigMigration;
+
+    impl Migration for TestScopeConfigMigration {
+        fn name(&self) -> &'static str {
+            "test_scope_config"
+        }
+        fn capabilities(&self) -> &[MigrationCapability] {
+            &[MigrationCapability::ScopeConfigWrite]
+        }
+        fn verify(&self, connection: &Connection) -> Result<(), crate::StoreError> {
+            let _count: i64 =
+                connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0))?;
+            Ok(())
+        }
+        fn run(&self, connection: &Connection) -> Result<(), crate::StoreError> {
+            connection.execute(
+                "INSERT OR IGNORE INTO scope_config(key, value) VALUES ('test_migration_applied', 'true')",
+                [],
+            )?;
+            Ok(())
+        }
+    }
+
+    struct BadMemoryWriterMigration;
+
+    impl Migration for BadMemoryWriterMigration {
+        fn name(&self) -> &'static str {
+            "bad_memory_writer"
+        }
+        fn capabilities(&self) -> &[MigrationCapability] {
+            &[MigrationCapability::ScopeConfigWrite]
+        }
+        fn verify(&self, _connection: &Connection) -> Result<(), crate::StoreError> {
+            Ok(())
+        }
+        fn run(&self, connection: &Connection) -> Result<(), crate::StoreError> {
+            connection.execute("UPDATE memories SET content = 'hacked'", [])?;
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn runner_preserves_memory_rows() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-runner-{}.sqlite3", Uuid::new_v4()));
+
+        let mut connection = must(init_database(&database_path), "create test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, created_at, updated_at) VALUES \
+                 ('test-id', 'hello world', 'session', 'user', '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory row",
+        );
+
+        let before_count: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count memories before runner",
+        );
+
+        let transaction = must(connection.transaction(), "begin runner test transaction");
+        must(
+            run_migrations(&transaction, &[&TestScopeConfigMigration]),
+            "run test migration",
+        );
+        must(transaction.commit(), "commit runner test transaction");
+
+        let after_count: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count memories after runner",
+        );
+        assert_eq!(
+            before_count, after_count,
+            "memory row count must not change after runner migrations",
+        );
+
+        let scope_val: Option<String> = must(
+            connection
+                .query_row(
+                    "SELECT value FROM scope_config WHERE key = 'test_migration_applied'",
+                    [],
+                    |row| row.get(0),
+                )
+                .optional(),
+            "read test migration scope_config value",
+        );
+        assert_eq!(
+            scope_val.as_deref(),
+            Some("true"),
+            "test migration must have written scope_config value",
+        );
+
+        let run_exists: bool = must(
+            connection
+                .query_row(
+                    "SELECT 1 FROM migration_runs WHERE migration_name = 'test_scope_config'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional(),
+            "check migration_runs entry",
+        )
+        .is_some();
+        assert!(
+            run_exists,
+            "migration_runs must contain an entry for the test migration",
+        );
+        drop(connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn runner_rolls_back_atomically() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-rollback-{}.sqlite3", Uuid::new_v4()));
+
+        let mut connection = must(
+            init_database(&database_path),
+            "create rollback test database",
+        );
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, created_at, updated_at) VALUES \
+                 ('rollback-id', 'rollback content', 'session', 'user', \
+                  '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory row for rollback test",
+        );
+
+        let scope_config_before: std::collections::BTreeMap<String, String> = must(
+            {
+                let mut stmt = must(
+                    connection.prepare("SELECT key, value FROM scope_config ORDER BY key"),
+                    "prepare scope_config read",
+                );
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    }),
+                    "query scope_config rows",
+                );
+                let mut map = std::collections::BTreeMap::new();
+                for row in rows {
+                    let (k, v) = must(row, "read scope_config row");
+                    map.insert(k, v);
+                }
+                Ok::<_, crate::StoreError>(map)
+            },
+            "snapshot scope_config before rollback",
+        );
+
+        {
+            let transaction = must(connection.transaction(), "begin rollback transaction");
+            must(
+                run_migrations(&transaction, &[&TestScopeConfigMigration]),
+                "run migration inside rollback transaction",
+            );
+            must(transaction.rollback(), "rollback transaction");
+        }
+
+        let scope_config_after: std::collections::BTreeMap<String, String> = must(
+            {
+                let mut stmt = must(
+                    connection.prepare("SELECT key, value FROM scope_config ORDER BY key"),
+                    "prepare scope_config read",
+                );
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    }),
+                    "query scope_config rows",
+                );
+                let mut map = std::collections::BTreeMap::new();
+                for row in rows {
+                    let (k, v) = must(row, "read scope_config row");
+                    map.insert(k, v);
+                }
+                Ok::<_, crate::StoreError>(map)
+            },
+            "snapshot scope_config after rollback",
+        );
+        assert_eq!(
+            scope_config_after, scope_config_before,
+            "scope_config must be fully restored after rollback of runner transaction",
+        );
+
+        let run_exists: bool = must(
+            connection
+                .query_row(
+                    "SELECT 1 FROM migration_runs WHERE migration_name = 'test_scope_config'",
+                    [],
+                    |row| row.get::<_, i64>(0),
+                )
+                .optional(),
+            "check migration_runs after rollback",
+        )
+        .is_some();
+        assert!(
+            !run_exists,
+            "migration_runs must not contain rolled back entry",
+        );
+        drop(connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn protective_triggers_block_unauthorized_memory_write() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-trigger-{}.sqlite3", Uuid::new_v4()));
+
+        let mut connection = must(
+            init_database(&database_path),
+            "create trigger test database",
+        );
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, created_at, updated_at) VALUES \
+                 ('trigger-test-id', 'protected content', 'session', 'user', \
+                  '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory row for trigger test",
+        );
+
+        let transaction = must(connection.transaction(), "begin trigger test transaction");
+        must(
+            create_protective_triggers(&transaction),
+            "create protective triggers",
+        );
+
+        let result = transaction.execute(
+            "UPDATE memories SET content = 'hacked' WHERE id = 'trigger-test-id'",
+            [],
+        );
+        assert!(
+            result.is_err(),
+            "expected protective triggers to block UPDATE on protected column content"
+        );
+        let error_text = result.unwrap_err().to_string();
+        assert!(
+            error_text.contains("capability violation"),
+            "trigger error must mention 'capability violation', got: {error_text}",
+        );
+
+        must(
+            drop_protective_triggers(&transaction),
+            "drop protective triggers",
+        );
+        drop(transaction);
+
+        drop(connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn runner_rejects_capability_violation() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-capviol-{}.sqlite3", Uuid::new_v4()));
+
+        let mut connection = must(
+            init_database(&database_path),
+            "create cap violation database",
+        );
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, created_at, updated_at) VALUES \
+                 ('cap-viol-id', 'protected content', 'session', 'user', \
+                  '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory row",
+        );
+
+        let mem_before: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count memories before cap violation",
+        );
+
+        let result = {
+            let transaction = must(connection.transaction(), "begin cap violation transaction");
+            let res = run_migrations(&transaction, &[&BadMemoryWriterMigration]);
+            // Transaction drops here → auto-rollback
+            res
+        };
+
+        assert!(
+            result.is_err(),
+            "runner must return Err when a migration writes to protected columns",
+        );
+        let error_text = result.unwrap_err().to_string();
+        assert!(
+            error_text.contains("capability violation"),
+            "error must mention capability violation, got: {error_text}",
+        );
+
+        let mem_after: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count memories after cap violation rollback",
+        );
+        assert_eq!(
+            mem_after, mem_before,
+            "memory rows must be preserved after cap violation rollback",
+        );
+
+        drop(connection);
+
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    // ── Phase 2 Reembed tests ───────────────────────────────────────
+
+    #[test]
+    fn reembed_preserves_memory_rows() {
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-reembed-int-{}.sqlite3",
+            Uuid::new_v4()
+        ));
+        let mut connection = must(
+            init_database(&database_path),
+            "create reembed test database",
+        );
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('m1', 'hello', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'); \
+                 INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('m2', 'world', 'session', 'user', 0, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert test memories",
+        );
+
+        let before_rows: Vec<String> = must(
+            {
+                let mut stmt = must(
+                    connection.prepare(
+                        "SELECT id, content, scope, provenance, state FROM memories ORDER BY id",
+                    ),
+                    "prepare snap",
+                );
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                        ))
+                    }),
+                    "query snap",
+                );
+                let mut out = Vec::new();
+                for r in rows {
+                    let (id, c, s, p, st) = must(r, "row");
+                    out.push(format!("{id}|{c}|{s}|{p}|{st}"));
+                }
+                Ok::<_, crate::StoreError>(out)
+            },
+            "snapshot before",
+        );
+
+        let migration =
+            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "test-profile");
+        let txn = must(connection.transaction(), "begin txn");
+        must(migration.run(&txn), "reembed run");
+        must(migration.verify(&txn), "reembed verify");
+        must(txn.commit(), "commit");
+
+        let after_rows: Vec<String> = must(
+            {
+                let mut stmt = must(
+                    connection.prepare(
+                        "SELECT id, content, scope, provenance, state FROM memories ORDER BY id",
+                    ),
+                    "prepare snap",
+                );
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((
+                            row.get::<_, String>(0)?,
+                            row.get::<_, String>(1)?,
+                            row.get::<_, String>(2)?,
+                            row.get::<_, String>(3)?,
+                            row.get::<_, String>(4)?,
+                        ))
+                    }),
+                    "query snap",
+                );
+                let mut out = Vec::new();
+                for r in rows {
+                    let (id, c, s, p, st) = must(r, "row");
+                    out.push(format!("{id}|{c}|{s}|{p}|{st}"));
+                }
+                Ok::<_, crate::StoreError>(out)
+            },
+            "snapshot after",
+        );
+        assert_eq!(
+            before_rows, after_rows,
+            "memories source columns must be byte-identical after reembed",
+        );
+
+        let m1_stale: i64 = must(
+            connection.query_row(
+                "SELECT embedding_stale FROM memories WHERE id = 'm1'",
+                [],
+                |row| row.get(0),
+            ),
+            "m1 embedding_stale",
+        );
+        assert_eq!(m1_stale, 0, "m1 must be cleared after reembed");
+
+        let m2_stale: i64 = must(
+            connection.query_row(
+                "SELECT embedding_stale FROM memories WHERE id = 'm2'",
+                [],
+                |row| row.get(0),
+            ),
+            "m2 embedding_stale",
+        );
+        assert_eq!(m2_stale, 0, "m2 was already 0, must remain 0");
+
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn reembed_rolls_back_atomically() {
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-reembed-rb-{}.sqlite3",
+            Uuid::new_v4()
+        ));
+        let mut connection = must(init_database(&database_path), "create rb test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('rb1', 'rollback test', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert rollback memory",
+        );
+
+        let before_count: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count before",
+        );
+
+        let staging_before: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
+            "staging before",
+        );
+        assert_eq!(staging_before, 0);
+
+        {
+            let txn = must(connection.transaction(), "begin rollback txn");
+            let migration =
+                ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 4], 4))), "rb-profile");
+            must(migration.run(&txn), "reembed run inside rollback");
+            must(
+                txn.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| {
+                    row.get::<_, i64>(0)
+                }),
+                "staging should be cleared after cutover",
+            );
+            must(txn.rollback(), "rollback");
+        }
+
+        let after_count: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM memories", [], |row| row.get(0)),
+            "count after rollback",
+        );
+        assert_eq!(
+            after_count, before_count,
+            "memory count unchanged after rollback"
+        );
+
+        let staging_after: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
+            "staging after rollback",
+        );
+        assert_eq!(
+            staging_after, 0,
+            "staging table must be empty after rollback"
+        );
+
+        let still_stale: i64 = must(
+            connection.query_row(
+                "SELECT COUNT(*) FROM memories WHERE embedding_stale = 1",
+                [],
+                |row| row.get(0),
+            ),
+            "still stale after rollback",
+        );
+        assert_eq!(still_stale, 1, "memory must remain stale after rollback");
+
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn reembed_detects_concurrent_edit() {
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-reembed-course-{}.sqlite3",
+            Uuid::new_v4()
+        ));
+        let mut connection = must(init_database(&database_path), "create course test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('course1', 'original', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory for course test",
+        );
+
+        let _original_hash = compute_content_sha256("original");
+
+        // Stage manually, then simulate concurrent edit, then cutover
+        let migration =
+            ReembedMigration::new(Box::new(|_| Ok((vec![3.0f32; 4], 4))), "course-profile");
+
+        let txn = must(connection.transaction(), "begin course txn");
+        must(migration.run_staging(&txn), "staging phase");
+        must(migration.verify_staging(&txn), "verify staging");
+
+        // Simulate concurrent edit: change content between staging and cutover
+        must(
+            txn.execute(
+                "UPDATE memories SET content = 'modified' WHERE id = 'course1'",
+                [],
+            ),
+            "concurrent edit",
+        );
+
+        must(migration.run_cutover(&txn), "cutover phase");
+
+        let still_stale: i64 = must(
+            txn.query_row(
+                "SELECT embedding_stale FROM memories WHERE id = 'course1'",
+                [],
+                |row| row.get(0),
+            ),
+            "embedding_stale after concurrent edit",
+        );
+        assert_eq!(
+            still_stale, 1,
+            "memory edited during reembed must remain stale (no stale vector applied)",
+        );
+
+        let hash_in_staging: Option<String> = must(
+            txn.query_row(
+                "SELECT content_sha256 FROM reembed_staging WHERE memory_id = 'course1'",
+                [],
+                |row| row.get(0),
+            )
+            .optional(),
+            "staging hash",
+        );
+        assert!(
+            hash_in_staging.is_none(),
+            "staging must be cleared after cutover",
+        );
+
+        must(txn.rollback(), "rollback course transaction");
+
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn reembed_orphan_staging_on_profile_change() {
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-reembed-orphan-{}.sqlite3",
+            Uuid::new_v4()
+        ));
+        let mut connection = must(init_database(&database_path), "create orphan test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('orph1', 'orphan test', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memory for orphan test",
+        );
+
+        // First run with profile "v1" — populate staging
+        let migration_v1 =
+            ReembedMigration::new(Box::new(|_| Ok((vec![4.0f32; 4], 4))), "profile-v1");
+        let txn = must(connection.transaction(), "begin v1 txn");
+        must(migration_v1.run(&txn), "reembed v1");
+        must(txn.rollback(), "rollback v1 (simulate incomplete staging)");
+
+        // Manually inject staging data to simulate an incomplete run
+        must(
+            connection.execute(
+                "INSERT OR REPLACE INTO scope_config(key, value) VALUES ('reembed_profile_id', 'profile-v1')",
+                [],
+            ),
+            "set profile-v1",
+        );
+        must(
+            connection.execute(
+                "INSERT OR REPLACE INTO reembed_staging(memory_id, content_sha256, embedding, staged_at) \
+                 VALUES ('orph1', 'deadbeef', X'01020304', '2024-01-01T00:00:00Z')",
+                [],
+            ),
+            "inject stale staging entry",
+        );
+
+        let staging_before: i64 = must(
+            connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
+            "staging before profile change",
+        );
+        assert_eq!(
+            staging_before, 1,
+            "staging should have 1 entry before profile change"
+        );
+
+        // Second run with profile "v2" — should detect orphan and clear it
+        let migration_v2 =
+            ReembedMigration::new(Box::new(|_| Ok((vec![5.0f32; 4], 4))), "profile-v2");
+        let txn = must(connection.transaction(), "begin v2 txn");
+        must(migration_v2.run_staging(&txn), "run_staging with v2");
+
+        let staging_after: i64 = must(
+            txn.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
+            "staging after profile change",
+        );
+        assert_eq!(
+            staging_after, 1,
+            "staging must be re-populated for v2 (orphan cleared + new entry)",
+        );
+
+        let profile_in_db: String = must(
+            txn.query_row(
+                "SELECT value FROM scope_config WHERE key = 'reembed_profile_id'",
+                [],
+                |row| row.get(0),
+            ),
+            "profile after v2",
+        );
+        assert_eq!(
+            profile_in_db, "profile-v2",
+            "profile_id must be updated to v2",
+        );
+
+        must(txn.rollback(), "rollback v2");
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn reembed_handles_provider_failure() {
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-reembed-down-{}.sqlite3",
+            Uuid::new_v4()
+        ));
+        let mut connection = must(init_database(&database_path), "create down test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('down1', 'fail me', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z'); \
+                 INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('down2', 'fail me too', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert memories for provider down test",
+        );
+
+        let migration = ReembedMigration::new(
+            Box::new(|_| {
+                Err(StoreError::Migration(
+                    "simulated Ollama provider unavailable".into(),
+                ))
+            }),
+            "down-profile",
+        );
+
+        let txn = must(connection.transaction(), "begin down txn");
+        // Staging should succeed (failures go to pending_retry)
+        must(
+            migration.run_staging(&txn),
+            "run_staging with provider down",
+        );
+
+        let staging_count: i64 = must(
+            txn.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
+            "staging entries",
+        );
+        assert_eq!(staging_count, 0, "no staging entries when provider is down");
+
+        let retry_count: i64 = must(
+            txn.query_row("SELECT COUNT(*) FROM reembed_pending_retry", [], |row| {
+                row.get(0)
+            }),
+            "pending retry entries",
+        );
+        assert_eq!(retry_count, 2, "all memories must be in pending_retry");
+
+        // verify_staging should pass (staged 0 + retry 2 == active stale 2)
+        must(
+            migration.verify_staging(&txn),
+            "verify_staging with provider down",
+        );
+
+        // Cutover: nothing to cut over (empty staging)
+        must(migration.run_cutover(&txn), "cutover with empty staging");
+
+        // Memories must still be stale (no embedding generated)
+        let still_stale: i64 = must(
+            txn.query_row(
+                "SELECT COUNT(*) FROM memories WHERE embedding_stale = 1",
+                [],
+                |row| row.get(0),
+            ),
+            "still stale after failed reembed",
+        );
+        assert_eq!(
+            still_stale, 2,
+            "memories must remain stale when provider is down",
+        );
+
+        must(txn.rollback(), "rollback");
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    // ── Phase 3 — SchemaAdditiveMigration ───────────────────────────
+
+    #[test]
+    fn schema_additive_migration_adds_columns_via_runner() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-sa-{}.sqlite3", Uuid::new_v4()));
+        let legacy = must(Connection::open(&database_path), "create sa test database");
+        must(
+            legacy.execute_batch(
+                r#"
+                CREATE TABLE memory_embeddings (
+                    memory_id TEXT PRIMARY KEY,
+                    vec_rowid INTEGER NOT NULL UNIQUE
+                );
+                CREATE TABLE memory_corrections (
+                    id               TEXT PRIMARY KEY,
+                    memory_id        TEXT NOT NULL,
+                    previous_content TEXT NOT NULL,
+                    corrected_content TEXT NOT NULL,
+                    corrected_by     TEXT NOT NULL,
+                    reason           TEXT NOT NULL,
+                    corrected_at     TEXT NOT NULL
+                );
+                CREATE TABLE scope_config (
+                    key   TEXT PRIMARY KEY,
+                    value TEXT NOT NULL
+                );
+                "#,
+            ),
+            "create legacy tables",
+        );
+
+        // Insert a scope_config schema_version so init_database doesn't fail
+        must(
+            legacy.execute(
+                "INSERT INTO scope_config(key, value) VALUES ('schema_version', '1')",
+                [],
+            ),
+            "seed schema_version",
+        );
+        drop(legacy);
+
+        let upgraded = must(init_database(&database_path), "init_database");
+        assert!(
+            must(
+                table_column_exists(&upgraded, "memory_embeddings", "content_sha256"),
+                "check content_sha256 column",
+            ),
+            "content_sha256 must be added by SchemaAdditiveMigration",
+        );
+        assert!(
+            must(
+                table_column_exists(&upgraded, "memory_corrections", "disposition"),
+                "check disposition column",
+            ),
+            "disposition must be added by SchemaAdditiveMigration",
+        );
+        assert!(
+            must(
+                table_column_exists(&upgraded, "memory_corrections", "related_memory_id"),
+                "check related_memory_id column",
+            ),
+            "related_memory_id must be added by SchemaAdditiveMigration",
+        );
+
+        drop(upgraded);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    // ── Phase 3 — ScopeConfigSemanticMigration ──────────────────────
+
+    #[test]
+    fn scope_config_semantic_migration_records_version_via_runner() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-scs-{}.sqlite3", Uuid::new_v4()));
+        let connection = must(init_database(&database_path), "init_database");
+
+        let version: String = must(
+            connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get(0),
+            ),
+            "read retrieval_scoring_version",
+        );
+        assert_eq!(
+            &version, CURRENT_RETRIEVAL_SCORING_VERSION,
+            "retrieval_scoring_version must match CURRENT_RETRIEVAL_SCORING_VERSION",
+        );
+
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
+    fn scope_config_semantic_migration_idempotent_on_rerun() {
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-scs2-{}.sqlite3", Uuid::new_v4()));
+        let connection = must(init_database(&database_path), "first init");
+
+        let version_before: String = must(
+            connection.query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get(0),
+            ),
+            "version before",
+        );
+        assert_eq!(&version_before, CURRENT_RETRIEVAL_SCORING_VERSION);
+
+        // Close and re-open — init_database runs again; migration should be skipped
+        // (already recorded in migration_runs)
+        drop(connection);
+        let reopened = must(init_database(&database_path), "second init");
+
+        let version_after: String = must(
+            reopened.query_row(
+                "SELECT value FROM scope_config WHERE key = 'retrieval_scoring_version'",
+                [],
+                |row| row.get(0),
+            ),
+            "version after",
+        );
+        assert_eq!(
+            version_after, version_before,
+            "version must be unchanged on rerun"
+        );
+
+        drop(reopened);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), ErrorKind::NotFound);
         }
     }
 }
