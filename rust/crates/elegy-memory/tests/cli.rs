@@ -500,11 +500,12 @@ fn reembed_requires_a_configured_provider_from_cli() {
         "stdout: {}",
         String::from_utf8_lossy(&reembed.stdout)
     );
-    assert!(
-        String::from_utf8_lossy(&reembed.stderr).contains("reembed requires an embedding provider"),
-        "expected provider-required error, stderr: {}",
-        String::from_utf8_lossy(&reembed.stderr)
-    );
+    let body: serde_json::Value =
+        serde_json::from_slice(&reembed.stdout).expect("stdout should be valid json");
+    assert!(body["failure"]["message"]
+        .as_str()
+        .expect("failure message")
+        .contains("reembed requires an embedding provider"));
 }
 
 #[test]
@@ -727,12 +728,12 @@ fn contradictions_resolve_nonexistent_contradiction_returns_clear_error() {
         "stdout: {}",
         String::from_utf8_lossy(&resolve.stdout)
     );
-    assert!(
-        String::from_utf8_lossy(&resolve.stderr)
-            .contains(&format!("contradiction not found: {missing_id}")),
-        "expected clear contradiction-not-found error, stderr: {}",
-        String::from_utf8_lossy(&resolve.stderr)
-    );
+    let body: serde_json::Value =
+        serde_json::from_slice(&resolve.stdout).expect("stdout should be valid json");
+    assert!(body["failure"]["message"]
+        .as_str()
+        .expect("failure message")
+        .contains(&format!("contradiction not found: {missing_id}")));
 }
 
 #[test]
@@ -906,7 +907,7 @@ fn health_command_json_exposes_enhanced_fields() {
     let health_json: serde_json::Value =
         serde_json::from_slice(&health.stdout).expect("parse health response");
     let data = &health_json["data"];
-    assert_eq!(health_json["command"].as_str(), Some("health"));
+    assert_eq!(health_json["command"], serde_json::json!(["health"]));
     assert!(
         data["averageImportance"].is_number(),
         "health json: {health_json}"
@@ -1145,7 +1146,10 @@ fn consolidate_cross_scope_promotes_survivor_and_deletes_duplicate() {
     );
     let consolidate_json: serde_json::Value =
         serde_json::from_slice(&consolidate.stdout).expect("parse consolidate response");
-    assert_eq!(consolidate_json["command"].as_str(), Some("consolidate"));
+    assert_eq!(
+        consolidate_json["command"],
+        serde_json::json!(["consolidate"])
+    );
     assert_eq!(consolidate_json["data"]["mergedCount"].as_u64(), Some(1));
     assert_eq!(
         consolidate_json["data"]["mergedIds"]
@@ -1429,7 +1433,7 @@ fn ollama_offline_add_succeeds_and_warns_about_degraded_storage() {
 
     let add_json: serde_json::Value =
         serde_json::from_slice(&add.stdout).expect("parse add response as json");
-    assert_eq!(add_json["command"].as_str(), Some("add"));
+    assert_eq!(add_json["command"], serde_json::json!(["add"]));
     assert!(
         String::from_utf8_lossy(&add.stderr).contains(&format!(
             "Ollama not reachable at {ollama_url}, storing without embeddings. Run reembed later."
@@ -1830,7 +1834,7 @@ fn openai_offline_add_succeeds_and_warns_about_degraded_storage() {
 
     let add_json: serde_json::Value =
         serde_json::from_slice(&add.stdout).expect("parse add response as json");
-    assert_eq!(add_json["command"].as_str(), Some("add"));
+    assert_eq!(add_json["command"], serde_json::json!(["add"]));
     assert!(
         String::from_utf8_lossy(&add.stderr).contains(&format!(
             "OpenAI not reachable at {openai_url}, storing without embeddings. Run reembed later."
@@ -1876,7 +1880,7 @@ fn openai_invalid_api_key_add_succeeds_and_warns_about_degraded_storage() {
 
     let add_json: serde_json::Value =
         serde_json::from_slice(&add.stdout).expect("parse add response as json");
-    assert_eq!(add_json["command"].as_str(), Some("add"));
+    assert_eq!(add_json["command"], serde_json::json!(["add"]));
     assert!(
         String::from_utf8_lossy(&add.stderr).contains(
             "OpenAI embeddings unavailable (401 Unauthorized: invalid API key), storing without embeddings. Run reembed later."
@@ -1991,7 +1995,7 @@ fn import_from_export_file_restores_memories_after_purge() {
 
     let import_json: serde_json::Value =
         serde_json::from_slice(&import.stdout).expect("parse import json");
-    assert_eq!(import_json["command"].as_str(), Some("import"));
+    assert_eq!(import_json["command"], serde_json::json!(["import"]));
     assert_eq!(
         import_json["data"]["total"].as_u64(),
         Some(2),
@@ -2036,6 +2040,40 @@ fn import_from_export_file_restores_memories_after_purge() {
             .any(|m| m["preview"].as_str().is_some_and(|p| p.contains("Apollo"))),
         "expected at least one Apollo memory restored, got {list_json}"
     );
+}
+
+#[test]
+fn purge_requires_yes_in_non_interactive_json_mode() {
+    let temp_dir = unique_temp_dir("elegy-memory-cli-purge-non-interactive");
+    let db_path = temp_dir.join("memory.sqlite3");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
+        .args([
+            "--format",
+            "json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-memory-purge-1",
+            "purge",
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+        ])
+        .output()
+        .expect("run non-interactive purge without yes");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let body: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(body["status"], "invalid");
+    assert_eq!(body["correlationId"], "corr-memory-purge-1");
+    assert_eq!(body["nonInteractive"], true);
+    assert_eq!(body["command"], serde_json::json!(["purge"]));
+    assert!(body["failure"]["message"]
+        .as_str()
+        .expect("failure message")
+        .contains("purge requires --yes when --non-interactive is set"));
 }
 
 #[test]

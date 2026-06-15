@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/dynamic-skill-activation.schema.json",
+  "title": "DynamicSkillActivation",
+  "description": "Canonical dynamic skill activation options contract for non-.NET consumers.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["isEnabled"],
+  "properties": {
+    "isEnabled": { "type": "boolean" }
+  }
+}

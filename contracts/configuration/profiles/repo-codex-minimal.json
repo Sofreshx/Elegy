@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-configuration-profile/v1",
+  "profileId": "repo-codex-minimal",
+  "displayName": "Repo Codex Minimal",
+  "description": "Minimal repo-local Codex-facing setup with configurable skill authority and Codex mirror root.",
+  "bindings": {
+    "authority.skills": ".github/skills",
+    "target.skills": ".agents/skills"
+  },
+  "templates": [
+    {
+      "templateId": "repo-skill-mirror-minimal",
+      "bindings": {}
+    }
+  ]
+}

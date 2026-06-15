@@ -22,7 +22,7 @@ It does not move runtime authority out of `SAASTools`.
 
 The authority chain is explicit and one-way:
 
-1. `contracts/fixtures/skill-definition-v2.elegy-memory.json` is the governed skill definition source of truth.
+1. `contracts/fixtures/skill.elegy-memory.json` is the governed skill definition source of truth.
 2. `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed discovery projection derived from that definition.
 3. `.agents/skills/elegy-memory/SKILL.md` and `.github/skills/elegy-memory/SKILL.md` are rendered local outputs and are not authoritative.
 

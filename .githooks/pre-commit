@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+# Pre-commit hook: fast registry-alignment validation.
+set -euo pipefail
+
+REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+
+echo "[pre-commit] registry-alignment"
+pwsh -NoProfile -NonInteractive -Command "& '$REPO_ROOT/scripts/validate-registry-alignment.ps1' -RepoRoot '$REPO_ROOT'"

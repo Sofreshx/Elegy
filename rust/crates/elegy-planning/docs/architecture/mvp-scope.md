@@ -17,7 +17,9 @@
 | SQLite authority store | **MVP** | Single local DB file |
 | Schema version bootstrap | **MVP** | `planning_config.schema_version` |
 | Append-only planning event log | **MVP** | `planning_events` |
-| Current-state projection tables | **MVP** | Goals, roadmaps, plans, todos, issues, review points |
+| Current-state projection tables | **MVP** | Goals, roadmaps, plans, todos, issues, review points, insights |
+| Tag index table | **MVP** | Denormalized tag-to-entity mapping for fast correlation queries |
+| FTS5 full-text search | **MVP** | Content search across entities and insights |
 | Replay-only reconstruction from events | **v1** | Current MVP writes both events and projections |
 
 ### Durable Entities
@@ -32,6 +34,7 @@
 | Todo | **MVP** | Linked or standalone |
 | Issue | **MVP** | First-class aggregate |
 | Review point | **MVP** | Attached record, not top-level review aggregate |
+| Insight | **MVP** | First-class reasoning entity attached to any planning entity |
 | Evidence aggregate | **v1** | MVP uses string evidence refs on todos |
 
 ### Validation
@@ -57,6 +60,10 @@
 | Todo create/list | **MVP** | Implemented |
 | Issue record/list/show | **MVP** | Implemented |
 | Review point record | **MVP** | Implemented |
+| Insight record/list/show/search/update-status | **MVP** | First-class reasoning entity with tag indexing |
+| Context entity/session | **MVP** | Progressive disclosure bundles with token estimates |
+| Tags list | **MVP** | Tag governance via indexed listing |
+| Extended search with --tag and --fts | **MVP** | Tag correlation and full-text content search |
 | Validate all | **MVP** | Implemented |
 | Events list | **MVP** | Implemented |
 | Health | **MVP** | Implemented |

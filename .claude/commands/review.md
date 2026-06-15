@@ -1,8 +1,9 @@
-Review les changements sur la branche actuelle vs `dev` :
+Review the changes on the current branch against `dev`:
 
-1. `git diff dev --stat` puis `git diff dev` pour voir les changements
-2. Pour chaque fichier modifié, vérifie la cohérence avec les docs d'architecture
-3. Cherche : invariants structurels touchés, unwrap en production, edge cases non testés, fichiers modifiés hors scope
-4. Liste les findings par sévérité (critique / important / mineur)
+1. Run `git diff dev --stat`, then inspect `git diff dev`.
+2. For each changed file, verify coherence with the smallest relevant architecture doc, ADR, spec, or AGENTS.md file.
+3. Look for touched structural invariants, contract drift, stale generated/derived surfaces, production `unwrap` or `expect`, untested edge cases, and files changed outside scope.
+4. For agent-facing changes, check the governed artifact plus the Rust behavior or projection that exposes it.
+5. List findings first, ordered by severity: critical, important, minor.
 
-Focus : $ARGUMENTS
+Focus: $ARGUMENTS

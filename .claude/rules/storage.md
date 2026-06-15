@@ -1,14 +1,15 @@
-# --- .claude/rules/storage.md (dans le repo Elegy) ---
-# Ce fichier se charge UNIQUEMENT quand Claude touche des fichiers dans storage/
+# .claude/rules/storage.md for Elegy
+# This rule applies only when Claude touches memory storage files.
 
 ---
 paths:
   - "rust/crates/elegy-memory/src/storage/**"
 ---
 
-Tu travailles sur le moteur de stockage SQLite d'Elegy-Memory.
+You are working on the SQLite storage layer for `elegy-memory`.
 
-Vérifie la cohérence avec @rust/crates/elegy-memory/docs/architecture/storage-schema.md.
-Le schéma est géré dans `schema.rs` — toute modification = STOP + validation humaine.
-Les migrations se font dans `ensure_schema()`, jamais de SQL brut ad-hoc ailleurs.
-Tous les accès DB passent par le trait `MemoryStore` défini dans `traits.rs`.
+Check coherence with @rust/crates/elegy-memory/docs/architecture/storage-schema.md.
+The schema is managed in `schema.rs`; schema changes require an explicit human confirmation before editing.
+Migrations belong in `ensure_schema()`, not ad hoc SQL elsewhere.
+All database access should flow through the `MemoryStore` trait boundary defined in `traits.rs`.
+Do not store raw transcripts, bypass salience/provenance, or mix memory scopes implicitly.

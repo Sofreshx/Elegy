@@ -58,15 +58,18 @@ The key current crates are:
 
 The current shipped operator path is intentionally narrow.
 
-The current shipped operator surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`.
+The current shipped operator surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`.
 
 What the repo proves today:
 
 - the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, umbrella `skills ...`, and lower-level `generate skills` / `generate codex-plugin`
 - the in-repo `elegy-memory` surface is shipped as a bounded local operator surface
 - the in-repo `elegy-mcp` surface is shipped as a thin dedicated wrapper over descriptor authoring and descriptor analysis
+- the in-repo `elegy-planning` surface is shipped as a dedicated wrapper over durable planning authority
 - the in-repo `elegy-skills` surface is shipped as a thin dedicated wrapper over governed skill-registry access and validation
-- those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp`, `rust/crates/elegy-skills`, and `rust/crates/elegy-tooling`
+- the in-repo `elegy-configuration` surface is shipped as a dedicated wrapper over governed template/profile flows
+- the in-repo `elegy-documentation` surface is shipped as a dedicated wrapper over documentation inspection, mapping, and non-authoritative export
+- those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp`, `rust/crates/elegy-skills`, `rust/crates/elegy-planning`, and `rust/crates/elegy-tooling`
 - the CLI also carries validation, inspection, and stdio-host startup entrypoints
 - contract bundles can be exported and consumed independently of the Rust workspace
 
