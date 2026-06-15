@@ -12,17 +12,19 @@ use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
 use crate::{
-    validation::validate_entity, AttachWorktreeInput, BlockedCandidate, EffortTier, EntityType,
-    FileScopeRecord, FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, InsightRecord,
-    InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView, MutationResult,
-    PlanRecord, PlanStatus, PlanView, PlanningEdgeKind, PlanningEvent, PlanningGraphEdge,
-    PlanningGraphNode, PlanningHealthReport, PlanningNodeKind, PlanningStoreError, Priority,
-    ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat,
-    RenderedProjection, ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapSectionRecord,
-    RoadmapStatus, RoadmapView, RunnableCandidates, RunnableWorkPointCandidate, ScopeRecord,
-    SessionSummary, Severity, TagInfo, TodoRecord, TodoStatus, ValidationFinding, ValidationReport,
-    ValidationRunReport, ValidationSeverity, WorkGraph, WorkGraphEdge, WorkGraphNode,
-    WorkPointKind, WorkPointRecord, WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
+    validation::validate_entity, AcceptanceKind, AcceptanceView, AttachWorktreeInput,
+    BlockedCandidate, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeRecord,
+    FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, GraphEdgeView, GraphNodeView,
+    InsightRecord, InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView,
+    MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEdgeKind, PlanningEvent,
+    PlanningGraphEdge, PlanningGraphNode, PlanningHealthReport, PlanningNodeKind,
+    PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus,
+    ProjectRunView, ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus,
+    RoadmapRecord, RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
+    RunnableWorkPointCandidate, ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord,
+    TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity,
+    WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord, WorkPointStatus,
+    WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
 pub const CURRENT_SCHEMA_VERSION: &str = "9";
@@ -289,23 +291,140 @@ pub struct RevisePlanInput {
 pub struct CreateGraphNodeInput {
     pub id: Option<String>,
     pub scope_key: Option<String>,
+    pub correlation_id: String,
     pub kind: PlanningNodeKind,
     pub title: String,
     pub summary: String,
     pub status: String,
     pub payload: serde_json::Value,
     pub tags: Vec<String>,
+    pub run_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
 pub struct CreateGraphEdgeInput {
     pub id: Option<String>,
     pub scope_key: Option<String>,
+    pub correlation_id: String,
     pub kind: PlanningEdgeKind,
     pub source_node_id: String,
     pub target_node_id: String,
     pub status: String,
     pub payload: serde_json::Value,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct UpdateGraphNodeStatusInput {
+    pub node_id: String,
+    pub correlation_id: String,
+    pub active_scope_key: Option<String>,
+    pub status: String,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct UpdateGraphEdgeStatusInput {
+    pub edge_id: String,
+    pub correlation_id: String,
+    pub active_scope_key: Option<String>,
+    pub status: String,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReviseGraphNodeInput {
+    pub node_id: String,
+    pub correlation_id: String,
+    pub active_scope_key: Option<String>,
+    pub title: Option<String>,
+    pub summary: Option<String>,
+    pub status: Option<String>,
+    pub payload: Option<serde_json::Value>,
+    pub tags: Option<Vec<String>>,
+    pub clear_tags: bool,
+    pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ReviseGraphEdgeInput {
+    pub edge_id: String,
+    pub correlation_id: String,
+    pub active_scope_key: Option<String>,
+    pub status: Option<String>,
+    pub payload: Option<serde_json::Value>,
+    pub run_id: Option<String>,
+}
+
+/// Typed input for creating an acceptance graph node.
+#[derive(Clone, Debug)]
+pub struct CreateAcceptanceInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub correlation_id: String,
+    pub title: String,
+    pub summary: String,
+    pub status: String,
+    pub acceptance_kind: AcceptanceKind,
+    pub description: String,
+    pub verification_policy: String,
+    pub required_evidence_kinds: Vec<EvidenceKind>,
+    pub waiver: Option<String>,
+    pub tags: Vec<String>,
+    pub run_id: Option<String>,
+}
+
+/// Typed input for creating an evidence graph node.
+#[derive(Clone, Debug)]
+pub struct CreateEvidenceInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub correlation_id: String,
+    pub title: String,
+    pub summary: String,
+    pub status: String,
+    pub evidence_kind: EvidenceKind,
+    pub reference: String,
+    pub content: String,
+    pub captured_at: String,
+    pub tags: Vec<String>,
+    pub run_id: Option<String>,
+}
+
+/// Input for linking a concrete acceptance to an abstract acceptance (Satisfies edge).
+#[derive(Clone, Debug)]
+pub struct SatisfyAcceptanceInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub correlation_id: String,
+    pub concrete_node_id: String,
+    pub abstract_node_id: String,
+    pub rationale: String,
+    pub run_id: Option<String>,
+}
+
+/// Input for attaching an evidence node to a target (EvidencedBy edge).
+#[derive(Clone, Debug)]
+pub struct AttachEvidenceInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub correlation_id: String,
+    pub evidence_node_id: String,
+    pub target_node_id: String,
+    pub rationale: String,
+    pub run_id: Option<String>,
+}
+
+/// Input for finalizing a graph node (transitioning to a terminal status).
+#[derive(Clone, Debug)]
+pub struct FinalizeGraphNodeInput {
+    pub node_id: String,
+    pub correlation_id: String,
+    pub active_scope_key: Option<String>,
+    pub status: String,
+    /// Optional accepted risk rationale. Only applies to acceptance/evidence gaps.
+    pub accepted_risk: Option<String>,
+    pub run_id: Option<String>,
 }
 
 impl PlanningStore {
@@ -1872,7 +1991,7 @@ impl PlanningStore {
         let normalized = normalize_scope_key_value(scope_key);
         let entity_json = load_entity_json(&connection, entity_type, entity_id)?;
         let parent_summary = load_parent_summary(&connection, entity_type, entity_id)?;
-        let children = load_children_json(&connection, entity_type, entity_id)?;
+        let children = load_children_json(&connection, entity_type, entity_id, &normalized)?;
         let insights =
             list_insights_for_entity_in_scope(&connection, entity_type, entity_id, &normalized)?;
         let related_insights = if let Some(ref parent) = parent_summary {
@@ -2960,7 +3079,11 @@ impl PlanningStore {
                 )?;
                 serde_json::json!({ "record": record, "validation": validation })
             }
-            EntityType::RoadmapSection | EntityType::Scope | EntityType::ProjectRun => {
+            EntityType::RoadmapSection
+            | EntityType::Scope
+            | EntityType::ProjectRun
+            | EntityType::GraphNode
+            | EntityType::GraphEdge => {
                 return Err(PlanningStoreError::InvalidInput(format!(
                     "status transitions are not supported for {}",
                     input.entity_type.as_str()
@@ -4348,6 +4471,8 @@ impl PlanningStore {
             review_point_count: count_table(&connection, "review_points")?,
             insight_count: count_table(&connection, "insights")?,
             project_run_count: count_table(&connection, "project_runs")?,
+            graph_node_count: count_table(&connection, "planning_nodes")?,
+            graph_edge_count: count_table(&connection, "planning_edges")?,
         })
     }
 
@@ -4526,9 +4651,14 @@ impl PlanningStore {
         &self,
         input: CreateGraphNodeInput,
     ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
         require_non_empty("title", &input.title)?;
         require_non_empty("summary", &input.summary)?;
         require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+        if let Some(ref explicit_id) = input.id {
+            require_non_empty("id", explicit_id)?;
+        }
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
@@ -4572,8 +4702,24 @@ impl PlanningStore {
             ],
         )?;
 
-        // Phase 1: skip events, validation, and tag indexing for graph nodes
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphNode,
+                &id,
+                EntityType::GraphNode,
+                &id,
+                &input.correlation_id,
+                input.run_id,
+                "graph-node.created",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        // Phase 3: graph validators run during validate_all but are not called at write time
         let validation = ValidationReport::from_findings(Vec::new());
+        rebuild_tag_index_for_entity(&transaction, EntityType::GraphNode, &id, &record.tags)?;
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -4581,6 +4727,180 @@ impl PlanningStore {
     pub fn graph_node(&self, id: &str) -> Result<PlanningGraphNode, PlanningStoreError> {
         let connection = self.open_connection()?;
         load_graph_node(&connection, id)
+    }
+
+    pub fn graph_node_view(
+        &self,
+        node_id: &str,
+        scope_key: &str,
+    ) -> Result<GraphNodeView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let node = load_graph_node(&connection, node_id)?;
+        let normalized_scope = normalize_scope_key_value(scope_key);
+        if node.scope_key != normalized_scope {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph node `{}` is in scope `{}`, not `{}`",
+                node_id, node.scope_key, normalized_scope
+            )));
+        }
+        let incoming = list_incoming_edges_in_scope(&connection, node_id, &normalized_scope, None)?;
+        let outgoing = list_outgoing_edges_in_scope(&connection, node_id, &normalized_scope, None)?;
+        let connected = load_connected_graph_node_summaries(&connection, &incoming, &outgoing)?;
+        let tags: Vec<String> = parse_json_column(
+            connection
+                .query_row(
+                    "SELECT tags_json FROM planning_nodes WHERE id = ?1",
+                    params![node_id],
+                    |row| row.get::<_, String>(0),
+                )
+                .map_err(|e| map_not_found(e, EntityType::GraphNode, node_id))?,
+        )
+        .map_err(PlanningStoreError::from)?;
+        let findings = validate_entity(&connection, EntityType::GraphNode, node_id)?;
+        let validation = ValidationReport::from_findings(findings);
+        Ok(GraphNodeView {
+            node,
+            incoming_edges: incoming,
+            outgoing_edges: outgoing,
+            connected_nodes: connected,
+            tags,
+            validation,
+        })
+    }
+
+    pub fn graph_edge_view(
+        &self,
+        edge_id: &str,
+        scope_key: &str,
+    ) -> Result<GraphEdgeView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let edge = load_graph_edge(&connection, edge_id)?;
+        let normalized_scope = normalize_scope_key_value(scope_key);
+        if edge.scope_key != normalized_scope {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph edge `{}` is in scope `{}`, not `{}`",
+                edge_id, edge.scope_key, normalized_scope
+            )));
+        }
+        let source_node = load_graph_node_summary(&connection, &edge.source_node_id)?;
+        let target_node = load_graph_node_summary(&connection, &edge.target_node_id)?;
+        let findings = validate_entity(&connection, EntityType::GraphEdge, edge_id)?;
+        let validation = ValidationReport::from_findings(findings);
+        Ok(GraphEdgeView {
+            edge,
+            source_node,
+            target_node,
+            validation,
+        })
+    }
+
+    /// Build a typed acceptance view including requirements, coverage, and evidence paths.
+    pub fn acceptance_view(
+        &self,
+        node_id: &str,
+        scope_key: &str,
+    ) -> Result<AcceptanceView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let node = load_graph_node(&connection, node_id)?;
+        let normalized_scope = normalize_scope_key_value(scope_key);
+        if node.scope_key != normalized_scope {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph node `{}` is in scope `{}`, not `{}`",
+                node_id, node.scope_key, normalized_scope
+            )));
+        }
+
+        if node.kind != PlanningNodeKind::Acceptance {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph node `{}` is a `{}` node, not an acceptance node",
+                node_id,
+                node.kind.as_str()
+            )));
+        }
+
+        // Nodes that require this acceptance (Requires edge: X --requires--> this)
+        let incoming = list_incoming_edges_in_scope(&connection, node_id, &normalized_scope, None)?;
+        let required_by: Vec<PlanningGraphNode> = incoming
+            .iter()
+            .filter(|e| e.kind == PlanningEdgeKind::Requires && e.status == "active")
+            .filter_map(|e| load_graph_node(&connection, &e.source_node_id).ok())
+            .collect();
+
+        // Abstract acceptances this concrete satisfies (Satisfies edge: this --satisfies--> abstract)
+        let outgoing = list_outgoing_edges_in_scope(&connection, node_id, &normalized_scope, None)?;
+        let satisfied_abstracts: Vec<PlanningGraphNode> = outgoing
+            .iter()
+            .filter(|e| e.kind == PlanningEdgeKind::Satisfies && e.status == "active")
+            .filter_map(|e| load_graph_node(&connection, &e.target_node_id).ok())
+            .collect();
+
+        // Concrete acceptances that satisfy this abstract (Satisfies edge: concrete --satisfies--> this)
+        let satisfying_concretes: Vec<PlanningGraphNode> = incoming
+            .iter()
+            .filter(|e| e.kind == PlanningEdgeKind::Satisfies && e.status == "active")
+            .filter_map(|e| load_graph_node(&connection, &e.source_node_id).ok())
+            .collect();
+
+        // Evidence attached to this acceptance (EvidencedBy edge: this --evidenced-by--> evidence)
+        let attached_evidence: Vec<PlanningGraphNode> = outgoing
+            .iter()
+            .filter(|e| e.kind == PlanningEdgeKind::EvidencedBy && e.status == "active")
+            .filter_map(|e| load_graph_node(&connection, &e.target_node_id).ok())
+            .collect();
+
+        let findings = validate_entity(&connection, EntityType::GraphNode, node_id)?;
+        let validation = ValidationReport::from_findings(findings);
+
+        Ok(AcceptanceView {
+            node,
+            required_by,
+            satisfied_abstracts,
+            satisfying_concretes,
+            attached_evidence,
+            validation,
+        })
+    }
+
+    /// Build a typed evidence view including linked targets.
+    pub fn evidence_view(
+        &self,
+        node_id: &str,
+        scope_key: &str,
+    ) -> Result<EvidenceView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let node = load_graph_node(&connection, node_id)?;
+        let normalized_scope = normalize_scope_key_value(scope_key);
+        if node.scope_key != normalized_scope {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph node `{}` is in scope `{}`, not `{}`",
+                node_id, node.scope_key, normalized_scope
+            )));
+        }
+
+        if node.kind != PlanningNodeKind::Evidence {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "graph node `{}` is a `{}` node, not an evidence node",
+                node_id,
+                node.kind.as_str()
+            )));
+        }
+
+        // Targets this evidence is attached to (EvidencedBy edge: target --evidenced-by--> this)
+        let incoming = list_incoming_edges_in_scope(&connection, node_id, &normalized_scope, None)?;
+        let attached_to: Vec<PlanningGraphNode> = incoming
+            .iter()
+            .filter(|e| e.kind == PlanningEdgeKind::EvidencedBy && e.status == "active")
+            .filter_map(|e| load_graph_node(&connection, &e.source_node_id).ok())
+            .collect();
+
+        let findings = validate_entity(&connection, EntityType::GraphNode, node_id)?;
+        let validation = ValidationReport::from_findings(findings);
+
+        Ok(EvidenceView {
+            node,
+            attached_to,
+            validation,
+        })
     }
 
     pub fn list_graph_nodes(
@@ -4605,15 +4925,377 @@ impl PlanningStore {
         }
     }
 
+    pub fn update_graph_node_status(
+        &self,
+        input: UpdateGraphNodeStatusInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("nodeId", &input.node_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphNode,
+            &input.node_id,
+            &active_scope_key,
+        )?;
+
+        let old_record = load_graph_node(&transaction, &input.node_id)?;
+        let old_status = old_record.status.clone();
+        let now = now_string()?;
+
+        transaction.execute(
+            "UPDATE planning_nodes SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
+            params![input.status.trim(), now, input.node_id],
+        )?;
+
+        let record = load_graph_node(&transaction, &input.node_id)?;
+
+        let payload = serde_json::json!({
+            "status": record.status,
+            "previousStatus": old_status,
+            "revision": record.revision,
+        });
+
+        let correlation_id = &input.correlation_id;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphNode,
+                &record.id,
+                EntityType::GraphNode,
+                &record.id,
+                correlation_id,
+                input.run_id,
+                "graph-node.status-updated",
+                payload,
+            )?,
+        )?;
+
+        let findings = validate_entity(&transaction, EntityType::GraphNode, &record.id)?;
+        persist_validation_findings(&transaction, EntityType::GraphNode, &record.id, &findings)?;
+        let validation = ValidationReport::from_findings(findings);
+
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn update_graph_edge_status(
+        &self,
+        input: UpdateGraphEdgeStatusInput,
+    ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("edgeId", &input.edge_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphEdge,
+            &input.edge_id,
+            &active_scope_key,
+        )?;
+
+        let old_record = load_graph_edge(&transaction, &input.edge_id)?;
+        let old_status = old_record.status.clone();
+        let new_status = input.status.trim().to_string();
+
+        // If transitioning TO "active", recheck invariants (checks on every active transition,
+        // including when the edge is already active — the duplicate query excludes the current edge)
+        if new_status == "active" {
+            // Recheck: no duplicate active edge
+            let dup_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active' AND id != ?5",
+                params![old_record.scope_key, old_record.kind.as_str(), old_record.source_node_id, old_record.target_node_id, input.edge_id],
+                |row| row.get(0),
+            )?;
+            if dup_count > 0 {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "cannot set edge status to active: duplicate active {} edge from `{}` to `{}` in scope `{}`",
+                    old_record.kind.as_str(),
+                    old_record.source_node_id,
+                    old_record.target_node_id,
+                    old_record.scope_key
+                )));
+            }
+
+            // Recheck: no cycle for acyclic edge kinds
+            match old_record.kind {
+                PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
+                    if would_create_graph_cycle(
+                        &transaction,
+                        &old_record.source_node_id,
+                        &old_record.target_node_id,
+                        &old_record.kind,
+                    )? =>
+                {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "cannot set edge status to active: {} edge from `{}` to `{}` would create a cycle",
+                        old_record.kind.as_str(),
+                        old_record.source_node_id,
+                        old_record.target_node_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        let now = now_string()?;
+        transaction.execute(
+            "UPDATE planning_edges SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
+            params![new_status, now, input.edge_id],
+        )?;
+
+        let record = load_graph_edge(&transaction, &input.edge_id)?;
+
+        let payload = serde_json::json!({
+            "status": record.status,
+            "previousStatus": old_status,
+            "revision": record.revision,
+        });
+
+        let correlation_id = &input.correlation_id;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphEdge,
+                &record.id,
+                EntityType::GraphNode,
+                &record.source_node_id,
+                correlation_id,
+                input.run_id,
+                "graph-edge.status-updated",
+                payload,
+            )?,
+        )?;
+
+        let findings = validate_entity(&transaction, EntityType::GraphEdge, &record.id)?;
+        persist_validation_findings(&transaction, EntityType::GraphEdge, &record.id, &findings)?;
+        let validation = ValidationReport::from_findings(findings);
+
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn revise_graph_node(
+        &self,
+        input: ReviseGraphNodeInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("nodeId", &input.node_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphNode,
+            &input.node_id,
+            &active_scope_key,
+        )?;
+
+        let existing = load_graph_node(&transaction, &input.node_id)?;
+        let now = now_string()?;
+
+        let title = input
+            .title
+            .map(|t| t.trim().to_string())
+            .filter(|t| !t.is_empty())
+            .unwrap_or(existing.title.clone());
+        let summary = input
+            .summary
+            .map(|s| s.trim().to_string())
+            .filter(|s| !s.is_empty())
+            .unwrap_or(existing.summary.clone());
+        let status = match &input.status {
+            Some(s) => {
+                require_kebab_token("status", s)?;
+                s.trim().to_string()
+            }
+            None => existing.status.clone(),
+        };
+        let payload = input.payload.unwrap_or(existing.payload.clone());
+        let tags = if input.clear_tags {
+            Vec::new()
+        } else {
+            input
+                .tags
+                .map(normalize_string_list)
+                .unwrap_or(existing.tags.clone())
+        };
+
+        transaction.execute(
+            "UPDATE planning_nodes SET title = ?1, summary = ?2, status = ?3, payload_json = ?4, tags_json = ?5, revision = revision + 1, updated_at = ?6 WHERE id = ?7",
+            params![title, summary, status, to_json_text(&payload)?, to_json_text(&tags)?, now, input.node_id],
+        )?;
+
+        let record = load_graph_node(&transaction, &input.node_id)?;
+
+        let event_payload = serde_json::json!({
+            "title": record.title,
+            "summary": record.summary,
+            "status": record.status,
+            "tags": record.tags,
+            "revision": record.revision,
+        });
+
+        let correlation_id = &input.correlation_id;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphNode,
+                &record.id,
+                EntityType::GraphNode,
+                &record.id,
+                correlation_id,
+                input.run_id,
+                "graph-node.revised",
+                event_payload,
+            )?,
+        )?;
+
+        let findings = validate_entity(&transaction, EntityType::GraphNode, &record.id)?;
+        persist_validation_findings(&transaction, EntityType::GraphNode, &record.id, &findings)?;
+        let validation = ValidationReport::from_findings(findings);
+        rebuild_tag_index_for_entity(
+            &transaction,
+            EntityType::GraphNode,
+            &record.id,
+            &record.tags,
+        )?;
+
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    pub fn revise_graph_edge(
+        &self,
+        input: ReviseGraphEdgeInput,
+    ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("edgeId", &input.edge_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphEdge,
+            &input.edge_id,
+            &active_scope_key,
+        )?;
+
+        let existing = load_graph_edge(&transaction, &input.edge_id)?;
+        let now = now_string()?;
+
+        let old_status = existing.status.clone();
+        let status = match &input.status {
+            Some(s) => {
+                require_kebab_token("status", s)?;
+                s.trim().to_string()
+            }
+            None => existing.status.clone(),
+        };
+        let payload = input.payload.unwrap_or(existing.payload.clone());
+
+        // If status changes TO "active", recheck invariants (checks on every active transition,
+        // including when the edge is already active — the duplicate query excludes the current edge)
+        if status == "active" {
+            let dup_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active' AND id != ?5",
+                params![existing.scope_key, existing.kind.as_str(), existing.source_node_id, existing.target_node_id, input.edge_id],
+                |row| row.get(0),
+            )?;
+            if dup_count > 0 {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "cannot revise edge status to active: duplicate active {} edge from `{}` to `{}` in scope `{}`",
+                    existing.kind.as_str(),
+                    existing.source_node_id,
+                    existing.target_node_id,
+                    existing.scope_key
+                )));
+            }
+            match existing.kind {
+                PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
+                    if would_create_graph_cycle(
+                        &transaction,
+                        &existing.source_node_id,
+                        &existing.target_node_id,
+                        &existing.kind,
+                    )? =>
+                {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "cannot revise edge status to active: {} edge from `{}` to `{}` would create a cycle",
+                        existing.kind.as_str(),
+                        existing.source_node_id,
+                        existing.target_node_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        transaction.execute(
+            "UPDATE planning_edges SET status = ?1, payload_json = ?2, revision = revision + 1, updated_at = ?3 WHERE id = ?4",
+            params![status, to_json_text(&payload)?, now, input.edge_id],
+        )?;
+
+        let record = load_graph_edge(&transaction, &input.edge_id)?;
+
+        let event_payload = serde_json::json!({
+            "status": record.status,
+            "previousStatus": old_status,
+            "revision": record.revision,
+        });
+
+        let correlation_id = &input.correlation_id;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphEdge,
+                &record.id,
+                EntityType::GraphNode,
+                &record.source_node_id,
+                correlation_id,
+                input.run_id,
+                "graph-edge.revised",
+                event_payload,
+            )?,
+        )?;
+
+        let findings = validate_entity(&transaction, EntityType::GraphEdge, &record.id)?;
+        persist_validation_findings(&transaction, EntityType::GraphEdge, &record.id, &findings)?;
+        let validation = ValidationReport::from_findings(findings);
+
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
     // ── Graph edge methods ──────────────────────────────────────────────────────
 
     pub fn create_graph_edge(
         &self,
         input: CreateGraphEdgeInput,
     ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
         require_non_empty("source_node_id", &input.source_node_id)?;
         require_non_empty("target_node_id", &input.target_node_id)?;
         require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+        if let Some(ref explicit_id) = input.id {
+            require_non_empty("id", explicit_id)?;
+        }
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction()?;
@@ -4652,40 +5334,47 @@ impl PlanningStore {
         // Preflight: valid source/target node kinds for this edge kind
         validate_edge_kind_pair(&input.kind, &source.kind, &target.kind)?;
 
-        // Preflight: no duplicate active edge (also enforced by UNIQUE partial index)
-        let dup_count: i64 = transaction.query_row(
-            "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
-            params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
-            |row| row.get(0),
-        )?;
-        if dup_count > 0 {
-            return Err(PlanningStoreError::InvalidInput(format!(
-                "duplicate active {} edge from `{}` to `{}` in scope `{}`",
-                input.kind.as_str(),
-                input.source_node_id,
-                input.target_node_id,
-                scope_key
-            )));
-        }
+        let final_status = input.status.trim();
 
+        // Preflight: no duplicate active edge (also enforced by UNIQUE partial index)
         // Preflight: cycle detection for acyclic families
-        match input.kind {
-            PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
-                if would_create_graph_cycle(
-                    &transaction,
-                    &input.source_node_id,
-                    &input.target_node_id,
-                    &input.kind,
-                )? =>
-            {
+        // Only run active-only invariants when the final status is "active"
+        if final_status == "active" {
+            // Preflight: no duplicate active edge (also enforced by UNIQUE partial index)
+            let dup_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+                params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+                |row| row.get(0),
+            )?;
+            if dup_count > 0 {
                 return Err(PlanningStoreError::InvalidInput(format!(
-                    "adding this {} edge from `{}` to `{}` would create a cycle",
+                    "duplicate active {} edge from `{}` to `{}` in scope `{}`",
                     input.kind.as_str(),
                     input.source_node_id,
-                    input.target_node_id
+                    input.target_node_id,
+                    scope_key
                 )));
             }
-            _ => {}
+
+            // Preflight: cycle detection for acyclic families
+            match input.kind {
+                PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
+                    if would_create_graph_cycle(
+                        &transaction,
+                        &input.source_node_id,
+                        &input.target_node_id,
+                        &input.kind,
+                    )? =>
+                {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "adding this {} edge from `{}` to `{}` would create a cycle",
+                        input.kind.as_str(),
+                        input.source_node_id,
+                        input.target_node_id
+                    )));
+                }
+                _ => {}
+            }
         }
 
         let now = now_string()?;
@@ -4724,8 +5413,376 @@ impl PlanningStore {
             ],
         )?;
 
-        // Phase 1: skip events and validation
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphEdge,
+                &id,
+                EntityType::GraphNode,
+                &input.source_node_id,
+                &input.correlation_id,
+                input.run_id,
+                "graph-edge.created",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+
+        // Phase 3: graph edge validators run during validate_all but are not called at write time
         let validation = ValidationReport::from_findings(Vec::new());
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
+    /// Create an acceptance node with typed payload.
+    pub fn create_acceptance(
+        &self,
+        input: CreateAcceptanceInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("title", &input.title)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let payload = serde_json::json!({
+            "acceptanceKind": input.acceptance_kind.as_str(),
+            "description": input.description,
+            "verificationPolicy": input.verification_policy,
+            "requiredEvidenceKinds": input.required_evidence_kinds.iter().map(|k| k.as_str()).collect::<Vec<_>>(),
+        });
+        let payload = if let Some(waiver) = &input.waiver {
+            let mut p = payload;
+            p["waiver"] = serde_json::json!(waiver);
+            p
+        } else {
+            payload
+        };
+
+        self.create_graph_node(CreateGraphNodeInput {
+            id: input.id,
+            scope_key: input.scope_key,
+            correlation_id: input.correlation_id,
+            kind: PlanningNodeKind::Acceptance,
+            title: input.title,
+            summary: input.summary,
+            status: input.status,
+            payload,
+            tags: input.tags,
+            run_id: input.run_id,
+        })
+    }
+
+    /// Create an evidence node with typed payload.
+    pub fn create_evidence(
+        &self,
+        input: CreateEvidenceInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("title", &input.title)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let payload = serde_json::json!({
+            "evidenceKind": input.evidence_kind.as_str(),
+            "summary": input.summary,
+            "reference": input.reference,
+            "content": input.content,
+            "capturedAt": input.captured_at,
+        });
+
+        self.create_graph_node(CreateGraphNodeInput {
+            id: input.id,
+            scope_key: input.scope_key,
+            correlation_id: input.correlation_id,
+            kind: PlanningNodeKind::Evidence,
+            title: input.title,
+            summary: input.summary,
+            status: input.status,
+            payload,
+            tags: input.tags,
+            run_id: input.run_id,
+        })
+    }
+
+    /// Create a Satisfies edge from a concrete acceptance to an abstract acceptance.
+    pub fn satisfy_acceptance(
+        &self,
+        input: SatisfyAcceptanceInput,
+    ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("concrete_node_id", &input.concrete_node_id)?;
+        require_non_empty("abstract_node_id", &input.abstract_node_id)?;
+        require_non_empty("rationale", &input.rationale)?;
+
+        // Preflight: both nodes must be Acceptance kind with correct direction
+        let connection = self.open_connection()?;
+        let concrete_node =
+            load_graph_node(&connection, &input.concrete_node_id).map_err(|_| {
+                PlanningStoreError::InvalidInput(format!(
+                    "concrete_node_id `{}` references a missing node",
+                    input.concrete_node_id
+                ))
+            })?;
+        if concrete_node.kind != PlanningNodeKind::Acceptance {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "concrete_node_id `{}` is a `{}` node, not an acceptance node",
+                input.concrete_node_id,
+                concrete_node.kind.as_str()
+            )));
+        }
+        let concrete_kind = concrete_node
+            .payload
+            .get("acceptanceKind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if concrete_kind != "concrete" {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "concrete_node_id `{}` has acceptanceKind `{}`, expected `concrete`",
+                input.concrete_node_id, concrete_kind
+            )));
+        }
+
+        let abstract_node =
+            load_graph_node(&connection, &input.abstract_node_id).map_err(|_| {
+                PlanningStoreError::InvalidInput(format!(
+                    "abstract_node_id `{}` references a missing node",
+                    input.abstract_node_id
+                ))
+            })?;
+        if abstract_node.kind != PlanningNodeKind::Acceptance {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "abstract_node_id `{}` is a `{}` node, not an acceptance node",
+                input.abstract_node_id,
+                abstract_node.kind.as_str()
+            )));
+        }
+        let abstract_kind = abstract_node
+            .payload
+            .get("acceptanceKind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if abstract_kind != "abstract" {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "abstract_node_id `{}` has acceptanceKind `{}`, expected `abstract`",
+                input.abstract_node_id, abstract_kind
+            )));
+        }
+
+        let payload = serde_json::json!({
+            "rationale": input.rationale,
+        });
+
+        self.create_graph_edge(CreateGraphEdgeInput {
+            id: input.id,
+            scope_key: input.scope_key,
+            correlation_id: input.correlation_id,
+            kind: PlanningEdgeKind::Satisfies,
+            source_node_id: input.concrete_node_id,
+            target_node_id: input.abstract_node_id,
+            status: "active".to_string(),
+            payload,
+            run_id: input.run_id,
+        })
+    }
+
+    /// Create an EvidencedBy edge from a target node to an evidence node.
+    pub fn attach_evidence(
+        &self,
+        input: AttachEvidenceInput,
+    ) -> Result<MutationResult<PlanningGraphEdge>, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("evidence_node_id", &input.evidence_node_id)?;
+        require_non_empty("target_node_id", &input.target_node_id)?;
+
+        let payload = if input.rationale.is_empty() {
+            serde_json::json!({})
+        } else {
+            serde_json::json!({
+                "rationale": input.rationale,
+            })
+        };
+
+        self.create_graph_edge(CreateGraphEdgeInput {
+            id: input.id,
+            scope_key: input.scope_key,
+            correlation_id: input.correlation_id,
+            kind: PlanningEdgeKind::EvidencedBy,
+            source_node_id: input.target_node_id,
+            target_node_id: input.evidence_node_id,
+            status: "active".to_string(),
+            payload,
+            run_id: input.run_id,
+        })
+    }
+
+    /// Finalize a graph node by transitioning it to a terminal status.
+    ///
+    /// Rejects finalization when the node or its connected edges have blocking
+    /// validation findings. Acceptance/evidence gaps can be waived with
+    /// `accepted_risk`; structural graph corruption cannot.
+    pub fn finalize_graph_node(
+        &self,
+        input: FinalizeGraphNodeInput,
+    ) -> Result<MutationResult<PlanningGraphNode>, PlanningStoreError> {
+        require_non_empty("nodeId", &input.node_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction()?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphNode,
+            &input.node_id,
+            &active_scope_key,
+        )?;
+
+        let node = load_graph_node(&transaction, &input.node_id)?;
+
+        // Collect all findings from the node itself
+        let node_findings = validate_entity(&transaction, EntityType::GraphNode, &node.id)?;
+
+        // Collect findings from connected edges
+        let incoming = list_incoming_edges_in_scope(&transaction, &node.id, &node.scope_key, None)?;
+        let outgoing = list_outgoing_edges_in_scope(&transaction, &node.id, &node.scope_key, None)?;
+        let mut all_edge_findings = Vec::new();
+        for edge in incoming.iter().chain(outgoing.iter()) {
+            if let Ok(mut ef) = validate_entity(&transaction, EntityType::GraphEdge, &edge.id) {
+                all_edge_findings.append(&mut ef);
+            }
+        }
+
+        // Determine blocking findings — three groups:
+        //   1. Structural: always blocked, never waivable
+        //   2. Type integrity: always blocked, never waivable (malformed payloads)
+        //   3. Waivable gaps: blocked unless accepted_risk is provided
+        let structural_codes: &[&str] = &[
+            "GRAPH-EDGE-CYCLE",
+            "GRAPH-EDGE-DUPLICATE-ACTIVE",
+            "GRAPH-EDGE-MISSING-NODE",
+            "GRAPH-EDGE-CROSS-SCOPE",
+            "GRAPH-EDGE-KIND-MISMATCH",
+        ];
+        let type_integrity_codes: &[&str] = &["ACCEPTANCE-KIND-INVALID", "EVIDENCE-KIND-INVALID"];
+        let waivable_gap_codes: &[&str] =
+            &["ACCEPTANCE-COVERAGE-MISSING", "ACCEPTANCE-EVIDENCE-MISSING"];
+
+        let all_findings: Vec<&crate::ValidationFinding> = node_findings
+            .iter()
+            .chain(all_edge_findings.iter())
+            .collect();
+
+        let has_structural = all_findings
+            .iter()
+            .any(|f| structural_codes.contains(&f.code.as_str()));
+        let has_type_integrity = all_findings
+            .iter()
+            .any(|f| type_integrity_codes.contains(&f.code.as_str()));
+        let has_waivable_gap = all_findings
+            .iter()
+            .any(|f| waivable_gap_codes.contains(&f.code.as_str()));
+
+        // Structural corruption is always blocking
+        if has_structural {
+            let codes: Vec<_> = all_findings
+                .iter()
+                .filter(|f| structural_codes.contains(&f.code.as_str()))
+                .map(|f| &f.code)
+                .collect();
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "cannot finalize graph node `{}`: blocking structural findings: {:?}",
+                input.node_id, codes
+            )));
+        }
+
+        // Type integrity violations are always blocking — malformed payloads
+        if has_type_integrity {
+            let codes: Vec<_> = all_findings
+                .iter()
+                .filter(|f| type_integrity_codes.contains(&f.code.as_str()))
+                .map(|f| &f.code)
+                .collect();
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "cannot finalize graph node `{}`: invalid typed payloads: {:?}. Fix the payload before finalizing",
+                input.node_id, codes
+            )));
+        }
+
+        // Coverage/evidence gaps are blocking unless accepted_risk is provided
+        if has_waivable_gap {
+            match &input.accepted_risk {
+                Some(rationale) if !rationale.trim().is_empty() => {
+                    // Allow with accepted risk — rationale captured in event
+                }
+                _ => {
+                    let codes: Vec<_> = all_findings
+                        .iter()
+                        .filter(|f| waivable_gap_codes.contains(&f.code.as_str()))
+                        .map(|f| &f.code)
+                        .collect();
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "cannot finalize graph node `{}`: acceptance/evidence gaps: {:?}. Use --accepted-risk to waive",
+                        input.node_id, codes
+                    )));
+                }
+            }
+        }
+
+        // Perform the status update
+        let old_status = node.status.clone();
+        let now = now_string()?;
+        transaction.execute(
+            "UPDATE planning_nodes SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
+            params![input.status.trim(), now, input.node_id],
+        )?;
+
+        let record = load_graph_node(&transaction, &input.node_id)?;
+
+        // Build event payload
+        let mut event_payload = serde_json::json!({
+            "status": record.status,
+            "previousStatus": old_status,
+            "revision": record.revision,
+        });
+        let event_type = if input
+            .accepted_risk
+            .as_ref()
+            .is_some_and(|r| !r.trim().is_empty())
+        {
+            event_payload["acceptedRisk"] =
+                serde_json::json!(input.accepted_risk.as_deref().unwrap_or(""));
+            "graph-node.finalized-with-accepted-risk"
+        } else {
+            "graph-node.finalized"
+        };
+
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::GraphNode,
+                &record.id,
+                EntityType::GraphNode,
+                &record.id,
+                &input.correlation_id,
+                input.run_id,
+                event_type,
+                event_payload,
+            )?,
+        )?;
+
+        // Re-validate after finalization
+        let node_findings = validate_entity(&transaction, EntityType::GraphNode, &record.id)?;
+        persist_validation_findings(
+            &transaction,
+            EntityType::GraphNode,
+            &record.id,
+            &node_findings,
+        )?;
+        let validation = ValidationReport::from_findings(node_findings);
+
         transaction.commit()?;
         Ok(MutationResult { record, validation })
     }
@@ -5570,6 +6627,7 @@ fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningS
         ("todos", EntityType::Todo),
         ("issues", EntityType::Issue),
         ("insights", EntityType::Insight),
+        ("planning_nodes", EntityType::GraphNode),
     ] {
         let mut statement =
             connection.prepare(&format!("SELECT id, scope_key, tags_json FROM {table}"))?;
@@ -5818,6 +6876,15 @@ fn ensure_entity_exists(
             .map_err(|error| map_not_found(error, EntityType::ReviewPoint, entity_id)),
         EntityType::Insight => load_insight(connection, entity_id).map(|_| ()),
         EntityType::ProjectRun => load_project_run(connection, entity_id).map(|_| ()),
+        EntityType::GraphNode => load_graph_node(connection, entity_id).map(|_| ()),
+        EntityType::GraphEdge => connection
+            .query_row(
+                "SELECT id FROM planning_edges WHERE id = ?1",
+                params![entity_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|_| ())
+            .map_err(|error| map_not_found(error, EntityType::GraphEdge, entity_id)),
     };
 
     match lookup {
@@ -5966,6 +7033,8 @@ fn scope_key_for_entity(
         EntityType::ReviewPoint => "SELECT scope_key FROM review_points WHERE id = ?1",
         EntityType::Insight => "SELECT scope_key FROM insights WHERE id = ?1",
         EntityType::ProjectRun => "SELECT scope_key FROM project_runs WHERE id = ?1",
+        EntityType::GraphNode => "SELECT scope_key FROM planning_nodes WHERE id = ?1",
+        EntityType::GraphEdge => "SELECT scope_key FROM planning_edges WHERE id = ?1",
     };
 
     connection
@@ -6440,6 +7509,16 @@ pub(crate) fn collect_entities(
         "project_runs",
         EntityType::ProjectRun,
     )?);
+    entities.extend(entity_ids(
+        connection,
+        "planning_nodes",
+        EntityType::GraphNode,
+    )?);
+    entities.extend(entity_ids(
+        connection,
+        "planning_edges",
+        EntityType::GraphEdge,
+    )?);
     Ok(entities)
 }
 
@@ -6516,6 +7595,20 @@ pub(crate) fn collect_entities_in_scope(
         "project_runs",
         "scope_key",
         EntityType::ProjectRun,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "planning_nodes",
+        "scope_key",
+        EntityType::GraphNode,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "planning_edges",
+        "scope_key",
+        EntityType::GraphEdge,
         scope_key,
     )?);
     Ok(entities)
@@ -6620,6 +7713,8 @@ pub(crate) fn attached_entity_correlation_id(
                 .map_err(|error| map_not_found(error, EntityType::ReviewPoint, entity_id))?;
             attached_entity_correlation_id(connection, review.0, &review.1)
         }
+        EntityType::GraphNode => Ok(format!("corr-graph-node-{entity_id}")),
+        EntityType::GraphEdge => Ok(format!("corr-graph-edge-{entity_id}")),
     }
 }
 
@@ -6846,6 +7941,8 @@ fn entity_revision(
         EntityType::ReviewPoint => ("review_points", "id"),
         EntityType::Insight => ("insights", "id"),
         EntityType::ProjectRun => ("project_runs", "id"),
+        EntityType::GraphNode => ("planning_nodes", "id"),
+        EntityType::GraphEdge => ("planning_edges", "id"),
     };
     let sql = format!("SELECT revision FROM {table} WHERE {id_column} = ?1");
     connection
@@ -7228,6 +8325,30 @@ fn require_non_empty(field: &str, value: &str) -> Result<(), PlanningStoreError>
     Ok(())
 }
 
+fn require_kebab_token(field: &str, value: &str) -> Result<(), PlanningStoreError> {
+    let trimmed = value.trim();
+    if trimmed.is_empty() {
+        return Err(PlanningStoreError::InvalidInput(format!(
+            "{field} must not be empty"
+        )));
+    }
+    // Format: [a-z]([a-z0-9]*(-[a-z0-9]+)*)?
+    // Must start with a lowercase letter. Rejects empty, uppercase, spaces,
+    // leading digits, leading/trailing dashes, and consecutive dashes.
+    let is_kebab = trimmed
+        .chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && trimmed.starts_with(|c: char| c.is_ascii_lowercase())
+        && !trimmed.ends_with('-')
+        && !trimmed.contains("--");
+    if !is_kebab {
+        return Err(PlanningStoreError::InvalidInput(format!(
+            "{field} must be a lowercase kebab-case token matching [a-z]([a-z0-9]*(-[a-z0-9]+)*)?, got: '{trimmed}'"
+        )));
+    }
+    Ok(())
+}
+
 fn normalize_string_list(values: Vec<String>) -> Vec<String> {
     let mut values: Vec<String> = values
         .into_iter()
@@ -7503,9 +8624,88 @@ pub(crate) fn load_graph_node(
         })
 }
 
+pub(crate) fn load_graph_edge(
+    connection: &Connection,
+    edge_id: &str,
+) -> Result<PlanningGraphEdge, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE id = ?1",
+            params![edge_id],
+            row_to_graph_edge,
+        )
+        .map_err(|error| map_not_found(error, EntityType::GraphEdge, edge_id))
+}
+
+pub(crate) fn list_incoming_edges_for_node(
+    connection: &Connection,
+    node_id: &str,
+    kind: Option<PlanningEdgeKind>,
+) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+    if let Some(k) = kind {
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE target_node_id = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+        )?;
+        let rows = stmt.query_map(params![node_id, k.as_str()], row_to_graph_edge)?;
+        collect_rows(rows)
+    } else {
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE target_node_id = ?1 ORDER BY updated_at DESC, id ASC"
+        )?;
+        let rows = stmt.query_map(params![node_id], row_to_graph_edge)?;
+        collect_rows(rows)
+    }
+}
+
+pub(crate) fn list_outgoing_edges_for_node(
+    connection: &Connection,
+    node_id: &str,
+    kind: Option<PlanningEdgeKind>,
+) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+    if let Some(k) = kind {
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE source_node_id = ?1 AND kind = ?2 ORDER BY updated_at DESC, id ASC"
+        )?;
+        let rows = stmt.query_map(params![node_id, k.as_str()], row_to_graph_edge)?;
+        collect_rows(rows)
+    } else {
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE source_node_id = ?1 ORDER BY updated_at DESC, id ASC"
+        )?;
+        let rows = stmt.query_map(params![node_id], row_to_graph_edge)?;
+        collect_rows(rows)
+    }
+}
+
+pub(crate) fn list_incoming_edges_in_scope(
+    connection: &Connection,
+    node_id: &str,
+    scope_key: &str,
+    kind: Option<PlanningEdgeKind>,
+) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+    let edges = list_incoming_edges_for_node(connection, node_id, kind)?;
+    Ok(edges
+        .into_iter()
+        .filter(|e| e.scope_key == scope_key)
+        .collect())
+}
+
+pub(crate) fn list_outgoing_edges_in_scope(
+    connection: &Connection,
+    node_id: &str,
+    scope_key: &str,
+    kind: Option<PlanningEdgeKind>,
+) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+    let edges = list_outgoing_edges_for_node(connection, node_id, kind)?;
+    Ok(edges
+        .into_iter()
+        .filter(|e| e.scope_key == scope_key)
+        .collect())
+}
+
 // ── Graph edge preflight helpers ──────────────────────────────────────────
 
-fn validate_edge_kind_pair(
+pub(crate) fn validate_edge_kind_pair(
     edge_kind: &PlanningEdgeKind,
     source_kind: &PlanningNodeKind,
     target_kind: &PlanningNodeKind,
@@ -7588,8 +8788,8 @@ fn kind_pair_error(
     ))
 }
 
-fn would_create_graph_cycle(
-    connection: &Transaction<'_>,
+pub(crate) fn would_create_graph_cycle(
+    connection: &Connection,
     source_node_id: &str,
     target_node_id: &str,
     edge_kind: &PlanningEdgeKind,
@@ -7605,7 +8805,7 @@ fn would_create_graph_cycle(
 }
 
 fn walk_graph_edges(
-    connection: &Transaction<'_>,
+    connection: &Connection,
     current: &str,
     target: &str,
     edge_kind: &PlanningEdgeKind,
@@ -7820,6 +9020,17 @@ fn load_entity_json(
             serde_json::to_string(&section)
         }
         EntityType::ProjectRun => serde_json::to_string(&load_project_run(connection, entity_id)?),
+        EntityType::GraphNode => serde_json::to_string(&load_graph_node(connection, entity_id)?),
+        EntityType::GraphEdge => {
+            let edge = connection
+                .query_row(
+                    "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE id = ?1",
+                    params![entity_id],
+                    row_to_graph_edge,
+                )
+                .map_err(|e| map_not_found(e, EntityType::GraphEdge, entity_id))?;
+            serde_json::to_string(&edge)
+        }
     };
     let text = json_str.map_err(PlanningStoreError::from)?;
     serde_json::from_str(&text).map_err(PlanningStoreError::from)
@@ -7865,6 +9076,7 @@ fn load_children_json(
     connection: &Connection,
     entity_type: EntityType,
     entity_id: &str,
+    scope_key: &str,
 ) -> Result<Vec<Value>, PlanningStoreError> {
     let children = match entity_type {
         EntityType::Goal => {
@@ -7892,9 +9104,68 @@ fn load_children_json(
                 .map(|r| serde_json::to_value(&r))
                 .collect::<Result<Vec<_>, _>>()?
         }
+        EntityType::GraphNode => {
+            let incoming = list_incoming_edges_in_scope(connection, entity_id, scope_key, None)?;
+            let outgoing = list_outgoing_edges_in_scope(connection, entity_id, scope_key, None)?;
+            let connected = load_connected_graph_node_summaries(connection, &incoming, &outgoing)?;
+            let children: Vec<Value> = vec![
+                serde_json::to_value(&incoming)?,
+                serde_json::to_value(&outgoing)?,
+                serde_json::to_value(&connected)?,
+            ];
+            children
+        }
+        EntityType::GraphEdge => {
+            let edge = load_graph_edge(connection, entity_id)?;
+            let source = load_graph_node_summary(connection, &edge.source_node_id);
+            let target = load_graph_node_summary(connection, &edge.target_node_id);
+            vec![source.unwrap_or_default(), target.unwrap_or_default()]
+        }
         _ => Vec::new(),
     };
     Ok(children.into_iter().filter(|v| !v.is_null()).collect())
+}
+
+fn load_graph_node_summary(
+    connection: &Connection,
+    node_id: &str,
+) -> Result<Value, PlanningStoreError> {
+    let node = load_graph_node(connection, node_id)?;
+    Ok(serde_json::json!({
+        "id": node.id,
+        "kind": node.kind.as_str(),
+        "title": node.title,
+        "status": node.status,
+        "scope_key": node.scope_key,
+    }))
+}
+
+fn load_connected_graph_node_summaries(
+    connection: &Connection,
+    incoming: &[PlanningGraphEdge],
+    outgoing: &[PlanningGraphEdge],
+) -> Result<Vec<Value>, PlanningStoreError> {
+    let mut node_ids = std::collections::HashSet::new();
+    for edge in incoming {
+        node_ids.insert(edge.source_node_id.clone());
+    }
+    for edge in outgoing {
+        node_ids.insert(edge.target_node_id.clone());
+    }
+    let mut summaries = Vec::new();
+    for node_id in node_ids {
+        if let Ok(summary) = load_graph_node_summary(connection, &node_id) {
+            summaries.push(summary);
+        }
+    }
+    // Sort by id for deterministic output
+    summaries.sort_by(|a, b| {
+        a["id"]
+            .as_str()
+            .unwrap_or("")
+            .cmp(b["id"].as_str().unwrap_or(""))
+    });
+    Ok(summaries)
 }
 
 fn load_entity_tags(
@@ -7911,6 +9182,7 @@ fn load_entity_tags(
         EntityType::Issue => "issues",
         EntityType::Insight => "insights",
         EntityType::Scope => "scopes",
+        EntityType::GraphNode => "planning_nodes",
         _ => return Ok(Vec::new()),
     };
     let sql = format!("SELECT tags_json FROM {table} WHERE id = ?1");
@@ -9370,6 +10642,8 @@ mod tests {
             status: "active".to_string(),
             payload: serde_json::json!({}),
             tags: vec!["test".to_string()],
+            correlation_id: "test-correlation".to_string(),
+            run_id: None,
         };
         let result = store
             .create_graph_node(node_input)
@@ -9389,13 +10663,28 @@ mod tests {
         let dir = tempdir().expect("tempdir");
         let db_path = dir.path().join("test.db");
 
-        // Create a database and manually set schema version to 8
+        // Step 1: Create a v8-schema database by creating a v9 one,
+        // dropping the graph tables, and rolling back the version.
+        let v8_goal_id = "goal-v8-fixture";
         {
             let store = PlanningStore::new(&db_path);
             store.init().expect("init");
-            // The init creates v9 tables, but we set version back to 8 to simulate
-            // a v8 database that hasn't been migrated yet
             let conn = store.open_connection().expect("open");
+
+            // Insert a goal as v8 test data
+            conn.execute(
+                "INSERT INTO goals (id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at) VALUES (?1, 'default', 'corr-v8', 'V8 Goal', 'Pre-migration goal', '[]', '[]', 'active', '[]', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+                params![v8_goal_id],
+            )
+            .expect("insert v8 goal");
+
+            // Drop graph tables to simulate v8 state
+            conn.execute_batch(
+                "DROP TABLE IF EXISTS planning_edges; DROP TABLE IF EXISTS planning_nodes;",
+            )
+            .expect("drop graph tables");
+
+            // Set version back to 8
             conn.execute(
                 "UPDATE planning_config SET value = '8' WHERE key = 'schema_version'",
                 [],
@@ -9403,11 +10692,13 @@ mod tests {
             .expect("set version to 8");
         }
 
-        // Re-open: migration should kick in
+        // Step 2: Re-open — migration should create graph tables
         let store = PlanningStore::new(&db_path);
         store.init().expect("re-init with migration");
 
         let conn = store.open_connection().expect("open");
+
+        // Assert version is now 9
         let version: String = conn
             .query_row(
                 "SELECT value FROM planning_config WHERE key = 'schema_version'",
@@ -9417,7 +10708,17 @@ mod tests {
             .expect("get schema version");
         assert_eq!(version, "9", "should have migrated to v9");
 
-        // Graph tables should exist but be empty
+        // Assert v8 tables remain readable
+        let goal_title: String = conn
+            .query_row(
+                "SELECT title FROM goals WHERE id = ?1",
+                params![v8_goal_id],
+                |row| row.get(0),
+            )
+            .expect("read v8 goal");
+        assert_eq!(goal_title, "V8 Goal", "v8 data should survive migration");
+
+        // Assert graph tables exist but are empty
         let count: i64 = conn
             .query_row("SELECT COUNT(*) FROM planning_nodes", [], |row| row.get(0))
             .expect("count nodes");
@@ -9458,6 +10759,8 @@ mod tests {
             status: "active".to_string(),
             payload: payload.clone(),
             tags: vec!["test".to_string(), "roundtrip".to_string()],
+            correlation_id: "test-correlation".to_string(),
+            run_id: None,
         };
         let result = store.create_graph_node(node_input).expect("create");
         assert_eq!(result.record.id, "gn-round");
@@ -9491,6 +10794,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create w1");
         store
@@ -9503,6 +10808,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create w2");
 
@@ -9516,6 +10823,8 @@ mod tests {
                 target_node_id: "gn-w2".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({"priority": "high"}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create edge");
         assert_eq!(edge_result.record.id, "ge-dep");
@@ -9565,6 +10874,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create node");
 
@@ -9578,6 +10889,8 @@ mod tests {
                 target_node_id: "gn-nonexistent".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject missing target");
         assert!(
@@ -9595,6 +10908,8 @@ mod tests {
                 target_node_id: "gn-missing-1".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject missing source");
         assert!(
@@ -9643,6 +10958,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create node in scope a");
         // Create node in scope B
@@ -9656,6 +10973,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create node in scope b");
 
@@ -9669,6 +10988,8 @@ mod tests {
                 target_node_id: "gn-sb".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject cross-scope edge");
         assert!(
@@ -9695,6 +11016,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create goal");
         store
@@ -9707,6 +11030,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create plan");
 
@@ -9720,6 +11045,8 @@ mod tests {
                 target_node_id: "gn-plan-invalid".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject invalid kind pair");
         assert!(
@@ -9747,6 +11074,8 @@ mod tests {
                     status: "active".to_string(),
                     payload: serde_json::json!({}),
                     tags: vec![],
+                    correlation_id: "test-correlation".to_string(),
+                    run_id: None,
                 })
                 .expect("create node");
         }
@@ -9761,6 +11090,8 @@ mod tests {
                 target_node_id: "gn-b".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("A -> B");
 
@@ -9774,6 +11105,8 @@ mod tests {
                 target_node_id: "gn-c".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("B -> C");
 
@@ -9787,6 +11120,8 @@ mod tests {
                 target_node_id: "gn-a".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject cycle");
         assert!(
@@ -9813,6 +11148,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create goal");
         store
@@ -9825,6 +11162,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create roadmap");
         store
@@ -9837,6 +11176,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create milestone");
 
@@ -9850,6 +11191,8 @@ mod tests {
                 target_node_id: "gn-roadmap-decomp".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("Goal -> Roadmap");
 
@@ -9863,6 +11206,8 @@ mod tests {
                 target_node_id: "gn-milestone-decomp".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("Roadmap -> Milestone");
 
@@ -9876,6 +11221,8 @@ mod tests {
                 target_node_id: "gn-goal-decomp".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject decomposition cycle");
         assert!(
@@ -9902,6 +11249,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create w1");
         store
@@ -9914,6 +11263,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create w2");
 
@@ -9927,6 +11278,8 @@ mod tests {
                 target_node_id: "gn-dup-2".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("first edge");
 
@@ -9940,6 +11293,8 @@ mod tests {
                 target_node_id: "gn-dup-2".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject duplicate active edge");
         assert!(
@@ -9967,6 +11322,8 @@ mod tests {
                     status: "active".to_string(),
                     payload: serde_json::json!({}),
                     tags: vec![],
+                    correlation_id: "test-correlation".to_string(),
+                    run_id: None,
                 })
                 .expect("create node");
         }
@@ -9981,6 +11338,8 @@ mod tests {
                 target_node_id: "gn-dc-b".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("A -> B");
 
@@ -9994,6 +11353,8 @@ mod tests {
                 target_node_id: "gn-dc-c".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("B -> C");
 
@@ -10007,6 +11368,8 @@ mod tests {
                 target_node_id: "gn-dc-a".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject DecomposesTo cycle with valid kind pairs");
         assert!(
@@ -10032,6 +11395,8 @@ mod tests {
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
                 tags: vec![],
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect("create node");
 
@@ -10044,11 +11409,3343 @@ mod tests {
                 target_node_id: "gn-self".to_string(),
                 status: "active".to_string(),
                 payload: serde_json::json!({}),
+                correlation_id: "test-correlation".to_string(),
+                run_id: None,
             })
             .expect_err("should reject self-referential edge");
         assert!(
             err.to_string().contains("self-referential"),
             "error should mention self-referential: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_node_create_appends_event() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let result = store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-event-test".to_string()),
+                scope_key: None,
+                correlation_id: "corr-gn-event".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Event Test Node".to_string(),
+                summary: "Testing event emission".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"key": "value"}),
+                tags: vec!["event-test".to_string()],
+                run_id: Some("run-123".to_string()),
+            })
+            .expect("create node");
+        assert_eq!(result.record.id, "gn-event-test");
+
+        // Verify event was appended
+        let events = store.list_events().expect("list events");
+        let node_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.entity_type == EntityType::GraphNode)
+            .collect();
+        assert_eq!(
+            node_events.len(),
+            1,
+            "should have exactly one graph-node event"
+        );
+        let event = node_events[0];
+        assert_eq!(event.entity_type, EntityType::GraphNode);
+        assert_eq!(event.entity_id, "gn-event-test");
+        assert_eq!(event.aggregate_type, EntityType::GraphNode);
+        assert_eq!(event.aggregate_id, "gn-event-test");
+        assert_eq!(event.event_type, "graph-node.created");
+        assert_eq!(event.correlation_id, "corr-gn-event");
+        assert_eq!(event.run_id, "run-123");
+        assert_eq!(event.payload["title"].as_str(), Some("Event Test Node"));
+    }
+
+    #[test]
+    fn graph_edge_create_appends_event() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create source and target nodes
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-edge-event-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-src".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Source".to_string(),
+                summary: "Source node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create source");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-edge-event-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-tgt".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Target".to_string(),
+                summary: "Target node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create target");
+
+        let result = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-event-test".to_string()),
+                scope_key: None,
+                correlation_id: "corr-edge-event".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-edge-event-src".to_string(),
+                target_node_id: "gn-edge-event-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"priority": "high"}),
+                run_id: Some("run-edge-456".to_string()),
+            })
+            .expect("create edge");
+        assert_eq!(result.record.id, "ge-event-test");
+
+        // Verify edge event
+        let events = store.list_events().expect("list events");
+        let edge_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.entity_type == EntityType::GraphEdge)
+            .collect();
+        assert_eq!(
+            edge_events.len(),
+            1,
+            "should have exactly one graph-edge event"
+        );
+        let event = edge_events[0];
+        assert_eq!(event.entity_type, EntityType::GraphEdge);
+        assert_eq!(event.entity_id, "ge-event-test");
+        assert_eq!(event.aggregate_type, EntityType::GraphNode);
+        assert_eq!(event.aggregate_id, "gn-edge-event-src");
+        assert_eq!(event.event_type, "graph-edge.created");
+        assert_eq!(event.correlation_id, "corr-edge-event");
+        assert_eq!(event.run_id, "run-edge-456");
+        assert_eq!(event.payload["kind"].as_str(), Some("depends-on"));
+    }
+
+    #[test]
+    fn graph_node_rejects_empty_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let make_input = |id: Option<String>| CreateGraphNodeInput {
+            id,
+            scope_key: None,
+            correlation_id: "corr-empty-id".to_string(),
+            kind: PlanningNodeKind::Work,
+            title: "Test".to_string(),
+            summary: "Test".to_string(),
+            status: "active".to_string(),
+            payload: serde_json::json!({}),
+            tags: vec![],
+            run_id: None,
+        };
+
+        // Empty string ID
+        let err = store
+            .create_graph_node(make_input(Some("".to_string())))
+            .expect_err("should reject empty id");
+        assert!(
+            err.to_string().contains("must not be empty"),
+            "error should mention empty: {err}"
+        );
+
+        // Whitespace-only ID
+        let err = store
+            .create_graph_node(make_input(Some("   ".to_string())))
+            .expect_err("should reject whitespace id");
+        assert!(
+            err.to_string().contains("must not be empty"),
+            "error should mention empty: {err}"
+        );
+
+        // None ID should still work (auto-generated)
+        store
+            .create_graph_node(make_input(None))
+            .expect("None id should auto-generate");
+    }
+
+    #[test]
+    fn graph_edge_rejects_empty_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a node to use as source/target
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-empty-id".to_string()),
+                scope_key: None,
+                correlation_id: "corr".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Node".to_string(),
+                summary: "Node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        let make_input = |id: Option<String>| CreateGraphEdgeInput {
+            id,
+            scope_key: None,
+            correlation_id: "corr-empty-edge-id".to_string(),
+            kind: PlanningEdgeKind::DependsOn,
+            source_node_id: "gn-empty-id".to_string(),
+            target_node_id: "gn-empty-id".to_string(),
+            status: "active".to_string(),
+            payload: serde_json::json!({}),
+            run_id: None,
+        };
+
+        // Empty string ID
+        let err = store
+            .create_graph_edge(make_input(Some("".to_string())))
+            .expect_err("should reject empty id");
+        assert!(
+            err.to_string().contains("must not be empty"),
+            "error should mention empty: {err}"
+        );
+
+        // Whitespace-only ID
+        let err = store
+            .create_graph_edge(make_input(Some("   ".to_string())))
+            .expect_err("should reject whitespace id");
+        assert!(
+            err.to_string().contains("must not be empty"),
+            "error should mention empty: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_node_rejects_non_kebab_status() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let make_input = |status: &str| CreateGraphNodeInput {
+            id: Some(format!("gn-status-{}", status.replace(' ', "-"))),
+            scope_key: None,
+            correlation_id: "corr-status".to_string(),
+            kind: PlanningNodeKind::Work,
+            title: "Test".to_string(),
+            summary: "Test".to_string(),
+            status: status.to_string(),
+            payload: serde_json::json!({}),
+            tags: vec![],
+            run_id: None,
+        };
+
+        // Uppercase rejected
+        let err = store
+            .create_graph_node(make_input("Active"))
+            .expect_err("should reject Active");
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should mention kebab-case: {err}"
+        );
+
+        // Spaces rejected
+        let err = store
+            .create_graph_node(make_input("in progress"))
+            .expect_err("should reject spaces");
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should mention kebab-case: {err}"
+        );
+
+        // Trailing dash rejected
+        let err = store
+            .create_graph_node(make_input("active-"))
+            .expect_err("should reject trailing dash");
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should mention kebab-case: {err}"
+        );
+
+        // Leading digit rejected
+        let err = store
+            .create_graph_node(make_input("1st"))
+            .expect_err("should reject leading digit");
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should mention kebab-case: {err}"
+        );
+
+        // Valid kebab-case accepted
+        for valid in &["active", "in-progress", "completed", "needs-review"] {
+            store
+                .create_graph_node(make_input(valid))
+                .unwrap_or_else(|e| panic!("should accept '{valid}': {e}"));
+        }
+    }
+
+    #[test]
+    fn graph_edge_rejects_non_kebab_status() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes for edge
+        for id in &["gn-edge-status-src", "gn-edge-status-tgt"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    correlation_id: "corr".to_string(),
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: format!("Node {id}"),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                    run_id: None,
+                })
+                .expect("create node");
+        }
+
+        let make_input = |status: &str| CreateGraphEdgeInput {
+            id: None,
+            scope_key: None,
+            correlation_id: "corr-edge-status".to_string(),
+            kind: PlanningEdgeKind::DependsOn,
+            source_node_id: "gn-edge-status-src".to_string(),
+            target_node_id: "gn-edge-status-tgt".to_string(),
+            status: status.to_string(),
+            payload: serde_json::json!({}),
+            run_id: None,
+        };
+
+        // Uppercase rejected
+        let err = store
+            .create_graph_edge(make_input("Active"))
+            .expect_err("should reject Active");
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should mention kebab-case: {err}"
+        );
+
+        // Valid kebab accepted
+        store
+            .create_graph_edge(make_input("active"))
+            .expect("should accept active");
+    }
+
+    #[test]
+    fn active_status_rejected_before_duplicate_check() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes
+        for id in &["gn-dc-a", "gn-dc-b"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    correlation_id: "corr-dc".to_string(),
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: "DC node".to_string(),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                    run_id: None,
+                })
+                .expect("create node");
+        }
+
+        // Create first edge (valid)
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dc-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dc-e1".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-dc-a".to_string(),
+                target_node_id: "gn-dc-b".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("first edge");
+
+        // Try duplicate with non-kebab status "Active"
+        // This should be rejected by status validation BEFORE the duplicate check
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-dc-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dc-e2".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-dc-a".to_string(),
+                target_node_id: "gn-dc-b".to_string(),
+                status: "Active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect_err("should reject non-kebab status");
+        // Error must be about kebab-case, NOT about duplicate
+        assert!(
+            err.to_string().contains("kebab-case"),
+            "error should be about kebab-case format, got: {err}"
+        );
+        assert!(
+            !err.to_string().contains("duplicate"),
+            "error should NOT mention duplicate (status rejected first): {err}"
+        );
+    }
+
+    #[test]
+    fn health_includes_graph_counts() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create 2 nodes
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gh-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-gh".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "H1".to_string(),
+                summary: "H1".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node 1");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gh-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-gh".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "H2".to_string(),
+                summary: "H2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node 2");
+
+        // Create 1 edge
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("gh-e1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-gh".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gh-1".to_string(),
+                target_node_id: "gh-2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        let health = store.health().expect("health");
+        assert_eq!(health.graph_node_count, 2, "should count 2 graph nodes");
+        assert_eq!(health.graph_edge_count, 1, "should count 1 graph edge");
+        assert_eq!(health.schema_version, "9", "schema version should be 9");
+    }
+
+    #[test]
+    fn graph_node_tags_indexed() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-tagged".to_string()),
+                scope_key: None,
+                correlation_id: "corr-tags".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Tagged Node".to_string(),
+                summary: "Has tags".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec!["rust".to_string(), "graph".to_string()],
+                run_id: None,
+            })
+            .expect("create tagged node");
+
+        // Query tags for graph nodes
+        let tags = store
+            .list_tags("default", Some("graph-node"))
+            .expect("list tags");
+        assert_eq!(tags.len(), 2, "should find 2 tags for graph node");
+        let tag_names: Vec<&str> = tags.iter().map(|t| t.tag.as_str()).collect();
+        assert!(tag_names.contains(&"rust"), "should have 'rust' tag");
+        assert!(tag_names.contains(&"graph"), "should have 'graph' tag");
+    }
+
+    #[test]
+    fn graph_validator_detects_invalid_status() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a valid node
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-val-status".to_string()),
+                scope_key: None,
+                correlation_id: "corr-val-status".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Status Test".to_string(),
+                summary: "Testing status validation".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        // Corrupt status via raw SQL
+        let conn = store.open_connection().expect("open");
+        conn.execute(
+            "UPDATE planning_nodes SET status = 'Active' WHERE id = 'gn-val-status'",
+            [],
+        )
+        .expect("corrupt status");
+
+        // Run validate_all
+        let report = store.validate_all().expect("validate all");
+        let findings: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.code == "GRAPH-STATUS-INVALID")
+            .collect();
+        assert!(
+            !findings.is_empty(),
+            "should detect invalid graph node status"
+        );
+    }
+
+    #[test]
+    fn graph_validator_detects_missing_node() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes and an edge
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-val-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-val-missing".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Source".to_string(),
+                summary: "Source node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create source");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-val-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-val-missing".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Target".to_string(),
+                summary: "Target node".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create target");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-val-missing".to_string()),
+                scope_key: None,
+                correlation_id: "corr-val-missing".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-val-src".to_string(),
+                target_node_id: "gn-val-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        // Delete target node via raw SQL.
+        // Disable foreign keys temporarily to avoid cascading delete of the edge
+        // (the planning_edges table uses ON DELETE CASCADE).
+        let conn = store.open_connection().expect("open");
+        conn.execute("PRAGMA foreign_keys = OFF", [])
+            .expect("disable fk");
+        conn.execute("DELETE FROM planning_nodes WHERE id = 'gn-val-tgt'", [])
+            .expect("delete target node");
+        conn.execute("PRAGMA foreign_keys = ON", [])
+            .expect("enable fk");
+
+        // Run validate_all
+        let report = store.validate_all().expect("validate all");
+        let findings: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.code == "GRAPH-EDGE-MISSING-NODE")
+            .collect();
+        assert!(
+            !findings.is_empty(),
+            "should detect missing node referenced by edge"
+        );
+    }
+
+    #[test]
+    fn graph_validator_detects_self_loop() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a node
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-self-val".to_string()),
+                scope_key: None,
+                correlation_id: "corr-self-val".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Self Loop".to_string(),
+                summary: "Node for self-loop test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        // Insert self-loop edge via raw SQL (bypasses preflight check)
+        let conn = store.open_connection().expect("open");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-self-val', 'default', 'blocks', 'gn-self-val', 'gn-self-val', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        )
+        .expect("insert self-loop edge");
+
+        // Run validate_all
+        let report = store.validate_all().expect("validate all");
+        let findings: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.code == "GRAPH-EDGE-SELF-LOOP")
+            .collect();
+        assert!(!findings.is_empty(), "should detect self-loop edge");
+    }
+
+    #[test]
+    fn graph_validator_detects_duplicate_active() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes via store API
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-dup-val-a".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dup-val".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Node A".to_string(),
+                summary: "Dup test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-dup-val-b".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dup-val".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Node B".to_string(),
+                summary: "Dup test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        // Create two duplicate active edges using a single raw connection.
+        // We drop the UNIQUE index first so the duplicate insert succeeds,
+        // then run validation directly on the same connection (avoiding
+        // store.open_connection() which would recreate the index and fail).
+        let conn = store.open_connection().expect("open");
+        conn.execute("DROP INDEX IF EXISTS idx_planning_edges_unique_active", [])
+            .expect("drop unique index");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-dup-val-1', 'default', 'depends-on', 'gn-dup-val-a', 'gn-dup-val-b', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        )
+        .expect("insert edge 1");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-dup-val-2', 'default', 'depends-on', 'gn-dup-val-a', 'gn-dup-val-b', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        )
+        .expect("insert edge 2");
+
+        // Run validation directly on the same connection (avoids recreating the index)
+        let entities = collect_entities(&conn).expect("collect entities");
+        let mut found_duplicate = false;
+        for (entity_type, entity_id) in entities {
+            if entity_type == EntityType::GraphEdge {
+                let findings =
+                    validate_entity(&conn, entity_type, &entity_id).expect("validate graph edge");
+                if findings
+                    .iter()
+                    .any(|f| f.code == "GRAPH-EDGE-DUPLICATE-ACTIVE")
+                {
+                    found_duplicate = true;
+                }
+                // Persist findings for the store even though we bypassed validate_all
+                persist_validation_findings(&conn, entity_type, &entity_id, &findings)
+                    .expect("persist findings");
+            }
+        }
+        assert!(found_duplicate, "should detect duplicate active edge");
+    }
+
+    #[test]
+    fn graph_validator_detects_cycle() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create three nodes
+        for id in &["gn-cycle-a", "gn-cycle-b", "gn-cycle-c"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    correlation_id: "corr-cycle-val".to_string(),
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: "Cycle test".to_string(),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                    run_id: None,
+                })
+                .expect("create node");
+        }
+
+        // Create two edges normally: A->B, B->C
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-cycle-ab".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cycle-val".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-cycle-a".to_string(),
+                target_node_id: "gn-cycle-b".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("A->B");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-cycle-bc".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cycle-val".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-cycle-b".to_string(),
+                target_node_id: "gn-cycle-c".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("B->C");
+
+        // Insert cyclic edge C->A via raw SQL (bypasses preflight)
+        let conn = store.open_connection().expect("open");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-cycle-ca', 'default', 'depends-on', 'gn-cycle-c', 'gn-cycle-a', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        )
+        .expect("insert cyclic edge");
+
+        // Run validate_all
+        let report = store.validate_all().expect("validate all");
+        let findings: Vec<_> = report
+            .findings
+            .iter()
+            .filter(|f| f.code == "GRAPH-EDGE-CYCLE")
+            .collect();
+        assert!(!findings.is_empty(), "should detect graph cycle");
+    }
+
+    #[test]
+    fn context_graph_node_includes_edges_and_tags() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes + edge
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ctx-node".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ctx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Context Node".to_string(),
+                summary: "Node for context test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"ctx": true}),
+                tags: vec!["ctx-tag".to_string(), "test".to_string()],
+                run_id: None,
+            })
+            .expect("create node");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ctx-other".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ctx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Other Node".to_string(),
+                summary: "Connected node".to_string(),
+                status: "completed".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create other node");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ctx".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ctx".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-ctx-node".to_string(),
+                target_node_id: "gn-ctx-other".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        let bundle = store
+            .context_bundle(EntityType::GraphNode, "gn-ctx-node", "default")
+            .expect("context bundle");
+
+        // Tags present
+        assert_eq!(bundle.tags.len(), 2);
+        assert!(bundle.tags.contains(&"ctx-tag".to_string()));
+
+        // Entity JSON is the full node record
+        assert_eq!(bundle.entity["id"], "gn-ctx-node");
+        assert_eq!(bundle.entity["title"], "Context Node");
+
+        // Children contains outgoing edges and connected nodes
+        assert!(!bundle.children.is_empty(), "should have children");
+        // At least one child should contain the edges
+        let children_str = serde_json::to_string(&bundle.children).unwrap();
+        assert!(
+            children_str.contains("gn-ctx-other"),
+            "children should reference connected node: {children_str}"
+        );
+
+        // Validation report present
+        assert!(
+            bundle.validation.findings.is_empty(),
+            "no validation issues expected"
+        );
+    }
+
+    #[test]
+    fn context_graph_edge_includes_source_target() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two nodes + edge
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ectx-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ectx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Context Source".to_string(),
+                summary: "Source for edge context".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create source");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ectx-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ectx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Context Target".to_string(),
+                summary: "Target for edge context".to_string(),
+                status: "completed".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create target");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ectx".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ectx".to_string(),
+                kind: PlanningEdgeKind::Blocks,
+                source_node_id: "gn-ectx-src".to_string(),
+                target_node_id: "gn-ectx-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"reason": "blocked"}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        let bundle = store
+            .context_bundle(EntityType::GraphEdge, "ge-ectx", "default")
+            .expect("context bundle");
+
+        // Entity JSON is the full edge record
+        assert_eq!(bundle.entity["id"], "ge-ectx");
+        assert_eq!(bundle.entity["kind"], "blocks");
+
+        // Children should contain source and target node summaries
+        assert!(!bundle.children.is_empty(), "should have children");
+        let children_str = serde_json::to_string(&bundle.children).unwrap();
+        assert!(
+            children_str.contains("Edge Context Source"),
+            "children should reference source node: {children_str}"
+        );
+        assert!(
+            children_str.contains("Edge Context Target"),
+            "children should reference target node: {children_str}"
+        );
+    }
+
+    #[test]
+    fn load_entity_tags_returns_graph_node_tags() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-tags-regr".to_string()),
+                scope_key: None,
+                correlation_id: "corr-tags-regr".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Tag Regression".to_string(),
+                summary: "Testing tag regression".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec!["regression".to_string(), "graph".to_string()],
+                run_id: None,
+            })
+            .expect("create tagged node");
+
+        // Verify via context bundle (which uses load_entity_tags internally)
+        let bundle = store
+            .context_bundle(EntityType::GraphNode, "gn-tags-regr", "default")
+            .expect("context bundle");
+        assert_eq!(bundle.tags.len(), 2);
+        assert!(bundle.tags.contains(&"regression".to_string()));
+        assert!(bundle.tags.contains(&"graph".to_string()));
+    }
+
+    #[test]
+    fn graph_edges_are_collected_in_validate_all() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create a valid node and a valid edge
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-collect-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-collect".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Collection Node 1".to_string(),
+                summary: "Node for collection test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node 1");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-collect-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-collect".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Collection Node 2".to_string(),
+                summary: "Node for collection test".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node 2");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-collect".to_string()),
+                scope_key: None,
+                correlation_id: "corr-collect".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-collect-1".to_string(),
+                target_node_id: "gn-collect-2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        // Run validate_all — should not panic, should complete
+        let report = store.validate_all().expect("validate all");
+        // Graph entities should be included: at least 2 nodes + 1 edge = 3+
+        assert!(
+            report.entity_reports.len() >= 3,
+            "should include graph entities in validation reports, got {} reports",
+            report.entity_reports.len()
+        );
+    }
+
+    #[test]
+    fn scope_aware_incoming_excludes_cross_scope() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create scope-a
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "scope-a".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope-a");
+
+        // Create a node in default scope and a node in scope-a
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-sa-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-sa".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Default Node".to_string(),
+                summary: "In default scope".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create default node");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-sa-tgt".to_string()),
+                scope_key: Some("scope-a".to_string()),
+                correlation_id: "corr-sa".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Scope-A Node".to_string(),
+                summary: "In scope-a".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope-a node");
+
+        // Insert an edge via SQL that references both nodes (bypassing preflight scope check)
+        let conn = store.open_connection().expect("open");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-sa-cross', 'scope-a', 'depends-on', 'gn-sa-src', 'gn-sa-tgt', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        ).expect("insert cross-scope edge");
+
+        // Scope-aware query from default scope should NOT include the edge (it's in scope-a)
+        let edges = list_incoming_edges_in_scope(&conn, "gn-sa-tgt", "default", None)
+            .expect("list incoming in default scope");
+        assert!(
+            edges.is_empty(),
+            "cross-scope edge should be excluded from default scope"
+        );
+
+        // Scope-aware query from scope-a should include the edge
+        let edges = list_incoming_edges_in_scope(&conn, "gn-sa-tgt", "scope-a", None)
+            .expect("list incoming in scope-a");
+        assert_eq!(edges.len(), 1, "edge should be visible in its own scope");
+    }
+
+    #[test]
+    fn graph_node_view_includes_validation() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-view-test".to_string()),
+                scope_key: None,
+                correlation_id: "corr-view".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "View Test".to_string(),
+                summary: "Testing views".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"key": "val"}),
+                tags: vec!["view-tag".to_string()],
+                run_id: None,
+            })
+            .expect("create node");
+
+        let view = store
+            .graph_node_view("gn-view-test", "default")
+            .expect("get view");
+        assert_eq!(view.node.id, "gn-view-test");
+        assert_eq!(view.node.title, "View Test");
+        assert_eq!(view.tags, vec!["view-tag"]);
+        assert!(
+            view.validation.findings.is_empty(),
+            "no validation issues expected"
+        );
+        assert!(view.incoming_edges.is_empty());
+        assert!(view.outgoing_edges.is_empty());
+        assert!(view.connected_nodes.is_empty());
+    }
+
+    #[test]
+    fn graph_edge_view_includes_source_target() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ev-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge View Source".to_string(),
+                summary: "Source".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create source");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ev-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge View Target".to_string(),
+                summary: "Target".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create target");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ev".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningEdgeKind::Blocks,
+                source_node_id: "gn-ev-src".to_string(),
+                target_node_id: "gn-ev-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"reason": "blocked"}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        let view = store.graph_edge_view("ge-ev", "default").expect("get view");
+        assert_eq!(view.edge.id, "ge-ev");
+        assert_eq!(view.edge.kind, PlanningEdgeKind::Blocks);
+        assert_eq!(view.source_node["id"], "gn-ev-src");
+        assert_eq!(view.source_node["title"], "Edge View Source");
+        assert_eq!(view.target_node["id"], "gn-ev-tgt");
+        assert_eq!(view.target_node["title"], "Edge View Target");
+        assert!(view.validation.findings.is_empty());
+    }
+
+    #[test]
+    fn update_graph_node_status_appends_event() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-status-event".to_string()),
+                scope_key: None,
+                correlation_id: "corr-status-ev".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Status Event".to_string(),
+                summary: "Testing status events".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        let result = store
+            .update_graph_node_status(UpdateGraphNodeStatusInput {
+                node_id: "gn-status-event".to_string(),
+                correlation_id: "test-correlation".to_string(),
+                active_scope_key: None,
+                status: "completed".to_string(),
+                run_id: Some("run-status-1".to_string()),
+            })
+            .expect("update status");
+        assert_eq!(result.record.status, "completed");
+        assert_eq!(result.record.revision, 2);
+
+        // Verify event
+        let events = store.list_events().expect("list events");
+        let status_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.status-updated")
+            .collect();
+        assert_eq!(
+            status_events.len(),
+            1,
+            "should have one status-updated event"
+        );
+        let event = status_events[0];
+        assert_eq!(event.entity_type, EntityType::GraphNode);
+        assert_eq!(event.entity_id, "gn-status-event");
+        assert_eq!(event.run_id, "run-status-1");
+        assert_eq!(event.payload["status"], "completed");
+    }
+
+    #[test]
+    fn update_graph_edge_status_rejects_duplicate_active() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create nodes and edge (inactive first)
+        for id in &["gn-active-1", "gn-active-2"] {
+            store
+                .create_graph_node(CreateGraphNodeInput {
+                    id: Some(id.to_string()),
+                    scope_key: None,
+                    correlation_id: "corr-active".to_string(),
+                    kind: PlanningNodeKind::Work,
+                    title: format!("Node {id}"),
+                    summary: "Active test".to_string(),
+                    status: "active".to_string(),
+                    payload: serde_json::json!({}),
+                    tags: vec![],
+                    run_id: None,
+                })
+                .expect("create node");
+        }
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-active-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-active".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-active-1".to_string(),
+                target_node_id: "gn-active-2".to_string(),
+                status: "inactive".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create first edge (inactive)");
+
+        // Create second edge (active) — succeeds because first is inactive
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-active-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-active".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-active-1".to_string(),
+                target_node_id: "gn-active-2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create second edge (active)");
+
+        // Try to set first edge to active — should fail (duplicate)
+        let err = store
+            .update_graph_edge_status(UpdateGraphEdgeStatusInput {
+                edge_id: "ge-active-1".to_string(),
+                correlation_id: "test-correlation".to_string(),
+                active_scope_key: None,
+                status: "active".to_string(),
+                run_id: None,
+            })
+            .expect_err("should reject duplicate active");
+        assert!(
+            err.to_string().contains("duplicate"),
+            "error should mention duplicate: {err}"
+        );
+    }
+
+    #[test]
+    fn revise_graph_node_updates_fields() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-revise".to_string()),
+                scope_key: None,
+                correlation_id: "corr-revise".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Old Title".to_string(),
+                summary: "Old Summary".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"old": true}),
+                tags: vec!["old-tag".to_string()],
+                run_id: None,
+            })
+            .expect("create node");
+
+        let result = store
+            .revise_graph_node(ReviseGraphNodeInput {
+                node_id: "gn-revise".to_string(),
+                correlation_id: "test-correlation".to_string(),
+                active_scope_key: None,
+                title: Some("New Title".to_string()),
+                summary: Some("New Summary".to_string()),
+                status: Some("completed".to_string()),
+                payload: Some(serde_json::json!({"new": true})),
+                tags: Some(vec!["new-tag".to_string(), "rust".to_string()]),
+                clear_tags: false,
+                run_id: Some("run-revise-1".to_string()),
+            })
+            .expect("revise node");
+        assert_eq!(result.record.title, "New Title");
+        assert_eq!(result.record.summary, "New Summary");
+        assert_eq!(result.record.status, "completed");
+        assert_eq!(result.record.payload, serde_json::json!({"new": true}));
+        assert_eq!(result.record.tags.len(), 2);
+        assert!(result.record.tags.contains(&"new-tag".to_string()));
+        assert_eq!(result.record.revision, 2);
+
+        // Verify event
+        let events = store.list_events().expect("list events");
+        let revise_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.revised")
+            .collect();
+        assert_eq!(revise_events.len(), 1);
+        assert_eq!(revise_events[0].run_id, "run-revise-1");
+    }
+
+    #[test]
+    fn graph_node_context_bundle_excludes_cross_scope_edges() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "ws-x".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope");
+
+        // Node in default, node in ws-x
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ctx-def".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ctx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Default Ctx Node".to_string(),
+                summary: "Default".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create default node");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ctx-wsx".to_string()),
+                scope_key: Some("ws-x".to_string()),
+                correlation_id: "corr-ctx".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "WS-X Ctx Node".to_string(),
+                summary: "WS-X".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create ws-x node");
+
+        // Insert cross-scope edge via SQL
+        let conn = store.open_connection().expect("open");
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES ('ge-ctx-cross', 'ws-x', 'depends-on', 'gn-ctx-def', 'gn-ctx-wsx', 'active', '{}', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z')",
+            [],
+        ).expect("insert cross-scope edge");
+
+        // Context bundle for default scope should NOT include the cross-scope edge
+        let bundle = store
+            .context_bundle(EntityType::GraphNode, "gn-ctx-def", "default")
+            .expect("context bundle");
+        let children_str = serde_json::to_string(&bundle.children).unwrap();
+        assert!(
+            !children_str.contains("ge-ctx-cross"),
+            "cross-scope edge should be excluded from children: {children_str}"
+        );
+    }
+
+    #[test]
+    fn graph_node_view_rejects_out_of_scope() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "ws-nv".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-nv".to_string()),
+                scope_key: Some("ws-nv".to_string()),
+                correlation_id: "corr-nv".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Scope Test".to_string(),
+                summary: "In ws-nv".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scoped node");
+
+        // Query from wrong scope should fail
+        let err = store
+            .graph_node_view("gn-nv", "default")
+            .expect_err("should reject out-of-scope view");
+        assert!(
+            err.to_string().contains("not"),
+            "should mention scope mismatch: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_edge_view_rejects_out_of_scope() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "ws-ev".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ev-s".to_string()),
+                scope_key: Some("ws-ev".to_string()),
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "EV Src".to_string(),
+                summary: "Src".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create src");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ev-t".to_string()),
+                scope_key: Some("ws-ev".to_string()),
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "EV Tgt".to_string(),
+                summary: "Tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create tgt");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ev".to_string()),
+                scope_key: Some("ws-ev".to_string()),
+                correlation_id: "corr-ev".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-ev-s".to_string(),
+                target_node_id: "gn-ev-t".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        // Query from wrong scope
+        let err = store
+            .graph_edge_view("ge-ev", "default")
+            .expect_err("should reject out-of-scope view");
+        assert!(
+            err.to_string().contains("not"),
+            "should mention scope mismatch: {err}"
+        );
+    }
+
+    #[test]
+    fn graph_node_status_preserves_correlation_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-corr".to_string()),
+                scope_key: None,
+                correlation_id: "corr-create".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Corr Test".to_string(),
+                summary: "Testing correlation".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        store
+            .update_graph_node_status(UpdateGraphNodeStatusInput {
+                node_id: "gn-corr".to_string(),
+                correlation_id: "corr-status-1".to_string(),
+                active_scope_key: None,
+                status: "completed".to_string(),
+                run_id: Some("run-1".to_string()),
+            })
+            .expect("update status");
+
+        let events = store.list_events().expect("list events");
+        let status_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.status-updated")
+            .collect();
+        assert_eq!(status_events.len(), 1);
+        assert_eq!(status_events[0].correlation_id, "corr-status-1");
+    }
+
+    #[test]
+    fn graph_node_revise_preserves_correlation_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-rev-corr".to_string()),
+                scope_key: None,
+                correlation_id: "corr-create".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Revise Corr".to_string(),
+                summary: "Testing revise correlation".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create node");
+
+        store
+            .revise_graph_node(ReviseGraphNodeInput {
+                node_id: "gn-rev-corr".to_string(),
+                correlation_id: "corr-revise-1".to_string(),
+                active_scope_key: None,
+                title: Some("Revised Title".to_string()),
+                summary: None,
+                status: None,
+                payload: None,
+                tags: None,
+                clear_tags: false,
+                run_id: Some("run-1".to_string()),
+            })
+            .expect("revise node");
+
+        let events = store.list_events().expect("list events");
+        let revise_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.revised")
+            .collect();
+        assert_eq!(revise_events.len(), 1);
+        assert_eq!(revise_events[0].correlation_id, "corr-revise-1");
+    }
+
+    #[test]
+    fn graph_edge_status_preserves_correlation_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-es-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-es".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Status Src".to_string(),
+                summary: "Src".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create src");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-es-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-es".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Status Tgt".to_string(),
+                summary: "Tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create tgt");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-es-corr".to_string()),
+                scope_key: None,
+                correlation_id: "corr-es".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-es-src".to_string(),
+                target_node_id: "gn-es-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        store
+            .update_graph_edge_status(UpdateGraphEdgeStatusInput {
+                edge_id: "ge-es-corr".to_string(),
+                correlation_id: "corr-status-e1".to_string(),
+                active_scope_key: None,
+                status: "completed".to_string(),
+                run_id: Some("run-e1".to_string()),
+            })
+            .expect("update edge status");
+
+        let events = store.list_events().expect("list events");
+        let status_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-edge.status-updated")
+            .collect();
+        assert_eq!(status_events.len(), 1);
+        assert_eq!(status_events[0].correlation_id, "corr-status-e1");
+    }
+
+    #[test]
+    fn graph_edge_revise_preserves_correlation_id() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-er-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-er".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Revise Src".to_string(),
+                summary: "Src".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create src");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-er-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-er".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Edge Revise Tgt".to_string(),
+                summary: "Tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create tgt");
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-er-corr".to_string()),
+                scope_key: None,
+                correlation_id: "corr-er".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-er-src".to_string(),
+                target_node_id: "gn-er-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create edge");
+
+        store
+            .revise_graph_edge(ReviseGraphEdgeInput {
+                edge_id: "ge-er-corr".to_string(),
+                correlation_id: "corr-revise-e1".to_string(),
+                active_scope_key: None,
+                status: None,
+                payload: Some(serde_json::json!({"note": "revised"})),
+                run_id: Some("run-e1".to_string()),
+            })
+            .expect("revise edge");
+
+        let events = store.list_events().expect("list events");
+        let revise_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-edge.revised")
+            .collect();
+        assert_eq!(revise_events.len(), 1);
+        assert_eq!(revise_events[0].correlation_id, "corr-revise-e1");
+    }
+
+    #[test]
+    fn create_graph_edge_allows_inactive_duplicates() {
+        // Phase 5: inactive graph edges may exist as proposals without
+        // enforcing active-only duplicate invariants.
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-id-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Inactive Dup Src".to_string(),
+                summary: "Src".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create src");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-id-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Inactive Dup Tgt".to_string(),
+                summary: "Tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create tgt");
+
+        // Create first inactive edge
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-id-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-id-src".to_string(),
+                target_node_id: "gn-id-tgt".to_string(),
+                status: "proposed".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create first inactive edge");
+
+        // Create second inactive edge for same src/target/kind — should succeed
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-id-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-id-src".to_string(),
+                target_node_id: "gn-id-tgt".to_string(),
+                status: "proposed".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create second inactive edge — duplicates allowed when inactive");
+
+        // Creating an active edge for same src/target/kind (with no active duplicates) should succeed
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-id-3".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-id-src".to_string(),
+                target_node_id: "gn-id-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("active edge succeeds when only inactive duplicates exist");
+
+        // Creating another active edge for same src/target/kind should now reject
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-id-4".to_string()),
+                scope_key: None,
+                correlation_id: "corr-id".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-id-src".to_string(),
+                target_node_id: "gn-id-tgt".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect_err("active duplicate should be rejected");
+        assert!(
+            err.to_string().contains("duplicate"),
+            "should mention duplicate: {err}"
+        );
+    }
+
+    #[test]
+    fn create_graph_edge_allows_inactive_potential_cycle() {
+        // Phase 5: inactive graph edges bypass active-only cycle detection.
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ic-a".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ic".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Inactive Cycle A".to_string(),
+                summary: "Node A".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create a");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("gn-ic-b".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ic".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Inactive Cycle B".to_string(),
+                summary: "Node B".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create b");
+
+        // Create active edge A → B
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ic-ab".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ic".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-ic-a".to_string(),
+                target_node_id: "gn-ic-b".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create a→b");
+
+        // B → A (active) would create a cycle — should reject
+        let err = store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ic-ba-active".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ic".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-ic-b".to_string(),
+                target_node_id: "gn-ic-a".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect_err("active cycle should be rejected");
+        assert!(
+            err.to_string().contains("cycle"),
+            "should mention cycle: {err}"
+        );
+
+        // B → A (proposed/inactive) — should succeed since inactive edges bypass cycle check
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-ic-ba-proposed".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ic".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "gn-ic-b".to_string(),
+                target_node_id: "gn-ic-a".to_string(),
+                status: "proposed".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("inactive cycle should be allowed as proposal");
+    }
+
+    #[test]
+    fn acceptance_abstract_round_trip() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let result = store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-abstract".to_string()),
+                scope_key: None,
+                correlation_id: "corr-acc".to_string(),
+                title: "All tests pass".to_string(),
+                summary: "Acceptance criterion for test suite".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "Test suite must pass 100%".to_string(),
+                verification_policy: "automated".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract acceptance");
+
+        assert_eq!(result.record.id, "acc-abstract");
+        assert_eq!(result.record.kind, PlanningNodeKind::Acceptance);
+        assert_eq!(
+            result.record.payload["acceptanceKind"].as_str().unwrap(),
+            "abstract"
+        );
+
+        // Verify stored as graph node
+        let node =
+            load_graph_node(&store.open_connection().unwrap(), "acc-abstract").expect("load node");
+        assert_eq!(node.kind, PlanningNodeKind::Acceptance);
+    }
+
+    #[test]
+    fn acceptance_concrete_round_trip() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let result = store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-concrete".to_string()),
+                scope_key: None,
+                correlation_id: "corr-acc".to_string(),
+                title: "Verify login endpoint".to_string(),
+                summary: "Concrete check for login".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "POST /login returns 200".to_string(),
+                verification_policy: "test-driven".to_string(),
+                required_evidence_kinds: vec![EvidenceKind::TestResult],
+                waiver: None,
+                tags: vec!["security".to_string()],
+                run_id: None,
+            })
+            .expect("create concrete acceptance");
+
+        assert_eq!(result.record.id, "acc-concrete");
+        assert_eq!(
+            result.record.payload["acceptanceKind"].as_str().unwrap(),
+            "concrete"
+        );
+        assert!(result.record.payload["requiredEvidenceKinds"].is_array());
+    }
+
+    #[test]
+    fn evidence_round_trip() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        let result = store
+            .create_evidence(CreateEvidenceInput {
+                id: Some("ev-test".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev".to_string(),
+                title: "Login test results".to_string(),
+                summary: "All login tests passed".to_string(),
+                status: "active".to_string(),
+                evidence_kind: EvidenceKind::TestResult,
+                reference: "ci/build-42".to_string(),
+                content: "42 passed, 0 failed".to_string(),
+                captured_at: "2026-06-01T12:00:00Z".to_string(),
+                tags: vec!["ci".to_string()],
+                run_id: None,
+            })
+            .expect("create evidence");
+
+        assert_eq!(result.record.id, "ev-test");
+        assert_eq!(result.record.kind, PlanningNodeKind::Evidence);
+        assert_eq!(
+            result.record.payload["evidenceKind"].as_str().unwrap(),
+            "test-result"
+        );
+    }
+
+    #[test]
+    fn acceptance_satisfy_multiple_abstracts() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-sat".to_string(),
+                title: "Abs 1".to_string(),
+                summary: "s".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "d".to_string(),
+                verification_policy: "v".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract 1");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-sat".to_string(),
+                title: "Abs 2".to_string(),
+                summary: "s".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "d".to_string(),
+                verification_policy: "v".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract 2");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-sat".to_string(),
+                title: "Conc 1".to_string(),
+                summary: "s".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete");
+
+        // Satisfy both abstracts
+        for (abs_id, rationale) in [
+            ("abs-1", "Concrete check covers this requirement"),
+            ("abs-2", "Same check also addresses this"),
+        ] {
+            let edge_id = format!("sat-{abs_id}");
+            store
+                .satisfy_acceptance(SatisfyAcceptanceInput {
+                    id: Some(edge_id),
+                    scope_key: None,
+                    correlation_id: "corr-sat".to_string(),
+                    concrete_node_id: "conc-1".to_string(),
+                    abstract_node_id: abs_id.to_string(),
+                    rationale: rationale.to_string(),
+                    run_id: None,
+                })
+                .expect("satisfy abstract");
+        }
+
+        // View shows both satisfied abstracts
+        let view = store.acceptance_view("conc-1", "default").expect("view");
+        assert_eq!(view.satisfied_abstracts.len(), 2);
+    }
+
+    #[test]
+    fn acceptance_view_includes_attached_evidence() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-ea".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ea".to_string(),
+                title: "Acceptance with evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create acceptance");
+        store
+            .create_evidence(CreateEvidenceInput {
+                id: Some("ev-ea".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ea".to_string(),
+                title: "Evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                evidence_kind: EvidenceKind::TestResult,
+                reference: "".to_string(),
+                content: "".to_string(),
+                captured_at: "".to_string(),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create evidence");
+
+        store
+            .attach_evidence(AttachEvidenceInput {
+                id: Some("edge-ea".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ea".to_string(),
+                evidence_node_id: "ev-ea".to_string(),
+                target_node_id: "acc-ea".to_string(),
+                rationale: "Test results prove acceptance".to_string(),
+                run_id: None,
+            })
+            .expect("attach evidence");
+
+        let view = store.acceptance_view("acc-ea", "default").expect("view");
+        assert_eq!(view.attached_evidence.len(), 1);
+        assert_eq!(view.attached_evidence[0].id, "ev-ea");
+    }
+
+    #[test]
+    fn abstract_acceptance_without_coverage_emits_warning() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-uncov".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cov".to_string(),
+                title: "Uncovered abstract".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+
+        let conn = store.open_connection().unwrap();
+        let findings =
+            validate_entity(&conn, EntityType::GraphNode, "abs-uncov").expect("validate");
+        let has_coverage_warning = findings
+            .iter()
+            .any(|f| f.code == "ACCEPTANCE-COVERAGE-MISSING");
+        assert!(
+            has_coverage_warning,
+            "abstract without coverage should warn"
+        );
+    }
+
+    #[test]
+    fn concrete_acceptance_missing_evidence_emits_warning() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-evmiss".to_string()),
+                scope_key: None,
+                correlation_id: "corr-em".to_string(),
+                title: "Needs evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![EvidenceKind::TestResult],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete");
+
+        let conn = store.open_connection().unwrap();
+        let findings =
+            validate_entity(&conn, EntityType::GraphNode, "acc-evmiss").expect("validate");
+        let has_evidence_warning = findings
+            .iter()
+            .any(|f| f.code == "ACCEPTANCE-EVIDENCE-MISSING");
+        assert!(has_evidence_warning, "should warn about missing evidence");
+
+        // Attach evidence of required kind
+        store
+            .create_evidence(CreateEvidenceInput {
+                id: Some("ev-fix".to_string()),
+                scope_key: None,
+                correlation_id: "corr-em".to_string(),
+                title: "Evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                evidence_kind: EvidenceKind::TestResult,
+                reference: "".to_string(),
+                content: "".to_string(),
+                captured_at: "".to_string(),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create evidence");
+        store
+            .attach_evidence(AttachEvidenceInput {
+                id: Some("edge-fix".to_string()),
+                scope_key: None,
+                correlation_id: "corr-em".to_string(),
+                evidence_node_id: "ev-fix".to_string(),
+                target_node_id: "acc-evmiss".to_string(),
+                rationale: "Coverage".to_string(),
+                run_id: None,
+            })
+            .expect("attach evidence");
+
+        // Re-validate — warning should be gone
+        let conn2 = store.open_connection().unwrap();
+        let findings2 =
+            validate_entity(&conn2, EntityType::GraphNode, "acc-evmiss").expect("validate2");
+        let still_warns = findings2
+            .iter()
+            .any(|f| f.code == "ACCEPTANCE-EVIDENCE-MISSING");
+        assert!(!still_warns, "warning should clear after evidence attached");
+    }
+
+    #[test]
+    fn satisfies_edge_without_rationale_emits_warning() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-rat".to_string()),
+                scope_key: None,
+                correlation_id: "corr-rat".to_string(),
+                title: "Abstract".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-rat".to_string()),
+                scope_key: None,
+                correlation_id: "corr-rat".to_string(),
+                title: "Concrete".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete");
+
+        // Create satisfies edge with empty rationale via direct graph_edge to bypass typed validation
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-rat".to_string()),
+                scope_key: None,
+                correlation_id: "corr-rat".to_string(),
+                kind: PlanningEdgeKind::Satisfies,
+                source_node_id: "conc-rat".to_string(),
+                target_node_id: "abs-rat".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"rationale": ""}),
+                run_id: None,
+            })
+            .expect("create edge with empty rationale");
+
+        let conn = store.open_connection().unwrap();
+        let findings = validate_entity(&conn, EntityType::GraphEdge, "ge-rat").expect("validate");
+        let has_rationale_warning = findings
+            .iter()
+            .any(|f| f.code == "ACCEPTANCE-RATIONALE-MISSING");
+        assert!(has_rationale_warning, "empty rationale should warn");
+    }
+
+    #[test]
+    fn invalid_acceptance_kind_emits_validation_warning() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("acc-bad".to_string()),
+                scope_key: None,
+                correlation_id: "corr-bad".to_string(),
+                kind: PlanningNodeKind::Acceptance,
+                title: "Bad acceptance".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"acceptanceKind": "invalid-kind"}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create bad acceptance node");
+
+        let conn = store.open_connection().unwrap();
+        let findings = validate_entity(&conn, EntityType::GraphNode, "acc-bad").expect("validate");
+        let has_kind_warning = findings.iter().any(|f| f.code == "ACCEPTANCE-KIND-INVALID");
+        assert!(has_kind_warning, "invalid acceptanceKind should warn");
+    }
+
+    #[test]
+    fn invalid_evidence_kind_emits_validation_warning() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("ev-bad".to_string()),
+                scope_key: None,
+                correlation_id: "corr-bad2".to_string(),
+                kind: PlanningNodeKind::Evidence,
+                title: "Bad evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"evidenceKind": "not-a-real-kind"}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create bad evidence node");
+
+        let conn = store.open_connection().unwrap();
+        let findings = validate_entity(&conn, EntityType::GraphNode, "ev-bad").expect("validate");
+        let has_kind_warning = findings.iter().any(|f| f.code == "EVIDENCE-KIND-INVALID");
+        assert!(has_kind_warning, "invalid evidenceKind should warn");
+    }
+
+    #[test]
+    fn cross_scope_acceptance_view_rejects() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_scope(CreateScopeInput {
+                scope_key: "ws-xs".to_string(),
+                scope_type: Some("workspace".to_string()),
+                parent_scope_key: None,
+                metadata: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scope");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-xs".to_string()),
+                scope_key: Some("ws-xs".to_string()),
+                correlation_id: "corr-xs".to_string(),
+                title: "Scoped acceptance".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create scoped acceptance");
+
+        let err = store
+            .acceptance_view("acc-xs", "default")
+            .expect_err("should reject cross-scope view");
+        assert!(
+            err.to_string().contains("not"),
+            "should mention scope mismatch: {err}"
+        );
+    }
+
+    #[test]
+    fn evidence_view_shows_attached_targets() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-ev-view".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev-v".to_string(),
+                title: "Target acceptance".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create acceptance");
+        store
+            .create_evidence(CreateEvidenceInput {
+                id: Some("ev-ev-view".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev-v".to_string(),
+                title: "View evidence".to_string(),
+                summary: "test summary".to_string(),
+                status: "active".to_string(),
+                evidence_kind: EvidenceKind::Review,
+                reference: "".to_string(),
+                content: "".to_string(),
+                captured_at: "".to_string(),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create evidence");
+
+        store
+            .attach_evidence(AttachEvidenceInput {
+                id: Some("edge-ev-view".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev-v".to_string(),
+                evidence_node_id: "ev-ev-view".to_string(),
+                target_node_id: "acc-ev-view".to_string(),
+                rationale: "Reviewed".to_string(),
+                run_id: None,
+            })
+            .expect("attach");
+
+        let view = store
+            .evidence_view("ev-ev-view", "default")
+            .expect("evidence view");
+        assert_eq!(view.attached_to.len(), 1);
+        assert_eq!(view.attached_to[0].id, "acc-ev-view");
+    }
+
+    #[test]
+    fn satisfy_acceptance_rejects_abstract_to_abstract() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-a1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir".to_string(),
+                title: "Abs A1".to_string(),
+                summary: "Abstract acceptance".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract 1");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-a2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir".to_string(),
+                title: "Abs A2".to_string(),
+                summary: "Another abstract".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract 2");
+
+        let err = store
+            .satisfy_acceptance(SatisfyAcceptanceInput {
+                id: Some("sat-bad-aa".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir".to_string(),
+                concrete_node_id: "abs-a1".to_string(),
+                abstract_node_id: "abs-a2".to_string(),
+                rationale: "Should fail".to_string(),
+                run_id: None,
+            })
+            .expect_err("abstract→abstract should be rejected");
+        assert!(
+            err.to_string().contains("concrete"),
+            "should mention concrete: {err}"
+        );
+    }
+
+    #[test]
+    fn satisfy_acceptance_rejects_concrete_to_concrete() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-c1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir2".to_string(),
+                title: "Conc C1".to_string(),
+                summary: "Concrete acceptance".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete 1");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-c2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir2".to_string(),
+                title: "Conc C2".to_string(),
+                summary: "Another concrete".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete 2");
+
+        let err = store
+            .satisfy_acceptance(SatisfyAcceptanceInput {
+                id: Some("sat-bad-cc".to_string()),
+                scope_key: None,
+                correlation_id: "corr-dir2".to_string(),
+                concrete_node_id: "conc-c1".to_string(),
+                abstract_node_id: "conc-c2".to_string(),
+                rationale: "Should fail".to_string(),
+                run_id: None,
+            })
+            .expect_err("concrete→concrete should be rejected");
+        assert!(
+            err.to_string().contains("abstract"),
+            "should mention abstract: {err}"
+        );
+    }
+
+    #[test]
+    fn satisfy_acceptance_rejects_non_acceptance_kind() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("work-nac".to_string()),
+                scope_key: None,
+                correlation_id: "corr-nac".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Work node".to_string(),
+                summary: "Not an acceptance".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create work");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-nac".to_string()),
+                scope_key: None,
+                correlation_id: "corr-nac".to_string(),
+                title: "Abstract".to_string(),
+                summary: "Acceptance".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+
+        // Work node as "concrete" source
+        let err = store
+            .satisfy_acceptance(SatisfyAcceptanceInput {
+                id: Some("sat-nac-src".to_string()),
+                scope_key: None,
+                correlation_id: "corr-nac".to_string(),
+                concrete_node_id: "work-nac".to_string(),
+                abstract_node_id: "abs-nac".to_string(),
+                rationale: "Should fail".to_string(),
+                run_id: None,
+            })
+            .expect_err("non-acceptance source should be rejected");
+        assert!(
+            err.to_string().contains("acceptance"),
+            "should mention acceptance: {err}"
+        );
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-nac".to_string()),
+                scope_key: None,
+                correlation_id: "corr-nac".to_string(),
+                title: "Concrete".to_string(),
+                summary: "Acceptance".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete");
+
+        // Work node as "abstract" target
+        let err2 = store
+            .satisfy_acceptance(SatisfyAcceptanceInput {
+                id: Some("sat-nac-tgt".to_string()),
+                scope_key: None,
+                correlation_id: "corr-nac".to_string(),
+                concrete_node_id: "conc-nac".to_string(),
+                abstract_node_id: "work-nac".to_string(),
+                rationale: "Should fail".to_string(),
+                run_id: None,
+            })
+            .expect_err("non-acceptance target should be rejected");
+        assert!(
+            err2.to_string().contains("acceptance"),
+            "should mention acceptance: {err2}"
+        );
+    }
+
+    #[test]
+    fn acceptance_view_rejects_non_acceptance_node() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("work-av".to_string()),
+                scope_key: None,
+                correlation_id: "corr-av".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "A work node".to_string(),
+                summary: "Not an acceptance".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create work node");
+
+        let err = store
+            .acceptance_view("work-av", "default")
+            .expect_err("should reject non-acceptance node in acceptance view");
+        assert!(
+            err.to_string().contains("acceptance"),
+            "should mention acceptance: {err}"
+        );
+    }
+
+    #[test]
+    fn evidence_view_rejects_non_evidence_node() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-ev".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev2".to_string(),
+                title: "Acceptance".to_string(),
+                summary: "Acceptance node".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create acceptance");
+
+        let err = store
+            .evidence_view("acc-ev", "default")
+            .expect_err("should reject non-evidence node in evidence view");
+        assert!(
+            err.to_string().contains("evidence"),
+            "should mention evidence: {err}"
+        );
+    }
+
+    #[test]
+    fn abstract_coverage_ignores_non_concrete_source() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-cov".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cov2".to_string(),
+                title: "Abstract".to_string(),
+                summary: "Needs concrete coverage".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+
+        // Create another abstract acceptance and a Satisfies edge from it to the first abstract
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-other".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cov2".to_string(),
+                title: "Other Abstract".to_string(),
+                summary: "Another abstract acceptance".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create other abstract");
+
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-cov-bad".to_string()),
+                scope_key: None,
+                correlation_id: "corr-cov2".to_string(),
+                kind: PlanningEdgeKind::Satisfies,
+                source_node_id: "abs-other".to_string(),
+                target_node_id: "abs-cov".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"rationale": "pretend"}),
+                run_id: None,
+            })
+            .expect("create satisfies edge between abstracts");
+
+        // Validate — should still warn ACCEPTANCE-COVERAGE-MISSING because source is abstract, not concrete
+        let conn = store.open_connection().unwrap();
+        let findings = validate_entity(&conn, EntityType::GraphNode, "abs-cov").expect("validate");
+        let has_coverage_warning = findings
+            .iter()
+            .any(|f| f.code == "ACCEPTANCE-COVERAGE-MISSING");
+        assert!(
+            has_coverage_warning,
+            "should still warn: abstract source doesn't count as concrete coverage"
+        );
+    }
+
+    #[test]
+    fn finalize_graph_node_rejects_abstract_without_coverage() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-final".to_string()),
+                scope_key: None,
+                correlation_id: "corr-fin".to_string(),
+                title: "Abstract for finalize".to_string(),
+                summary: "No coverage".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+
+        let err = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "abs-final".to_string(),
+                correlation_id: "corr-fin".to_string(),
+                active_scope_key: None,
+                status: "validated".to_string(),
+                accepted_risk: None,
+                run_id: None,
+            })
+            .expect_err("should reject abstract without coverage");
+        assert!(
+            err.to_string().contains("ACCEPTANCE-COVERAGE-MISSING"),
+            "should mention coverage: {err}"
+        );
+    }
+
+    #[test]
+    fn finalize_graph_node_succeeds_with_coverage() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-cov-final".to_string()),
+                scope_key: None,
+                correlation_id: "corr-fin2".to_string(),
+                title: "Covered abstract".to_string(),
+                summary: "Has coverage".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("conc-cov-final".to_string()),
+                scope_key: None,
+                correlation_id: "corr-fin2".to_string(),
+                title: "Concrete for abstract".to_string(),
+                summary: "Provides coverage".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create concrete");
+        store
+            .satisfy_acceptance(SatisfyAcceptanceInput {
+                id: Some("sat-final".to_string()),
+                scope_key: None,
+                correlation_id: "corr-fin2".to_string(),
+                concrete_node_id: "conc-cov-final".to_string(),
+                abstract_node_id: "abs-cov-final".to_string(),
+                rationale: "Verified".to_string(),
+                run_id: None,
+            })
+            .expect("satisfy");
+
+        let result = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "abs-cov-final".to_string(),
+                correlation_id: "corr-fin2".to_string(),
+                active_scope_key: None,
+                status: "validated".to_string(),
+                accepted_risk: None,
+                run_id: None,
+            })
+            .expect("should succeed with coverage");
+        assert_eq!(result.record.status, "validated");
+    }
+
+    #[test]
+    fn finalize_graph_node_accepted_risk_allows_gap() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("abs-risk".to_string()),
+                scope_key: None,
+                correlation_id: "corr-risk".to_string(),
+                title: "Acceptance with risk".to_string(),
+                summary: "No coverage but accepted risk".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Abstract,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create abstract");
+
+        let result = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "abs-risk".to_string(),
+                correlation_id: "corr-risk".to_string(),
+                active_scope_key: None,
+                status: "validated".to_string(),
+                accepted_risk: Some("Accepted by team lead: coverage deferred to Q2".to_string()),
+                run_id: Some("run-risk".to_string()),
+            })
+            .expect("should succeed with accepted risk");
+        assert_eq!(result.record.status, "validated");
+
+        // Verify event has accepted risk
+        let events = store.list_events().expect("list events");
+        let finalize_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.finalized-with-accepted-risk")
+            .collect();
+        assert_eq!(finalize_events.len(), 1);
+        assert_eq!(finalize_events[0].correlation_id, "corr-risk");
+        assert!(finalize_events[0].payload["acceptedRisk"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Accepted by team lead"));
+    }
+
+    #[test]
+    fn finalize_graph_node_accepted_risk_does_not_bypass_structural() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        // Create two work nodes
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("work-s1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-struct".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Structural S1".to_string(),
+                summary: "Source".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create s1");
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("work-s2".to_string()),
+                scope_key: None,
+                correlation_id: "corr-struct".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Structural S2".to_string(),
+                summary: "Target".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create s2");
+
+        // Create a DependsOn edge: s1 --depends-on--> s2
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-cycle1".to_string()),
+                scope_key: None,
+                correlation_id: "corr-struct".to_string(),
+                kind: PlanningEdgeKind::DependsOn,
+                source_node_id: "work-s1".to_string(),
+                target_node_id: "work-s2".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                run_id: None,
+            })
+            .expect("create first edge");
+        // Create a reverse DependsOn edge: s2 --depends-on--> s1 to form a cycle.
+        // We bypass the create-time cycle check via direct SQL.
+        let conn = store.open_connection().unwrap();
+        conn.execute(
+            "INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at)
+             VALUES (?1, 'default', ?2, ?3, ?4, 'active', '{}', 1, '2026-01-01T00:00:00Z', '2026-01-01T00:00:00Z')",
+            rusqlite::params!["ge-cycle2", PlanningEdgeKind::DependsOn.as_str(), "work-s2", "work-s1"],
+        ).expect("insert second edge via SQL (bypassing cycle check)");
+
+        // Now try to finalize with accepted risk — should still reject because cycle is structural
+        let err = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "work-s1".to_string(),
+                correlation_id: "corr-struct".to_string(),
+                active_scope_key: None,
+                status: "completed".to_string(),
+                accepted_risk: Some("I accept the risks".to_string()),
+                run_id: None,
+            })
+            .expect_err("should reject structural even with accepted risk");
+        assert!(
+            err.to_string().contains("structural"),
+            "should mention structural: {err}"
+        );
+    }
+
+    #[test]
+    fn finalize_graph_node_accepted_risk_does_not_bypass_invalid_acceptance_kind() {
+        // Phase 7 Fixup: type integrity is never waivable
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("acc-bad-kind".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ti".to_string(),
+                kind: PlanningNodeKind::Acceptance,
+                title: "Bad acceptance kind".to_string(),
+                summary: "Malformed payload".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"acceptanceKind": "not-a-real-kind"}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create bad acceptance");
+
+        let err = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "acc-bad-kind".to_string(),
+                correlation_id: "corr-ti".to_string(),
+                active_scope_key: None,
+                status: "validated".to_string(),
+                accepted_risk: Some("I accept the risks".to_string()),
+                run_id: None,
+            })
+            .expect_err("should reject type integrity even with accepted risk");
+        assert!(
+            err.to_string().contains("invalid typed payloads"),
+            "should mention typed payloads: {err}"
+        );
+    }
+
+    #[test]
+    fn finalize_graph_node_accepted_risk_does_not_bypass_invalid_evidence_kind() {
+        // Phase 7 Fixup: type integrity is never waivable
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("ev-bad-kind".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ti2".to_string(),
+                kind: PlanningNodeKind::Evidence,
+                title: "Bad evidence kind".to_string(),
+                summary: "Malformed payload".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({"evidenceKind": "not-a-real-kind"}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create bad evidence");
+
+        let err = store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "ev-bad-kind".to_string(),
+                correlation_id: "corr-ti2".to_string(),
+                active_scope_key: None,
+                status: "validated".to_string(),
+                accepted_risk: Some("I accept the risks".to_string()),
+                run_id: None,
+            })
+            .expect_err("should reject type integrity even with accepted risk");
+        assert!(
+            err.to_string().contains("invalid typed payloads"),
+            "should mention typed payloads: {err}"
+        );
+    }
+
+    #[test]
+    fn finalize_graph_node_appends_event() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_graph_node(CreateGraphNodeInput {
+                id: Some("work-final-ev".to_string()),
+                scope_key: None,
+                correlation_id: "corr-ev-fin".to_string(),
+                kind: PlanningNodeKind::Work,
+                title: "Finalize event test".to_string(),
+                summary: "Testing events".to_string(),
+                status: "active".to_string(),
+                payload: serde_json::json!({}),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create work");
+
+        store
+            .finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: "work-final-ev".to_string(),
+                correlation_id: "corr-ev-fin".to_string(),
+                active_scope_key: None,
+                status: "completed".to_string(),
+                accepted_risk: None,
+                run_id: Some("run-fin".to_string()),
+            })
+            .expect("finalize");
+
+        let events = store.list_events().expect("list events");
+        let finalize_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type == "graph-node.finalized")
+            .collect();
+        assert_eq!(finalize_events.len(), 1);
+        assert_eq!(finalize_events[0].correlation_id, "corr-ev-fin");
+        assert_eq!(finalize_events[0].run_id, "run-fin");
+    }
+
+    #[test]
+    fn acceptance_view_excludes_inactive_links() {
+        let dir = tempdir().expect("tempdir");
+        let db_path = dir.path().join("test.db");
+        let store = PlanningStore::new(&db_path);
+        store.init().expect("init");
+
+        store
+            .create_evidence(CreateEvidenceInput {
+                id: Some("ev-inactive".to_string()),
+                scope_key: None,
+                correlation_id: "corr-av".to_string(),
+                title: "Inactive evidence".to_string(),
+                summary: "Should be excluded".to_string(),
+                status: "active".to_string(),
+                evidence_kind: EvidenceKind::TestResult,
+                reference: "".to_string(),
+                content: "".to_string(),
+                captured_at: "".to_string(),
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create evidence");
+        store
+            .create_acceptance(CreateAcceptanceInput {
+                id: Some("acc-av".to_string()),
+                scope_key: None,
+                correlation_id: "corr-av".to_string(),
+                title: "Acceptance view test".to_string(),
+                summary: "With inactive link".to_string(),
+                status: "active".to_string(),
+                acceptance_kind: AcceptanceKind::Concrete,
+                description: "".to_string(),
+                verification_policy: "".to_string(),
+                required_evidence_kinds: vec![],
+                waiver: None,
+                tags: vec![],
+                run_id: None,
+            })
+            .expect("create acceptance");
+
+        // Attach evidence with inactive edge (via direct graph edge)
+        store
+            .create_graph_edge(CreateGraphEdgeInput {
+                id: Some("ge-av-inactive".to_string()),
+                scope_key: None,
+                correlation_id: "corr-av".to_string(),
+                kind: PlanningEdgeKind::EvidencedBy,
+                source_node_id: "acc-av".to_string(),
+                target_node_id: "ev-inactive".to_string(),
+                status: "proposed".to_string(),
+                payload: serde_json::json!({"rationale": "inactive link"}),
+                run_id: None,
+            })
+            .expect("create inactive evidenced-by edge");
+
+        let view = store.acceptance_view("acc-av", "default").expect("view");
+        assert!(
+            view.attached_evidence.is_empty(),
+            "inactive links should be excluded"
+        );
+
+        // Activate the edge
+        store
+            .update_graph_edge_status(UpdateGraphEdgeStatusInput {
+                edge_id: "ge-av-inactive".to_string(),
+                correlation_id: "corr-av".to_string(),
+                active_scope_key: None,
+                status: "active".to_string(),
+                run_id: None,
+            })
+            .expect("activate edge");
+
+        let view2 = store.acceptance_view("acc-av", "default").expect("view2");
+        assert_eq!(
+            view2.attached_evidence.len(),
+            1,
+            "active links should be included"
         );
     }
 }

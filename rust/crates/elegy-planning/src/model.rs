@@ -47,7 +47,9 @@ string_enum!(EntityType {
     Issue => "issue",
     ReviewPoint => "review-point",
     Insight => "insight",
-    ProjectRun => "project-run"
+    ProjectRun => "project-run",
+    GraphNode => "graph-node",
+    GraphEdge => "graph-edge"
 });
 
 string_enum!(GoalStatus {
@@ -324,6 +326,54 @@ string_enum!(PlanningEdgeKind {
     Supersedes => "supersedes"
 });
 
+string_enum!(AcceptanceKind {
+    Abstract => "abstract",
+    Concrete => "concrete"
+});
+
+string_enum!(EvidenceKind {
+    CommandResult => "command-result",
+    TestResult => "test-result",
+    ArtifactRef => "artifact-ref",
+    CommitRef => "commit-ref",
+    PrRef => "pr-ref",
+    Review => "review",
+    TraceExcerpt => "trace-excerpt",
+    ExternalUrl => "external-url"
+});
+
+/// Acceptance node payload shape (stored in payload_json column).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptancePayload {
+    #[serde(rename = "acceptanceKind")]
+    pub acceptance_kind: String,
+    #[serde(default)]
+    pub description: String,
+    #[serde(default, rename = "verificationPolicy")]
+    pub verification_policy: String,
+    #[serde(default, rename = "requiredEvidenceKinds")]
+    pub required_evidence_kinds: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub waiver: Option<String>,
+}
+
+/// Evidence node payload shape (stored in payload_json column).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidencePayload {
+    #[serde(rename = "evidenceKind")]
+    pub evidence_kind: String,
+    #[serde(default)]
+    pub summary: String,
+    #[serde(default)]
+    pub reference: String,
+    #[serde(default)]
+    pub content: String,
+    #[serde(default, rename = "capturedAt")]
+    pub captured_at: String,
+}
+
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanningGraphNode {
@@ -353,6 +403,52 @@ pub struct PlanningGraphEdge {
     pub revision: i64,
     pub created_at: String,
     pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphNodeView {
+    pub node: PlanningGraphNode,
+    pub incoming_edges: Vec<PlanningGraphEdge>,
+    pub outgoing_edges: Vec<PlanningGraphEdge>,
+    pub connected_nodes: Vec<serde_json::Value>,
+    pub tags: Vec<String>,
+    pub validation: ValidationReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphEdgeView {
+    pub edge: PlanningGraphEdge,
+    pub source_node: serde_json::Value,
+    pub target_node: serde_json::Value,
+    pub validation: ValidationReport,
+}
+
+/// Acceptance view: node + linked requirements, coverage, and evidence paths.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct AcceptanceView {
+    pub node: PlanningGraphNode,
+    /// Nodes that require this acceptance (via Requires edge).
+    pub required_by: Vec<PlanningGraphNode>,
+    /// Abstract acceptances this concrete satisfies (via Satisfies edge from self).
+    pub satisfied_abstracts: Vec<PlanningGraphNode>,
+    /// Concrete acceptances that satisfy this abstract (via Satisfies edge to self).
+    pub satisfying_concretes: Vec<PlanningGraphNode>,
+    /// Evidence attached to this acceptance (via EvidencedBy edge).
+    pub attached_evidence: Vec<PlanningGraphNode>,
+    pub validation: ValidationReport,
+}
+
+/// Evidence view: node + linked targets.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct EvidenceView {
+    pub node: PlanningGraphNode,
+    /// Targets this evidence is attached to (via EvidencedBy edge).
+    pub attached_to: Vec<PlanningGraphNode>,
+    pub validation: ValidationReport,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -765,6 +861,8 @@ pub struct PlanningHealthReport {
     pub review_point_count: i64,
     pub insight_count: i64,
     pub project_run_count: i64,
+    pub graph_node_count: i64,
+    pub graph_edge_count: i64,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]

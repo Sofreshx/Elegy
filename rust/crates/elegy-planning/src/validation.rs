@@ -4,12 +4,15 @@ use rusqlite::{params, Connection, OptionalExtension};
 
 use crate::{
     storage::{
-        attached_entity_correlation_id, list_review_points_for_entity, list_todos_for_plan,
-        list_work_points_for_roadmap, load_goal, load_insight, load_issue, load_plan,
-        load_project_run, load_roadmap, load_todo, load_work_point,
+        attached_entity_correlation_id, list_incoming_edges_in_scope, list_outgoing_edges_for_node,
+        list_outgoing_edges_in_scope, list_review_points_for_entity, list_todos_for_plan,
+        list_work_points_for_roadmap, load_goal, load_graph_edge, load_graph_node, load_insight,
+        load_issue, load_plan, load_project_run, load_roadmap, load_todo, load_work_point,
+        validate_edge_kind_pair, would_create_graph_cycle,
     },
-    EntityType, GoalStatus, IssueStatus, PlanningStoreError, ProjectRunStatus, ReviewPointStatus,
-    Severity, TodoStatus, ValidationFinding, ValidationSeverity, WorkPointKind, WorkPointStatus,
+    AcceptanceKind, EntityType, EvidenceKind, GoalStatus, IssueStatus, PlanningEdgeKind,
+    PlanningNodeKind, PlanningStoreError, ProjectRunStatus, ReviewPointStatus, Severity,
+    TodoStatus, ValidationFinding, ValidationSeverity, WorkPointKind, WorkPointStatus,
 };
 
 pub(crate) fn validate_entity(
@@ -29,6 +32,8 @@ pub(crate) fn validate_entity(
         EntityType::ReviewPoint => validate_review_point(connection, entity_id),
         EntityType::Insight => validate_insight(connection, entity_id),
         EntityType::ProjectRun => validate_project_run(connection, entity_id),
+        EntityType::GraphNode => validate_graph_node(connection, entity_id),
+        EntityType::GraphEdge => validate_graph_edge(connection, entity_id),
     }
 }
 
@@ -978,6 +983,380 @@ fn finding(
             .format(&time::format_description::well_known::Rfc3339)
             .map_err(|_| PlanningStoreError::TimeFormat)?,
     })
+}
+
+fn validate_graph_node(
+    connection: &Connection,
+    node_id: &str,
+) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
+    let node = match load_graph_node(connection, node_id) {
+        Ok(n) => n,
+        Err(_) => return Ok(Vec::new()), // node missing — edge validators will catch this
+    };
+    let mut findings = Vec::new();
+
+    // GRAPH-STATUS-INVALID: check status is valid kebab-case
+    let status = node.status.trim();
+    let is_valid_status = !status.is_empty()
+        && status
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && status.starts_with(|c: char| c.is_ascii_lowercase())
+        && !status.ends_with('-')
+        && !status.contains("--");
+
+    if !is_valid_status {
+        findings.push(warning(
+            EntityType::GraphNode,
+            node_id,
+            &node.scope_key,
+            "GRAPH-STATUS-INVALID",
+            &format!(
+                "graph node status '{}' is not a valid lowercase kebab-case token",
+                node.status
+            ),
+        )?);
+    }
+
+    // ACCEPTANCE-KIND-INVALID: acceptance node must have a valid acceptanceKind in payload
+    if node.kind == PlanningNodeKind::Acceptance {
+        let acceptance_kind_str = node
+            .payload
+            .get("acceptanceKind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if AcceptanceKind::from_str(acceptance_kind_str).is_err() {
+            findings.push(warning(
+                EntityType::GraphNode,
+                node_id,
+                &node.scope_key,
+                "ACCEPTANCE-KIND-INVALID",
+                &format!(
+                    "acceptance node '{}' has invalid or missing acceptanceKind: '{}' (expected 'abstract' or 'concrete')",
+                    node_id, acceptance_kind_str
+                ),
+            )?);
+        }
+
+        // ACCEPTANCE-COVERAGE-MISSING: abstract acceptance must have at least one active concrete satisfies edge
+        if acceptance_kind_str == "abstract" {
+            let incoming =
+                list_incoming_edges_in_scope(connection, node_id, &node.scope_key, None)?;
+            let has_active_coverage = incoming.iter().any(|e| {
+                e.kind == PlanningEdgeKind::Satisfies
+                    && e.status == "active"
+                    && e.source_node_id != node_id
+                    && {
+                        if let Ok(source_node) = load_graph_node(connection, &e.source_node_id) {
+                            source_node.kind == PlanningNodeKind::Acceptance
+                                && source_node
+                                    .payload
+                                    .get("acceptanceKind")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("")
+                                    == "concrete"
+                        } else {
+                            false
+                        }
+                    }
+            });
+            if !has_active_coverage {
+                findings.push(warning(
+                    EntityType::GraphNode,
+                    node_id,
+                    &node.scope_key,
+                    "ACCEPTANCE-COVERAGE-MISSING",
+                    &format!(
+                        "abstract acceptance '{}' has no active concrete acceptance satisfying it",
+                        node_id
+                    ),
+                )?);
+            }
+        }
+
+        // ACCEPTANCE-EVIDENCE-MISSING: concrete acceptance requiring evidence must have active evidence
+        if acceptance_kind_str == "concrete" {
+            let required_kinds: Vec<String> = node
+                .payload
+                .get("requiredEvidenceKinds")
+                .and_then(|v| v.as_array())
+                .map(|arr| {
+                    arr.iter()
+                        .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                        .collect()
+                })
+                .unwrap_or_default();
+
+            if !required_kinds.is_empty() {
+                let outgoing =
+                    list_outgoing_edges_in_scope(connection, node_id, &node.scope_key, None)?;
+                let evidence_edges: Vec<_> = outgoing
+                    .iter()
+                    .filter(|e| e.kind == PlanningEdgeKind::EvidencedBy && e.status == "active")
+                    .collect();
+
+                // Check each required evidence kind is covered by at least one attached evidence node
+                for required_kind in &required_kinds {
+                    let covered = evidence_edges.iter().any(|edge| {
+                        if let Ok(evidence_node) = load_graph_node(connection, &edge.target_node_id)
+                        {
+                            if evidence_node.kind == PlanningNodeKind::Evidence {
+                                let evidence_kind = evidence_node
+                                    .payload
+                                    .get("evidenceKind")
+                                    .and_then(|v| v.as_str())
+                                    .unwrap_or("");
+                                return evidence_kind == required_kind;
+                            }
+                        }
+                        false
+                    });
+                    if !covered {
+                        findings.push(warning(
+                            EntityType::GraphNode,
+                            node_id,
+                            &node.scope_key,
+                            "ACCEPTANCE-EVIDENCE-MISSING",
+                            &format!(
+                                "concrete acceptance '{}' requires evidence of kind '{}' but none is attached",
+                                node_id, required_kind
+                            ),
+                        )?);
+                    }
+                }
+            }
+        }
+    }
+
+    // EVIDENCE-KIND-INVALID: evidence node must have a valid evidenceKind in payload
+    if node.kind == PlanningNodeKind::Evidence {
+        let evidence_kind_str = node
+            .payload
+            .get("evidenceKind")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if EvidenceKind::from_str(evidence_kind_str).is_err() {
+            findings.push(warning(
+                EntityType::GraphNode,
+                node_id,
+                &node.scope_key,
+                "EVIDENCE-KIND-INVALID",
+                &format!(
+                    "evidence node '{}' has invalid or missing evidenceKind: '{}'",
+                    node_id, evidence_kind_str
+                ),
+            )?);
+        }
+    }
+
+    Ok(findings)
+}
+
+fn validate_graph_edge(
+    connection: &Connection,
+    edge_id: &str,
+) -> Result<Vec<ValidationFinding>, PlanningStoreError> {
+    let edge = match load_graph_edge(connection, edge_id) {
+        Ok(e) => e,
+        Err(_) => return Ok(Vec::new()), // edge missing — nothing to validate
+    };
+    let mut findings = Vec::new();
+    let scope_key = &edge.scope_key;
+
+    // GRAPH-STATUS-INVALID: check edge status is valid kebab-case
+    let status = edge.status.trim();
+    let is_valid_status = !status.is_empty()
+        && status
+            .chars()
+            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
+        && status.starts_with(|c: char| c.is_ascii_lowercase())
+        && !status.ends_with('-')
+        && !status.contains("--");
+
+    if !is_valid_status {
+        findings.push(warning(
+            EntityType::GraphEdge,
+            edge_id,
+            scope_key,
+            "GRAPH-STATUS-INVALID",
+            &format!(
+                "graph edge status '{}' is not a valid lowercase kebab-case token",
+                edge.status
+            ),
+        )?);
+    }
+
+    // Load source and target nodes (may not exist)
+    let source = load_graph_node(connection, &edge.source_node_id);
+    let target = load_graph_node(connection, &edge.target_node_id);
+
+    // GRAPH-EDGE-MISSING-NODE
+    if source.is_err() {
+        findings.push(warning(
+            EntityType::GraphEdge,
+            edge_id,
+            scope_key,
+            "GRAPH-EDGE-MISSING-NODE",
+            &format!(
+                "source node '{}' referenced by edge '{}' does not exist",
+                edge.source_node_id, edge_id
+            ),
+        )?);
+    }
+    if target.is_err() {
+        findings.push(warning(
+            EntityType::GraphEdge,
+            edge_id,
+            scope_key,
+            "GRAPH-EDGE-MISSING-NODE",
+            &format!(
+                "target node '{}' referenced by edge '{}' does not exist",
+                edge.target_node_id, edge_id
+            ),
+        )?);
+    }
+
+    // Only continue if both nodes exist (avoid cascading findings)
+    if let (Ok(source_node), Ok(target_node)) = (&source, &target) {
+        // GRAPH-EDGE-SELF-LOOP
+        if edge.source_node_id == edge.target_node_id {
+            findings.push(warning(
+                EntityType::GraphEdge,
+                edge_id,
+                scope_key,
+                "GRAPH-EDGE-SELF-LOOP",
+                &format!(
+                    "edge '{}' is a self-loop (source == target == '{}')",
+                    edge_id, edge.source_node_id
+                ),
+            )?);
+        }
+
+        // GRAPH-EDGE-CROSS-SCOPE: node scopes must match edge scope
+        if source_node.scope_key != *scope_key {
+            findings.push(warning(
+                EntityType::GraphEdge,
+                edge_id,
+                scope_key,
+                "GRAPH-EDGE-CROSS-SCOPE",
+                &format!(
+                    "source node '{}' is in scope '{}' but edge '{}' is in scope '{}'",
+                    edge.source_node_id, source_node.scope_key, edge_id, scope_key
+                ),
+            )?);
+        }
+        if target_node.scope_key != *scope_key {
+            findings.push(warning(
+                EntityType::GraphEdge,
+                edge_id,
+                scope_key,
+                "GRAPH-EDGE-CROSS-SCOPE",
+                &format!(
+                    "target node '{}' is in scope '{}' but edge '{}' is in scope '{}'",
+                    edge.target_node_id, target_node.scope_key, edge_id, scope_key
+                ),
+            )?);
+        }
+
+        // GRAPH-EDGE-KIND-MISMATCH
+        if let Err(err) = validate_edge_kind_pair(&edge.kind, &source_node.kind, &target_node.kind)
+        {
+            findings.push(warning(
+                EntityType::GraphEdge,
+                edge_id,
+                scope_key,
+                "GRAPH-EDGE-KIND-MISMATCH",
+                &format!("edge '{}' has invalid kind pair: {}", edge_id, err),
+            )?);
+        }
+
+        // GRAPH-EDGE-DUPLICATE-ACTIVE: detect duplicate active edges
+        if edge.status == "active" {
+            // Check for outgoing duplicates
+            let outgoing =
+                list_outgoing_edges_for_node(connection, &edge.source_node_id, Some(edge.kind))?;
+            let dup_count = outgoing
+                .iter()
+                .filter(|e| {
+                    e.id != edge.id
+                        && e.target_node_id == edge.target_node_id
+                        && e.status == "active"
+                        && e.scope_key == *scope_key
+                })
+                .count();
+            if dup_count > 0 {
+                findings.push(warning(
+                    EntityType::GraphEdge,
+                    edge_id,
+                    scope_key,
+                    "GRAPH-EDGE-DUPLICATE-ACTIVE",
+                    &format!(
+                        "duplicate active {} edge from '{}' to '{}' in scope '{}'",
+                        edge.kind.as_str(),
+                        edge.source_node_id,
+                        edge.target_node_id,
+                        scope_key
+                    ),
+                )?);
+            }
+        }
+
+        // GRAPH-EDGE-CYCLE: check for would-be cycles in decomposes-to / depends-on
+        // Only active edges can participate in cycles
+        if edge.status == "active" {
+            match edge.kind {
+                PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn => {
+                    match would_create_graph_cycle(
+                        connection,
+                        &edge.source_node_id,
+                        &edge.target_node_id,
+                        &edge.kind,
+                    ) {
+                        Ok(true) => {
+                            findings.push(warning(
+                                EntityType::GraphEdge,
+                                edge_id,
+                                scope_key,
+                                "GRAPH-EDGE-CYCLE",
+                                &format!(
+                                    "{} edge from '{}' to '{}' creates a cycle",
+                                    edge.kind.as_str(),
+                                    edge.source_node_id,
+                                    edge.target_node_id
+                                ),
+                            )?);
+                        }
+                        Err(_) => {} // cycle check failure is non-fatal for validation
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    // ACCEPTANCE-RATIONALE-MISSING: active Satisfies edge must have a non-empty rationale
+    if edge.kind == PlanningEdgeKind::Satisfies && edge.status == "active" {
+        let rationale = edge
+            .payload
+            .get("rationale")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        if rationale.trim().is_empty() {
+            findings.push(warning(
+                EntityType::GraphEdge,
+                edge_id,
+                scope_key,
+                "ACCEPTANCE-RATIONALE-MISSING",
+                &format!(
+                    "active Satisfies edge '{}' has no non-empty rationale",
+                    edge_id
+                ),
+            )?);
+        }
+    }
+
+    Ok(findings)
 }
 
 fn sql_string_err(message: String) -> rusqlite::Error {

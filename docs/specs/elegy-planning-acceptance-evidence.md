@@ -1,9 +1,9 @@
 ---
 title: elegy-planning acceptance and evidence
-status: draft
+status: implemented
 owner: Elegy
 created: 2026-06-15
-updated: 2026-06-15
+updated: 2026-06-16
 doc_kind: spec
 summary: First-class abstract and concrete acceptance requirements, many-to-many coverage links, typed evidence, and completion gating rules.
 schema_version: elegy-planning-acceptance-evidence/v0
@@ -87,8 +87,8 @@ Finalization gating:
   coverage below it and required evidence for that coverage.
 - Draft and active states remain flexible; coverage gaps are allowed until
   finalization.
-- Accepted risk is allowed only through an explicit finding or acceptance waiver
-  command with rationale and event history.
+- Accepted risk is allowed only for acceptance coverage/evidence gaps, not for
+  malformed typed payloads. Type integrity and structural corruption are never waivable.
 
 Evidence is not uniformly trusted. The verification policy on the acceptance
 node decides which evidence kinds are required and whether evidence is
@@ -96,12 +96,33 @@ mandatory, advisory, or review-only.
 
 ## Acceptance Criteria
 
-- [ ] Abstract and concrete acceptance criteria round-trip as graph nodes.
-- [ ] Concrete acceptance can satisfy multiple abstract criteria with rationale.
-- [ ] Finalization rejects uncovered abstract acceptance.
-- [ ] Finalization rejects concrete acceptance with missing required evidence.
-- [ ] Evidence kinds are typed and queryable.
-- [ ] Accepted-risk paths require explicit rationale and event history.
+- [x] Abstract and concrete acceptance criteria round-trip as graph nodes.
+- [x] Concrete acceptance can satisfy multiple abstract criteria with rationale.
+- [x] Finalization rejects uncovered abstract acceptance.
+- [x] Finalization rejects concrete acceptance with missing required evidence.
+- [x] Evidence kinds are typed and queryable.
+- [x] Accepted-risk paths require explicit rationale and event history.
+
+## Implementation Notes
+
+- Acceptance and evidence are stored as `PlanningNodeKind::Acceptance` / `Evidence`
+  graph nodes in `planning_nodes`; no separate tables.
+- Typed wrappers (`create_acceptance`, `create_evidence`, `satisfy_acceptance`,
+  `attach_evidence`) construct payload JSON and delegate to `create_graph_node` /
+  `create_graph_edge`.
+- `acceptance_view` and `evidence_view` return active-only linked entities
+  (inactive/proposed links are excluded).
+- Validators emit warnings (`ACCEPTANCE-COVERAGE-MISSING`, `ACCEPTANCE-EVIDENCE-MISSING`,
+  `ACCEPTANCE-RATIONALE-MISSING`, `ACCEPTANCE-KIND-INVALID`, `EVIDENCE-KIND-INVALID`).
+- `graph node finalize` gates completion/validation on blocking findings:
+  structural corruption (GRAPH-EDGE-*) is always blocked; type integrity violations
+  (ACCEPTANCE-KIND-INVALID, EVIDENCE-KIND-INVALID) are always blocked;
+  acceptance/evidence gaps (ACCEPTANCE-COVERAGE-MISSING, ACCEPTANCE-EVIDENCE-MISSING)
+  are blocked unless `--accepted-risk` is provided.
+- Accepted risk appends a `graph-node.finalized-with-accepted-risk` event with
+  rationale in the payload.
+- CLI surface: `graph acceptance create|show|list|satisfy`, `graph evidence
+  create|show|list|attach`, `graph node finalize`.
 
 ## Validation
 
