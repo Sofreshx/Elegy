@@ -204,17 +204,48 @@ Pour une migration de type `Reembed` (recalcul d'embeddings) :
 
 ---
 
-## B — Non implémenté (réservé v1/v2)
+## B — Reembed staging+cutover (implémenté WU17 Phase B suite)
 
-Conformément à `mvp-scope.md`, le type suivant est supporté par le trait
-`Migration` et l'enum `MigrationCapability` mais n'a pas d'implémentation
-concrète :
+Le chemin Reembed complet est implémenté et intégré dans le chemin de production :
 
-| Type | Mutation autorisée | Déclencheur |
-|---|---|---|
-| **DerivedRebuild** | Drop + recréer index FTS5, vec_memories | Changement de schéma d'index |
+| Type | Mutation autorisée | Déclencheur | Statut |
+|---|---|---|---|
+| **ReembedMigration** | Recalcul d'embeddings dans `reembed_staging` → `memory_embeddings` / `vec_memories` | Changement de modèle d'embedding, embeddings stale | ✅ Implémenté |
+| **DerivedRebuild** | Drop + recréer index FTS5, vec_memories | Changement de schéma d'index | ❌ Réservé v1/v2 |
 
-Tout le reste de l'ancienne section B (runner, triggers, capability-split,
-SchemaAdditive, ScopeConfigSemantic, Reembed staging+cutover, staging
-orphelin, gestion des cours concurrentes) est implémenté dans la section A
-ci-dessus.
+### B.1 ReembedMigration — intégration
+
+- **Type exposé :** `ReembedMigration` et `run_migrations` sont publics dans `elegy_memory::storage`.
+- **CLI :** La commande `reembed` route via `ReembedMigration` + `run_migrations()`. Le chemin direct `sqlite_store::reembed_stale_memories` est retiré.
+- **Scope filter :** `ReembedMigration::with_scope()` limite le re-embedding à un scope spécifique.
+- **Runner idempotence :** `migration_runs` bloque la ré-exécution d'un run déjà enregistré.
+
+### B.2 Invariants
+
+| Invariant | Mécanisme |
+|---|---|
+| Table `memories` jamais mutée | Capability `Reembed` + triggers colonne-level sur `memories` via `run_migrations()` |
+| Cutover atomique | `run_staging()` → `verify_staging()` → `run_cutover()` dans la même transaction |
+| Garde de course (hash de contenu) | `run_cutover()` compare `content_sha256` du staging avec le contenu courant ; mismatch ⇒ `embedding_stale = 1` conservé |
+| Fail-fast provider down | `check_provider_health()` avant `run_staging()` — échec ⇒ abort sans staging |
+| Staging orphelin | `run_staging()` nettoie `reembed_staging` et `reembed_pending_retry` dont le `memory_id` n'existe plus dans `memories` |
+| Reprise après interruption | Si staging incomplet (`staged < active`), le staging existant est supprimé et le run recommence ; si complet, le run est skippé |
+| No-loss sur provider failure mid-run | `verify_staging()` exige `staged + retry == active` ; les mémoires en échec restent dans `pending_retry` pour le prochain run |
+
+### B.3 Procédure — utiliser ReembedMigration
+
+```rust
+use rusqlite::Connection;
+use elegy_memory::storage::{ReembedMigration, run_migrations};
+
+let connection = Connection::open("my_memory.db")?;
+let migration = ReembedMigration::new(
+    Box::new(|content| {
+        // Appeler l'embedding provider ici
+        Ok((vec![0.0f32; 768], 768))
+    }),
+    "my-profile-v1",
+).with_scope(MemoryScope::Workspace);
+
+run_migrations(&connection, &[&migration])?;
+```
