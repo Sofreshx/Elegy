@@ -87,7 +87,7 @@ Typical downstream consumption flow:
 
 ## Discovery Surface
 
-The governed discovery authority for this surface is `contracts/fixtures/skill-definition-v2.elegy-observe.json`.
+The governed discovery authority for this surface is `contracts/fixtures/skill.elegy-observe.json`.
 
 Hosts should prefer:
 

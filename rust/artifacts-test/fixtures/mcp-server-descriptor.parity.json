@@ -1,0 +1,36 @@
+{
+  "serverName": "parity-server",
+  "transport": "stdio",
+  "tools": [
+    {
+      "name": "list-files",
+      "description": "List files in a workspace",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "readFile",
+      "description": "Read a file from a workspace",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string"
+          }
+        },
+        "required": ["path"]
+      }
+    },
+    {
+      "name": "search_code",
+      "description": "Search source code by text"
+    }
+  ]
+}

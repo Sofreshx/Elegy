@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "elegy-configuration-template/v1",
+  "templateId": "demo-template",
+  "displayName": "Demo Template",
+  "scope": "repo",
+  "operations": [
+    {
+      "operationType": "copyFile",
+      "operationId": "copy-demo-file",
+      "family": "support-file",
+      "source": {
+        "base": "template-root",
+        "path": "assets/demo.txt"
+      },
+      "destination": {
+        "base": "target-root",
+        "path": "generated/demo.txt"
+      }
+    }
+  ]
+}

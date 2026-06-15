@@ -90,7 +90,7 @@ jobs:
             -WorkflowName '${{ github.workflow }}' `
             -OutputPath (Join-Path $callerRoot 'artifacts/ws3/mode-selection.json')
 
-      - name: Script smoke validation (warn mode, non-blocking)
+      - name: Script smoke (non-blocking, NOT a real formalization check)
         shell: pwsh
         run: |
           $ErrorActionPreference = 'Stop'

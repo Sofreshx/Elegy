@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/governed-memory-record.schema.json",
+  "title": "Governed Memory Record",
+  "description": "Portable governed reusable-memory record for local non-authoritative import, supersede, tombstone, and deterministic projection semantics. Local lifecycle metadata here must remain separate from host-owned currentness, approval, freshness, ranking, validation, and promotion semantics.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifactKind",
+    "recordId",
+    "sessionContext",
+    "provenance",
+    "localLifecycle",
+    "deterministicSortKeys"
+  ],
+  "properties": {
+    "artifactKind": {
+      "const": "governed-memory-record"
+    },
+    "recordId": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 128
+    },
+    "sessionContext": {
+      "$ref": "summary-only-session-context-envelope.schema.json#/properties/sessionContext"
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sourceArtifactKind",
+        "importedAtUtc",
+        "projectionRulesVersion"
+      ],
+      "properties": {
+        "sourceArtifactKind": {
+          "const": "summary-only-session-context-envelope"
+        },
+        "requestId": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "runId": {
+          "type": ["string", "null"],
+          "minLength": 1
+        },
+        "capturedAtUtc": {
+          "type": ["string", "null"],
+          "format": "date-time"
+        },
+        "importedAtUtc": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "projectionRulesVersion": {
+          "const": "1.0.0"
+        }
+      }
+    },
+    "localLifecycle": {
+      "type": "object",
+      "description": "Local artifact-management state only. This does not imply host-owned approval, freshness, retrieval ranking, or currentness.",
+      "additionalProperties": false,
+      "required": ["state"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["active", "superseded", "tombstoned"]
+        },
+        "supersededByRecordId": {
+          "type": ["string", "null"],
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "tombstone": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "required": ["tombstonedAtUtc", "reason"],
+          "properties": {
+            "tombstonedAtUtc": {
+              "type": "string",
+              "format": "date-time"
+            },
+            "reason": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 280
+            }
+          }
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "active"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "supersededByRecordId": false,
+              "tombstone": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "superseded"
+              }
+            }
+          },
+          "then": {
+            "required": ["supersededByRecordId"],
+            "properties": {
+              "tombstone": false
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "state": {
+                "const": "tombstoned"
+              }
+            }
+          },
+          "then": {
+            "required": ["tombstone"]
+          }
+        }
+      ]
+    },
+    "deterministicSortKeys": {
+      "type": "object",
+      "description": "Deterministic local sort keys derived from scope, capture/import timestamps, lifecycle state, and lineage identifiers.",
+      "additionalProperties": false,
+      "required": [
+        "scopeCapturedAtRecordId",
+        "lifecycleStateRecordId",
+        "supersededByRecordIdOrSelf"
+      ],
+      "properties": {
+        "scopeCapturedAtRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280
+        },
+        "lifecycleStateRecordId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280
+        },
+        "supersededByRecordIdOrSelf": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 280
+        }
+      }
+    }
+  }
+}

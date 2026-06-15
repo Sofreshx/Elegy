@@ -31,13 +31,21 @@ pub enum PlanningStoreError {
     },
     #[error("time formatting failed")]
     TimeFormat,
+    #[error("work point already has an active lease: {work_point_id}")]
+    ActiveLeaseConflict { work_point_id: String },
+    #[error("project run not in expected status: expected {expected}, actual {actual}")]
+    ProjectRunStatusMismatch { expected: String, actual: String },
 }
 
 impl PlanningStoreError {
     pub fn is_invalid_input(&self) -> bool {
         matches!(
             self,
-            Self::InvalidInput(_) | Self::NotFound { .. } | Self::ProjectionParentMissing(_)
+            Self::InvalidInput(_)
+                | Self::NotFound { .. }
+                | Self::ProjectionParentMissing(_)
+                | Self::ActiveLeaseConflict { .. }
+                | Self::ProjectRunStatusMismatch { .. }
         )
     }
 }

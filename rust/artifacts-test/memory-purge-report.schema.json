@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/memory-purge-report.schema.json",
+  "title": "MemoryPurgeReport",
+  "description": "Purge report with deleted record counts across the memory store.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["dbPath", "scope", "report"],
+  "properties": {
+    "dbPath": { "type": "string" },
+    "scope": { "type": "string" },
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["memoriesDeleted", "versionsDeleted", "linksDeleted", "contradictionsDeleted", "embeddingsDeleted"],
+      "properties": {
+        "memoriesDeleted": { "type": "integer", "minimum": 0 },
+        "versionsDeleted": { "type": "integer", "minimum": 0 },
+        "linksDeleted": { "type": "integer", "minimum": 0 },
+        "contradictionsDeleted": { "type": "integer", "minimum": 0 },
+        "embeddingsDeleted": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

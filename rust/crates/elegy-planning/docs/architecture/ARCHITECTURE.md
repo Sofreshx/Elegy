@@ -38,8 +38,10 @@ Implemented in MVP:
 - `todo`
 - `issue`
 - `review point`
+- `insight`
 - `planning event`
 - `validation finding`
+- `tag index`
 
 ## Core Design Choices
 
@@ -77,6 +79,7 @@ Every successful write appends an event to `planning_events`.
 Event metadata currently includes:
 
 - `event_id`
+- `scope_key`
 - `entity_type`
 - `entity_id`
 - `aggregate_type`
@@ -90,6 +93,8 @@ Event metadata currently includes:
 - `payload_json`
 
 Current-state tables provide fast reads for CLI and projections.
+
+Flat event listing is scope-filtered by the active scope while still using append order within that filtered view.
 
 This is a pragmatic MVP version of event-sourced authority: append event, update projection table, validate current state, store findings.
 
@@ -137,11 +142,10 @@ Not yet implemented:
 
 - compatibility import from `instruction-engine` roadmap workflow artifacts
 - automatic export/projection into shared repo planning docs
-- update and transition subcommands beyond initial create flows
 - richer evidence aggregates
 - replay-based rebuild from events alone
-- explicit migration history beyond schema version `1`
 - dedicated wrapper projection for repo-local skill bridge surfaces
+- FTS5 rebuild on entity update (currently only on create)
 
 ## Intended Next Steps
 

@@ -1,0 +1,45 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/obsidian-result.schema.json",
+  "title": "ObsidianResult",
+  "description": "Obsidian CLI result envelope. Captures the rendered command vector, status, target vault, command-specific data payload, optional raw text, and a human-readable error. Data shape is intentionally freeform because the underlying obsidian CLI returns different shapes per command family (vault, file, search, daily, tags, tasks, command, eval).",
+  "type": "object",
+  "required": ["schemaVersion", "command", "status"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "obsidian-result/v1"
+    },
+    "correlationId": {
+      "type": ["string", "null"],
+      "description": "Optional correlation ID for mutation event lineage."
+    },
+    "command": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "The full command vector that was executed, e.g. ['obsidian', 'read', 'file=notes/foo.md']."
+    },
+    "status": {
+      "type": "string",
+      "enum": ["ok", "error"],
+      "description": "ok when the official obsidian CLI exited zero; error otherwise."
+    },
+    "vault": {
+      "type": ["string", "null"],
+      "description": "Vault name when the CLI was invoked against a specific vault."
+    },
+    "data": {
+      "type": ["object", "array", "string", "number", "boolean", "null"],
+      "description": "Command-specific payload. Shape varies by command family; refer to the skill's command reference for the per-command shape."
+    },
+    "rawOutput": {
+      "type": ["string", "null"],
+      "description": "Original stdout captured from the obsidian CLI when structured data is not available, or when raw passthrough is useful for the caller."
+    },
+    "error": {
+      "type": ["string", "null"],
+      "description": "Human-readable error message when status is 'error'."
+    }
+  },
+  "additionalProperties": false
+}

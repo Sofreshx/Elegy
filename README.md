@@ -1,177 +1,229 @@
 # Elegy
 
-Elegy is a Rust toolkit that makes local CLI capabilities discoverable,
-selectable, and safe for AI-agent hosts to invoke. Its core model is:
+[![CI](https://github.com/Sofreshx/Elegy/actions/workflows/rust-ci.yml/badge.svg)](https://github.com/Sofreshx/Elegy/actions/workflows/rust-ci.yml)
+[![Latest release](https://img.shields.io/github/v/release/Sofreshx/Elegy?display_name=tag&sort=semver)](https://github.com/Sofreshx/Elegy/releases/latest)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-- governed contracts are the durable authority
-- v2 skill definitions are the discovery authority
+Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent
+hosts. It keeps contracts and discovery metadata durable, exposes installable
+binaries through GitHub Releases, and uses CLI invocation templates as the
+default execution boundary.
+
+Core model:
+
+- governed artifacts are the durable authority
+- Rust implements reusable executable behavior over those artifacts
+- skill definitions are the discovery authority for agent capabilities
 - CLI invocation templates are the default execution boundary
+- generated mirrors, wrapper roots, Codex plugin projections, and MCP tool
+  lists are derived adapter surfaces
 - MCP is an optional projection for MCP-native clients
+
+## Repository Model
+
+| Area | Purpose |
+| --- | --- |
+| `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
+| `governance/`, `schemas/`, `policies/` | Version, inventory, schema-line, boundary, and formalization policy. |
+| `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
+| `src/Elegy-*` | Contributor-navigation and wrapper-package overlays, not implementation roots. |
+| `.agents/skills/**`, `.github/skills/**` | Rendered skill mirrors for host and contributor routing. |
+| `artifacts/` | Generated bundles, archives, and validation outputs. |
+
+When those surfaces disagree, prefer the governed artifact roots and the
+smallest relevant architecture or spec document under `docs/`.
+
+## Install
+
+Latest stable release: [github.com/Sofreshx/Elegy/releases/latest](https://github.com/Sofreshx/Elegy/releases/latest)
+
+Rolling prerelease from `main`: [github.com/Sofreshx/Elegy/releases/tag/main-snapshot](https://github.com/Sofreshx/Elegy/releases/tag/main-snapshot)
+
+See [docs/distribution.md](docs/distribution.md) for the full package matrix
+and asset family descriptions.
+
+Published targets:
+
+- Windows x64: `x86_64-pc-windows-msvc`
+- Linux x64: `x86_64-unknown-linux-gnu`
+- macOS ARM64: `aarch64-apple-darwin`
+
+### PowerShell installer
+
+Download `elegy-installer-<bundleVersion>.zip` from GitHub Releases, extract,
+and run the bundled `install-distribution.ps1`:
+
+```powershell
+pwsh ./install-distribution.ps1 -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+```
+
+Pin a specific release:
+
+```powershell
+pwsh ./install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning -Force
+```
+
+Track the rolling `main-snapshot` prerelease:
+
+```powershell
+pwsh ./install-distribution.ps1 -Tag main-snapshot -Destination ./tools/elegy-main -CliSurfaces elegy-cli -Force
+```
+
+The same installer is also available at `scripts/install-distribution.ps1` from
+a repo checkout.
+
+### Bash installer
+
+On Linux or macOS, use the Bash installer from a repo checkout:
+
+```bash
+bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+```
+
+### Installed layout
+
+- `contracts/` - extracted governed contracts bundle
+- `bin/<surface>/` - installed CLI binaries
+- `wrappers/<surface>/` - installed wrapper surfaces when requested
+- `install-receipt.json` - verification evidence and installed asset metadata
+
+### From source
+
+```bash
+git clone https://github.com/Sofreshx/Elegy.git
+cd Elegy/rust
+cargo build -p elegy-cli
+cargo run -p elegy-cli -- --version --json
+```
+
+Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
+[docs/architecture/README.md](docs/architecture/README.md).
 
 ## Quick Start
 
-From the Rust workspace:
+After installing a release asset:
 
 ```bash
-cd rust
-cargo run -p elegy-cli -- --version --json
-cargo run -p elegy-cli -- agent check --json
-cargo run -p elegy-cli -- agent manifest --json
-cargo run -p elegy-cli -- agent discover --query "repo status" --json
+elegy agent check --json
+elegy agent discover --query "repo status" --json
+elegy repo status --json
+elegy docs check --json
 ```
 
-Build the umbrella CLI:
-
-```bash
-cd rust
-cargo build -p elegy-cli
-```
-
-## Agent Onboarding Flow
-
-Host software should start with the `agent` surface instead of loading every
-Elegy capability into context:
-
-1. Validate the local setup:
-
-   ```bash
-   elegy agent check --json
-   ```
-
-2. Load the host integration packet:
-
-   ```bash
-   elegy agent manifest --json --profile ./tools/elegy-profile.json
-   ```
-
-3. Discover only what the task needs:
-
-   ```bash
-   elegy agent discover --query "memory search" --json --profile ./tools/elegy-profile.json
-   elegy agent discover --query "memory search" --detail --json --profile ./tools/elegy-profile.json
-   ```
-
-4. Invoke the advertised CLI template from the selected capability. Hosts still
-   enforce policy before running side-effecting capabilities.
-
-Profiles are host-owned allowlists. They let a downstream app opt into a subset
-of Elegy instead of exposing every built-in tool.
+From a repo checkout, use `cargo run -p elegy-cli -- ...` with the same
+arguments.
 
 ## Main Surfaces
 
 | Surface | Purpose |
 | --- | --- |
-| `elegy agent manifest/check/discover` | Host onboarding, profile validation, and profile-filtered discovery. |
-| `elegy skills list/search/resolve/get/capability/validate` | Umbrella compatibility surface over the built-in governed skill registry. |
-| `elegy generate skills/codex-plugin` | Lower-level contributor tooling for MCP-to-skill generation and conservative Codex plugin projection from portable package metadata. |
-| `elegy run` | Optional MCP stdio host over the same capability registry. |
-| `elegy diagram ...` | Semantic diagram creation, mutation, explanation, and rendering. |
-| `elegy mermaid ...` | Mermaid rendering, reverse projection, and narration. |
-| `elegy observe ...` | Read-only OS/process/window/screen/clipboard/filesystem/system observation. |
-| `elegy desktop ...` | Desktop automation with dry-run support for high-risk actions. |
-| `elegy repo ...` | Read-only git status, diff, branch, and log inspection. |
-| `elegy web ...` | Bounded HTTP fetch and reachability checks. |
-| `elegy data ...` | JSON/YAML/TOML/CSV conversion, extraction, and schema validation. |
-| `elegy notify ...` | Local toast and webhook notification helpers. |
+| `elegy` | General-purpose CLI: agent onboarding, skills, contracts, configuration, docs, mermaid, diagram, observe, desktop, repo, web, data, notify, MCP host, and lower-level author/analyze/generate/validate/inspect. |
 | `elegy-memory` | Dedicated local memory CLI. |
-| `elegy-planning` | Dedicated durable planning CLI for goals, roadmaps, plans, todos, issues, validation, and projections. |
 | `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
-| `elegy-skills` | Dedicated skill registry CLI with search, resolve, inspect, and built-in format validation, backed by the same reusable Rust registry API. |
+| `elegy-planning` | Dedicated durable planning CLI for goals, roadmaps, plans, and todos. |
+| `elegy-skills` | Dedicated governed skill registry CLI. |
+| `elegy-configuration` | Dedicated deterministic configuration materialization CLI. |
+| `elegy-documentation` | Dedicated documentation authority CLI. |
 
-Observation guide: [docs/architecture/observe-cli.md](docs/architecture/observe-cli.md)
+## Wrapper and Skill Surfaces
 
-Example observe commands:
+Wrapper roots under `src/Elegy-*` package bounded handoff surfaces for
+downstream repositories. They are not authority roots and they do not replace
+the Rust crates or governed JSON contracts.
+
+Most wrappers delegate to dedicated `elegy-*` Rust binaries. The current
+`elegy-obsidian` wrapper is different: it wraps the official Obsidian Desktop
+CLI and keeps Obsidian vault content non-authoritative. Durable planning state
+continues to live in `elegy-planning` and SQLite.
+
+Rendered `SKILL.md` files under `.agents/skills/**`, `.github/skills/**`, and
+wrapper-local `skills/**` directories are routing mirrors. The governed
+`contracts/fixtures/skill.*.json` files remain the skill authority.
+
+## Configuration Materialization
+
+The umbrella CLI and dedicated `elegy-configuration` binary support
+deterministic materialization and drift verification of agent-facing repo and
+home assets from governed templates and profiles.
 
 ```bash
-elegy observe system --json
-elegy observe record --duration-seconds 1 --poll-interval-ms 50 --json
+elegy configuration list --json
+elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
+elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
 ```
+
+See [docs/architecture/README.md](docs/architecture/README.md) for built-in
+templates and profile details.
 
 ## Skill Tools
 
-Elegy's skills product is registry-first:
-
-- governed v2 skill definitions under `contracts/fixtures/skill-definition-v2.*.json` remain the discovery authority
-- `elegy-skills` is the dedicated registry surface for searching, resolving, inspecting, and validating those governed skills
-- `elegy skills ...` mirrors that functionality on the umbrella CLI as a compatibility surface
-- Rust hosts can avoid shelling out and call the shared `rust/crates/elegy-skills` library directly for registry loading, profile filtering, search, resolve, capability inspection, and validation
-
-Dedicated registry examples:
+Elegy's skills product is registry-first. Governed skill definitions under
+`contracts/fixtures/skill.*.json` are the discovery authority. The `elegy-skills`
+CLI provides search, resolve, inspect, and validation. The umbrella `elegy skills ...`
+surface mirrors this for convenience.
 
 ```bash
 elegy-skills list --json
 elegy-skills search --query "repo status" --json
-elegy-skills resolve --query "repo status" --json
-elegy-skills validate --file ./contracts/fixtures/skill-definition-v2.elegy-repo.json --json
+elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
-
-## Package Projection Tools
-
-Portable package metadata can also be projected into conservative derived Codex
-plugin bundles:
-
-```bash
-elegy generate codex-plugin --package ./contracts/fixtures/elegy-plugin-package-v1.minimal.json --output-dir ./artifacts/codex
-```
-
-Current scope:
-
-- generates `.codex-plugin/plugin.json` and `skills/`
-- treats Codex files as derived outputs only
-- does not yet generate `.mcp.json`, `.app.json`, hooks, or marketplace metadata
-
-## Capability Profiles
-
-Profile schema: `contracts/schemas/agent-capability-profile.schema.json`.
-
-Minimal example:
-
-```json
-{
-  "schemaVersion": "agent-capability-profile/v1",
-  "profileId": "generic-agent-host",
-  "includeSkills": ["repo", "data"],
-  "includeCapabilities": ["memory-search"],
-  "excludeCapabilities": [],
-  "alwaysIncludeRouter": true
-}
-```
-
-Selection does not grant approval. A side-effecting capability selected by a
-profile is visible and invokable only after the host applies its own policy.
 
 ## Optional MCP Projection
-
-MCP is available for clients that prefer protocol tools:
 
 ```bash
 elegy run --profile ./tools/elegy-profile.json
 ```
 
-The same profile filters the MCP tool list. MCP should be treated as an adapter
-over governed skills and CLI behavior, not as the primary Elegy integration
-model.
+MCP is an adapter over governed skills and CLI behavior. Side-effecting tools
+stay blocked unless the host passes `--allow-side-effects`. Prefer `--dry-run`
+for one-off invocations.
 
-## Contracts
+## Documentation
 
-The authoritative contract bundle lives in `contracts/`:
+- [Agent integration guide](docs/agent-integration.md)
+- [Distribution and downstream consumption](docs/distribution.md)
+- [Architecture index](docs/architecture/README.md)
+- [Ecosystem topology](docs/architecture/ecosystem-topology.md)
+- [Substrate governance](docs/architecture/substrate-governance.md)
+- [Contributing guide](CONTRIBUTING.md) | [Security policy](SECURITY.md)
+- [Code of conduct](CODE_OF_CONDUCT.md) | [Changelog](CHANGELOG.md)
 
-- `contracts/schemas/skill-definition-v2.schema.json`
-- `contracts/schemas/agent-capability-profile.schema.json`
-- `contracts/fixtures/skill-definition-v2.*.json`
-- `contracts/manifests/compatibility-manifest.json`
-- additional schemas for invocation, responses, failures, memory records, MCP
-  descriptors, and events
-
-## Development
-
-Common checks:
+## Contributing From Source
 
 ```bash
 cd rust
-cargo fmt
-cargo test -p elegy-contracts -p elegy-host-mcp -p elegy-cli
+cargo build -p elegy-cli
+cargo test --workspace --all-targets --all-features
 ```
 
-Distribution workflows are documented in [docs/distribution.md](docs/distribution.md).
-Agent integration guidance lives in [docs/agent-integration.md](docs/agent-integration.md).
+When touching governed artifacts, packaging, or release workflows, also use the
+repo-root validation commands below.
+
+For documentation-only changes, prefer the dedicated documentation checker:
+
+```bash
+elegy-documentation check --project . --json
+```
+
+## Development
+
+Common Rust checks:
+
+```bash
+cd rust
+cargo fmt --all --check
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-targets --all-features
+```
+
+Repo-root validation for governed artifacts and packaging:
+
+```powershell
+pwsh ./scripts/validate-package-boundaries.ps1
+pwsh ./scripts/export-contracts.ps1
+pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+```
+
+## License
+
+Elegy is licensed under [Apache 2.0](LICENSE).

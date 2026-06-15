@@ -1,15 +1,15 @@
 use crate::HostError;
 use base64::Engine as _;
-use elegy_contracts::find_builtin_skill_capability;
+use elegy_contracts::{StructuredFailure, StructuredFailureCategory, CLI_SCHEMA_VERSION};
 use elegy_core::{
     compose_runtime_state, CatalogResource, ProjectLocator, ReadResourceError, ResourceReadResult,
     RuntimeState,
 };
-use elegy_skills::SkillRegistry;
+use elegy_skills::{RegistryMcpToolBinding, SkillRegistry};
 use rmcp::{
     model::*, transport::stdio, ErrorData as McpError, RoleServer, ServerHandler, ServiceExt,
 };
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::BTreeSet;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
@@ -18,6 +18,13 @@ use tokio::task;
 // ---------------------------------------------------------------------------
 // Cached tool list built from the embedded skill definitions
 // ---------------------------------------------------------------------------
+fn cached_tool_bindings() -> Vec<RegistryMcpToolBinding> {
+    static TOOL_BINDINGS: OnceLock<Vec<RegistryMcpToolBinding>> = OnceLock::new();
+    TOOL_BINDINGS
+        .get_or_init(build_tool_bindings_from_skill_definitions)
+        .clone()
+}
+
 fn cached_tools() -> Vec<Tool> {
     static TOOLS: OnceLock<Vec<Tool>> = OnceLock::new();
     TOOLS
@@ -32,55 +39,57 @@ fn tools_for_allowed_ids(allowed_tool_ids: Option<&BTreeSet<String>>) -> Vec<Too
         .collect()
 }
 
-/// Parse every embedded v2 skill-definition JSON and convert each capability
+/// Parse every embedded skill-definition JSON and convert each capability
 /// entry into an rmcp `Tool`.
-fn build_tools_from_skill_definitions() -> Vec<Tool> {
+fn build_tool_bindings_from_skill_definitions() -> Vec<RegistryMcpToolBinding> {
     let registry = match SkillRegistry::builtin() {
         Ok(registry) => registry,
         Err(_) => return Vec::new(),
     };
 
-    registry
-        .build_mcp_tools()
-        .into_iter()
-        .map(|tool| {
-            let mut mcp_tool = Tool::new(
-                tool.capability_id,
-                tool.description,
-                match tool.input_schema {
-                    serde_json::Value::Object(map) => map,
-                    _ => serde_json::Map::new(),
-                },
-            );
-            mcp_tool.annotations = Some(
-                ToolAnnotations::new()
-                    .read_only(tool.read_only_hint.unwrap_or(false))
-                    .destructive(false)
-                    .idempotent(tool.idempotent_hint.unwrap_or(false))
-                    .open_world(false),
-            );
-            mcp_tool
-        })
+    registry.build_mcp_tool_bindings()
+}
+
+fn build_tools_from_skill_definitions() -> Vec<Tool> {
+    build_tool_bindings_from_skill_definitions()
+        .iter()
+        .map(tool_from_binding)
         .collect()
+}
+
+fn tool_from_binding(binding: &RegistryMcpToolBinding) -> Tool {
+    let mut mcp_tool = Tool::new(
+        binding.capability_id.clone(),
+        binding.description.clone(),
+        match &binding.input_schema {
+            Value::Object(map) => map.clone(),
+            _ => serde_json::Map::new(),
+        },
+    );
+    mcp_tool.annotations = Some(
+        ToolAnnotations::new()
+            .read_only(binding.read_only_hint.unwrap_or(false))
+            .destructive(false)
+            .idempotent(binding.idempotent_hint.unwrap_or(false))
+            .open_world(false),
+    );
+    mcp_tool
 }
 
 // ---------------------------------------------------------------------------
 // Capability lookup + argument substitution helpers (used by call_tool)
 // ---------------------------------------------------------------------------
 
-/// Locate the raw capability JSON and its parent skill definition for a given
-/// tool name (= capability id).
-fn find_capability(tool_name: &str) -> Option<(serde_json::Value, serde_json::Value)> {
-    let (capability, definition) = find_builtin_skill_capability(tool_name).ok()??;
-    let capability = serde_json::to_value(capability).ok()?;
-    let definition = serde_json::to_value(definition).ok()?;
-    Some((capability, definition))
+fn find_tool_binding(tool_name: &str) -> Option<RegistryMcpToolBinding> {
+    cached_tool_bindings()
+        .into_iter()
+        .find(|binding| binding.capability_id == tool_name)
 }
 
 /// Build the final CLI argument vector, correctly dropping `--flag ${param}`
 /// pairs when the parameter is not supplied by the caller.
 fn build_cli_arguments(
-    template_args: &[serde_json::Value],
+    template_args: &[String],
     params: &serde_json::Map<String, serde_json::Value>,
 ) -> Vec<String> {
     let mut result = Vec::new();
@@ -91,7 +100,7 @@ fn build_cli_arguments(
             skip_next = false;
             continue;
         }
-        let s = arg.as_str().unwrap_or_default();
+        let s = arg.as_str();
 
         if s.starts_with("${") && s.ends_with('}') {
             let key = &s[2..s.len() - 1];
@@ -107,7 +116,7 @@ fn build_cli_arguments(
 
         // Look ahead: if the *next* element is a placeholder, decide now
         if let Some(next) = template_args.get(i + 1) {
-            let next_s = next.as_str().unwrap_or_default();
+            let next_s = next.as_str();
             if next_s.starts_with("${") && next_s.ends_with('}') {
                 let key = &next_s[2..next_s.len() - 1];
                 if let Some(val) = params.get(key) {
@@ -147,50 +156,6 @@ fn value_as_string(v: &serde_json::Value) -> String {
     }
 }
 
-fn capability_has_side_effects(capability: &serde_json::Value) -> bool {
-    capability
-        .get("execution")
-        .and_then(|execution| execution.get("hasSideEffects"))
-        .and_then(|value| value.as_bool())
-        .unwrap_or(false)
-}
-
-fn capability_supports_dry_run(capability: &serde_json::Value) -> bool {
-    let declares_parameter = capability
-        .get("input")
-        .and_then(|input| input.get("parameters"))
-        .and_then(|parameters| parameters.as_array())
-        .is_some_and(|parameters| {
-            parameters.iter().any(|parameter| {
-                parameter
-                    .get("name")
-                    .and_then(|name| name.as_str())
-                    .is_some_and(|name| name == "dry_run" || name == "dryRun")
-            })
-        });
-
-    let template_uses_parameter = capability
-        .get("implementation")
-        .and_then(|implementation| implementation.get("arguments"))
-        .and_then(|arguments| arguments.as_array())
-        .is_some_and(|arguments| {
-            arguments.iter().any(|argument| {
-                argument.as_str().is_some_and(|argument| {
-                    argument.contains("${dry_run}") || argument.contains("${dryRun}")
-                })
-            })
-        });
-
-    declares_parameter && template_uses_parameter
-}
-
-fn capability_timeout_seconds(capability: &serde_json::Value) -> Option<u64> {
-    capability
-        .get("execution")
-        .and_then(|execution| execution.get("timeoutSeconds"))
-        .and_then(|value| value.as_u64())
-}
-
 fn dry_run_argument_value(arguments: &serde_json::Map<String, serde_json::Value>) -> Option<bool> {
     arguments
         .get("dryRun")
@@ -222,6 +187,75 @@ fn bytes_to_capped_string(bytes: &[u8], max_bytes: usize) -> String {
     text
 }
 
+fn executable_file_name(name: &str) -> String {
+    if cfg!(windows) && !name.ends_with(".exe") {
+        format!("{name}.exe")
+    } else {
+        name.to_string()
+    }
+}
+
+fn workspace_target_dir() -> Option<std::path::PathBuf> {
+    let current = std::env::current_exe().ok()?;
+    let parent = current.parent()?;
+    if parent.file_name().and_then(|name| name.to_str()) == Some("deps") {
+        parent.parent().map(std::path::Path::to_path_buf)
+    } else {
+        Some(parent.to_path_buf())
+    }
+}
+
+fn parse_cli_machine_envelope(stdout: &str) -> Option<Value> {
+    let trimmed = stdout.trim();
+    let json_slice = trimmed
+        .find('{')
+        .zip(trimmed.rfind('}'))
+        .and_then(|(start, end)| trimmed.get(start..=end))
+        .unwrap_or(trimmed);
+    let value: Value = serde_json::from_str(json_slice).ok()?;
+    let schema_version = value
+        .get("schemaVersion")
+        .or_else(|| value.get("schema_version"))
+        .and_then(Value::as_str);
+    if schema_version == Some(CLI_SCHEMA_VERSION) && value.is_object() {
+        Some(value)
+    } else {
+        None
+    }
+}
+
+fn cli_machine_result(envelope: Value) -> CallToolResult {
+    let is_error = envelope.get("status").and_then(Value::as_str) != Some("ok");
+    if is_error {
+        CallToolResult::structured_error(envelope)
+    } else {
+        CallToolResult::structured(envelope)
+    }
+}
+
+fn host_error_result(
+    tool_name: &str,
+    code: &str,
+    category: StructuredFailureCategory,
+    message: impl Into<String>,
+    details: Option<Value>,
+) -> CallToolResult {
+    let failure = StructuredFailure {
+        code: code.to_string(),
+        message: message.into(),
+        category,
+        retryable: false,
+        correlation_id: None,
+        details,
+        cause: None,
+    };
+    CallToolResult::structured_error(json!({
+        "surface": "elegy-host-mcp",
+        "tool": tool_name,
+        "failure": failure,
+    }))
+}
+
 /// Resolve the path for an executable name.  If it matches the current binary
 /// stem, returns the current exe path so the MCP host can self-dispatch even
 /// when the binary is not on `PATH`.
@@ -234,6 +268,12 @@ fn which_executable(name: &str) -> String {
             .unwrap_or_default();
         if stem == name {
             return current.to_string_lossy().into_owned();
+        }
+    }
+    if let Some(target_dir) = workspace_target_dir() {
+        let candidate = target_dir.join(executable_file_name(name));
+        if candidate.is_file() {
+            return candidate.to_string_lossy().into_owned();
         }
     }
     // Otherwise assume the executable is on PATH
@@ -395,62 +435,62 @@ impl ServerHandler for ElegyMcpHost {
             ));
         }
 
-        // 1. Find the matching capability
-        let (capability, _def) = find_capability(tool_name).ok_or_else(|| {
+        // 1. Find the matching capability binding
+        let binding = find_tool_binding(tool_name).ok_or_else(|| {
             McpError::invalid_params(
                 format!("unknown tool: {tool_name}"),
                 Some(json!({ "tool": tool_name })),
             )
         })?;
 
-        let has_side_effects = capability_has_side_effects(&capability);
+        let has_side_effects = binding.has_side_effects;
         let dry_run_requested = arguments_request_dry_run(&arguments);
-        let dry_run_allowed = dry_run_requested && capability_supports_dry_run(&capability);
+        let dry_run_allowed = dry_run_requested && binding.supports_dry_run;
         if has_side_effects && !self.options.allow_side_effects && !dry_run_allowed {
-            return Ok(CallToolResult::error(vec![Content::text(format!(
-                "tool {tool_name} has side effects; restart the host with side-effect execution enabled or call a capability that explicitly supports dry-run"
-            ))]));
+            return Ok(host_error_result(
+                tool_name,
+                "MCP-POLICY-DENIED",
+                StructuredFailureCategory::Policy,
+                format!(
+                    "tool {tool_name} has side effects; restart the host with side-effect execution enabled or call a capability that explicitly supports dry-run"
+                ),
+                Some(json!({
+                    "tool": tool_name,
+                    "dryRunRequested": dry_run_requested,
+                    "supportsDryRun": binding.supports_dry_run,
+                })),
+            ));
         }
         if dry_run_allowed {
             normalize_dry_run_argument(&mut arguments);
         }
 
         // 2. Extract implementation details
-        let impl_block = capability.get("implementation").ok_or_else(|| {
-            McpError::internal_error(
-                "capability has no implementation block",
-                Some(json!({ "tool": tool_name })),
-            )
-        })?;
-
-        let execution_type = impl_block
-            .get("executionType")
-            .and_then(|v| v.as_str())
-            .unwrap_or("subprocess");
+        let execution_type = binding.execution_type.as_str();
         if execution_type != "subprocess" {
-            return Ok(CallToolResult::error(vec![Content::text(format!(
-                "tool {tool_name} uses unsupported executionType '{execution_type}' in this host"
-            ))]));
+            return Ok(host_error_result(
+                tool_name,
+                "MCP-UNSUPPORTED-EXECUTION",
+                StructuredFailureCategory::Unavailable,
+                format!(
+                    "tool {tool_name} uses unsupported executionType '{execution_type}' in this host"
+                ),
+                Some(json!({
+                    "tool": tool_name,
+                    "executionType": execution_type,
+                })),
+            ));
         }
 
-        let executable = impl_block
-            .get("executableName")
-            .and_then(|v| v.as_str())
-            .unwrap_or("elegy");
-
-        let template_args = impl_block
-            .get("arguments")
-            .and_then(|a| a.as_array())
-            .cloned()
-            .unwrap_or_default();
+        let executable = binding.executable_name.as_str();
 
         // 3. Build CLI arguments with placeholder substitution
-        let cli_args = build_cli_arguments(&template_args, &arguments);
+        let cli_args = build_cli_arguments(&binding.argument_template, &arguments);
 
         // 4. Detect whether stdin piping is required
-        let stdin_data = capability
-            .get("input")
-            .and_then(|i| i.get("stdinFormat"))
+        let stdin_data = binding
+            .stdin_format
+            .as_ref()
             .and_then(|_| arguments.get("stdin"))
             .map(value_as_string);
 
@@ -487,7 +527,8 @@ impl ServerHandler for ElegyMcpHost {
         }
 
         // 8. Await completion
-        let timeout_seconds = capability_timeout_seconds(&capability)
+        let timeout_seconds = binding
+            .timeout_seconds
             .unwrap_or(self.options.default_tool_timeout_seconds);
         let output = match tokio::time::timeout(
             Duration::from_secs(timeout_seconds),
@@ -502,15 +543,26 @@ impl ServerHandler for ElegyMcpHost {
                 )
             })?,
             Err(_) => {
-                return Ok(CallToolResult::error(vec![Content::text(format!(
-                    "tool {tool_name} timed out after {timeout_seconds}s"
-                ))]));
+                return Ok(host_error_result(
+                    tool_name,
+                    "MCP-TIMEOUT",
+                    StructuredFailureCategory::Timeout,
+                    format!("tool {tool_name} timed out after {timeout_seconds}s"),
+                    Some(json!({
+                        "tool": tool_name,
+                        "timeoutSeconds": timeout_seconds,
+                    })),
+                ));
             }
         };
 
         // 9. Return result
         let stdout = bytes_to_capped_string(&output.stdout, self.options.max_tool_output_bytes);
         let stderr = bytes_to_capped_string(&output.stderr, self.options.max_tool_output_bytes);
+
+        if let Some(envelope) = parse_cli_machine_envelope(&stdout) {
+            return Ok(cli_machine_result(envelope));
+        }
 
         if output.status.success() {
             Ok(CallToolResult::success(vec![Content::text(stdout)]))
@@ -622,12 +674,24 @@ mod tests {
     use super::*;
     use elegy_core::ProjectLocator;
     use rmcp::{ClientHandler, ServiceExt};
+    use serde::Deserialize;
+    use serde_json::Value;
     use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[derive(Default, Clone)]
     struct TestClient;
 
     impl ClientHandler for TestClient {}
+
+    #[derive(Debug, Deserialize)]
+    struct HostMachineEnvelope {
+        #[serde(rename = "schema_version", alias = "schemaVersion")]
+        schema_version: String,
+        command: Vec<String>,
+        status: String,
+        data: Value,
+    }
 
     fn repo_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -635,6 +699,46 @@ mod tests {
             .and_then(|path| path.parent())
             .expect("workspace root")
             .to_path_buf()
+    }
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("current time should be after unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
+        std::fs::create_dir_all(&dir).expect("create temp directory");
+        dir
+    }
+
+    fn ensure_elegy_binary_built() {
+        static BUILT: OnceLock<()> = OnceLock::new();
+        BUILT.get_or_init(|| {
+            let status = std::process::Command::new("cargo")
+                .args(["build", "-p", "elegy-cli", "--bin", "elegy"])
+                .current_dir(repo_root())
+                .status()
+                .expect("build elegy binary for MCP host tests");
+            assert!(
+                status.success(),
+                "failed to build elegy binary for MCP host tests"
+            );
+        });
+    }
+
+    fn expect_structured_content(result: &CallToolResult) -> Value {
+        result.structured_content.clone().unwrap_or_else(|| {
+            let fallback_text = result
+                .content
+                .iter()
+                .filter_map(|content| content.raw.as_text().map(|text| text.text.clone()))
+                .collect::<Vec<_>>()
+                .join("\n");
+            panic!(
+                "tool result should include structured content; is_error={:?}; content={fallback_text}",
+                result.is_error
+            );
+        })
     }
 
     #[test]
@@ -760,12 +864,15 @@ mod tests {
     #[test]
     fn build_tools_parses_expected_capabilities() {
         let tools = build_tools_from_skill_definitions();
+        let expected_count = SkillRegistry::builtin()
+            .expect("built-in skill registry should load")
+            .build_mcp_tools()
+            .len();
 
-        // The governed registry currently exposes 83 MCP tools.
         assert_eq!(
             tools.len(),
-            83,
-            "expected 83 tools from the built-in v2 skill registry"
+            expected_count,
+            "expected tool count to match the built-in Skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -974,12 +1081,12 @@ mod tests {
 
     #[test]
     fn build_cli_arguments_substitutes_provided_params() {
-        let template: Vec<serde_json::Value> = vec![
-            json!("diagram"),
-            json!("create"),
-            json!("--diagram-type"),
-            json!("${type}"),
-            json!("--json"),
+        let template = vec![
+            "diagram".to_string(),
+            "create".to_string(),
+            "--diagram-type".to_string(),
+            "${type}".to_string(),
+            "--json".to_string(),
         ];
         let mut params = serde_json::Map::new();
         params.insert("type".to_string(), json!("architecture"));
@@ -999,12 +1106,12 @@ mod tests {
 
     #[test]
     fn build_cli_arguments_drops_flag_and_placeholder_when_param_missing() {
-        let template: Vec<serde_json::Value> = vec![
-            json!("diagram"),
-            json!("render"),
-            json!("--render-format"),
-            json!("${format}"),
-            json!("--json"),
+        let template = vec![
+            "diagram".to_string(),
+            "render".to_string(),
+            "--render-format".to_string(),
+            "${format}".to_string(),
+            "--json".to_string(),
         ];
         let params = serde_json::Map::new(); // no params provided
 
@@ -1014,12 +1121,12 @@ mod tests {
 
     #[test]
     fn build_cli_arguments_treats_boolean_placeholder_as_flag() {
-        let template: Vec<serde_json::Value> = vec![
-            json!("desktop"),
-            json!("click"),
-            json!("--dry-run"),
-            json!("${dry_run}"),
-            json!("--json"),
+        let template = vec![
+            "desktop".to_string(),
+            "click".to_string(),
+            "--dry-run".to_string(),
+            "${dry_run}".to_string(),
+            "--json".to_string(),
         ];
 
         let mut true_params = serde_json::Map::new();
@@ -1039,12 +1146,12 @@ mod tests {
 
     #[test]
     fn build_cli_arguments_expands_array_placeholder_per_flag() {
-        let template: Vec<serde_json::Value> = vec![
-            json!("web"),
-            json!("fetch"),
-            json!("--header"),
-            json!("${headers}"),
-            json!("--json"),
+        let template = vec![
+            "web".to_string(),
+            "fetch".to_string(),
+            "--header".to_string(),
+            "${headers}".to_string(),
+            "--json".to_string(),
         ];
         let mut params = serde_json::Map::new();
         params.insert(
@@ -1069,12 +1176,12 @@ mod tests {
 
     #[test]
     fn build_cli_arguments_substitutes_standalone_placeholders() {
-        let template: Vec<serde_json::Value> = vec![
-            json!("memory"),
-            json!("add"),
-            json!("${content}"),
-            json!("--format"),
-            json!("json"),
+        let template = vec![
+            "memory".to_string(),
+            "add".to_string(),
+            "${content}".to_string(),
+            "--format".to_string(),
+            "json".to_string(),
         ];
         let mut params = serde_json::Map::new();
         params.insert("content".to_string(), json!("A distilled memory"));
@@ -1088,35 +1195,35 @@ mod tests {
 
     #[test]
     fn side_effect_policy_helpers_require_explicit_dry_run_support() {
-        let unsupported_capability = json!({
-            "execution": {
-                "hasSideEffects": true
-            }
-        });
+        let unsupported_capability = RegistryMcpToolBinding {
+            capability_id: "desktop-click".to_string(),
+            description: "click".to_string(),
+            executable_name: "elegy".to_string(),
+            execution_type: "subprocess".to_string(),
+            argument_template: vec!["desktop".to_string(), "click".to_string()],
+            input_schema: json!({}),
+            stdin_format: None,
+            timeout_seconds: None,
+            has_side_effects: true,
+            supports_dry_run: false,
+            read_only_hint: Some(false),
+            idempotent_hint: Some(false),
+        };
         let mut args = serde_json::Map::new();
 
-        assert!(capability_has_side_effects(&unsupported_capability));
-        assert!(!capability_supports_dry_run(&unsupported_capability));
+        assert!(unsupported_capability.has_side_effects);
+        assert!(!unsupported_capability.supports_dry_run);
         assert!(!arguments_request_dry_run(&args));
 
         args.insert("dryRun".to_string(), json!(true));
         assert!(arguments_request_dry_run(&args));
-        assert!(!capability_supports_dry_run(&unsupported_capability));
+        assert!(!unsupported_capability.supports_dry_run);
 
-        let supported_capability = json!({
-            "implementation": {
-                "arguments": ["desktop", "click", "--dry-run", "${dry_run}", "--json"]
-            },
-            "input": {
-                "parameters": [
-                    { "name": "dry_run", "type": "boolean", "required": false }
-                ]
-            },
-            "execution": {
-                "hasSideEffects": true
-            }
-        });
-        assert!(capability_supports_dry_run(&supported_capability));
+        let supported_capability = SkillRegistry::builtin()
+            .expect("built-in skill registry should load")
+            .mcp_tool_binding("desktop-click")
+            .expect("desktop-click binding");
+        assert!(supported_capability.supports_dry_run);
 
         normalize_dry_run_argument(&mut args);
         assert_eq!(args.get("dry_run"), Some(&json!(true)));
@@ -1124,18 +1231,16 @@ mod tests {
     }
 
     #[test]
-    fn find_capability_returns_matching_capability() {
-        let (cap, _def) =
-            find_capability("diagram-create").expect("should find diagram-create capability");
-        assert_eq!(
-            cap.get("id").and_then(|v| v.as_str()),
-            Some("diagram-create")
-        );
+    fn find_tool_binding_returns_matching_capability() {
+        let binding =
+            find_tool_binding("diagram-create").expect("should find diagram-create capability");
+        assert_eq!(binding.capability_id, "diagram-create");
+        assert_eq!(binding.execution_type, "subprocess");
     }
 
     #[test]
-    fn find_capability_returns_none_for_unknown_tool() {
-        assert!(find_capability("nonexistent-tool").is_none());
+    fn find_tool_binding_returns_none_for_unknown_tool() {
+        assert!(find_tool_binding("nonexistent-tool").is_none());
     }
 
     #[tokio::test]
@@ -1164,11 +1269,15 @@ mod tests {
             .list_all_tools()
             .await
             .expect("client should list tools");
+        let expected_count = SkillRegistry::builtin()
+            .expect("built-in skill registry should load")
+            .build_mcp_tools()
+            .len();
 
         assert_eq!(
             tools.len(),
-            83,
-            "expected 83 tools from the built-in v2 skill registry"
+            expected_count,
+            "expected tool count to match the built-in Skill registry"
         );
 
         let names: Vec<&str> = tools.iter().map(|t| t.name.as_ref()).collect();
@@ -1209,6 +1318,171 @@ mod tests {
         assert!(names.contains(&"data-validate"));
         assert!(names.contains(&"notify-toast"));
         assert!(names.contains(&"notify-webhook"));
+
+        client_service.cancel().await.expect("client should cancel");
+        server_task.await.expect("server task should join");
+    }
+
+    #[tokio::test]
+    async fn host_call_tool_returns_structured_machine_success_for_elegy_cli() {
+        ensure_elegy_binary_built();
+        let state = compose_runtime_state(ProjectLocator::Path(
+            repo_root().join("examples/http-minimal"),
+        ))
+        .expect("example runtime should compose");
+        let server = ElegyMcpHost::new(state);
+        let client = TestClient;
+        let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let service = server
+                .serve(server_transport)
+                .await
+                .expect("server should initialize");
+            service.waiting().await.expect("server should run cleanly");
+        });
+
+        let schema_dir = unique_temp_dir("elegy-host-mcp-data-validate-success");
+        let schema_path = schema_dir.join("schema.json");
+        std::fs::write(
+            &schema_path,
+            r#"{"type":"object","properties":{"name":{"type":"string"}},"required":["name"]}"#,
+        )
+        .expect("write schema file");
+
+        let client_service = client
+            .serve(client_transport)
+            .await
+            .expect("client should initialize");
+        let result = client_service
+            .call_tool(
+                CallToolRequestParams::new("data-validate").with_arguments(
+                    json!({
+                        "schema": schema_path.display().to_string(),
+                        "stdin": { "name": "Elegy" }
+                    })
+                    .as_object()
+                    .expect("tool arguments should be an object")
+                    .clone(),
+                ),
+            )
+            .await
+            .expect("tool call should succeed");
+
+        assert_eq!(result.is_error, Some(false));
+        let structured = expect_structured_content(&result);
+        let envelope: HostMachineEnvelope = serde_json::from_value(structured)
+            .expect("structured content should be an elegy envelope");
+        assert_eq!(envelope.schema_version, CLI_SCHEMA_VERSION);
+        assert_eq!(envelope.command, ["data", "validate"]);
+        assert_eq!(envelope.status, "ok");
+        assert_eq!(envelope.data["valid"], json!(true));
+
+        client_service.cancel().await.expect("client should cancel");
+        server_task.await.expect("server task should join");
+    }
+
+    #[tokio::test]
+    async fn host_call_tool_returns_structured_machine_failure_for_elegy_cli() {
+        ensure_elegy_binary_built();
+        let state = compose_runtime_state(ProjectLocator::Path(
+            repo_root().join("examples/http-minimal"),
+        ))
+        .expect("example runtime should compose");
+        let server = ElegyMcpHost::new(state);
+        let client = TestClient;
+        let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let service = server
+                .serve(server_transport)
+                .await
+                .expect("server should initialize");
+            service.waiting().await.expect("server should run cleanly");
+        });
+
+        let missing_path =
+            unique_temp_dir("elegy-host-mcp-data-validate-missing").join("missing-schema.json");
+
+        let client_service = client
+            .serve(client_transport)
+            .await
+            .expect("client should initialize");
+        let result = client_service
+            .call_tool(
+                CallToolRequestParams::new("data-validate").with_arguments(
+                    json!({
+                        "schema": missing_path.display().to_string(),
+                        "stdin": { "name": "Elegy" }
+                    })
+                    .as_object()
+                    .expect("tool arguments should be an object")
+                    .clone(),
+                ),
+            )
+            .await
+            .expect("tool call should return structured failure");
+
+        assert_eq!(result.is_error, Some(true));
+        let structured = expect_structured_content(&result);
+        assert_eq!(
+            structured
+                .get("schemaVersion")
+                .or_else(|| structured.get("schema_version"))
+                .cloned(),
+            Some(json!(CLI_SCHEMA_VERSION))
+        );
+        assert_eq!(structured["command"], json!(["data", "validate"]));
+        assert_eq!(structured["status"], json!("error"));
+        let summary_text = structured["summary"]["text"]
+            .as_str()
+            .expect("summary text");
+        assert!(!summary_text.trim().is_empty());
+
+        client_service.cancel().await.expect("client should cancel");
+        server_task.await.expect("server task should join");
+    }
+
+    #[tokio::test]
+    async fn host_call_tool_returns_structured_policy_denial() {
+        ensure_elegy_binary_built();
+        let state = compose_runtime_state(ProjectLocator::Path(
+            repo_root().join("examples/http-minimal"),
+        ))
+        .expect("example runtime should compose");
+        let server = ElegyMcpHost::with_options(
+            state,
+            HostOptions {
+                allow_side_effects: false,
+                default_tool_timeout_seconds: 30,
+                max_tool_output_bytes: 1_048_576,
+                allowed_tool_ids: None,
+            },
+        );
+        let client = TestClient;
+        let (server_transport, client_transport) = tokio::io::duplex(4096);
+
+        let server_task = tokio::spawn(async move {
+            let service = server
+                .serve(server_transport)
+                .await
+                .expect("server should initialize");
+            service.waiting().await.expect("server should run cleanly");
+        });
+
+        let client_service = client
+            .serve(client_transport)
+            .await
+            .expect("client should initialize");
+        let result = client_service
+            .call_tool(CallToolRequestParams::new("desktop-click"))
+            .await
+            .expect("tool call should return policy denial");
+
+        assert_eq!(result.is_error, Some(true));
+        let structured = expect_structured_content(&result);
+        assert_eq!(structured["failure"]["code"], json!("MCP-POLICY-DENIED"));
+        assert_eq!(structured["failure"]["category"], json!("policy"));
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");

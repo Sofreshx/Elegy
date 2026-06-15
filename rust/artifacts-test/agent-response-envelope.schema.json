@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/agent-response-envelope.schema.json",
+  "title": "Agent Response Envelope",
+  "description": "Canonical final response envelope for provider-neutral agent execution flows, with optional summary-only session context metadata.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["requestId", "runId", "status", "messages", "usage"],
+  "properties": {
+    "requestId": { "type": "string", "minLength": 1 },
+    "runId": { "type": "string", "minLength": 1 },
+    "status": { "type": "string", "enum": ["completed", "failed", "cancelled"] },
+    "messages": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["role", "content"],
+        "properties": {
+          "messageId": { "type": "string" },
+          "role": { "type": "string", "enum": ["system", "user", "assistant", "tool"] },
+          "content": { "type": "string", "minLength": 1 },
+          "name": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "usage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "inputTokens": { "type": ["integer", "null"], "minimum": 0 },
+        "outputTokens": { "type": ["integer", "null"], "minimum": 0 },
+        "totalTokens": { "type": ["integer", "null"], "minimum": 0 }
+      }
+    },
+    "errorCode": { "type": ["string", "null"] },
+    "errorMessage": { "type": ["string", "null"] },
+    "sessionContext": {
+      "type": "object",
+      "description": "Optional summary-only context metadata that can be reused by workspace or instruction-engine flows without defining the durable transcript policy surface.",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "representation",
+        "summary",
+        "rawTranscriptPersisted"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["run", "session", "workspace"]
+        },
+        "representation": {
+          "type": "string",
+          "enum": ["summary-only"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "salientFacts": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "instructionContext": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "rawTranscriptPersisted": {
+          "const": false
+        }
+      }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

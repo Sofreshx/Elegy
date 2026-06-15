@@ -2,14 +2,14 @@
   "manifestVersion": "1.0.0",
   "package": {
     "name": "Elegy.Formalization.Contracts",
-    "version": "1.4.0"
+    "version": "1.8.0"
   },
   "plannedFamilies": [
     {
       "name": "elegy-memory-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Local non-authoritative import, list, show, export, supersede, and tombstone semantics only.",
       "wrapperSurface": {
         "root": "src/Elegy-memory",
@@ -36,7 +36,7 @@
       "name": "elegy-mcp-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Dedicated MCP descriptor authoring and analysis commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-mcp",
@@ -61,7 +61,7 @@
       "name": "elegy-planning-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetUpstreamPackageVersion": "1.4.0",
+      "targetUpstreamPackageVersion": "1.8.0",
       "scope": "Dedicated durable planning authority commands with scoped lifecycle transitions, revision, validation, and projection export.",
       "wrapperSurface": {
         "root": "src/Elegy-planning",
@@ -74,7 +74,7 @@
       },
       "existingSchemasUnchanged": [
         "planning-result",
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
@@ -87,7 +87,7 @@
       "name": "elegy-skills-v1",
       "status": "published",
       "targetReleaseType": "minor",
-      "targetPackageVersion": "1.4.0",
+      "targetPackageVersion": "1.8.0",
       "scope": "Dedicated governed skill-registry access and validation commands only.",
       "wrapperSurface": {
         "root": "src/Elegy-skills",
@@ -99,13 +99,67 @@
         "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-skills/, and the wrapper surface under wrappers/elegy-skills/."
       },
       "existingArtifactsUnchanged": [
-        "skill-definition-v2",
+        "skill",
         "skill-discovery-index"
       ],
       "authorityReservations": [
-        "contracts skill-definition-v2 authority",
+        "contracts skill authority",
         "contracts skill-discovery-index authority",
         "downstream runtime registration and orchestration"
+      ]
+    },
+    {
+      "name": "elegy-configuration-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Deterministic materialization and verification of agentic configuration templates, profiles, and receipts for harness, repo, and workspace targets.",
+      "wrapperSurface": {
+        "root": "src/Elegy-configuration",
+        "entrypoint": "src/Elegy-configuration/wrapper-entrypoint.json",
+        "installer": "src/Elegy-configuration/install.ps1",
+        "skillBridge": "src/Elegy-configuration/skills/elegy-configuration/SKILL.md",
+        "releaseAssetPrefix": "elegy-configuration-wrapper",
+        "archivePattern": "elegy-configuration-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-configuration/, and the wrapper surface under wrappers/elegy-configuration/."
+      },
+      "authorityReservations": [
+        "contracts configuration template/profile/receipt authority",
+        "rust/crates/elegy-configuration deterministic materialization behavior",
+        "downstream hosts own release download, auth, trust, approvals, and runtime registration"
+      ]
+    },
+    {
+      "name": "elegy-documentation-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Dedicated authority-aware documentation inspection, mapping, objective validation, and non-authoritative export commands over repo-local docs roots.",
+      "wrapperSurface": {
+        "root": "src/Elegy-documentation",
+        "entrypoint": "src/Elegy-documentation/wrapper-entrypoint.json",
+        "installer": "src/Elegy-documentation/install.ps1",
+        "skillBridge": "src/Elegy-documentation/skills/elegy-documentation/SKILL.md",
+        "releaseAssetPrefix": "elegy-documentation-wrapper",
+        "archivePattern": "elegy-documentation-wrapper-<bundleVersion>.zip",
+        "installExpectation": "Wrapper installs stage contracts under contracts/, the dedicated CLI under bin/elegy-documentation/, and the wrapper surface under wrappers/elegy-documentation/."
+      },
+      "authorityReservations": [
+        "contracts documentation config and result schema authority",
+        "rust/crates/elegy-documentation deterministic docs inspection behavior",
+        "source documents remain authoritative over derived llms and bundle exports"
+      ]
+    },
+    {
+      "name": "elegy-piloting-v1",
+      "status": "published",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Contracts-first targeted piloting foundation for portable observation, action, readiness, adapter, fixture, policy, simulation, replay, and Holon-compatible package metadata only.",
+      "authorityReservations": [
+        "contracts piloting schema and fixture authority",
+        "portable package metadata authority for Holon-compatible targeted plugins",
+        "downstream hosts own marketplace trust, approvals, leases, bridge sessions, live execution, and evidence"
       ]
     }
   ],
@@ -289,33 +343,41 @@
       ]
     },
     {
-      "name": "skill-definition-v2",
+      "name": "skill",
       "schemaVersion": "2.0.0",
-      "file": "skill-definition-v2.schema.json",
+      "file": "skill.schema.json",
       "fixtures": [
-        "fixtures/skill-definition-v2.minimal.json",
-        "fixtures/skill-definition-v2.elegy-data.json",
-        "fixtures/skill-definition-v2.elegy-desktop.json",
-        "fixtures/skill-definition-v2.elegy-diagram.json",
-        "fixtures/skill-definition-v2.elegy-memory.json",
-        "fixtures/skill-definition-v2.elegy-mcp.json",
-        "fixtures/skill-definition-v2.elegy-mermaid.json",
-        "fixtures/skill-definition-v2.elegy-notify.json",
-        "fixtures/skill-definition-v2.elegy-observe.json",
-        "fixtures/skill-definition-v2.elegy-planning.json",
-        "fixtures/skill-definition-v2.elegy-repo.json",
-        "fixtures/skill-definition-v2.elegy-skill-router.json",
-        "fixtures/skill-definition-v2.elegy-skills.json",
-        "fixtures/skill-definition-v2.elegy-web.json"
+        "fixtures/skill.minimal.json",
+        "fixtures/skill.elegy-data.json",
+        "fixtures/skill.elegy-desktop.json",
+        "fixtures/skill.elegy-diagram.json",
+        "fixtures/skill.elegy-documentation.json",
+        "fixtures/skill.elegy-memory.json",
+        "fixtures/skill.elegy-mcp.json",
+        "fixtures/skill.elegy-mermaid.json",
+        "fixtures/skill.elegy-notify.json",
+        "fixtures/skill.elegy-observe.json",
+        "fixtures/skill.elegy-obsidian.json",
+        "fixtures/skill.elegy-planning.json",
+        "fixtures/skill.elegy-repo.json",
+        "fixtures/skill.elegy-skill-router.json",
+        "fixtures/skill.elegy-skills.json",
+        "fixtures/skill.elegy-skill-authoring.json",
+        "fixtures/skill.elegy-web.json"
       ]
     },
     {
-      "name": "elegy-plugin-package-v1",
+      "name": "elegy-plugin-package",
       "schemaVersion": "1.0.0",
-      "file": "elegy-plugin-package-v1.schema.json",
+      "file": "elegy-plugin-package.schema.json",
       "fixtures": [
-        "fixtures/elegy-plugin-package-v1.minimal.json",
-        "fixtures/elegy-plugin-package-v1.elegy-planning.json"
+        "fixtures/elegy-plugin-package.minimal.json",
+        "fixtures/elegy-plugin-package.demo-config.json",
+        "fixtures/elegy-plugin-package.elegy-planning.json",
+        "fixtures/elegy-plugin-package.elegy-skills.json",
+        "fixtures/elegy-plugin-package.negative-missing-subset-marker.json",
+        "fixtures/elegy-plugin-package.negative-side-effect-loosening.json",
+        "fixtures/elegy-plugin-package.negative-phantom-capability.json"
       ]
     },
     {
@@ -341,10 +403,13 @@
       "fixtures": [
         "fixtures/skill-discovery-index.minimal.json",
         "fixtures/skill-discovery-index.elegy-memory.json",
+        "fixtures/skill-discovery-index.elegy-documentation.json",
         "fixtures/skill-discovery-index.elegy-mcp.json",
         "fixtures/skill-discovery-index.elegy-planning.json",
         "fixtures/skill-discovery-index.elegy-skills.json",
-        "fixtures/skill-discovery-index.elegy-mermaid.json"
+        "fixtures/skill-discovery-index.elegy-mermaid.json",
+        "fixtures/skill-discovery-index.elegy-obsidian.json",
+        "fixtures/skill-discovery-index.elegy-skill-authoring.json"
       ]
     },
     {
@@ -532,6 +597,72 @@
       "schemaVersion": "1.0.0",
       "file": "notify-result.schema.json",
       "fixtures": []
+    },
+    {
+      "name": "elegy-documentation-v2",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-documentation-v2.schema.json",
+      "fixtures": [
+        "fixtures/elegy-documentation-v2.minimal.json"
+      ]
+    },
+    {
+      "name": "documentation-init-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-init-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-map-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-map-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-check-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-check-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "documentation-export-result",
+      "schemaVersion": "1.0.0",
+      "file": "documentation-export-result.schema.json",
+      "fixtures": []
+    },
+    {
+      "name": "elegy-configuration-template-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-configuration-template-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-template-v1.minimal.json",
+        "fixtures/configuration/demo-template.json"
+      ]
+    },
+    {
+      "name": "elegy-configuration-profile-v1",
+      "schemaVersion": "1.0.0",
+      "file": "elegy-configuration-profile-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-profile-v1.minimal.json",
+        "fixtures/configuration/demo-profile.json"
+      ]
+    },
+    {
+      "name": "elegy-configuration-receipt-v1",
+      "schemaVersion": "1.1.0",
+      "file": "elegy-configuration-receipt-v1.schema.json",
+      "fixtures": [
+        "fixtures/elegy-configuration-receipt-v1.minimal.json"
+      ]
     }
+  ],
+  "supplementalFixtures": [
+    "fixtures/mcp-server-descriptor.parity.json",
+    "fixtures/mcp-analysis-result.parity.json",
+    "fixtures/mcp-parity-expected.json",
+    "fixtures/configuration/assets/demo.txt",
+    "fixtures/skill.negative-no-output-schema.json",
+    "fixtures/install-receipt.elegy-planning.json"
   ]
 }

@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/elegy-configuration-profile-v1.schema.json",
+  "title": "Elegy Configuration Profile V1",
+  "description": "Governed profile that selects one or more configuration templates plus binding overrides.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "profileId", "templates"],
+  "properties": {
+    "schemaVersion": { "const": "elegy-configuration-profile/v1" },
+    "profileId": {
+      "type": "string",
+      "minLength": 1
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "bindings": {
+      "type": "object",
+      "propertyNames": {
+        "type": "string",
+        "minLength": 1
+      },
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "templates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/templateSelection"
+      }
+    }
+  },
+  "$defs": {
+    "templateSelection": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "templateId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "templatePath": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bindings": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "oneOf": [
+        { "required": ["templateId"] },
+        { "required": ["templatePath"] }
+      ]
+    }
+  }
+}
