@@ -130,7 +130,7 @@ on the umbrella `elegy configuration ...` commands.
 
 - Minimum supported `elegy-configuration` version: `0.1.0`.
 - The portable package schema version is declared in
-  `contracts/schemas/elegy-plugin-package-v2.schema.json`. The CLI
+  `contracts/schemas/elegy-plugin-package.schema.json`. The CLI
   only supports the current schema version.
 - Template and profile schemas are versioned independently under
   `contracts/configuration/`. Confirm the schema version of the
@@ -185,6 +185,6 @@ For a drifted target, one or more drift entries with `file`,
 ## References
 
 - Configuration schemas: `contracts/configuration/`.
-- Portable package schema: `contracts/schemas/elegy-plugin-package-v2.schema.json`.
+- Portable package schema: `contracts/schemas/elegy-plugin-package.schema.json`.
 - Umbrella surface: `elegy configuration ...` commands.
 - Wrapper surface: `src/Elegy-configuration/`.

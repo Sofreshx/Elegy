@@ -89,6 +89,17 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-06-16",
+      "docKind": "adr",
+      "freshness": "fresh",
+      "path": "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Decision record for unifying the Elegy plugin package contract under a single `elegy-plugin-package/v1` schema. Supersedes the V1/V2 split described in `specs/neutral-package-consolidation/spec.md`.",
+      "title": "Elegy Plugin Package V1 Unification"
+    },
+    {
+      "authorityClass": "current",
       "created": "2026-05-25",
       "updated": "2026-06-02",
       "docKind": "spec",
@@ -124,6 +135,7 @@
   "recommendedReadingOrder": [
     "README.md",
     "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
+    "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/documentation-practices-skill-and-cli.md",

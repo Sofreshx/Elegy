@@ -8,7 +8,7 @@
       "id": "elegy.generator.example.create-doc",
       "path": "elegy-generator.manifest.minimal.json",
       "schemaVersion": "elegy-generator.manifest/v0",
-      "kind": "solved_unit"
+      "kind": "generator"
     },
     {
       "id": "elegy.generator.check.schema.example",

@@ -24,5 +24,9 @@
         "path": "configuration/demo-profile.json"
       }
     ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
   }
 }

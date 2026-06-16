@@ -60,13 +60,8 @@ Elegy can ship these package asset families:
 
 - `capability-contract`
 - `skill`
-- `eval-pack`
-- `resource-pack`
-- `tool-adapter` contract
-- optional CLI helper
 
-The package can also reference package-local JSON files through `manifestRef`
-and `fixturePackRef`.
+The package can also reference package-local JSON files through `manifestRef`.
 
 ## Non-Goals
 

@@ -109,7 +109,7 @@ the durable authority.
 `elegy-plugin-package/v1` is the portable package metadata contract for hosts
 that want one governed package surface over multiple components. A package can
 bundle or reference `skill` definitions, instruction skill files, MCP projection
-metadata, docs, assets, and local configuration template/profile components for
+metadata, docs, and local configuration template/profile components for
 deterministic `elegy-configuration` loading.
 
 The package contract is not a runtime. It must not contain host workspace ids,

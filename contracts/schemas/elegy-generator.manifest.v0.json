@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elegy/contracts/schemas/elegy-generator.manifest.v0.json",
   "title": "Elegy Generator Manifest v0",
-  "description": "Dry-run foundation manifest for a generator-capable or solved-unit-like contract.",
+  "description": "Lightweight definition metadata for a deterministic generator tool.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "id", "kind", "version", "extensions"],

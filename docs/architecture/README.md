@@ -19,6 +19,9 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Observe CLI](observe-cli.md) - shipped read-only observation commands plus the bounded `elegy observe record` MVP contract
 - [Piloting Moved To Holon](piloting-moved-to-holon.md) - migration note: piloting authority, protocol, and execution have moved to the Holon Rust runtime
 - [Elegy Plugin Package Model](elegy-plugin-package-model.md) - primary plugin package model: shape, setup flow, authority chain, and boundaries
+- [Plugin Package V1 Unification ADR](../adr/2026-06-16-elegy-plugin-package-v1-unification.md) - accepted decision record for the unified single-schema `elegy-plugin-package/v1` contract
+- [Generator-as-plugin convention](../specs/generator-backed-plugin-convention.md) - reference pattern for packaging deterministic generator tools as portable plugin packages
+- [Authoring lane (deferred)](../issues/unresolved-goals.md#goal-20260616-01) - the polished host-driven plugin authoring lane (`elegy plugin author`, generator template kind, `definitionRef` resolution) is deferred; current authoring is hand-edited via `elegy plugin new` plus manual verify-iterate
 - [Elegy Plugin Readiness](elegy-plugin-readiness.md) - host-neutral package metadata and publishing posture for LLM agent hosts
 - [Elegy-memory V1](elegy-memory-v1.md) - shipped local memory surface under `elegy-memory`, authority chain, and retention/removal semantics
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - placement rules for governed MCP and skill artifacts versus Rust tooling

@@ -4,8 +4,6 @@ use serde_json::{json, Map, Value};
 use std::collections::BTreeMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use time::format_description::well_known::Rfc3339;
-use time::OffsetDateTime;
 
 use crate::ToolingError;
 
@@ -13,10 +11,6 @@ pub const GENERATOR_META_SCHEMA_VERSION: &str = "elegy-generator.contract-meta/v
 pub const GENERATOR_MANIFEST_SCHEMA_VERSION: &str = "elegy-generator.manifest/v0";
 pub const GENERATOR_CHECK_SCHEMA_VERSION: &str = "elegy-generator.check/v0";
 pub const GENERATOR_REGISTRY_SCHEMA_VERSION: &str = "elegy-generator.registry/v0";
-pub const GENERATOR_RECEIPT_SCHEMA_VERSION: &str = "elegy-generator.receipt/v0";
-
-const RUNTIME_NAME: &str = "elegy-tooling";
-const RUNTIME_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -100,43 +94,6 @@ pub struct RegistryEntry {
     pub schema_version: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kind: Option<String>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneratorReceipt {
-    pub schema_version: String,
-    pub id: String,
-    pub kind: String,
-    pub version: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub manifest_ref: Option<ManifestRef>,
-    pub operation: String,
-    pub status: String,
-    pub started_at: String,
-    pub finished_at: String,
-    pub runtime: RuntimeRef,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub inputs_hash: Option<String>,
-    pub outputs: Vec<Value>,
-    pub checks: Vec<Value>,
-    pub warnings: Vec<GeneratorFinding>,
-    pub errors: Vec<GeneratorFinding>,
-    #[serde(default)]
-    pub extensions: Map<String, Value>,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ManifestRef {
-    pub id: String,
-    pub version: String,
-}
-
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct RuntimeRef {
-    pub name: String,
-    pub version: String,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize)]
@@ -226,18 +183,6 @@ pub struct GeneratorCheckRunReport {
     pub check: GeneratorContractSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub target: Option<GeneratorValidationReport>,
-    pub receipt: GeneratorReceipt,
-    pub warnings: Vec<GeneratorFinding>,
-    pub errors: Vec<GeneratorFinding>,
-}
-
-#[derive(Clone, Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneratorPlanReport {
-    pub status: String,
-    pub manifest: GeneratorContractSummary,
-    pub inputs: Value,
-    pub receipt: GeneratorReceipt,
     pub warnings: Vec<GeneratorFinding>,
     pub errors: Vec<GeneratorFinding>,
 }
@@ -369,7 +314,6 @@ pub fn run_generator_check_file(
     let value = load_json_value(check_path)?;
     let check: GeneratorCheck = deserialize_after_schema(check_path, value)?;
     let check_summary = contract_summary_from_meta(check_path, &check.meta);
-    let started_at = now_rfc3339();
 
     if check.check_kind != "schema" {
         let warning = GeneratorFinding::new(
@@ -380,19 +324,10 @@ pub fn run_generator_check_file(
             ),
         )
         .with_detail("checkKind", json!(check.check_kind));
-        let receipt = build_receipt(
-            "check",
-            "unsupported",
-            None,
-            started_at,
-            vec![warning.clone()],
-            Vec::new(),
-        );
         return Ok(GeneratorCheckRunReport {
             status: "unsupported".to_string(),
             check: check_summary,
             target: None,
-            receipt,
             warnings: vec![warning],
             errors: Vec::new(),
         });
@@ -433,68 +368,13 @@ pub fn run_generator_check_file(
     }
 
     let has_errors = !errors.is_empty();
-    let receipt = build_receipt(
-        "check",
-        if has_errors { "failed" } else { "success" },
-        None,
-        started_at,
-        warnings.clone(),
-        errors.clone(),
-    );
 
     Ok(GeneratorCheckRunReport {
         status: if has_errors { "failed" } else { "success" }.to_string(),
         check: check_summary,
         target: Some(target),
-        receipt,
         warnings,
         errors,
-    })
-}
-
-pub fn plan_generator_manifest_file(
-    manifest_path: &Path,
-    inputs: Value,
-) -> Result<GeneratorPlanReport, ToolingError> {
-    let value = load_json_value(manifest_path)?;
-    let manifest: GeneratorManifest = deserialize_after_schema(manifest_path, value)?;
-    let summary = contract_summary_from_meta(manifest_path, &manifest.meta);
-    let started_at = now_rfc3339();
-
-    let warning = match manifest.backend {
-        Some(backend) => GeneratorFinding::new(
-            "UNSUPPORTED_BACKEND",
-            format!(
-                "Backend kind '{}' is schema-valid but unsupported in v0.1.",
-                backend.kind
-            ),
-        )
-        .with_detail("backendKind", json!(backend.kind)),
-        None => GeneratorFinding::new(
-            "UNSUPPORTED_BACKEND",
-            "No backend implementation is available in v0.1.",
-        ),
-    };
-
-    let receipt = build_receipt(
-        "plan",
-        "unsupported",
-        Some(ManifestRef {
-            id: manifest.meta.id,
-            version: manifest.meta.version,
-        }),
-        started_at,
-        vec![warning.clone()],
-        Vec::new(),
-    );
-
-    Ok(GeneratorPlanReport {
-        status: "unsupported".to_string(),
-        manifest: summary,
-        inputs,
-        receipt,
-        warnings: vec![warning],
-        errors: Vec::new(),
     })
 }
 
@@ -575,7 +455,7 @@ fn semantic_warnings(value: &Value, schema_version: &str) -> Vec<GeneratorFindin
     let mut warnings = Vec::new();
 
     if schema_version == GENERATOR_MANIFEST_SCHEMA_VERSION {
-        if kind != "solved_unit" {
+        if kind != "generator" {
             warnings.push(
                 GeneratorFinding::new(
                     "UNKNOWN_KIND",
@@ -635,9 +515,6 @@ fn schema_value_for_version(schema_version: &str) -> Option<Value> {
         }
         GENERATOR_REGISTRY_SCHEMA_VERSION => {
             include_str!("../../../../../contracts/schemas/elegy-generator.registry.v0.json")
-        }
-        GENERATOR_RECEIPT_SCHEMA_VERSION => {
-            include_str!("../../../../../contracts/schemas/elegy-generator.receipt.v0.json")
         }
         _ => return None,
     };
@@ -769,49 +646,6 @@ fn resolve_check_target_path(
     context_path.to_path_buf()
 }
 
-fn build_receipt(
-    operation: &str,
-    status: &str,
-    manifest_ref: Option<ManifestRef>,
-    started_at: String,
-    warnings: Vec<GeneratorFinding>,
-    errors: Vec<GeneratorFinding>,
-) -> GeneratorReceipt {
-    let finished_at = now_rfc3339();
-    GeneratorReceipt {
-        schema_version: GENERATOR_RECEIPT_SCHEMA_VERSION.to_string(),
-        id: format!(
-            "elegy.generator.receipt.{}.{}",
-            operation,
-            finished_at.replace([':', '-', '.'], "")
-        ),
-        kind: "receipt".to_string(),
-        version: "0.1.0".to_string(),
-        manifest_ref,
-        operation: operation.to_string(),
-        status: status.to_string(),
-        started_at,
-        finished_at,
-        runtime: RuntimeRef {
-            name: RUNTIME_NAME.to_string(),
-            version: RUNTIME_VERSION.to_string(),
-        },
-        inputs_hash: None,
-        outputs: Vec::new(),
-        checks: Vec::new(),
-        warnings,
-        errors,
-        extensions: Map::new(),
-    }
-}
-
-fn now_rfc3339() -> String {
-    match OffsetDateTime::now_utc().format(&Rfc3339) {
-        Ok(value) => value,
-        Err(_) => "1970-01-01T00:00:00Z".to_string(),
-    }
-}
-
 fn display_path(path: &Path) -> String {
     path.display().to_string().replace('\\', "/")
 }
@@ -875,21 +709,6 @@ mod tests {
         let meta: GeneratorMeta =
             deserialize_after_schema(&path, value).expect("deserialize extension fixture");
         assert!(meta.extensions.contains_key("elegy.experimental"));
-    }
-
-    #[test]
-    fn unsupported_backend_plan_returns_receipt_without_outputs() {
-        let path = repo_root()
-            .join("contracts")
-            .join("fixtures")
-            .join("elegy-generator.manifest.unsupported-backend.json");
-        let report = plan_generator_manifest_file(&path, json!({})).expect("plan manifest");
-        assert_eq!(report.status, "unsupported");
-        assert!(report.receipt.outputs.is_empty());
-        assert!(report
-            .warnings
-            .iter()
-            .any(|warning| warning.code == "UNSUPPORTED_BACKEND"));
     }
 
     #[test]

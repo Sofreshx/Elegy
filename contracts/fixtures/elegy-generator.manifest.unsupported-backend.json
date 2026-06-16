@@ -1,7 +1,7 @@
 {
   "schemaVersion": "elegy-generator.manifest/v0",
   "id": "elegy.generator.example.unsupported-backend",
-  "kind": "solved_unit",
+  "kind": "generator",
   "version": "0.1.0",
   "backend": {
     "kind": "template",

@@ -517,9 +517,9 @@ Only after the earlier substrate is stable, add a separately governed desktop an
 
 ### Status note, 2026-05-28
 
-The first contracts-first piloting foundation slice is now implemented as a
-preparatory Phase 8 step under the existing `elegy` CLI and governed
-`elegy-plugin-package/v2` family.
+The first contracts-first piloting foundation slice was a preparatory Phase 8
+step under the existing `elegy` CLI and an older package-family direction. That
+direction is no longer the current portable plugin package model.
 
 Implemented evidence:
 

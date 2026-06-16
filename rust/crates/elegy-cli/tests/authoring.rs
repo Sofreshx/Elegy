@@ -391,7 +391,7 @@ fn generate_codex_plugin_command_writes_projected_plugin_bundle() {
           "origin": {
             "materializationKind": "declared",
             "sourceKind": "manual",
-            "sourceRef": "contracts/fixtures/elegy-plugin-package-v1.minimal.json"
+            "sourceRef": "contracts/fixtures/elegy-plugin-package.minimal.json"
           },
           "lifecycleState": "active"
         }
@@ -1406,6 +1406,15 @@ fn plugin_inspect_reports_package_summary() {
           "lifecycleState": "active"
         }
       }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "inspect-cap-projection",
+        "skill": "elegy.inspect-skill",
+        "capability": "inspect-cap",
+        "lane": "subprocess",
+        "supportsDryRun": false
+      }
     ]
   }
 }
@@ -1479,6 +1488,15 @@ fn plugin_pack_creates_valid_zip() {
           ],
           "lifecycleState": "active"
         }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "packed-cap-projection",
+        "skill": "elegy.packed-skill",
+        "capability": "packed-cap",
+        "lane": "subprocess",
+        "supportsDryRun": false
       }
     ]
   }
@@ -1557,6 +1575,15 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
           ],
           "lifecycleState": "active"
         }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "codex-cap-projection",
+        "skill": "elegy.codex-skill",
+        "capability": "codex-cap",
+        "lane": "subprocess",
+        "supportsDryRun": false
       }
     ]
   }
@@ -1811,11 +1838,14 @@ fn plugin_verify_reports_partial_for_incomplete_subset() {
     fs::write(
         &package_path,
         r#"{
-  "schemaVersion": "elegy-plugin-package/v1",
+    "schemaVersion": "elegy-plugin-package/v1",
   "identity": {
     "packageId": "elegy.subset-plugin",
     "name": "subset-plugin",
     "version": "0.1.0"
+  },
+  "metadata": {
+    "subsetOf": ["cap-b"]
   },
   "components": {
     "skillDefinitions": [

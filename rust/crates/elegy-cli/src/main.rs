@@ -55,15 +55,15 @@ use elegy_skills::{
     SkillRegistryQuery,
 };
 use elegy_tooling::generator::{
-    list_generator_registry, plan_generator_manifest_file, resolve_generator_registry_entry,
-    run_generator_check_file, show_generator_contract_file, validate_generator_contract_file,
+    list_generator_registry, resolve_generator_registry_entry, run_generator_check_file,
+    show_generator_contract_file, validate_generator_contract_file,
 };
 use elegy_tooling::{
     check_plugin_installation, docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
     generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
     inspect_plugin_package, pack_plugin_package, project_plugin_for_host, scaffold_plugin_package,
     verify_plugin_package, DocsCheckReport, DocsCreateResult, DocsIndexResult, DocsInitResult,
-    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
+    GeneratedHostProjection, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
     PluginTemplateKind, ToolingError as ToolingSurfaceError,
 };
 
@@ -353,7 +353,7 @@ enum PluginProjectCommand {
     },
     /// Project a plugin package for a specific host
     Host {
-        /// Target host: holon, opencode, or generic
+        /// Target host: opencode, or generic
         #[arg(long)]
         host: String,
         /// Path to the plugin package JSON file
@@ -432,10 +432,6 @@ enum GeneratorCommand {
         #[command(subcommand)]
         command: GeneratorCheckCommand,
     },
-    Manifest {
-        #[command(subcommand)]
-        command: GeneratorManifestCommand,
-    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -450,15 +446,6 @@ enum GeneratorCheckCommand {
         file: PathBuf,
         #[arg(long)]
         context: PathBuf,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum GeneratorManifestCommand {
-    Plan {
-        file: PathBuf,
-        #[arg(long = "input")]
-        inputs: Vec<String>,
     },
 }
 
@@ -1299,12 +1286,6 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     command: GeneratorCheckCommand::Run { file, context },
                 },
         } => execute_generator_check_run_command(file, context, format),
-        Command::Generator {
-            command:
-                GeneratorCommand::Manifest {
-                    command: GeneratorManifestCommand::Plan { file, inputs },
-                },
-        } => execute_generator_manifest_plan_command(file, inputs, format),
         Command::Validate {
             command: ValidateCommand::Config,
         } => execute_config_command(locator, format, vec!["validate", "config"]),
@@ -2287,7 +2268,7 @@ fn execute_generate_codex_plugin_command(
     match generate_codex_plugin_from_package_file(&package, &output_dir, force) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Text => print_generated_host_projection_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
                     ["generate", "codex-plugin"],
                     "ok",
@@ -2491,71 +2472,19 @@ fn execute_generator_check_run_command(
     }
 }
 
-fn execute_generator_manifest_plan_command(
-    file: PathBuf,
-    inputs: Vec<String>,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    let input_value = match parse_generator_inputs(&inputs) {
-        Ok(input_value) => input_value,
-        Err(message) => {
-            let error = ToolingSurfaceError::InvalidGeneratorContract {
-                path: file,
-                issues: vec![message],
-            };
-            return emit_tooling_error(
-                error,
-                format,
-                vec!["generator", "manifest", "plan"],
-                json!({}),
-            );
-        }
-    };
-
-    match plan_generator_manifest_file(&file, input_value) {
-        Ok(report) => {
-            let status = report.status.clone();
-            match format {
-                OutputFormat::Text => {
-                    println!("generator manifest plan: {status}");
-                    println!("manifest: {}", report.manifest.id);
-                    for warning in &report.warnings {
-                        println!("warning {}: {}", warning.code, warning.message);
-                    }
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "manifest", "plan"],
-                    match status.as_str() {
-                        "unsupported" => "unsupported",
-                        "success" => "ok",
-                        "warning" => "ok",
-                        "failed" => "invalid",
-                        _ => "error",
-                    },
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(match status.as_str() {
-                "unsupported" => exit_invalid(),
-                _ => ExitCode::SUCCESS,
-            })
-        }
-        Err(error) => emit_tooling_error(
-            error,
-            format,
-            vec!["generator", "manifest", "plan"],
-            json!({}),
-        ),
-    }
-}
-
 fn execute_plugin_new_command(
     template: String,
     output: PathBuf,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
+    // `elegy plugin new` is the scaffolder lane. It writes a starter file set;
+    // the author hand-fills the schema-required fields and iterates against
+    // `elegy plugin verify`. The future host-driven authoring lane
+    // (`elegy plugin author`, `elegy plugin doctor`, the `generator` template
+    // kind, `definitionRef` resolution in the validator) is a deferred goal;
+    // see `docs/issues/unresolved-goals.md` GOAL-20260616-01. It does not
+    // conflict with this command — the scaffolder remains the lowest-friction
+    // starting point even after the authoring lane lands.
     let template_kind = match PluginTemplateKind::from_str(&template) {
         Ok(kind) => kind,
         Err(error) => {
@@ -2800,7 +2729,7 @@ fn execute_plugin_project_host_command(
     ) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Text => print_generated_host_projection_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
                     ["plugin", "project", "host"],
                     "ok",
@@ -3807,7 +3736,7 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     }
 }
 
-fn print_generated_codex_plugin_text(result: &GeneratedCodexPluginArtifacts) {
+fn print_generated_host_projection_text(result: &GeneratedHostProjection) {
     println!("generated Codex plugin projection");
     println!("source: {}", result.source_package);
     println!("plugin: {} {}", result.plugin_name, result.plugin_version);
@@ -3981,23 +3910,6 @@ fn parse_tool_specs(values: &[String]) -> Result<Vec<AuthorMcpToolRequest>, Stri
         .collect()
 }
 
-fn parse_generator_inputs(values: &[String]) -> Result<serde_json::Value, String> {
-    let mut object = serde_json::Map::new();
-    for value in values {
-        let (key, raw_value) = value
-            .split_once('=')
-            .ok_or_else(|| format!("generator input `{value}` is invalid; expected key=value"))?;
-        let key = key.trim();
-        if key.is_empty() {
-            return Err(format!(
-                "generator input `{value}` is invalid; key must not be empty"
-            ));
-        }
-        object.insert(key.to_string(), json!(raw_value));
-    }
-    Ok(serde_json::Value::Object(object))
-}
-
 fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
     match error {
         McpSurfaceError::Io {
@@ -4139,7 +4051,7 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
             "CLI-PLUGIN-006",
             format!("unsupported host target: {host}"),
         )
-        .with_hint("valid targets: codex, holon, opencode, generic")],
+        .with_hint("valid targets: opencode, generic")],
     }
 }
 
