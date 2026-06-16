@@ -26,13 +26,13 @@ runtime spec.
 
 ## Decision
 
-Adopt an `elegy-generator.*` contract family and a small Rust runtime foundation
-under `elegy-tooling`.
+Adopt an `elegy-generator.*` contract family and a small Rust validation
+foundation under `elegy-tooling`.
 
-- Define governed manifest, check, registry, receipt, and meta-contract
-  schemas under `contracts/schemas/`.
-- Treat v0.1 as dry-run foundation only: validation, registry loading, schema
-  checks, unsupported-backend reporting, and receipt evidence.
+- Define governed manifest, check, registry, and meta-contract schemas under
+  `contracts/schemas/`.
+- Treat v0.1 as definition metadata only: validation, registry loading, schema
+  checks, and unsupported-backend reporting.
 - Expose a thin `elegy generator ...` CLI surface from the umbrella CLI.
 - Keep existing `elegy plugin new`, `elegy generate skills`, and
   `elegy generate codex-plugin` behavior unchanged.
@@ -44,8 +44,8 @@ under `elegy-tooling`.
 ## Alternatives
 
 Option A: implement a concrete UI or workflow generator first. Rejected because
-it would force domain-specific fields before the shared validation, receipt,
-registry, and unsupported-capability semantics are stable.
+it would force domain-specific fields before the shared validation, registry,
+and unsupported-capability semantics are stable.
 
 Option B: make `elegy plugin new` the generator foundation. Rejected because
 plugin package scaffolding is a specific existing lane, not the durable
@@ -56,10 +56,10 @@ step is now small enough to govern and validate without choosing a real backend.
 
 ## Consequences
 
-- Positive: future generator tracks can share identity, extension, validation,
-  registry, and evidence mechanics.
-- Positive: agents get a machine-readable dry-run/validation surface before any
-  file-emitting backend exists.
+- Positive: future generator tools can share identity, extension, validation,
+  and registry mechanics.
+- Positive: agents get a machine-readable validation surface before any
+  file-emitting generator exists.
 - Positive: unsupported future backends and check kinds are represented
   explicitly instead of silently passing.
 - Negative: v0.1 adds contract surface area before a real generator exists.

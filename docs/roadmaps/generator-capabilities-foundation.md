@@ -57,7 +57,7 @@ lanes.
 
 - Phase: expansion
 - Status: pending
-- Summary: Add domain-specific solved-unit tracks for UI, tool wrapping,
+- Summary: Add domain-specific generator tracks for UI, tool wrapping,
   workflow scaffolding, infrastructure templates, and plugin/code generation
   only after their contracts and validation gates are proven.
 - Backlog IDs: none

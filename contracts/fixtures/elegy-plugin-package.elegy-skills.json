@@ -16,13 +16,13 @@
     "skillDefinitions": [
       {
         "id": "skills-skill",
-        "definitionRef": "contracts/fixtures/skill.elegy-skills.json"
+        "definitionRef": "skill.elegy-skills.json"
       }
     ],
     "instructionSkills": [
       {
         "id": "skills-instructions",
-        "path": ".agents/skills/elegy-skills/SKILL.md",
+        "path": "instruction-skills/elegy-skills.SKILL.md",
         "description": "Repo-local skills instruction bridge metadata."
       }
     ],
@@ -75,5 +75,9 @@
     "sideEffectClass": "read_only",
     "requiresApproval": false,
     "policyTags": ["skill-registry", "read-only"]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
   }
 }

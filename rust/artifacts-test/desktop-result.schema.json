@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elegy/contracts/schemas/desktop-result.schema.json",
-  "title": "DesktopResult",
-  "description": "Desktop automation result: ClickResult, TypeResult, KeyResult, or WindowActionResult with coordinates, dry-run flag, target window evidence, and UTC timestamp.",
-  "type": "object"
-}

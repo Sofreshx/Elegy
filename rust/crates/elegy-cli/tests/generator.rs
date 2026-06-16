@@ -123,7 +123,6 @@ fn generator_check_run_reports_unsupported_check_kind() {
     assert!(!output.status.success());
     let parsed: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
     assert_eq!(parsed["status"], "unsupported");
-    assert_eq!(parsed["data"]["receipt"]["status"], "unsupported");
     assert_eq!(
         parsed["data"]["warnings"][0]["code"],
         "UNSUPPORTED_CHECK_KIND"
@@ -131,7 +130,7 @@ fn generator_check_run_reports_unsupported_check_kind() {
 }
 
 #[test]
-fn generator_manifest_plan_emits_receipt_and_no_outputs() {
+fn generator_manifest_plan_is_not_part_of_the_thin_surface() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
             "generator",
@@ -145,14 +144,13 @@ fn generator_manifest_plan_emits_receipt_and_no_outputs() {
             "--json",
         ])
         .output()
-        .expect("run generator manifest plan");
+        .expect("run removed generator manifest plan");
 
     assert!(!output.status.success());
-    let parsed: Value = serde_json::from_slice(&output.stdout).expect("parse stdout");
-    assert_eq!(parsed["status"], "unsupported");
-    assert_eq!(parsed["data"]["receipt"]["status"], "unsupported");
-    assert_eq!(parsed["data"]["receipt"]["outputs"], json!([]));
-    assert_eq!(parsed["data"]["warnings"][0]["code"], "UNSUPPORTED_BACKEND");
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("unrecognized subcommand")
+            || String::from_utf8_lossy(&output.stderr).contains("Usage:")
+    );
 }
 
 #[test]
@@ -207,7 +205,7 @@ fn generator_validate_accepts_non_object_backend_config() {
         json!({
             "schemaVersion": "elegy-generator.manifest/v0",
             "id": "elegy.generator.test.scalar-backend-config",
-            "kind": "solved_unit",
+            "kind": "generator",
             "version": "0.1.0",
             "backend": {
                 "kind": "template",

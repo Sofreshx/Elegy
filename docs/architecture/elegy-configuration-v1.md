@@ -20,7 +20,7 @@ and below product-specific bootstrap or runtime wiring.
 What this lane owns:
 
 - deterministic application and verification of governed templates and profiles
-- deterministic application and verification of governed configuration carried by local `elegy-plugin-package/v2` package files
+- deterministic application and verification of governed configuration carried by local `elegy-plugin-package/v1` package files
 - small built-in materialization slices for repo skill mirrors, repo-local
   OpenCode configuration, repo-local Codex skill mirrors, and bounded Codex
   home setup

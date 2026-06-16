@@ -1,5 +1,12 @@
 # Neutral Plugin And Distribution Consolidation — Implementation Plan
 
+> **Status: historical.** This plan is an archive of the implementation steps
+> that consolidated Elegy's V1/V2 schema split. The work is done. The current
+> schema at `contracts/schemas/elegy-plugin-package.schema.json` is the single
+> unified `elegy-plugin-package/v1`. See
+> [ADR](../../docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md)
+> for the current decision record.
+
 ## Overview
 
 This plan implements the signed-off spec at `specs/neutral-package-consolidation/spec.md`. It consolidates Elegy around one neutral portable package contract, removes the V1/V2 schema split, removes Holon-specific language, and applies crates.io publish policy.

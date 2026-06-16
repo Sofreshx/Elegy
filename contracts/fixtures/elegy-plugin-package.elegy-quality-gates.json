@@ -1,0 +1,72 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.quality-gates-plugin",
+    "name": "elegy-quality-gates",
+    "version": "0.1.0",
+    "displayName": "Elegy Quality Gates Plugin"
+  },
+  "metadata": {
+    "description": "Reference package for a future deterministic quality-gate generator tool. It exposes only definition validation until a concrete file-creating generator exists.",
+    "tags": ["generator", "quality-gates", "github-actions", "ci", "validation", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/specs/generator-backed-plugin-convention.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "quality-gates-skill",
+        "definitionRef": "skill.elegy-quality-gates.json"
+      }
+    ],
+    "instructionSkills": [
+      {
+        "id": "quality-gates-instructions",
+        "path": "instruction-skills/elegy-quality-gates.SKILL.md",
+        "description": "Instruction bridge for safe generator-backed quality-gate use."
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "quality-gates-definition-validate-cli",
+        "skill": "elegy.quality-gates",
+        "capability": "quality-gates-definition-validate",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "quality_gates_definition_validate"
+        }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy",
+        "cliBinary": "elegy",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Umbrella Elegy CLI exposing generator definition validation."
+      }
+    ],
+    "docs": [
+      {
+        "id": "generator-backed-plugin-convention",
+        "path": "docs/specs/generator-backed-plugin-convention.md"
+      },
+      {
+        "id": "generator-foundation",
+        "path": "docs/specs/elegy-generator-foundation.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "read_only",
+    "requiresApproval": false,
+    "policyTags": ["generator-backed", "quality-gates", "reference-only"]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

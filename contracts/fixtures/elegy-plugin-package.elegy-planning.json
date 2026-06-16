@@ -12,26 +12,31 @@
     "license": "Apache-2.0",
     "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/elegy-planning-v1.md",
     "subsetOf": [
-      "planning-goal-create", "planning-goal-show",
-      "planning-roadmap-create", "planning-plan-show",
-      "planning-validate-all", "planning-project-run-claim",
-      "planning-project-run-activate", "planning-project-run-release",
-      "planning-project-run-add-evidence", "planning-project-run-list",
-      "planning-project-run-show", "planning-work-point-next-runnable",
-      "planning-work-point-work-graph"
+      "planning-goal-list", "planning-goal-update-status",
+      "planning-roadmap-show", "planning-roadmap-list", "planning-roadmap-update-status", "planning-roadmap-add-work-point",
+      "planning-plan-create", "planning-plan-list", "planning-plan-update-status", "planning-plan-revise",
+      "planning-todo-create", "planning-todo-list", "planning-todo-update-status",
+      "planning-issue-record", "planning-issue-list", "planning-issue-update-status",
+      "planning-review-point-record", "planning-review-point-update-status",
+      "planning-health", "planning-project-render", "planning-project-export",
+      "planning-scope-create", "planning-scope-list", "planning-scope-show",
+      "planning-events-list", "planning-insight-record",
+      "planning-context-entity", "planning-context-session",
+      "planning-tags-list", "planning-search-extended",
+      "planning-work-point-list", "planning-work-point-show", "planning-work-point-update-status"
     ]
   },
   "components": {
     "skillDefinitions": [
       {
         "id": "planning-skill",
-        "definitionRef": "contracts/fixtures/skill.elegy-planning.json"
+        "definitionRef": "skill.elegy-planning.json"
       }
     ],
     "instructionSkills": [
       {
         "id": "planning-instructions",
-        "path": ".agents/skills/elegy-planning/SKILL.md",
+        "path": "instruction-skills/elegy-planning.SKILL.md",
         "description": "Repo-local planning instruction bridge metadata."
       }
     ],
@@ -200,17 +205,6 @@
         "minVersion": "0.1.0",
         "probeCommand": "--version",
         "description": "Elegy Planning CLI for durable planning operations."
-      }
-    ],
-    "hostCompatibility": [
-      {
-        "host": "opencode",
-        "versionRange": ">=0.1.0",
-        "notes": "OpenCode support via CLI invocation templates."
-      },
-      {
-        "host": "generic",
-        "versionRange": ">=0.1.0"
       }
     ],
     "docs": [

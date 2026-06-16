@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://elegy/contracts/schemas/elegy-plugin-package.schema.json",
   "title": "Elegy Plugin Package",
-  "description": "Portable package metadata for bundling Elegy skill definitions, instruction skills, deterministic configuration templates/profiles, MCP projection metadata, capability projections, docs, assets, tooling requirements, host compatibility, and neutral publishing/provenance metadata for host-governed import.",
+  "description": "Portable package metadata for bundling Elegy skill definitions, instruction skills, capability projections, MCP projection metadata, configuration templates/profiles, docs, tool requirements, and neutral publishing/provenance metadata for host-governed import.",
   "type": "object",
   "additionalProperties": false,
   "required": ["schemaVersion", "identity", "components"],
@@ -41,6 +41,7 @@
         },
         "tags": {
           "type": "array",
+          "description": "Descriptive tags for discovery (e.g. ['planning', 'roadmap']). Free-form.",
           "items": {
             "type": "string",
             "minLength": 1
@@ -61,10 +62,10 @@
         },
         "subsetOf": {
           "type": "array",
-          "description": "Capability IDs that this package deliberately subsets from the underlying skill definitions. When declared, every capabilityProjection must reference only capabilities in this set.",
+          "description": "Capability IDs that the package deliberately omits from its capabilityProjections[]. When declared, every capability in the referenced skill's capabilities[] must either appear in components.capabilityProjections[] or be listed here.",
           "items": {
             "type": "string",
-            "minLength": 1
+            "pattern": "^[a-z][a-z0-9-]+$"
           },
           "uniqueItems": true
         }
@@ -79,27 +80,7 @@
           "minItems": 1,
           "items": { "$ref": "#/$defs/skillDefinitionComponent" }
         },
-        "capabilityContracts": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
         "instructionSkills": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "evalPacks": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "resourcePacks": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "toolAdapterContracts": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "bridgeAdapterContracts": {
           "type": "array",
           "items": { "$ref": "#/$defs/pathComponent" }
         },
@@ -111,23 +92,7 @@
           "type": "array",
           "items": { "$ref": "#/$defs/capabilityProjectionComponent" }
         },
-        "pilotingAdapters": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pilotingAdapterComponent" }
-        },
-        "fixturePacks": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/fixturePackComponent" }
-        },
         "docs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "assets": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/pathComponent" }
-        },
-        "cliHelpers": {
           "type": "array",
           "items": { "$ref": "#/$defs/pathComponent" }
         },
@@ -148,11 +113,6 @@
           "type": "array",
           "description": "Required CLI tools and MCP surfaces this package needs installed and probeable.",
           "items": { "$ref": "#/$defs/toolRequirementComponent" }
-        },
-        "hostCompatibility": {
-          "type": "array",
-          "description": "Host compatibility hints for target harnesses and version ranges.",
-          "items": { "$ref": "#/$defs/compatibilityMetadata" }
         }
       }
     },
@@ -166,6 +126,7 @@
         },
         "policyTags": {
           "type": "array",
+          "description": "Policy routing tags consumed by host policy. Distinct from descriptive metadata.tags.",
           "items": {
             "type": "string",
             "minLength": 1
@@ -198,7 +159,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z][a-z0-9-]+$"
         },
         "path": { "$ref": "#/$defs/relativePath" },
         "description": {
@@ -231,7 +192,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z][a-z0-9-]+$"
         },
         "descriptorRef": { "$ref": "#/$defs/relativePath" },
         "serverName": {
@@ -256,7 +217,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z][a-z0-9-]+$"
         },
         "skill": {
           "type": "string",
@@ -326,7 +287,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z][a-z0-9-]+$"
         },
         "path": {
           "$ref": "#/$defs/relativePath"
@@ -337,27 +298,6 @@
         }
       }
     },
-    "pilotingAdapterComponent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "manifestRef": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "manifest": {
-          "$ref": "piloting-adapter-manifest.schema.json"
-        }
-      },
-      "anyOf": [
-        { "required": ["manifestRef"] },
-        { "required": ["manifest"] }
-      ]
-    },
     "rustToolAdapterComponent": {
       "type": "object",
       "additionalProperties": false,
@@ -365,7 +305,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "minLength": 1
+          "pattern": "^[a-z][a-z0-9-]+$"
         },
         "crateName": {
           "type": "string",
@@ -392,27 +332,6 @@
           "description": "Optional relative path to the adapter's manifest file."
         }
       }
-    },
-    "fixturePackComponent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "minLength": 1
-        },
-        "fixturePackRef": {
-          "$ref": "#/$defs/relativePath"
-        },
-        "fixturePack": {
-          "$ref": "piloting-fixture-pack.schema.json"
-        }
-      },
-      "anyOf": [
-        { "required": ["fixturePackRef"] },
-        { "required": ["fixturePack"] }
-      ]
     },
     "toolRequirementComponent": {
       "type": "object",

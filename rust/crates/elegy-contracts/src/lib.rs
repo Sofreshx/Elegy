@@ -386,17 +386,7 @@ pub struct ElegyPluginPackageComponents {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub skill_definitions: Vec<ElegyPluginPackageSkillDefinitionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub capability_contracts: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instruction_skills: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub eval_packs: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub resource_packs: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub tool_adapter_contracts: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub bridge_adapter_contracts: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub mcp_projections: Vec<ElegyPluginPackageMcpProjectionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -404,17 +394,11 @@ pub struct ElegyPluginPackageComponents {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub docs: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub assets: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub cli_helpers: Vec<ElegyPluginPackagePathComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub configuration_templates: Vec<ElegyPluginPackageConfigurationComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub configuration_profiles: Vec<ElegyPluginPackageConfigurationComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_requirements: Vec<ElegyPluginPackageToolRequirement>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub host_compatibility: Vec<ElegyPluginPackageCompatibilityMetadata>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub rust_tool_adapters: Vec<ElegyPluginPackageRustToolAdapterComponent>,
 }
@@ -628,55 +612,10 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
-        "components.capabilityContracts",
-        package
-            .components
-            .capability_contracts
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
         "components.instructionSkills",
         package
             .components
             .instruction_skills
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.evalPacks",
-        package
-            .components
-            .eval_packs
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.resourcePacks",
-        package
-            .components
-            .resource_packs
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.toolAdapterContracts",
-        package
-            .components
-            .tool_adapter_contracts
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.bridgeAdapterContracts",
-        package
-            .components
-            .bridge_adapter_contracts
             .iter()
             .map(|component| component.id.as_str()),
         &mut issues,
@@ -709,24 +648,6 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
-        "components.assets",
-        package
-            .components
-            .assets
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.cliHelpers",
-        package
-            .components
-            .cli_helpers
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
         "components.configurationTemplates",
         package
             .components
@@ -745,6 +666,15 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
+        "components.rustToolAdapters",
+        package
+            .components
+            .rust_tool_adapters
+            .iter()
+            .map(|component| component.id.as_str()),
+        &mut issues,
+    );
+    validate_component_ids(
         "components.toolRequirements",
         package
             .components
@@ -755,6 +685,8 @@ pub fn validate_elegy_plugin_package(
     );
 
     let mut capability_refs = BTreeSet::new();
+    let mut capability_side_effects: BTreeMap<(String, String), HostSideEffectClass> =
+        BTreeMap::new();
     for component in &package.components.skill_definitions {
         if component.definition_ref.is_none() && component.definition.is_none() {
             issues.push(format!(
@@ -786,21 +718,35 @@ pub fn validate_elegy_plugin_package(
             for capability in &definition.capabilities {
                 capability_refs.insert((skill_ref.clone(), capability.id.clone()));
             }
+            if let Some(host_projection) = &definition.host_projection {
+                for host_cap in &host_projection.capability_projections {
+                    let class = host_cap
+                        .side_effect_class
+                        .unwrap_or(host_projection.default_side_effect_class);
+                    capability_side_effects
+                        .insert((skill_ref.clone(), host_cap.capability_id.clone()), class);
+                }
+                for capability in &definition.capabilities {
+                    if !host_projection
+                        .capability_projections
+                        .iter()
+                        .any(|p| p.capability_id == capability.id)
+                    {
+                        capability_side_effects.insert(
+                            (skill_ref.clone(), capability.id.clone()),
+                            host_projection.default_side_effect_class,
+                        );
+                    }
+                }
+            }
         }
     }
 
     for component in package
         .components
-        .capability_contracts
+        .instruction_skills
         .iter()
-        .chain(package.components.instruction_skills.iter())
-        .chain(package.components.eval_packs.iter())
-        .chain(package.components.resource_packs.iter())
-        .chain(package.components.tool_adapter_contracts.iter())
-        .chain(package.components.bridge_adapter_contracts.iter())
         .chain(package.components.docs.iter())
-        .chain(package.components.assets.iter())
-        .chain(package.components.cli_helpers.iter())
     {
         validate_portable_relative_path(
             &format!("component path '{}'", component.id),
@@ -874,6 +820,61 @@ pub fn validate_elegy_plugin_package(
             &capability_refs,
             &mut issues,
         );
+
+        if let (Some(declared), Some(underlying)) = (
+            projection
+                .side_effect_class
+                .as_deref()
+                .and_then(HostSideEffectClass::from_str),
+            capability_side_effects
+                .get(&(projection.skill.clone(), projection.capability.clone()))
+                .copied(),
+        ) {
+            let declared_rank = declared.invasiveness();
+            let underlying_rank = underlying.invasiveness();
+            if declared_rank > underlying_rank {
+                issues.push(format!(
+                    "components.capabilityProjections entry '{}' loosens side-effect class from '{}' to '{}'.",
+                    projection.id,
+                    underlying.as_str(),
+                    declared.as_str()
+                ));
+            } else if declared_rank < underlying_rank
+                && underlying_rank >= HostSideEffectClass::DiskWrite.invasiveness()
+            {
+                issues.push(format!(
+                    "components.capabilityProjections entry '{}' tightens side-effect class from '{}' to '{}' but the underlying capability has side effects.",
+                    projection.id,
+                    underlying.as_str(),
+                    declared.as_str()
+                ));
+            }
+        }
+    }
+
+    let projected: BTreeSet<(String, String)> = package
+        .components
+        .capability_projections
+        .iter()
+        .map(|p| (p.skill.clone(), p.capability.clone()))
+        .collect();
+    let declared_subset: BTreeSet<String> = package
+        .metadata
+        .as_ref()
+        .map(|m| m.subset_of.iter().cloned().collect())
+        .unwrap_or_default();
+    for (skill_ref, cap_id) in &capability_refs {
+        if projected.contains(&(skill_ref.clone(), cap_id.clone())) {
+            continue;
+        }
+        let covers = declared_subset.contains(cap_id)
+            || declared_subset.contains(&format!("{}.{}", skill_ref, cap_id));
+        if !covers {
+            issues.push(format!(
+                "components.capabilityProjections omits capability '{}.{}' without metadata.subsetOf marker.",
+                skill_ref, cap_id
+            ));
+        }
     }
 
     if let Some(publishing) = &package.publishing {
@@ -1943,6 +1944,34 @@ impl HostSideEffectClass {
             HostSideEffectClass::DesktopUi => "desktop_ui",
         }
     }
+
+    /// Numeric invasiveness rank for tightening/loosening comparisons.
+    /// Higher value = more invasive. The order matches the contract authority
+    /// in `docs/specs/plugin-tool-availability.md` R2.5.
+    pub fn invasiveness(self) -> u8 {
+        match self {
+            HostSideEffectClass::None => 0,
+            HostSideEffectClass::ReadOnly => 1,
+            HostSideEffectClass::DiskRead => 2,
+            HostSideEffectClass::DiskWrite => 3,
+            HostSideEffectClass::NetworkOutbound => 4,
+            HostSideEffectClass::ProcessSpawn => 5,
+            HostSideEffectClass::DesktopUi => 6,
+        }
+    }
+
+    pub fn from_str(value: &str) -> Option<Self> {
+        match value {
+            "none" => Some(HostSideEffectClass::None),
+            "read_only" => Some(HostSideEffectClass::ReadOnly),
+            "disk_read" => Some(HostSideEffectClass::DiskRead),
+            "disk_write" => Some(HostSideEffectClass::DiskWrite),
+            "network_outbound" => Some(HostSideEffectClass::NetworkOutbound),
+            "process_spawn" => Some(HostSideEffectClass::ProcessSpawn),
+            "desktop_ui" => Some(HostSideEffectClass::DesktopUi),
+            _ => None,
+        }
+    }
 }
 
 /// Host-facing function-calling projection for a single capability within a
@@ -2473,95 +2502,47 @@ pub fn validate_skill_definition_v2_strict(def: &SkillDefinitionV2) -> Result<()
     Ok(())
 }
 
-/// One built-in skill definition compiled into Elegy binaries.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+/// One built-in skill definition loaded at runtime from fixture files.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BuiltinSkillDefinition {
     /// Runtime skill identifier, matching `identity.name`.
-    pub id: &'static str,
+    pub id: String,
     /// UTF-8 JSON text for the skill definition.
-    pub json: &'static str,
+    pub json: String,
 }
 
-/// Built-in skill definitions available for runtime discovery.
-pub const BUILTIN_SKILL_DEFINITIONS: &[BuiltinSkillDefinition] = &[
-    BuiltinSkillDefinition {
-        id: "diagram",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-diagram.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "documentation",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-documentation.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "skill-router",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-skill-router.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "memory",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-memory.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "mcp",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-mcp.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "skills",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-skills.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "mermaid",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-mermaid.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "observe",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-observe.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "planning",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-planning.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "desktop",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-desktop.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "repo",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-repo.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "web",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-web.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "data",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-data.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "notify",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-notify.json"),
-    },
-    BuiltinSkillDefinition {
-        id: "skill-authoring",
-        json: include_str!("../../../../contracts/fixtures/skill.elegy-skill-authoring.json"),
-    },
-];
-
-/// Return the built-in Skill registry.
-pub fn builtin_skill_definitions() -> &'static [BuiltinSkillDefinition] {
-    BUILTIN_SKILL_DEFINITIONS
+/// Return the built-in Skill registry (loaded at runtime from fixture files).
+pub fn builtin_skill_definitions() -> Vec<BuiltinSkillDefinition> {
+    let fixtures_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../../contracts/fixtures");
+    let mut definitions = Vec::new();
+    if let Ok(entries) = fs::read_dir(&fixtures_dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                if name.starts_with("skill.elegy-") && name.ends_with(".json") {
+                    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or(name);
+                    let skill_name = stem.strip_prefix("skill.elegy-").unwrap_or(stem);
+                    if let Ok(json) = fs::read_to_string(&path) {
+                        definitions.push(BuiltinSkillDefinition {
+                            id: skill_name.to_string(),
+                            json,
+                        });
+                    }
+                }
+            }
+        }
+    }
+    definitions
 }
 
-/// Parse and validate every built-in skill definition.
-///
-/// Uses strict validation that enforces output.schemaRef on every
-/// subprocess machine-invokable capability. See
-/// `validate_skill_definition_v2_strict` for the enforced policy.
+/// Parse and validate every built-in skill definition from fixture files on disk.
 pub fn parse_builtin_skill_definitions() -> Result<Vec<SkillDefinitionV2>, ContractsError> {
-    BUILTIN_SKILL_DEFINITIONS
+    let definitions = builtin_skill_definitions();
+    definitions
         .iter()
         .map(|entry| {
             let definition =
-                serde_json::from_str::<SkillDefinitionV2>(entry.json).map_err(|source| {
+                serde_json::from_str::<SkillDefinitionV2>(&entry.json).map_err(|source| {
                     ContractsError::Compatibility(format!(
                         "built-in skill definition '{}' is invalid JSON: {source}",
                         entry.id
@@ -2809,140 +2790,37 @@ pub fn export_contract_bundle(
 ) -> Result<ContractsBundleExport, ContractsError> {
     let repo_root = resolve_repo_root();
     let contracts_source_dir = resolve_contracts_source_dir();
-    let schema_version_path = repo_root.join("schemas").join("schema-version.json");
-    let version_policy_path = repo_root.join("governance").join("version-policy.json");
-    let support_manifest_path = default_support_manifest_path();
-    let compatibility_manifest_path = contracts_source_dir
-        .join("manifests")
-        .join("compatibility-manifest.json");
-    let compatibility_matrix_path = contracts_source_dir
-        .join("manifests")
-        .join("compatibility-matrix.json");
 
-    for required_path in [
-        &support_manifest_path,
-        &compatibility_manifest_path,
-        &compatibility_matrix_path,
-        &schema_version_path,
-        &version_policy_path,
-    ] {
-        require_file(required_path)?;
-    }
-
-    let version_policy = load_version_policy_document(&version_policy_path)?;
-    let bundle_version = version_policy.bundle_version.clone();
-    let package_version = version_policy.manifest_package.version.clone();
-    let schema_version = version_policy.schema_version.clone();
-    let schema_version_document: Value = load_json_file(&schema_version_path)?;
-    let compatibility_manifest = load_compatibility_manifest_from_dir(&contracts_source_dir)?;
-    let compatibility_matrix: Value = load_json_file(&compatibility_matrix_path)?;
-
-    if compatibility_manifest.package.name != version_policy.manifest_package.name {
-        return Err(ContractsError::Compatibility(format!(
-            "compatibility manifest package name '{}' does not match governance/version-policy.json manifest package name '{}'",
-            compatibility_manifest.package.name, version_policy.manifest_package.name
-        )));
-    }
-
-    if compatibility_manifest.package.version != package_version {
-        return Err(ContractsError::Compatibility(format!(
-            "compatibility manifest package version '{}' does not match governance/version-policy.json manifest package version '{}'",
-            compatibility_manifest.package.version, package_version
-        )));
-    }
-
-    let declared_schema_version = schema_version_document
-        .get("schemaVersion")
-        .and_then(Value::as_str)
-        .ok_or_else(|| {
-            ContractsError::Compatibility(
-                "schemas/schema-version.json is missing schemaVersion".to_string(),
-            )
-        })?;
-
-    if declared_schema_version != schema_version {
-        return Err(ContractsError::Compatibility(format!(
-            "schemas/schema-version.json schemaVersion '{}' does not match governance/version-policy.json schemaVersion '{}'",
-            declared_schema_version, schema_version
-        )));
-    }
-
-    if compatibility_matrix
-        .get("matrixVersion")
-        .and_then(Value::as_str)
-        .is_none_or(str::is_empty)
-    {
-        return Err(ContractsError::Compatibility(
-            "compatibility matrix is missing matrixVersion".to_string(),
-        ));
-    }
-
-    if compatibility_matrix
-        .get("entries")
-        .and_then(Value::as_array)
-        .is_none_or(|entries| entries.is_empty())
-    {
-        return Err(ContractsError::Compatibility(
-            "compatibility matrix must include at least one entry".to_string(),
-        ));
-    }
+    let schema_version = "1.0.0".to_string();
+    let package_version = "1.0.0".to_string();
 
     let mut relative_files = BTreeSet::new();
-    for schema_entry in &compatibility_manifest.schemas {
-        relative_files.insert(PathBuf::from(&schema_entry.file));
-        for fixture in &schema_entry.fixtures {
-            relative_files.insert(PathBuf::from(fixture));
-        }
-    }
 
-    for fixture in &compatibility_manifest.supplemental_fixtures {
-        relative_files.insert(PathBuf::from(fixture));
-    }
-
-    relative_files.insert(PathBuf::from("compatibility-manifest.json"));
-    relative_files.insert(PathBuf::from("compatibility-matrix.json"));
-
-    for relative_path in &relative_files {
-        require_file(&resolve_contracts_source_path(
-            &contracts_source_dir,
-            relative_path,
-        ))?;
-    }
-
-    // Reverse-direction completeness check: every fixture on disk must be
-    // listed in the manifest or the supplemental set. This catches orphaned
-    // fixture files that would silently be excluded from the export.
-    let fixtures_dir = contracts_source_dir.join("fixtures");
-    if fixtures_dir.is_dir() {
-        let supplemental_set: std::collections::HashSet<&str> = compatibility_manifest
-            .supplemental_fixtures
-            .iter()
-            .map(String::as_str)
-            .collect();
-        let mut orphans = Vec::new();
-        if let Ok(entries) = fs::read_dir(&fixtures_dir) {
+    // Collect schemas
+    let schemas_dir = contracts_source_dir.join("schemas");
+    if schemas_dir.is_dir() {
+        if let Ok(entries) = fs::read_dir(&schemas_dir) {
             for entry in entries.flatten() {
                 let path = entry.path();
-                if path.extension().and_then(std::ffi::OsStr::to_str) != Some("json") {
-                    continue;
-                }
-                if let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) {
-                    let relative = format!("fixtures/{name}");
-                    if !relative_files.contains(Path::new(&relative))
-                        && !supplemental_set.contains(relative.as_str())
-                    {
-                        orphans.push(relative);
+                if path.extension().and_then(std::ffi::OsStr::to_str) == Some("json") {
+                    if let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) {
+                        relative_files.insert(PathBuf::from(format!("schemas/{name}")));
                     }
                 }
             }
         }
-        if !orphans.is_empty() {
-            orphans.sort();
-            return Err(ContractsError::Compatibility(format!(
-                "fixture(s) on disk not listed in compatibility manifest or supplemental set: {}",
-                orphans.join(", ")
-            )));
-        }
+    }
+
+    // Collect fixtures
+    let fixtures_dir = contracts_source_dir.join("fixtures");
+    if fixtures_dir.is_dir() {
+        collect_fixture_files(&fixtures_dir, "fixtures", &mut relative_files)?;
+    }
+
+    // Collect configuration
+    let config_dir = contracts_source_dir.join("configuration");
+    if config_dir.is_dir() {
+        collect_fixture_files(&config_dir, "configuration", &mut relative_files)?;
     }
 
     let output_path = output_dir
@@ -2981,28 +2859,10 @@ pub fn export_contract_bundle(
     }
     exported_files.sort();
 
-    let rust_support_mirror_path = repo_root
-        .join("rust")
-        .join("contracts")
-        .join("elegy-rust-support.json");
-    if let Some(parent) = rust_support_mirror_path.parent() {
-        fs::create_dir_all(parent).map_err(|source| ContractsError::Io {
-            path: parent.to_path_buf(),
-            source,
-        })?;
-    }
-
-    fs::copy(&support_manifest_path, &rust_support_mirror_path).map_err(|source| {
-        ContractsError::Io {
-            path: rust_support_mirror_path.clone(),
-            source,
-        }
-    })?;
-
     let archive_path = if create_archive || archive_output_path.is_some() {
         let resolved_archive_path = archive_output_path
             .map(Path::to_path_buf)
-            .unwrap_or_else(|| default_contracts_archive_path(&repo_root, &bundle_version));
+            .unwrap_or_else(|| default_contracts_archive_path(&repo_root, &package_version));
         write_contract_archive(&resolved_archive_path, &output_path, &relative_files)?;
         Some(resolved_archive_path)
     } else {
@@ -3016,6 +2876,33 @@ pub fn export_contract_bundle(
         schema_version,
         files: exported_files,
     })
+}
+
+fn collect_fixture_files(
+    dir: &Path,
+    prefix: &str,
+    relative_files: &mut BTreeSet<PathBuf>,
+) -> Result<(), ContractsError> {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                let sub_prefix = format!(
+                    "{}/{}",
+                    prefix,
+                    path.file_name()
+                        .and_then(std::ffi::OsStr::to_str)
+                        .unwrap_or("")
+                );
+                collect_fixture_files(&path, &sub_prefix, relative_files)?;
+            } else if path.extension().and_then(std::ffi::OsStr::to_str) == Some("json") {
+                if let Some(name) = path.file_name().and_then(std::ffi::OsStr::to_str) {
+                    relative_files.insert(PathBuf::from(format!("{prefix}/{name}")));
+                }
+            }
+        }
+    }
+    Ok(())
 }
 
 pub fn load_consumer_support_manifest(
@@ -3103,15 +2990,6 @@ pub fn load_elegy_plugin_package_fixture_from_dir(
     load_json_file(
         &dir.join("fixtures")
             .join("elegy-plugin-package.minimal.json"),
-    )
-}
-
-pub fn load_skill_discovery_index_fixture_from_dir(
-    dir: &Path,
-) -> Result<SkillDiscoveryIndex, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("skill-discovery-index.minimal.json"),
     )
 }
 
@@ -4303,7 +4181,7 @@ mod tests {
     fn builtin_registry_contains_only_valid_v2_definitions() {
         let definitions =
             parse_builtin_skill_definitions().expect("built-in skill registry should parse");
-        assert_eq!(definitions.len(), 15);
+        assert_eq!(definitions.len(), 17);
         assert!(definitions
             .iter()
             .any(|definition| definition.identity.name == "documentation"));

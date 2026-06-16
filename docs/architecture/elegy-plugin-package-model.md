@@ -26,7 +26,7 @@ version used to build the package.
 |---|---|---|
 | **Identity** | Unique package identifier, name, version, and display name. | `identity: { packageId, name, version, displayName? }` |
 | **Metadata** | Description, tags, license, homepage, documentation URI. | `metadata: { description?, tags?, license?, homepage?, documentationUri? }` |
-| **Components** | The package payload: skill definitions, instruction skills, capability projections, MCP projections, configuration templates/profiles, docs, assets, tool requirements, and host compatibility hints. | `components: { skillDefinitions[], instructionSkills[], capabilityProjections[], mcpProjections[], configurationTemplates[], configurationProfiles[], docs[], assets[], toolRequirements[], hostCompatibility[] }` |
+| **Components** | The package payload: skill definitions, instruction skills, capability projections, MCP projections, configuration templates/profiles, docs, tool requirements, and rust tool adapters. | `components: { skillDefinitions[], instructionSkills[], capabilityProjections[], mcpProjections[], configurationTemplates[], configurationProfiles[], docs[], toolRequirements[], rustToolAdapters[] }` |
 | **Tool Requirements** | Declared runtime tools the host must satisfy before capabilities are useful. | `components.toolRequirements[]: { toolName, cliBinary, minVersion?, probeCommand?, description? }` |
 | **Elegy Compatibility** | Contract bundle version pin and schema line. | `elegyCompatibility: { contractBundleVersion, schemaLine, minimumElegyToolingVersion?, contractsSource? }` |
 | **Publishing / Provenance** | Source repository, ref, commit, changelog, and signature references for publishable packages. | `publishing: { sourceRepository, sourceRef, sourceCommit, changelogRef?, provenanceRef?, signatureRefs[] }` |
@@ -39,6 +39,12 @@ definitions, either inline or by reference through `definitionRef`. Each skill
 is the contract authority for its capabilities, host projection metadata,
 side-effect classes, and output contracts.
 
+Component paths such as `definitionRef`, `instructionSkills[].path`, docs,
+templates, and profiles are package-local paths. Resolve them relative
+to the package JSON file unless a component explicitly defines a different
+resolution rule. Maintained fixture packages under `contracts/fixtures/` follow
+the same rule.
+
 ### Capability projections
 
 `components.capabilityProjections[]` re-states skill capabilities in
@@ -48,9 +54,9 @@ These projections are the bridge between governed skill capabilities and the hos
 tool registry.
 
 A package MAY project fewer capabilities than its referenced skill defines.
-When it does, it declares the deliberate subset through `metadata.subsetOf`
-— currently a flat array in v1, planned as a structured object
-(`{ skill, version, omitted[], reason }`) in v2.
+When it does, it declares the deliberate subset through `metadata.subsetOf`.
+The marker is at package level, not per-entry, so reviewers see the whole
+omission set in one place.
 
 ### Tool requirements
 
@@ -120,33 +126,79 @@ decisions never flow back into the package or contract authority.
 
 ## Setup Flow
 
-The canonical plugin package setup flow:
+The canonical plugin package setup flow is a hand-edited, dev-driven loop. The
+schema and CLI are settled; the polished host-driven authoring lane (where a
+harness such as Holon creates a new package programmatically) is tracked as a
+deferred goal. See
+[GOAL-20260616-01](../issues/unresolved-goals.md#goal-20260616-01).
 
-1. **Create** a new plugin package scaffold:
+For the **current** dev flow:
+
+1. **Scaffold** a starter package (optional, hands-on starting point):
 
    ```bash
    elegy plugin new --template cli-tool --output ./my-plugin
    ```
 
-   This generates `elegy-plugin-package.json`, `elegy-plugin.lock.json`, and
-   supporting templates in the target directory.
+   This generates a starter `plugin.json`, `elegy-plugin.lock.json`, a stub
+   skill definition, and a `plugin-ci.yml` workflow. The scaffold is a
+   starting point only — it is **not** a verified package, and running
+   `elegy plugin verify` on a fresh scaffold will report contract issues
+   (empty capabilities, missing hostProjection) that the next steps fix.
+   For a generator-backed plugin, the same scaffold works as the skeleton;
+   the generator manifest is a separate file the author hand-writes next to
+   the package.
 
-2. **Edit** `elegy-plugin-package.json` to declare package identity, metadata,
-   components, capability projections, tool requirements, and publishing details.
+2. **Author the skill v2** under `contracts/fixtures/skill.<name>.json` (or
+   inline `definition` for small fixtures). The skill must declare
+   `capabilities[]` and `hostProjection` with `cliName`, `outputContractId`,
+   `defaultSideEffectClass`, and one `capabilityProjections[]` entry per
+   callable capability.
 
-3. **Keep** `elegy-plugin.lock.json` under version control. It pins the exact
+3. **Edit `plugin.json`** to declare package identity, metadata, components,
+   capability projections, tool requirements, and (if the package will be
+   published) publishing details. The schema, the `elegy-plugin-package-model`
+   component table above, and the
+   [`elegy-plugin-package.elegy-quality-gates.json`](../../contracts/fixtures/elegy-plugin-package.elegy-quality-gates.json)
+   reference fixture are the three things to keep in mind.
+
+4. **Author the generator manifest** at `elegy-generator.manifest.json` next
+   to `plugin.json` (only for generator-backed plugins). The
+   [`elegy-generator.manifest.minimal.json`](../../contracts/fixtures/elegy-generator.manifest.minimal.json)
+   reference fixture and the
+   [Generator-As-Plugin Convention spec](../specs/generator-backed-plugin-convention.md)
+   describe the shape.
+
+5. **Keep `elegy-plugin.lock.json` under version control.** It pins the exact
    contract bundle version the package was built against.
 
-4. **Verify** the package is contract-consistent:
+6. **Verify** the package is contract-consistent:
 
    ```bash
    elegy plugin verify --package ./my-plugin/elegy-plugin-package.json --json
    ```
 
-   This checks skill definition references, capability projections, side-effect
-   class declarations, and subset posture.
+   This checks schema shape, skill definition references, capability
+   projection consistency (R2.1, R2.2, R2.3, R2.5), side-effect class
+   declarations, and subset posture. Inline-definition packages get full
+   R2.x coverage; `definitionRef`-based packages get shape and lane checks
+   but the validator does not yet resolve the external skill file to apply
+   R2.3 and R2.5 (this is part of the deferred authoring lane).
 
-5. **Check** installed tools against the package's declared tool requirements:
+7. **Validate the manifest** (if present):
+
+   ```bash
+   elegy generator validate ./my-plugin/elegy-generator.manifest.json --json
+   ```
+
+   This catches schema and semantic issues in the generator manifest itself
+   (backend kind, unsupported kinds, schema-shape drift).
+
+8. **Iterate.** Edit the package, the skill, or the manifest to address any
+   issues the verifier or validator surface. There is no in-CLI `doctor` or
+   `elegy plugin author` lane yet (deferred).
+
+9. **Check installed tools** against the package's declared tool requirements:
 
    ```bash
    elegy plugin install-check --package ./my-plugin/elegy-plugin-package.json --install-receipt ./tools/elegy/install-receipt.json --json
@@ -155,15 +207,32 @@ The canonical plugin package setup flow:
    Use `--bin-dir <path>` when a binary exists outside the receipt, and
    `--skip-probe` when the host wants shape-only installed-tool validation.
 
-6. **Optional: project to host.** For hosts that consume Codex plugin
-   projections, run:
+10. **Optional: project to host.** For hosts that consume Codex plugin
+    projections, run:
 
-   ```bash
-   elegy generate codex-plugin --package <path> --output-dir <dir> --force
-   ```
+    ```bash
+    elegy generate codex-plugin --package <path> --output-dir <dir> --force
+    ```
 
-   This generates `.codex-plugin/plugin.json` and `skills/<id>/SKILL.md`
-   as derived adapter surfaces. The generated files are never authority roots.
+    This generates `.codex-plugin/plugin.json` and `skills/<id>/SKILL.md`
+    as derived adapter surfaces. The generated files are never authority roots.
+
+### What `elegy plugin new` is and is not
+
+- It is a one-shot scaffolder for a starter directory.
+- It is **not** an authoring tool, a host-callable capability, or a substitute
+  for the schema and validator. The `cli-tool` template kind is the most
+  useful default for generator-backed plugins; the future `generator`
+  template kind (deferred under
+  [GOAL-20260616-01](../issues/unresolved-goals.md#goal-20260616-01)) will
+  scaffold the manifest, skill, and package JSON in one pass with decisions
+  guided by the referenced skill.
+- The `elegy plugin new` command does not conflict with the future
+  `elegy plugin author` or `elegy plugin doctor` lane. They serve different
+  purposes: `plugin new` writes a starter file set; `plugin author` would
+  walk the user (or a harness) through the full authoring decisions and
+  drive the verify loop. The scaffolder remains useful as the lowest-friction
+  starting point even after the authoring lane lands.
 
 ## Boundaries
 
@@ -190,10 +259,30 @@ but the generated files remain non-authoritative adapter surfaces.
 See [Codex Plugin Projection](codex-plugin-projection.md) for the full
 projection rules.
 
+## Generator-As-Plugin Tools
+
+Generator-backed plugins use the same package model as every other tool.
+Generators are not a special Elegy runtime lane. The package describes
+capability discovery, invocation, side effects, tool requirements, docs, and
+host projection; the generator definition describes the deterministic tool's
+purpose, inputs, outputs, implementation reference, compatibility, and
+extensions.
+
+Keep these responsibilities separate. Do not put backend-specific generator
+metadata directly into the plugin package.
+
+Generator-backed packages must only expose callable capabilities that actually
+exist. File creation is handled by the concrete generator tool and described
+through existing side-effect metadata. The reference convention is
+[Generator-Backed Plugin Convention](../specs/generator-backed-plugin-convention.md).
+
 ## Related Documents
 
 - [Plugin Tool Availability](../specs/plugin-tool-availability.md) — the durable
   contract for tool availability, verify-only flow, and readiness receipts.
+- [Generator-As-Plugin Convention](../specs/generator-backed-plugin-convention.md) —
+  the reference pattern for wrapping generator manifests with portable plugin
+  packages.
 - [Elegy Plugin Readiness](elegy-plugin-readiness.md) — publishing metadata and
   validation posture for host consumption.
 - [Codex Plugin Projection](codex-plugin-projection.md) — conservative Codex
