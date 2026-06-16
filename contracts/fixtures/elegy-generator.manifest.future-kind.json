@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "elegy-generator.manifest/v0",
+  "id": "elegy.generator.example.future-theme",
+  "kind": "theme",
+  "version": "0.1.0",
+  "extensions": {}
+}

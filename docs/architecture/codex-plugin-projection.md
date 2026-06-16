@@ -1,5 +1,11 @@
 # Codex Plugin Projection
 
+> **This is a narrow optional projection target, not the main plugin setup
+> path.** The primary plugin package model is defined in
+> [elegy-plugin-package-model.md](elegy-plugin-package-model.md). Plugin
+> packages are the canonical portable contract surface; Codex plugin generation
+> is one derived adapter output among several possible host projections.
+
 ## Purpose
 
 This document describes the current Codex projection slice implemented in Elegy.

@@ -3,8 +3,14 @@
 ## Purpose
 
 This document defines how Elegy packages prepare governed plugin artifacts for
-a future Holon marketplace without turning Elegy into a marketplace or runtime
-authority.
+host consumption — including Holon, OpenCode, Codex, and other LLM agent hosts —
+without turning Elegy into a marketplace, runtime authority, or host policy
+engine.
+
+The primary plugin package model is defined in
+[elegy-plugin-package-model.md](elegy-plugin-package-model.md). This document
+focuses on publishing metadata, validation posture, and the contract boundary
+between the portable package and the consuming host.
 
 Piloting authority, protocol, and execution ownership have moved to the Holon
 Rust runtime. See [piloting-moved-to-holon.md](piloting-moved-to-holon.md).
@@ -15,7 +21,7 @@ A plugin package is expected to come from a normal Git repository source tree.
 
 The package should contain governed assets such as:
 
-- package metadata under `elegy-plugin-package/v2`
+- package metadata under `elegy-plugin-package/v1`
 - schemas and fixtures rooted in `contracts/`
 - adapter manifests and fixture packs referenced by package components
 - supporting docs under `docs/`
@@ -26,10 +32,12 @@ Package component paths resolve relative to the package file itself.
 
 ## Required Manifest Metadata
 
-For Holon-oriented publishing, the package must carry source and provenance
-metadata through `publishing` fields on `elegy-plugin-package/v2`.
+For publishable packages, the package must carry source and provenance metadata
+through `publishing` fields on `elegy-plugin-package/v1`.
 
-Required fields for the Holon target:
+### Holon-specific publishing metadata
+
+For the Holon target specifically, these metadata fields are required:
 
 - `marketplaceTarget: "holon"`
 - `importMode: "package"`
@@ -41,7 +49,7 @@ Required fields for the Holon target:
 - `provenanceRef`
 - at least one `signatureRefs` entry
 - compatibility metadata describing supported Holon ranges, including at least
-  one `compatibility.host: "holon"` entry
+  one `publishing.compatibility[].host: "holon"` entry
 
 This keeps the package portable while still giving Holon enough evidence to make
 its own future trust and install decisions.
@@ -62,8 +70,8 @@ and `fixturePackRef`.
 
 ## Non-Goals
 
-The package is not allowed to become a one-off Holon import path for individual
-Elegy features.
+The package is not allowed to become a one-off import path for individual
+features of any specific host.
 
 That means:
 
@@ -75,8 +83,8 @@ That means:
 - no host-local secrets or lease state
 - no piloting authority (now owned by Holon runtime)
 
-The package is the portable source artifact. Holon decides whether and how to
-accept, trust, install, approve, and execute it.
+The package is the portable source artifact. The consuming host decides whether
+and how to accept, trust, install, approve, and execute it.
 
 ## Validation Posture
 

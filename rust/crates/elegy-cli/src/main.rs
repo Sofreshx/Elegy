@@ -54,6 +54,10 @@ use elegy_skills::{
     CapabilityDefinition, RegistryCapabilityCard, RegistrySkillEntry, SkillRegistry,
     SkillRegistryQuery,
 };
+use elegy_tooling::generator::{
+    list_generator_registry, plan_generator_manifest_file, resolve_generator_registry_entry,
+    run_generator_check_file, show_generator_contract_file, validate_generator_contract_file,
+};
 use elegy_tooling::{
     check_plugin_installation, docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
     generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
@@ -128,6 +132,10 @@ enum Command {
     Generate {
         #[command(subcommand)]
         command: GenerateCommand,
+    },
+    Generator {
+        #[command(subcommand)]
+        command: GeneratorCommand,
     },
     Validate {
         #[command(subcommand)]
@@ -405,6 +413,52 @@ enum GenerateCommand {
         output_dir: PathBuf,
         #[arg(long)]
         force: bool,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GeneratorCommand {
+    Validate {
+        file: PathBuf,
+    },
+    Show {
+        file: PathBuf,
+    },
+    Registry {
+        #[command(subcommand)]
+        command: GeneratorRegistryCommand,
+    },
+    Check {
+        #[command(subcommand)]
+        command: GeneratorCheckCommand,
+    },
+    Manifest {
+        #[command(subcommand)]
+        command: GeneratorManifestCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GeneratorRegistryCommand {
+    List { path: PathBuf },
+    Resolve { id: String, path: PathBuf },
+}
+
+#[derive(Subcommand, Debug)]
+enum GeneratorCheckCommand {
+    Run {
+        file: PathBuf,
+        #[arg(long)]
+        context: PathBuf,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GeneratorManifestCommand {
+    Plan {
+        file: PathBuf,
+        #[arg(long = "input")]
+        inputs: Vec<String>,
     },
 }
 
@@ -1221,6 +1275,36 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     force,
                 },
         } => execute_generate_codex_plugin_command(package, output_dir, force, format),
+        Command::Generator {
+            command: GeneratorCommand::Validate { file },
+        } => execute_generator_validate_command(file, format),
+        Command::Generator {
+            command: GeneratorCommand::Show { file },
+        } => execute_generator_show_command(file, format),
+        Command::Generator {
+            command:
+                GeneratorCommand::Registry {
+                    command: GeneratorRegistryCommand::List { path },
+                },
+        } => execute_generator_registry_list_command(path, format),
+        Command::Generator {
+            command:
+                GeneratorCommand::Registry {
+                    command: GeneratorRegistryCommand::Resolve { id, path },
+                },
+        } => execute_generator_registry_resolve_command(id, path, format),
+        Command::Generator {
+            command:
+                GeneratorCommand::Check {
+                    command: GeneratorCheckCommand::Run { file, context },
+                },
+        } => execute_generator_check_run_command(file, context, format),
+        Command::Generator {
+            command:
+                GeneratorCommand::Manifest {
+                    command: GeneratorManifestCommand::Plan { file, inputs },
+                },
+        } => execute_generator_manifest_plan_command(file, inputs, format),
         Command::Validate {
             command: ValidateCommand::Config,
         } => execute_config_command(locator, format, vec!["validate", "config"]),
@@ -2217,6 +2301,253 @@ fn execute_generate_codex_plugin_command(
         Err(error) => {
             emit_tooling_error(error, format, vec!["generate", "codex-plugin"], json!({}))
         }
+    }
+}
+
+fn execute_generator_validate_command(
+    file: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match validate_generator_contract_file(&file) {
+        Ok(report) => {
+            let exit_code = if report.status == "failed" {
+                exit_invalid()
+            } else {
+                ExitCode::SUCCESS
+            };
+            match format {
+                OutputFormat::Text => {
+                    println!("generator contract validation: {}", report.status);
+                    if let Some(contract) = &report.contract {
+                        println!("id: {}", contract.id);
+                        println!("schemaVersion: {}", contract.schema_version);
+                    }
+                    for warning in &report.warnings {
+                        println!("warning {}: {}", warning.code, warning.message);
+                    }
+                    for error in &report.errors {
+                        eprintln!("error {}: {}", error.code, error.message);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "validate"],
+                    if report.status == "failed" {
+                        "invalid"
+                    } else {
+                        "ok"
+                    },
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(exit_code)
+        }
+        Err(error) => emit_tooling_error(error, format, vec!["generator", "validate"], json!({})),
+    }
+}
+
+fn execute_generator_show_command(
+    file: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match show_generator_contract_file(&file) {
+        Ok(report) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("id: {}", report.contract.id);
+                    println!("schemaVersion: {}", report.contract.schema_version);
+                    println!("kind: {}", report.contract.kind);
+                    println!("version: {}", report.contract.version);
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "show"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_tooling_error(error, format, vec!["generator", "show"], json!({})),
+    }
+}
+
+fn execute_generator_registry_list_command(
+    path: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match list_generator_registry(&path) {
+        Ok(report) => {
+            match format {
+                OutputFormat::Text => {
+                    println!("generator registry: {}", report.root);
+                    for entry in &report.entries {
+                        println!("{} {} {}", entry.id, entry.kind, entry.path);
+                    }
+                    for warning in &report.warnings {
+                        println!("warning {}: {}", warning.code, warning.message);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "registry", "list"],
+                    "ok",
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(ExitCode::SUCCESS)
+        }
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["generator", "registry", "list"],
+            json!({}),
+        ),
+    }
+}
+
+fn execute_generator_registry_resolve_command(
+    id: String,
+    path: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match resolve_generator_registry_entry(&id, &path) {
+        Ok(report) => {
+            let found = report.status == "found";
+            match format {
+                OutputFormat::Text => {
+                    println!("generator registry resolve: {}", report.status);
+                    if let Some(contract) = &report.contract {
+                        println!("{} {} {}", contract.id, contract.kind, contract.path);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "registry", "resolve"],
+                    if found { "ok" } else { "missing" },
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(if found {
+                ExitCode::SUCCESS
+            } else {
+                exit_invalid()
+            })
+        }
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["generator", "registry", "resolve"],
+            json!({}),
+        ),
+    }
+}
+
+fn execute_generator_check_run_command(
+    file: PathBuf,
+    context: PathBuf,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    match run_generator_check_file(&file, &context) {
+        Ok(report) => {
+            let status = report.status.clone();
+            match format {
+                OutputFormat::Text => {
+                    println!("generator check run: {status}");
+                    println!("check: {}", report.check.id);
+                    for warning in &report.warnings {
+                        println!("warning {}: {}", warning.code, warning.message);
+                    }
+                    for error in &report.errors {
+                        eprintln!("error {}: {}", error.code, error.message);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "check", "run"],
+                    match status.as_str() {
+                        "success" => "ok",
+                        "unsupported" => "unsupported",
+                        "failed" => "invalid",
+                        _ => "error",
+                    },
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(match status.as_str() {
+                "success" => ExitCode::SUCCESS,
+                "unsupported" => exit_invalid(),
+                _ => exit_runtime(),
+            })
+        }
+        Err(error) => {
+            emit_tooling_error(error, format, vec!["generator", "check", "run"], json!({}))
+        }
+    }
+}
+
+fn execute_generator_manifest_plan_command(
+    file: PathBuf,
+    inputs: Vec<String>,
+    format: OutputFormat,
+) -> Result<ExitCode, serde_json::Error> {
+    let input_value = match parse_generator_inputs(&inputs) {
+        Ok(input_value) => input_value,
+        Err(message) => {
+            let error = ToolingSurfaceError::InvalidGeneratorContract {
+                path: file,
+                issues: vec![message],
+            };
+            return emit_tooling_error(
+                error,
+                format,
+                vec!["generator", "manifest", "plan"],
+                json!({}),
+            );
+        }
+    };
+
+    match plan_generator_manifest_file(&file, input_value) {
+        Ok(report) => {
+            let status = report.status.clone();
+            match format {
+                OutputFormat::Text => {
+                    println!("generator manifest plan: {status}");
+                    println!("manifest: {}", report.manifest.id);
+                    for warning in &report.warnings {
+                        println!("warning {}: {}", warning.code, warning.message);
+                    }
+                }
+                OutputFormat::Json => print_json(&build_envelope(
+                    ["generator", "manifest", "plan"],
+                    match status.as_str() {
+                        "unsupported" => "unsupported",
+                        "success" => "ok",
+                        "warning" => "ok",
+                        "failed" => "invalid",
+                        _ => "error",
+                    },
+                    Summary::default(),
+                    report,
+                    Vec::new(),
+                ))?,
+            }
+            Ok(match status.as_str() {
+                "unsupported" => exit_invalid(),
+                _ => ExitCode::SUCCESS,
+            })
+        }
+        Err(error) => emit_tooling_error(
+            error,
+            format,
+            vec!["generator", "manifest", "plan"],
+            json!({}),
+        ),
     }
 }
 
@@ -3650,6 +3981,23 @@ fn parse_tool_specs(values: &[String]) -> Result<Vec<AuthorMcpToolRequest>, Stri
         .collect()
 }
 
+fn parse_generator_inputs(values: &[String]) -> Result<serde_json::Value, String> {
+    let mut object = serde_json::Map::new();
+    for value in values {
+        let (key, raw_value) = value
+            .split_once('=')
+            .ok_or_else(|| format!("generator input `{value}` is invalid; expected key=value"))?;
+        let key = key.trim();
+        if key.is_empty() {
+            return Err(format!(
+                "generator input `{value}` is invalid; key must not be empty"
+            ));
+        }
+        object.insert(key.to_string(), json!(raw_value));
+    }
+    Ok(serde_json::Value::Object(object))
+}
+
 fn mcp_error_diagnostics(error: McpSurfaceError) -> Vec<Diagnostic> {
     match error {
         McpSurfaceError::Io {
@@ -3767,6 +4115,14 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
             .map(|issue| {
                 Diagnostic::error("CLI-DOCS-002", issue)
                     .with_hint("use supported doc type, status, owner, and slug values")
+            })
+            .collect(),
+        ToolingSurfaceError::InvalidGeneratorContract { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-GENERATOR-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint("fix the generator contract so it matches the governed schema")
             })
             .collect(),
         ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(

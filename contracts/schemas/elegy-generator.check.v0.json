@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/elegy-generator.check.v0.json",
+  "title": "Elegy Generator Check v0",
+  "description": "Validation check declaration for the elegy-generator foundation.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "id", "kind", "version", "checkKind", "extensions"],
+  "properties": {
+    "schemaVersion": {
+      "const": "elegy-generator.check/v0"
+    },
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "kind": {
+      "const": "check"
+    },
+    "version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "displayName": {
+      "type": "string",
+      "minLength": 1
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "compatibility": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "checkKind": {
+      "type": "string",
+      "minLength": 1
+    },
+    "target": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path": { "type": "string", "minLength": 1 },
+        "schemaVersion": { "type": "string", "minLength": 1 }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

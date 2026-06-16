@@ -5,9 +5,9 @@ status: draft
 type: contract
 owner: Elegy
 created: 2026-06-04
-updated: 2026-06-12
+updated: 2026-06-16
 doc_kind: spec
-summary: Contract for how elegy-plugin-package/v1 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, and the Codex projection conservatism rules.
+summary: Contract for how elegy-plugin-package/v1 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, host-facing verification commands, and optional Codex projection conservatism rules.
 ---
 
 # Plugin Tool Availability
@@ -23,9 +23,10 @@ covers tool availability, verify-only projection, and readiness receipts.
 
 This spec pins down a single, host-facing concept — **tool availability** — and
 the verify-only flow that produces it. The goal is to make it cheap and
-deterministic for any host (Elegy-Copilot, Holon, OpenCode, Codex) to ask "what
-can this plugin package actually do on disk right now?" and get a machine-readable
-answer, without Elegy becoming a host, a marketplace, or a runtime authority.
+deterministic for any host (Holon, OpenCode, Codex, or any LLM agent host) to
+ask "what can this plugin package actually do on disk right now?" and get a
+machine-readable answer, without Elegy becoming a host, a marketplace, or a
+runtime authority.
 
 Three durable definitions and three durable rules cover that goal:
 
@@ -64,10 +65,12 @@ host owns install, auth, approvals, and runtime enablement.
   "elegy-planning-v1"`, and `defaultSideEffectClass: "disk_write"` — these
   are the install-receipt-resolvable identifiers the verifier must use.
 - `docs/architecture/elegy-plugin-readiness.md` already declares the
-  contracts-only posture: "Elegy packages prepare governed plugin artifacts
-  for a future Holon marketplace without turning Elegy into a marketplace or
-  runtime authority" and "The package is the portable source artifact. Holon
-  decides whether and how to accept, trust, install, approve, and execute it."
+  contracts-only posture: "Elegy packages prepare governed plugin artifacts for
+  host consumption — including Holon, OpenCode, Codex, and other LLM agent
+  hosts — without turning Elegy into a marketplace, runtime authority, or host
+  policy engine" and "The package is the portable source artifact. The
+  consuming host decides whether and how to accept, trust, install, approve,
+  and execute it."
 - `docs/architecture/codex-plugin-projection.md` defines the current
   conservative Codex projection slice (`.codex-plugin/plugin.json` and
   `skills/`), and explicitly states `.mcp.json`, `.app.json`, `hooks/hooks.json`,
@@ -497,7 +500,13 @@ verification, not a statement of host-side trust, approval, or policy.
 Hosts MUST treat the readiness receipt as one input among many, and
 MUST keep their own approval, auth, and policy decisions.
 
-### R6. Codex projection conservatism
+### R6. Optional: Codex Projection
+
+> Codex plugin generation is one optional derived projection target, not the
+> main plugin setup path. The primary plugin package model is defined in
+> [docs/architecture/elegy-plugin-package-model.md](../architecture/elegy-plugin-package-model.md).
+> This section restates the conservative projection rules for hosts that choose
+> to consume the Codex adapter surface.
 
 `elegy generate codex-plugin` MUST keep its current conservative
 posture and MUST NOT silently widen it. The existing rules from
