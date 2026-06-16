@@ -151,6 +151,19 @@
       ]
     },
     {
+      "name": "elegy-generator-v0",
+      "status": "planned",
+      "targetReleaseType": "minor",
+      "targetPackageVersion": "1.8.0",
+      "scope": "Contracts-first foundation for deterministic generator and solved-unit manifests, checks, registries, receipts, and dry-run planning only.",
+      "authorityReservations": [
+        "contracts own generator schema and fixture authority",
+        "rust/crates/elegy-tooling owns reusable dry-run validation behavior",
+        "future domain tracks own concrete UI, tool, workflow, infrastructure, and release-lane generator shapes",
+        "downstream hosts own approval, policy, runtime execution, and side-effect gating"
+      ]
+    },
+    {
       "name": "elegy-piloting-v1",
       "status": "published",
       "targetReleaseType": "minor",
@@ -599,6 +612,50 @@
       "fixtures": []
     },
     {
+      "name": "elegy-generator-contract-meta-v0",
+      "schemaVersion": "0.1.0",
+      "file": "elegy-generator.contract-meta.v0.json",
+      "fixtures": [
+        "fixtures/elegy-generator.contract-meta.minimal.json",
+        "fixtures/elegy-generator.contract-meta.unknown-extension.json"
+      ]
+    },
+    {
+      "name": "elegy-generator-manifest-v0",
+      "schemaVersion": "0.1.0",
+      "file": "elegy-generator.manifest.v0.json",
+      "fixtures": [
+        "fixtures/elegy-generator.manifest.minimal.json",
+        "fixtures/elegy-generator.manifest.future-kind.json",
+        "fixtures/elegy-generator.manifest.unsupported-backend.json"
+      ]
+    },
+    {
+      "name": "elegy-generator-check-v0",
+      "schemaVersion": "0.1.0",
+      "file": "elegy-generator.check.v0.json",
+      "fixtures": [
+        "fixtures/elegy-generator.check.minimal.json",
+        "fixtures/elegy-generator.check.unsupported-kind.json"
+      ]
+    },
+    {
+      "name": "elegy-generator-registry-v0",
+      "schemaVersion": "0.1.0",
+      "file": "elegy-generator.registry.v0.json",
+      "fixtures": [
+        "fixtures/elegy-generator.registry.minimal.json"
+      ]
+    },
+    {
+      "name": "elegy-generator-receipt-v0",
+      "schemaVersion": "0.1.0",
+      "file": "elegy-generator.receipt.v0.json",
+      "fixtures": [
+        "fixtures/elegy-generator.receipt.minimal.json"
+      ]
+    },
+    {
       "name": "elegy-documentation-v2",
       "schemaVersion": "1.0.0",
       "file": "elegy-documentation-v2.schema.json",
@@ -662,6 +719,8 @@
     "fixtures/mcp-analysis-result.parity.json",
     "fixtures/mcp-parity-expected.json",
     "fixtures/configuration/assets/demo.txt",
+    "fixtures/elegy-codegraph.graph.v0.example.json",
+    "fixtures/elegy-generator.contract-meta.unknown-top-level.invalid.json",
     "fixtures/skill.negative-no-output-schema.json",
     "fixtures/install-receipt.elegy-planning.json"
   ]

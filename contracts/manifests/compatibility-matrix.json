@@ -148,6 +148,19 @@
       ]
     },
     {
+      "name": "elegy-generator-v0",
+      "status": "planned",
+      "targetReleaseType": "minor",
+      "targetPackageVersionRange": ">=1.8.0 <2.0.0",
+      "scope": "Contracts-first foundation for deterministic generator and solved-unit manifests, checks, registries, receipts, and dry-run planning only.",
+      "authorityReservations": [
+        "contracts generator schema and fixture authority",
+        "rust/crates/elegy-tooling dry-run validation behavior",
+        "future domain-track concrete generator contracts",
+        "downstream host policy and side-effect gating"
+      ]
+    },
+    {
       "name": "elegy-piloting-v1",
       "status": "published",
       "targetReleaseType": "minor",

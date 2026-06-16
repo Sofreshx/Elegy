@@ -1,4 +1,5 @@
 mod docs;
+pub mod generator;
 
 pub use docs::*;
 
@@ -144,6 +145,8 @@ pub enum ToolingError {
     InvalidDocsConfig { path: PathBuf, issues: Vec<String> },
     #[error("invalid docs request")]
     InvalidDocsRequest { issues: Vec<String> },
+    #[error("invalid generator contract in {path}")]
+    InvalidGeneratorContract { path: PathBuf, issues: Vec<String> },
     #[error("duplicate generated skill ID: {skill_id}")]
     DuplicateSkillId { skill_id: String },
     #[error("output file already exists: {path}")]

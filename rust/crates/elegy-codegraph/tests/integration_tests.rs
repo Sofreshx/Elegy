@@ -286,3 +286,372 @@ fn ts_query_pipeline() {
     assert_eq!(parsed["status"], "ok");
     assert!(parsed["data"]["entityCount"].as_u64().unwrap() > 0);
 }
+
+// ── CLI integration tests ─────────────────────────────────────
+
+#[test]
+fn cli_extract_rust_and_query_pipeline() {
+    let repo_path = fixture_path("rust-mini");
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.redb");
+
+    // Extract
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("rust")
+        .arg("--repo")
+        .arg(&repo_path)
+        .arg("--out")
+        .arg(db_path.to_str().unwrap())
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(output.status.success(), "Extract exited with error:\n{}", {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        format!("stderr:\n{}\nstdout:\n{}", stderr, stdout)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Extract output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    let entity_count = parsed["entityCount"].as_u64().unwrap();
+    assert!(entity_count > 0, "entityCount should be positive");
+    let edge_count = parsed["edgeCount"].as_u64().unwrap();
+    assert!(edge_count > 0, "edgeCount should be positive");
+    assert!(
+        parsed["extractor"].as_str().unwrap().contains("rust"),
+        "extractor should contain 'rust'"
+    );
+
+    // Query: summary
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("summary")
+        .output()
+        .expect("Failed to run elegy-codegraph query summary");
+
+    assert!(output.status.success(), "Query summary exited with error:\n{}", {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        format!("stderr:\n{}\nstdout:\n{}", stderr, stdout)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Query summary output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert!(
+        parsed["data"]["entityCount"].as_u64().unwrap() > 0,
+        "Summary entityCount should be positive"
+    );
+
+    // Query: symbol --name add
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("symbol")
+        .arg("--name")
+        .arg("add")
+        .output()
+        .expect("Failed to run elegy-codegraph query symbol");
+
+    assert!(output.status.success(), "Query symbol exited with error:\n{}", {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        format!("stderr:\n{}\nstdout:\n{}", stderr, stdout)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Query symbol output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    let data = parsed["data"]
+        .as_array()
+        .expect("symbol data should be an array");
+    assert!(!data.is_empty(), "symbol data should not be empty");
+    assert!(
+        data.iter().any(|e| e["name"] == "add"),
+        "Expected entity named 'add' in symbol results"
+    );
+
+    // Query: impact --path src/lib.rs
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("impact")
+        .arg("--path")
+        .arg("src/lib.rs")
+        .output()
+        .expect("Failed to run elegy-codegraph query impact");
+
+    assert!(output.status.success(), "Query impact exited with error:\n{}", {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        format!("stderr:\n{}\nstdout:\n{}", stderr, stdout)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Query impact output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert!(
+        parsed["data"]["entityCount"].as_u64().unwrap() > 0,
+        "Impact entityCount should be positive"
+    );
+}
+
+#[test]
+fn cli_extract_invalid_lang_produces_error() {
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("go")
+        .arg("--repo")
+        .arg("/tmp")
+        .arg("--out")
+        .arg("/tmp/out.redb")
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(
+        !output.status.success(),
+        "Expected non-zero exit for unsupported language"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Error output is not valid JSON");
+    assert_eq!(parsed["status"], "error");
+    assert!(
+        parsed["message"].as_str().unwrap().contains("Unsupported"),
+        "Error message should contain 'Unsupported'"
+    );
+}
+
+#[test]
+fn cli_extract_double_produces_fresh_snapshot() {
+    let repo_path = fixture_path("rust-mini");
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.redb");
+
+    // First extract
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("rust")
+        .arg("--repo")
+        .arg(&repo_path)
+        .arg("--out")
+        .arg(db_path.to_str().unwrap())
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(output.status.success(), "First extract failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let first: serde_json::Value =
+        serde_json::from_str(&stdout).expect("First extract output is not valid JSON");
+    let first_count = first["entityCount"].as_u64().unwrap();
+
+    // Query redb to get baseline symbol count
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("symbol")
+        .arg("--name")
+        .arg("add")
+        .output()
+        .expect("Failed to run elegy-codegraph query symbol");
+    assert!(output.status.success(), "First query symbol failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let first_query: serde_json::Value =
+        serde_json::from_str(&stdout).expect("First query output is not valid JSON");
+    let first_symbol_count = first_query["data"].as_array().unwrap().len();
+
+    // Second extract — same output path
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("rust")
+        .arg("--repo")
+        .arg(&repo_path)
+        .arg("--out")
+        .arg(db_path.to_str().unwrap())
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(output.status.success(), "Second extract failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let second: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Second extract output is not valid JSON");
+    let second_count = second["entityCount"].as_u64().unwrap();
+
+    assert_eq!(
+        first_count, second_count,
+        "Re-extraction should produce the same entityCount (not doubled)"
+    );
+
+    // Query redb again — proves no duplicate name-index entries in persisted state
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("symbol")
+        .arg("--name")
+        .arg("add")
+        .output()
+        .expect("Failed to run elegy-codegraph query symbol after second extract");
+    assert!(output.status.success(), "Second query symbol failed");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let second_query: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Second query output is not valid JSON");
+    let second_symbol_count = second_query["data"].as_array().unwrap().len();
+
+    assert_eq!(
+        first_symbol_count, second_symbol_count,
+        "Symbol count in persisted redb should not change on re-extraction (no duplicate name-index entries)"
+    );
+}
+
+#[test]
+fn cli_extract_ts_when_available() {
+    if !ts_extractor_available() {
+        eprintln!("Skipping TS CLI test: Node.js + typescript not available");
+        return;
+    }
+
+    let repo_path = fixture_path("ts-mini");
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.redb");
+
+    // Extract
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("ts")
+        .arg("--repo")
+        .arg(&repo_path)
+        .arg("--out")
+        .arg(db_path.to_str().unwrap())
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(output.status.success(), "TS extract failed:\n{}", {
+        String::from_utf8_lossy(&output.stderr)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Extract output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert!(
+        parsed["entityCount"].as_u64().unwrap() > 0,
+        "entityCount should be positive"
+    );
+
+    // Query summary
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("query")
+        .arg("--graph")
+        .arg(db_path.to_str().unwrap())
+        .arg("summary")
+        .output()
+        .expect("Failed to run elegy-codegraph query summary");
+
+    assert!(output.status.success(), "TS query summary failed:\n{}", {
+        String::from_utf8_lossy(&output.stderr)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Query summary output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert!(
+        parsed["data"]["entityCount"].as_u64().unwrap() > 0,
+        "Summary entityCount should be positive"
+    );
+}
+
+#[test]
+fn cli_extract_missing_parent_dir_produces_error() {
+    let dir = tempfile::tempdir().unwrap();
+    let bad_path = dir.path().join("nonexistent").join("out.redb");
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("rust")
+        .arg("--repo")
+        .arg(fixture_path("rust-mini"))
+        .arg("--out")
+        .arg(bad_path.to_str().unwrap())
+        .output()
+        .expect("Failed to run elegy-codegraph extract");
+
+    assert!(
+        !output.status.success(),
+        "Expected non-zero exit for missing parent output directory"
+    );
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Error output is not valid JSON");
+    assert_eq!(parsed["status"], "error");
+    assert!(
+        parsed["message"]
+            .as_str()
+            .unwrap()
+            .contains("Output directory does not exist"),
+        "Error message should indicate missing output directory"
+    );
+}
+
+#[test]
+fn cli_extract_ts_with_use_scip_produces_warning() {
+    if !ts_extractor_available() {
+        eprintln!("Skipping TS CLI use-scip test: Node.js + typescript not available");
+        return;
+    }
+
+    let repo_path = fixture_path("ts-mini");
+    let dir = tempfile::tempdir().unwrap();
+    let db_path = dir.path().join("test.redb");
+
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-codegraph"))
+        .arg("extract")
+        .arg("--lang")
+        .arg("ts")
+        .arg("--repo")
+        .arg(&repo_path)
+        .arg("--out")
+        .arg(db_path.to_str().unwrap())
+        .arg("--use-scip")
+        .output()
+        .expect("Failed to run elegy-codegraph extract with --use-scip");
+
+    assert!(output.status.success(), "TS extract with --use-scip failed:\n{}", {
+        String::from_utf8_lossy(&output.stderr)
+    });
+
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let parsed: serde_json::Value =
+        serde_json::from_str(&stdout).expect("Extract output is not valid JSON");
+    assert_eq!(parsed["status"], "ok");
+    assert!(
+        parsed.get("warning").is_some(),
+        "Expected a warning field when --use-scip is passed for TS"
+    );
+    let warning = parsed["warning"].as_str().unwrap();
+    assert!(
+        warning.contains("not supported") || warning.contains("ignoring"),
+        "Warning should indicate --use-scip is not supported for TS, got: {}",
+        warning
+    );
+}

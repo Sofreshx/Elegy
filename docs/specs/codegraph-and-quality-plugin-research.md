@@ -3,7 +3,7 @@ title: "Codegraph and Quality Plugin — v0 Implementation Spec"
 status: active
 owner: Elegy
 created: 2026-06-13
-updated: 2026-06-15
+updated: 2026-06-16
 doc_kind: spec
 summary: Concrete v0 spec for elegy-codegraph: portable CLI (extract + query) with TypeScript (Compiler API) and Rust (tree-sitter + cargo metadata + SCIP from rust-analyzer) extractors feeding a normalized graph IR stored in redb, with governed contract artifacts.
 ---
@@ -273,17 +273,19 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 
 - **Extractor strategies:** Concrete TS and Rust strategies documented above with known gaps explicitly listed. ✅
 - **Fixture repos:** `rust/tests/fixtures/ts-mini/` and `rust/tests/fixtures/rust-mini/` committed in-tree with expected graph snapshots. ✅
-- **Integration tests:** `cargo test -p elegy-codegraph` — **40 tests pass** (32 unit + 8 integration). Exercises extract + query against both fixtures; asserts entity counts, expected kinds, tests edges, and provenance presence. ✅
+- **Integration tests:** `cargo test -p elegy-codegraph` — **46 tests pass** (32 unit + 14 integration). Exercises extract + query against both fixtures through both the library API and the CLI binary (`CARGO_BIN_EXE_elegy-codegraph`); asserts entity counts, expected kinds, tests edges, provenance presence, error envelopes, snapshot idempotency, and TS --use-scip warning. ✅
 - **Contract validation:** `contracts/fixtures/elegy-codegraph.graph.v0.example.json` validates against `contracts/schemas/elegy-codegraph.graph.v0.json` via the `ir::tests::round_trip_contract_fixture` test. ✅
 - **Design decisions:** All architectural choices (redb over sled, SCIP over LSP, locked enums) documented in the Design Decisions section with rationale and alternatives considered. ✅
 - **Clippy:** `cargo clippy -p elegy-codegraph -- -D warnings` clean (0 warnings). ✅
 - **Host neutrality:** No host imports in the `elegy-codegraph` crate; CLI emits JSON only. Verified by code review. ✅
-- **Deferred commands:** `docs/specs/codegraph-diff-slice.md` stub spec created; TODO stubs marked in `main.rs`. ✅
+- **Deferred commands:** `docs/specs/codegraph-diff-slice.md` stub spec created; deferred command surface documented in `main.rs` module doc comment. ✅
+- **Extract CLI:** `elegy-codegraph extract` is fully operational: validates `--lang`, dispatches to language-specific extractors, writes entities/edges to redb via atomic temp-file-then-rename, and emits a JSON result envelope with status/entityCount/edgeCount/extractor/warning. ✅
 
 ## Deferred Commands
 
-The `diff`, `review`, and `validate` commands are deferred to a follow-up spec. See [`docs/specs/codegraph-diff-slice.md`](./codegraph-diff-slice.md) for the design intent, acceptance criteria template, and integration plan. A TODO in `rust/crates/elegy-codegraph/src/main.rs` marks the deferred command stubs.
+The `diff`, `review`, and `validate` commands are deferred to a follow-up spec. See [`docs/specs/codegraph-diff-slice.md`](./codegraph-diff-slice.md) for the design intent, acceptance criteria template, and integration plan. The deferred command surface is noted in the `main.rs` module doc comment; no stub implementations exist.
 
 ## Drift Notes
 
 - This spec was promoted from `draft` (research) to `active` (implementation) on 2026-06-15. The research phase confirmed that existing tools (tree-sitter, SCIP, TypeScript Compiler API) are sufficient for a v0 prototype without building a custom analysis engine. The prototype validates the hypothesis that a language-neutral graph IR with mandatory provenance is useful for agent-driven code exploration.
+- Validation evidence updated 2026-06-16: `elegy-codegraph extract` is fully operational as a host-neutral CLI with atomic snapshot writes, JSON error envelopes, and 14 CLI integration tests. Test suite grew from 40 → 46 tests. The deferred `diff`/`review`/`validate` commands remain deferred per the follow-up spec.

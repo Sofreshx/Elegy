@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-generator.manifest/v0",
+  "id": "elegy.generator.example.create-doc",
+  "kind": "solved_unit",
+  "version": "0.1.0",
+  "status": "draft",
+  "displayName": "Create Documentation Page",
+  "description": "Creates a governed documentation page from a future generator backend.",
+  "intent": {
+    "name": "create-doc"
+  },
+  "extensions": {}
+}

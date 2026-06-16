@@ -1029,6 +1029,7 @@ version = "0.1.0"
 dependencies = [
  "elegy-contracts",
  "elegy-mcp",
+ "jsonschema 0.17.1",
  "serde",
  "serde_json",
  "serde_yaml",

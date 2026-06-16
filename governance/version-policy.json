@@ -88,6 +88,20 @@
       ]
     },
     {
+      "name": "elegy-generator-v0",
+      "status": "planned",
+      "targetReleaseType": "minor",
+      "targetBundleVersion": "1.8.0",
+      "targetSchemaLine": "1.x",
+      "releaseStory": "Add a contracts-first generator foundation for deterministic solved-unit manifests, validation checks, loose registries, receipts, and dry-run planning without shipping a file-emitting backend.",
+      "authorityReservations": [
+        "contracts own generator schema and fixture authority",
+        "rust/crates/elegy-tooling owns reusable dry-run validation behavior",
+        "future domain tracks own concrete generator contract shapes and backends",
+        "downstream hosts own approval, policy, runtime execution, and side-effect gating"
+      ]
+    },
+    {
       "name": "elegy-obsidian-v1",
       "status": "draft",
       "targetReleaseType": "minor",

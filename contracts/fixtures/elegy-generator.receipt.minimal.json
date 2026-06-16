@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "elegy-generator.receipt/v0",
+  "id": "elegy.generator.receipt.example",
+  "kind": "receipt",
+  "version": "0.1.0",
+  "manifestRef": {
+    "id": "elegy.generator.example.create-doc",
+    "version": "0.1.0"
+  },
+  "operation": "plan",
+  "status": "unsupported",
+  "startedAt": "2026-06-16T00:00:00Z",
+  "finishedAt": "2026-06-16T00:00:01Z",
+  "runtime": {
+    "name": "elegy-tooling",
+    "version": "0.1.0"
+  },
+  "inputsHash": "sha256:example",
+  "outputs": [],
+  "checks": [],
+  "warnings": [
+    {
+      "code": "UNSUPPORTED_BACKEND",
+      "message": "No backend implementation is available in v0.1."
+    }
+  ],
+  "errors": [],
+  "extensions": {}
+}

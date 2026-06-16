@@ -1,0 +1,7 @@
+{
+  "schemaVersion": "elegy-generator.contract-meta/v0",
+  "id": "elegy.generator.meta.example",
+  "kind": "contract_meta",
+  "version": "0.1.0",
+  "extensions": {}
+}

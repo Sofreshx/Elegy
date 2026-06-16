@@ -168,6 +168,48 @@ elegy-skills search --query "repo status" --json
 elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
 
+## Plugin Packages
+
+`elegy-plugin-package/v1` is the portable package contract for bundling
+governed skill definitions, capability projections, tool requirements, and
+publishing metadata into a single host-facing surface. Plugin packages are the
+primary setup path for bringing governed capabilities to LLM hosts.
+
+Setup flow:
+
+```bash
+elegy plugin new --template cli-tool --output ./my-plugin
+# edit ./my-plugin/elegy-plugin-package.json
+elegy plugin verify --package ./my-plugin/elegy-plugin-package.json --json
+elegy plugin install-check --package ./my-plugin/elegy-plugin-package.json --install-receipt ./tools/elegy/install-receipt.json --json
+```
+
+`elegy plugin verify` checks package consistency against referenced skill
+definitions, capability projections, side-effect classes, and subset
+declarations. `elegy plugin install-check` checks declared tool requirements
+against an install receipt and optional binary probes. Both commands emit a
+readiness receipt (`ready` | `partial` | `blocked`) governed by
+`contracts/schemas/elegy-plugin-readiness-v1.schema.json`. The receipt is the
+machine-readable answer to "what can this package actually do on this host right
+now?"
+
+Authority schemas:
+
+- `contracts/schemas/elegy-plugin-package.schema.json` — package contract
+- `contracts/schemas/elegy-plugin.lock.json` — pinned contract bundle version
+- `contracts/schemas/elegy-plugin-readiness-v1.schema.json` — readiness receipt
+
+Boundaries: the package is a portable contract bundle, not a runtime,
+marketplace, auth store, approval record, or secret/session container. Hosts own
+install, auth, approvals, runtime sessions, and execution policy.
+
+See the [Elegy Plugin Package Model](docs/architecture/elegy-plugin-package-model.md)
+for the full model, and the [Plugin Tool Availability spec](docs/specs/plugin-tool-availability.md)
+for the verify-only contract rules.
+
+Codex plugin projection (`elegy generate codex-plugin`) is one optional derived
+projection target, not the main plugin setup path.
+
 ## Optional MCP Projection
 
 ```bash
