@@ -40,6 +40,16 @@ and would have failed regardless.
    `publish = false` from a target crate and a GitHub Release is
    published.
 
+4. **Dormant-by-design.**  The publish step is intentionally dormant.
+   Its presence in the workflow is not a loophole or an oversight.
+   Activation requires three independent conscious actions: removing
+   `publish = false` from the crate's `Cargo.toml`, configuring the
+   `CARGO_REGISTRY_TOKEN` secret, and publishing a GitHub Release.
+   Without all three, the step is inert.  This is consistent with the
+   "block by default" posture — the gate exists so the workflow
+   definition does not need rewriting when publishing is eventually
+   desired, but it must never fire accidentally.
+
 ## How to enable publishing for a crate
 
 1. Remove `publish = false` from the crate's `Cargo.toml`.
@@ -57,5 +67,5 @@ distribution path is the elegy umbrella CLI or GitHub Releases.
   validity + tests) and a dry-run readiness check for future
   publishing.
 - All GitHub Actions workflows now use valid, pinned action versions
-  (`actions/checkout@v4.2.2`, `actions/upload-artifact@v4`,
-  `actions/download-artifact@v4`).
+(`actions/checkout@v6.0.2`, `actions/upload-artifact@v4`,
+   `actions/download-artifact@v4`).

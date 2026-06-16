@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout caller repository
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
         with:
           path: caller-repo
 
@@ -67,7 +67,7 @@ jobs:
 
       - name: Checkout governance asset repository
         if: steps.workflow-source.outputs.same-repository != 'true'
-        uses: actions/checkout@v4.2.2
+        uses: actions/checkout@v6.0.2
         with:
           repository: ${{ steps.workflow-source.outputs.repository }}
           ref: ${{ steps.workflow-source.outputs.ref }}
