@@ -31,6 +31,8 @@ members = [
 ]
 resolver = "2"
 
+# All crates carry `publish = false`.  Distribution flows through GitHub
+# Releases, not crates.io.  See docs/adr/2026-06-15-block-crates-io-publishing.md.
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
