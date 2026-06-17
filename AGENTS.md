@@ -10,11 +10,11 @@ authority surface.
 
 ## Authority Centers
 
-- `contracts/`, `governance/`, root `schemas/`, and `policies/` are the neutral authority roots for contracts, compatibility, schema-line metadata, and policy.
+- `contracts/` and `policies/` are the neutral authority roots for contracts, schemas, fixtures, compatibility, schema-line metadata, and policy.
 - `contracts/fixtures/skill.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
 - `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
-- `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs configured by `.elegy/docs.yaml`.
-- `src/Elegy-memory`, `src/Elegy-mcp`, `src/Elegy-skills`, `src/Elegy-planning`, `src/Elegy-configuration`, `src/Elegy-documentation`, and `src/Elegy-obsidian` are contributor-navigation wrapper overlays only. They are not authority roots, implementation centers, or release orchestration surfaces.
+- `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs, configured by `.elegy/docs.yaml`.
+- `src/Elegy-*/install.ps1` per surface is a thin host-neutral install passthrough; see `docs/specs/host-neutral-plugin-install.md`.
 - `src/Elegy-obsidian` delegates to the official Obsidian Desktop CLI. Do not describe it as a Rust binary or as durable planning authority.
 
 ## Start Here
@@ -30,7 +30,7 @@ authority surface.
 ## Boundary Rules
 
 - `contracts/schemas/**` define durable contract truth. Governed fixtures and compatibility data under `contracts/**` define the stable agent-facing artifact family.
-- Discovery indexes, generated bundles, `.agents/skills/**`, `.github/skills/**`, `SKILL.md` mirrors, wrapper surfaces, Codex plugin projections, and MCP projections are derived outputs or adapters, not independent authority.
+- Discovery indexes, generated bundles, `SKILL.md` mirrors, wrapper surfaces, Codex plugin exports, and MCP projections are derived outputs or adapters, not independent authority.
 - Profiles are allowlists, not approvals. Side effects still require host policy, and side-effecting MCP tools stay blocked unless the call is an explicit dry run or the host is started with `--allow-side-effects`.
 - CLI invocation templates are the default integration contract. Use MCP only when the host specifically needs an MCP protocol boundary.
 - Mermaid reverse projection is bounded analysis. Do not describe it as canonical workflow reconstruction.
@@ -51,7 +51,7 @@ authority surface.
 - Run validation from `rust/` for Rust behavior and use repo-root scripts for governed/export boundaries.
 - If docs or fixtures changed without code, inspect emitted JSON or generated contract output instead of only proofreading Markdown.
 - When capability behavior changes, verify both the Rust implementation and the governed fixture/projection that exposes it to agents.
-- When skill mirrors, wrapper roots, or generated projections change, verify the canonical-output or package-boundary path that covers that generated surface.
+- When wrapper roots or generated projections change, verify the canonical-output or package-boundary path that covers that generated surface.
 
 ## Rust Style
 
@@ -73,20 +73,3 @@ authority surface.
 7. Scopes are isolated. Session, workspace, user, and agent scopes must not cross-query implicitly.
 8. SQLite is the MVP storage authority. PostgreSQL and broader provider surfaces stay later-scope unless the current memory docs say otherwise.
 
-## Git Workflow
-
-- Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`.
-- Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`.
-- Do feature work on dedicated topic branches rather than directly on `roro`, `dev`, or `main`.
-- Merge `dev` into `main` only after `dev` is clean and validated.
-- If a hotfix lands on `main`, propagate it back through `dev` and then `roro` before continuing feature work.
-- If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work.
-- After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle.
-- After a clean local promotion cycle, push `main`, `dev`, and `roro` to `origin` immediately so the remote stays aligned with the validated local state. Prefer a single atomic push when available.
-### `roro` Branch Rules
-
-The following rules apply only when the current branch is `roro`:
-
-- Merge a topic branch into `roro` only after the relevant validation passes and the branch is ready to promote.
-- Merge `roro` into `dev` only after `roro` is clean, validated, and reconciled with newer `main` changes.
-- Never force-push or rewrite history on `main` or `dev`.

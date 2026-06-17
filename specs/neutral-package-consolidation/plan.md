@@ -1,3 +1,12 @@
+---
+spec_id: neutral-package-consolidation-plan
+title: Neutral Plugin And Distribution Consolidation — Implementation Plan
+status: historical
+type: migration-plan
+updated: 2026-06-16
+superseded_by: docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md
+---
+
 # Neutral Plugin And Distribution Consolidation — Implementation Plan
 
 > **Status: historical.** This plan is an archive of the implementation steps

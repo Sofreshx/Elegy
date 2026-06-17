@@ -36,7 +36,7 @@ This roadmap does **not** change the current architecture boundary already docum
 
 The following remain true:
 
-- governed artifacts under `contracts/`, `governance/`, and `policies/` remain the durable authority surfaces
+- governed artifacts under `contracts/` and `policies/` remain the durable authority surfaces
 - Rust crates under `rust/` remain the reusable executable layer
 - thin CLIs remain operator shells, not new authority roots
 - host-specific orchestration, auth, tenancy, prompt assembly, approval UX, and control-plane ownership remain consumer-local

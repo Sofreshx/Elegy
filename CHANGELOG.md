@@ -15,6 +15,6 @@ The format is based on Keep a Changelog principles, adapted for the current boot
 
 ### Changed
 
-- repository authority language now centers on `contracts/`, `governance/`, `schemas/`, and `policies/` plus exported artifacts, rather than removed source-package roots
+- repository authority language now centers on `contracts/`, `schemas/`, and `policies/` plus exported artifacts, rather than removed source-package roots
 - architecture and policy docs now describe `rust/` as the active executable surface and avoid claiming a built-in MCP-native or skill-driven self-authoring surface that the repo does not yet ship
 - validation posture now points to surviving scripts and workflows instead of removed legacy build and test flows

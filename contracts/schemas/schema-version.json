@@ -1,7 +1,7 @@
 {
   "schemaVersion": "1.5.0",
   "policy": {
-    "major": "Increment for breaking schema changes. Requires a bundle major version bump in governance/version-policy.json.",
+    "major": "Increment for breaking schema changes. Requires a bundle major version bump.",
     "minor": "Increment for backward-compatible schema additions.",
     "patch": "Increment for backward-compatible schema corrections or metadata fixes."
   }

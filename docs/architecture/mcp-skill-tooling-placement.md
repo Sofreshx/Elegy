@@ -12,7 +12,7 @@ This document applies the burden-of-proof rule to the features that are easiest 
 
 The goal is to decide where neutral artifact authority lives, where Rust executable behavior lives, and when a capability should remain in a consuming repo instead of being centralized in Elegy.
 
-The contributor-navigation overlays under `src/Elegy-mcp` and `src/Elegy-skills` are pointer shells only. They are not repo centers, authority layers, implementation centers, or release surfaces.
+The `src/Elegy-*/install.ps1` files are thin install passthroughs only. They are not repo centers, authority layers, implementation centers, or release surfaces.
 
 For contributor-facing CLI use in these lanes, prefer the dedicated `elegy-mcp` and `elegy-skills` binaries for their bounded paths. Keep `elegy` as the general/compatibility surface.
 
@@ -42,7 +42,7 @@ The longer-range MCP target narrative remains REST/OpenAPI definition ingestion,
 ### What stays authoritative
 
 - governed MCP descriptor and analysis-result schemas, fixtures, and manifests under `contracts/`
-- compatibility expectations and version policy under `governance/`
+- compatibility expectations and version policy under `contracts/schemas/`
 - canonical skill projection semantics where MCP analysis feeds governed skill outputs
 
 These belong with governed artifacts and canonical contract semantics.
@@ -106,7 +106,7 @@ approval decisions, secret refs, runtime sessions, adapter handles, or local
 trust state. A consuming host owns those concerns after import.
 
 Elegy V1 support currently includes contract validation plus conservative
-derived projection export such as `elegy generate codex-plugin`. Do not add a
+derived projection export such as `elegy plugin export codex`. Do not add a
 broad Elegy plugin runtime for this lane without a separate placement decision.
 
 Current Codex projection support is intentionally narrow: generated
@@ -140,4 +140,4 @@ If a new feature request touches MCP analysis, MCP creation, MCP-to-skill genera
 3. If it is executable runtime code, can it be self-contained and reusable enough to justify Rust ownership?
 4. If it depends on host-specific lifecycle or product policy, why is it not consumer-local?
 
-The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/`, `governance/`, `schemas/`, and `policies/`.
+The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/`, `schemas/`, and `policies/`.

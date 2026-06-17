@@ -81,7 +81,7 @@ Recommended placement:
 
 This matches the broader burden-of-proof reset:
 
-- governed artifacts under `contracts/`, `governance/`, `schemas/`, and `policies/` remain the authority for contracts and canonical semantics
+- governed artifacts under `contracts/`, `schemas/`, and `policies/` remain the authority for contracts and canonical semantics
 - Rust in Elegy owns self-contained shared executable capabilities, with dedicated in-repo CLIs preferred for bounded paths
 - app-local runtime integration stays local to the consumer
 

@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::Path;
 
-use super::{GeneratedHostProjection, GeneratedHostProjectionComponents};
+use super::{GeneratedHostExport, GeneratedHostExportComponents};
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
@@ -57,7 +57,7 @@ pub fn generate_codex_plugin_from_package_file(
     package_path: &Path,
     output_dir: &Path,
     overwrite: bool,
-) -> Result<GeneratedHostProjection, ToolingError> {
+) -> Result<GeneratedHostExport, ToolingError> {
     let package = crate::load_plugin_package_file(package_path)?;
     let package_root = package_path.parent().unwrap_or_else(|| Path::new("."));
     let plugin_output_name = package.identity.name.trim();
@@ -100,11 +100,11 @@ pub fn generate_codex_plugin_from_package_file(
         written_files.push(crate::display_path(&output_path));
     }
 
-    Ok(GeneratedHostProjection {
+    Ok(GeneratedHostExport {
         source_package: crate::display_path(package_path),
         plugin_name: plugin_output_name.to_string(),
         plugin_version: package.identity.version.clone(),
-        emitted_components: GeneratedHostProjectionComponents {
+        emitted_components: GeneratedHostExportComponents {
             plugin_manifest: crate::display_path(&manifest_path),
             skills_dir: crate::display_path(&skills_root),
             skills_count: skill_documents.len(),

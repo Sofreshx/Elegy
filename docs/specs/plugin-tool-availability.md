@@ -507,8 +507,9 @@ MUST keep their own approval, auth, and policy decisions.
 > This section restates the conservative projection rules for hosts that choose
 > to consume the Codex adapter surface.
 
-`elegy generate codex-plugin` MUST keep its current conservative
-posture and MUST NOT silently widen it. The existing rules from
+`elegy plugin export codex` (Codex plugin export) MUST keep its current conservative
+posture and MUST NOT silently widen it. The legacy alias is `elegy generate codex-plugin`.
+The existing rules from
 `docs/architecture/codex-plugin-projection.md` are restated here as
 contract rules; any future widening is a contract change and not a
 generator tweak.
@@ -565,8 +566,8 @@ projections, it MUST declare `metadata.subsetOf` on the same package
 rather than emit a new package fixture with a phantom skill.
 
 **R7.3 Codex-facing instruction skills MAY be split if usage triggers
-are too broad.** A future slice MAY split the repo-local
-`.agents/skills/elegy-planning/SKILL.md` into narrower Codex-facing
+are too broad.** A future slice MAY split the generated Codex plugin
+`skills/elegy-planning/SKILL.md` into narrower Codex-facing
 instruction skills along the trigger boundaries:
 
 - `elegy-planning-authoring` — creating goals, roadmaps, plans, todos,
@@ -597,7 +598,7 @@ only the instruction-skill mirror changes.
   lists a binary that is `broken` (e.g. wrong `executablePath`).
 - The same command returns `status: partial` when the receipt is
   absent.
-- `elegy generate codex-plugin --package
+- `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` continues to emit only
   `.codex-plugin/plugin.json` and `skills/`; no `.mcp.json`,
@@ -680,7 +681,7 @@ Each item is observable and machine-checkable.
   `sideEffectSummary` matches the per-capability
   `sideEffectClass` counts; a `disk_read` capability shows up under
   `disk_read` and never under `disk_write`.
-- **AC10** `elegy generate codex-plugin --package
+- **AC10** `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` emits only `.codex-plugin/plugin.json`
   and `skills/`. No `.mcp.json`, `.app.json`, `apps/`,
@@ -746,7 +747,7 @@ they MUST stay green on `main` once the verifier is implemented.
 - `elegy plugin verify --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json --json`
   (no receipt) — reports `blocked` with unpinned compatibility.
-- `elegy generate codex-plugin --package
+- `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` — emits only
   `.codex-plugin/plugin.json` and `skills/`.

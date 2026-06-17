@@ -1,11 +1,10 @@
 mod docs;
-pub mod generator;
 pub mod projection;
 
 pub use docs::*;
 pub use projection::codex::generate_codex_plugin_from_package_file;
 pub use projection::{
-    project_plugin_for_host, GeneratedHostProjection, GeneratedHostProjectionComponents, HostTarget,
+    project_plugin_for_host, GeneratedHostExport, GeneratedHostExportComponents, HostTarget,
 };
 
 use elegy_contracts::{
@@ -91,8 +90,6 @@ pub enum ToolingError {
     InvalidDocsConfig { path: PathBuf, issues: Vec<String> },
     #[error("invalid docs request")]
     InvalidDocsRequest { issues: Vec<String> },
-    #[error("invalid generator contract in {path}")]
-    InvalidGeneratorContract { path: PathBuf, issues: Vec<String> },
     #[error("duplicate generated skill ID: {skill_id}")]
     DuplicateSkillId { skill_id: String },
     #[error("output file already exists: {path}")]
@@ -199,6 +196,7 @@ pub fn verify_plugin_package(
     > = std::collections::BTreeMap::new();
     let mut skill_host_projections: std::collections::BTreeMap<String, SkillHostProjection> =
         std::collections::BTreeMap::new();
+    let mut has_definition_ref = false;
 
     for component in &package.components.skill_definitions {
         let _skill_key = if let Some(def) = &component.definition {
@@ -219,6 +217,7 @@ pub fn verify_plugin_package(
                 });
             key
         } else if let Some(definition_ref) = &component.definition_ref {
+            has_definition_ref = true;
             // Try to load referenced skill definition from package root
             let skill_path = root.join(definition_ref);
             let key = format!("ref:{}", component.id);
@@ -351,46 +350,47 @@ pub fn verify_plugin_package(
     }
 
     // Check subset declarations
+    // subsetOf lists capabilities that are intentionally omitted from projection.
     let empty_subset = Vec::new();
     let subset_of = package
         .metadata
         .as_ref()
         .map(|m| &m.subset_of)
         .unwrap_or(&empty_subset);
-    if !subset_of.is_empty() {
-        // All projected capabilities must be in subset_of
-        for projection in &package.components.capability_projections {
-            if !subset_of.contains(&projection.capability) {
-                findings.push(ElegyPluginReadinessFinding {
-                    code: "SUBSET-VIOLATION".to_string(),
-                    severity: "warning".to_string(),
-                    message: format!(
-                        "Projection '{}' capability '{}' is not listed in metadata.subsetOf",
-                        projection.id, projection.capability
-                    ),
-                    detail: None,
-                });
-            }
-        }
-    } else {
-        // Check if subset is implied (not all skill capabilities are projected)
-        for (skill_key, caps) in &known_capabilities {
-            let projected_caps: std::collections::BTreeSet<String> = package
-                .components
-                .capability_projections
-                .iter()
-                .filter(|p| &p.skill == skill_key)
-                .map(|p| p.capability.clone())
-                .collect();
 
-            if !projected_caps.is_empty() && projected_caps.len() < caps.len() {
-                let omitted: Vec<String> = caps.difference(&projected_caps).cloned().collect();
-                for cap in &omitted {
-                    readiness
-                        .omitted_capabilities
-                        .push(format!("{}.{}", skill_key, cap));
-                }
-                if subset_of.is_empty() && !omitted.is_empty() {
+    let mut omitted_cap_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    for (skill_key, caps) in &known_capabilities {
+        let projected_caps: std::collections::BTreeSet<String> = package
+            .components
+            .capability_projections
+            .iter()
+            .filter(|p| &p.skill == skill_key)
+            .map(|p| p.capability.clone())
+            .collect();
+
+        if !projected_caps.is_empty() && projected_caps.len() < caps.len() {
+            let omitted: Vec<String> = caps.difference(&projected_caps).cloned().collect();
+            for cap in &omitted {
+                omitted_cap_ids.insert(cap.clone());
+                readiness
+                    .omitted_capabilities
+                    .push(format!("{}.{}", skill_key, cap));
+            }
+            if subset_of.is_empty() {
+                if has_definition_ref && !omitted.is_empty() {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "SUBSET-MISSING".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Skill '{}' (via definitionRef) has {} capabilities but only {} are projected. metadata.subsetOf must declare omitted capabilities.",
+                            skill_key,
+                            caps.len(),
+                            projected_caps.len()
+                        ),
+                        detail: Some(format!("Omitted: {}", omitted.join(", "))),
+                    });
+                } else if !omitted.is_empty() {
                     findings.push(ElegyPluginReadinessFinding {
                         code: "SUBSET-IMPLIED".to_string(),
                         severity: "warning".to_string(),
@@ -404,6 +404,32 @@ pub fn verify_plugin_package(
                     });
                 }
             }
+        }
+    }
+
+    // Collect all known capability IDs (both bare and fully-qualified) for bogus-subsetOf check.
+    let all_known_cap_ids: std::collections::BTreeSet<String> = known_capabilities
+        .iter()
+        .flat_map(|(skill_key, caps)| {
+            caps.iter().flat_map(move |c| {
+                vec![c.clone(), format!("{}.{}", skill_key, c)]
+            })
+        })
+        .collect();
+
+    for entry in subset_of {
+        if !all_known_cap_ids.contains(entry)
+            && !omitted_cap_ids.contains(entry)
+        {
+            findings.push(ElegyPluginReadinessFinding {
+                code: "SUBSET-BOGUS".to_string(),
+                severity: "warning".to_string(),
+                message: format!(
+                    "metadata.subsetOf entry '{}' does not match any known capability ID.",
+                    entry
+                ),
+                detail: None,
+            });
         }
     }
 
@@ -782,16 +808,13 @@ fn probe_binary(target: &Path, probe_arg: &str) -> ProbeResult {
 /// This is the scaffolder lane: `elegy plugin new --template <kind>` writes a
 /// starter file set for a plugin package. It is **not** the future host-driven
 /// authoring lane (that is tracked as a deferred goal; see
-/// `docs/issues/unresolved-goals.md` GOAL-20260616-01 and
-/// `docs/specs/generator-backed-plugin-convention.md`). Adding a new variant
+/// `docs/issues/unresolved-goals.md` GOAL-20260616-01). Adding a new variant
 /// here changes the scaffolder's output shape — it does not change the schema
-/// or the contract. The future `Generator` template kind is one of the
-/// future variants that will land with the authoring lane, not now.
+/// or the contract.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PluginTemplateKind {
     SkillOnly,
     CliTool,
-    McpTool,
     Configuration,
     Mixed,
     RustCli,
@@ -805,7 +828,6 @@ impl std::str::FromStr for PluginTemplateKind {
         match s {
             "skill-only" => Ok(Self::SkillOnly),
             "cli-tool" => Ok(Self::CliTool),
-            "mcp-tool" => Ok(Self::McpTool),
             "configuration" => Ok(Self::Configuration),
             "mixed" => Ok(Self::Mixed),
             "rust-cli" => Ok(Self::RustCli),
@@ -813,7 +835,7 @@ impl std::str::FromStr for PluginTemplateKind {
             _ => Err(ToolingError::InvalidPluginPackage {
                 path: PathBuf::from(s),
                 issues: vec![format!(
-                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness",
+                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, configuration, mixed, rust-cli, rust-harness",
                     s
                 )],
             }),
@@ -827,8 +849,7 @@ impl std::str::FromStr for PluginTemplateKind {
 /// skill definition, a lock file, and a CI workflow. The starter will **not**
 /// pass `elegy plugin verify` on its own — empty capabilities, missing
 /// `hostProjection`, and a stub identity are all expected. The author fills
-/// them in against the schema, the model doc, and the quality-gates reference
-/// fixture, then re-runs verify until ready.
+/// them in against the schema and the model doc, then re-runs verify until ready.
 ///
 /// This function is **not** the host-driven authoring lane. The future
 /// `elegy plugin author` / `elegy plugin doctor` lane will walk the user (or a
@@ -861,7 +882,6 @@ pub fn scaffold_plugin_package(
     let dirs_to_create = match template {
         PluginTemplateKind::SkillOnly => vec!["skills", "docs"],
         PluginTemplateKind::CliTool => vec!["skills", "docs", "contracts"],
-        PluginTemplateKind::McpTool => vec!["skills", "docs", "contracts", "mcp"],
         PluginTemplateKind::Configuration => vec!["configuration", "docs"],
         PluginTemplateKind::Mixed => {
             vec!["skills", "docs", "contracts", "mcp", "configuration"]
@@ -900,7 +920,6 @@ pub fn scaffold_plugin_package(
     let readme_description = match template {
         PluginTemplateKind::SkillOnly => "A skill-only plugin package.",
         PluginTemplateKind::CliTool => "A CLI tool plugin package.",
-        PluginTemplateKind::McpTool => "An MCP tool plugin package.",
         PluginTemplateKind::Configuration => "A configuration plugin package.",
         PluginTemplateKind::Mixed => {
             "A mixed plugin package with skills, tools, and configurations."
@@ -1107,26 +1126,6 @@ fn build_scaffold_plugin_json(
                 }
             }]);
         }
-        PluginTemplateKind::McpTool => {
-            components["skillDefinitions"] = serde_json::json!([{
-                "id": format!("{}-skill", package_name),
-                "definition": {
-                    "skillFormat": "elegy-skill-definition",
-                    "skillVersion": 2,
-                    "identity": {
-                        "namespace": "elegy",
-                        "name": package_name,
-                        "version": package_version
-                    },
-                    "capabilities": [],
-                    "lifecycleState": "draft"
-                }
-            }]);
-            components["mcpProjections"] = serde_json::json!([{
-                "id": format!("{}-mcp", package_name),
-                "serverName": package_name
-            }]);
-        }
         PluginTemplateKind::Configuration => {
             components["configurationTemplates"] = serde_json::json!([{
                 "id": format!("{}-template", package_name),
@@ -1171,12 +1170,6 @@ fn build_scaffold_plugin_json(
                     "lifecycleState": "draft"
                 }
             }]);
-            components["rustToolAdapters"] = serde_json::json!([{
-                "id": format!("{}-adapter", package_name),
-                "crateName": format!("{}-adapter", package_name),
-                "adapterPath": "rust/src/lib.rs",
-                "registerFn": "register_tools"
-            }]);
             components["capabilityProjections"] = serde_json::json!([{
                 "id": format!("{}-rust-projection", package_name),
                 "capabilityRef": format!("{}.default", package_name),
@@ -1204,7 +1197,6 @@ fn build_scaffold_plugin_json(
             "description": format!("A {} Elegy plugin package.", match template {
                 PluginTemplateKind::SkillOnly => "skill-only",
                 PluginTemplateKind::CliTool => "CLI tool",
-                PluginTemplateKind::McpTool => "MCP tool",
                 PluginTemplateKind::Configuration => "configuration",
                 PluginTemplateKind::Mixed => "mixed",
                 PluginTemplateKind::RustCli => "Rust CLI",
@@ -1226,7 +1218,6 @@ pub fn inspect_plugin_package(package_path: &Path) -> Result<serde_json::Value, 
 
     let skill_count = package.components.skill_definitions.len();
     let projection_count = package.components.capability_projections.len();
-    let mcp_count = package.components.mcp_projections.len();
     let config_template_count = package.components.configuration_templates.len();
     let config_profile_count = package.components.configuration_profiles.len();
     let tool_req_count = package.components.tool_requirements.len();
@@ -1244,7 +1235,6 @@ pub fn inspect_plugin_package(package_path: &Path) -> Result<serde_json::Value, 
         "summary": {
             "skillCount": skill_count,
             "capabilityProjectionCount": projection_count,
-            "mcpProjectionCount": mcp_count,
             "configurationTemplateCount": config_template_count,
             "configurationProfileCount": config_profile_count,
             "toolRequirementCount": tool_req_count,
@@ -2002,18 +1992,6 @@ mod tests {
         "id": "demo-instructions",
         "path": "skills/demo/SKILL.md",
         "description": "Optional instruction surface derived from the governed skill definition."
-      }
-    ],
-    "mcpProjections": [
-      {
-        "id": "demo-mcp",
-        "serverName": "elegy-demo-mcp",
-        "capabilityRefs": [
-          {
-            "skill": "elegy.demo-plugin",
-            "capability": "demo-search"
-          }
-        ]
       }
     ],
     "capabilityProjections": [

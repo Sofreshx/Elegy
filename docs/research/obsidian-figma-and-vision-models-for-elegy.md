@@ -5,7 +5,6 @@ This note is research-oriented guidance for contributors. It is not the canonica
 Canonical implemented truth stays in:
 
 - `contracts/`
-- `governance/`
 - `rust/`
 - [docs/architecture/ecosystem-topology.md](../architecture/ecosystem-topology.md)
 - [docs/architecture/substrate-governance.md](../architecture/substrate-governance.md)
@@ -55,7 +54,7 @@ The research framing that this section responds to (Obsidian = knowledge, Figma 
 │         ▼                 ▼                    ▼              │
 │  ┌──────────────────────────────────────────────────────────┐ │
 │  │ Elegy contract substrate (canonical authority)          │ │
-│  │  contracts/  governance/  schemas/  policies/            │ │
+│  │  contracts/  schemas/  policies/                      │ │
 │  │  skill.*.json                              │ │
 │  └──────────────────────────────────────────────────────────┘ │
 │         │ argv template / subprocess                          │

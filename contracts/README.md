@@ -6,8 +6,7 @@ Use it for:
 
 - schemas under `contracts/schemas`
 - fixtures under `contracts/fixtures`
-- compatibility and bundle manifests under `contracts/manifests`
-- consumer support manifests under `contracts/support`
+
 
 The portable plugin package contract, `elegy-plugin-package/v1`, also lives
 here. It describes bundle metadata and component references for consuming
@@ -18,4 +17,4 @@ Do not treat `artifacts/contracts` as the authored source of truth. That directo
 Current governed schemas include:
 - `elegy-codegraph.graph.v0.json` — Normalized graph IR for elegy-codegraph (entities, edges, provenance, confidence)
 
-All other authored contract assets live here or under `governance/`.
+All other authored contract assets live here.

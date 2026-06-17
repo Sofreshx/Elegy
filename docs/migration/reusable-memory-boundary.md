@@ -40,7 +40,7 @@ This planned family does not add or imply:
 
 | Concern | Placement | Notes |
 | --- | --- | --- |
-| Portable reusable-memory artifacts, fixtures, manifests, and support metadata | `Elegy` | Governed artifacts may live under `contracts/` and `governance/`. |
+| Portable reusable-memory artifacts, fixtures, manifests, and support metadata | `Elegy` | Governed artifacts may live under `contracts/`. |
 | Local import, list, show, export, supersede, and tombstone semantics | `Elegy` | These semantics are local and non-authoritative only. |
 | Compatibility manifests and fixture corpus | `Elegy` | This is governed evidence, not app logic. |
 | Currentness, approval, freshness policy, and retrieval ranking | `SAASTools` | These remain host-owned policy decisions. |

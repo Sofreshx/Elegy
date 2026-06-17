@@ -340,6 +340,8 @@ pub struct ElegyPluginPackage {
     pub publishing: Option<ElegyPluginPackagePublishingMetadata>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub elegy_compatibility: Option<ElegyPluginPackageElegyCompatibility>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub extensions: Option<serde_json::Map<String, serde_json::Value>>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -388,8 +390,6 @@ pub struct ElegyPluginPackageComponents {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub instruction_skills: Vec<ElegyPluginPackagePathComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub mcp_projections: Vec<ElegyPluginPackageMcpProjectionComponent>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub capability_projections: Vec<ElegyPluginPackageCapabilityProjectionComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub docs: Vec<ElegyPluginPackagePathComponent>,
@@ -399,8 +399,6 @@ pub struct ElegyPluginPackageComponents {
     pub configuration_profiles: Vec<ElegyPluginPackageConfigurationComponent>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub tool_requirements: Vec<ElegyPluginPackageToolRequirement>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub rust_tool_adapters: Vec<ElegyPluginPackageRustToolAdapterComponent>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -429,18 +427,6 @@ pub struct ElegyPluginPackageConfigurationComponent {
     pub path: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub description: Option<String>,
-}
-
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ElegyPluginPackageMcpProjectionComponent {
-    pub id: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub descriptor_ref: Option<String>,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub server_name: Option<String>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub capability_refs: Vec<ElegyPluginPackageCapabilityRef>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -536,19 +522,6 @@ pub struct ElegyPluginPackageToolRequirement {
     pub description: Option<String>,
 }
 
-#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
-pub struct ElegyPluginPackageRustToolAdapterComponent {
-    pub id: String,
-    pub crate_name: String,
-    pub crate_version: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub feature: Option<String>,
-    pub registry_symbol: String,
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub manifest_ref: Option<String>,
-}
-
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ElegyPluginPackageValidationResult {
     pub issues: Vec<String>,
@@ -621,15 +594,6 @@ pub fn validate_elegy_plugin_package(
         &mut issues,
     );
     validate_component_ids(
-        "components.mcpProjections",
-        package
-            .components
-            .mcp_projections
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
         "components.capabilityProjections",
         package
             .components
@@ -661,15 +625,6 @@ pub fn validate_elegy_plugin_package(
         package
             .components
             .configuration_profiles
-            .iter()
-            .map(|component| component.id.as_str()),
-        &mut issues,
-    );
-    validate_component_ids(
-        "components.rustToolAdapters",
-        package
-            .components
-            .rust_tool_adapters
             .iter()
             .map(|component| component.id.as_str()),
         &mut issues,
@@ -768,38 +723,6 @@ pub fn validate_elegy_plugin_package(
         );
     }
 
-    for projection in &package.components.mcp_projections {
-        if projection.descriptor_ref.is_none()
-            && projection
-                .server_name
-                .as_deref()
-                .is_none_or(|server_name| server_name.trim().is_empty())
-        {
-            issues.push(format!(
-                "components.mcpProjections entry '{}' must declare descriptorRef or serverName.",
-                projection.id
-            ));
-        }
-        if let Some(descriptor_ref) = &projection.descriptor_ref {
-            validate_portable_relative_path(
-                &format!(
-                    "components.mcpProjections['{}'].descriptorRef",
-                    projection.id
-                ),
-                descriptor_ref,
-                &mut issues,
-            );
-        }
-        for capability_ref in &projection.capability_refs {
-            validate_package_capability_ref(
-                "components.mcpProjections",
-                capability_ref,
-                &capability_refs,
-                &mut issues,
-            );
-        }
-    }
-
     for projection in &package.components.capability_projections {
         if !matches!(
             projection.lane.as_str(),
@@ -849,31 +772,6 @@ pub fn validate_elegy_plugin_package(
                     declared.as_str()
                 ));
             }
-        }
-    }
-
-    let projected: BTreeSet<(String, String)> = package
-        .components
-        .capability_projections
-        .iter()
-        .map(|p| (p.skill.clone(), p.capability.clone()))
-        .collect();
-    let declared_subset: BTreeSet<String> = package
-        .metadata
-        .as_ref()
-        .map(|m| m.subset_of.iter().cloned().collect())
-        .unwrap_or_default();
-    for (skill_ref, cap_id) in &capability_refs {
-        if projected.contains(&(skill_ref.clone(), cap_id.clone())) {
-            continue;
-        }
-        let covers = declared_subset.contains(cap_id)
-            || declared_subset.contains(&format!("{}.{}", skill_ref, cap_id));
-        if !covers {
-            issues.push(format!(
-                "components.capabilityProjections omits capability '{}.{}' without metadata.subsetOf marker.",
-                skill_ref, cap_id
-            ));
         }
     }
 

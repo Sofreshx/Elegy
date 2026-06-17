@@ -41,9 +41,7 @@ The authority chain is explicit and one-way:
 4. `contracts/fixtures/elegy-plugin-package.elegy-planning.json` is the
    portable Holon plugin package that carries capability projections for
    package-level consumers.
-5. `.agents/skills/elegy-planning/SKILL.md` and
-   `.github/skills/elegy-planning/SKILL.md` are rendered local outputs and are
-   not authoritative.
+5. SKILL.md mirrors are generated via `elegy plugin export` and are not authoritative.
 6. `docs/specs/elegy-planning.md` is the implementation-facing spec and the
    authority for entity model, lifecycle, and validation rules.
 7. This document (`docs/architecture/elegy-planning-v1.md`) is the
@@ -148,4 +146,4 @@ finding refs, commit SHA, PR URL, linked spec ids).
 - [Elegy Memory V1](elegy-memory-v1.md)
 - [Agent Integration](../agent-integration.md)
 - [Distribution and downstream consumption](../distribution.md)
-- [Substrate Governance](substrate-governance.md)
+- [Substrate Governance (historical)](substrate-governance.md)
