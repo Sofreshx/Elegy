@@ -17,7 +17,7 @@ The main goal is to keep Elegy reusable across Holon and non-Holon projects whil
 
 Its active design centers are:
 
-- governed schemas, fixtures, manifests, and policies rooted under `contracts/`, `schemas/`, and `policies/`
+- governed schemas, fixtures, manifests, and policies rooted under `contracts/` and `policies/`
 - the first-party Rust workspace under `rust/`, which owns the reusable executable and operator-facing surfaces
 
 Thin install passthroughs exist under `src/Elegy-*/install.ps1`; they are not repo centers, authority layers, implementation centers, or release surfaces.

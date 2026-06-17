@@ -123,6 +123,8 @@ arguments.
 | `elegy-skills` | Dedicated governed skill registry CLI. |
 | `elegy-configuration` | Dedicated deterministic configuration materialization CLI. |
 | `elegy-documentation` | Dedicated documentation authority CLI. |
+| `elegy-memory-mcp-http` | Optional MCP-over-HTTP transport adapter for `elegy-memory` (OAuth 2.1 + bearer JWT). |
+| `elegy-memory-mcp-stdio` | Optional MCP-over-stdio transport adapter for `elegy-memory` (local subprocess). |
 
 ## Wrapper and Skill Surfaces
 
@@ -169,6 +171,10 @@ elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
 
 ## Plugin Packages
+
+> Note: the `elegy-codegraph` library crate is a separate portable codebase
+> graph extraction and query tool. It is **not** a plugin package and lives
+> under its own `contracts/schemas/elegy-codegraph.graph.v0.json` contract.
 
 `elegy-plugin-package/v1` is the portable package contract for bundling
 governed skill definitions, capability projections, tool requirements, and

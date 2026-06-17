@@ -147,11 +147,11 @@ For the **current** dev flow:
     `elegy plugin verify` on a fresh scaffold will report contract issues
     (empty capabilities, missing hostProjection) that the next steps fix.
 
-2. **Author the skill v2** under `contracts/fixtures/skill.<name>.json` (or
-   inline `definition` for small fixtures). The skill must declare
-   `capabilities[]` and `hostProjection` with `cliName`, `outputContractId`,
-   `defaultSideEffectClass`, and one `capabilityProjections[]` entry per
-   callable capability.
+2. **Author the skill** (`skillFormat: "elegy-skill-definition"`, `skillVersion: 2`)
+   under `contracts/fixtures/skill.<name>.json` (or inline `definition` for
+   small fixtures). The skill must declare `capabilities[]` and
+   `hostProjection` with `cliName`, `outputContractId`, `defaultSideEffectClass`,
+   and one `capabilityProjections[]` entry per callable capability.
 
 3. **Edit `plugin.json`** to declare package identity, metadata, components,
     capability projections, tool requirements, and (if the package will be

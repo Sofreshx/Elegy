@@ -140,4 +140,4 @@ If a new feature request touches MCP analysis, MCP creation, MCP-to-skill genera
 3. If it is executable runtime code, can it be self-contained and reusable enough to justify Rust ownership?
 4. If it depends on host-specific lifecycle or product policy, why is it not consumer-local?
 
-The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/`, `schemas/`, and `policies/`.
+The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/` and `policies/`.
