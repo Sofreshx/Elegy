@@ -3775,14 +3775,6 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
                     .with_hint("use supported doc type, status, owner, and slug values")
             })
             .collect(),
-        ToolingSurfaceError::InvalidGeneratorContract { path, issues } => issues
-            .into_iter()
-            .map(|issue| {
-                Diagnostic::error("CLI-GENERATOR-001", issue)
-                    .with_path(path.display().to_string())
-                    .with_hint("fix the generator contract so it matches the governed schema")
-            })
-            .collect(),
         ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
