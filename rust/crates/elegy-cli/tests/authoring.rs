@@ -404,18 +404,6 @@ fn generate_codex_plugin_command_writes_projected_plugin_bundle() {
         "description": "Optional instruction surface derived from the governed skill definition."
       }
     ],
-    "mcpProjections": [
-      {
-        "id": "demo-mcp",
-        "serverName": "elegy-demo-mcp",
-        "capabilityRefs": [
-          {
-            "skill": "elegy.demo-plugin",
-            "capability": "demo-search"
-          }
-        ]
-      }
-    ],
     "capabilityProjections": [
       {
         "id": "demo-search-mcp",
@@ -1535,8 +1523,8 @@ fn plugin_pack_creates_valid_zip() {
 }
 
 #[test]
-fn plugin_project_codex_generates_valid_codex_plugin() {
-    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-codex");
+fn plugin_export_codex_generates_valid_codex_plugin() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-export-codex");
     let package_path = temp_dir.join("test-plugin.json");
     let output_dir = temp_dir.join("codex-output");
 
@@ -1595,7 +1583,7 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
             "plugin",
-            "project",
+            "export",
             "codex",
             "--package",
             package_path.to_str().expect("utf-8 package path"),
@@ -1604,11 +1592,11 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
             "--json",
         ])
         .output()
-        .expect("run elegy plugin project codex");
+        .expect("run elegy plugin export codex");
 
     assert!(
         output.status.success(),
-        "project codex should succeed: {}",
+        "export codex should succeed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
 
@@ -1640,8 +1628,8 @@ fn plugin_project_codex_generates_valid_codex_plugin() {
 }
 
 #[test]
-fn plugin_project_host_rejects_bad_host_name() {
-    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-bad-host");
+fn plugin_export_host_rejects_bad_host_name() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-export-bad-host");
     let package_path = temp_dir.join("test-plugin.json");
     let output_dir = temp_dir.join("host-output");
 
@@ -1680,7 +1668,7 @@ fn plugin_project_host_rejects_bad_host_name() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
         .args([
             "plugin",
-            "project",
+            "export",
             "host",
             "--host",
             "nonexistent-host",
@@ -1691,109 +1679,13 @@ fn plugin_project_host_rejects_bad_host_name() {
             "--json",
         ])
         .output()
-        .expect("run elegy plugin project host with bad host");
+        .expect("run elegy plugin export host with bad host");
 
     assert!(
         !output.status.success(),
         "bad host should fail but stderr was: {}",
         String::from_utf8_lossy(&output.stderr)
     );
-}
-
-#[test]
-fn plugin_project_host_generic_emits_host_manifest() {
-    let temp_dir = unique_temp_dir("elegy-cli-plugin-project-generic");
-    let package_path = temp_dir.join("test-plugin.json");
-    let output_dir = temp_dir.join("host-output");
-
-    fs::write(
-        &package_path,
-        r#"{
-  "schemaVersion": "elegy-plugin-package/v1",
-  "identity": {
-    "packageId": "elegy.generic-test",
-    "name": "generic-test",
-    "version": "0.1.0"
-  },
-  "components": {
-    "skillDefinitions": [
-      {
-        "id": "generic-skill",
-        "definition": {
-          "skillFormat": "elegy-skill-definition",
-          "skillVersion": 2,
-          "identity": {
-            "namespace": "elegy",
-            "name": "generic-skill",
-            "version": "1.0.0"
-          },
-          "capabilities": [
-            {
-              "id": "gen-cap",
-              "name": "Gen Cap",
-              "description": "A generic capability.",
-              "implementation": {
-                "executionType": "subprocess",
-                "executableName": "gen-tool",
-                "arguments": []
-              }
-            }
-          ],
-          "lifecycleState": "active"
-        }
-      }
-    ],
-    "capabilityProjections": [
-      {
-        "id": "gen-cap-proj",
-        "skill": "elegy.generic-skill",
-        "capability": "gen-cap",
-        "lane": "cli",
-        "supportsDryRun": false,
-        "projection": {
-          "projections": ["cli"],
-          "functionName": "gen_cap"
-        }
-      }
-    ]
-  }
-}
-"#,
-    )
-    .expect("write test plugin package");
-
-    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
-        .args([
-            "plugin",
-            "project",
-            "host",
-            "--host",
-            "generic",
-            "--package",
-            package_path.to_str().expect("utf-8 package path"),
-            "--output-dir",
-            output_dir.to_str().expect("utf-8 output dir"),
-            "--json",
-        ])
-        .output()
-        .expect("run elegy plugin project host generic");
-
-    assert!(
-        output.status.success(),
-        "host project should succeed: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let plugin_root = output_dir.join("generic-test");
-    assert!(plugin_root
-        .join(".elegy-host-generic")
-        .join("plugin.json")
-        .is_file());
-
-    let parsed: serde_json::Value =
-        serde_json::from_slice(&output.stdout).expect("parse host project JSON output");
-    assert_eq!(parsed["status"], "ok");
-    assert_eq!(parsed["data"]["pluginName"], "generic-test");
 }
 
 #[test]
@@ -1830,11 +1722,12 @@ fn plugin_new_scaffolds_skill_only_template() {
 }
 
 #[test]
-fn plugin_verify_reports_partial_for_incomplete_subset() {
-    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-partial");
+fn plugin_verify_reports_ready_when_subset_of_declares_omitted_capabilities() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-subset-ok");
     let package_path = temp_dir.join("subset-plugin.json");
 
-    // Package has 1 capability projected from a skill with 2 capabilities, no subsetOf declared
+    // Package has 1 capability projected from a skill with 2 capabilities,
+    // subsetOf correctly declares the omitted capability
     fs::write(
         &package_path,
         r#"{
@@ -1918,6 +1811,307 @@ fn plugin_verify_reports_partial_for_incomplete_subset() {
     let parsed: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
     assert_eq!(parsed["status"], "ok");
-    // Should be "partial" because only 1 of 2 capabilities projected without subsetOf
+    // Should be "ready" because subsetOf correctly declares the omitted cap-b
+    assert_eq!(parsed["data"]["readiness"], "ready");
+}
+
+#[test]
+fn plugin_verify_reports_blocked_when_definition_ref_omits_caps_without_subset_of() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-defref-no-subset");
+    let package_path = temp_dir.join("ref-plugin.json");
+    let skill_def_path = temp_dir.join("ref-skill.json");
+
+    // Referenced skill definition with 2 capabilities
+    fs::write(
+        &skill_def_path,
+        r#"{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "test",
+    "name": "ref-skill",
+    "version": "1.0.0"
+  },
+  "capabilities": [
+    {
+      "id": "cap-a",
+      "name": "Cap A",
+      "description": "First capability.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "ref-tool",
+        "arguments": []
+      }
+    },
+    {
+      "id": "cap-b",
+      "name": "Cap B",
+      "description": "Second capability.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "ref-tool",
+        "arguments": []
+      }
+    }
+  ],
+  "lifecycleState": "active"
+}
+"#,
+    )
+    .expect("write referenced skill definition");
+
+    // Plugin package uses definitionRef and projects only one capability
+    // without declaring subsetOf -> should be blocked
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.defref-no-subset",
+    "name": "defref-no-subset",
+    "version": "0.1.0"
+  },
+  "metadata": {},
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "ref-skill",
+        "definitionRef": "ref-skill.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "only-cap-a",
+        "skill": "test.ref-skill",
+        "capability": "cap-a",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}
+"#,
+    )
+    .expect("write definitionRef plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["readiness"], "blocked");
+    let findings = parsed["data"]["findings"]
+        .as_array()
+        .expect("findings array");
+    assert!(
+        findings
+            .iter()
+            .any(|f| f["code"] == "SUBSET-MISSING"),
+        "should report SUBSET-MISSING error for definitionRef omission without subsetOf"
+    );
+}
+
+#[test]
+fn plugin_verify_reports_warning_for_bogus_subset_of_entries() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-subset-bogus");
+    let package_path = temp_dir.join("bogus-subset-plugin.json");
+
+    // Package declares subsetOf entries that don't match any capability
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.bogus-subset",
+    "name": "bogus-subset",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "subsetOf": ["ghost-cap", "phantom-cap"]
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "real-skill",
+        "definition": {
+          "skillFormat": "elegy-skill-definition",
+          "skillVersion": 2,
+          "identity": {
+            "namespace": "test",
+            "name": "real-skill",
+            "version": "1.0.0"
+          },
+          "capabilities": [
+            {
+              "id": "cap-a",
+              "name": "Cap A",
+              "description": "Only real capability.",
+              "implementation": {
+                "executionType": "subprocess",
+                "executableName": "real-tool",
+                "arguments": []
+              }
+            }
+          ],
+          "lifecycleState": "active"
+        }
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "all-caps",
+        "skill": "test.real-skill",
+        "capability": "cap-a",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}
+"#,
+    )
+    .expect("write bogus subset plugin package");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    assert_eq!(parsed["status"], "ok");
     assert_eq!(parsed["data"]["readiness"], "partial");
+    let findings = parsed["data"]["findings"]
+        .as_array()
+        .expect("findings array");
+    assert!(
+        findings
+            .iter()
+            .any(|f| f["code"] == "SUBSET-BOGUS"),
+        "should report SUBSET-BOGUS warning for entries that don't match any known capability"
+    );
+}
+
+#[test]
+fn plugin_verify_reports_ready_when_definition_ref_subset_of_correct() {
+    let temp_dir = unique_temp_dir("elegy-cli-plugin-verify-defref-subset-ok");
+    let package_path = temp_dir.join("ref-subset-plugin.json");
+    let skill_def_path = temp_dir.join("ref-skill-ok.json");
+
+    // Referenced skill definition with 2 capabilities
+    fs::write(
+        &skill_def_path,
+        r#"{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "test",
+    "name": "ref-skill-ok",
+    "version": "1.0.0"
+  },
+  "capabilities": [
+    {
+      "id": "cap-a",
+      "name": "Cap A",
+      "description": "First capability.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "ref-tool",
+        "arguments": []
+      }
+    },
+    {
+      "id": "cap-b",
+      "name": "Cap B",
+      "description": "Second capability.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "ref-tool",
+        "arguments": []
+      }
+    }
+  ],
+  "lifecycleState": "active"
+}
+"#,
+    )
+    .expect("write referenced skill definition");
+
+    // Plugin package uses definitionRef, projects one capability, and declares subsetOf correctly
+    fs::write(
+        &package_path,
+        r#"{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.defref-subset-ok",
+    "name": "defref-subset-ok",
+    "version": "0.1.0"
+  },
+  "metadata": {
+    "subsetOf": ["cap-b"]
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "ref-skill",
+        "definitionRef": "ref-skill-ok.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "only-cap-a",
+        "skill": "test.ref-skill-ok",
+        "capability": "cap-a",
+        "lane": "cli",
+        "supportsDryRun": false
+      }
+    ]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}
+"#,
+    )
+    .expect("write definitionRef plugin package with correct subsetOf");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy"))
+        .args([
+            "plugin",
+            "verify",
+            "--package",
+            package_path.to_str().expect("utf-8 package path"),
+            "--json",
+        ])
+        .output()
+        .expect("run elegy plugin verify");
+
+    let parsed: serde_json::Value =
+        serde_json::from_slice(&output.stdout).expect("parse verify JSON output");
+    assert_eq!(parsed["status"], "ok");
+    assert_eq!(parsed["data"]["readiness"], "ready");
 }

@@ -15,7 +15,7 @@ Core model:
 - Rust implements reusable executable behavior over those artifacts
 - skill definitions are the discovery authority for agent capabilities
 - CLI invocation templates are the default execution boundary
-- generated mirrors, wrapper roots, Codex plugin projections, and MCP tool
+- generated mirrors, wrapper roots, Codex plugin exports, and MCP tool
   lists are derived adapter surfaces
 - MCP is an optional projection for MCP-native clients
 
@@ -24,10 +24,9 @@ Core model:
 | Area | Purpose |
 | --- | --- |
 | `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
-| `governance/`, `schemas/`, `policies/` | Version, inventory, schema-line, boundary, and formalization policy. |
+| `policies/` | Formalization policy. |
 | `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
 | `src/Elegy-*` | Contributor-navigation and wrapper-package overlays, not implementation roots. |
-| `.agents/skills/**`, `.github/skills/**` | Rendered skill mirrors for host and contributor routing. |
 | `artifacts/` | Generated bundles, archives, and validation outputs. |
 
 When those surfaces disagree, prefer the governed artifact roots and the
@@ -136,9 +135,10 @@ Most wrappers delegate to dedicated `elegy-*` Rust binaries. The current
 CLI and keeps Obsidian vault content non-authoritative. Durable planning state
 continues to live in `elegy-planning` and SQLite.
 
-Rendered `SKILL.md` files under `.agents/skills/**`, `.github/skills/**`, and
-wrapper-local `skills/**` directories are routing mirrors. The governed
-`contracts/fixtures/skill.*.json` files remain the skill authority.
+Rendered `SKILL.md` files under wrapper-local `skills/**` directories are routing
+mirrors. The governed `contracts/fixtures/skill.*.json` files remain the skill
+authority. Skill delivery uses plugin packages and host export; repo-local
+`.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
 
 ## Configuration Materialization
 
@@ -207,7 +207,7 @@ See the [Elegy Plugin Package Model](docs/architecture/elegy-plugin-package-mode
 for the full model, and the [Plugin Tool Availability spec](docs/specs/plugin-tool-availability.md)
 for the verify-only contract rules.
 
-Codex plugin projection (`elegy generate codex-plugin`) is one optional derived
+Host export (`elegy plugin export codex` / `elegy plugin export host`) is one optional derived
 projection target, not the main plugin setup path.
 
 ## Optional MCP Projection
@@ -261,7 +261,6 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```powershell
-pwsh ./scripts/validate-package-boundaries.ps1
 pwsh ./scripts/export-contracts.ps1
 pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
 ```

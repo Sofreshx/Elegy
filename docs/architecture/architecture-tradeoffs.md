@@ -1,16 +1,16 @@
 ---
-created: 2026-03-24
-updated: 2026-03-24
-category: architecture
+title: Architecture Tradeoffs
 status: active
+owner: eleg
 doc_kind: reference
+updated: 2026-03-24
 ---
 
 # Architecture Tradeoffs
 
 ## Executive summary
 
-The current architecture is the stronger fit for Elegy as it exists today: `src\Elegy-*` are thin wrapper surfaces, not implementation centers, while `rust/` is the implementation workspace and executable surface for shared Rust behavior. The governed roots under `contracts/`, `governance/`, `schemas/`, and `policies/` remain the authority layer.
+The current architecture is the stronger fit for Elegy as it exists today: `src\Elegy-*` are thin wrapper surfaces, not implementation centers, while `rust/` is the implementation workspace and executable surface for shared Rust behavior. The governed roots under `contracts/`, `schemas/`, and `policies/` remain the authority layer.
 
 Removing `rust/` would not automatically improve runtime performance. It would mostly change structure, ownership, and packaging. Unless another clear implementation center replaces it, the result would likely be more churn, more ambiguity, and weaker coherence.
 

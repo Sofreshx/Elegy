@@ -8,7 +8,7 @@ The goal is to keep skill authority in neutral governed artifacts while keeping 
 
 ## Authority decision
 
-The canonical skill model lives in the governed skill artifact family exported from `contracts/` and versioned through `governance/`.
+The canonical skill model lives in the governed skill artifact family exported from `contracts/` and versioned through `contracts/schemas/`.
 
 That means:
 
@@ -19,7 +19,7 @@ That means:
 
 The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and the repo-local `SKILL.md` lanes remain non-authoritative rendered mirrors only.
 
-The contributor-navigation overlays under `src/Elegy-memory` and `src/Elegy-skills` do not change that authority split. They are pointer shells only, not skill authority surfaces, implementation centers, or release surfaces.
+The `src/Elegy-*/install.ps1` files are thin install passthroughs only, not skill authority surfaces, implementation centers, or release surfaces.
 
 ## Current executable ownership
 
@@ -66,9 +66,8 @@ The high-level skills model is now:
 Current confidence comes from the surviving validation and export flows:
 
 - `scripts/export-contracts.ps1` and `scripts/validate-canonical-outputs.ps1`
-- `scripts/validate-package-boundaries.ps1`
 - Rust CI for formatting, linting, and tests in `.github/workflows/rust-ci.yml`
 
 Future work should build on this split rather than reopening skill authority. New reusable execution logic belongs in Rust, and new durable skill truth belongs in governed artifacts.
 
-See [Agent Skill Bridge Mirrors](agent-skill-bridge-mirrors.md) for the current repo-local `.agents/skills/**` and `.github/skills/**` mirror split.
+See [Agent Skill Bridge Mirrors](agent-skill-bridge-mirrors.md) for the retired repo-local `.agents/skills/**` and `.github/skills/**` mirror split.

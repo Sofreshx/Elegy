@@ -289,12 +289,11 @@ elegy-planning --scope repo:elegy --json --non-interactive \
   --roadmap-id skill-rename-roadmap \
   --work-point-id update-fixtures \
   --effort-tier balanced \
-  --file-scope glob:primary:contracts/fixtures/skill.*.json \
-  --file-scope glob:review:contracts/manifests/*.json
+  --file-scope glob:primary:contracts/fixtures/skill.*.json
 ```
 
-Expected: `status: "ok"`, `data.workPoint.fileScopes` lists both
-selectors in declaration order.
+Expected: `status: "ok"`, `data.workPoint.fileScopes` lists the
+selector in declaration order.
 
 ### Example 3 — clear file scopes on a plan
 

@@ -10,9 +10,7 @@ on:
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/**'
-      - 'governance/**'
-      - 'schemas/**'
+      - 'contracts/schemas/**'
       - 'policies/**'
   push:
     branches:

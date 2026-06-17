@@ -1,6 +1,6 @@
 # Holon Purge Concept Decision Table
 
-Historical-only migration note: this table records pre-zero-dotnet ownership assumptions used during the purge analysis. References to `.NET`, `Directory.Build.props`, and `Elegy.Formalization.*` describe historical overlap, not the current authority model. Current canonical roots are `contracts/`, `governance/`, and `rust/`.
+Historical-only migration note: this table records pre-zero-dotnet ownership assumptions used during the purge analysis. References to `.NET`, `Directory.Build.props`, and `Elegy.Formalization.*` describe historical overlap, not the current authority model. Current canonical roots are `contracts/` and `rust/`.
 
 Scope: historical concept-level ownership decisions that had to be made before deleting the remaining `.NET` surfaces.
 
@@ -17,7 +17,7 @@ Decision meanings:
 | Schema files and fixtures | `src/Elegy.Formalization.Contracts/Resources` | `File artifacts only` | Recommended | Keep the files as authority, but stop treating the `.csproj` as the authority boundary. |
 | Compatibility manifest and compatibility matrix | `src/Elegy.Formalization.Contracts/Resources` plus export script | `File artifacts only` | Recommended | Keep the files, replace `.NET` packaging and export assumptions. |
 | Contract bundle assembly and release packaging | `elegy contracts export` in the Rust workspace, with `scripts/export-contracts.ps1` as a compatibility wrapper | `Rust executable semantics` | Implemented for current bundle production | Rust now builds `artifacts/contracts` and the versioned contracts archive without `dotnet`; any remaining package-feed discussion is historical compatibility tracking only. |
-| Package or release version authority | `Directory.Build.props` | `governance/version-policy.json` plus `schemas/schema-version.json` | Implemented | Version authority is now file-native; the `Directory.Build.props` reference is historical only. |
+| Package or release version authority | `Directory.Build.props` | `schemas/schema-version.json` | Implemented | Version authority is now file-native; the `Directory.Build.props` reference is historical only. |
 | Schema version authority | `schemas/schema-version.json` | `File artifacts only` | Recommended | This file can survive with minimal change. |
 | Governance policy data | Policy files and current governance scripts | `File artifacts only` | Recommended | Keep policy as files regardless of whether execution moves to Rust. |
 | Governance enforcement and resolution semantics | `Elegy.Formalization.Governance` | `Rust executable semantics` | Pending implementation | Rust currently lacks equivalent enforcement and resolution ownership. |

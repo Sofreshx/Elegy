@@ -1,36 +1,46 @@
 {
   "schemaVersion": "elegy-configuration-template/v1",
-  "templateId": "repo-skill-mirror-minimal",
-  "displayName": "Repo Skill Mirror Minimal",
-  "description": "Mirror canonical repo-local skill authority into a selected harness-local path.",
-  "harness": "generic",
+  "templateId": "repo-opencode-agentic-minimal",
+  "displayName": "Repo OpenCode Agentic Minimal",
+  "description": "Patch AGENTS.md and merge a minimal VS Code MCP config for repo-local OpenCode setup.",
+  "harness": "opencode",
   "scope": "repo",
   "bindings": {
-    "authority.skills": {
-      "defaultValue": ".github/skills",
+    "target.instructions": {
+      "defaultValue": "AGENTS.md",
       "required": true,
-      "description": "Canonical repo-local skill authority root."
-    },
-    "target.skills": {
-      "defaultValue": ".agents/skills",
-      "required": true,
-      "description": "Mirror root for the selected harness."
+      "description": "Repo instruction overlay file."
     }
   },
   "operations": [
     {
-      "operationType": "mirrorDirectory",
-      "operationId": "mirror-skills",
-      "family": "skill",
-      "source": {
-        "base": "target-root",
-        "path": "${authority.skills}"
-      },
+      "operationType": "patchTextBlock",
+      "operationId": "patch-agents-block",
+      "family": "instruction",
       "destination": {
         "base": "target-root",
-        "path": "${target.skills}"
+        "path": "${target.instructions}"
       },
-      "prune": true
+      "startMarker": "<!-- elegy-configuration:begin opencode-agentic -->",
+      "endMarker": "<!-- elegy-configuration:end opencode-agentic -->",
+      "contentPath": {
+        "base": "template-root",
+        "path": "assets/opencode-agentic-agents-block.md"
+      },
+      "createIfMissing": true
+    },
+    {
+      "operationType": "mergeJson",
+      "operationId": "merge-vscode-mcp",
+      "family": "mcp",
+      "destination": {
+        "base": "target-root",
+        "path": ".vscode/mcp.json"
+      },
+      "source": {
+        "base": "template-root",
+        "path": "assets/vscode-mcp.json"
+      }
     }
   ]
 }

@@ -7,7 +7,7 @@ use super::codex::{
     load_package_skill_definition, projected_governed_skill_directory_name,
     projected_instruction_skill_directory_name, skill_description, yaml_quoted, yaml_scalar,
 };
-use super::{GeneratedHostProjection, GeneratedHostProjectionComponents};
+use super::{GeneratedHostExport, GeneratedHostExportComponents};
 
 struct OpenCodeSkillDocument {
     directory_name: String,
@@ -19,7 +19,7 @@ pub fn generate_opencode_plugin_from_package_file(
     output_dir: &Path,
     overwrite: bool,
     package_root: Option<&Path>,
-) -> Result<GeneratedHostProjection, ToolingError> {
+) -> Result<GeneratedHostExport, ToolingError> {
     let package = crate::load_plugin_package_file(package_path)?;
     let root = package_root.unwrap_or_else(|| package_path.parent().unwrap_or(Path::new(".")));
     let plugin_output_name = package.identity.name.trim();
@@ -65,11 +65,11 @@ pub fn generate_opencode_plugin_from_package_file(
         written_files.push(crate::display_path(&output_path));
     }
 
-    Ok(GeneratedHostProjection {
+    Ok(GeneratedHostExport {
         source_package: crate::display_path(package_path),
         plugin_name: plugin_output_name.to_string(),
         plugin_version: package.identity.version.clone(),
-        emitted_components: GeneratedHostProjectionComponents {
+        emitted_components: GeneratedHostExportComponents {
             plugin_manifest: String::new(),
             skills_dir: crate::display_path(&skills_root),
             skills_count: skill_documents.len(),

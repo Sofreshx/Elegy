@@ -54,16 +54,12 @@ use elegy_skills::{
     CapabilityDefinition, RegistryCapabilityCard, RegistrySkillEntry, SkillRegistry,
     SkillRegistryQuery,
 };
-use elegy_tooling::generator::{
-    list_generator_registry, resolve_generator_registry_entry, run_generator_check_file,
-    show_generator_contract_file, validate_generator_contract_file,
-};
 use elegy_tooling::{
     check_plugin_installation, docs_check, docs_index, docs_init, docs_new_adr, docs_new_spec,
     generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
     inspect_plugin_package, pack_plugin_package, project_plugin_for_host, scaffold_plugin_package,
     verify_plugin_package, DocsCheckReport, DocsCreateResult, DocsIndexResult, DocsInitResult,
-    GeneratedHostProjection, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
+    GeneratedHostExport, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
     PluginTemplateKind, ToolingError as ToolingSurfaceError,
 };
 
@@ -132,10 +128,6 @@ enum Command {
     Generate {
         #[command(subcommand)]
         command: GenerateCommand,
-    },
-    Generator {
-        #[command(subcommand)]
-        command: GeneratorCommand,
     },
     Validate {
         #[command(subcommand)]
@@ -280,7 +272,7 @@ enum ConfigurationCommand {
 enum PluginCommand {
     /// Create a new plugin package from a template
     New {
-        /// Template kind: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness
+        /// Template kind: skill-only, cli-tool, configuration, mixed, rust-cli, rust-harness
         #[arg(long)]
         template: String,
         /// Output directory for the new plugin package
@@ -330,16 +322,16 @@ enum PluginCommand {
         #[arg(long)]
         output: PathBuf,
     },
-    /// Project a plugin package for a specific host
-    Project {
+    /// Export a plugin package for a specific host
+    Export {
         #[command(subcommand)]
-        command: PluginProjectCommand,
+        command: PluginExportCommand,
     },
 }
 
 #[derive(Subcommand, Debug)]
-enum PluginProjectCommand {
-    /// Project a plugin package as a Codex plugin
+enum PluginExportCommand {
+    /// Export a plugin package as a Codex plugin
     Codex {
         /// Path to the plugin package JSON file
         #[arg(long)]
@@ -351,15 +343,15 @@ enum PluginProjectCommand {
         #[arg(long)]
         force: bool,
     },
-    /// Project a plugin package for a specific host
+    /// Export a plugin package for a specific host
     Host {
-        /// Target host: opencode, or generic
+        /// Target host: opencode
         #[arg(long)]
         host: String,
         /// Path to the plugin package JSON file
         #[arg(long)]
         package: PathBuf,
-        /// Output directory for the host projection
+        /// Output directory for the host export
         #[arg(long)]
         output_dir: PathBuf,
         /// Force overwrite existing output
@@ -413,39 +405,6 @@ enum GenerateCommand {
         output_dir: PathBuf,
         #[arg(long)]
         force: bool,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum GeneratorCommand {
-    Validate {
-        file: PathBuf,
-    },
-    Show {
-        file: PathBuf,
-    },
-    Registry {
-        #[command(subcommand)]
-        command: GeneratorRegistryCommand,
-    },
-    Check {
-        #[command(subcommand)]
-        command: GeneratorCheckCommand,
-    },
-}
-
-#[derive(Subcommand, Debug)]
-enum GeneratorRegistryCommand {
-    List { path: PathBuf },
-    Resolve { id: String, path: PathBuf },
-}
-
-#[derive(Subcommand, Debug)]
-enum GeneratorCheckCommand {
-    Run {
-        file: PathBuf,
-        #[arg(long)]
-        context: PathBuf,
     },
 }
 
@@ -1262,30 +1221,6 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                     force,
                 },
         } => execute_generate_codex_plugin_command(package, output_dir, force, format),
-        Command::Generator {
-            command: GeneratorCommand::Validate { file },
-        } => execute_generator_validate_command(file, format),
-        Command::Generator {
-            command: GeneratorCommand::Show { file },
-        } => execute_generator_show_command(file, format),
-        Command::Generator {
-            command:
-                GeneratorCommand::Registry {
-                    command: GeneratorRegistryCommand::List { path },
-                },
-        } => execute_generator_registry_list_command(path, format),
-        Command::Generator {
-            command:
-                GeneratorCommand::Registry {
-                    command: GeneratorRegistryCommand::Resolve { id, path },
-                },
-        } => execute_generator_registry_resolve_command(id, path, format),
-        Command::Generator {
-            command:
-                GeneratorCommand::Check {
-                    command: GeneratorCheckCommand::Run { file, context },
-                },
-        } => execute_generator_check_run_command(file, context, format),
         Command::Validate {
             command: ValidateCommand::Config,
         } => execute_config_command(locator, format, vec!["validate", "config"]),
@@ -1741,21 +1676,20 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: PluginCommand::Pack { source, output },
         } => execute_plugin_pack_command(source, output, format),
         Command::Plugin {
-            command:
-                PluginCommand::Project {
-                    command:
-                        PluginProjectCommand::Codex {
-                            package,
-                            output_dir,
-                            force,
-                        },
-                },
+            command: PluginCommand::Export {
+                command:
+                    PluginExportCommand::Codex {
+                        package,
+                        output_dir,
+                        force,
+                    },
+            },
         } => execute_generate_codex_plugin_command(package, output_dir, force, format),
         Command::Plugin {
             command:
-                PluginCommand::Project {
+                PluginCommand::Export {
                     command:
-                        PluginProjectCommand::Host {
+                        PluginExportCommand::Host {
                             host,
                             package,
                             output_dir,
@@ -1763,7 +1697,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                             package_root,
                         },
                 },
-        } => execute_plugin_project_host_command(
+        } => execute_plugin_export_host_command(
             host,
             package,
             output_dir,
@@ -2268,7 +2202,7 @@ fn execute_generate_codex_plugin_command(
     match generate_codex_plugin_from_package_file(&package, &output_dir, force) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_host_projection_text(&result),
+                OutputFormat::Text => print_generated_host_export_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
                     ["generate", "codex-plugin"],
                     "ok",
@@ -2285,193 +2219,6 @@ fn execute_generate_codex_plugin_command(
     }
 }
 
-fn execute_generator_validate_command(
-    file: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    match validate_generator_contract_file(&file) {
-        Ok(report) => {
-            let exit_code = if report.status == "failed" {
-                exit_invalid()
-            } else {
-                ExitCode::SUCCESS
-            };
-            match format {
-                OutputFormat::Text => {
-                    println!("generator contract validation: {}", report.status);
-                    if let Some(contract) = &report.contract {
-                        println!("id: {}", contract.id);
-                        println!("schemaVersion: {}", contract.schema_version);
-                    }
-                    for warning in &report.warnings {
-                        println!("warning {}: {}", warning.code, warning.message);
-                    }
-                    for error in &report.errors {
-                        eprintln!("error {}: {}", error.code, error.message);
-                    }
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "validate"],
-                    if report.status == "failed" {
-                        "invalid"
-                    } else {
-                        "ok"
-                    },
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(exit_code)
-        }
-        Err(error) => emit_tooling_error(error, format, vec!["generator", "validate"], json!({})),
-    }
-}
-
-fn execute_generator_show_command(
-    file: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    match show_generator_contract_file(&file) {
-        Ok(report) => {
-            match format {
-                OutputFormat::Text => {
-                    println!("id: {}", report.contract.id);
-                    println!("schemaVersion: {}", report.contract.schema_version);
-                    println!("kind: {}", report.contract.kind);
-                    println!("version: {}", report.contract.version);
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "show"],
-                    "ok",
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_tooling_error(error, format, vec!["generator", "show"], json!({})),
-    }
-}
-
-fn execute_generator_registry_list_command(
-    path: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    match list_generator_registry(&path) {
-        Ok(report) => {
-            match format {
-                OutputFormat::Text => {
-                    println!("generator registry: {}", report.root);
-                    for entry in &report.entries {
-                        println!("{} {} {}", entry.id, entry.kind, entry.path);
-                    }
-                    for warning in &report.warnings {
-                        println!("warning {}: {}", warning.code, warning.message);
-                    }
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "registry", "list"],
-                    "ok",
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(ExitCode::SUCCESS)
-        }
-        Err(error) => emit_tooling_error(
-            error,
-            format,
-            vec!["generator", "registry", "list"],
-            json!({}),
-        ),
-    }
-}
-
-fn execute_generator_registry_resolve_command(
-    id: String,
-    path: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    match resolve_generator_registry_entry(&id, &path) {
-        Ok(report) => {
-            let found = report.status == "found";
-            match format {
-                OutputFormat::Text => {
-                    println!("generator registry resolve: {}", report.status);
-                    if let Some(contract) = &report.contract {
-                        println!("{} {} {}", contract.id, contract.kind, contract.path);
-                    }
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "registry", "resolve"],
-                    if found { "ok" } else { "missing" },
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(if found {
-                ExitCode::SUCCESS
-            } else {
-                exit_invalid()
-            })
-        }
-        Err(error) => emit_tooling_error(
-            error,
-            format,
-            vec!["generator", "registry", "resolve"],
-            json!({}),
-        ),
-    }
-}
-
-fn execute_generator_check_run_command(
-    file: PathBuf,
-    context: PathBuf,
-    format: OutputFormat,
-) -> Result<ExitCode, serde_json::Error> {
-    match run_generator_check_file(&file, &context) {
-        Ok(report) => {
-            let status = report.status.clone();
-            match format {
-                OutputFormat::Text => {
-                    println!("generator check run: {status}");
-                    println!("check: {}", report.check.id);
-                    for warning in &report.warnings {
-                        println!("warning {}: {}", warning.code, warning.message);
-                    }
-                    for error in &report.errors {
-                        eprintln!("error {}: {}", error.code, error.message);
-                    }
-                }
-                OutputFormat::Json => print_json(&build_envelope(
-                    ["generator", "check", "run"],
-                    match status.as_str() {
-                        "success" => "ok",
-                        "unsupported" => "unsupported",
-                        "failed" => "invalid",
-                        _ => "error",
-                    },
-                    Summary::default(),
-                    report,
-                    Vec::new(),
-                ))?,
-            }
-            Ok(match status.as_str() {
-                "success" => ExitCode::SUCCESS,
-                "unsupported" => exit_invalid(),
-                _ => exit_runtime(),
-            })
-        }
-        Err(error) => {
-            emit_tooling_error(error, format, vec!["generator", "check", "run"], json!({}))
-        }
-    }
-}
-
 fn execute_plugin_new_command(
     template: String,
     output: PathBuf,
@@ -2480,9 +2227,9 @@ fn execute_plugin_new_command(
     // `elegy plugin new` is the scaffolder lane. It writes a starter file set;
     // the author hand-fills the schema-required fields and iterates against
     // `elegy plugin verify`. The future host-driven authoring lane
-    // (`elegy plugin author`, `elegy plugin doctor`, the `generator` template
-    // kind, `definitionRef` resolution in the validator) is a deferred goal;
-    // see `docs/issues/unresolved-goals.md` GOAL-20260616-01. It does not
+    // (`elegy plugin author`, `elegy plugin doctor`, `definitionRef`
+    // resolution in the validator) is a deferred goal; see
+    // `docs/issues/unresolved-goals.md` GOAL-20260616-01. It does not
     // conflict with this command — the scaffolder remains the lowest-friction
     // starting point even after the authoring lane lands.
     let template_kind = match PluginTemplateKind::from_str(&template) {
@@ -2654,7 +2401,6 @@ fn execute_plugin_inspect_command(
                         "Capability Projections: {}",
                         summary["capabilityProjectionCount"]
                     );
-                    println!("MCP Projections: {}", summary["mcpProjectionCount"]);
                     println!(
                         "Configuration Templates: {}",
                         summary["configurationTemplateCount"]
@@ -2705,7 +2451,7 @@ fn execute_plugin_pack_command(
     }
 }
 
-fn execute_plugin_project_host_command(
+fn execute_plugin_export_host_command(
     host: String,
     package: PathBuf,
     output_dir: PathBuf,
@@ -2716,7 +2462,7 @@ fn execute_plugin_project_host_command(
     let host_target = match HostTarget::from_str(&host) {
         Ok(target) => target,
         Err(error) => {
-            return emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}));
+            return emit_tooling_error(error, format, vec!["plugin", "export", "host"], json!({}));
         }
     };
 
@@ -2729,9 +2475,9 @@ fn execute_plugin_project_host_command(
     ) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_host_projection_text(&result),
+                OutputFormat::Text => print_generated_host_export_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
-                    ["plugin", "project", "host"],
+                    ["plugin", "export", "host"],
                     "ok",
                     Summary::default(),
                     result,
@@ -2741,7 +2487,7 @@ fn execute_plugin_project_host_command(
             Ok(ExitCode::SUCCESS)
         }
         Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}))
+            emit_tooling_error(error, format, vec!["plugin", "export", "host"], json!({}))
         }
     }
 }
@@ -3736,8 +3482,8 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     }
 }
 
-fn print_generated_host_projection_text(result: &GeneratedHostProjection) {
-    println!("generated Codex plugin projection");
+fn print_generated_host_export_text(result: &GeneratedHostExport) {
+    println!("generated host export");
     println!("source: {}", result.source_package);
     println!("plugin: {} {}", result.plugin_name, result.plugin_version);
     println!("manifest: {}", result.emitted_components.plugin_manifest);
@@ -4051,7 +3797,7 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
             "CLI-PLUGIN-006",
             format!("unsupported host target: {host}"),
         )
-        .with_hint("valid targets: opencode, generic")],
+        .with_hint("valid targets: codex, opencode")],
     }
 }
 

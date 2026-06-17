@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document is the canonical governance baseline for the current Elegy repo.
+This document is the canonical governance baseline (historical) for the current Elegy repo.
 
 It defines:
 
@@ -26,9 +26,6 @@ These are the durable authority roots and must stay language-agnostic.
 | --- | --- |
 | `contracts/schemas/` | Governed JSON schema authority |
 | `contracts/fixtures/` | Minimal and parity fixtures |
-| `contracts/manifests/` | Compatibility and bundle manifests |
-| `contracts/support/` | Consumer support metadata |
-| `governance/` | Version, inventory, and boundary governance |
 | `policies/` | Formalization and operational policy artifacts |
 
 ### Layer 2: Rust executable crates
@@ -56,7 +53,6 @@ These surfaces validate and ship the governed and executable layers without rede
 | --- | --- |
 | `scripts/export-contracts.ps1` | Bundle export |
 | `scripts/validate-canonical-outputs.ps1` | Canonical output validation |
-| `scripts/validate-package-boundaries.ps1` | Boundary-governance validation |
 | `.github/workflows/*.yml` | CI enforcement for artifacts, Rust, security, and distribution |
 
 ## Dependency direction rules
@@ -69,7 +65,7 @@ The following rules are mandatory until a later architecture decision changes th
 4. Operator surfaces such as `elegy-cli` and `elegy-host-mcp` must remain thin over explicit runtime and tooling crates.
 5. Export scripts and workflows validate or package the repo surfaces; they are not alternate places to invent contract truth.
 6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
-7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists; wrapper overlays under `src/` do not create an internal Elegy agent orchestration lane.
+7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists; `src/Elegy-*/install.ps1` does not create an internal Elegy agent orchestration lane.
 
 ## Post-legacy rule
 
@@ -77,7 +73,7 @@ Elegy no longer has an active first-party `.NET` source-package family in-repo.
 
 That means:
 
-1. docs must not describe `src/` or `tests/` as active repo centers; the docs-only overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are the only exception, and they remain pointer shells only
+1. docs must not describe `src/` or `tests/` as active repo centers; the install-passthrough files under `src/Elegy-*/install.ps1` are the only exception, and they remain thin install passthroughs only
 2. any downstream `.NET` consumer is now just that: a consumer of governed outputs, not a co-owned in-repo authority surface
 3. new shared responsibilities should be expressed either as governed artifacts or as Rust executable behavior, not by reintroducing legacy compatibility framing
 
@@ -110,7 +106,7 @@ Shared contracts, fixtures, manifests, and policy artifacts are governed central
 That means:
 
 1. the authoritative source lives in `Elegy`, not in downstream consuming repos
-2. versioning rules are defined in `governance/` first, then consumed elsewhere
+2. versioning rules are defined in `contracts/schemas/schema-version.json`
 3. first-party Rust crates and downstream consumers should consume published artifacts or versioned files, not co-own the truth through copy-paste drift
 4. coordinated change procedures are required before a governed contract family becomes a wider dependency
 
@@ -132,9 +128,6 @@ Current enforcement lives in these surfaces:
 
 - `scripts/export-contracts.ps1`
 - `scripts/validate-canonical-outputs.ps1`
-- `scripts/validate-package-boundaries.ps1`
-- `.github/workflows/versioning-governance.yml`
-- `.github/workflows/package-boundaries.yml`
 - `.github/workflows/distribution-artifacts.yml`
 - `.github/workflows/rust-ci.yml`
 - Rust workspace tests that exercise CLI and tooling behavior

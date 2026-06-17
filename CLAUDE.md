@@ -40,7 +40,7 @@ For elegy-memory specifically:
 - Trait-first design. All behaviors behind traits.
 - MVP scope is strict. Features marked v1/v2 get trait/struct skeletons with `todo!()`, not implementations.
 - No `unwrap()` or `expect()` in library code. Use `thiserror` / `anyhow` / `?`.
-- Do not promote `.agents/skills/**`, `.github/skills/**`, wrapper folders, generated bundles, or MCP projections into authority roots.
+- Do not promote wrapper folders, generated bundles, or MCP projections into authority roots.
 - New architecture docs are required when a change introduces a durable cross-crate decision or behavior contract. Do not create boilerplate docs for routine local edits.
 
 ### elegy-memory specific
@@ -60,7 +60,6 @@ cargo clippy -p <crate-name> --all-targets --all-features -- -D warnings
 Use repo-root scripts for governed exports or package boundaries:
 
 ```powershell
-pwsh ./scripts/validate-package-boundaries.ps1
 pwsh ./scripts/export-contracts.ps1
 pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
 ```
@@ -74,22 +73,6 @@ Never modify without explicit human confirmation:
 - Public API surface of any crate
 
 If you need to touch these, STOP, explain why, wait for confirmation.
-
-## Git
-
-- Promotion chain: `<topic>` -> `roro` -> `dev` -> `main`
-- Keep branch ancestry monotonic: `main` must remain an ancestor of `dev`, and `dev` must remain an ancestor of `roro`
-- Do normal feature work on dedicated topic branches, not directly on `roro`, `dev`, or `main`
-- Merge `dev` into `main` only when `dev` is clean and validated
-- If a hotfix lands on `main`, propagate it back through `dev`, then `roro`, before continuing feature work
-- If any branch in the chain falls behind its upstream branch, reconcile downstream before starting more feature work
-- After a complete promotion cycle, `main`, `dev`, and `roro` may all point to the same commit. This is the correct starting state for the next cycle
-- After a clean local promotion cycle, push `main`, `dev`, and `roro` to `origin` immediately so the remote stays aligned with the validated local state. Prefer a single atomic push when available
-- The following `roro` rules apply only when the current branch is `roro`:
-- Merge a topic branch into `roro` only when the work and validation are clean
-- Merge `roro` into `dev` only when `roro` is clean, validated, and reconciled with newer `main` changes
-- Atomic commits: one logical change = one commit
-- Never force-push or rewrite history on `main` or `dev`
 
 ## Do NOT
 

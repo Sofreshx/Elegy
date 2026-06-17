@@ -42,5 +42,8 @@
   "elegyCompatibility": {
     "contractBundleVersion": "1.8.0",
     "schemaLine": "1.x"
+  },
+  "extensions": {
+    "x-demo-key": "example-extension-value"
   }
 }

@@ -26,8 +26,9 @@ metadata, skill authority, connector ownership, or host policy.
 
 ## Current implemented slice
 
-The current implementation adds `elegy generate codex-plugin` on the umbrella
-CLI as lower-level contributor tooling.
+The current implementation adds `elegy plugin export codex` (Codex plugin
+export) on the umbrella CLI as lower-level contributor tooling.
+The legacy `elegy generate codex-plugin` command remains as a compatibility alias.
 
 It currently generates:
 
@@ -64,8 +65,10 @@ Reason:
 ## Current command
 
 ```text
-elegy generate codex-plugin --package <path> --output-dir <dir> [--force]
+elegy plugin export codex --package <path> --output-dir <dir> [--force]
 ```
+
+The legacy alias is `elegy generate codex-plugin`.
 
 When `--force` is used, the generator replaces the existing plugin root for that
 projected plugin name before writing the fresh output so stale generated files
@@ -93,7 +96,7 @@ The current evidence for this slice is:
 
 - reusable generation logic in `rust/crates/elegy-tooling`
 - umbrella CLI coverage in `rust/crates/elegy-cli`
-- focused tooling and CLI tests for `generate codex-plugin`
+- focused tooling and CLI tests for Codex plugin export (tests cover both `elegy plugin export codex` and the legacy `elegy generate codex-plugin` alias)
 
 If future work adds `.mcp.json`, `.app.json`, or marketplace output, update the
 portable package contract, generator behavior, and docs together.

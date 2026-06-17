@@ -13,10 +13,10 @@ The main Elegy repo is now the intended long-term home for both:
 
 The repository now converges on this shape:
 
-- `contracts/`, `governance/`, `schemas/`, and `policies/` remain the authored authority roots
+- `contracts/`, `schemas/`, and `policies/` remain the authored authority roots
 - `artifacts/contracts` remains the generated downstream handoff surface
 - `rust/` is the in-repo Cargo workspace for reusable executable behavior
-- `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` may exist as contributor-navigation overlays only; they do not reopen the removed source-package story
+- `src/Elegy-*/install.ps1` are thin install passthroughs only; they do not reopen the removed source-package story
 - root docs and root scripts define the contributor and validation path
 
 This is no longer a story about keeping a removed legacy package tree authoritative. The current question is simpler: which responsibilities belong in governed artifacts, which belong in Rust executable crates, and which should stay consumer-local.
@@ -26,8 +26,7 @@ This is no longer a story about keeping a removed legacy package tree authoritat
 The following remain canonical in the repo today:
 
 - governed schemas and fixtures under `contracts/`
-- compatibility manifests and bundle metadata under `contracts/manifests/`
-- version and release policy under `governance/`
+- version and release policy under `contracts/schemas/`
 - formalization policy under `policies/`
 - export and validation scripts at the repo root
 
@@ -97,7 +96,6 @@ Contributor-facing validation should point to the smallest real flows that still
 ```powershell
 pwsh ./scripts/export-contracts.ps1 -CreateArchive
 pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
-pwsh ./scripts/validate-package-boundaries.ps1
 ```
 
 ### Rust executable surfaces
@@ -115,7 +113,7 @@ Docs should point contributors only at repo-root bundle scripts and Rust workspa
 ## Current next sequence
 
 1. keep hardening the Rust CLI, tooling crates, and host/runtime surfaces that ship from the in-repo workspace
-2. keep the governed contract, policy, and export roots under `contracts/`, `governance/`, and `policies/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
+2. keep the governed contract, policy, and export roots under `contracts/` and `policies/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
 3. finish removing stale docs that still imply deleted source, test, or package-family centers
 4. only document broader built-in self-authoring or MCP-hosted operator experiences once the Rust workspace proves them as runnable, contributor-facing surfaces
 

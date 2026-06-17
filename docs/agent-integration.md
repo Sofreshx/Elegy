@@ -117,14 +117,14 @@ approval state, secret refs, runtime sessions, adapter handles, or local trust
 decisions. Hosts such as Holon import the portable package, then apply local
 policy, readiness, approvals, secrets, evidence, and execution rules.
 
-`SKILL.md` files, including the repo-local `.agents/skills/**` and
-`.github/skills/**` mirrors, MCP descriptors, wrapper folders, and generated
+`SKILL.md` files, MCP descriptors, wrapper folders, and generated
 discovery indexes remain derived or adapter surfaces. The governed package and
 skill schemas under `contracts/schemas/` remain the authority roots.
 
 Portable packages may also be projected into host-specific plugin folders
-through `elegy generate codex-plugin` (Codex) or future host projection
-targets, but those generated outputs remain derived adapter surfaces rather
+through `elegy plugin export codex` (Codex plugin export) or `elegy plugin export host`
+(OpenCode skills export). The legacy `elegy generate codex-plugin` command is retained as
+a compatibility alias. Generated outputs remain derived adapter surfaces rather
 than authority.
 
 Local `elegy-plugin-package/v1` files may also be consumed directly by
@@ -243,12 +243,10 @@ The governed plugin package fixtures
 (`elegy-plugin-package.elegy-planning.json` and
 `elegy-plugin-package.elegy-skills.json`) carry self-sufficient
 `capabilityProjections` for direct host consumption, alongside the
-`hostProjection` block on the underlying skill definition. To ship in a
-released contract bundle, every package fixture must be listed under its
-schema entry in `contracts/manifests/compatibility-manifest.json` and
-mirrored in `governance/canonical-output-inventory.json`; otherwise the
-`export_contract_bundle` exporter omits it from the directory output and zip
-archive.
+`hostProjection` block on the underlying skill definition. The publication flow
+(`export_contract_bundle`) requires package fixtures to be listed in the
+governed compatibility manifest and canonical output inventory; these metadata
+files are generated as part of the release pipeline.
 
 ## Example Profiles
 

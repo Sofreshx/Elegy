@@ -16,7 +16,7 @@ Record the protocol baseline Elegy is targeting so governed contracts, exported 
 
 Elegy is currently centered on two implementation anchors:
 
-- governed contract and policy artifacts under `contracts/`, `governance/`, `schemas/`, and `policies/`
+- governed contract and policy artifacts under `contracts/`, `schemas/`, and `policies/`
 - the first-party Rust workspace under `rust/`
 
 Protocol-baseline drift would now affect:
@@ -60,7 +60,7 @@ Until that happens, the repository baseline remains `2025-11-25`.
 
 ## Related baselines
 
-- contract authority: `contracts/` and `governance/`
+- contract authority: `contracts/`
 - exported machine-readable handoff: `artifacts/contracts`
 - current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
 - current operator slice: Rust CLI author/analyze/generate with narrow validation and inspection flows under `rust/`

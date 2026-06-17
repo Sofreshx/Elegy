@@ -84,10 +84,6 @@
           "type": "array",
           "items": { "$ref": "#/$defs/pathComponent" }
         },
-        "mcpProjections": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/mcpProjectionComponent" }
-        },
         "capabilityProjections": {
           "type": "array",
           "items": { "$ref": "#/$defs/capabilityProjectionComponent" }
@@ -103,11 +99,6 @@
         "configurationProfiles": {
           "type": "array",
           "items": { "$ref": "#/$defs/configurationComponent" }
-        },
-        "rustToolAdapters": {
-          "type": "array",
-          "description": "Native Rust harness tool adapters for compile-time or harness-load-time integration. Each entry registers a crate adapter that exposes governed capabilities as native tools.",
-          "items": { "$ref": "#/$defs/rustToolAdapterComponent" }
         },
         "toolRequirements": {
           "type": "array",
@@ -183,31 +174,6 @@
       "anyOf": [
         { "required": ["definitionRef"] },
         { "required": ["definition"] }
-      ]
-    },
-    "mcpProjectionComponent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]+$"
-        },
-        "descriptorRef": { "$ref": "#/$defs/relativePath" },
-        "serverName": {
-          "type": "string",
-          "minLength": 1
-        },
-        "capabilityRefs": {
-          "type": "array",
-          "items": { "$ref": "#/$defs/capabilityRef" },
-          "uniqueItems": true
-        }
-      },
-      "anyOf": [
-        { "required": ["descriptorRef"] },
-        { "required": ["serverName"] }
       ]
     },
     "capabilityProjectionComponent": {
@@ -295,41 +261,6 @@
         "description": {
           "type": "string",
           "minLength": 1
-        }
-      }
-    },
-    "rustToolAdapterComponent": {
-      "type": "object",
-      "additionalProperties": false,
-      "required": ["id", "crateName", "crateVersion", "registrySymbol"],
-      "properties": {
-        "id": {
-          "type": "string",
-          "pattern": "^[a-z][a-z0-9-]+$"
-        },
-        "crateName": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Rust crate name (e.g. 'elegy-planning-adapter')."
-        },
-        "crateVersion": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Semver version of the adapter crate."
-        },
-        "feature": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Optional Cargo feature flag to enable this adapter."
-        },
-        "registrySymbol": {
-          "type": "string",
-          "minLength": 1,
-          "description": "Rust symbol name for tool registration (e.g. 'register_planning_tools')."
-        },
-        "manifestRef": {
-          "$ref": "#/$defs/relativePath",
-          "description": "Optional relative path to the adapter's manifest file."
         }
       }
     },
@@ -448,6 +379,11 @@
           "format": "uri"
         }
       }
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Optional free-form extension surface for host-specific or experimental metadata. Preserved on round-trip; not semantically validated by the contract.",
+      "additionalProperties": { "type": ["string", "number", "boolean", "array", "object"] }
     }
   }
 }

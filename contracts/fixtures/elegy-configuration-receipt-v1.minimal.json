@@ -2,22 +2,21 @@
   "schemaVersion": "elegy-configuration-receipt/v1",
   "mode": "dry-run",
   "subjectKind": "template",
-  "subjectId": "repo-skill-mirror-minimal",
+  "subjectId": "repo-opencode-agentic-minimal",
   "sourceKind": "builtin",
-  "sourceRef": "repo-skill-mirror-minimal",
+  "sourceRef": "repo-opencode-agentic-minimal",
   "targetRoot": "C:/example/repo",
   "force": false,
   "bindings": {
-    "authority.skills": ".github/skills",
-    "target.skills": ".opencode/skills"
+    "target.instructions": "AGENTS.md"
   },
   "entries": [
     {
-      "templateId": "repo-skill-mirror-minimal",
-      "operationId": "mirror-skills",
-      "family": "skill",
+      "templateId": "repo-opencode-agentic-minimal",
+      "operationId": "patch-agents-block",
+      "family": "instruction",
       "action": "would-create",
-      "path": "C:/example/repo/.opencode/skills",
+      "path": "C:/example/repo/AGENTS.md",
       "expectedHash": "sha256:demo-expected"
     }
   ],

@@ -2,7 +2,7 @@
 
 This subtree is the first-party Rust runtime family inside the main Elegy repo.
 
-Its job is to implement behavior-heavy runtime concerns that are better served by Rust while continuing to consume governed contracts from the authoritative neutral roots under `contracts/` and `governance/`.
+Its job is to implement behavior-heavy runtime concerns that are better served by Rust while continuing to consume governed contracts from the authoritative neutral roots under `contracts/`.
 
 ## Current slice
 
@@ -33,7 +33,7 @@ Imported or added so far:
 These crates currently provide:
 
 - Rust-native models for governed Elegy contracts
-- semantic validators that mirror the contract authority owned by `contracts/` and `governance/`
+- semantic validators that mirror the contract authority owned by `contracts/`
 - in-repo conformance checks against the exported contract bundle under `artifacts/contracts`
 - reusable policy validation for filesystem and HTTP runtime boundaries
 - parity-first Rust implementations of MCP analyzer, governed skill registry, lower-level generation, and discovery behavior
