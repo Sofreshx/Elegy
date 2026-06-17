@@ -41,6 +41,8 @@ Most users do not need every asset in the release:
 | Dedicated planning CLI | `elegy-planning-<cliVersion>-<target>.zip` |
 | Dedicated skill registry CLI | `elegy-skills-<cliVersion>-<target>.zip` |
 | Dedicated documentation CLI | `elegy-documentation-<cliVersion>-<target>.zip` |
+| Optional MCP-over-HTTP transport for `elegy-memory` | `elegy-memory-mcp-http-<cliVersion>-<target>.zip` |
+| Optional MCP-over-stdio transport for `elegy-memory` | `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip` |
 | Wrapper surface for a dedicated tool family | `elegy-*-wrapper-<bundleVersion>.zip` |
 
 Direct release asset families include:
@@ -51,6 +53,8 @@ Direct release asset families include:
 - `elegy-planning-<cliVersion>-<target>.zip` - dedicated planning CLI
 - `elegy-skills-<cliVersion>-<target>.zip` - dedicated skill registry CLI
 - `elegy-documentation-<cliVersion>-<target>.zip` - dedicated documentation authority CLI
+- `elegy-memory-mcp-http-<cliVersion>-<target>.zip` - optional MCP-over-HTTP transport adapter for `elegy-memory` (OAuth 2.1 + bearer JWT)
+- `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip` - optional MCP-over-stdio transport adapter for `elegy-memory` (local subprocess)
 - `elegy-contracts-<bundleVersion>.zip` - governed contracts bundle
 - `elegy-installer-<bundleVersion>.zip` - installer bootstrap
 - `elegy-*-wrapper-<bundleVersion>.zip` - dedicated wrapper surfaces
@@ -68,6 +72,8 @@ Tagged releases are configured to publish neutral asset families across the cont
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
 - configuration CLI archive: `elegy-configuration-<cliVersion>-<target>.zip`
 - documentation CLI archive: `elegy-documentation-<cliVersion>-<target>.zip`
+- memory MCP HTTP transport archive: `elegy-memory-mcp-http-<cliVersion>-<target>.zip`
+- memory MCP stdio transport archive: `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
 - planning wrapper archive: `elegy-planning-wrapper-<bundleVersion>.zip`
@@ -270,7 +276,7 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 
 1. Update bundle and manifest package metadata/version when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
-3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
+3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, `elegy-documentation`, `elegy-memory-mcp-http`, and `elegy-memory-mcp-stdio`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
 # (distribution packaging not yet implemented)
 5. Run `pwsh ./scripts/package-installer.ps1`.
 7. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata`.

@@ -13,7 +13,7 @@ The main Elegy repo is now the intended long-term home for both:
 
 The repository now converges on this shape:
 
-- `contracts/`, `schemas/`, and `policies/` remain the authored authority roots
+- `contracts/` and `policies/` remain the authored authority roots
 - `artifacts/contracts` remains the generated downstream handoff surface
 - `rust/` is the in-repo Cargo workspace for reusable executable behavior
 - `src/Elegy-*/install.ps1` are thin install passthroughs only; they do not reopen the removed source-package story

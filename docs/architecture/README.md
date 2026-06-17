@@ -12,7 +12,6 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Rust consolidation](rust-consolidation.md) - current cleanup baseline for governed roots, exports, and Rust executable ownership
 - [Substrate governance (historical)](substrate-governance.md) - active artifact/runtime boundary and validation rules
 - [Skill Core V1](skill-core-v1.md) - current skill authority split between governed artifacts and Rust executable behavior
-- [Architecture Tradeoffs](architecture-tradeoffs.md) — decisions and reasoning for current architecture choices
 - [Agent skill bridge mirrors](agent-skill-bridge-mirrors.md) - OBSOLETE: former repo-local SKILL.md mirror policy
 - [Elegy-configuration V1](elegy-configuration-v1.md) - deterministic template and profile materialization boundary between installer, reusable runtime, and consumer bootstrap
 - [Codex plugin projection](codex-plugin-projection.md) - optional Codex projection slice (derived adapter surface, not the primary plugin path)

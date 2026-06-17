@@ -10,7 +10,7 @@
       "planning": [],
       "research": []
     },
-    "compatibilityMode": "v1-compat",
+    "compatibilityMode": "v2",
     "derivedSurfaces": {
       "bundles": [
         "docs/docs-index.md"
@@ -27,13 +27,15 @@
       "planningDays": 45,
       "researchDays": 90
     },
-    "localExceptions": [],
+    "localExceptions": [
+      "docs/specs/obsidian-skill-and-cli.md"
+    ],
     "requiredFrontmatter": [
       "title",
       "status",
       "owner"
     ],
-    "schemaVersion": "elegy-docs/v1"
+    "schemaVersion": "elegy-documentation/v2"
   },
   "configPath": ".elegy/docs.yaml",
   "configuredDerivedSurfaces": {
@@ -69,6 +71,28 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-06-15",
+      "docKind": "adr",
+      "freshness": "fresh",
+      "path": "docs/adr/2026-06-15-adopt-elegy-planning-graph-core.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "title: Adopt elegy-planning graph core",
+      "title": "Adopt elegy-planning graph core"
+    },
+    {
+      "authorityClass": "current",
+      "created": "2026-06-16",
+      "docKind": "adr",
+      "freshness": "fresh",
+      "path": "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Decision record for unifying the Elegy plugin package contract under a single `elegy-plugin-package/v1` schema. Supersedes the V1/V2 split described in `specs/neutral-package-consolidation/spec.md`.",
+      "title": "Elegy Plugin Package V1 Unification"
+    },
+    {
+      "authorityClass": "current",
       "docKind": "spec",
       "freshness": "fresh",
       "path": "docs/specs/README.md",
@@ -89,17 +113,6 @@
     },
     {
       "authorityClass": "current",
-      "created": "2026-06-16",
-      "docKind": "adr",
-      "freshness": "fresh",
-      "path": "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
-      "sourceOfTruth": "current-canon",
-      "status": "accepted",
-      "summary": "Decision record for unifying the Elegy plugin package contract under a single `elegy-plugin-package/v1` schema. Supersedes the V1/V2 split described in `specs/neutral-package-consolidation/spec.md`.",
-      "title": "Elegy Plugin Package V1 Unification"
-    },
-    {
-      "authorityClass": "current",
       "created": "2026-05-25",
       "updated": "2026-06-02",
       "docKind": "spec",
@@ -113,13 +126,43 @@
     {
       "authorityClass": "current",
       "created": "2026-06-02",
-      "docKind": "architecture",
+      "docKind": "spec",
       "freshness": "fresh",
-      "path": "docs/architecture/elegy-planning-v1.md",
+      "path": "docs/specs/elegy-planning-state-machine.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "Architecture mirror for the elegy-planning durable planning surface, mirroring the elegy-memory-v1 and elegy-configuration-v1 layout.",
-      "title": "Elegy-planning V1"
+      "summary": "title: elegy-planning state machine",
+      "title": "elegy-planning state machine"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "fresh",
+      "path": "docs/specs/host-neutral-plugin-install.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "title: Host-neutral plugin install",
+      "title": "Host-neutral plugin install"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "fresh",
+      "path": "docs/specs/obsidian-skill-and-cli.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "title: Obsidian skill and CLI",
+      "title": "Obsidian skill and CLI"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "fresh",
+      "path": "docs/specs/plugin-tool-availability.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "title: Plugin tool availability",
+      "title": "Plugin tool availability"
     }
   ],
   "entrypoints": [
@@ -127,7 +170,7 @@
       "authorityClass": "other",
       "exists": true,
       "path": "README.md",
-      "summary": "[![Latest release](https://img.shields.io/github/v/release/Sofreshx/Elegy?display_name=tag&sort=semver)](https://github.com/Sofreshx/Elegy/releases/latest)",
+      "summary": "Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.",
       "title": "Elegy"
     }
   ],
@@ -140,7 +183,7 @@
     "docs/specs/README.md",
     "docs/specs/documentation-practices-skill-and-cli.md",
     "docs/specs/elegy-planning.md",
-    "docs/architecture/elegy-planning-v1.md"
+    "docs/specs/elegy-planning-state-machine.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

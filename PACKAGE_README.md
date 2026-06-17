@@ -29,6 +29,10 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
   - Dedicated `elegy-configuration` binary.
 - `elegy-documentation-<cliVersion>-<target>.zip`
   - Dedicated `elegy-documentation` binary.
+- `elegy-memory-mcp-http-<cliVersion>-<target>.zip`
+  - `elegy-memory-mcp-http` binary. Optional MCP-over-HTTP transport adapter for `elegy-memory` with OAuth 2.1 + bearer JWT.
+- `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip`
+  - `elegy-memory-mcp-stdio` binary. Optional MCP-over-stdio transport adapter for `elegy-memory` for local subprocess hosting.
 - `elegy-memory-wrapper-<bundleVersion>.zip`, `elegy-mcp-wrapper-<bundleVersion>.zip`, `elegy-planning-wrapper-<bundleVersion>.zip`, `elegy-skills-wrapper-<bundleVersion>.zip`, `elegy-configuration-wrapper-<bundleVersion>.zip`
   - Dedicated wrapper surfaces with wrapper metadata, local install entrypoint, skill bridge, bundled installer helper, and this README.
 - `elegy-documentation-wrapper-<bundleVersion>.zip`
