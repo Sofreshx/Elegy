@@ -364,6 +364,7 @@ via the session ID without needing `--correlation-id` on every call.
 | Search | cross-entity `search`, entity-specific `* search` |
 | Validate | `all` |
 | Health | `health` |
+| Compatibility metadata | `capabilities` |
 | Events | `events` |
 | Project | `render`, `export` |
 | Project run | `claim`, `activate`, `heartbeat`, `release`, `add-evidence`, `list`, `show` |

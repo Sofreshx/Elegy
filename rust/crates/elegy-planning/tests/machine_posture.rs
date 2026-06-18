@@ -35,6 +35,50 @@ fn command_json(args: &[&str]) -> Value {
 }
 
 #[test]
+fn capabilities_reports_lease_contract_without_initializing_a_database() {
+    let temp_dir = unique_temp_dir("elegy-planning-capabilities");
+    let db_path = temp_dir.join("missing-parent").join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "capabilities",
+        ])
+        .output()
+        .expect("run elegy-planning capabilities");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !db_path.exists(),
+        "capability discovery must not initialize storage"
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["schemaVersion"], "planning-result/v1");
+    assert_eq!(envelope["command"], serde_json::json!(["capabilities"]));
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["data"]["planningSchemaVersion"], "10");
+    assert_eq!(
+        envelope["data"]["capabilities"],
+        serde_json::json!([
+            "project-run.claim.v2",
+            "project-run.activate.fenced.v1",
+            "project-run.heartbeat.v1",
+            "project-run.release.fenced.v1",
+            "project-run.add-evidence.fenced.v1"
+        ])
+    );
+}
+
+#[test]
 fn goal_create_supports_machine_flags_and_correlation_id() {
     let temp_dir = unique_temp_dir("elegy-planning-machine-goal");
     let db_path = temp_dir.join("planning.db");
