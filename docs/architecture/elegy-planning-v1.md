@@ -68,6 +68,7 @@ The implemented CLI surface in `rust/crates/elegy-planning/src/cli.rs` is:
 - `elegy-planning validate all`
 - `elegy-planning events list`
 - `elegy-planning health`
+- `elegy-planning capabilities`
 - `elegy-planning project render|export`
 - `elegy-planning context --entity-type <type> --entity-id <id>`
 - `elegy-planning tags list`
@@ -93,6 +94,9 @@ The current MVP CLI behavior is intentionally narrow:
 - `project-run release` accepts `claimed`, `active`, or `interrupted` as
   from-statuses; the new `--status` value drives the final recorded state
 - `project-run add-evidence` rejects updates to `completed` or `released`
+- `capabilities --json` reports the CLI version, result-envelope schema,
+  planning database schema, and exact project-run lease capabilities without
+  initializing a database
   runs; the run must be in `claimed` or `active` to accept evidence
 - activate, heartbeat, release, and add-evidence require the current
   `--fencing-token`; callers must persist the token returned by claim

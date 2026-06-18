@@ -6,6 +6,7 @@ use serde_json::json;
 use thiserror::Error;
 
 use crate::envelope::{MachineEnvelope, MachineStatus};
+use crate::storage::CURRENT_SCHEMA_VERSION;
 use crate::{
     AcceptanceKind, ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput,
     AddWorkPointInput, AttachEvidenceInput, AttachWorktreeInput, ClaimProjectRunInput,
@@ -115,6 +116,8 @@ enum Command {
     Events,
     #[command(about = "Check planning database health")]
     Health,
+    #[command(about = "Report machine-readable CLI compatibility metadata")]
+    Capabilities,
     #[command(about = "Manage project-level configuration")]
     Project {
         #[command(subcommand)]
@@ -1317,6 +1320,9 @@ where
         command: command_path(&cli.command),
     };
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
+    if matches!(&cli.command, Command::Capabilities) {
+        return execute_capabilities(&context);
+    }
     let store = PlanningStore::new(&context.db_path);
     store.init()?;
 
@@ -1358,6 +1364,9 @@ where
         Command::Validate { command } => execute_validate(command, &store, &context),
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
+        Command::Capabilities => {
+            unreachable!("capabilities returns before database initialization")
+        }
         Command::Project { command } => execute_project(command, &store, &context),
         Command::Session { command } => execute_session(command, &store, &context),
         Command::Search(args) => execute_search(args, &store, &context),
@@ -2156,6 +2165,25 @@ fn execute_events(store: &PlanningStore, context: &MachineContext) -> Result<Exi
 
 fn execute_health(store: &PlanningStore, context: &MachineContext) -> Result<ExitCode, CliError> {
     emit_success(context, vec!["health"], store.health()?)
+}
+
+fn execute_capabilities(context: &MachineContext) -> Result<ExitCode, CliError> {
+    emit_success(
+        context,
+        vec!["capabilities"],
+        json!({
+            "cliVersion": env!("CARGO_PKG_VERSION"),
+            "resultSchemaVersion": RESULT_SCHEMA_VERSION,
+            "planningSchemaVersion": CURRENT_SCHEMA_VERSION,
+            "capabilities": [
+                "project-run.claim.v2",
+                "project-run.activate.fenced.v1",
+                "project-run.heartbeat.v1",
+                "project-run.release.fenced.v1",
+                "project-run.add-evidence.fenced.v1"
+            ]
+        }),
+    )
 }
 
 fn execute_project(
@@ -3165,6 +3193,7 @@ fn command_path(command: &Command) -> Vec<String> {
         ],
         Command::Events => vec!["events".to_string(), "list".to_string()],
         Command::Health => vec!["health".to_string()],
+        Command::Capabilities => vec!["capabilities".to_string()],
         Command::Project { command } => vec![
             "project".to_string(),
             project_command_name(command).to_string(),
@@ -3553,6 +3582,7 @@ fn is_command_mutation(command: &Command) -> bool {
         Command::Validate { .. }
         | Command::Events
         | Command::Health
+        | Command::Capabilities
         | Command::Project { .. }
         | Command::Search(_)
         | Command::Context(_)
