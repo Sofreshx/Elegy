@@ -64,7 +64,7 @@ The implemented CLI surface in `rust/crates/elegy-planning/src/cli.rs` is:
 - `elegy-planning issue record|list|show|update-status|search`
 - `elegy-planning review-point record|update-status`
 - `elegy-planning insight record|list|show|update-status|search`
-- `elegy-planning project-run claim|activate|release|add-evidence|list|show`
+- `elegy-planning project-run claim|activate|heartbeat|release|add-evidence|list|show`
 - `elegy-planning validate all`
 - `elegy-planning events list`
 - `elegy-planning health`
@@ -84,13 +84,18 @@ The current MVP CLI behavior is intentionally narrow:
   returning candidates; the candidate order is `ordering` then `id`
 - `work-graph` runs `validate_all` first; nodes carry `hasActiveLease` and
   `planCount`; edges come from declared `dependencyIds`
-- `project-run claim` is rejected with `ACTIVE-LEASE-CONFLICT` if the target
-  work point already has a `claimed`, `active`, or `interrupted` lease
+- `project-run claim` atomically expires stale leases, rejects a live competing
+  lease, and returns owner, expiry, heartbeat, idempotency, and fencing fields
+- identical claim idempotency keys replay the original record; mismatched
+  payloads fail with `PROJECT-RUN-IDEMPOTENCY-CONFLICT`
 - `project-run activate` is the only path from `claimed` to `active`
+- `project-run heartbeat` extends a live claimed or active lease
 - `project-run release` accepts `claimed`, `active`, or `interrupted` as
   from-statuses; the new `--status` value drives the final recorded state
 - `project-run add-evidence` rejects updates to `completed` or `released`
   runs; the run must be in `claimed` or `active` to accept evidence
+- activate, heartbeat, release, and add-evidence require the current
+  `--fencing-token`; callers must persist the token returned by claim
 - validation is advisory; an invalid plan still exists in the database and
   carries a `validation` payload in the response envelope
 - `--json --non-interactive` produces a stable versioned envelope on every

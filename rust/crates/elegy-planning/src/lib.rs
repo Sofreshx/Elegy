@@ -16,8 +16,8 @@ pub use storage::{
     AttachEvidenceInput, ClaimProjectRunInput, CreateAcceptanceInput, CreateEvidenceInput,
     CreateGoalInput, CreateGraphEdgeInput, CreateGraphNodeInput, CreateInsightInput,
     CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateScopeInput, CreateTodoInput, FinalizeGraphNodeInput, PlanningStore,
-    ReleaseProjectRunInput, ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput,
-    ReviseWorkPointInput, SatisfyAcceptanceInput, SearchInput, UpdateGraphEdgeStatusInput,
-    UpdateGraphNodeStatusInput, UpdateStatusInput,
+    CreateScopeInput, CreateTodoInput, FinalizeGraphNodeInput, HeartbeatProjectRunInput,
+    PlanningStore, ReleaseProjectRunInput, ReviseGraphEdgeInput, ReviseGraphNodeInput,
+    RevisePlanInput, ReviseWorkPointInput, SatisfyAcceptanceInput, SearchInput,
+    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput,
 };
