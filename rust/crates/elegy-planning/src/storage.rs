@@ -5,7 +5,9 @@ use std::{
     time::Duration,
 };
 
-use rusqlite::{params, params_from_iter, Connection, OptionalExtension, Row, Transaction};
+use rusqlite::{
+    params, params_from_iter, Connection, OptionalExtension, Row, Transaction, TransactionBehavior,
+};
 use serde::Serialize;
 use serde_json::Value;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
@@ -27,7 +29,8 @@ use crate::{
     WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "9";
+pub const CURRENT_SCHEMA_VERSION: &str = "10";
+const DEFAULT_LEASE_SECONDS: i64 = 900;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
 const SQLITE_MAX_VARIABLES: usize = 999;
@@ -220,6 +223,9 @@ pub struct ClaimProjectRunInput {
     pub run_id: Option<String>,
     pub profile_id: Option<String>,
     pub correlation_id: Option<String>,
+    pub owner_id: Option<String>,
+    pub idempotency_key: Option<String>,
+    pub lease_seconds: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -227,6 +233,16 @@ pub struct ActivateProjectRunInput {
     pub project_run_id: String,
     pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
+    pub fencing_token: Option<i64>,
+}
+
+#[derive(Clone, Debug)]
+pub struct HeartbeatProjectRunInput {
+    pub project_run_id: String,
+    pub active_scope_key: Option<String>,
+    pub run_id: Option<String>,
+    pub fencing_token: Option<i64>,
+    pub lease_seconds: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -236,6 +252,7 @@ pub struct ReleaseProjectRunInput {
     pub evidence: Option<ProjectRunEvidence>,
     pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
+    pub fencing_token: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -244,6 +261,7 @@ pub struct AddEvidenceInput {
     pub evidence: ProjectRunEvidence,
     pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
+    pub fencing_token: Option<i64>,
 }
 
 #[derive(Clone, Debug)]
@@ -2112,11 +2130,13 @@ impl PlanningStore {
         // Phase 6: Extended session context fields
 
         // Active project runs for this scope
+        let lease_now = now_string()?;
         let mut project_run_stmt = connection.prepare(
-            "SELECT id FROM project_runs WHERE scope_key = ?1 AND status IN ('claimed', 'active', 'interrupted') AND session_id IS NOT NULL ORDER BY claimed_at DESC LIMIT 10",
+            "SELECT id FROM project_runs WHERE scope_key = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2) AND session_id IS NOT NULL ORDER BY claimed_at DESC LIMIT 10",
         )?;
-        let run_rows =
-            project_run_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let run_rows = project_run_stmt.query_map(params![normalized, lease_now], |row| {
+            row.get::<_, String>(0)
+        })?;
         let mut active_project_runs = Vec::new();
         for run_id in run_rows.flatten() {
             if let Ok(run) = load_project_run(&connection, &run_id) {
@@ -3491,7 +3511,7 @@ impl PlanningStore {
         require_non_empty("workPointId", &input.work_point_id)?;
 
         let mut connection = self.open_connection()?;
-        let transaction = connection.transaction()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let scope_key = normalized_scope_key(input.scope_key);
         let inherited_scope_key = ensure_referenced_entity_in_scope(
             &transaction,
@@ -3545,9 +3565,104 @@ impl PlanningStore {
             )));
         }
 
+        let now = now_string()?;
+        let lease_seconds = normalize_lease_seconds(input.lease_seconds)?;
+        let owner_id = input
+            .owner_id
+            .clone()
+            .or_else(|| input.session_id.clone())
+            .or_else(|| input.run_id.clone())
+            .ok_or_else(|| {
+                PlanningStoreError::InvalidInput(
+                    serde_json::json!({
+                        "code": "PROJECT-RUN-OWNER-REQUIRED",
+                        "message": "provide ownerId, sessionId, or a run correlation id",
+                    })
+                    .to_string(),
+                )
+            })?;
+        if let Some(ref key) = input.idempotency_key {
+            require_non_empty("idempotencyKey", key)?;
+            let existing_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM project_runs WHERE scope_key = ?1 AND idempotency_key = ?2",
+                    params![inherited_scope_key, key],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if let Some(existing_id) = existing_id {
+                let existing = load_project_run(&transaction, &existing_id)?;
+                if existing.goal_id == input.goal_id
+                    && existing.roadmap_id == input.roadmap_id
+                    && existing.work_point_id == input.work_point_id
+                    && existing.owner_id == owner_id
+                    && existing.repo_id == input.repo_id
+                    && existing.branch == input.branch
+                    && existing.worktree_id == input.worktree_id
+                    && existing.session_id == input.session_id
+                    && existing.profile_id == input.profile_id
+                {
+                    let validation =
+                        validate_and_store(&transaction, EntityType::ProjectRun, &existing.id)?;
+                    transaction.commit()?;
+                    return Ok(MutationResult {
+                        record: existing,
+                        validation,
+                    });
+                }
+                return Err(PlanningStoreError::InvalidInput(
+                    serde_json::json!({
+                        "code": "PROJECT-RUN-IDEMPOTENCY-CONFLICT",
+                        "message": "idempotency key was already used with a different claim payload",
+                        "idempotencyKey": key,
+                        "existingProjectRunId": existing.id,
+                    })
+                    .to_string(),
+                ));
+            }
+        }
+
+        let expired_ids = {
+            let mut statement = transaction.prepare(
+                "SELECT id FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) <= julianday(?2) ORDER BY fencing_token ASC",
+            )?;
+            let rows = statement.query_map(params![input.work_point_id, now], |row| {
+                row.get::<_, String>(0)
+            })?;
+            collect_rows(rows)?
+        };
+        transaction.execute(
+            "UPDATE project_runs SET status = 'released', revision = revision + 1, updated_at = ?1 WHERE work_point_id = ?2 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) <= julianday(?1)",
+            params![now, input.work_point_id],
+        )?;
+        for expired_id in expired_ids {
+            let expired = load_project_run(&transaction, &expired_id)?;
+            let correlation_id = input
+                .correlation_id
+                .as_deref()
+                .unwrap_or("lease-expiration");
+            append_event(
+                &transaction,
+                build_event(
+                    &transaction,
+                    EntityType::ProjectRun,
+                    &expired.id,
+                    EntityType::Roadmap,
+                    &expired.roadmap_id,
+                    correlation_id,
+                    input.run_id.clone(),
+                    "project-run.expired",
+                    serde_json::json!({
+                        "fencingToken": expired.fencing_token,
+                        "leaseExpiresAt": expired.lease_expires_at,
+                        "status": expired.status,
+                    }),
+                )?,
+            )?;
+        }
         let active_count: i64 = transaction.query_row(
-            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
-            params![input.work_point_id],
+            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+            params![input.work_point_id, now],
             |row| row.get(0),
         )?;
         if active_count > 0 {
@@ -3556,8 +3671,13 @@ impl PlanningStore {
             });
         }
 
-        let now = now_string()?;
         let id = input.id.unwrap_or_else(new_id);
+        let fencing_token: i64 = transaction.query_row(
+            "SELECT COALESCE(MAX(fencing_token), 0) + 1 FROM project_runs WHERE work_point_id = ?1",
+            params![input.work_point_id],
+            |row| row.get(0),
+        )?;
+        let lease_expires_at = lease_deadline(&now, lease_seconds)?;
         let evidence = ProjectRunEvidence::default();
         let record = ProjectRunRecord {
             id: id.clone(),
@@ -3571,6 +3691,11 @@ impl PlanningStore {
             session_id: input.session_id,
             run_id: input.run_id.clone(),
             profile_id: input.profile_id,
+            owner_id,
+            idempotency_key: input.idempotency_key,
+            fencing_token,
+            lease_expires_at,
+            heartbeat_at: now.clone(),
             status: ProjectRunStatus::Claimed,
             evidence,
             revision: 1,
@@ -3584,9 +3709,10 @@ impl PlanningStore {
             r#"
             INSERT INTO project_runs (
                 id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch,
-                worktree_id, session_id, run_id, profile_id, status, evidence_json,
+                worktree_id, session_id, run_id, profile_id, owner_id, idempotency_key,
+                fencing_token, lease_expires_at, heartbeat_at, status, evidence_json,
                 revision, claimed_at, completed_at, created_at, updated_at
-            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
             "#,
             params![
                 record.id,
@@ -3600,6 +3726,11 @@ impl PlanningStore {
                 record.session_id,
                 record.run_id,
                 record.profile_id,
+                record.owner_id,
+                record.idempotency_key,
+                record.fencing_token,
+                record.lease_expires_at,
+                record.heartbeat_at,
                 record.status.as_str(),
                 to_json_text(&record.evidence)?,
                 record.revision,
@@ -3660,7 +3791,7 @@ impl PlanningStore {
         require_non_empty("projectRunId", &input.project_run_id)?;
 
         let mut connection = self.open_connection()?;
-        let transaction = connection.transaction()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let active_scope_key = normalized_scope_key(input.active_scope_key);
         ensure_entity_in_scope(
             &transaction,
@@ -3670,14 +3801,14 @@ impl PlanningStore {
         )?;
 
         let existing = load_project_run(&transaction, &input.project_run_id)?;
+        let now = now_string()?;
+        require_current_lease(&existing, input.fencing_token, &now)?;
         if existing.status != ProjectRunStatus::Claimed {
             return Err(PlanningStoreError::ProjectRunStatusMismatch {
                 expected: "claimed".to_string(),
                 actual: existing.status.to_string(),
             });
         }
-
-        let now = now_string()?;
 
         transaction.execute(
             r#"
@@ -3735,6 +3866,62 @@ impl PlanningStore {
         Ok(MutationResult { record, validation })
     }
 
+    pub fn heartbeat_project_run(
+        &self,
+        input: HeartbeatProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        require_non_empty("projectRunId", &input.project_run_id)?;
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let active_scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::ProjectRun,
+            &input.project_run_id,
+            &active_scope_key,
+        )?;
+        let existing = load_project_run(&transaction, &input.project_run_id)?;
+        let now = now_string()?;
+        require_current_lease(&existing, input.fencing_token, &now)?;
+        if existing.status != ProjectRunStatus::Claimed
+            && existing.status != ProjectRunStatus::Active
+        {
+            return Err(PlanningStoreError::ProjectRunStatusMismatch {
+                expected: "claimed or active".to_string(),
+                actual: existing.status.to_string(),
+            });
+        }
+        let lease_seconds = normalize_lease_seconds(input.lease_seconds)?;
+        let lease_expires_at = lease_deadline(&now, lease_seconds)?;
+        transaction.execute(
+            "UPDATE project_runs SET heartbeat_at = ?1, lease_expires_at = ?2, revision = revision + 1, updated_at = ?1 WHERE id = ?3 AND fencing_token = ?4",
+            params![now, lease_expires_at, input.project_run_id, existing.fencing_token],
+        )?;
+        let record = load_project_run(&transaction, &input.project_run_id)?;
+        let correlation_id = roadmap_correlation_id(&transaction, &record.roadmap_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &record.id,
+                EntityType::Roadmap,
+                &record.roadmap_id,
+                &correlation_id,
+                input.run_id,
+                "project-run.heartbeat",
+                serde_json::json!({
+                    "fencingToken": record.fencing_token,
+                    "heartbeatAt": record.heartbeat_at,
+                    "leaseExpiresAt": record.lease_expires_at,
+                }),
+            )?,
+        )?;
+        let validation = validate_and_store(&transaction, EntityType::ProjectRun, &record.id)?;
+        transaction.commit()?;
+        Ok(MutationResult { record, validation })
+    }
+
     pub fn release_project_run(
         &self,
         input: ReleaseProjectRunInput,
@@ -3742,7 +3929,7 @@ impl PlanningStore {
         require_non_empty("projectRunId", &input.project_run_id)?;
 
         let mut connection = self.open_connection()?;
-        let transaction = connection.transaction()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let active_scope_key = normalized_scope_key(input.active_scope_key);
         ensure_entity_in_scope(
             &transaction,
@@ -3752,6 +3939,8 @@ impl PlanningStore {
         )?;
 
         let existing = load_project_run(&transaction, &input.project_run_id)?;
+        let now = now_string()?;
+        require_current_lease(&existing, input.fencing_token, &now)?;
         if existing.status != ProjectRunStatus::Claimed
             && existing.status != ProjectRunStatus::Active
             && existing.status != ProjectRunStatus::Interrupted
@@ -3762,7 +3951,6 @@ impl PlanningStore {
             });
         }
 
-        let now = now_string()?;
         let evidence = input.evidence.unwrap_or(existing.evidence);
         let completed_at = if input.status == ProjectRunStatus::Completed {
             Some(now.clone())
@@ -3827,7 +4015,7 @@ impl PlanningStore {
         require_non_empty("projectRunId", &input.project_run_id)?;
 
         let mut connection = self.open_connection()?;
-        let transaction = connection.transaction()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
         let active_scope_key = normalized_scope_key(input.active_scope_key);
         ensure_entity_in_scope(
             &transaction,
@@ -3837,6 +4025,8 @@ impl PlanningStore {
         )?;
 
         let existing = load_project_run(&transaction, &input.project_run_id)?;
+        let now = now_string()?;
+        require_current_lease(&existing, input.fencing_token, &now)?;
         if existing.status == ProjectRunStatus::Completed
             || existing.status == ProjectRunStatus::Released
         {
@@ -3845,8 +4035,6 @@ impl PlanningStore {
                 actual: existing.status.to_string(),
             });
         }
-        let now = now_string()?;
-
         transaction.execute(
             r#"
             UPDATE project_runs SET
@@ -3902,9 +4090,10 @@ impl PlanningStore {
         session_id: &str,
     ) -> Result<i64, PlanningStoreError> {
         let conn = self.open_connection()?;
+        let now = now_string()?;
         let count: i64 = conn.query_row(
-            "SELECT COUNT(*) FROM project_runs WHERE session_id = ?1 AND status IN ('claimed','active','interrupted')",
-            params![session_id],
+            "SELECT COUNT(*) FROM project_runs WHERE session_id = ?1 AND status IN ('claimed','active','interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+            params![session_id, now],
             |row| row.get(0),
         )?;
         Ok(count)
@@ -4129,12 +4318,13 @@ impl PlanningStore {
     /// List recent sessions from the events table.
     pub fn list_sessions(&self, limit: i64) -> Result<Vec<SessionSummary>, PlanningStoreError> {
         let conn = self.open_connection()?;
+        let now = now_string()?;
         let mut stmt = conn.prepare(
             "SELECT
                 COALESCE(e.session_id, 'unknown') as sid,
                 COUNT(*) as event_count,
                 MAX(e.created_at) as last_seen,
-                (SELECT COUNT(*) FROM project_runs pr WHERE pr.session_id = e.session_id AND pr.status IN ('claimed','active','interrupted')) as active_runs
+                (SELECT COUNT(*) FROM project_runs pr WHERE pr.session_id = e.session_id AND pr.status IN ('claimed','active','interrupted') AND julianday(pr.lease_expires_at) > julianday(?2)) as active_runs
              FROM planning_events e
              WHERE e.session_id IS NOT NULL AND e.session_id != ''
              GROUP BY e.session_id
@@ -4142,7 +4332,7 @@ impl PlanningStore {
              LIMIT ?1"
         )?;
 
-        let rows = stmt.query_map(params![limit], |row| {
+        let rows = stmt.query_map(params![limit, now], |row| {
             Ok(SessionSummary {
                 session_id: row.get(0)?,
                 scope: String::new(),
@@ -4159,7 +4349,7 @@ impl PlanningStore {
     pub fn list_project_runs(&self) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, owner_id, idempotency_key, fencing_token, lease_expires_at, heartbeat_at, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map([], row_to_project_run)?;
         collect_rows(rows)
@@ -4171,7 +4361,7 @@ impl PlanningStore {
     ) -> Result<Vec<ProjectRunRecord>, PlanningStoreError> {
         let connection = self.open_connection()?;
         let mut statement = connection.prepare(
-            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, owner_id, idempotency_key, fencing_token, lease_expires_at, heartbeat_at, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE scope_key = ?1 ORDER BY updated_at DESC, id ASC",
         )?;
         let rows = statement.query_map(
             params![normalize_scope_key_value(scope_key)],
@@ -4199,6 +4389,7 @@ impl PlanningStore {
         require_non_empty("roadmapId", roadmap_id)?;
 
         let connection = self.open_connection()?;
+        let now = now_string()?;
         let roadmap = load_roadmap(&connection, roadmap_id)?;
         let all_work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
         let scope_key = &roadmap.scope_key;
@@ -4296,8 +4487,8 @@ impl PlanningStore {
 
             // Check active leases
             let active_lease_count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
-                params![wp.id],
+                "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+                params![wp.id, now],
                 |row| row.get(0),
             )?;
             if active_lease_count > 0 {
@@ -4393,6 +4584,7 @@ impl PlanningStore {
         require_non_empty("roadmapId", roadmap_id)?;
 
         let connection = self.open_connection()?;
+        let now = now_string()?;
         let work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
         let mut nodes = Vec::new();
         let mut edges = Vec::new();
@@ -4407,8 +4599,8 @@ impl PlanningStore {
                 .unwrap_or(0);
             let has_active_lease: bool = connection
                 .query_row(
-                    "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted')",
-                    params![wp.id],
+                    "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+                    params![wp.id, now],
                     |row| row.get::<_, i64>(0),
                 )
                 .unwrap_or(0)
@@ -6120,6 +6312,11 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
             session_id TEXT,
             run_id TEXT,
             profile_id TEXT,
+            owner_id TEXT NOT NULL,
+            idempotency_key TEXT,
+            fencing_token INTEGER NOT NULL,
+            lease_expires_at TEXT NOT NULL,
+            heartbeat_at TEXT NOT NULL,
             status TEXT NOT NULL,
             evidence_json TEXT NOT NULL,
             revision INTEGER NOT NULL,
@@ -6130,6 +6327,7 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
         );
         CREATE INDEX IF NOT EXISTS idx_project_runs_work_point ON project_runs(work_point_id, status);
         CREATE INDEX IF NOT EXISTS idx_project_runs_roadmap ON project_runs(roadmap_id, status);
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_project_runs_idempotency ON project_runs(scope_key, idempotency_key) WHERE idempotency_key IS NOT NULL;
 
         CREATE TABLE IF NOT EXISTS planning_nodes (
             id TEXT PRIMARY KEY,
@@ -6212,7 +6410,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("2") => {
             migrate_v2_to_v3(connection)?;
@@ -6221,7 +6420,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("3") => {
             migrate_v3_to_v4(connection)?;
@@ -6229,31 +6429,40 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("4") => {
             migrate_v4_to_v5(connection)?;
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("5") => {
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("6") => {
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
         Some("7") => {
             migrate_v7_to_v8(connection)?;
-            migrate_v8_to_v9(connection)
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
         }
-        Some("8") => migrate_v8_to_v9(connection),
+        Some("8") => {
+            migrate_v8_to_v9(connection)?;
+            migrate_v9_to_v10(connection)
+        }
+        Some("9") => migrate_v9_to_v10(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -6612,6 +6821,45 @@ fn migrate_v8_to_v9(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
 
     connection.execute(
         "UPDATE planning_config SET value = '9' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
+    )?;
+    Ok(())
+}
+
+fn migrate_v9_to_v10(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    let now = now_string()?;
+    let default_expiry = lease_deadline(&now, DEFAULT_LEASE_SECONDS)?;
+    for (column, definition) in [
+        ("owner_id", "TEXT NOT NULL DEFAULT 'legacy-owner'"),
+        ("idempotency_key", "TEXT"),
+        ("fencing_token", "INTEGER NOT NULL DEFAULT 1"),
+        ("lease_expires_at", "TEXT NOT NULL DEFAULT ''"),
+        ("heartbeat_at", "TEXT NOT NULL DEFAULT ''"),
+    ] {
+        if !table_has_column(connection, "project_runs", column)? {
+            connection.execute(
+                &format!("ALTER TABLE project_runs ADD COLUMN {column} {definition}"),
+                [],
+            )?;
+        }
+    }
+    connection.execute(
+        "UPDATE project_runs SET owner_id = COALESCE(NULLIF(session_id, ''), NULLIF(run_id, ''), 'legacy-owner') WHERE owner_id = 'legacy-owner'",
+        [],
+    )?;
+    connection.execute(
+        "UPDATE project_runs SET heartbeat_at = COALESCE(NULLIF(claimed_at, ''), updated_at, ?1) WHERE heartbeat_at = ''",
+        params![now],
+    )?;
+    connection.execute(
+        "UPDATE project_runs SET lease_expires_at = ?1 WHERE lease_expires_at = ''",
+        params![default_expiry],
+    )?;
+    connection.execute_batch(
+        "CREATE UNIQUE INDEX IF NOT EXISTS idx_project_runs_idempotency ON project_runs(scope_key, idempotency_key) WHERE idempotency_key IS NOT NULL;",
+    )?;
+    connection.execute(
+        "UPDATE planning_config SET value = '10' WHERE key = ?1",
         params![SCHEMA_VERSION_KEY],
     )?;
     Ok(())
@@ -8312,6 +8560,75 @@ fn now_string() -> Result<String, PlanningStoreError> {
         .map_err(|_| PlanningStoreError::TimeFormat)
 }
 
+fn normalize_lease_seconds(value: Option<i64>) -> Result<i64, PlanningStoreError> {
+    let seconds = value.unwrap_or(DEFAULT_LEASE_SECONDS);
+    if !(1..=86_400).contains(&seconds) {
+        return Err(PlanningStoreError::InvalidInput(
+            serde_json::json!({
+                "code": "PROJECT-RUN-LEASE-DURATION-INVALID",
+                "message": "leaseSeconds must be between 1 and 86400",
+                "leaseSeconds": seconds,
+            })
+            .to_string(),
+        ));
+    }
+    Ok(seconds)
+}
+
+fn lease_deadline(now: &str, lease_seconds: i64) -> Result<String, PlanningStoreError> {
+    let parsed =
+        OffsetDateTime::parse(now, &Rfc3339).map_err(|_| PlanningStoreError::TimeFormat)?;
+    (parsed + time::Duration::seconds(lease_seconds))
+        .format(&Rfc3339)
+        .map_err(|_| PlanningStoreError::TimeFormat)
+}
+
+fn require_current_lease(
+    record: &ProjectRunRecord,
+    fencing_token: Option<i64>,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    let supplied = fencing_token.ok_or_else(|| {
+        PlanningStoreError::InvalidInput(
+            serde_json::json!({
+                "code": "PROJECT-RUN-FENCING-TOKEN-REQUIRED",
+                "message": "pass the fencingToken returned by project-run claim",
+                "projectRunId": record.id,
+                "expectedFencingToken": record.fencing_token,
+            })
+            .to_string(),
+        )
+    })?;
+    if supplied != record.fencing_token {
+        return Err(PlanningStoreError::InvalidInput(
+            serde_json::json!({
+                "code": "PROJECT-RUN-STALE-FENCING-TOKEN",
+                "message": "the project run fencing token is stale",
+                "projectRunId": record.id,
+                "expectedFencingToken": record.fencing_token,
+                "actualFencingToken": supplied,
+            })
+            .to_string(),
+        ));
+    }
+    let lease_expires_at = OffsetDateTime::parse(&record.lease_expires_at, &Rfc3339)
+        .map_err(|_| PlanningStoreError::TimeFormat)?;
+    let current_time =
+        OffsetDateTime::parse(now, &Rfc3339).map_err(|_| PlanningStoreError::TimeFormat)?;
+    if lease_expires_at <= current_time {
+        return Err(PlanningStoreError::InvalidInput(
+            serde_json::json!({
+                "code": "PROJECT-RUN-LEASE-EXPIRED",
+                "message": "the project run lease has expired",
+                "projectRunId": record.id,
+                "leaseExpiresAt": record.lease_expires_at,
+            })
+            .to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn new_id() -> String {
     Uuid::new_v4().to_string()
 }
@@ -8507,13 +8824,18 @@ fn row_to_project_run(row: &Row<'_>) -> Result<ProjectRunRecord, rusqlite::Error
         session_id: row.get(8)?,
         run_id: row.get(9)?,
         profile_id: row.get(10)?,
-        status: parse_project_run_status(row.get::<_, String>(11)?)?,
-        evidence: parse_json_column(row.get::<_, String>(12)?)?,
-        revision: row.get(13)?,
-        claimed_at: row.get(14)?,
-        completed_at: row.get(15)?,
-        created_at: row.get(16)?,
-        updated_at: row.get(17)?,
+        owner_id: row.get(11)?,
+        idempotency_key: row.get(12)?,
+        fencing_token: row.get(13)?,
+        lease_expires_at: row.get(14)?,
+        heartbeat_at: row.get(15)?,
+        status: parse_project_run_status(row.get::<_, String>(16)?)?,
+        evidence: parse_json_column(row.get::<_, String>(17)?)?,
+        revision: row.get(18)?,
+        claimed_at: row.get(19)?,
+        completed_at: row.get(20)?,
+        created_at: row.get(21)?,
+        updated_at: row.get(22)?,
     })
 }
 
@@ -8548,7 +8870,7 @@ pub(crate) fn load_project_run(
 ) -> Result<ProjectRunRecord, PlanningStoreError> {
     connection
         .query_row(
-            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE id = ?1",
+            "SELECT id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch, worktree_id, session_id, run_id, profile_id, owner_id, idempotency_key, fencing_token, lease_expires_at, heartbeat_at, status, evidence_json, revision, claimed_at, completed_at, created_at, updated_at FROM project_runs WHERE id = ?1",
             params![id],
             row_to_project_run,
         )
@@ -9219,11 +9541,95 @@ fn render_insight_markdown(view: &InsightView) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::{
+        sync::{Arc, Barrier},
+        thread,
+        time::Duration as StdDuration,
+    };
+
     use rusqlite::params;
     use tempfile::tempdir;
 
     use super::*;
     use crate::ValidationStatus;
+
+    fn create_lease_fixture(store: &PlanningStore) {
+        store
+            .create_goal(CreateGoalInput {
+                id: Some("lease-goal".to_string()),
+                scope_key: None,
+                correlation_id: "lease-correlation".to_string(),
+                title: "Lease goal".to_string(),
+                description: "Lease test fixture.".to_string(),
+                acceptance_criteria: vec!["lease is exclusive".to_string()],
+                rejection_criteria: vec!["duplicate owner".to_string()],
+                status: GoalStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create lease goal");
+        store
+            .create_roadmap(CreateRoadmapInput {
+                id: Some("lease-roadmap".to_string()),
+                scope_key: None,
+                goal_id: "lease-goal".to_string(),
+                correlation_id: "lease-correlation".to_string(),
+                title: "Lease roadmap".to_string(),
+                summary: "Lease test fixture.".to_string(),
+                status: RoadmapStatus::Active,
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create lease roadmap");
+        store
+            .add_work_point(AddWorkPointInput {
+                id: Some("lease-work-point".to_string()),
+                scope_key: None,
+                roadmap_id: "lease-roadmap".to_string(),
+                section_id: None,
+                title: "Lease work point".to_string(),
+                summary: "Lease test fixture.".to_string(),
+                status: WorkPointStatus::Proposed,
+                ordering: Some(1),
+                dependency_ids: Vec::new(),
+                validation_expectations: vec!["exclusive claim".to_string()],
+                effort_tier: EffortTier::Fast,
+                kind: Some(WorkPointKind::Feature),
+                priority: Some(Priority::Medium),
+                repairs_work_point_ids: Vec::new(),
+                supersedes_work_point_ids: Vec::new(),
+                blocks_work_point_ids: Vec::new(),
+                file_scopes: Vec::new(),
+                tags: Vec::new(),
+                run_id: None,
+            })
+            .expect("create lease work point");
+    }
+
+    fn lease_claim(
+        id: &str,
+        owner_id: &str,
+        idempotency_key: &str,
+        lease_seconds: i64,
+    ) -> ClaimProjectRunInput {
+        ClaimProjectRunInput {
+            id: Some(id.to_string()),
+            scope_key: None,
+            goal_id: "lease-goal".to_string(),
+            roadmap_id: "lease-roadmap".to_string(),
+            work_point_id: "lease-work-point".to_string(),
+            repo_id: Some("lease-repo".to_string()),
+            branch: Some("lease-branch".to_string()),
+            worktree_id: Some("lease-worktree".to_string()),
+            session_id: Some(owner_id.to_string()),
+            run_id: Some(format!("run-{id}")),
+            profile_id: None,
+            correlation_id: Some("lease-correlation".to_string()),
+            owner_id: Some(owner_id.to_string()),
+            idempotency_key: Some(idempotency_key.to_string()),
+            lease_seconds: Some(lease_seconds),
+        }
+    }
 
     #[derive(Clone, Debug)]
     struct ScopedFixtureIds {
@@ -10630,7 +11036,10 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("get schema version");
-        assert_eq!(version, "9", "fresh database should have schema version 9");
+        assert_eq!(
+            version, "10",
+            "fresh database should have schema version 10"
+        );
 
         // Verify graph tables exist and accept inserts
         let node_input = CreateGraphNodeInput {
@@ -10706,7 +11115,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("get schema version");
-        assert_eq!(version, "9", "should have migrated to v9");
+        assert_eq!(version, "10", "should have migrated through v10");
 
         // Assert v8 tables remain readable
         let goal_title: String = conn
@@ -11873,7 +12282,7 @@ mod tests {
         let health = store.health().expect("health");
         assert_eq!(health.graph_node_count, 2, "should count 2 graph nodes");
         assert_eq!(health.graph_edge_count, 1, "should count 1 graph edge");
-        assert_eq!(health.schema_version, "9", "schema version should be 9");
+        assert_eq!(health.schema_version, "10", "schema version should be 10");
     }
 
     #[test]
@@ -14746,6 +15155,163 @@ mod tests {
             view2.attached_evidence.len(),
             1,
             "active links should be included"
+        );
+    }
+
+    #[test]
+    fn project_run_claim_replays_identical_idempotency_key() {
+        let dir = tempdir().expect("tempdir");
+        let store = PlanningStore::new(dir.path().join("planning.db"));
+        store.init().expect("init");
+        create_lease_fixture(&store);
+
+        let first = store
+            .claim_project_run(lease_claim("lease-run-1", "owner-a", "claim-key", 30))
+            .expect("first claim");
+        let replay = store
+            .claim_project_run(lease_claim(
+                "different-request-id",
+                "owner-a",
+                "claim-key",
+                30,
+            ))
+            .expect("idempotent replay");
+
+        assert_eq!(first.record.id, replay.record.id);
+        assert_eq!(first.record.fencing_token, replay.record.fencing_token);
+
+        let conflict = store
+            .claim_project_run(lease_claim("lease-run-2", "owner-b", "claim-key", 30))
+            .expect_err("different payload must conflict");
+        assert!(conflict
+            .to_string()
+            .contains("PROJECT-RUN-IDEMPOTENCY-CONFLICT"));
+    }
+
+    #[test]
+    fn project_run_heartbeat_extends_lease_and_requires_fence() {
+        let dir = tempdir().expect("tempdir");
+        let store = PlanningStore::new(dir.path().join("planning.db"));
+        store.init().expect("init");
+        create_lease_fixture(&store);
+
+        let claim = store
+            .claim_project_run(lease_claim("lease-run-1", "owner-a", "heartbeat-key", 1))
+            .expect("claim");
+        thread::sleep(StdDuration::from_millis(500));
+        let heartbeat = store
+            .heartbeat_project_run(HeartbeatProjectRunInput {
+                project_run_id: claim.record.id.clone(),
+                active_scope_key: None,
+                run_id: None,
+                fencing_token: Some(claim.record.fencing_token),
+                lease_seconds: Some(3),
+            })
+            .expect("heartbeat");
+        assert!(heartbeat.record.lease_expires_at > claim.record.lease_expires_at);
+
+        thread::sleep(StdDuration::from_millis(700));
+        let active = store
+            .activate_project_run(ActivateProjectRunInput {
+                project_run_id: claim.record.id,
+                active_scope_key: None,
+                run_id: None,
+                fencing_token: Some(claim.record.fencing_token),
+            })
+            .expect("heartbeat kept lease alive");
+        assert_eq!(active.record.status, ProjectRunStatus::Active);
+    }
+
+    #[test]
+    fn expired_owner_cannot_mutate_after_new_fence() {
+        let dir = tempdir().expect("tempdir");
+        let store = PlanningStore::new(dir.path().join("planning.db"));
+        store.init().expect("init");
+        create_lease_fixture(&store);
+
+        let first = store
+            .claim_project_run(lease_claim("lease-run-1", "owner-a", "expiry-key-a", 1))
+            .expect("first claim");
+        thread::sleep(StdDuration::from_millis(1_200));
+        let second = store
+            .claim_project_run(lease_claim("lease-run-2", "owner-b", "expiry-key-b", 30))
+            .expect("claim after expiry");
+        assert!(second.record.fencing_token > first.record.fencing_token);
+        assert!(store
+            .list_events()
+            .expect("list events")
+            .iter()
+            .any(|event| {
+                event.event_type == "project-run.expired" && event.entity_id == first.record.id
+            }));
+
+        let stale = store
+            .activate_project_run(ActivateProjectRunInput {
+                project_run_id: second.record.id,
+                active_scope_key: None,
+                run_id: None,
+                fencing_token: Some(first.record.fencing_token),
+            })
+            .expect_err("stale fence must fail");
+        assert!(stale
+            .to_string()
+            .contains("PROJECT-RUN-STALE-FENCING-TOKEN"));
+
+        let expired = store
+            .add_project_run_evidence(AddEvidenceInput {
+                project_run_id: first.record.id,
+                evidence: ProjectRunEvidence::default(),
+                active_scope_key: None,
+                run_id: None,
+                fencing_token: Some(first.record.fencing_token),
+            })
+            .expect_err("expired owner must fail");
+        assert!(expired.to_string().contains("PROJECT-RUN-LEASE-EXPIRED"));
+    }
+
+    #[test]
+    fn simultaneous_project_run_claims_have_one_owner() {
+        let dir = tempdir().expect("tempdir");
+        let store = Arc::new(PlanningStore::new(dir.path().join("planning.db")));
+        store.init().expect("init");
+        create_lease_fixture(&store);
+        let barrier = Arc::new(Barrier::new(2));
+        let handles = (0..2)
+            .map(|index| {
+                let store = Arc::clone(&store);
+                let barrier = Arc::clone(&barrier);
+                thread::spawn(move || {
+                    barrier.wait();
+                    store.claim_project_run(lease_claim(
+                        &format!("lease-race-{index}"),
+                        &format!("owner-{index}"),
+                        &format!("race-key-{index}"),
+                        30,
+                    ))
+                })
+            })
+            .collect::<Vec<_>>();
+        let outcomes = handles
+            .into_iter()
+            .map(|handle| handle.join().expect("claim thread"))
+            .collect::<Vec<_>>();
+
+        assert_eq!(outcomes.iter().filter(|result| result.is_ok()).count(), 1);
+        assert_eq!(
+            store
+                .list_project_runs()
+                .expect("list runs")
+                .into_iter()
+                .filter(|run| {
+                    matches!(
+                        run.status,
+                        ProjectRunStatus::Claimed
+                            | ProjectRunStatus::Active
+                            | ProjectRunStatus::Interrupted
+                    )
+                })
+                .count(),
+            1
         );
     }
 }

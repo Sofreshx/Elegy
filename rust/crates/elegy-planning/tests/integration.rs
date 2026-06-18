@@ -1717,6 +1717,74 @@ fn project_run_session_state() {
         .as_str()
         .expect("run id")
         .to_string();
+    let fencing_token = claim_result["data"]["record"]["fencingToken"]
+        .as_i64()
+        .expect("fencing token")
+        .to_string();
+
+    let missing_fence_output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c3-missing-fence",
+            "--scope",
+            scope,
+            "project-run",
+            "activate",
+            "--project-run-id",
+            &run_id,
+        ])
+        .env("HOME", home_dir.to_str().expect("utf-8 home path"))
+        .output()
+        .expect("run project-run activate without fence");
+    assert!(!missing_fence_output.status.success());
+    let missing_fence_result: Value =
+        serde_json::from_slice(&missing_fence_output.stdout).expect("missing-fence json");
+    assert_eq!(missing_fence_result["status"], "invalid");
+    assert!(missing_fence_result["error"]
+        .as_str()
+        .expect("error string")
+        .contains("PROJECT-RUN-FENCING-TOKEN-REQUIRED"));
+
+    // Heartbeat project run with the claimed fencing token.
+    let heartbeat_output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "c3-heartbeat",
+            "--scope",
+            scope,
+            "project-run",
+            "heartbeat",
+            "--project-run-id",
+            &run_id,
+            "--fencing-token",
+            &fencing_token,
+            "--lease-seconds",
+            "120",
+        ])
+        .env("HOME", home_dir.to_str().expect("utf-8 home path"))
+        .output()
+        .expect("run project-run heartbeat");
+    assert!(
+        heartbeat_output.status.success(),
+        "heartbeat should succeed: {}",
+        String::from_utf8_lossy(&heartbeat_output.stderr)
+    );
+    let heartbeat_result: Value =
+        serde_json::from_slice(&heartbeat_output.stdout).expect("heartbeat json");
+    assert_eq!(heartbeat_result["status"], "ok");
+    assert_eq!(
+        heartbeat_result["data"]["record"]["fencingToken"],
+        claim_result["data"]["record"]["fencingToken"]
+    );
+    assert!(heartbeat_result["data"]["record"]["heartbeatAt"].is_string());
 
     // Activate project run
     let activate_output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
@@ -1733,6 +1801,8 @@ fn project_run_session_state() {
             "activate",
             "--project-run-id",
             &run_id,
+            "--fencing-token",
+            &fencing_token,
         ])
         .env("HOME", home_dir.to_str().expect("utf-8 home path"))
         .output()
@@ -1784,6 +1854,8 @@ fn project_run_session_state() {
             &run_id,
             "--status",
             "completed",
+            "--fencing-token",
+            &fencing_token,
         ])
         .env("HOME", home_dir.to_str().expect("utf-8 home path"))
         .output()

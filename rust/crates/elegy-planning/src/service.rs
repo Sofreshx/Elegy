@@ -5,11 +5,12 @@ use serde_json::Value;
 use crate::{
     ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
     ClaimProjectRunInput, CreateGoalInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalView, InsightView,
-    IssueView, MutationResult, PlanView, PlanningHealthReport, PlanningStore, PlanningStoreError,
-    ProjectRunRecord, ProjectRunView, ProjectionFormat, ReleaseProjectRunInput, RenderedProjection,
-    RevisePlanInput, RoadmapView, RunnableCandidates, ScopeRecord, TagInfo, UpdateStatusInput,
-    ValidationRunReport, WorkGraph, WorkPointRecord, WorkPointView,
+    CreateReviewPointInput, CreateRoadmapInput, CreateTodoInput, EntityType, GoalView,
+    HeartbeatProjectRunInput, InsightView, IssueView, MutationResult, PlanView,
+    PlanningHealthReport, PlanningStore, PlanningStoreError, ProjectRunRecord, ProjectRunView,
+    ProjectionFormat, ReleaseProjectRunInput, RenderedProjection, RevisePlanInput, RoadmapView,
+    RunnableCandidates, ScopeRecord, TagInfo, UpdateStatusInput, ValidationRunReport, WorkGraph,
+    WorkPointRecord, WorkPointView,
 };
 
 #[derive(Clone, Debug)]
@@ -343,6 +344,16 @@ impl PlanningService {
         input.active_scope_key = Some(self.config.scope_key.clone());
         input.run_id = resolve_run_id(context);
         self.store.activate_project_run(input)
+    }
+
+    pub fn heartbeat_project_run(
+        &self,
+        context: &PlanningContext,
+        mut input: HeartbeatProjectRunInput,
+    ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
+        input.active_scope_key = Some(self.config.scope_key.clone());
+        input.run_id = resolve_run_id(context);
+        self.store.heartbeat_project_run(input)
     }
 
     pub fn add_project_run_evidence(

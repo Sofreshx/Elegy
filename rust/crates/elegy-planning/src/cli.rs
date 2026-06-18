@@ -791,8 +791,9 @@ struct WorkPointReviseArgs {
 
 #[derive(Subcommand, Debug)]
 enum ProjectRunCommand {
-    Claim(ProjectRunClaimArgs),
+    Claim(Box<ProjectRunClaimArgs>),
     Activate(ProjectRunActivateArgs),
+    Heartbeat(ProjectRunHeartbeatArgs),
     Release(ProjectRunReleaseArgs),
     AddEvidence(ProjectRunAddEvidenceArgs),
     List,
@@ -821,12 +822,30 @@ struct ProjectRunClaimArgs {
     profile_id: Option<String>,
     #[arg(long = "correlation-id")]
     correlation_id: Option<String>,
+    #[arg(long = "owner-id")]
+    owner_id: Option<String>,
+    #[arg(long = "idempotency-key")]
+    idempotency_key: Option<String>,
+    #[arg(long = "lease-seconds", default_value_t = 900)]
+    lease_seconds: i64,
 }
 
 #[derive(Args, Debug)]
 struct ProjectRunActivateArgs {
     #[arg(long = "project-run-id")]
     project_run_id: String,
+    #[arg(long = "fencing-token")]
+    fencing_token: Option<i64>,
+}
+
+#[derive(Args, Debug)]
+struct ProjectRunHeartbeatArgs {
+    #[arg(long = "project-run-id")]
+    project_run_id: String,
+    #[arg(long = "fencing-token")]
+    fencing_token: Option<i64>,
+    #[arg(long = "lease-seconds", default_value_t = 900)]
+    lease_seconds: i64,
 }
 
 #[derive(Args, Debug)]
@@ -837,6 +856,8 @@ struct ProjectRunReleaseArgs {
     status: ProjectRunStatus,
     #[arg(long = "evidence-json")]
     evidence_json: Option<String>,
+    #[arg(long = "fencing-token")]
+    fencing_token: Option<i64>,
 }
 
 #[derive(Args, Debug)]
@@ -845,6 +866,8 @@ struct ProjectRunAddEvidenceArgs {
     project_run_id: String,
     #[arg(long = "evidence-json")]
     evidence_json: String,
+    #[arg(long = "fencing-token")]
+    fencing_token: Option<i64>,
 }
 
 #[derive(Args, Debug)]
@@ -1369,6 +1392,9 @@ fn execute_project_run(
                 run_id: context.correlation_id.clone(),
                 profile_id: args.profile_id,
                 correlation_id: args.correlation_id,
+                owner_id: args.owner_id,
+                idempotency_key: args.idempotency_key,
+                lease_seconds: Some(args.lease_seconds),
             })?,
         ),
         ProjectRunCommand::Activate(args) => emit_success(
@@ -1378,6 +1404,18 @@ fn execute_project_run(
                 project_run_id: args.project_run_id,
                 active_scope_key: Some(context.scope_key.clone()),
                 run_id: context.correlation_id.clone(),
+                fencing_token: args.fencing_token,
+            })?,
+        ),
+        ProjectRunCommand::Heartbeat(args) => emit_success(
+            context,
+            vec!["project-run", "heartbeat"],
+            store.heartbeat_project_run(crate::HeartbeatProjectRunInput {
+                project_run_id: args.project_run_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                run_id: context.correlation_id.clone(),
+                fencing_token: args.fencing_token,
+                lease_seconds: Some(args.lease_seconds),
             })?,
         ),
         ProjectRunCommand::Release(args) => {
@@ -1394,6 +1432,7 @@ fn execute_project_run(
                     evidence,
                     active_scope_key: Some(context.scope_key.clone()),
                     run_id: context.correlation_id.clone(),
+                    fencing_token: args.fencing_token,
                 })?,
             )
         }
@@ -1407,6 +1446,7 @@ fn execute_project_run(
                     evidence,
                     active_scope_key: Some(context.scope_key.clone()),
                     run_id: context.correlation_id.clone(),
+                    fencing_token: args.fencing_token,
                 })?,
             )
         }
@@ -3218,6 +3258,7 @@ fn project_run_command_name(command: &ProjectRunCommand) -> &'static str {
     match command {
         ProjectRunCommand::Claim(_) => "claim",
         ProjectRunCommand::Activate(_) => "activate",
+        ProjectRunCommand::Heartbeat(_) => "heartbeat",
         ProjectRunCommand::Release(_) => "release",
         ProjectRunCommand::AddEvidence(_) => "add-evidence",
         ProjectRunCommand::List => "list",
@@ -3481,6 +3522,7 @@ fn is_command_mutation(command: &Command) -> bool {
             command,
             ProjectRunCommand::Claim(_)
                 | ProjectRunCommand::Activate(_)
+                | ProjectRunCommand::Heartbeat(_)
                 | ProjectRunCommand::Release(_)
                 | ProjectRunCommand::AddEvidence(_)
         ),
