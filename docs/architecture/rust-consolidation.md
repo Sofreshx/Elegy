@@ -167,6 +167,15 @@ These remain forward-looking targets rather than completed surfaces:
 
 `elegy-host-mcp` exists, and the CLI includes runtime validation, inspection, and run entrypoints, but those facts do not by themselves justify a claim that the broader self-authoring experience is already delivered.
 
+## Crate publishing policy
+
+All crates are blocked from crates.io with `publish = false`.
+Distribution flows through GitHub Releases, binary artifacts, wrapper
+surfaces, and agent-facing skill + MCP projections — not through
+`cargo install`.  See `docs/adr/2026-06-15-block-crates-io-publishing.md`
+for the decision record and the procedure to re-enable publishing for
+a specific crate.
+
 ## Replacement rule
 
 Prefer governed artifacts when the responsibility is:
