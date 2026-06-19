@@ -67,4 +67,3 @@ Last Reviewed: 2026-06-16
 
 - [Distribution and downstream consumption](../distribution.md)
 - [Elegy Plugin Package Model](../architecture/elegy-plugin-package-model.md)
-- [Elegy Plugin Package V1 Unification ADR](../adr/2026-06-16-elegy-plugin-package-v1-unification.md)

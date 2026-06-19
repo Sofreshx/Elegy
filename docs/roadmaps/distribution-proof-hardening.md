@@ -21,8 +21,6 @@ Record the two local distribution-proof phases completed in this session: claim-
 
 ### RM-distribution-proof-hardening-001
 
-Covers: [RB-001](../backlog.md)
-
 Phase: 1
 
 Goal: completed locally. Claim-versus-proof acceptance is now hardened for the current contributor-facing runtime, CLI, host, and distribution posture.
@@ -38,17 +36,17 @@ Primary Evidence:
 - [docs/architecture/README.md](../architecture/README.md)
 - [docs/architecture/rust-consolidation.md](../architecture/rust-consolidation.md)
 - [docs/distribution.md](../distribution.md)
-- [rust/crates/elegy-cli/tests/authoring.rs](../../rust/crates/elegy-cli/tests/authoring.rs)
-- [rust/crates/elegy-cli/tests/mermaid.rs](../../rust/crates/elegy-cli/tests/mermaid.rs)
-- [rust/crates/elegy-mcp/tests/cli.rs](../../rust/crates/elegy-mcp/tests/cli.rs)
-- [rust/crates/elegy-skills/tests/cli.rs](../../rust/crates/elegy-skills/tests/cli.rs)
+- [rust/bin/elegy-cli/tests/authoring.rs](../../rust/bin/elegy-cli/tests/authoring.rs)
+- [rust/bin/elegy-cli/tests/mermaid.rs](../../rust/bin/elegy-cli/tests/mermaid.rs)
+- [rust/features/elegy-mcp/tests/cli.rs](../../rust/features/elegy-mcp/tests/cli.rs)
+- [rust/features/elegy-skills/tests/cli.rs](../../rust/features/elegy-skills/tests/cli.rs)
 - [.github/workflows/distribution-artifacts.yml](../../.github/workflows/distribution-artifacts.yml)
 
 Exit Signal: achieved locally. Contributor-facing runtime and distribution claims are narrowed to what the repo currently builds, validates, and explains locally.
 
 ### RM-distribution-proof-hardening-002
 
-Covers: [RB-002](../backlog.md)
+Phase: 2
 
 Phase: 2
 
@@ -64,16 +62,18 @@ Primary Evidence:
 
 - [docs/distribution.md](../distribution.md)
 - [.github/workflows/distribution-artifacts.yml](../../.github/workflows/distribution-artifacts.yml)
-- [scripts/package-installer.ps1](../../scripts/package-installer.ps1)
-- [scripts/install-distribution.ps1](../../scripts/install-distribution.ps1)
-- [scripts/validate-canonical-outputs.ps1](../../scripts/validate-canonical-outputs.ps1)
+- [.github/workflows/publish-orchestrator.yml](../../.github/workflows/publish-orchestrator.yml) (auto-discovers surfaces from `contracts/fixtures/elegy-plugin-package.*.json`)
+- [scripts/install-distribution.sh](../../scripts/install-distribution.sh) (canonical)
+- [scripts/install-distribution.ps1](../../scripts/install-distribution.ps1) (thin shim that forwards to the bash script)
+- `cargo run -p elegy-cli -- contracts validate` (replaces `scripts/validate-canonical-outputs.ps1`)
+- `cargo run -p elegy-cli -- contracts export` (replaces `scripts/export-contracts.ps1`)
 
 Exit Signal: achieved locally. Local distribution validation is documented and evidenced independently of the hosted publish lane, which is now active and verified through the release workflow itself.
 
 ## References
 
-- [docs/backlog.md](../backlog.md)
 - [docs/architecture/README.md](../architecture/README.md)
 - [docs/architecture/rust-consolidation.md](../architecture/rust-consolidation.md)
 - [docs/distribution.md](../distribution.md)
 - [docs/issues/unresolved-goals.md](../issues/unresolved-goals.md)
+- [CHANGELOG.md](../../CHANGELOG.md) (current activity and history)

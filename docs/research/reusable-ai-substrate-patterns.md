@@ -9,7 +9,7 @@ Canonical implemented truth stays in:
 - [docs/architecture/ecosystem-topology.md](../architecture/ecosystem-topology.md)
 - [docs/architecture/substrate-governance.md](../architecture/substrate-governance.md)
 - [docs/architecture/mcp-skill-tooling-placement.md](../architecture/mcp-skill-tooling-placement.md)
-- [docs/architecture/elegy-memory-v1.md](../architecture/elegy-memory-v1.md)
+- [rust/features/elegy-memory/docs/architecture/v1.md](../../rust/features/elegy-memory/docs/architecture/v1.md)
 
 ## Why this note exists
 
@@ -183,7 +183,7 @@ Add a governed capability-definition schema family and keep its projections expl
 
 - governed contract in `contracts/schemas/`
 - minimal valid fixtures in `contracts/fixtures/`
-- Rust registry and resolution crate under `rust/crates/`
+- Rust registry and resolution crate under `rust/features/`
 - markdown materializations only as contributor-facing projections where needed
 
 ---
@@ -490,7 +490,7 @@ Elegy is already closer to current best practice than many memory implementation
 
 Elegy should use memory contracts and traits for reusable semantics and storage interfaces. Consumers should keep runtime ranking policy and host-specific currentness decisions when those are product-owned.
 
-This matches the current repo guidance in `docs/architecture/elegy-memory-v1.md`, which already keeps some runtime authority outside Elegy.
+This matches the current repo guidance in `rust/features/elegy-memory/docs/architecture/v1.md`, which already keeps some runtime authority outside Elegy.
 
 ### State-of-the-art practice
 
@@ -1021,7 +1021,7 @@ This matters because the repo is strongest when it stays a reusable substrate, n
 - [docs/architecture/substrate-governance.md](../architecture/substrate-governance.md)
 - [docs/architecture/mcp-skill-tooling-placement.md](../architecture/mcp-skill-tooling-placement.md)
 - [docs/architecture/skill-core-v1.md](../architecture/skill-core-v1.md)
-- [docs/architecture/elegy-memory-v1.md](../architecture/elegy-memory-v1.md)
+- [rust/features/elegy-memory/docs/architecture/v1.md](../../rust/features/elegy-memory/docs/architecture/v1.md)
 - [docs/research/dynamic-cli-tooling.md](./dynamic-cli-tooling.md)
 - [docs/research/openclaw-orchestration-gap-roadmap.md](./openclaw-orchestration-gap-roadmap.md)
 - [rust/README.md](../../rust/README.md)

@@ -17,7 +17,7 @@
     "license": "Apache-2.0",
     "tags": ["planning", "goal", "roadmap", "plan", "todo", "issue", "review", "validation", "projection", "sqlite", "work-point", "project-run", "lease", "graph", "next-runnable"],
     "owners": ["elegy"],
-    "documentationUri": "docs/architecture/elegy-planning-v1.md"
+    "documentationUri": "rust/features/elegy-planning/docs/architecture/v1.md"
   },
   "capabilities": [
     {
@@ -1880,7 +1880,7 @@
   "governance": {
     "riskLevel": "medium",
     "approvalRequirement": "none",
-    "policyRefs": ["rust/crates/elegy-planning/docs/architecture/ARCHITECTURE.md", "rust/crates/elegy-planning/docs/architecture/mvp-scope.md"],
+    "policyRefs": ["rust/features/elegy-planning/docs/architecture/ARCHITECTURE.md", "rust/features/elegy-planning/docs/architecture/mvp-scope.md"],
     "allowedContexts": ["contributor-routing", "local-cli", "planning-authority"]
   },
   "discovery": {

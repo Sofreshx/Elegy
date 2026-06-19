@@ -82,17 +82,6 @@
     },
     {
       "authorityClass": "current",
-      "created": "2026-06-16",
-      "docKind": "adr",
-      "freshness": "fresh",
-      "path": "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
-      "sourceOfTruth": "current-canon",
-      "status": "accepted",
-      "summary": "Decision record for unifying the Elegy plugin package contract under a single `elegy-plugin-package/v1` schema. Supersedes the V1/V2 split described in `specs/neutral-package-consolidation/spec.md`.",
-      "title": "Elegy Plugin Package V1 Unification"
-    },
-    {
-      "authorityClass": "current",
       "docKind": "spec",
       "freshness": "fresh",
       "path": "docs/specs/README.md",
@@ -117,7 +106,7 @@
       "updated": "2026-06-02",
       "docKind": "spec",
       "freshness": "fresh",
-      "path": "docs/specs/elegy-planning.md",
+      "path": "rust/features/elegy-planning/docs/specs/index.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.",
@@ -128,21 +117,11 @@
       "created": "2026-06-02",
       "docKind": "spec",
       "freshness": "fresh",
-      "path": "docs/specs/elegy-planning-state-machine.md",
+      "path": "rust/features/elegy-planning/docs/specs/state-machine.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "title: elegy-planning state machine",
       "title": "elegy-planning state machine"
-    },
-    {
-      "authorityClass": "current",
-      "docKind": "spec",
-      "freshness": "fresh",
-      "path": "docs/specs/host-neutral-plugin-install.md",
-      "sourceOfTruth": "current-canon",
-      "status": "active",
-      "summary": "title: Host-neutral plugin install",
-      "title": "Host-neutral plugin install"
     },
     {
       "authorityClass": "current",
@@ -178,12 +157,11 @@
   "recommendedReadingOrder": [
     "README.md",
     "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
-    "docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/documentation-practices-skill-and-cli.md",
-    "docs/specs/elegy-planning.md",
-    "docs/specs/elegy-planning-state-machine.md"
+    "rust/features/elegy-planning/docs/specs/index.md",
+    "rust/features/elegy-planning/docs/specs/state-machine.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

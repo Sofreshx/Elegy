@@ -1,0 +1,209 @@
+name: _reusable-publish
+
+# Generic per-feature publish workflow. Each per-feature workflow is a thin
+# caller of this one; this workflow knows nothing about specific surfaces.
+# Per-feature publish metadata is owned by the feature's
+# elegy-plugin-package.<feature>.json fixture, not by the workflow.
+
+on:
+  workflow_call:
+    inputs:
+      surface:
+        description: "Per-feature surface name (matches identity.name in the plugin package fixture)"
+        type: string
+        required: true
+      fixture:
+        description: "Path to the per-feature elegy-plugin-package.<feature>.json fixture"
+        type: string
+        required: true
+      crate_path:
+        description: "Workspace crate name to build (e.g. 'elegy-memory'). Pass the empty string for skill-only / external-CLI surfaces that have no Rust crate to build; the build step is skipped in that case."
+        type: string
+        required: false
+        default: ''
+      archive_family:
+        description: "Per-feature archive family name (matches publishing.archiveFamily in the fixture); the per-target asset name is <archiveFamily>-<target>-<sha>.zip"
+        type: string
+        required: true
+      asset_kind:
+        description: "Whether this surface produces wrapper-archives or cli-archives. Drives staging contents."
+        type: string
+        default: 'wrapper'
+      skill_bridge:
+        description: "For wrapper assets: relative path within the feature tree to the SKILL.md mirror (matches publishing.skillBridge in the fixture)"
+        type: string
+        default: ''
+      installer:
+        description: "For wrapper assets: filename of the installer script inside the archive (matches publishing.installer in the fixture)"
+        type: string
+        default: ''
+      pre_publish_hook:
+        description: "Optional shell command to run before cargo build"
+        type: string
+        default: ''
+      post_publish_hook:
+        description: "Optional shell command to run after the asset is uploaded"
+        type: string
+        default: ''
+      include_targets:
+        description: "Comma-separated runner:target pairs to include in the build matrix. Defaults to the standard 3-OS set."
+        type: string
+        default: 'ubuntu-24.04:x86_64-unknown-linux-gnu,windows-2022:x86_64-pc-windows-msvc,macos-14:aarch64-apple-darwin'
+    secrets:
+      GITHUB_TOKEN:
+        description: "GitHub token with permission to upload release assets"
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ inputs.surface }}-${{ inputs.crate_path }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: build (${{ inputs.surface }}, ${{ matrix.target }})
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: windows-2022
+            target: x86_64-pc-windows-msvc
+          - runner: macos-14
+            target: aarch64-apple-darwin
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6.0.2
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: rust -> rust/target
+
+      - name: Validate per-feature publish metadata fixture exists
+        shell: pwsh
+        run: |
+          if (-not (Test-Path -LiteralPath "${{ inputs.fixture }}")) {
+            throw "Per-feature publish metadata fixture not found: ${{ inputs.fixture }}. Each feature owns its own elegy-plugin-package.<feature>.json fixture; the reusable publish workflow does not maintain a central catalog."
+          }
+          $pkg = Get-Content -LiteralPath "${{ inputs.fixture }}" -Raw | ConvertFrom-Json
+          $expectedArchive = "${{ inputs.archive_family }}"
+          $actualArchive = $pkg.publishing.archiveFamily
+          if ($expectedArchive -ne $actualArchive) {
+            throw "Per-feature fixture archiveFamily mismatch: workflow input '$expectedArchive' != fixture '$actualArchive' in ${{ inputs.fixture }}"
+          }
+
+      - name: Run pre-publish hook
+        if: ${{ inputs.pre_publish_hook != '' }}
+        shell: bash
+        run: ${{ inputs.pre_publish_hook }}
+
+      - name: Build
+        if: ${{ inputs.crate_path != '' }}
+        shell: pwsh
+        run: |
+          Set-Location rust
+          cargo build --release --target ${{ matrix.target }} -p ${{ inputs.crate_path }}
+
+      - name: Stage asset
+        id: stage
+        shell: pwsh
+        run: |
+          $archiveFamily = "${{ inputs.archive_family }}"
+          $target = "${{ matrix.target }}"
+          $assetBase = "${archiveFamily}-${target}-${{ github.sha }}"
+          $staging = New-Item -ItemType Directory -Path "artifacts/distribution/$assetBase" -Force
+          $binaryDir = "rust/target/${target}/release"
+          if ("${{ inputs.crate_path }}" -ne "") {
+            if (-not (Test-Path -LiteralPath $binaryDir)) {
+              throw "Build did not produce ${binaryDir} for ${{ inputs.crate_path }}"
+            }
+            Get-ChildItem -LiteralPath $binaryDir | Copy-Item -Destination $staging -Recurse -Force
+          }
+          if ("${{ inputs.asset_kind }}" -eq "wrapper") {
+            if ("${{ inputs.skill_bridge }}" -ne "") {
+              $bridge = "${{ inputs.skill_bridge }}"
+              $bridgeDest = Join-Path $staging $bridge
+              New-Item -ItemType Directory -Path (Split-Path -Parent $bridgeDest) -Force | Out-Null
+              if (Test-Path -LiteralPath $bridge) {
+                Copy-Item -Path $bridge -Destination $bridgeDest -Force
+              } else {
+                Write-Host "::notice::skill bridge path '$bridge' not found in repo; this surface's wrapper archive will not include the SKILL.md mirror. Create the file in your feature tree to fix this."
+              }
+            }
+            if ("${{ inputs.installer }}" -ne "") {
+              $installerDest = Join-Path $staging "${{ inputs.installer }}"
+              Copy-Item -Path "scripts/install-distribution.sh" -Destination $installerDest -Force
+            }
+          }
+          Compress-Archive -Path "$staging/*" -DestinationPath "artifacts/distribution/$assetBase.zip" -CompressionLevel Optimal
+          Remove-Item -Path $staging -Recurse -Force
+          "asset_path=artifacts/distribution/$assetBase.zip" >> $env:GITHUB_OUTPUT
+
+      - name: Upload asset
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ inputs.surface }}-${{ matrix.target }}-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ steps.stage.outputs.asset_path }}
+
+  upload:
+    name: upload (${{ inputs.surface }})
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}
+    steps:
+      - name: Download all target assets
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: ${{ inputs.surface }}-*-${{ github.sha }}
+          path: artifacts/distribution
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: release_meta
+        shell: bash
+        env:
+          MAIN_RELEASE_TAG: main-snapshot
+        run: |
+          set -euo pipefail
+          tag_name="local-artifacts"
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag_name="${{ github.event.release.tag_name }}"
+          elif [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            tag_name="${GITHUB_REF_NAME}"
+          elif [[ "${GITHUB_REF:-}" == "refs/heads/main" ]]; then
+            tag_name="${MAIN_RELEASE_TAG}"
+          fi
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Upload to release
+        if: ${{ steps.release_meta.outputs.tag_name != 'local-artifacts' }}
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          if ! gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            echo "Release ${RELEASE_TAG} does not exist; the per-feature workflow uploads only to existing releases. The release-finalize workflow creates the release manifest+checksums once the release is published."
+            exit 0
+          fi
+          mapfile -t assets < <(find artifacts/distribution -type f -name '*.zip' | sort)
+          if [[ "${#assets[@]}" -eq 0 ]]; then
+            echo "No asset to upload for ${{ inputs.surface }}"
+            exit 0
+          fi
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+
+      - name: Run post-publish hook
+        if: ${{ inputs.post_publish_hook != '' }}
+        shell: bash
+        run: ${{ inputs.post_publish_hook }}

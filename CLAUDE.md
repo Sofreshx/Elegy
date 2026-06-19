@@ -17,14 +17,14 @@ Read these docs in order:
 2. `docs/agent-integration.md` before changing host onboarding, discovery, invocation envelopes, profiles, or MCP projection
 3. `docs/architecture/mcp-skill-tooling-placement.md` before changing MCP authoring, analysis, skill generation, portable plugin packages, or ownership boundaries
 4. The smallest relevant architecture, ADR, or spec under `docs/`
-5. For memory work, `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/crates/elegy-memory/docs/architecture/mvp-scope.md`
+5. For memory work, `rust/features/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/features/elegy-memory/docs/architecture/mvp-scope.md`
 
 For elegy-memory specifically:
-@rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md
-@rust/crates/elegy-memory/docs/architecture/memory-model.md
-@rust/crates/elegy-memory/docs/architecture/traits-and-interfaces.md
-@rust/crates/elegy-memory/docs/architecture/storage-schema.md
-@rust/crates/elegy-memory/docs/architecture/mvp-scope.md
+@rust/features/elegy-memory/docs/architecture/ARCHITECTURE.md
+@rust/features/elegy-memory/docs/architecture/memory-model.md
+@rust/features/elegy-memory/docs/architecture/traits-and-interfaces.md
+@rust/features/elegy-memory/docs/architecture/storage-schema.md
+@rust/features/elegy-memory/docs/architecture/mvp-scope.md
 
 ## Discovery Surface
 
@@ -57,11 +57,11 @@ cargo test -p <crate-name>
 cargo clippy -p <crate-name> --all-targets --all-features -- -D warnings
 ```
 
-Use repo-root scripts for governed exports or package boundaries:
+Use the Rust CLI for governed exports and contract validation:
 
-```powershell
-pwsh ./scripts/export-contracts.ps1
-pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+```bash
+cd rust && cargo run -p elegy-cli -- contracts validate --project ..
+cd rust && cargo test -p elegy-contracts --test conformance
 ```
 
 ## Structural Invariants — STOP

@@ -6,7 +6,7 @@ Elegy owns the canonical WS3 governance policy, scripts, and reusable workflow p
 
 ## Canonical assets
 
-- Policy: `policies/formalization/visual-llm-enforcement-policy.json`
+- Policy: `docs/governance/visual-llm-enforcement-policy.json`
 - Scripts:
   - `scripts/ws3/resolve-enforcement-mode.ps1`
   - `scripts/ws3/evaluate-formalization-gates.ps1`

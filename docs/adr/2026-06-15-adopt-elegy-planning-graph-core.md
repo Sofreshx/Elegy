@@ -79,8 +79,8 @@ retrospective observations.
 
 ## Links
 
-- [elegy-planning graph core spec](../specs/elegy-planning-graph-core.md)
-- [elegy-planning deterministic state machine spec](../specs/elegy-planning-state-machine.md)
-- [elegy-planning acceptance and evidence spec](../specs/elegy-planning-acceptance-evidence.md)
-- [elegy-planning run trace and context spec](../specs/elegy-planning-run-trace-context.md)
-- [elegy-planning v1 spec](../specs/elegy-planning.md)
+- [elegy-planning graph core spec](../../rust/features/elegy-planning/docs/specs/graph-core.md)
+- [elegy-planning deterministic state machine spec](../../rust/features/elegy-planning/docs/specs/state-machine.md)
+- [elegy-planning acceptance and evidence spec](../../rust/features/elegy-planning/docs/specs/acceptance-evidence.md)
+- [elegy-planning run trace and context spec](../../rust/features/elegy-planning/docs/specs/run-trace-context.md)
+- [elegy-planning v1 spec](../../rust/features/elegy-planning/docs/specs/index.md)
