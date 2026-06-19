@@ -10,7 +10,7 @@
     "description": "Portable deterministic configuration materialization plugin. Wraps the reusable apply/verify behavior over contracts/configuration/* templates and profiles.",
     "tags": ["configuration", "materialization", "deterministic", "plugin"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-configuration/docs/architecture/ARCHITECTURE.md"
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/rust/features/elegy-configuration/docs/architecture/ARCHITECTURE.md"
   },
   "components": {
     "skillDefinitions": [
@@ -71,7 +71,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-configuration-wrapper",

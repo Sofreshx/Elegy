@@ -10,7 +10,7 @@
     "description": "Portable documentation authority plugin. Authority-aware inspect, map, check, init, and export of ADRs, specs, and architectural docs.",
     "tags": ["documentation", "adr", "spec", "validation", "plugin"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-documentation/docs/architecture/ARCHITECTURE.md"
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/rust/features/elegy-documentation/docs/architecture/ARCHITECTURE.md"
   },
   "components": {
     "skillDefinitions": [
@@ -83,7 +83,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-documentation-wrapper",

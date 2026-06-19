@@ -10,7 +10,7 @@
     "description": "Portable Obsidian vault bridge plugin. Delegates to the official Obsidian Desktop CLI; does not own Rust binary behavior or durable planning state. The wrapper is a skill + thin shim, not a Rust binary.",
     "tags": ["obsidian", "vault", "bridge", "plugin"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/specs/obsidian-skill-and-cli.md"
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/docs/specs/obsidian-skill-and-cli.md"
   },
   "components": {
     "skillDefinitions": [
@@ -61,7 +61,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-obsidian-wrapper",

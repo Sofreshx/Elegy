@@ -10,7 +10,7 @@
     "description": "Portable MCP descriptor authoring and analysis plugin. Wraps the reusable author/analyze behavior in rust/core/elegy-tooling over governed MCP descriptors under contracts/schemas/mcp-*.schema.json and contracts/fixtures/mcp-*.json.",
     "tags": ["mcp", "authoring", "analysis", "plugin"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-mcp/docs/architecture/ARCHITECTURE.md"
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/rust/features/elegy-mcp/docs/architecture/ARCHITECTURE.md"
   },
   "components": {
     "skillDefinitions": [
@@ -71,7 +71,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-mcp-wrapper",

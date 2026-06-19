@@ -10,7 +10,7 @@
     "description": "Portable planning package fixture for downstream host projection from governed planning skill definitions, including work-point graph projection and project-run lease management.",
     "tags": ["planning", "roadmap", "durable-state", "plugin", "work-point", "project-run", "lease", "graph", "next-runnable"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-planning/docs/architecture/v1.md",
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/rust/features/elegy-planning/docs/architecture/v1.md",
     "subsetOf": [
       "planning-goal-list", "planning-goal-update-status",
       "planning-roadmap-show", "planning-roadmap-list", "planning-roadmap-update-status", "planning-roadmap-add-work-point",
@@ -232,7 +232,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-planning-wrapper",
