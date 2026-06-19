@@ -28,6 +28,7 @@ WRAPPER_SURFACES_RAW=""
 LOCAL_ARTIFACTS_ROOT=""
 FIXTURES_DIR=""
 FORCE=false
+ADD_TO_PATH=false
 
 # ---- Tooling (set by check_dependencies) ----
 DOWNLOAD_CMD=""
@@ -56,6 +57,7 @@ Options:
                                   (default: contracts/fixtures/, or the extracted
                                   contracts bundle when running from a release archive)
   -f, --force                   Overwrite existing installation
+  -p, --add-to-path             Add the bin directory to the user PATH (via shell profile)
   -h, --help                    Show this help message
 
 Supported targets:
@@ -110,6 +112,10 @@ _parse_args() {
                 ;;
             -f|--force)
                 FORCE=true
+                shift
+                ;;
+            -p|--add-to-path)
+                ADD_TO_PATH=true
                 shift
                 ;;
             -h|--help)
@@ -1396,6 +1402,38 @@ main() {
     fi
 
     _info "Install receipt: ${receipt_path}"
+
+    # ---- PATH management ----
+    if $ADD_TO_PATH; then
+        local path_entry="${bin_dir}"
+        local profile_file=""
+        local profile_line=""
+
+        if [[ -n "${ZSH_VERSION:-}" ]]; then
+            profile_file="${ZDOTDIR:-$HOME}/.zshrc"
+        elif [[ -n "${BASH_VERSION:-}" ]]; then
+            profile_file="${HOME}/.bashrc"
+        else
+            # Fallback: use .profile
+            profile_file="${HOME}/.profile"
+        fi
+
+        profile_line="export PATH=\"${path_entry}:\$PATH\""
+
+        if grep -qxF "export PATH=\"${path_entry}"'${PATH}"' "$profile_file" 2>/dev/null \
+            || grep -qxF "export PATH=\"${path_entry}:"'$PATH"' "$profile_file" 2>/dev/null; then
+            _info "PATH already contains ${path_entry} (skipped)"
+        else
+            echo "" >> "$profile_file"
+            echo "# Added by Elegy distribution installer" >> "$profile_file"
+            echo "$profile_line" >> "$profile_file"
+            _info "Added to PATH in ${profile_file}"
+            _info "Run 'source ${profile_file}' or open a new shell to update your PATH."
+        fi
+    else
+        _info "Tip: re-run with --add-to-path to add ${bin_dir} to your shell PATH."
+    fi
+
     _info "Installation complete."
 }
 

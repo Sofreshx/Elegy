@@ -130,8 +130,19 @@ Current enforcement lives in these surfaces:
 - `elegy-cli contracts validate`
 - Conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
 - `.github/workflows/distribution-artifacts.yml`
+- `.github/workflows/publish-distribution.yml`
+- `.github/workflows/publish-crate.yml`
 - `.github/workflows/rust-ci.yml`
+- `.github/workflows/security.yml`
+- `.github/workflows/ws3-formalization-governance.yml`
 - Rust workspace tests that exercise CLI and tooling behavior
+
+## Crate publishing policy
+
+All crates in the Rust workspace carry `publish = false`.  No crate can
+be published to crates.io without a conscious decision to remove that
+gate.  See `docs/adr/2026-06-15-block-crates-io-publishing.md` for the
+full decision record and the re-enablement procedure.
 
 ## Completion standard
 

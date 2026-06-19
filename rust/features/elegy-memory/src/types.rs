@@ -11,7 +11,7 @@ pub const DEFAULT_SIMILARITY_WEIGHT: f32 = 0.4;
 pub const DEFAULT_RECENCY_WEIGHT: f32 = 0.25;
 
 /// Default weight applied to access frequency during retrieval scoring.
-pub const DEFAULT_ACCESS_WEIGHT: f32 = 0.15;
+pub const DEFAULT_ACCESS_WEIGHT: f32 = 0.05;
 
 /// Default weight applied to priority (`importance × reliability`) during retrieval scoring.
 pub const DEFAULT_PRIORITY_WEIGHT: f32 = 0.2;
