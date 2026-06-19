@@ -16,7 +16,7 @@ Record the protocol baseline Elegy is targeting so governed contracts, exported 
 
 Elegy is currently centered on two implementation anchors:
 
-- governed contract and policy artifacts under `contracts/` and `policies/`
+- governed contract artifacts under `contracts/` and operational policy under `docs/governance/`
 - the first-party Rust workspace under `rust/`
 
 Protocol-baseline drift would now affect:

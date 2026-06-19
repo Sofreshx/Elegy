@@ -3,7 +3,19 @@
 # install-distribution.sh — Elegy Distribution Installer (Bash)
 # ============================================================
 # Installs Elegy distribution assets from GitHub releases or
-# a local artifacts directory, mirroring install-distribution.ps1.
+# a local artifacts directory. The PowerShell entry point at
+# scripts/install-distribution.ps1 is a thin shim that forwards
+# all arguments to this script.
+#
+# Surface metadata (binary name, asset prefix, installer filename,
+# skill bridge path) is derived from the per-feature plugin
+# fixtures under contracts/fixtures/elegy-plugin-package.*.json.
+# There is no central catalog in this script: every surface's
+# publish metadata is owned by the feature's own fixture, and the
+# per-feature publish workflow populates the contracts bundle
+# with that fixture. To add a new surface, author
+# contracts/fixtures/elegy-plugin-package.<feature>.json with a
+# publishing block; no change to this script is required.
 # ============================================================
 set -euo pipefail
 
@@ -14,6 +26,7 @@ DESTINATION=""
 CLI_SURFACES_RAW=""
 WRAPPER_SURFACES_RAW=""
 LOCAL_ARTIFACTS_ROOT=""
+FIXTURES_DIR=""
 FORCE=false
 
 # ---- Tooling (set by check_dependencies) ----
@@ -39,6 +52,9 @@ Options:
   -d, --destination PATH        Installation target directory (required)
   -c, --cli-surfaces LIST       Comma-separated CLI surface list (default: elegy-cli)
   -w, --wrapper-surfaces LIST   Comma-separated wrapper surface list
+  -F, --fixtures-dir PATH       Directory of elegy-plugin-package.*.json fixtures
+                                  (default: contracts/fixtures/, or the extracted
+                                  contracts bundle when running from a release archive)
   -f, --force                   Overwrite existing installation
   -h, --help                    Show this help message
 
@@ -86,6 +102,10 @@ _parse_args() {
                 ;;
             -w|--wrapper-surfaces)
                 WRAPPER_SURFACES_RAW="$2"
+                shift 2
+                ;;
+            -F|--fixtures-dir)
+                FIXTURES_DIR="$2"
                 shift 2
                 ;;
             -f|--force)
@@ -280,23 +300,39 @@ _expand_and_resolve_surfaces() {
 
 _resolve_cli_surfaces() {
     if [[ -z "$CLI_SURFACES_RAW" ]]; then
-        echo "elegy-cli"
+        # If metadata was loaded and elegy-cli is known, default to it.
+        if [[ ${#_CLI_BINARY[@]} -gt 0 ]] && [[ -n "${_CLI_BINARY[elegy-cli]:-}" ]]; then
+            echo "elegy-cli"
+        else
+            # No metadata and no override: best-effort default.
+            echo "elegy-cli"
+        fi
         return 0
     fi
-    local -a all_cli=(
-        "elegy-cli" "elegy-memory" "elegy-mcp" "elegy-planning"
-        "elegy-skills" "elegy-configuration" "elegy-documentation"
-    )
-    _expand_and_resolve_surfaces "$CLI_SURFACES_RAW" "${all_cli[@]}"
+    local -a known
+    while IFS= read -r s; do
+        [[ -n "$s" ]] && known+=("$s")
+    done < <(_known_cli_surfaces | sort -u)
+    if [[ ${#known[@]} -eq 0 ]]; then
+        # No metadata loaded; accept the user's list as-is. Per-feature
+        # publish workflows are the source of truth for what exists.
+        echo "$CLI_SURFACES_RAW" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$'
+        return 0
+    fi
+    _expand_and_resolve_surfaces "$CLI_SURFACES_RAW" "${known[@]}"
 }
 
 _resolve_wrapper_surfaces() {
     [[ -z "$WRAPPER_SURFACES_RAW" ]] && return 0
-    local -a all_wrapper=(
-        "elegy-memory" "elegy-mcp" "elegy-planning" "elegy-skills"
-        "elegy-configuration" "elegy-documentation" "elegy-obsidian"
-    )
-    _expand_and_resolve_surfaces "$WRAPPER_SURFACES_RAW" "${all_wrapper[@]}"
+    local -a known
+    while IFS= read -r s; do
+        [[ -n "$s" ]] && known+=("$s")
+    done < <(_known_wrapper_surfaces | sort -u)
+    if [[ ${#known[@]} -eq 0 ]]; then
+        echo "$WRAPPER_SURFACES_RAW" | tr ',' '\n' | sed 's/^[[:space:]]*//;s/[[:space:]]*$//' | grep -v '^$'
+        return 0
+    fi
+    _expand_and_resolve_surfaces "$WRAPPER_SURFACES_RAW" "${known[@]}"
 }
 
 # ============================================================
@@ -645,47 +681,105 @@ _verify_staged_file() {
 # ============================================================
 # CLI surface -> binary name mapping
 declare -A _CLI_BINARY
-_CLI_BINARY["elegy-cli"]="elegy"
-_CLI_BINARY["elegy-memory"]="elegy-memory"
-_CLI_BINARY["elegy-mcp"]="elegy-mcp"
-_CLI_BINARY["elegy-planning"]="elegy-planning"
-_CLI_BINARY["elegy-skills"]="elegy-skills"
-_CLI_BINARY["elegy-configuration"]="elegy-configuration"
-_CLI_BINARY["elegy-documentation"]="elegy-documentation"
 
 # Wrapper surface -> metadata mapping (assetPrefix, installer, skillBridge)
 declare -A _WRAPPER_META
 
-_populate_wrapper_metadata() {
-    _WRAPPER_META["elegy-memory_assetPrefix"]="elegy-memory-wrapper"
-    _WRAPPER_META["elegy-memory_installer"]="install.ps1"
-    _WRAPPER_META["elegy-memory_skillBridge"]="skills/elegy-memory/SKILL.md"
+# Internal: parse a single elegy-plugin-package.*.json fixture and emit a TSV
+# row per surface for downstream aggregation. Skips negative-* and template
+# fixtures. Fields: <surface> <binary> <assetPrefix> <installer> <skillBridge>
+# A surface is a CLI surface iff it has a non-empty toolRequirements[].cliBinary.
+# A surface is a wrapper surface iff it has a non-empty publishing.installer.
+_enumerate_fixtures_tsv() {
+    local fixtures_dir="$1"
 
-    _WRAPPER_META["elegy-mcp_assetPrefix"]="elegy-mcp-wrapper"
-    _WRAPPER_META["elegy-mcp_installer"]="install.ps1"
-    _WRAPPER_META["elegy-mcp_skillBridge"]="skills/elegy-mcp/SKILL.md"
+    if [[ ! -d "$fixtures_dir" ]]; then
+        return 0
+    fi
 
-    _WRAPPER_META["elegy-planning_assetPrefix"]="elegy-planning-wrapper"
-    _WRAPPER_META["elegy-planning_installer"]="install.ps1"
-    _WRAPPER_META["elegy-planning_skillBridge"]="skills/elegy-planning/SKILL.md"
+    local fixture
+    for fixture in "$fixtures_dir"/elegy-plugin-package.*.json; do
+        [[ -f "$fixture" ]] || continue
+        local fname
+        fname="$(basename "$fixture")"
+        case "$fname" in
+            *.negative-*) continue ;;
+            *.template.json) continue ;;
+        esac
 
-    _WRAPPER_META["elegy-skills_assetPrefix"]="elegy-skills-wrapper"
-    _WRAPPER_META["elegy-skills_installer"]="install.ps1"
-    _WRAPPER_META["elegy-skills_skillBridge"]="skills/elegy-skills/SKILL.md"
+        # Extract per-fixture fields with jq
+        local surface binary asset_prefix installer skill_bridge
+        surface="$(jq -r '.identity.name // empty' "$fixture")"
+        binary="$(jq -r '.components.toolRequirements[0].cliBinary // empty' "$fixture")"
+        asset_prefix="$(jq -r '.publishing.assetPrefix // empty' "$fixture")"
+        installer="$(jq -r '.publishing.installer // empty' "$fixture")"
+        skill_bridge="$(jq -r '.publishing.skillBridge // empty' "$fixture")"
 
-    _WRAPPER_META["elegy-configuration_assetPrefix"]="elegy-configuration-wrapper"
-    _WRAPPER_META["elegy-configuration_installer"]="install.ps1"
-    _WRAPPER_META["elegy-configuration_skillBridge"]="skills/elegy-configuration/SKILL.md"
+        [[ -z "$surface" ]] && continue
 
-    _WRAPPER_META["elegy-documentation_assetPrefix"]="elegy-documentation-wrapper"
-    _WRAPPER_META["elegy-documentation_installer"]="install.ps1"
-    _WRAPPER_META["elegy-documentation_skillBridge"]="skills/elegy-documentation/SKILL.md"
-
-    _WRAPPER_META["elegy-obsidian_assetPrefix"]="elegy-obsidian-wrapper"
-    _WRAPPER_META["elegy-obsidian_installer"]="install.ps1"
-    _WRAPPER_META["elegy-obsidian_skillBridge"]="skills/elegy-obsidian/SKILL.md"
+        printf '%s\t%s\t%s\t%s\t%s\n' \
+            "$surface" "$binary" "$asset_prefix" "$installer" "$skill_bridge"
+    done
 }
-_populate_wrapper_metadata
+
+# Populate _CLI_BINARY and _WRAPPER_META from a directory of per-feature
+# plugin package fixtures. Each fixture is the source of truth for that
+# feature's publish metadata. There is no central catalog; the per-feature
+# publish workflow populates the contracts bundle with these fixtures.
+_load_surface_metadata_from_fixtures() {
+    local fixtures_dir="${1:-}"
+
+    # Clear existing maps so re-loading is idempotent
+    _CLI_BINARY=()
+    _WRAPPER_META=()
+
+    if [[ -z "$fixtures_dir" ]]; then
+        return 0
+    fi
+    if [[ ! -d "$fixtures_dir" ]]; then
+        _warn "Fixtures directory not found: ${fixtures_dir} (no per-feature surface metadata; install will rely on the user's -CliSurfaces/-WrapperSurfaces arguments as-is)"
+        return 0
+    fi
+
+    local row surface binary asset_prefix installer skill_bridge
+    while IFS=$'\t' read -r surface binary asset_prefix installer skill_bridge; do
+        [[ -z "$surface" ]] && continue
+
+        if [[ -n "$binary" ]]; then
+            _CLI_BINARY["$surface"]="$binary"
+        fi
+
+        if [[ -n "$asset_prefix" ]]; then
+            _WRAPPER_META["${surface}_assetPrefix"]="$asset_prefix"
+        fi
+        if [[ -n "$installer" ]]; then
+            _WRAPPER_META["${surface}_installer"]="$installer"
+        fi
+        if [[ -n "$skill_bridge" ]]; then
+            _WRAPPER_META["${surface}_skillBridge"]="$skill_bridge"
+        fi
+    done < <(_enumerate_fixtures_tsv "$fixtures_dir")
+}
+
+# List every known CLI surface (from the loaded fixtures). Returns one
+# surface per line. Used to validate the user's -CliSurfaces request.
+_known_cli_surfaces() {
+    local surface
+    for surface in "${!_CLI_BINARY[@]}"; do
+        printf '%s\n' "$surface"
+    done
+}
+
+# List every known wrapper surface (from the loaded fixtures). Returns one
+# surface per line. Used to validate the user's -WrapperSurfaces request.
+_known_wrapper_surfaces() {
+    local key="${!_WRAPPER_META[@]}"
+    local k
+    for k in $key; do
+        [[ "$k" == *_installer ]] || continue
+        printf '%s\n' "${k%_installer}"
+    done
+}
 
 # ============================================================
 # Main
@@ -698,14 +792,6 @@ main() {
     local resolved_target
     resolved_target="$(_detect_target)"
     _info "Detected host target: ${resolved_target}"
-
-    # ---- Surface resolution ----
-    local -a cli_surfaces wrapper_surfaces
-    IFS=$'\n' read -r -d '' -a cli_surfaces < <(_resolve_cli_surfaces && printf '\0')
-    IFS=$'\n' read -r -d '' -a wrapper_surfaces < <(_resolve_wrapper_surfaces && printf '\0') || true
-
-    _info "Requested CLI surfaces: ${cli_surfaces[*]:-(none)}"
-    _info "Requested wrapper surfaces: ${wrapper_surfaces[*]:-(none)}"
 
     # ---- Destination initialization ----
     local abs_dest
@@ -950,6 +1036,23 @@ main() {
     # Extract contracts
     _info "Extracting contracts bundle to ${contracts_dir}"
     unzip -qo "$contracts_archive" -d "$contracts_dir"
+
+    # Load per-feature surface metadata from the extracted contracts bundle.
+    # This is the per-feature self-owned publishing contract: every
+    # elegy-plugin-package.*.json is the source of truth for that feature's
+    # publish metadata; this script never maintains its own central catalog.
+    # Override via -F/--fixtures-dir for repo-checkout installs.
+    local fixtures_source="${FIXTURES_DIR:-${contracts_dir}/contracts/fixtures}"
+    _info "Loading per-feature surface metadata from ${fixtures_source}"
+    _load_surface_metadata_from_fixtures "$fixtures_source"
+
+    # ---- Surface resolution (after metadata is loaded) ----
+    local -a cli_surfaces wrapper_surfaces
+    IFS=$'\n' read -r -d '' -a cli_surfaces < <(_resolve_cli_surfaces && printf '\0')
+    IFS=$'\n' read -r -d '' -a wrapper_surfaces < <(_resolve_wrapper_surfaces && printf '\0') || true
+
+    _info "Requested CLI surfaces: ${cli_surfaces[*]:-(none)}"
+    _info "Requested wrapper surfaces: ${wrapper_surfaces[*]:-(none)}"
 
     # Record installed asset
     local contracts_size_bytes contracts_sha256

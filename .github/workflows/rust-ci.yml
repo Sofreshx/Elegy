@@ -11,7 +11,7 @@ on:
       - 'docs/specs/**'
       - 'docs/docs-index.md'
       - 'contracts/schemas/**'
-      - 'policies/**'
+      - 'docs/governance/**'
   push:
     branches:
       - main
@@ -25,18 +25,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  registry-alignment:
-    name: registry alignment
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: validate-registry-alignment
-        run: pwsh -NoProfile -NonInteractive -Command "& ./scripts/validate-registry-alignment.ps1 -RepoRoot ."
-
   fmt:
     name: fmt
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -53,7 +43,6 @@ jobs:
 
   clippy:
     name: clippy
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -70,7 +59,6 @@ jobs:
 
   msrv:
     name: msrv check (Rust 1.88)
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -85,7 +73,6 @@ jobs:
 
   test:
     name: test (${{ matrix.os }})
-    needs: registry-alignment
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:

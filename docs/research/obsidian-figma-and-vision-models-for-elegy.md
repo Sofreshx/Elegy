@@ -9,7 +9,7 @@ Canonical implemented truth stays in:
 - [docs/architecture/ecosystem-topology.md](../architecture/ecosystem-topology.md)
 - [docs/architecture/substrate-governance.md](../architecture/substrate-governance.md)
 - [docs/architecture/mcp-skill-tooling-placement.md](../architecture/mcp-skill-tooling-placement.md)
-- [docs/architecture/elegy-memory-v1.md](../architecture/elegy-memory-v1.md)
+- [rust/features/elegy-memory/docs/architecture/v1.md](../../rust/features/elegy-memory/docs/architecture/v1.md)
 - [docs/agent-integration.md](../agent-integration.md)
 
 ## Why this note exists
@@ -54,8 +54,8 @@ The research framing that this section responds to (Obsidian = knowledge, Figma 
 │         ▼                 ▼                    ▼              │
 │  ┌──────────────────────────────────────────────────────────┐ │
 │  │ Elegy contract substrate (canonical authority)          │ │
-│  │  contracts/  schemas/  policies/                      │ │
-│  │  skill.*.json                              │ │
+│  │  contracts/  schemas/                                   │ │
+│  │  skill.*.json                                           │ │
 │  └──────────────────────────────────────────────────────────┘ │
 │         │ argv template / subprocess                          │
 │         ▼                                                     │
@@ -414,7 +414,7 @@ The user explicitly asked about a vision-capable model that can "do visual feedb
 
 The slice lands as:
 
-- `rust/crates/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
+- `rust/features/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
 - `contracts/fixtures/skill.elegy-vision.json` — argv templates
 - `contracts/schemas/vision-result.schema.json`
 - `contracts/fixtures/impeccable-ruleset-v1.json` — the 41 deterministic + 4 opt-in + 5 LLM-only rules
@@ -570,7 +570,7 @@ The full loop, expressed as a 6-step sequence that any host agent can execute:
 
 If Part 4's "second slice" lands, the concrete deliverables are:
 
-- `rust/crates/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
+- `rust/features/elegy-vision/` — thin crate, `elegy-vision describe|diff|ui-review|generate|mockup-to-code`
 - `contracts/fixtures/skill.elegy-vision.json` — argv templates
 - `contracts/schemas/vision-result.schema.json`
 - `contracts/fixtures/impeccable-ruleset-v1.json` — the 41 deterministic + 4 opt-in + 5 LLM-only rules

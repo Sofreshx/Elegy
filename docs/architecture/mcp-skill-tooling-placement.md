@@ -12,8 +12,6 @@ This document applies the burden-of-proof rule to the features that are easiest 
 
 The goal is to decide where neutral artifact authority lives, where Rust executable behavior lives, and when a capability should remain in a consuming repo instead of being centralized in Elegy.
 
-The `src/Elegy-*/install.ps1` files are thin install passthroughs only. They are not repo centers, authority layers, implementation centers, or release surfaces.
-
 For contributor-facing CLI use in these lanes, prefer the dedicated `elegy-mcp` and `elegy-skills` binaries for their bounded paths. Keep `elegy` as the general/compatibility surface.
 
 ## Placement rule
@@ -140,4 +138,4 @@ If a new feature request touches MCP analysis, MCP creation, MCP-to-skill genera
 3. If it is executable runtime code, can it be self-contained and reusable enough to justify Rust ownership?
 4. If it depends on host-specific lifecycle or product policy, why is it not consumer-local?
 
-The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/` and `policies/`.
+The default answer for new shared executable capabilities in this area should now be Rust, while neutral artifact authority stays rooted in `contracts/`.

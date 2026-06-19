@@ -1,4 +1,4 @@
-schemaVersion: elegy-documentation/v2
+schemaVersion: elegy-docs/v1
 authorityRoots:
   current:
     - docs/adr

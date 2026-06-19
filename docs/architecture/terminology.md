@@ -145,7 +145,7 @@ In the current topology, the Rust subtree under `rust/` is the primary runtime f
 
 The package family or artifact set that is allowed to define canonical truth for a concept.
 
-In Elegy, authority surfaces are the governed artifact roots under `contracts/` and `policies/`. Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth.
+In Elegy, authority surfaces are the governed artifact roots under `contracts/`. Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth. Operational policy lives at `docs/governance/`.
 
 ### Governance
 

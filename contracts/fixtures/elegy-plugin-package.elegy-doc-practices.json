@@ -10,7 +10,7 @@
     "description": "Portable plugin package for the central Elegy documentation doctrine: ADR/spec classification, scaffolding, objective validation, and downstream adoption.",
     "tags": ["documentation", "doctrine", "adr", "spec", "validation", "adoption", "plugin"],
     "license": "Apache-2.0",
-    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/docs/architecture/documentation-practices.md"
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/architecture/documentation-practices.md"
   },
   "components": {
     "skillDefinitions": [
@@ -123,6 +123,22 @@
     "sideEffectClass": "disk_write",
     "requiresApproval": false,
     "policyTags": ["documentation-authority", "centralized-doctrine", "objective-validation"]
+  },
+  "publishing": {
+    "cratePath": "elegy-documentation",
+    "assetKind": "wrapper",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-doc-practices-wrapper",
+    "assetPrefix": "elegy-doc-practices-wrapper",
+    "skillBridge": "skills/elegy-doc-practices/SKILL.md",
+    "installer": "install.sh",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
   },
   "elegyCompatibility": {
     "contractBundleVersion": "1.8.0",
