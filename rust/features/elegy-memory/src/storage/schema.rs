@@ -876,10 +876,9 @@ impl ReembedMigration {
             .into_iter()
             .map(rusqlite::types::Value::from)
             .collect();
-        let rows = stmt.query_map(
-            rusqlite::params_from_iter(scope_params.iter()),
-            |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
-        )?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(scope_params.iter()), |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+        })?;
 
         let mut batch: Vec<(String, String)> = Vec::new();
         for row in rows {
@@ -932,7 +931,10 @@ impl ReembedMigration {
 
     fn stale_where_clause(&self) -> (&str, Option<String>) {
         match self.scope_filter {
-            Some(ref s) => ("state = 'active' AND embedding_stale = 1 AND scope = ?1", Some(scope_to_db(*s).to_string())),
+            Some(ref s) => (
+                "state = 'active' AND embedding_stale = 1 AND scope = ?1",
+                Some(scope_to_db(*s).to_string()),
+            ),
             None => ("state = 'active' AND embedding_stale = 1", None),
         }
     }
@@ -2606,8 +2608,10 @@ mod tests {
 
     #[test]
     fn reembed_migration_via_runner_succeeds() {
-        let database_path =
-            env::temp_dir().join(format!("elegy-memory-ree-runner-{}.sqlite3", Uuid::new_v4()));
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-ree-runner-{}.sqlite3",
+            Uuid::new_v4()
+        ));
         let mut connection = must(init_database(&database_path), "create runner test database");
         must(
             connection.execute_batch(
@@ -2719,8 +2723,10 @@ mod tests {
 
     #[test]
     fn reembed_cleans_orphan_staging_at_start_of_run() {
-        let database_path =
-            env::temp_dir().join(format!("elegy-memory-ree-orphan2-{}.sqlite3", Uuid::new_v4()));
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-ree-orphan2-{}.sqlite3",
+            Uuid::new_v4()
+        ));
         let mut connection = must(init_database(&database_path), "create orphan test database");
         must(
             connection.execute_batch(
@@ -2775,7 +2781,9 @@ mod tests {
         assert_eq!(staging_after, 1, "only the real memory must be staged");
 
         let retry_after: i64 = must(
-            txn.query_row("SELECT COUNT(*) FROM reembed_pending_retry", [], |row| row.get(0)),
+            txn.query_row("SELECT COUNT(*) FROM reembed_pending_retry", [], |row| {
+                row.get(0)
+            }),
             "pending_retry after",
         );
         assert_eq!(retry_after, 0, "orphan pending_retry must be cleaned");
@@ -2789,8 +2797,10 @@ mod tests {
 
     #[test]
     fn reembed_resumes_idempotently_after_partial_staging() {
-        let database_path =
-            env::temp_dir().join(format!("elegy-memory-ree-resume-{}.sqlite3", Uuid::new_v4()));
+        let database_path = env::temp_dir().join(format!(
+            "elegy-memory-ree-resume-{}.sqlite3",
+            Uuid::new_v4()
+        ));
         let mut connection = must(init_database(&database_path), "create resume test database");
         must(
             connection.execute_batch(
@@ -2870,9 +2880,12 @@ mod tests {
                     connection.prepare("SELECT id, content FROM memories ORDER BY id"),
                     "snapshot before",
                 );
-                let rows = must(stmt.query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-                }), "query");
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    }),
+                    "query",
+                );
                 let mut out = Vec::new();
                 for r in rows {
                     out.push(must(r, "row"));
@@ -2886,7 +2899,9 @@ mod tests {
         let migration = ReembedMigration::new(
             Box::new(|content: &str| {
                 if content.contains("second fails") {
-                    Err(StoreError::Migration("simulated mid-run provider failure".into()))
+                    Err(StoreError::Migration(
+                        "simulated mid-run provider failure".into(),
+                    ))
                 } else {
                     Ok((vec![1.0f32; 4], 4))
                 }
@@ -2899,7 +2914,10 @@ mod tests {
         // verify: staged(1) + retry(1) == active(2) → passes
         // cutover: mid1 gets promoted (embedding_stale=0), mid2 stays stale
         let txn = must(connection.transaction(), "begin mid txn");
-        must(migration.run(&txn), "reembed with mid-run failure must succeed");
+        must(
+            migration.run(&txn),
+            "reembed with mid-run failure must succeed",
+        );
         must(txn.commit(), "commit");
 
         // (a) Staging partiel NON promu
@@ -2921,7 +2939,10 @@ mod tests {
             ),
             "mid2 stale",
         );
-        assert_eq!(mid2_stale, 1, "mid2 must remain stale after provider failure");
+        assert_eq!(
+            mid2_stale, 1,
+            "mid2 must remain stale after provider failure"
+        );
 
         let staging_left: i64 = must(
             connection.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| row.get(0)),
@@ -2936,9 +2957,12 @@ mod tests {
                     connection.prepare("SELECT id, content FROM memories ORDER BY id"),
                     "snapshot after",
                 );
-                let rows = must(stmt.query_map([], |row| {
-                    Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-                }), "query");
+                let rows = must(
+                    stmt.query_map([], |row| {
+                        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+                    }),
+                    "query",
+                );
                 let mut out = Vec::new();
                 for r in rows {
                     out.push(must(r, "row"));
@@ -2979,10 +3003,8 @@ mod tests {
     fn reembed_two_consecutive_runs_both_execute() {
         // Proves that reembed is not gated by migration_runs — it is an
         // explicit operator action, not a one-shot schema migration.
-        let database_path = env::temp_dir().join(format!(
-            "elegy-memory-ree-twice-{}.sqlite3",
-            Uuid::new_v4()
-        ));
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-ree-twice-{}.sqlite3", Uuid::new_v4()));
         let mut connection = must(init_database(&database_path), "create twice test database");
         must(
             connection.execute_batch(

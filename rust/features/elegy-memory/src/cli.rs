@@ -2754,15 +2754,17 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
     let generator = {
         let provider = Arc::clone(&provider);
         move |content: &str| -> Result<(Vec<f32>, usize), StoreError> {
-            let prepared = prepare_embedding_input(provider.as_ref(), EmbeddingTask::Document, content);
+            let prepared =
+                prepare_embedding_input(provider.as_ref(), EmbeddingTask::Document, content);
             let rt = Builder::new_current_thread()
                 .enable_all()
                 .build()
                 .map_err(|e| StoreError::Migration(format!("failed to build runtime: {e}")))?;
             rt.block_on(async {
-                provider.embed(prepared.as_ref()).await.map_err(|e| {
-                    StoreError::Migration(format!("embedding generation failed: {e}"))
-                })
+                provider
+                    .embed(prepared.as_ref())
+                    .await
+                    .map_err(|e| StoreError::Migration(format!("embedding generation failed: {e}")))
             })
             .map(|v| {
                 let dims = v.len();
@@ -2772,8 +2774,7 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
     };
 
     let profile_id = format!("cli-reembed-{}", Utc::now().timestamp_millis());
-    let migration = ReembedMigration::new(Box::new(generator), profile_id)
-        .with_scope(scope);
+    let migration = ReembedMigration::new(Box::new(generator), profile_id).with_scope(scope);
 
     let txn = connection.transaction()?;
     migration.run(&txn)?;
@@ -4397,10 +4398,7 @@ mod tests {
     fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
         let db_path = unique_temp_path("elegy-memory-cli-reembed");
         let provider = Arc::new(StubEmbeddingProvider::new([
-            (
-                "",
-                StubEmbeddingResponse::Embedding(vec![0.0; 1]),
-            ),
+            ("", StubEmbeddingResponse::Embedding(vec![0.0; 1])),
             (
                 "older stale memory",
                 StubEmbeddingResponse::Embedding(vec![1.0; 768]),
@@ -4507,7 +4505,8 @@ mod tests {
             "expected fail-fast health check error, got: {message}"
         );
         assert!(
-            message.contains("stub embed failure") || message.contains("missing stub embedding for"),
+            message.contains("stub embed failure")
+                || message.contains("missing stub embedding for"),
             "expected stub failure in error, got: {message}"
         );
 
