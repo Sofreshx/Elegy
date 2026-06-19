@@ -85,7 +85,7 @@ jobs:
           }
 
           & (Join-Path $governanceRoot 'scripts/ws3/resolve-enforcement-mode.ps1') `
-            -PolicyPath (Join-Path $governanceRoot 'policies/formalization/visual-llm-enforcement-policy.json') `
+            -PolicyPath (Join-Path $governanceRoot 'docs/governance/visual-llm-enforcement-policy.json') `
             -BranchName '${{ github.ref_name }}' `
             -WorkflowName '${{ github.workflow }}' `
             -OutputPath (Join-Path $callerRoot 'artifacts/ws3/mode-selection.json')

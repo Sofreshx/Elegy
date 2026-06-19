@@ -16,7 +16,7 @@ Before writing any code, read the relevant architecture docs:
 - `docs/architecture/mcp-skill-tooling-placement.md` - MCP, skill generation, portable package, and ownership boundaries.
 - `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` - ADR/spec doctrine and docs validation posture.
 - `docs/spec-baseline.md` - current MCP protocol baseline.
-- `rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` - memory architecture and MVP scope.
+- `rust/features/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/features/elegy-memory/docs/architecture/mvp-scope.md` - memory architecture and MVP scope.
 
 ## Coding Standards
 
@@ -40,7 +40,7 @@ Before writing any code, read the relevant architecture docs:
 ## Architecture Rules — Critical
 
 1. **Trait-first design.** All core behaviors are defined as traits (`MemoryStore`, `EmbeddingProvider`, `MemoryConsolidator`). Implementations are separate. Never hardcode a concrete type where a trait would work.
-2. **MVP discipline.** Check `rust/crates/elegy-memory/docs/architecture/mvp-scope.md` before implementing anything. If a feature is marked v1 or v2, create the trait/struct/table but leave the implementation as a no-op or todo!().
+2. **MVP discipline.** Check `rust/features/elegy-memory/docs/architecture/mvp-scope.md` before implementing anything. If a feature is marked v1 or v2, create the trait/struct/table but leave the implementation as a no-op or todo!().
 3. **Write-time gating.** Every memory write passes through the salience gate (novelty check → salience check → provenance check) before being stored. Never bypass the gate.
 4. **Scopes are isolated.** Session, Workspace, User, and Agent scopes have separate storage. Never cross-query scopes without explicit API calls.
 5. **Embeddings are async-safe.** Embedding computation can fail or be slow. Always handle `embedding_stale` flag. Never block writes on embedding generation.
@@ -49,7 +49,6 @@ Before writing any code, read the relevant architecture docs:
 
 ## File Organization
 
-- `contracts/` and `policies/` hold the governed contract and policy surfaces.
-- `rust/crates/` is the active Rust workspace and contains first-party crates for the umbrella CLI, dedicated CLIs, runtime, adapters, policy, contracts, memory, MCP, skills, planning, configuration, documentation, observe, desktop, data, web, notify, and related tooling.
-- `src/Elegy-*` directories are wrapper or contributor-navigation surfaces, not the canonical Rust implementation roots.
+- `contracts/` holds the governed contract and policy surfaces. Operational policy lives at `docs/governance/`.
+- `rust/{core,features,bin}/` is the active Rust workspace. `core/` holds the shared kernel crates used by multiple features, `features/` holds one tree per agent capability, and `bin/` holds the thin host and umbrella CLI entrypoints.
 - `docs/adr/` and `docs/specs/` are the configured current documentation authority roots for durable decisions and implementation-facing specs.

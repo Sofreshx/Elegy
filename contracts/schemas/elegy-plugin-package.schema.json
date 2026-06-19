@@ -316,6 +316,16 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "cratePath": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Workspace-relative path to the Rust crate that produces this surface's binary (e.g. 'elegy-memory'). The central publish orchestrator passes this to `cargo build -p`. Required when the surface produces a binary; may be absent for skill-only surfaces that ship without a Rust build (e.g. external-CLI shim bridges). The orchestrator falls back to the `identity.name` field when cratePath is absent and a binary is expected."
+        },
+        "assetKind": {
+          "type": "string",
+          "enum": ["cli", "wrapper"],
+          "description": "Whether this surface produces CLI archives (binary only) or wrapper archives (binary + SKILL.md bridge + installer). Drives the staging contents in the reusable publish workflow. Required when the surface has a `publishing` block."
+        },
         "marketplaceTarget": {
           "type": "string",
           "minLength": 1
@@ -354,6 +364,45 @@
           "items": {
             "$ref": "#/$defs/compatibilityMetadata"
           }
+        },
+        "archiveFamily": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Per-feature archive asset family name used to derive release asset names. The reusable publish workflow turns this into <archiveFamily>-<version>-<target>.zip for binaries, or <archiveFamily>-<bundleVersion>.zip for wrappers. Owns the asset name; the central publish workflow does not enumerate it."
+        },
+        "assetPrefix": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Per-feature asset prefix used inside the wrapper archive layout (typically the same as archiveFamily for wrappers, or the binary name for CLI archives). The generic installer reads this to know which asset name to expect in the release."
+        },
+        "skillBridge": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative path (within the feature tree) of the SKILL.md mirror that wrapper archives bundle. Optional; absent for non-wrapper features."
+        },
+        "installer": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Filename of the wrapper's installer script inside the archive (e.g. 'install.sh'). Optional; absent for non-wrapper features."
+        },
+        "prePublishHook": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional shell command the per-feature publish workflow runs before cargo build. Use sparingly; the per-feature workflow already covers the standard cases."
+        },
+        "postPublishHook": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Optional shell command the per-feature publish workflow runs after the asset is uploaded. Use sparingly."
+        },
+        "targets": {
+          "type": "array",
+          "description": "Optional override of the default target list (x86_64-pc-windows-msvc, x86_64-unknown-linux-gnu, aarch64-apple-darwin). Use when a feature cannot build for a standard target.",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "uniqueItems": true
         }
       }
     },

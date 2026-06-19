@@ -94,8 +94,8 @@ It does not currently claim bundled apps, MCP servers, or hooks.
 
 The current evidence for this slice is:
 
-- reusable generation logic in `rust/crates/elegy-tooling`
-- umbrella CLI coverage in `rust/crates/elegy-cli`
+- reusable generation logic in `rust/core/elegy-tooling`
+- umbrella CLI coverage in `rust/bin/elegy-cli`
 - focused tooling and CLI tests for Codex plugin export (tests cover both `elegy plugin export codex` and the legacy `elegy generate codex-plugin` alias)
 
 If future work adds `.mcp.json`, `.app.json`, or marketplace output, update the

@@ -14,7 +14,7 @@ Thanks for your interest in contributing.
 Please keep these rules in mind:
 
 1. **Be honest about current status.** Do not document commands, examples, or capabilities that do not exist yet.
-2. **Respect the accepted direction.** `contracts/` and `rust/` remain the canonical owned surfaces. The `src/Elegy-*/install.ps1` files are thin host-neutral install passthroughs.
+2. **Respect the accepted direction.** `contracts/` and `rust/` remain the canonical owned surfaces.
 3. **Keep v1 intentionally narrow.** The current protocol/runtime target is Rust-first, runtime composition, resources-first MCP behavior, and conservative policy defaults.
 4. **Prefer safe defaults.** Validation, policy, and security posture are core project behavior, not extras.
 5. **Do not widen scope casually.** Changes that affect protocol scope, trust boundaries, packaging topology, or repo-split direction should start with an issue or design discussion.
@@ -25,11 +25,11 @@ Review:
 
 - [README.md](README.md)
 - [docs/architecture/README.md](docs/architecture/README.md)
-- [docs/architecture/elegy-memory-v1.md](docs/architecture/elegy-memory-v1.md) when changing governed memory or repo-local non-authoritative skill-routing surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
+- [rust/features/elegy-memory/docs/architecture/v1.md](rust/features/elegy-memory/docs/architecture/v1.md) when changing governed memory or repo-local non-authoritative skill-routing surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
 - [docs/spec-baseline.md](docs/spec-baseline.md)
 - [SECURITY.md](SECURITY.md)
 
-If you touch `src/Elegy-*/install.ps1`, keep those paths thin install passthroughs and route substantive authority or implementation changes back to `contracts/` and `rust/`, and the canonical docs. Treat `.github/skills/` only as repo-local non-authoritative contributor-routing output.
+Treat `.github/skills/` only as repo-local non-authoritative contributor-routing output.
 For larger changes, open an issue or draft PR early so maintainers can confirm the work still matches the accepted consolidation direction.
 
 ## What to work on now
@@ -47,13 +47,23 @@ Good contributions right now include:
 
 Run the narrowest relevant checks for the surfaces you change.
 
+### Git hooks
+
+This repo ships pre-push and pre-commit hooks under `.githooks/`. To enable them locally, run from the repo root:
+
+```bash
+git config core.hooksPath .githooks
+```
+
+The pre-push hook runs `cargo fmt --all --check`, `cargo clippy --workspace --all-targets --all-features -- -D warnings`, the `elegy-documentation` check, and `cargo test --workspace --all-targets --all-features`. The pre-commit hook runs the fast `cargo fmt --all --check`.
+
 ### Contracts and workflow changes
 
 Use targeted checks such as:
 
-```powershell
-pwsh ./scripts/export-contracts.ps1
-pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+```bash
+cd rust && cargo run -p elegy-cli -- contracts validate --project ..
+cd rust && cargo test -p elegy-contracts --test conformance
 ```
 
 ### Rust runtime changes

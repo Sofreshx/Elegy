@@ -21,8 +21,9 @@ The `elegy-plugin-package/v1` schema is the **single** portable package
 contract. There is no V1/V2 split, no parallel schema files, and no
 Holon-specific enum values on the contract surface.
 
-This is recorded as an accepted decision in
-[Plugin Package V1 Unification](../adr/2026-06-16-elegy-plugin-package-v1-unification.md).
+This contract is the post-unification state: a single portable package
+contract with no V1/V2 split and no Holon-specific enum values on the
+contract surface.
 
 That means a publishable package carries:
 

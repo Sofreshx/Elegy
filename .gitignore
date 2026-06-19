@@ -2,12 +2,17 @@
 **/[Bb]in/
 **/[Oo]bj/
 rust/target/
+!/rust/bin/
 
-# Standalone crate outputs under rust/crates/
-rust/crates/**/target/
+# Standalone crate outputs under rust/{core,features,bin}/
+rust/core/**/target/
+rust/features/**/target/
+rust/bin/**/target/
 
-# Standalone crate lockfiles under rust/crates/
-rust/crates/**/Cargo.lock
+# Standalone crate lockfiles under rust/{core,features,bin}/
+rust/core/**/Cargo.lock
+rust/features/**/Cargo.lock
+rust/bin/**/Cargo.lock
 
 # Test artifacts
 TestResults/
@@ -45,15 +50,9 @@ Thumbs.db
 
 # Repo-local prompt/session scratch files
 /prompt.md
-/FLIGHT_RECORDER.md
-/SESSION_TRACKING.md
 elegy-memory-mvp-test-plan.md
 
 # Local agent session artifacts
-/.copilot/
-!/.copilot/
-/.copilot/*
-!/.copilot/commit-checks.json
 /target/agent-artifacts/
 
 # elegy-memory-mcp local auth state

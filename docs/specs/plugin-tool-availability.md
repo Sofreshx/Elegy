@@ -715,8 +715,8 @@ Each item is observable and machine-checkable.
   `scripts/install-distribution.ps1` (lines 880-923) and
   `docs/distribution.md` (line 103)
 - Code-level authority for the verifier (planned):
-  `rust/crates/elegy-configuration/` (new
-  `package-verify` command) or a new `rust/crates/elegy-readiness/`
+  `rust/features/elegy-configuration/` (new
+  `package-verify` command) or a new `rust/features/elegy-readiness/`
   module if the verifier is reused beyond `elegy-configuration`. The
   command is read-only, so it is safe to add to either surface.
 - Schemas that the verifier consumes:

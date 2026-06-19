@@ -17,7 +17,7 @@
     "license": "Apache-2.0",
     "tags": ["mermaid", "workflow", "projection", "narration", "reverse"],
     "owners": ["elegy"],
-    "documentationUri": "docs/architecture/mermaid-tooling.md"
+    "documentationUri": "rust/features/elegy-mermaid/docs/tooling.md"
   },
   "capabilities": [
     {
@@ -129,7 +129,7 @@
   "governance": {
     "riskLevel": "low",
     "approvalRequirement": "none",
-    "policyRefs": ["docs/architecture/mermaid-tooling.md"],
+    "policyRefs": ["rust/features/elegy-mermaid/docs/tooling.md"],
     "allowedContexts": ["contributor-routing", "local-cli", "diagram-projection"]
   },
   "discovery": {

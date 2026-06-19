@@ -10,12 +10,11 @@ authority surface.
 
 ## Authority Centers
 
-- `contracts/` and `policies/` are the neutral authority roots for contracts, schemas, fixtures, compatibility, schema-line metadata, and policy.
+- `contracts/` is the neutral authority root for contracts, schemas, fixtures, compatibility, schema-line metadata, and policy. Workflow and operational governance policy lives at `docs/governance/`.
 - `contracts/fixtures/skill.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
 - `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
 - `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs, configured by `.elegy/docs.yaml`.
-- `src/Elegy-*/install.ps1` per surface is a thin host-neutral install passthrough; see `docs/specs/host-neutral-plugin-install.md`.
-- `src/Elegy-obsidian` delegates to the official Obsidian Desktop CLI. Do not describe it as a Rust binary or as durable planning authority.
+- The `Elegy-obsidian` surface delegates to the official Obsidian Desktop CLI. Do not describe it as a Rust binary or as durable planning authority.
 
 ## Start Here
 
