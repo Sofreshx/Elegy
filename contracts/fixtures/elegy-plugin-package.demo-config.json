@@ -29,7 +29,7 @@
     "assetKind": "wrapper",
     "marketplaceTarget": "github-releases",
     "importMode": "package",
-    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
     "sourceRef": "main",
     "compatibility": [],
     "archiveFamily": "elegy-demo-config",
