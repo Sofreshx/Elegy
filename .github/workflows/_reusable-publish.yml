@@ -1,4 +1,4 @@
-name: _reusable-publish
+﻿name: _reusable-publish
 
 # Generic per-feature publish workflow. Each per-feature workflow is a thin
 # caller of this one; this workflow knows nothing about specific surfaces.
@@ -79,7 +79,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
 
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.96.0
         with:
           targets: ${{ matrix.target }}
 

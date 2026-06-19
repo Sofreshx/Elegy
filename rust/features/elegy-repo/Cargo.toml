@@ -3,7 +3,6 @@ name = "elegy-repo"
 version = "0.1.0"
 publish = false
 edition = "2021"
-rust-version = "1.88"
 license = "Apache-2.0"
 authors = ["Elegy Contributors"]
 repository = "https://github.com/Sofreshx/Elegy"

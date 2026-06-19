@@ -1,4 +1,4 @@
-name: publish orchestrator
+﻿name: publish orchestrator
 
 # Central CI orchestrator for the per-feature publish lane.
 #
@@ -105,7 +105,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6.0.2
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2.9.1
         with:
