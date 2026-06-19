@@ -3,7 +3,6 @@ name = "elegy-desktop-win32"
 version.workspace = true
 publish = false
 edition.workspace = true
-rust-version.workspace = true
 license.workspace = true
 description = "Minimal Win32 FFI wrappers for desktop input automation. Unsafe code is isolated in this leaf crate."
 

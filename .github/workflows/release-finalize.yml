@@ -1,4 +1,4 @@
-name: release-finalize
+﻿name: release-finalize
 
 # Generic release finalizer. Runs on release: published events. Walks all
 # uploaded assets via `gh release view --json assets`, computes SHA-256

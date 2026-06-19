@@ -3,7 +3,6 @@ name = "elegy-desktop"
 version.workspace = true
 publish = false
 edition.workspace = true
-rust-version.workspace = true
 license.workspace = true
 description = "Safe desktop automation for agentic workflows. Mouse clicks, keyboard input, window management with dry-run and evidence capture."
 

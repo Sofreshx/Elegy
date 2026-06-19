@@ -1,4 +1,4 @@
-name: WS3 Governance (formalization compatibility name)
+﻿name: WS3 Governance (formalization compatibility name)
 
 # Historical compatibility naming is retained in this workflow path, artifact names,
 # and formalization-named JSON inputs because reusable callers may still depend on them.

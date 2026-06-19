@@ -1,4 +1,4 @@
-name: Distribution Artifacts
+﻿name: Distribution Artifacts
 
 # Slimmed: each per-feature publish workflow now owns its own build/package/
 # upload steps via ./.github/workflows/_reusable-publish.yml. This workflow
@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@v6.0.2
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2.9.1
