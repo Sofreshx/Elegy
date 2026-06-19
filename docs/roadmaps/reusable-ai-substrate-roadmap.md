@@ -36,7 +36,7 @@ This roadmap does **not** change the current architecture boundary already docum
 
 The following remain true:
 
-- governed artifacts under `contracts/` and `policies/` remain the durable authority surfaces
+- governed artifacts under `contracts/` remain the durable authority surfaces; operational policy lives at `docs/governance/`
 - Rust crates under `rust/` remain the reusable executable layer
 - thin CLIs remain operator shells, not new authority roots
 - host-specific orchestration, auth, tenancy, prompt assembly, approval UX, and control-plane ownership remain consumer-local
@@ -159,7 +159,7 @@ Normalize `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills` around:
 Implemented in this phase so far:
 
 - shared CLI machine-output and structured-failure helpers in
-  `rust/crates/elegy-contracts`
+  `rust/core/elegy-contracts`
 - dedicated CLI normalization for `elegy-skills`, `elegy-configuration`, and
   `elegy-memory`
 - real-output conformance coverage for those dedicated CLI surfaces
@@ -633,7 +633,7 @@ while staying aligned with current repo boundaries.
 - [Ecosystem topology](../architecture/ecosystem-topology.md)
 - [Substrate governance](../architecture/substrate-governance.md)
 - [MCP, skill, and tooling placement](../architecture/mcp-skill-tooling-placement.md)
-- [Elegy-memory V1](../architecture/elegy-memory-v1.md)
+- [Elegy-memory V1](../../rust/features/elegy-memory/docs/architecture/v1.md)
 - AgentFlow: <https://agentflow.stanford.edu/>
 - SOAR: <https://arxiv.org/abs/2407.20635>
 - Autoresearch: <https://github.com/karpathy/autoresearch>

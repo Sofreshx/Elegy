@@ -17,10 +17,8 @@ The main goal is to keep Elegy reusable across Holon and non-Holon projects whil
 
 Its active design centers are:
 
-- governed schemas, fixtures, manifests, and policies rooted under `contracts/` and `policies/`
+- governed schemas, fixtures, manifests, and policy rooted under `contracts/`
 - the first-party Rust workspace under `rust/`, which owns the reusable executable and operator-facing surfaces
-
-Thin install passthroughs exist under `src/Elegy-*/install.ps1`; they are not repo centers, authority layers, implementation centers, or release surfaces.
 
 Legacy `src/`, `tests/`, solution files, and `.NET` package-family narratives are not active repo centers and should not be described as such in current docs.
 
@@ -34,7 +32,7 @@ The durable authority in this repo is language-agnostic and lives in authored as
 
 - schemas and fixtures under `contracts/`
 - version and release policy under `contracts/schemas/`
-- formalization policy under `policies/`
+- operational policy (workflow, environment, branch enforcement modes) under `docs/governance/`
 - exported downstream handoff bundles under `artifacts/contracts`
 
 These assets are the source of truth for downstream consumers. They should be preferred over reviving a removed source-package tree.
@@ -68,7 +66,7 @@ What the repo proves today:
 - the in-repo `elegy-skills` surface is shipped as a thin dedicated wrapper over governed skill-registry access and validation
 - the in-repo `elegy-configuration` surface is shipped as a dedicated wrapper over governed template/profile flows
 - the in-repo `elegy-documentation` surface is shipped as a dedicated wrapper over documentation inspection, mapping, and non-authoritative export
-- those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp`, `rust/crates/elegy-skills`, `rust/crates/elegy-planning`, and `rust/crates/elegy-tooling`
+- those commands are backed by shared Rust crates led by `rust/features/elegy-mcp`, `rust/features/elegy-skills`, `rust/features/elegy-planning`, and `rust/core/elegy-tooling`
 - the CLI also carries validation, inspection, and stdio-host startup entrypoints
 - contract bundles can be exported and consumed independently of the Rust workspace
 
@@ -97,15 +95,14 @@ If a capability depends on host-specific auth, persistence, UI, HTTP endpoints, 
 
 The dependency direction should remain one-way:
 
-1. governed artifacts and policies at the bottom
+1. governed artifacts and operational policy at the bottom
 2. Rust contract consumers and policy crates above those authored assets
 3. runtime-composition and adapter crates above the contract and policy layer
 4. operator surfaces such as `elegy-cli` and `elegy-host-mcp` on top
 5. downstream apps consuming exported bundles, explicit Rust crates, or CLI outputs
 
 That means:
-
-- contracts and policies define the durable boundary
+- contracts and operational policy define the durable boundary
 - Rust crates consume governed artifacts rather than redefining them
 - operator shells remain thin over explicit runtime and tooling crates
 - docs must not imply a removed source-package center just because downstream consumers may still be `.NET`
@@ -136,6 +133,5 @@ For now, the most coherent working model is:
 - `Elegy` is the single active repo
 - governed authority lives in root artifact and policy directories, not in a removed `.NET` source tree
 - `rust/` is the first-party home for reusable executable surfaces, especially CLI, MCP analysis, descriptor tooling, policy-bounded runtime composition, and host layers
-- `src/Elegy-*/install.ps1` are thin install passthroughs only, not revived package-family centers
 - the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through both the umbrella `elegy` surface and the dedicated `elegy-mcp` / `elegy-skills` binaries
 - built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

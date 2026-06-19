@@ -1,0 +1,79 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.obsidian-plugin",
+    "name": "elegy-obsidian",
+    "version": "0.1.0",
+    "displayName": "Elegy Obsidian Plugin"
+  },
+  "metadata": {
+    "description": "Portable Obsidian vault bridge plugin. Delegates to the official Obsidian Desktop CLI; does not own Rust binary behavior or durable planning state. The wrapper is a skill + thin shim, not a Rust binary.",
+    "tags": ["obsidian", "vault", "bridge", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/docs/specs/obsidian-skill-and-cli.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "obsidian-skill",
+        "definitionRef": "skill.elegy-obsidian.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "obsidian-vault-read-cli",
+        "skill": "elegy.obsidian",
+        "capability": "obsidian-vault-read",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "obsidian_vault_read"
+        }
+      },
+      {
+        "id": "obsidian-vault-write-cli",
+        "skill": "elegy.obsidian",
+        "capability": "obsidian-vault-write",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "obsidian_vault_write"
+        }
+      }
+    ],
+    "docs": [
+      {
+        "id": "obsidian-spec",
+        "path": "docs/specs/obsidian-skill-and-cli.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "read_only",
+    "requiresApproval": false,
+    "policyTags": ["vault-bridge", "external-cli", "non-authoritative"]
+  },
+  "publishing": {
+    "assetKind": "wrapper",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-obsidian-wrapper",
+    "assetPrefix": "elegy-obsidian-wrapper",
+    "skillBridge": "skills/elegy-obsidian/SKILL.md",
+    "installer": "install.sh",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

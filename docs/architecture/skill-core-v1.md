@@ -19,17 +19,17 @@ That means:
 
 The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and the repo-local `SKILL.md` lanes remain non-authoritative rendered mirrors only.
 
-The `src/Elegy-*/install.ps1` files are thin install passthroughs only, not skill authority surfaces, implementation centers, or release surfaces.
+The `src/Elegy-*/` wrapper installer lanes are retired. Skill delivery uses plugin packages and host export; repo-local `.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
 
 ## Current executable ownership
 
 The Rust workspace owns the reusable executable path around those governed skill artifacts.
 
-- `rust/crates/elegy-tooling` owns reusable authoring, analysis, and MCP-to-skill generation behavior over governed descriptors and skill projections
-- `rust/crates/elegy-cli` exposes the general/compatibility skills commands: `skills list/search/resolve/get/capability/validate`
-- `rust/crates/elegy-skills` owns the reusable registry API plus the dedicated `elegy-skills` registry CLI surface
-- `rust/crates/elegy-mcp` exposes the current dedicated MCP descriptor authoring and analysis flow
-- `rust/crates/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
+- `rust/core/elegy-tooling` owns reusable authoring, analysis, and MCP-to-skill generation behavior over governed descriptors and skill projections
+- `rust/bin/elegy-cli` exposes the general/compatibility skills commands: `skills list/search/resolve/get/capability/validate`
+- `rust/features/elegy-skills` owns the reusable registry API plus the dedicated `elegy-skills` registry CLI surface
+- `rust/features/elegy-mcp` exposes the current dedicated MCP descriptor authoring and analysis flow
+- `rust/features/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
 - consuming applications keep host-specific registration, auth, persistence, and orchestration local
 
 ## Current registry scope
@@ -65,7 +65,7 @@ The high-level skills model is now:
 
 Current confidence comes from the surviving validation and export flows:
 
-- `scripts/export-contracts.ps1` and `scripts/validate-canonical-outputs.ps1`
+- `cargo run -p elegy-cli -- contracts validate` and the conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
 - Rust CI for formatting, linting, and tests in `.github/workflows/rust-ci.yml`
 
 Future work should build on this split rather than reopening skill authority. New reusable execution logic belongs in Rust, and new durable skill truth belongs in governed artifacts.

@@ -13,10 +13,9 @@ The main Elegy repo is now the intended long-term home for both:
 
 The repository now converges on this shape:
 
-- `contracts/` and `policies/` remain the authored authority roots
+- `contracts/` remains the authored authority root
 - `artifacts/contracts` remains the generated downstream handoff surface
 - `rust/` is the in-repo Cargo workspace for reusable executable behavior
-- `src/Elegy-*/install.ps1` are thin install passthroughs only; they do not reopen the removed source-package story
 - root docs and root scripts define the contributor and validation path
 
 This is no longer a story about keeping a removed legacy package tree authoritative. The current question is simpler: which responsibilities belong in governed artifacts, which belong in Rust executable crates, and which should stay consumer-local.
@@ -27,7 +26,7 @@ The following remain canonical in the repo today:
 
 - governed schemas and fixtures under `contracts/`
 - version and release policy under `contracts/schemas/`
-- formalization policy under `policies/`
+- operational policy under `docs/governance/`
 - export and validation scripts at the repo root
 
 These are the durable coordination surfaces that downstream consumers should rely on.
@@ -50,7 +49,7 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `generate skills`
 - `generate codex-plugin`
 
-Those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp` and `rust/crates/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
+Those commands are backed by shared Rust crates led by `rust/features/elegy-mcp` and `rust/core/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
 
 ## What is still a target
 
@@ -93,9 +92,9 @@ Contributor-facing validation should point to the smallest real flows that still
 
 ### Contracts and exports
 
-```powershell
-pwsh ./scripts/export-contracts.ps1 -CreateArchive
-pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+```bash
+cd rust && cargo run -p elegy-cli -- contracts validate --project ..
+cd rust && cargo run -p elegy-cli -- contracts export --output ../artifacts/contracts --create-archive --archive-output ../artifacts/distribution/elegy-contracts-bundle.zip
 ```
 
 ### Rust executable surfaces
@@ -113,7 +112,7 @@ Docs should point contributors only at repo-root bundle scripts and Rust workspa
 ## Current next sequence
 
 1. keep hardening the Rust CLI, tooling crates, and host/runtime surfaces that ship from the in-repo workspace
-2. keep the governed contract, policy, and export roots under `contracts/` and `policies/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
+2. keep the governed contract, operational policy, and export roots under `contracts/` and `docs/governance/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
 3. finish removing stale docs that still imply deleted source, test, or package-family centers
 4. only document broader built-in self-authoring or MCP-hosted operator experiences once the Rust workspace proves them as runnable, contributor-facing surfaces
 

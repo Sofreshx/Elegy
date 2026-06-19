@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "<FILL-IN: elegy.<your-feature>>",
+    "name": "<FILL-IN: your-feature>",
+    "version": "0.1.0",
+    "displayName": "<FILL-IN: Human Readable Feature Name>"
+  },
+  "metadata": {
+    "description": "<FILL-IN: One-paragraph summary of what this package bundles and who consumes it.>",
+    "tags": ["<FILL-IN: feature>", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "<FILL-IN: absolute URL to the per-feature docs/architecture/*.md file on the public repo>"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "<FILL-IN: kebab-case-skill-id>",
+        "definitionRef": "skill.<your-feature>.json"
+      }
+    ],
+    "instructionSkills": [],
+    "capabilityProjections": [],
+    "toolRequirements": [
+      {
+        "toolName": "<FILL-IN: tool name, usually identity.name>",
+        "cliBinary": "<FILL-IN: binary name, e.g. 'elegy-<your-feature>'>",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "<FILL-IN: short description of what this CLI does>"
+      }
+    ],
+    "docs": [
+      {
+        "id": "readme",
+        "path": "README.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "read",
+    "requiresApproval": false,
+    "policyTags": []
+  },
+  "publishing": {
+    "marketplaceTarget": "<FILL-IN: where this package publishes, e.g. 'github-releases' or omit>",
+    "importMode": "package",
+    "sourceRepository": "<FILL-IN: absolute URL of the source repo>",
+    "sourceRef": "main",
+    "compatibility": [],
+
+    "archiveFamily": "<FILL-IN: asset family name, e.g. 'elegy-<your-feature>-wrapper' for wrappers or 'elegy-<your-feature>' for CLI binaries>",
+    "assetPrefix": "<FILL-IN: asset prefix, usually same as archiveFamily>",
+    "skillBridge": "<FILL-IN: relative path to SKILL.md mirror, omit for non-wrapper features>",
+    "installer": "<FILL-IN: 'install.sh' for wrappers, omit for non-wrapper features>",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "<FILL-IN: version from schemas/schema-version.json>",
+    "schemaLine": "1.x"
+  },
+  "extensions": {
+    "_template_instructions": "1. Copy this file to contracts/fixtures/elegy-plugin-package.<your-feature>.json. 2. Replace every <FILL-IN: ...> placeholder with real values; remove the `_template_instructions` extension after authoring. 3. Add the per-feature skill fixture to contracts/fixtures/skill.<your-feature>.json (use skill.minimal.json as a starting point). 4. Fill in capabilityProjections with one entry per CLI subcommand or tool, mapping to the actual binary surface. 5. Set hostPolicyHints.sideEffectClass to read_only | disk_read | disk_write | network_outbound | process_spawn per the actual capability. 6. Fill the publishing block: cratePath is the workspace crate name (e.g. 'elegy-memory'); assetKind is 'cli' or 'wrapper'; archiveFamily is the per-feature asset name; assetPrefix matches it; skillBridge and installer are required for wrapper assetKind. 7. Validate with: cargo run -p elegy-cli -- contracts validate --project . && cargo test -p elegy-contracts --test conformance -- --nocapture. 8. Add the per-feature DISTRIBUTION.md at rust/features/<your-feature>/DISTRIBUTION.md describing the binary's distribution shape; do not list the feature in a central catalog. 9. The central publish orchestrator (`.github/workflows/publish-orchestrator.yml`) auto-discovers the surface from this fixture; no per-feature workflow file is required. See contracts/AGENTS.md for the authority rules."
+  }
+}

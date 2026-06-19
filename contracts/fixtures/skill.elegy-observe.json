@@ -17,7 +17,7 @@
     "license": "Apache-2.0",
     "tags": ["observation", "desktop", "os", "processes", "windows", "screen", "clipboard", "filesystem", "system"],
     "owners": ["elegy"],
-    "documentationUri": "docs/architecture/observe-cli.md"
+    "documentationUri": "rust/features/elegy-observe/docs/cli.md"
   },
   "capabilities": [
     {

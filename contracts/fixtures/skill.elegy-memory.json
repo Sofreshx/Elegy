@@ -17,7 +17,7 @@
     "license": "Apache-2.0",
     "tags": ["memory", "local-cli", "mvp", "preview", "non-authoritative"],
     "owners": ["elegy"],
-    "documentationUri": "rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md"
+    "documentationUri": "rust/features/elegy-memory/docs/architecture/ARCHITECTURE.md"
   },
   "capabilities": [
     {
@@ -473,7 +473,7 @@
   "governance": {
     "riskLevel": "low",
     "approvalRequirement": "none",
-    "policyRefs": ["docs/migration/reusable-memory-boundary.md", "docs/architecture/skill-core-v1.md"],
+    "policyRefs": ["rust/features/elegy-memory/docs/migration/reusable-memory-boundary.md", "docs/architecture/skill-core-v1.md"],
     "allowedContexts": ["contributor-routing", "local-cli", "memory-operations"]
   },
   "discovery": {

@@ -1,0 +1,101 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.documentation-plugin",
+    "name": "elegy-documentation",
+    "version": "0.1.0",
+    "displayName": "Elegy Documentation Plugin"
+  },
+  "metadata": {
+    "description": "Portable documentation authority plugin. Authority-aware inspect, map, check, init, and export of ADRs, specs, and architectural docs.",
+    "tags": ["documentation", "adr", "spec", "validation", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-documentation/docs/architecture/ARCHITECTURE.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "documentation-skill",
+        "definitionRef": "skill.elegy-documentation.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "documentation-inspect-cli",
+        "skill": "elegy.documentation",
+        "capability": "documentation-inspect",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "documentation_inspect"
+        }
+      },
+      {
+        "id": "documentation-check-cli",
+        "skill": "elegy.documentation",
+        "capability": "documentation-check",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "documentation_check"
+        }
+      },
+      {
+        "id": "documentation-init-cli",
+        "skill": "elegy.documentation",
+        "capability": "documentation-init",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "documentation_init"
+        }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-documentation",
+        "cliBinary": "elegy-documentation",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Documentation CLI for authority-aware inspect, map, check, init, and export."
+      }
+    ],
+    "docs": [
+      {
+        "id": "documentation-architecture",
+        "path": "rust/features/elegy-documentation/docs/architecture/ARCHITECTURE.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "read_only",
+    "requiresApproval": false,
+    "policyTags": ["documentation-authority", "objective-validation"]
+  },
+  "publishing": {
+    "cratePath": "elegy-documentation",
+    "assetKind": "wrapper",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-documentation-wrapper",
+    "assetPrefix": "elegy-documentation-wrapper",
+    "skillBridge": "skills/elegy-documentation/SKILL.md",
+    "installer": "install.sh",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

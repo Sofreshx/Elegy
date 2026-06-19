@@ -24,9 +24,8 @@ Core model:
 | Area | Purpose |
 | --- | --- |
 | `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
-| `policies/` | Formalization policy. |
+| `docs/governance/` | Operational policy (workflow/environment/branch enforcement modes). |
 | `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
-| `src/Elegy-*` | Contributor-navigation and wrapper-package overlays, not implementation roots. |
 | `artifacts/` | Generated bundles, archives, and validation outputs. |
 
 When those surfaces disagree, prefer the governed artifact roots and the
@@ -38,8 +37,10 @@ Latest stable release: [github.com/Sofreshx/Elegy/releases/latest](https://githu
 
 Rolling prerelease from `main`: [github.com/Sofreshx/Elegy/releases/tag/main-snapshot](https://github.com/Sofreshx/Elegy/releases/tag/main-snapshot)
 
-See [docs/distribution.md](docs/distribution.md) for the full package matrix
-and asset family descriptions.
+Per-binary install commands and asset family names live in each binary's
+per-feature distribution note. The top-level [docs/distribution.md](docs/distribution.md)
+is a thin index: release channels, published targets, asset family patterns,
+and a per-binary link list.
 
 Published targets:
 
@@ -47,28 +48,36 @@ Published targets:
 - Linux x64: `x86_64-unknown-linux-gnu`
 - macOS ARM64: `aarch64-apple-darwin`
 
-### PowerShell installer
+### Install
 
 Download `elegy-installer-<bundleVersion>.zip` from GitHub Releases, extract,
-and run the bundled `install-distribution.ps1`:
+and run the canonical installer. The `install-distribution.ps1` file in the
+archive is a thin shim that forwards all arguments to `install-distribution.sh`;
+the bash script is the single canonical implementation.
+
+```bash
+# Canonical installer (recommended; works on any platform with bash)
+bash ./install-distribution.sh -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+```
 
 ```powershell
+# Native-pwsh entry point: thin shim that forwards all args to bash (requires bash in PATH)
 pwsh ./install-distribution.ps1 -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
 ```
 
 Pin a specific release:
 
-```powershell
-pwsh ./install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-mcp,elegy-planning -Force
+```bash
+bash ./install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory,elegy-planning -Force
 ```
 
 Track the rolling `main-snapshot` prerelease:
 
-```powershell
-pwsh ./install-distribution.ps1 -Tag main-snapshot -Destination ./tools/elegy-main -CliSurfaces elegy-cli -Force
+```bash
+bash ./install-distribution.sh -Tag main-snapshot -Destination ./tools/elegy-main -CliSurfaces elegy-cli -Force
 ```
 
-The same installer is also available at `scripts/install-distribution.ps1` from
+The same installer is also available at `scripts/install-distribution.{sh,ps1}` from
 a repo checkout.
 
 ### Bash installer
@@ -112,34 +121,33 @@ elegy docs check --json
 From a repo checkout, use `cargo run -p elegy-cli -- ...` with the same
 arguments.
 
-## Main Surfaces
+## Per-binary surface
 
-| Surface | Purpose |
-| --- | --- |
-| `elegy` | General-purpose CLI: agent onboarding, skills, contracts, configuration, docs, mermaid, diagram, observe, desktop, repo, web, data, notify, MCP host, and lower-level author/analyze/generate/validate/inspect. |
-| `elegy-memory` | Dedicated local memory CLI. |
-| `elegy-mcp` | Dedicated MCP descriptor authoring and analysis CLI. |
-| `elegy-planning` | Dedicated durable planning CLI for goals, roadmaps, plans, and todos. |
-| `elegy-skills` | Dedicated governed skill registry CLI. |
-| `elegy-configuration` | Dedicated deterministic configuration materialization CLI. |
-| `elegy-documentation` | Dedicated documentation authority CLI. |
-| `elegy-memory-mcp-http` | Optional MCP-over-HTTP transport adapter for `elegy-memory` (OAuth 2.1 + bearer JWT). |
-| `elegy-memory-mcp-stdio` | Optional MCP-over-stdio transport adapter for `elegy-memory` (local subprocess). |
+Each binary owns its own distribution note. Adding a new binary does not
+require editing this README.
+
+| Binary | Crate | Per-feature note |
+| --- | --- | --- |
+| `elegy` | `rust/bin/elegy-cli/` | [DISTRIBUTION.md](rust/bin/elegy-cli/DISTRIBUTION.md) |
+| `elegy-memory` | `rust/features/elegy-memory/` | [DISTRIBUTION.md](rust/features/elegy-memory/DISTRIBUTION.md) |
+| `elegy-mcp` | `rust/features/elegy-mcp/` | [DISTRIBUTION.md](rust/features/elegy-mcp/DISTRIBUTION.md) |
+| `elegy-planning` | `rust/features/elegy-planning/` | [DISTRIBUTION.md](rust/features/elegy-planning/DISTRIBUTION.md) |
+| `elegy-skills` | `rust/features/elegy-skills/` | [DISTRIBUTION.md](rust/features/elegy-skills/DISTRIBUTION.md) |
+| `elegy-configuration` | `rust/features/elegy-configuration/` | [DISTRIBUTION.md](rust/features/elegy-configuration/DISTRIBUTION.md) |
+| `elegy-documentation` | `rust/features/elegy-documentation/` | [DISTRIBUTION.md](rust/features/elegy-documentation/DISTRIBUTION.md) |
+| `elegy-memory-mcp-stdio` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
+| `elegy-memory-mcp-http` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
+| `elegy-codegraph` | `rust/features/elegy-codegraph/` | [DISTRIBUTION.md](rust/features/elegy-codegraph/DISTRIBUTION.md) |
 
 ## Wrapper and Skill Surfaces
 
-Wrapper roots under `src/Elegy-*` package bounded handoff surfaces for
-downstream repositories. They are not authority roots and they do not replace
-the Rust crates or governed JSON contracts.
-
-Most wrappers delegate to dedicated `elegy-*` Rust binaries. The current
-`elegy-obsidian` wrapper is different: it wraps the official Obsidian Desktop
+Elegy ships dedicated `elegy-*` Rust binaries for each capability surface. The
+`Elegy-obsidian` surface is different: it wraps the official Obsidian Desktop
 CLI and keeps Obsidian vault content non-authoritative. Durable planning state
 continues to live in `elegy-planning` and SQLite.
 
-Rendered `SKILL.md` files under wrapper-local `skills/**` directories are routing
-mirrors. The governed `contracts/fixtures/skill.*.json` files remain the skill
-authority. Skill delivery uses plugin packages and host export; repo-local
+The governed `contracts/fixtures/skill.*.json` files remain the skill authority.
+Skill delivery uses plugin packages and host export; repo-local
 `.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
 
 ## Configuration Materialization
@@ -229,7 +237,8 @@ for one-off invocations.
 ## Documentation
 
 - [Agent integration guide](docs/agent-integration.md)
-- [Distribution and downstream consumption](docs/distribution.md)
+- [Distribution index (thin)](docs/distribution.md) — per-binary notes live in
+  each binary's `DISTRIBUTION.md`
 - [Architecture index](docs/architecture/README.md)
 - [Ecosystem topology](docs/architecture/ecosystem-topology.md)
 - [Substrate governance](docs/architecture/substrate-governance.md)
@@ -266,9 +275,8 @@ cargo test --workspace --all-targets --all-features
 
 Repo-root validation for governed artifacts and packaging:
 
-```powershell
-pwsh ./scripts/export-contracts.ps1
-pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+```bash
+cd rust && cargo run -p elegy-cli -- contracts validate --project .. && cargo test -p elegy-contracts --test conformance
 ```
 
 ## License
