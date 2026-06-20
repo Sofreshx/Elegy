@@ -2750,3 +2750,57 @@ ull for memoryType, provenance, and sensitivity; Bug B reproduces in isolation w
 - Baseline (pre-WU17): 272
 - WU17 Phase B suite: 277 (+5)
 - Validation pre-merge: **278** (+1 re-runnability test)
+
+## WU-C Reprise — Fix annotated tag pinning (tag-object → peeled commit)
+
+### Context
+WU-C originally pinned all 6 third-party GitHub Actions by full 40-char SHA. Two annotated tags
+(codeql-action v4.36.2, rust-cache v2.9.1) were incorrectly pinned to their tag-object SHA instead
+of the peeled commit SHA.
+
+### ls-remote outputs (cited)
+
+```
+git ls-remote --tags https://github.com/github/codeql-action | Select-String 'v4.36.2'
+→ 1a818fd5f97ed0ee9a823421bd5b171add01227f  refs/tags/v4.36.2          (tag-object)
+→ 8aad20d150bbac5944a9f9d289da16a4b0d87c1e  refs/tags/v4.36.2^{}       (peeled commit)
+
+git ls-remote --tags https://github.com/Swatinem/rust-cache | Select-String 'v2.9.1'
+→ 23869a5bd66c73db3c0ac40331f3206eb23791dc  refs/tags/v2.9.1           (tag-object)
+→ c19371144df3bb44fab255c43d04cbc2ab54d1c4  refs/tags/v2.9.1^{}        (peeled commit)
+```
+
+### SHA mapping (final)
+
+| Action | Version | Old SHA (wrong) | New SHA (peeled commit) |
+|---|---|---|---|
+| actions/checkout | v6.0.2 | de0fac2e4500dabe0009e67214ff5f5447ce83dd | unchanged (lightweight) |
+| actions/upload-artifact | v7.0.1 | 043fb46d1a93c77aae656e7c1c64a875d1fc6a0a | unchanged (lightweight) |
+| actions/download-artifact | v8.0.1 | 3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c | unchanged (lightweight) |
+| gitleaks/gitleaks-action | v3.0.0 | e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e | unchanged (lightweight) |
+| github/codeql-action | v4.36.2 | 1a818fd5f97ed0ee9a823421bd5b171add01227f | 8aad20d150bbac5944a9f9d289da16a4b0d87c1e |
+| Swatinem/rust-cache | v2.9.1 | 23869a5bd66c73db3c0ac40331f3206eb23791dc | c19371144df3bb44fab255c43d04cbc2ab54d1c4 |
+
+### Files modified
+
+| File | Changes |
+|---|---|
+| rust-ci.yml | 4× rust-cache SHA fixed |
+| publish-orchestrator.yml | 1× rust-cache SHA fixed |
+| security.yml | 2× codeql-action SHA fixed |
+| distribution-artifacts.yml | 1× rust-cache SHA fixed |
+| package-boundaries.yml | 1× rust-cache SHA fixed |
+| publish-crate.yml | 1× rust-cache SHA fixed |
+| _reusable-publish.yml | 1× rust-cache SHA fixed |
+| **Total** | **11 occurrences fixed** |
+
+### Validation
+
+| Check | Result |
+|---|---|
+| `Select-String -Pattern '1a818fd5\|23869a5b'` | ✅ Zero matches |
+| `git diff --stat` | ✅ Only .github/workflows/*.yml |
+| Correct peeled SHAs present | ✅ 11 occurrences (codeql: 2, rust-cache: 9) |
+| Lightweight tags intact | ✅ 20 occurrences (checkout×11, upload×3, download×1, gitleaks×1) |
+| YAML file integrity | ✅ All 9 workflow files readable |
+| actionlint | ⚠️ Not available on this machine; manual YAML validation passed |
