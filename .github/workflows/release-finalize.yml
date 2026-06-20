@@ -74,7 +74,7 @@ jobs:
           entries_json="["
           first=true
           for row in "${asset_urls[@]}"; do
-            name="${row%%*$'\t'*}"
+            name="${row%%$'\t'*}"
             url="${row#*$'\t'}"
             sha=$(curl --fail --silent --show-error --location "${url}" | sha256sum | awk '{print $1}')
             size=$(gh release view "${RELEASE_TAG}" --json assets | jq --arg n "${name}" '.assets[] | select(.name == $n) | .size')
