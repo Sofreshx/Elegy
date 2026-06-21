@@ -1,16 +1,21 @@
 use std::fs;
 use std::path::PathBuf;
 use std::process::Command;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
+
+static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let unique = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .expect("current time should be after unix epoch")
         .as_nanos();
-    let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
+    let pid = std::process::id();
+    let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+    let dir = std::env::temp_dir().join(format!("{prefix}-{pid}-{unique}-{counter}"));
     fs::create_dir_all(&dir).expect("create temp directory");
     dir
 }
@@ -2324,5 +2329,1681 @@ fn project_run_claim_rejects_wrong_work_point_roadmap() {
         error.contains("PROJECT-RUN-WORK-POINT-ROADMAP-MISMATCH") || error.contains("MISMATCH"),
         "error should mention mismatch: {}",
         error
+    );
+}
+
+// ===================================================================
+// Graph CLI machine posture tests
+// ===================================================================
+
+#[test]
+fn graph_node_create_supports_machine_flags() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-graph-node");
+    let db_path = temp_dir.join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-graph-node-1",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-machine-1",
+            "--kind",
+            "work",
+            "--title",
+            "Machine Test Node",
+            "--summary",
+            "Testing graph node create via CLI",
+            "--status",
+            "active",
+            "--tag",
+            "cli-test",
+        ])
+        .output()
+        .expect("run graph node create");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "ok", "should succeed: {}", stdout);
+    assert_eq!(result["correlationId"], "corr-graph-node-1");
+    assert_eq!(result["nonInteractive"], true);
+    assert!(result["command"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .any(|c| c == "graph"));
+    let record = &result["data"]["record"];
+    assert_eq!(record["id"], "gn-machine-1");
+    assert_eq!(record["title"], "Machine Test Node");
+    assert_eq!(record["kind"], "work");
+    assert_eq!(record["status"], "active");
+}
+
+#[test]
+fn graph_edge_create_supports_machine_flags() {
+    let temp_dir = unique_temp_dir("elegy-planning-machine-graph-edge");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create two nodes first
+    for (id, title) in &[("gn-edge-src", "Source"), ("gn-edge-tgt", "Target")] {
+        let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args([
+                "--db",
+                db_path.to_str().expect("utf-8 db path"),
+                "--json",
+                "--non-interactive",
+                "--correlation-id",
+                "corr-graph-edge-setup",
+                "graph",
+                "node",
+                "create",
+                "--id",
+                id,
+                "--kind",
+                "work",
+                "--title",
+                title,
+                "--summary",
+                "Node for edge test",
+                "--status",
+                "active",
+            ])
+            .output()
+            .expect("create node for edge test");
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let result: Value = serde_json::from_str(&stdout).expect("valid json");
+        assert_eq!(result["status"], "ok", "node create failed: {}", stdout);
+    }
+
+    // Create edge
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-graph-edge-1",
+            "graph",
+            "edge",
+            "create",
+            "--id",
+            "ge-machine-1",
+            "--kind",
+            "depends-on",
+            "--source-node-id",
+            "gn-edge-src",
+            "--target-node-id",
+            "gn-edge-tgt",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("run graph edge create");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "ok", "should succeed: {}", stdout);
+    assert_eq!(result["correlationId"], "corr-graph-edge-1");
+    let record = &result["data"]["record"];
+    assert_eq!(record["id"], "ge-machine-1");
+    assert_eq!(record["kind"], "depends-on");
+    assert_eq!(record["sourceNodeId"], "gn-edge-src");
+    assert_eq!(record["targetNodeId"], "gn-edge-tgt");
+}
+
+#[test]
+fn graph_node_show_returns_correct_record() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-show");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create node
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-show-1",
+            "--kind",
+            "milestone",
+            "--title",
+            "Show Test",
+            "--summary",
+            "Node for show test",
+            "--status",
+            "in-progress",
+        ])
+        .output()
+        .expect("create node");
+
+    // Show node
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "show",
+        "--node-id",
+        "gn-show-1",
+    ]);
+    assert_eq!(result["status"], "ok");
+    let data = &result["data"];
+    assert_eq!(data["node"]["id"], "gn-show-1");
+    assert_eq!(data["node"]["kind"], "milestone");
+    assert_eq!(data["node"]["title"], "Show Test");
+    assert_eq!(data["node"]["status"], "in-progress");
+    assert!(data["incomingEdges"].is_array());
+    assert!(data["outgoingEdges"].is_array());
+    assert!(data["connectedNodes"].is_array());
+    assert!(data["tags"].is_array());
+    assert!(data["validation"]["status"].is_string());
+}
+
+#[test]
+fn graph_node_list_filters_by_kind() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-list");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create nodes of different kinds
+    for (id, kind, title) in &[
+        ("gn-list-w1", "work", "Work Node"),
+        ("gn-list-w2", "work", "Another Work"),
+        ("gn-list-m1", "milestone", "Milestone Node"),
+    ] {
+        Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args([
+                "--db",
+                db_path.to_str().expect("utf-8 db path"),
+                "--json",
+                "--non-interactive",
+                "graph",
+                "node",
+                "create",
+                "--id",
+                id,
+                "--kind",
+                kind,
+                "--title",
+                title,
+                "--summary",
+                "List test",
+                "--status",
+                "active",
+            ])
+            .output()
+            .expect("create node");
+    }
+
+    // List all
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "list",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["data"]["nodes"].as_array().unwrap().len(), 3);
+
+    // List only work nodes
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "list",
+        "--kind",
+        "work",
+    ]);
+    assert_eq!(result["status"], "ok");
+    let nodes = result["data"]["nodes"].as_array().unwrap();
+    assert_eq!(nodes.len(), 2);
+    for node in nodes {
+        assert_eq!(node["kind"], "work");
+    }
+
+    // List with limit
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "list",
+        "--limit",
+        "1",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["data"]["nodes"].as_array().unwrap().len(), 1);
+}
+
+#[test]
+fn graph_edge_incoming_and_outgoing() {
+    let temp_dir = unique_temp_dir("elegy-planning-ge-dir");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create three nodes: A -> B -> C
+    for (id, title) in &[
+        ("ge-dir-a", "Node A"),
+        ("ge-dir-b", "Node B"),
+        ("ge-dir-c", "Node C"),
+    ] {
+        Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args([
+                "--db",
+                db_path.to_str().expect("utf-8 db path"),
+                "--json",
+                "--non-interactive",
+                "graph",
+                "node",
+                "create",
+                "--id",
+                id,
+                "--kind",
+                "work",
+                "--title",
+                title,
+                "--summary",
+                "Direction test",
+                "--status",
+                "active",
+            ])
+            .output()
+            .expect("create node");
+    }
+
+    // A depends-on B
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "edge",
+            "create",
+            "--id",
+            "ge-dir-ab",
+            "--kind",
+            "depends-on",
+            "--source-node-id",
+            "ge-dir-a",
+            "--target-node-id",
+            "ge-dir-b",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create A->B edge");
+
+    // B depends-on C
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "edge",
+            "create",
+            "--id",
+            "ge-dir-bc",
+            "--kind",
+            "depends-on",
+            "--source-node-id",
+            "ge-dir-b",
+            "--target-node-id",
+            "ge-dir-c",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create B->C edge");
+
+    // B should have 1 outgoing (B->C) and 1 incoming (A->B)
+    let outgoing = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "edge",
+        "outgoing",
+        "--node-id",
+        "ge-dir-b",
+    ]);
+    assert_eq!(outgoing["status"], "ok");
+    assert_eq!(outgoing["data"]["edges"].as_array().unwrap().len(), 1);
+    assert_eq!(outgoing["data"]["edges"][0]["targetNodeId"], "ge-dir-c");
+
+    let incoming = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "edge",
+        "incoming",
+        "--node-id",
+        "ge-dir-b",
+    ]);
+    assert_eq!(incoming["status"], "ok");
+    assert_eq!(incoming["data"]["edges"].as_array().unwrap().len(), 1);
+    assert_eq!(incoming["data"]["edges"][0]["sourceNodeId"], "ge-dir-a");
+}
+
+#[test]
+fn graph_node_out_of_scope_show_returns_structured_invalid_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-scope");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    // Create a scope
+    let create_scope = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-a",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create workspace-a scope");
+    assert!(create_scope.status.success());
+
+    // Create a graph node in workspace-a
+    let create_node = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "workspace-a",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-gn-scope-1",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-scope-a",
+            "--kind",
+            "work",
+            "--title",
+            "Scoped Node",
+            "--summary",
+            "Node in workspace-a",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create scoped node");
+    assert!(create_node.status.success());
+
+    // Try to show the node from scope "default" — should fail
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-gn-scope-2",
+            "graph",
+            "node",
+            "show",
+            "--node-id",
+            "gn-scope-a",
+        ])
+        .output()
+        .expect("run out-of-scope graph node show");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+
+    let stdout = String::from_utf8(output.stdout).expect("stdout should be utf-8");
+    assert!(stdout.contains("\"status\": \"invalid\""));
+    assert!(stdout.contains("graph node `gn-scope-a` is in scope `workspace-a`"));
+    assert!(stdout.contains("\"correlationId\": \"corr-gn-scope-2\""));
+}
+
+#[test]
+fn graph_node_create_with_payload_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-payload");
+    let db_path = temp_dir.join("planning.db");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "gn-payload-1",
+        "--kind",
+        "work",
+        "--title",
+        "Payload Test",
+        "--summary",
+        "Testing payload",
+        "--status",
+        "active",
+        "--payload-json",
+        r#"{"key": "value", "num": 42}"#,
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["data"]["record"]["payload"]["key"], "value");
+    assert_eq!(result["data"]["record"]["payload"]["num"], 42);
+}
+
+#[test]
+fn graph_node_create_with_payload_file() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-payload-file");
+    let db_path = temp_dir.join("planning.db");
+    let payload_path = temp_dir.join("payload.json");
+    std::fs::write(&payload_path, r#"{"file_key": "file_value"}"#).expect("write payload file");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "gn-payload-file-1",
+        "--kind",
+        "work",
+        "--title",
+        "Payload File Test",
+        "--summary",
+        "Testing payload file",
+        "--status",
+        "active",
+        "--payload-file",
+        payload_path.to_str().expect("utf-8 path"),
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(
+        result["data"]["record"]["payload"]["file_key"],
+        "file_value"
+    );
+}
+
+#[test]
+fn graph_node_show_returns_view_shaped_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-view-show");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create node
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-view-show",
+            "--kind",
+            "work",
+            "--title",
+            "View Show Node",
+            "--summary",
+            "Testing view output",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create node");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "node",
+        "show",
+        "--node-id",
+        "gn-view-show",
+    ]);
+    assert_eq!(result["status"], "ok");
+    // Should have view-shaped response (node, incomingEdges, outgoingEdges, connectedNodes, tags, validation)
+    let data = &result["data"];
+    assert!(data["node"].is_object(), "view should have node field");
+    assert_eq!(data["node"]["id"], "gn-view-show");
+    assert!(
+        data["incomingEdges"].is_array(),
+        "view should have incomingEdges array"
+    );
+    assert!(
+        data["outgoingEdges"].is_array(),
+        "view should have outgoingEdges array"
+    );
+    assert!(
+        data["connectedNodes"].is_array(),
+        "view should have connectedNodes array"
+    );
+    assert!(data["tags"].is_array(), "view should have tags array");
+    assert!(
+        data["validation"].is_object(),
+        "view should have validation object"
+    );
+    assert_eq!(data["validation"]["status"], "valid");
+}
+
+#[test]
+fn graph_edge_show_returns_view_shaped_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-ge-view-show");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create 2 nodes + edge
+    for (id, title) in &[("ge-view-src", "VSource"), ("ge-view-tgt", "VTarget")] {
+        Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args([
+                "--db",
+                db_path.to_str().expect("utf-8 db path"),
+                "--json",
+                "--non-interactive",
+                "graph",
+                "node",
+                "create",
+                "--id",
+                id,
+                "--kind",
+                "work",
+                "--title",
+                title,
+                "--summary",
+                "test",
+                "--status",
+                "active",
+            ])
+            .output()
+            .expect("create node");
+    }
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "edge",
+            "create",
+            "--id",
+            "ge-view-show",
+            "--kind",
+            "depends-on",
+            "--source-node-id",
+            "ge-view-src",
+            "--target-node-id",
+            "ge-view-tgt",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create edge");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "edge",
+        "show",
+        "--edge-id",
+        "ge-view-show",
+    ]);
+    assert_eq!(result["status"], "ok");
+    let data = &result["data"];
+    assert!(data["edge"].is_object(), "view should have edge field");
+    assert_eq!(data["edge"]["id"], "ge-view-show");
+    assert!(
+        data["sourceNode"].is_object(),
+        "view should have sourceNode field"
+    );
+    assert!(
+        data["targetNode"].is_object(),
+        "view should have targetNode field"
+    );
+    assert!(
+        data["validation"].is_object(),
+        "view should have validation object"
+    );
+}
+
+#[test]
+fn graph_node_status_appends_event() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-status");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create node
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-status-node",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-status-cli",
+            "--kind",
+            "work",
+            "--title",
+            "Status CLI Node",
+            "--summary",
+            "Testing status CLI",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create node");
+
+    // Change status
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-status-change",
+        "graph",
+        "node",
+        "status",
+        "--node-id",
+        "gn-status-cli",
+        "--status",
+        "completed",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["data"]["record"]["status"], "completed");
+    assert_eq!(result["data"]["record"]["revision"], 2);
+    assert!(
+        result["data"]["validation"]["status"] == "valid"
+            || result["data"]["validation"]["status"] == "warning"
+    );
+}
+
+#[test]
+fn graph_edge_status_requires_scope_in_machine_mode() {
+    let temp_dir = unique_temp_dir("elegy-planning-ge-status-scope");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create scope + node
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-b",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create scope");
+
+    // Create node in workspace-b
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "workspace-b",
+            "--json",
+            "--non-interactive",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-scope-b",
+            "--kind",
+            "work",
+            "--title",
+            "Scoped B",
+            "--summary",
+            "In workspace-b",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create scoped node");
+
+    // Try to change status from default scope — should fail
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-status-out",
+            "graph",
+            "node",
+            "status",
+            "--node-id",
+            "gn-scope-b",
+            "--status",
+            "completed",
+        ])
+        .output()
+        .expect("run out-of-scope status");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid", "should be invalid: {}", stdout);
+}
+
+#[test]
+fn graph_node_revise_requires_scope_in_machine_mode() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-revise-scope");
+    let db_path = temp_dir.join("planning.db");
+
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-c",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create scope");
+
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "workspace-c",
+            "--json",
+            "--non-interactive",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-revise-scope",
+            "--kind",
+            "work",
+            "--title",
+            "Revise Scope",
+            "--summary",
+            "Test revise scope",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create scoped node");
+
+    // Try to revise from default scope — should fail
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-revise-out",
+            "graph",
+            "node",
+            "revise",
+            "--node-id",
+            "gn-revise-scope",
+            "--title",
+            "Out of Scope",
+        ])
+        .output()
+        .expect("run out-of-scope revise");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid", "should be invalid: {}", stdout);
+}
+
+#[test]
+fn graph_edge_revise_rejects_out_of_scope() {
+    let temp_dir = unique_temp_dir("elegy-planning-ge-revise-scope");
+    let db_path = temp_dir.join("planning.db");
+
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "scope",
+            "create",
+            "--scope-key",
+            "workspace-d",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create scope");
+
+    // Create nodes + edge in workspace-d
+    for id in &["ge-rv-src", "ge-rv-tgt"] {
+        Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args([
+                "--db",
+                db_arg,
+                "--scope",
+                "workspace-d",
+                "--json",
+                "--non-interactive",
+                "graph",
+                "node",
+                "create",
+                "--id",
+                id,
+                "--kind",
+                "work",
+                "--title",
+                &format!("Rev {id}"),
+                "--summary",
+                "test",
+                "--status",
+                "active",
+            ])
+            .output()
+            .expect("create scoped node");
+    }
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "workspace-d",
+            "--json",
+            "--non-interactive",
+            "graph",
+            "edge",
+            "create",
+            "--id",
+            "ge-rv-scope",
+            "--kind",
+            "depends-on",
+            "--source-node-id",
+            "ge-rv-src",
+            "--target-node-id",
+            "ge-rv-tgt",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create scoped edge");
+
+    // Try to revise from default scope
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--scope",
+            "default",
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-edge-rev-out",
+            "graph",
+            "edge",
+            "revise",
+            "--edge-id",
+            "ge-rv-scope",
+            "--status",
+            "completed",
+        ])
+        .output()
+        .expect("run out-of-scope edge revise");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid", "should be invalid: {}", stdout);
+}
+
+#[test]
+fn graph_node_status_preserves_correlation_id_in_events() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-corr");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create node
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-global-1",
+            "graph",
+            "node",
+            "create",
+            "--id",
+            "gn-corr-cli",
+            "--kind",
+            "work",
+            "--title",
+            "Corr CLI",
+            "--summary",
+            "Testing correlation",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("create node");
+
+    // Change status with explicit correlation-id
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-global-2",
+        "graph",
+        "node",
+        "status",
+        "--node-id",
+        "gn-corr-cli",
+        "--status",
+        "completed",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-global-2");
+}
+
+// ===================================================================
+// Phase 6: Acceptance graph machine posture tests
+// ===================================================================
+
+#[test]
+fn graph_acceptance_create_and_show_json_envelope() {
+    let temp_dir = unique_temp_dir("elegy-planning-acc-create-show");
+    let db_path = temp_dir.join("planning.db");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-acc-create",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "acc-show-test",
+        "--acceptance-kind",
+        "abstract",
+        "--title",
+        "System must be reliable",
+        "--summary",
+        "Abstract acceptance for reliability",
+        "--status",
+        "active",
+        "--description",
+        "The system must maintain 99.9% uptime",
+        "--verification-policy",
+        "automated",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-acc-create");
+    let record = &result["data"]["record"];
+    assert_eq!(record["id"], "acc-show-test");
+    assert_eq!(record["kind"], "acceptance");
+
+    // Show the acceptance
+    let show = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "acceptance",
+        "show",
+        "--node-id",
+        "acc-show-test",
+    ]);
+    assert_eq!(show["status"], "ok");
+    let node = &show["data"]["node"];
+    assert_eq!(node["id"], "acc-show-test");
+    assert_eq!(node["kind"], "acceptance");
+    assert!(show["data"]["requiredBy"].is_array());
+    assert!(show["data"]["satisfiedAbstracts"].is_array());
+    assert!(show["data"]["satisfyingConcretes"].is_array());
+    assert!(show["data"]["attachedEvidence"].is_array());
+}
+
+#[test]
+fn graph_acceptance_satisfy_preserves_correlation_id() {
+    let temp_dir = unique_temp_dir("elegy-planning-acc-satisfy");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create abstract acceptance
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-sat-1",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "abs-sat",
+        "--acceptance-kind",
+        "abstract",
+        "--title",
+        "Abstract requirement",
+        "--summary",
+        "Abstract acceptance for satisfy test",
+        "--description",
+        "Must be satisfiable",
+    ]);
+
+    // Create concrete acceptance
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-sat-2",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "conc-sat",
+        "--acceptance-kind",
+        "concrete",
+        "--title",
+        "Concrete check",
+        "--summary",
+        "Concrete acceptance for satisfy test",
+        "--description",
+        "Verifies the abstract",
+    ]);
+
+    // Satisfy the abstract
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-sat-3",
+        "graph",
+        "acceptance",
+        "satisfy",
+        "--id",
+        "sat-edge-1",
+        "--concrete-id",
+        "conc-sat",
+        "--abstract-id",
+        "abs-sat",
+        "--rationale",
+        "This concrete check verifies the abstract requirement",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-sat-3");
+    let edge_record = &result["data"]["record"];
+    assert_eq!(edge_record["kind"], "satisfies");
+    assert_eq!(edge_record["sourceNodeId"], "conc-sat");
+    assert_eq!(edge_record["targetNodeId"], "abs-sat");
+}
+
+#[test]
+fn graph_evidence_create_and_show_json_envelope() {
+    let temp_dir = unique_temp_dir("elegy-planning-ev-create-show");
+    let db_path = temp_dir.join("planning.db");
+
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-ev-create",
+        "graph",
+        "evidence",
+        "create",
+        "--id",
+        "ev-show-test",
+        "--evidence-kind",
+        "test-result",
+        "--title",
+        "Login test suite results",
+        "--summary",
+        "All login tests passed",
+        "--status",
+        "active",
+        "--reference",
+        "ci/build-42",
+        "--content",
+        "42 passed, 0 failed",
+        "--captured-at",
+        "2026-06-01T12:00:00Z",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-ev-create");
+    let record = &result["data"]["record"];
+    assert_eq!(record["id"], "ev-show-test");
+    assert_eq!(record["kind"], "evidence");
+
+    // Show the evidence
+    let show = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "evidence",
+        "show",
+        "--node-id",
+        "ev-show-test",
+    ]);
+    assert_eq!(show["status"], "ok");
+    let node = &show["data"]["node"];
+    assert_eq!(node["id"], "ev-show-test");
+    assert_eq!(node["kind"], "evidence");
+    assert!(show["data"]["attachedTo"].is_array());
+}
+
+#[test]
+fn graph_evidence_attach_to_acceptance() {
+    let temp_dir = unique_temp_dir("elegy-planning-ev-attach");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create concrete acceptance
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-ea-1",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "acc-ea-target",
+        "--acceptance-kind",
+        "concrete",
+        "--title",
+        "Target acceptance for evidence",
+        "--summary",
+        "Concrete acceptance for evidence attach test",
+        "--description",
+        "Must be verified by evidence",
+    ]);
+
+    // Create evidence
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-ea-2",
+        "graph",
+        "evidence",
+        "create",
+        "--id",
+        "ev-ea-source",
+        "--evidence-kind",
+        "review",
+        "--title",
+        "Peer review result",
+        "--summary",
+        "Code reviewed and approved",
+        "--reference",
+        "",
+        "--content",
+        "",
+        "--captured-at",
+        "",
+    ]);
+
+    // Attach evidence to acceptance
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-ea-3",
+        "graph",
+        "evidence",
+        "attach",
+        "--id",
+        "ev-attach-edge",
+        "--evidence-id",
+        "ev-ea-source",
+        "--target-id",
+        "acc-ea-target",
+        "--rationale",
+        "Code review confirms acceptance criteria met",
+    ]);
+    assert_eq!(result["status"], "ok");
+    let edge_record = &result["data"]["record"];
+    assert_eq!(edge_record["kind"], "evidenced-by");
+    assert_eq!(edge_record["sourceNodeId"], "acc-ea-target");
+    assert_eq!(edge_record["targetNodeId"], "ev-ea-source");
+
+    // Verify evidence appears in acceptance view
+    let view = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "graph",
+        "acceptance",
+        "show",
+        "--node-id",
+        "acc-ea-target",
+    ]);
+    assert_eq!(view["status"], "ok");
+    let attached = &view["data"]["attachedEvidence"];
+    assert_eq!(attached.as_array().unwrap().len(), 1);
+    assert_eq!(attached[0]["id"], "ev-ea-source");
+}
+
+#[test]
+fn graph_acceptance_create_rejects_invalid_status() {
+    let temp_dir = unique_temp_dir("elegy-planning-acc-bad-status");
+    let db_path = temp_dir.join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-bad-status",
+            "graph",
+            "acceptance",
+            "create",
+            "--id",
+            "acc-bad-status",
+            "--acceptance-kind",
+            "abstract",
+            "--title",
+            "Invalid status test",
+            "--summary",
+            "Test invalid status rejection",
+            "--description",
+            "This should fail with a non-kebab status",
+            "--status",
+            "InvalidStatus",
+        ])
+        .output()
+        .expect("run acceptance create with invalid status");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid");
+    assert!(
+        result["error"].as_str().unwrap_or("").contains("kebab"),
+        "should mention kebab: {}",
+        result
+    );
+}
+
+#[test]
+fn graph_acceptance_out_of_scope_show_rejected() {
+    let temp_dir = unique_temp_dir("elegy-planning-acc-oos");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create a separate scope
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-oos",
+            "scope",
+            "create",
+            "--scope-key",
+            "other-workspace",
+            "--scope-type",
+            "workspace",
+        ])
+        .output()
+        .expect("create scope");
+
+    // Create acceptance in other scope
+    Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-oos",
+            "--scope",
+            "other-workspace",
+            "graph",
+            "acceptance",
+            "create",
+            "--id",
+            "acc-oos",
+            "--acceptance-kind",
+            "abstract",
+            "--title",
+            "Out of scope acceptance",
+            "--summary",
+            "Acceptance in other workspace",
+            "--description",
+            "Should not be visible from default scope",
+        ])
+        .output()
+        .expect("create acceptance in other scope");
+
+    // Try to show from default scope (no --scope flag)
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "graph",
+            "acceptance",
+            "show",
+            "--node-id",
+            "acc-oos",
+        ])
+        .output()
+        .expect("run out-of-scope acceptance show");
+
+    assert!(!output.status.success());
+    assert!(output.stderr.is_empty());
+    let stdout = String::from_utf8(output.stdout).expect("stdout utf-8");
+    let result: serde_json::Value = serde_json::from_str(&stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid");
+    assert!(
+        result["error"].as_str().unwrap_or("").contains("not"),
+        "should mention scope mismatch: {}",
+        result
+    );
+}
+
+#[test]
+fn graph_node_finalize_success_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-finalize");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create a work node
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-cli-fin",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "gn-fin",
+        "--kind",
+        "work",
+        "--title",
+        "Finalize test node",
+        "--summary",
+        "Testing finalize",
+        "--status",
+        "active",
+    ]);
+
+    // Finalize it
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-cli-fin-2",
+        "graph",
+        "node",
+        "finalize",
+        "--node-id",
+        "gn-fin",
+        "--status",
+        "completed",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-cli-fin-2");
+    let record = &result["data"]["record"];
+    assert_eq!(record["status"], "completed");
+}
+
+#[test]
+fn graph_node_finalize_rejection_structured_json() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-fin-rej");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create abstract acceptance without coverage
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-fin-rej",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "abs-fin-rej",
+        "--acceptance-kind",
+        "abstract",
+        "--title",
+        "Uncovered abstract for finalize rejection",
+        "--summary",
+        "No coverage",
+        "--description",
+        "",
+    ]);
+
+    // Try to finalize — should fail with invalid status (InvalidInput -> status "invalid", exit code 1)
+    let output = std::process::Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-fin-rej-2",
+            "graph",
+            "node",
+            "finalize",
+            "--node-id",
+            "abs-fin-rej",
+            "--status",
+            "validated",
+        ])
+        .output()
+        .expect("run finalize command");
+    let result: serde_json::Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid");
+    assert!(
+        result["error"]
+            .as_str()
+            .unwrap_or("")
+            .contains("ACCEPTANCE-COVERAGE-MISSING"),
+        "should mention coverage: {result}"
+    );
+}
+
+#[test]
+fn graph_node_finalize_accepted_risk_in_event() {
+    let temp_dir = unique_temp_dir("elegy-planning-gn-fin-risk");
+    let db_path = temp_dir.join("planning.db");
+
+    // Create abstract acceptance without coverage
+    command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-risk-cli",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "abs-risk-cli",
+        "--acceptance-kind",
+        "abstract",
+        "--title",
+        "Risk-based finalization",
+        "--summary",
+        "Accepted risk",
+        "--description",
+        "",
+    ]);
+
+    // Finalize with accepted-risk
+    let result = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-risk-cli-2",
+        "graph",
+        "node",
+        "finalize",
+        "--node-id",
+        "abs-risk-cli",
+        "--status",
+        "validated",
+        "--accepted-risk",
+        "Deferred to Q3 per team decision",
+    ]);
+    assert_eq!(result["status"], "ok");
+    assert_eq!(result["correlationId"], "corr-risk-cli-2");
+
+    // Verify event contains accepted risk
+    let events = command_json(&[
+        "--db",
+        db_path.to_str().expect("utf-8 db path"),
+        "--json",
+        "--non-interactive",
+        "events",
+    ]);
+    let events_arr = events["data"]["events"].as_array().expect("events array");
+    let finalize_event = events_arr
+        .iter()
+        .find(|e| {
+            e["eventType"].as_str().unwrap_or("") == "graph-node.finalized-with-accepted-risk"
+        })
+        .expect("finalize event should exist");
+    assert!(finalize_event["payload"]["acceptedRisk"]
+        .as_str()
+        .unwrap_or("")
+        .contains("Deferred to Q3"));
+}
+
+#[test]
+fn graph_acceptance_evidence_finalize_help() {
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    // graph acceptance --help
+    let output = std::process::Command::new(bin)
+        .args(["graph", "acceptance", "--help"])
+        .output()
+        .expect("run graph acceptance --help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("stdout utf-8");
+    assert!(
+        help.contains("create"),
+        "acceptance help should include create"
+    );
+    assert!(
+        help.contains("satisfy"),
+        "acceptance help should include satisfy"
+    );
+    assert!(help.contains("show"), "acceptance help should include show");
+    assert!(help.contains("list"), "acceptance help should include list");
+
+    // graph evidence --help
+    let output = std::process::Command::new(bin)
+        .args(["graph", "evidence", "--help"])
+        .output()
+        .expect("run graph evidence --help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("stdout utf-8");
+    assert!(
+        help.contains("create"),
+        "evidence help should include create"
+    );
+    assert!(
+        help.contains("attach"),
+        "evidence help should include attach"
+    );
+
+    // graph node --help (should include finalize)
+    let output = std::process::Command::new(bin)
+        .args(["graph", "node", "--help"])
+        .output()
+        .expect("run graph node --help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("stdout utf-8");
+    assert!(
+        help.contains("finalize"),
+        "graph node help should include finalize"
     );
 }

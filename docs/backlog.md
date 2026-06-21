@@ -1,7 +1,7 @@
 ---
 created: 2026-03-30
 updated: 2026-05-28
-category: governance
+category: docs
 status: active
 doc_kind: reference
 ---
@@ -54,10 +54,7 @@ Evidence Anchors:
 
 - [docs/distribution.md](distribution.md)
 - [.github/workflows/distribution-artifacts.yml](../.github/workflows/distribution-artifacts.yml)
-- [scripts/package-cli.ps1](../scripts/package-cli.ps1)
-- [scripts/package-wrapper-surface.ps1](../scripts/package-wrapper-surface.ps1)
 - [scripts/package-installer.ps1](../scripts/package-installer.ps1)
-- [scripts/write-distribution-manifest.ps1](../scripts/write-distribution-manifest.ps1)
 - [scripts/install-distribution.ps1](../scripts/install-distribution.ps1)
 - [scripts/validate-canonical-outputs.ps1](../scripts/validate-canonical-outputs.ps1)
 

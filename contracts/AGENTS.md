@@ -4,7 +4,7 @@
 
 - `contracts/schemas/**` are the durable contract authority.
 - `contracts/fixtures/**`, especially `skill.*.json`, are governed examples, compatibility evidence, and the stable agent-facing discovery authority.
-- `contracts/manifests/**`, `contracts/support/**`, and `contracts/configuration/**` are governed metadata surfaces. Keep them aligned with schema and fixture changes.
+- `contracts/configuration/**` is the governed configuration materialization surface. Keep it aligned with schema and fixture changes.
 - Discovery indexes, generated bundles under `artifacts/`, and other materialized outputs are derived surfaces, not authored truth.
 - Do not add or revive v1 `skill-definition.*.json` files.
 

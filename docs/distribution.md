@@ -2,7 +2,7 @@
 
 Elegy is intended to be consumed through versioned release assets, not through sibling-repository workspace references or package-feed distribution.
 
-The active authority root is `contracts/`, with bundle and schema policy under `governance/version-policy.json`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the six dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
+The active authority root is `contracts/`. The current in-repo CLI surfaces are the general `elegy` CLI plus the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation` binaries built from the in-repo Rust workspace. Tagged release workflows publish archives for those surfaces plus the six dedicated wrapper archives, and pushes to `main` refresh a rolling `main-snapshot` prerelease with the same asset set for latest-integration validation.
 
 The bounded local memory operator lives in `rust/crates/elegy-memory` and exposes the `elegy-memory` binary. `rust/crates/elegy-mcp`, `rust/crates/elegy-planning`, and `rust/crates/elegy-skills` now expose their own dedicated binaries for descriptor authoring/analysis, durable planning authority, and governed skill-registry access/validation. Lower-level MCP-to-skill generation remains on the shared `elegy` CLI and tooling path. The shared `elegy` CLI remains the general and compatibility surface.
 
@@ -41,6 +41,8 @@ Most users do not need every asset in the release:
 | Dedicated planning CLI | `elegy-planning-<cliVersion>-<target>.zip` |
 | Dedicated skill registry CLI | `elegy-skills-<cliVersion>-<target>.zip` |
 | Dedicated documentation CLI | `elegy-documentation-<cliVersion>-<target>.zip` |
+| Optional MCP-over-HTTP transport for `elegy-memory` | `elegy-memory-mcp-http-<cliVersion>-<target>.zip` |
+| Optional MCP-over-stdio transport for `elegy-memory` | `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip` |
 | Wrapper surface for a dedicated tool family | `elegy-*-wrapper-<bundleVersion>.zip` |
 
 Direct release asset families include:
@@ -51,6 +53,8 @@ Direct release asset families include:
 - `elegy-planning-<cliVersion>-<target>.zip` - dedicated planning CLI
 - `elegy-skills-<cliVersion>-<target>.zip` - dedicated skill registry CLI
 - `elegy-documentation-<cliVersion>-<target>.zip` - dedicated documentation authority CLI
+- `elegy-memory-mcp-http-<cliVersion>-<target>.zip` - optional MCP-over-HTTP transport adapter for `elegy-memory` (OAuth 2.1 + bearer JWT)
+- `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip` - optional MCP-over-stdio transport adapter for `elegy-memory` (local subprocess)
 - `elegy-contracts-<bundleVersion>.zip` - governed contracts bundle
 - `elegy-installer-<bundleVersion>.zip` - installer bootstrap
 - `elegy-*-wrapper-<bundleVersion>.zip` - dedicated wrapper surfaces
@@ -68,6 +72,8 @@ Tagged releases are configured to publish neutral asset families across the cont
 - skills CLI archive: `elegy-skills-<cliVersion>-<target>.zip`
 - configuration CLI archive: `elegy-configuration-<cliVersion>-<target>.zip`
 - documentation CLI archive: `elegy-documentation-<cliVersion>-<target>.zip`
+- memory MCP HTTP transport archive: `elegy-memory-mcp-http-<cliVersion>-<target>.zip`
+- memory MCP stdio transport archive: `elegy-memory-mcp-stdio-<cliVersion>-<target>.zip`
 - local memory wrapper archive: `elegy-memory-wrapper-<bundleVersion>.zip`
 - MCP wrapper archive: `elegy-mcp-wrapper-<bundleVersion>.zip`
 - planning wrapper archive: `elegy-planning-wrapper-<bundleVersion>.zip`
@@ -109,7 +115,7 @@ On pushes to `main`, the publish workflow writes the same metadata pair with tag
 Local artifact installs use the same metadata lane. After building or copying local release assets into a staging directory, generate the metadata pair before invoking the installer:
 
 ```powershell
-pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts
+# (distribution packaging not yet implemented)
 ```
 
 ## Standalone installer archive
@@ -170,29 +176,23 @@ Current governed dedicated-surface skill artifacts in that bundle include:
 - `fixtures/skill.elegy-mermaid.json`
 - `fixtures/skill-discovery-index.elegy-mermaid.json`
 
-The repo carries `.agents/skills/elegy-memory/SKILL.md`, `.agents/skills/elegy-mcp/SKILL.md`, `.agents/skills/elegy-skills/SKILL.md`, `.agents/skills/elegy-documentation/SKILL.md`, and `.agents/skills/elegy-mermaid/SKILL.md` as repo-local host-facing derived mirrors for those surfaces. The repo also carries matching `.github/skills/.../SKILL.md` files as repo-local non-authoritative contributor-routing mirrors. Those markdown files are not part of the governed contracts bundle.
+The `.agents/skills/` and `.github/skills/` mirror paths are retired. Plugin packages are the authority, and host-specific exports are generated via `elegy plugin export`.
 
-The current lower-level contributor tooling also includes `elegy generate codex-plugin`, which projects a portable package into a conservative local Codex plugin folder containing `.codex-plugin/plugin.json` and `skills/`. That generated plugin folder is a derived local output and is not currently a release asset family.
+The current lower-level contributor tooling also includes `elegy generate codex-plugin` (legacy alias for `elegy plugin export codex`), which projects a portable package into a conservative local Codex plugin folder containing `.codex-plugin/plugin.json` and `skills/`. That generated plugin folder is a derived local output and is not currently a release asset family.
 
 ## CLI archive
 
 Build and package a current-host CLI surface with:
 
 ```powershell
-pwsh ./scripts/package-cli.ps1 -Surface elegy-cli
-pwsh ./scripts/package-cli.ps1 -Surface elegy-memory
-pwsh ./scripts/package-cli.ps1 -Surface elegy-mcp
-pwsh ./scripts/package-cli.ps1 -Surface elegy-planning
-pwsh ./scripts/package-cli.ps1 -Surface elegy-skills
-pwsh ./scripts/package-cli.ps1 -Surface elegy-configuration
-pwsh ./scripts/package-cli.ps1 -Surface elegy-documentation
+# (distribution packaging not yet implemented)
 ```
 
 Output:
 
 - versioned archive: `artifacts/distribution/<surface>-<cliVersion>-<target>.zip`
 
-Release workflows publish the explicit target set above by calling `pwsh ./scripts/package-cli.ps1 -Surface <surface> -Target <target>` for each current CLI surface and supported target.
+# (distribution packaging not yet implemented)
 
 Each archive contains only its corresponding executable plus archive-root `README.md`. These archives do not add host bootstrap logic, consumer config, or downstream runtime wiring.
 
@@ -235,18 +235,14 @@ elegy configuration verify --profile-id repo-opencode-minimal --target . --json
 elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
 ```
 
-Binding defaults are template-local and overrideable:
-
-```bash
-elegy configuration apply --template-id repo-skill-mirror-minimal --target . --binding authority.skills=.github/skills --binding target.skills=.agents/skills --json
-```
+Binding defaults are template-local and overrideable. The `repo-skill-mirror-minimal` template has been removed; skill delivery should use plugin packages and host export instead.
 
 ## Wrapper archive
 
 Build the platform-neutral wrapper archives with:
 
 ```powershell
-pwsh ./scripts/package-wrapper-surface.ps1
+# (distribution packaging not yet implemented)
 ```
 
 Outputs:
@@ -258,7 +254,7 @@ Outputs:
 - `artifacts/distribution/elegy-configuration-wrapper-<bundleVersion>.zip`
 - `artifacts/distribution/elegy-documentation-wrapper-<bundleVersion>.zip`
 
-Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.ps1` so the wrapper stays usable outside a full repo checkout.
+Each wrapper archive contains archive-root `README.md`, the dedicated wrapper root content, `wrapper-entrypoint.json`, a surface-local `install.ps1`, a surface-local `skills/<surface>/SKILL.md` bridge, and a bundled copy of `scripts/install-distribution.sh` so the wrapper stays usable outside a full repo checkout.
 
 Wrapper archives already embed the generic installer helper. Consumers that only need a dedicated wrapper surface can use the wrapper archive directly without separately downloading the standalone installer asset.
 
@@ -278,12 +274,10 @@ Historical GitHub Packages and NuGet publication surfaces remain frozen/deprecat
 
 ## Maintainer flow
 
-1. Update bundle and manifest package metadata/version in `governance/version-policy.json` when the governed contracts surface changes.
+1. Update bundle and manifest package metadata/version when the governed contracts surface changes.
 2. Run `pwsh ./scripts/export-contracts.ps1 -CreateArchive`.
-3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
-4. Run `pwsh ./scripts/package-wrapper-surface.ps1`.
+3. Ensure CLI publishing stays aligned to the explicit workflow target set and the current CLI surface selector set: `elegy-cli`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, `elegy-documentation`, `elegy-memory-mcp-http`, and `elegy-memory-mcp-stdio`; the umbrella `elegy-cli` selector publishes the `elegy` binary.
+# (distribution packaging not yet implemented)
 5. Run `pwsh ./scripts/package-installer.ps1`.
-6. Run `pwsh ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag local-artifacts` for local validation, or let the publish workflow generate the same files with the release tag.
 7. Run `pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata`.
-8. Run `pwsh ./scripts/validate-package-boundaries.ps1`.
-9. Publish the generated assets through the GitHub Actions workflows when ready. Pushes to `main` refresh the rolling `main-snapshot` prerelease; semver tags or published release events refresh the matching stable release.
+8. Publish the generated assets through the GitHub Actions workflows when ready. Pushes to `main` refresh the rolling `main-snapshot` prerelease; semver tags or published release events refresh the matching stable release.

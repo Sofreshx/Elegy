@@ -1,12 +1,20 @@
 ---
 spec_id: neutral-package-consolidation
 title: Neutral Plugin And Distribution Consolidation
-status: draft
+status: historical
 type: migration
-updated: 2026-06-09
+updated: 2026-06-16
+superseded_by: docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md
 ---
 
 # Neutral Plugin And Distribution Consolidation
+
+> **Status: historical.** This spec described the V1/V2 schema split and
+> Holon-specific language removal. That work is now done. The current plugin
+> package schema is a single unified `elegy-plugin-package/v1` with no
+> V1/V2 split. See
+> [ADR](../../docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md)
+> for the current decision record.
 
 ## Intent
 

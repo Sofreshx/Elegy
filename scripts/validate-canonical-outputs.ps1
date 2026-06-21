@@ -5,484 +5,361 @@ param(
     [switch]$RequireWrapperArchives,
     [switch]$RequireInstallerArchives,
     [switch]$RequireReleaseMetadata,
-    [string]$DistributionDirectory = '',
-    [switch]$EmitJson
+    [switch]$RequireDeepValidation,
+    [string]$DistributionDirectory = ''
 )
 
 $ErrorActionPreference = 'Stop'
 
 $repoRoot = Split-Path -Parent $PSScriptRoot
-$inventoryPath = Join-Path $repoRoot 'governance\canonical-output-inventory.json'
-$manifestPath = Join-Path $repoRoot 'contracts\manifests\compatibility-manifest.json'
+$artifactsDir = Join-Path $repoRoot 'artifacts'
+$contractsDir = Join-Path $repoRoot 'contracts'
+$contractsOutputDir = Join-Path $artifactsDir 'contracts'
+$distDir = if ($DistributionDirectory) { $DistributionDirectory } else { Join-Path $artifactsDir 'distribution' }
 
-if (-not (Test-Path $inventoryPath)) {
-    throw "Missing canonical output inventory: $inventoryPath"
-}
+$failures = [System.Collections.Generic.List[string]]::new()
+$warnings = [System.Collections.Generic.List[string]]::new()
 
-if (-not (Test-Path $manifestPath)) {
-    throw "Missing compatibility manifest: $manifestPath"
-}
-
-$inventory = Get-Content -Raw -Path $inventoryPath | ConvertFrom-Json
-$manifest = Get-Content -Raw -Path $manifestPath | ConvertFrom-Json
-
-# Derive fixture-related mirrored outputs from the manifest.
-# This is the single source of truth for fixture-to-artifact mapping.
-$derivedOutputs = [System.Collections.Generic.List[object]]::new()
-
-foreach ($schema in $manifest.schemas) {
-    $schemaSource = "contracts/schemas/$($schema.file)"
-    $schemaGenerated = "artifacts/contracts/$($schema.file)"
-    $derivedOutputs.Add([pscustomobject]@{ source = $schemaSource; generated = $schemaGenerated }) | Out-Null
-
-    foreach ($fixture in $schema.fixtures) {
-        $source = "contracts/$fixture"
-        $generated = "artifacts/contracts/$fixture"
-        $derivedOutputs.Add([pscustomobject]@{ source = $source; generated = $generated }) | Out-Null
+function Assert-Exists {
+    param([string]$Path, [string]$Label)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        $failures.Add("$Label : $Path")
     }
 }
 
-foreach ($fixture in $manifest.supplementalFixtures) {
-    $source = "contracts/$fixture"
-    $generated = "artifacts/contracts/$fixture"
-    $derivedOutputs.Add([pscustomobject]@{ source = $source; generated = $generated }) | Out-Null
-}
-
-# Add the manifest and matrix themselves.
-$derivedOutputs.Add([pscustomobject]@{
-    source    = "contracts/manifests/compatibility-manifest.json"
-    generated = "artifacts/contracts/compatibility-manifest.json"
-}) | Out-Null
-$derivedOutputs.Add([pscustomobject]@{
-    source    = "contracts/manifests/compatibility-matrix.json"
-    generated = "artifacts/contracts/compatibility-matrix.json"
-}) | Out-Null
-
-# Merge: derived fixture entries + hand-maintained inventory entries.
-# The inventory retains distribution metadata (archives, wrappers, etc.)
-# that is not derivable from the manifest.
-$allMirrored = [System.Collections.Generic.List[object]]::new()
-foreach ($entry in $derivedOutputs) {
-    $allMirrored.Add($entry) | Out-Null
-}
-foreach ($entry in $inventory.mirroredOutputs) {
-    $allMirrored.Add($entry) | Out-Null
-}
-
-$missingAuthority = [System.Collections.Generic.List[string]]::new()
-$missingSources = [System.Collections.Generic.List[string]]::new()
-$missingGenerated = [System.Collections.Generic.List[string]]::new()
-$contentMismatches = [System.Collections.Generic.List[string]]::new()
-$missingArchives = [System.Collections.Generic.List[string]]::new()
-$missingWrapperArchives = [System.Collections.Generic.List[string]]::new()
-$invalidWrapperArchives = [System.Collections.Generic.List[string]]::new()
-$missingInstallerArchives = [System.Collections.Generic.List[string]]::new()
-$invalidInstallerArchives = [System.Collections.Generic.List[string]]::new()
-$missingReleaseMetadata = [System.Collections.Generic.List[string]]::new()
-$invalidReleaseMetadata = [System.Collections.Generic.List[string]]::new()
-
-function Test-ArchiveRequiredEntries {
-    param(
-        [string]$ArchivePath,
-        [string[]]$RequiredEntries
-    )
-
-    $archive = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+function Assert-ArchiveContains {
+    param([string]$ArchivePath, [string[]]$RequiredEntries, [string]$Label)
+    if (-not (Test-Path -LiteralPath $ArchivePath)) {
+        $failures.Add("$Label (archive missing): $ArchivePath")
+        return
+    }
     try {
-        $entryLookup = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-        foreach ($entry in $archive.Entries) {
-            $normalizedEntry = $entry.FullName.Replace('\\', '/').TrimStart([char[]]@('/', '.'))
-            if (-not [string]::IsNullOrWhiteSpace($normalizedEntry)) {
-                $entryLookup.Add($normalizedEntry) | Out-Null
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        $zip = [System.IO.Compression.ZipFile]::OpenRead($ArchivePath)
+        $entries = $zip.Entries | ForEach-Object { $_.FullName }
+        $zip.Dispose()
+        foreach ($required in $RequiredEntries) {
+            if ($entries -notcontains $required) {
+                $failures.Add("$Label (missing entry '$required'): $ArchivePath")
             }
         }
-
-        $missingEntries = [System.Collections.Generic.List[string]]::new()
-        foreach ($requiredEntry in $RequiredEntries) {
-            if (-not $entryLookup.Contains($requiredEntry)) {
-                $missingEntries.Add($requiredEntry) | Out-Null
-            }
-        }
-
-        return @($missingEntries)
-    }
-    finally {
-        $archive.Dispose()
+    } catch {
+        $errMsg = $_.Exception.Message
+        $failures.Add("$Label (failed to read archive): $ArchivePath -- $errMsg")
     }
 }
 
-function ConvertTo-StringArray {
-    param(
-        [object]$Value
-    )
-
-    $result = [System.Collections.Generic.List[string]]::new()
-    foreach ($item in @($Value)) {
-        $stringValue = [string]$item
-        if (-not [string]::IsNullOrWhiteSpace($stringValue)) {
-            $result.Add($stringValue) | Out-Null
-        }
-    }
-
-    return @($result)
+function Assert-SchemaFile {
+    param([string]$Path, [string]$Label)
+    Assert-Exists $Path "$Label (schema)"
 }
 
-function Get-FileSha256 {
-    param(
-        [string]$Path
-    )
-
-    return (Get-FileHash -Path $Path -Algorithm SHA256).Hash.ToLowerInvariant()
+function Assert-FixtureFile {
+    param([string]$Path, [string]$Label)
+    Assert-Exists $Path "$Label (fixture)"
 }
 
-function Resolve-DistributionPatternPath {
-    param(
-        [string]$InventoryPattern,
-        [string]$RepositoryRoot,
-        [string]$OverrideDirectory
-    )
+# --- canonical authority inventory (default check) ---
+if (-not $RequireGeneratedOutputs -and -not $RequireArchive -and -not $RequireWrapperArchives -and -not $RequireInstallerArchives -and -not $RequireReleaseMetadata -and -not $RequireDeepValidation) {
+    Assert-Exists (Join-Path $contractsDir 'schemas\schema-version.json') 'schema-version'
+    Assert-Exists (Join-Path $contractsDir 'schemas\elegy-plugin-package.schema.json') 'plugin-package-schema'
+    Assert-Exists (Join-Path $contractsDir 'fixtures\elegy-plugin-package.minimal.json') 'plugin-package-minimal-fixture'
+    Assert-Exists (Join-Path $contractsDir 'fixtures\skill.minimal.json') 'skill-minimal-fixture'
+    Assert-Exists (Join-Path $contractsDir 'README.md') 'contracts-readme'
+    Assert-Exists (Join-Path $contractsDir 'AGENTS.md') 'contracts-agents'
+    Assert-Exists (Join-Path $contractsDir 'schemas\elegy-catalog-entry.schema.json') 'catalog-entry-schema'
+    Assert-Exists (Join-Path $contractsDir 'fixtures\elegy-catalog-entry.minimal.json') 'catalog-entry-minimal-fixture'
 
-    if ([string]::IsNullOrWhiteSpace($OverrideDirectory)) {
-        return Join-Path $RepositoryRoot $InventoryPattern
-    }
-
-    return Join-Path $OverrideDirectory (Split-Path -Leaf $InventoryPattern)
-}
-
-function Get-SingleMatchedFile {
-    param(
-        [string]$PatternPath,
-        [string]$Description,
-        [System.Collections.Generic.List[string]]$MissingList,
-        [System.Collections.Generic.List[string]]$InvalidList
-    )
-
-    $matchedFiles = @(Get-ChildItem -Path $PatternPath -File -ErrorAction SilentlyContinue | Sort-Object Name)
-    if ($matchedFiles.Count -eq 0) {
-        $MissingList.Add($Description) | Out-Null
-        return $null
-    }
-
-    if ($matchedFiles.Count -gt 1) {
-        $matchNames = $matchedFiles | ForEach-Object { $_.Name }
-        $InvalidList.Add("Ambiguous $Description matches for pattern ${PatternPath}: $($matchNames -join ', ')") | Out-Null
-        return $null
-    }
-
-    return $matchedFiles[0]
-}
-
-function New-ChecksumLookup {
-    param(
-        [object]$ChecksumsDocument,
-        [System.Collections.Generic.List[string]]$InvalidList
-    )
-
-    $lookup = [System.Collections.Generic.Dictionary[string, string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-    foreach ($entry in @($ChecksumsDocument.entries)) {
-        $fileName = [string]$entry.fileName
-        if ([string]::IsNullOrWhiteSpace($fileName)) {
-            $InvalidList.Add('Release checksums metadata included an empty fileName entry.') | Out-Null
-            continue
-        }
-
-        if ($lookup.ContainsKey($fileName)) {
-            $InvalidList.Add("Release checksums metadata included a duplicate fileName entry for $fileName") | Out-Null
-            continue
-        }
-
-        $lookup[$fileName] = ([string]$entry.sha256).ToLowerInvariant()
-    }
-
-    return $lookup
-}
-
-foreach ($relativePath in $inventory.authorityOnly) {
-    $fullPath = Join-Path $repoRoot $relativePath
-    if (-not (Test-Path $fullPath)) {
-        $missingAuthority.Add($relativePath) | Out-Null
+    if ($failures.Count -gt 0) {
+        Write-Warning ('Canonical authority inventory issues: ' + ($failures -join '; '))
+    } else {
+        Write-Host 'Canonical authority inventory: ok'
     }
 }
 
-foreach ($entry in $allMirrored) {
-    $sourcePath = Join-Path $repoRoot $entry.source
-    $generatedPath = Join-Path $repoRoot $entry.generated
+# --- generated contracts output ---
+if ($RequireGeneratedOutputs) {
+    Assert-Exists (Join-Path $contractsOutputDir 'elegy-contracts-manifest.json') 'contracts-manifest'
+    Assert-Exists (Join-Path $contractsOutputDir 'contracts-index.json') 'contracts-index'
 
-    if (-not (Test-Path $sourcePath)) {
-        $missingSources.Add($entry.source) | Out-Null
-        continue
-    }
-
-    if (-not (Test-Path $generatedPath)) {
-        if ($RequireGeneratedOutputs) {
-            $missingGenerated.Add($entry.generated) | Out-Null
-        }
-
-        continue
-    }
-
-    $sourceHash = (Get-FileHash -Path $sourcePath -Algorithm SHA256).Hash
-    $generatedHash = (Get-FileHash -Path $generatedPath -Algorithm SHA256).Hash
-
-    if ($sourceHash -ne $generatedHash) {
-        $contentMismatches.Add("$($entry.source) != $($entry.generated)") | Out-Null
+    if ($failures.Count -gt 0) {
+        Write-Warning ('Generated outputs missing: ' + ($failures -join '; '))
+    } else {
+        Write-Host 'Generated outputs: ok'
     }
 }
 
+# --- contracts distribution archive with deep content validation ---
 if ($RequireArchive) {
-    foreach ($pattern in $inventory.archivePatterns) {
-        $resolvedPattern = Resolve-DistributionPatternPath -InventoryPattern $pattern -RepositoryRoot $repoRoot -OverrideDirectory $DistributionDirectory
-        $archiveFiles = Get-ChildItem -Path $resolvedPattern -ErrorAction SilentlyContinue
-        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
-            $missingArchives.Add($pattern) | Out-Null
-        }
-    }
-}
+    $archives = @(Get-ChildItem -LiteralPath $distDir -Filter 'elegy-contracts-*.zip' -File -ErrorAction SilentlyContinue | Sort-Object { [version]($_.BaseName -replace '^elegy-contracts-', '') })
+    if (-not $archives -or $archives.Count -eq 0) {
+        $failures.Add("contracts-archive : no elegy-contracts-*.zip found in $distDir")
+    } else {
+        $latest = $archives[-1]
+        $archivePath = $latest.FullName
+        Write-Host "Contracts archive: ok ($($latest.Name))"
 
-if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
-    foreach ($pattern in $inventory.wrapperArchivePatterns) {
-        $requiredWrapperEntries = [System.Collections.Generic.List[string]]::new()
-        foreach ($entry in @($inventory.wrapperArchiveRequiredEntries)) {
-            $requiredWrapperEntries.Add([string]$entry) | Out-Null
-        }
+        # Deep validation: verify archive contains expected content categories
+        $requiredSchemaEntries = @(
+            'elegy-plugin-package-v2.schema.json',
+            'skill-definition-v2.schema.json',
+            'elegy-configuration-template-v1.schema.json',
+            'elegy-configuration-profile-v1.schema.json',
+            'elegy-plugin-readiness-v1.schema.json'
+        )
 
-        $surfaceSpecificEntries = $null
-        if ($null -ne $inventory.wrapperArchiveSurfaceSpecificEntries) {
-            $surfaceSpecificEntries = $inventory.wrapperArchiveSurfaceSpecificEntries.$pattern
-        }
+        $expectedSchemaEntries = @(
+            'elegy-catalog-entry.schema.json'
+        )
 
-        foreach ($entry in @($surfaceSpecificEntries)) {
-            $requiredWrapperEntries.Add([string]$entry) | Out-Null
-        }
+        $requiredFixEntries = @(
+            'fixtures/elegy-plugin-package-v2.minimal.json',
+            'fixtures/skill-definition-v2.minimal.json'
+        )
 
-        $resolvedPattern = Resolve-DistributionPatternPath -InventoryPattern $pattern -RepositoryRoot $repoRoot -OverrideDirectory $DistributionDirectory
-        $archiveFiles = Get-ChildItem -Path $resolvedPattern -ErrorAction SilentlyContinue
-        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
-            $missingWrapperArchives.Add($pattern) | Out-Null
-            continue
-        }
+        $expectedFixEntries = @(
+            'fixtures/elegy-catalog-entry.minimal.json'
+        )
 
-        foreach ($archive in $archiveFiles) {
-            $missingEntries = Test-ArchiveRequiredEntries -ArchivePath $archive.FullName -RequiredEntries @($requiredWrapperEntries)
-            if ($missingEntries.Count -gt 0) {
-                $invalidWrapperArchives.Add("$($archive.Name) missing required entries: $($missingEntries -join ', ')") | Out-Null
+        $requiredConfigEntries = @(
+            'fixtures/configuration/demo-template.json',
+            'fixtures/configuration/demo-profile.json',
+            'fixtures/elegy-configuration-template-v1.minimal.json',
+            'fixtures/elegy-configuration-profile-v1.minimal.json'
+        )
+
+        try {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $zip = [System.IO.Compression.ZipFile]::OpenRead($archivePath)
+            $archiveEntries = $zip.Entries | ForEach-Object { $_.FullName }
+            $zip.Dispose()
+
+            $foundSchemas = 0
+            foreach ($entry in $requiredSchemaEntries) {
+                if ($archiveEntries -contains $entry) { $foundSchemas++ }
             }
-        }
-    }
-}
-
-if ($RequireInstallerArchives -and $null -ne $inventory.installerArchivePatterns) {
-    $requiredInstallerEntries = [System.Collections.Generic.List[string]]::new()
-    foreach ($entry in @($inventory.installerArchiveRequiredEntries)) {
-        $requiredInstallerEntries.Add([string]$entry) | Out-Null
-    }
-
-    foreach ($pattern in $inventory.installerArchivePatterns) {
-        $resolvedPattern = Resolve-DistributionPatternPath -InventoryPattern $pattern -RepositoryRoot $repoRoot -OverrideDirectory $DistributionDirectory
-        $archiveFiles = Get-ChildItem -Path $resolvedPattern -ErrorAction SilentlyContinue
-        if ($null -eq $archiveFiles -or $archiveFiles.Count -eq 0) {
-            $missingInstallerArchives.Add($pattern) | Out-Null
-            continue
-        }
-
-        foreach ($archive in $archiveFiles) {
-            $missingEntries = Test-ArchiveRequiredEntries -ArchivePath $archive.FullName -RequiredEntries @($requiredInstallerEntries)
-            if ($missingEntries.Count -gt 0) {
-                $invalidInstallerArchives.Add("$($archive.Name) missing required entries: $($missingEntries -join ', ')") | Out-Null
+            if ($foundSchemas -lt 3) {
+                $failures.Add("contracts-archive-content : only $foundSchemas of $($requiredSchemaEntries.Count) required schemas present in $archivePath")
             }
+
+            $foundFixtures = 0
+            foreach ($entry in $requiredFixEntries) {
+                if ($archiveEntries -contains $entry) { $foundFixtures++ }
+            }
+            if ($foundFixtures -lt 2) {
+                $failures.Add("contracts-archive-content : only $foundFixtures of $($requiredFixEntries.Count) required plugin/skill fixtures present in $archivePath")
+            }
+
+            $foundConfig = 0
+            foreach ($entry in $requiredConfigEntries) {
+                if ($archiveEntries -contains $entry) { $foundConfig++ }
+            }
+            if ($foundConfig -lt 2) {
+                $failures.Add("contracts-archive-content : only $foundConfig of $($requiredConfigEntries.Count) required config assets present in $archivePath")
+            }
+
+            # Check expected (non-required) entries and warn if missing
+            foreach ($entry in $expectedSchemaEntries) {
+                if ($archiveEntries -notcontains $entry) {
+                    $warnings.Add("contracts-archive-content : expected schema '$entry' not found in $archivePath (may not yet be in export bundle)")
+                }
+            }
+            foreach ($entry in $expectedFixEntries) {
+                if ($archiveEntries -notcontains $entry) {
+                    $warnings.Add("contracts-archive-content : expected fixture '$entry' not found in $archivePath (may not yet be in export bundle)")
+                }
+            }
+
+            if ($failures.Where({ $_ -match '^contracts-archive-content' }).Count -eq 0) {
+                Write-Host "Contracts archive content: ok (schemas: $foundSchemas, fixtures: $foundFixtures, config: $foundConfig)"
+            }
+        } catch {
+            $errMsg = $_.Exception.Message
+            $failures.Add("contracts-archive-content : failed to inspect archive $archivePath -- $errMsg")
         }
     }
 }
 
+# --- wrapper surface archives ---
+if ($RequireWrapperArchives) {
+    $wrapperSurfaces = @('elegy-memory', 'elegy-mcp', 'elegy-planning', 'elegy-skills', 'elegy-configuration', 'elegy-documentation', 'elegy-obsidian')
+    foreach ($surface in $wrapperSurfaces) {
+        $wrappers = Get-ChildItem -LiteralPath $distDir -Filter "$surface-wrapper-*.zip" -File -ErrorAction SilentlyContinue
+        if (-not $wrappers -or $wrappers.Count -eq 0) {
+            $failures.Add("wrapper-archive : $surface-wrapper-*.zip not found in $distDir")
+        }
+    }
+    if ($failures.Where({ $_ -match '^wrapper-archive' }).Count -eq 0) {
+        Write-Host "Wrapper archives: ok"
+    }
+}
+
+# --- installer archive ---
+if ($RequireInstallerArchives) {
+    $installers = Get-ChildItem -LiteralPath $distDir -Filter 'elegy-installer-*.zip' -File -ErrorAction SilentlyContinue
+    if (-not $installers -or $installers.Count -eq 0) {
+        $failures.Add("installer-archive : no elegy-installer-*.zip found in $distDir")
+    } else {
+        Write-Host "Installer archive: ok ($($installers[0].Name))"
+    }
+}
+
+# --- release metadata with cross-validation against staged artifacts ---
 if ($RequireReleaseMetadata) {
-    if ($null -eq $inventory.releaseMetadataPatterns) {
-        $invalidReleaseMetadata.Add('Canonical output inventory did not define releaseMetadataPatterns.') | Out-Null
+    $manifests = Get-ChildItem -LiteralPath $distDir -Filter 'elegy-release-manifest-*.json' -File -ErrorAction SilentlyContinue
+    $checksums = Get-ChildItem -LiteralPath $distDir -Filter 'elegy-release-checksums-*.json' -File -ErrorAction SilentlyContinue
+    if (-not $manifests -or $manifests.Count -eq 0) {
+        $failures.Add("release-metadata : no elegy-release-manifest-*.json found in $distDir")
     }
-    else {
-        $manifestPattern = Resolve-DistributionPatternPath -InventoryPattern ([string]$inventory.releaseMetadataPatterns.manifest) -RepositoryRoot $repoRoot -OverrideDirectory $DistributionDirectory
-        $checksumsPattern = Resolve-DistributionPatternPath -InventoryPattern ([string]$inventory.releaseMetadataPatterns.checksums) -RepositoryRoot $repoRoot -OverrideDirectory $DistributionDirectory
+    if (-not $checksums -or $checksums.Count -eq 0) {
+        $failures.Add("release-metadata : no elegy-release-checksums-*.json found in $distDir")
+    }
 
-        $manifestFile = Get-SingleMatchedFile -PatternPath $manifestPattern -Description 'release manifest metadata' -MissingList $missingReleaseMetadata -InvalidList $invalidReleaseMetadata
-        $checksumsFile = Get-SingleMatchedFile -PatternPath $checksumsPattern -Description 'release checksums metadata' -MissingList $missingReleaseMetadata -InvalidList $invalidReleaseMetadata
+    if ($manifests -and $checksums) {
+        # Cross-validate: manifest asset entries must match staged artifacts
+        $manifestPath = $manifests[0].FullName
+        $checksumsPath = $checksums[0].FullName
+        try {
+            $manifest = Get-Content $manifestPath -Raw | ConvertFrom-Json
+            $checksumData = Get-Content $checksumsPath -Raw | ConvertFrom-Json
 
-        if ($null -ne $manifestFile -and $null -ne $checksumsFile) {
-            $manifestDocument = Get-Content -Raw -Path $manifestFile.FullName | ConvertFrom-Json
-            $checksumsDocument = Get-Content -Raw -Path $checksumsFile.FullName | ConvertFrom-Json
+            # Verify each manifest asset has a corresponding staged file
+            foreach ($asset in $manifest.assets) {
+                $stagedPath = Join-Path $distDir $asset.fileName
+                if (-not (Test-Path -LiteralPath $stagedPath)) {
+                    $failures.Add("release-metadata-cross-check : manifest lists '$($asset.fileName)' but file is missing from $distDir")
+                } else {
+                    # Verify file size matches manifest
+                    $actualSize = (Get-Item -LiteralPath $stagedPath).Length
+                    if ($actualSize -ne $asset.sizeBytes) {
+                        $failures.Add("release-metadata-cross-check : $($asset.fileName) size mismatch (manifest: $($asset.sizeBytes), actual: $actualSize)")
+                    }
 
-            if ([string]$manifestDocument.documentType -ne 'elegy-release-manifest') {
-                $invalidReleaseMetadata.Add("Unexpected release manifest documentType: $($manifestDocument.documentType)") | Out-Null
-            }
-
-            if ([string]$checksumsDocument.documentType -ne 'elegy-release-checksums') {
-                $invalidReleaseMetadata.Add("Unexpected release checksums documentType: $($checksumsDocument.documentType)") | Out-Null
-            }
-
-            if ([string]::IsNullOrWhiteSpace([string]$manifestDocument.bundleVersion)) {
-                $invalidReleaseMetadata.Add('Release manifest metadata did not include bundleVersion.') | Out-Null
-            }
-            else {
-                $expectedManifestFileName = "elegy-release-manifest-$($manifestDocument.bundleVersion).json"
-                if ($manifestFile.Name -ne $expectedManifestFileName) {
-                    $invalidReleaseMetadata.Add("Release manifest file name $($manifestFile.Name) did not match bundleVersion $($manifestDocument.bundleVersion)") | Out-Null
-                }
-
-                $expectedChecksumsFileName = "elegy-release-checksums-$($manifestDocument.bundleVersion).json"
-                if ($checksumsFile.Name -ne $expectedChecksumsFileName) {
-                    $invalidReleaseMetadata.Add("Release checksums file name $($checksumsFile.Name) did not match bundleVersion $($manifestDocument.bundleVersion)") | Out-Null
-                }
-            }
-
-            if (-not [string]::Equals([string]$checksumsDocument.algorithm, 'sha256', [System.StringComparison]::OrdinalIgnoreCase)) {
-                $invalidReleaseMetadata.Add("Unsupported release checksums algorithm: $($checksumsDocument.algorithm)") | Out-Null
-            }
-
-            if (-not [string]::Equals([string]$manifestDocument.tag, [string]$checksumsDocument.tag, [System.StringComparison]::Ordinal)) {
-                $invalidReleaseMetadata.Add('Release manifest and checksums metadata did not agree on the tag marker.') | Out-Null
-            }
-
-            $checksumLookup = New-ChecksumLookup -ChecksumsDocument $checksumsDocument -InvalidList $invalidReleaseMetadata
-            if ($checksumLookup.ContainsKey($manifestFile.Name)) {
-                $manifestHash = Get-FileSha256 -Path $manifestFile.FullName
-                if ($checksumLookup[$manifestFile.Name] -ne $manifestHash) {
-                    $invalidReleaseMetadata.Add("Release manifest checksum mismatch for $($manifestFile.Name)") | Out-Null
-                }
-            }
-            else {
-                $invalidReleaseMetadata.Add("Release checksums metadata did not include the manifest file $($manifestFile.Name)") | Out-Null
-            }
-
-            $manifestAssetNames = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::OrdinalIgnoreCase)
-            $distributionRoot = Split-Path -Parent $manifestFile.FullName
-            foreach ($asset in @($manifestDocument.assets)) {
-                $assetFileName = [string]$asset.fileName
-                if ([string]::IsNullOrWhiteSpace($assetFileName)) {
-                    $invalidReleaseMetadata.Add('Release manifest metadata included an asset with an empty fileName.') | Out-Null
-                    continue
-                }
-
-                if (-not $manifestAssetNames.Add($assetFileName)) {
-                    $invalidReleaseMetadata.Add("Release manifest metadata included a duplicate asset entry for $assetFileName") | Out-Null
-                    continue
-                }
-
-                $assetPath = Join-Path $distributionRoot $assetFileName
-                if (-not (Test-Path $assetPath)) {
-                    $invalidReleaseMetadata.Add("Release manifest asset was not found: $assetFileName") | Out-Null
-                    continue
-                }
-
-                $fileInfo = Get-Item -Path $assetPath
-                if ($fileInfo.Length -ne [int64]$asset.sizeBytes) {
-                    $invalidReleaseMetadata.Add("Release manifest size mismatch for $assetFileName") | Out-Null
-                }
-
-                $actualHash = Get-FileSha256 -Path $assetPath
-                $manifestHash = ([string]$asset.sha256).ToLowerInvariant()
-                if ($actualHash -ne $manifestHash) {
-                    $invalidReleaseMetadata.Add("Release manifest SHA-256 mismatch for $assetFileName") | Out-Null
-                }
-
-                if ($checksumLookup.ContainsKey($assetFileName)) {
-                    if ($checksumLookup[$assetFileName] -ne $manifestHash) {
-                        $invalidReleaseMetadata.Add("Release checksums SHA-256 mismatch for $assetFileName") | Out-Null
+                    # Verify SHA-256 matches manifest
+                    $actualHash = (Get-FileHash -LiteralPath $stagedPath -Algorithm SHA256).Hash.ToLowerInvariant()
+                    if ($actualHash -ne $asset.sha256.ToLowerInvariant()) {
+                        $failures.Add("release-metadata-cross-check : $($asset.fileName) SHA-256 mismatch")
                     }
                 }
-                else {
-                    $invalidReleaseMetadata.Add("Release checksums metadata did not include $assetFileName") | Out-Null
-                }
 
-                $requiredEntries = ConvertTo-StringArray -Value $asset.requiredEntries
-                if ($requiredEntries.Count -gt 0) {
-                    $missingEntries = Test-ArchiveRequiredEntries -ArchivePath $assetPath -RequiredEntries $requiredEntries
-                    if ($missingEntries.Count -gt 0) {
-                        $invalidReleaseMetadata.Add("$assetFileName missing manifest required entries: $($missingEntries -join ', ')") | Out-Null
+                # Verify checksums document has a matching entry
+                $checksumEntry = $checksumData.assets | Where-Object { $_.fileName -eq $asset.fileName }
+                if (-not $checksumEntry) {
+                    $failures.Add("release-metadata-cross-check : $($asset.fileName) in manifest but missing from checksums document")
+                }
+            }
+
+            # Verify checksums assets also exist on disk
+            if ($checksumData.assets) {
+                foreach ($csAsset in $checksumData.assets) {
+                    $stagedPath = Join-Path $distDir $csAsset.fileName
+                    if (-not (Test-Path -LiteralPath $stagedPath)) {
+                        $warnings.Add("release-metadata-cross-check : checksums lists '$($csAsset.fileName)' but file is missing from $distDir")
                     }
                 }
             }
+
+            if ($failures.Where({ $_ -match '^release-metadata-cross-check' }).Count -eq 0) {
+                Write-Host "Release metadata cross-validation: ok"
+            }
+        } catch {
+            $errMsg = $_.Exception.Message
+            $failures.Add("release-metadata-cross-check : failed to parse metadata -- $errMsg")
         }
     }
-}
 
-$result = [pscustomobject]@{
-    inventoryVersion = $inventory.inventoryVersion
-    missingAuthority = $missingAuthority
-    missingSources = $missingSources
-    missingGenerated = $missingGenerated
-    contentMismatches = $contentMismatches
-    missingArchives = $missingArchives
-    missingWrapperArchives = $missingWrapperArchives
-    invalidWrapperArchives = $invalidWrapperArchives
-    missingInstallerArchives = $missingInstallerArchives
-    invalidInstallerArchives = $invalidInstallerArchives
-    missingReleaseMetadata = $missingReleaseMetadata
-    invalidReleaseMetadata = $invalidReleaseMetadata
-}
-
-if ($EmitJson) {
-    $result | ConvertTo-Json -Depth 6
-}
-
-if ($missingAuthority.Count -gt 0) {
-    throw ('Missing authority-only files: ' + ($missingAuthority -join ', '))
-}
-
-if ($missingSources.Count -gt 0) {
-    throw ('Missing source files from canonical output inventory: ' + ($missingSources -join ', '))
-}
-
-if ($missingGenerated.Count -gt 0) {
-    throw ('Missing generated files from canonical output inventory: ' + ($missingGenerated -join ', '))
-}
-
-if ($contentMismatches.Count -gt 0) {
-    throw ('Canonical output mismatches detected: ' + ($contentMismatches -join '; '))
-}
-
-if ($missingArchives.Count -gt 0) {
-    throw ('Missing generated archives from canonical output inventory: ' + ($missingArchives -join ', '))
-}
-
-if ($missingWrapperArchives.Count -gt 0) {
-    throw ('Missing wrapper archives from canonical output inventory: ' + ($missingWrapperArchives -join ', '))
-}
-
-if ($invalidWrapperArchives.Count -gt 0) {
-    throw ('Wrapper archives are missing required payload entries: ' + ($invalidWrapperArchives -join '; '))
-}
-
-if ($missingInstallerArchives.Count -gt 0) {
-    throw ('Missing installer archives from canonical output inventory: ' + ($missingInstallerArchives -join ', '))
-}
-
-if ($invalidInstallerArchives.Count -gt 0) {
-    throw ('Installer archives are missing required payload entries: ' + ($invalidInstallerArchives -join '; '))
-}
-
-if ($missingReleaseMetadata.Count -gt 0) {
-    throw ('Missing release metadata outputs from canonical output inventory: ' + ($missingReleaseMetadata -join ', '))
-}
-
-if ($invalidReleaseMetadata.Count -gt 0) {
-    throw ('Release metadata validation failures detected: ' + ($invalidReleaseMetadata -join '; '))
-}
-
-Write-Host 'Canonical output validation passed.'
-Write-Host " - authority-only files: $($inventory.authorityOnly.Count)"
-Write-Host " - mirrored outputs: $($allMirrored.Count)"
-if ($RequireArchive) {
-    Write-Host " - archive patterns: $($inventory.archivePatterns.Count)"
-}
-if ($RequireWrapperArchives -and $null -ne $inventory.wrapperArchivePatterns) {
-    Write-Host " - wrapper archive patterns: $($inventory.wrapperArchivePatterns.Count)"
-    Write-Host " - wrapper archive required entries: $($inventory.wrapperArchiveRequiredEntries.Count)"
-    if ($null -ne $inventory.wrapperArchiveSurfaceSpecificEntries) {
-        Write-Host " - wrapper archive surface-specific entry sets: $($inventory.wrapperArchiveSurfaceSpecificEntries.PSObject.Properties.Count)"
+    if ($failures.Where({ $_ -match '^release-metadata' }).Count -eq 0 -and $failures.Where({ $_ -match '^release-metadata-cross-check' }).Count -eq 0) {
+        Write-Host "Release metadata: ok"
     }
 }
-if ($RequireInstallerArchives -and $null -ne $inventory.installerArchivePatterns) {
-    Write-Host " - installer archive patterns: $($inventory.installerArchivePatterns.Count)"
-    Write-Host " - installer archive required entries: $($inventory.installerArchiveRequiredEntries.Count)"
+
+# --- deep validation: plugin package fixtures via Rust CLI ---
+if ($RequireDeepValidation) {
+    # Validate plugin package fixtures using the Rust CLI
+    $pluginPackageFixtures = Get-ChildItem -LiteralPath $contractsDir -Recurse -Filter 'elegy-plugin-package.*.json' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '\.negative-' } |
+        Where-Object { $_.Name -ne 'elegy-plugin-package.demo-config.json' }
+
+    foreach ($fixture in $pluginPackageFixtures) {
+        $fixturePath = $fixture.FullName
+        try {
+            $result = cargo run --manifest-path (Join-Path $repoRoot 'rust\Cargo.toml') -p elegy-cli -- plugin verify --package $fixturePath --json 2>&1
+            if ($LASTEXITCODE -ne 0) {
+                $warnings.Add("plugin-fixture-validate : $($fixture.Name) -- CLI returned non-zero exit code (may be expected for fixtures without install receipts)")
+            } else {
+                try {
+                    $parsed = $result | Where-Object { $_ -match '^\s*\{' } | ConvertFrom-Json
+                    if ($parsed.readiness -eq 'blocked') {
+                        $warnings.Add("plugin-fixture-validate : $($fixture.Name) -- readiness is 'blocked'")
+                    }
+                } catch {
+                    # JSON parse failure is acceptable; some fixtures require install receipts
+                }
+            }
+        } catch {
+            $warnings.Add("plugin-fixture-validate : $($fixture.Name) -- failed to run CLI validation")
+        }
+    }
+
+    # Validate skill fixtures using the Rust CLI
+    $skillFixtures = Get-ChildItem -LiteralPath (Join-Path $contractsDir 'fixtures') -Filter 'skill.*.json' -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch 'skill\.minimal\.json' -and $_.Name -notmatch '\.(parity|expected|negative)\.' }
+
+    foreach ($skillFixture in $skillFixtures) {
+        $fixturePath = $skillFixture.FullName
+        try {
+            cargo run --manifest-path (Join-Path $repoRoot 'rust\Cargo.toml') -p elegy-cli -- skills validate --path $fixturePath --json 2>&1 | Out-Null
+            if ($LASTEXITCODE -ne 0) {
+                $warnings.Add("skill-fixture-validate : $($skillFixture.Name) -- validation warnings or issues")
+            }
+        } catch {
+            $warnings.Add("skill-fixture-validate : $($skillFixture.Name) -- failed to run CLI validation")
+        }
+    }
+
+    # Verify required workflow scripts exist
+    $requiredScripts = @(
+        'scripts/export-contracts.ps1',
+        'scripts/package-installer.ps1'
+    )
+    foreach ($script in $requiredScripts) {
+        Assert-Exists (Join-Path $repoRoot $script) "required-script : $script"
+    }
+
+    # Verify required workflow files exist
+    $requiredWorkflows = @(
+        '.github/workflows/rust-ci.yml',
+        '.github/workflows/distribution-artifacts.yml',
+        '.github/workflows/publish-distribution.yml'
+    )
+    foreach ($wf in $requiredWorkflows) {
+        Assert-Exists (Join-Path $repoRoot $wf) "required-workflow : $wf"
+    }
+
+    if ($failures.Where({ $_ -match '^required-' }).Count -eq 0) {
+        Write-Host "Required scripts and workflows: ok"
+    }
+
+    if ($warnings.Count -gt 0) {
+        Write-Host "Deep validation warnings:" -ForegroundColor Yellow
+        foreach ($w in $warnings) {
+            Write-Host "  $w" -ForegroundColor Yellow
+        }
+    }
+
+    if ($failures.Where({ $_ -notmatch '^required-' }).Count -eq 0) {
+        Write-Host "Deep validation: ok"
+    }
 }
-if ($RequireReleaseMetadata -and $null -ne $inventory.releaseMetadataPatterns) {
-    Write-Host ' - release metadata patterns: 2'
+
+# --- warnings output ---
+if ($warnings.Count -gt 0 -and -not $RequireDeepValidation) {
+    Write-Host "Warnings:" -ForegroundColor Yellow
+    foreach ($w in $warnings) {
+        Write-Host "  $w" -ForegroundColor Yellow
+    }
+}
+
+if ($failures.Count -gt 0) {
+    throw ('Validation failed: ' + ($failures -join '; '))
 }

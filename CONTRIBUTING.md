@@ -2,7 +2,7 @@
 
 Thanks for your interest in contributing.
 
-`Elegy` is the main repository for the project's formalization, governance, MCP-facing analysis, and first-party Rust runtime work. The most valuable contributions right now are:
+`Elegy` is the main repository for the project's formalization, MCP-facing analysis, and first-party Rust runtime work. The most valuable contributions right now are:
 
 - keeping docs aligned with the active contracts-first and Rust-first repository shape
 - improving clarity around package boundaries and dependency direction
@@ -14,7 +14,7 @@ Thanks for your interest in contributing.
 Please keep these rules in mind:
 
 1. **Be honest about current status.** Do not document commands, examples, or capabilities that do not exist yet.
-2. **Respect the accepted direction.** `contracts/`, `governance/`, and `rust/` remain the canonical owned surfaces. The contributor-navigation overlays under `src/Elegy-memory`, `src/Elegy-mcp`, and `src/Elegy-skills` are pointer shells only.
+2. **Respect the accepted direction.** `contracts/` and `rust/` remain the canonical owned surfaces. The `src/Elegy-*/install.ps1` files are thin host-neutral install passthroughs.
 3. **Keep v1 intentionally narrow.** The current protocol/runtime target is Rust-first, runtime composition, resources-first MCP behavior, and conservative policy defaults.
 4. **Prefer safe defaults.** Validation, policy, and security posture are core project behavior, not extras.
 5. **Do not widen scope casually.** Changes that affect protocol scope, trust boundaries, packaging topology, or repo-split direction should start with an issue or design discussion.
@@ -29,7 +29,7 @@ Review:
 - [docs/spec-baseline.md](docs/spec-baseline.md)
 - [SECURITY.md](SECURITY.md)
 
-If you touch `src/Elegy-memory`, `src/Elegy-mcp`, or `src/Elegy-skills`, keep those paths documentation-only and route substantive authority or implementation changes back to `contracts/`, `governance/`, `rust/`, and the canonical docs. Treat `.github/skills/` only as repo-local non-authoritative contributor-routing output.
+If you touch `src/Elegy-*/install.ps1`, keep those paths thin install passthroughs and route substantive authority or implementation changes back to `contracts/` and `rust/`, and the canonical docs. Treat `.github/skills/` only as repo-local non-authoritative contributor-routing output.
 For larger changes, open an issue or draft PR early so maintainers can confirm the work still matches the accepted consolidation direction.
 
 ## What to work on now
@@ -47,12 +47,11 @@ Good contributions right now include:
 
 Run the narrowest relevant checks for the surfaces you change.
 
-### Contracts, governance, and workflow changes
+### Contracts and workflow changes
 
 Use targeted checks such as:
 
 ```powershell
-pwsh ./scripts/validate-package-boundaries.ps1
 pwsh ./scripts/export-contracts.ps1
 pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
 ```

@@ -5,9 +5,9 @@ status: draft
 type: contract
 owner: Elegy
 created: 2026-06-04
-updated: 2026-06-12
+updated: 2026-06-16
 doc_kind: spec
-summary: Contract for how elegy-plugin-package/v1 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, and the Codex projection conservatism rules.
+summary: Contract for how elegy-plugin-package/v1 capability projections are verified against skill hostProjection, how the resulting tool availability is projected for hosts, and how the elegy-planning pilot package proves the rules. Defines the verify-only posture, the readiness receipt shape, host-facing verification commands, and optional Codex projection conservatism rules.
 ---
 
 # Plugin Tool Availability
@@ -23,14 +23,16 @@ covers tool availability, verify-only projection, and readiness receipts.
 
 This spec pins down a single, host-facing concept — **tool availability** — and
 the verify-only flow that produces it. The goal is to make it cheap and
-deterministic for any host (Elegy-Copilot, Holon, OpenCode, Codex) to ask "what
-can this plugin package actually do on disk right now?" and get a machine-readable
-answer, without Elegy becoming a host, a marketplace, or a runtime authority.
+deterministic for any host (Holon, OpenCode, Codex, or any LLM agent host) to
+ask "what can this plugin package actually do on disk right now?" and get a
+machine-readable answer, without Elegy becoming a host, a marketplace, or a
+runtime authority.
 
 Three durable definitions and three durable rules cover that goal:
 
 - **Plugin package** is the portable bundle. `elegy-plugin-package/v1` is the
-  current authority. `elegy-plugin-package/v2` is planned future work.
+  current authority. Future package revisions require a new ADR/spec and an
+  explicit migration plan.
 - **Skill definition v2** is the capability contract. `skill` is
   the authority, and `hostProjection` is the part a host cares about.
 - **App/connector** is host-owned. It is not an Elegy package-owned runtime and
@@ -64,10 +66,12 @@ host owns install, auth, approvals, and runtime enablement.
   "elegy-planning-v1"`, and `defaultSideEffectClass: "disk_write"` — these
   are the install-receipt-resolvable identifiers the verifier must use.
 - `docs/architecture/elegy-plugin-readiness.md` already declares the
-  contracts-only posture: "Elegy packages prepare governed plugin artifacts
-  for a future Holon marketplace without turning Elegy into a marketplace or
-  runtime authority" and "The package is the portable source artifact. Holon
-  decides whether and how to accept, trust, install, approve, and execute it."
+  contracts-only posture: "Elegy packages prepare governed plugin artifacts for
+  host consumption — including Holon, OpenCode, Codex, and other LLM agent
+  hosts — without turning Elegy into a marketplace, runtime authority, or host
+  policy engine" and "The package is the portable source artifact. The
+  consuming host decides whether and how to accept, trust, install, approve,
+  and execute it."
 - `docs/architecture/codex-plugin-projection.md` defines the current
   conservative Codex projection slice (`.codex-plugin/plugin.json` and
   `skills/`), and explicitly states `.mcp.json`, `.app.json`, `hooks/hooks.json`,
@@ -206,16 +210,14 @@ The derivation is per-entry and per-field:
 
 **R2.2 Deliberate subset source.** A package MAY carry a `capabilityProjections[]`
 that omits capabilities present in the referenced skill. When it does, the
-package MUST set `metadata.subsetOf` at the package level — currently a flat
-array of capability IDs (`elegy-plugin-package/v1`). A future `v2` revision
-will replace this with a structured object `{ skill, version, omitted[], reason }`.
-A subset without the marker is a contract violation. The marker is intentionally
-at package level, not per-entry, so reviewers see the whole omission set in one
-place.
+package MUST set `metadata.subsetOf` at the package level as a flat array
+of capability IDs. A subset without the marker is a contract violation. The
+marker is intentionally at package level, not per-entry, so reviewers see
+the whole omission set in one place.
 
 **R2.3 Inverse rule.** Every `hostProjection.capabilityProjections[].capabilityId`
 on a referenced skill MUST either appear in `components.capabilityProjections[]`
-or be listed under `metadata.subsetOf.omitted`. Otherwise the package
+or be listed under `metadata.subsetOf`. Otherwise the package
 under-reports its capabilities and the contract fails.
 
 **R2.4 No phantom projections.** A `components.capabilityProjections[]` entry
@@ -392,7 +394,7 @@ authority for downstream hosts; later schemas MUST keep this layout.
       "namespace": "elegy",
       "name": "planning",
       "version": "0.1.0",
-      "definitionRef": "contracts/fixtures/skill.elegy-planning.json",
+      "definitionRef": "skill.elegy-planning.json",
       "lifecycleState": "active",
       "cliName": "elegy-planning",
       "outputContractId": "elegy-planning-v1",
@@ -461,9 +463,9 @@ authority for downstream hosts; later schemas MUST keep this layout.
 - `unsupportedCapabilities[]` lists capabilities whose `lane` could not be
   resolved by the verifier (e.g. `api`, `plugin`) so the host knows what
   needs its own resolver.
-- `omittedCapabilities[]` mirrors `metadata.subsetOf.omitted` when the
+- `omittedCapabilities[]` mirrors the `metadata.subsetOf` entries when the
   package declares a deliberate subset.
-- `subset` echoes the full `metadata.subsetOf` block when present, else
+- `subset` echoes the `metadata.subsetOf` array when present, else
   `null`.
 
 **R5.2 Blocking findings.** The following codes are `blocking` and force
@@ -497,10 +499,17 @@ verification, not a statement of host-side trust, approval, or policy.
 Hosts MUST treat the readiness receipt as one input among many, and
 MUST keep their own approval, auth, and policy decisions.
 
-### R6. Codex projection conservatism
+### R6. Optional: Codex Projection
 
-`elegy generate codex-plugin` MUST keep its current conservative
-posture and MUST NOT silently widen it. The existing rules from
+> Codex plugin generation is one optional derived projection target, not the
+> main plugin setup path. The primary plugin package model is defined in
+> [docs/architecture/elegy-plugin-package-model.md](../architecture/elegy-plugin-package-model.md).
+> This section restates the conservative projection rules for hosts that choose
+> to consume the Codex adapter surface.
+
+`elegy plugin export codex` (Codex plugin export) MUST keep its current conservative
+posture and MUST NOT silently widen it. The legacy alias is `elegy generate codex-plugin`.
+The existing rules from
 `docs/architecture/codex-plugin-projection.md` are restated here as
 contract rules; any future widening is a contract change and not a
 generator tweak.
@@ -528,8 +537,9 @@ connector" MUST do so by carrying an honest
 and letting the host do the binding.
 
 **R6.4 No `subset` widening through projection.** A package that declares
-`metadata.subsetOf` MUST project only the non-omitted capabilities into
-Codex. Omitted capabilities MUST NOT appear in generated `skills/`.
+`metadata.subsetOf` MUST project only the listed capabilities into
+Codex. Capabilities outside that list MUST NOT appear in generated
+`skills/`.
 
 **R6.5 Provenance and license surface.** Generated `.codex-plugin/plugin.json`
 MUST include the package's `metadata.license`, `homepage`, and
@@ -556,8 +566,8 @@ projections, it MUST declare `metadata.subsetOf` on the same package
 rather than emit a new package fixture with a phantom skill.
 
 **R7.3 Codex-facing instruction skills MAY be split if usage triggers
-are too broad.** A future slice MAY split the repo-local
-`.agents/skills/elegy-planning/SKILL.md` into narrower Codex-facing
+are too broad.** A future slice MAY split the generated Codex plugin
+`skills/elegy-planning/SKILL.md` into narrower Codex-facing
 instruction skills along the trigger boundaries:
 
 - `elegy-planning-authoring` — creating goals, roadmaps, plans, todos,
@@ -576,15 +586,9 @@ only the instruction-skill mirror changes.
 **R7.4 Pilot acceptance bar.** The pilot passes when:
 
 - The pilot package is updated to declare
-  `metadata.subsetOf.skill = "elegy.planning"`,
-  `metadata.subsetOf.version = "0.1.0"`,
-  `metadata.subsetOf.omitted = [<the 33 capability ids not currently in
-  components.capabilityProjections[]>]`, and
-  `metadata.subsetOf.reason = "<non-empty rationale>"`. The
-  `elegy-plugin-package/v1` schema already supports `metadata.subsetOf`
-  as a flat array. The structured object form (`{ skill, version, omitted[], reason }`)
-  is planned for a future `v2` schema revision. When v2 lands, the pilot package
-  MUST adopt the new structure.
+  `metadata.subsetOf` as a flat array of capability IDs.
+  The `elegy-plugin-package/v1` schema supports `metadata.subsetOf`
+  as a flat array of capability ID strings.
 - `elegy plugin verify --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --install-receipt <fixture> --json` returns `status: ready` against
@@ -594,7 +598,7 @@ only the instruction-skill mirror changes.
   lists a binary that is `broken` (e.g. wrong `executablePath`).
 - The same command returns `status: partial` when the receipt is
   absent.
-- `elegy generate codex-plugin --package
+- `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` continues to emit only
   `.codex-plugin/plugin.json` and `skills/`; no `.mcp.json`,
@@ -649,8 +653,8 @@ Each item is observable and machine-checkable.
   without `metadata.subsetOf` fails the verifier with
   `SUBSET-MISSING-MARKER` and `status: blocked`.
 - **AC4** A package that declares `metadata.subsetOf` with a non-empty
-  `omitted[]` and a non-empty `reason` passes projection consistency
-  even when fewer entries are present in
+  list and projects fewer capabilities than its referenced skill defines
+  passes projection consistency even when fewer entries are present in
   `components.capabilityProjections[]`.
 - **AC5** `elegy plugin verify --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
@@ -677,7 +681,7 @@ Each item is observable and machine-checkable.
   `sideEffectSummary` matches the per-capability
   `sideEffectClass` counts; a `disk_read` capability shows up under
   `disk_read` and never under `disk_write`.
-- **AC10** `elegy generate codex-plugin --package
+- **AC10** `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` emits only `.codex-plugin/plugin.json`
   and `skills/`. No `.mcp.json`, `.app.json`, `apps/`,
@@ -685,8 +689,8 @@ Each item is observable and machine-checkable.
 - **AC11** The generated `.codex-plugin/plugin.json` does not claim
   bundled apps, MCP servers, or hooks. Its `skills` field points at the
   generated `skills/` directory.
-- **AC12** A package whose `metadata.subsetOf.omitted[]` is non-empty
-  has fewer `skills/<id>/SKILL.md` directories emitted than its
+- **AC12** A package whose `metadata.subsetOf` declares a deliberate
+  subset has fewer `skills/<id>/SKILL.md` directories emitted than its
   referenced skill's `hostProjection.capabilityProjections[]` entries.
 - **AC13** A package whose `components.capabilityProjections[]`
   contains an entry with `lane: "api"` or `lane: "plugin"` emits
@@ -743,7 +747,7 @@ they MUST stay green on `main` once the verifier is implemented.
 - `elegy plugin verify --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json --json`
   (no receipt) — reports `blocked` with unpinned compatibility.
-- `elegy generate codex-plugin --package
+- `elegy plugin export codex --package
   contracts/fixtures/elegy-plugin-package.elegy-planning.json
   --output-dir <tmp> --force` — emits only
   `.codex-plugin/plugin.json` and `skills/`.
@@ -757,11 +761,7 @@ they MUST stay green on `main` once the verifier is implemented.
   uses `elegy plugin verify` (not `elegy configuration package-verify`),
   and the spec text has been updated to match. If the CLI surface
   moves later, update the spec together with the code.
-- `elegy-plugin-package/v1` is the current authority. The planned
-  `elegy-plugin-package/v2` revision will introduce a structured
-  `metadata.subsetOf` object (`{ skill, version, omitted[], reason }`)
-  replacing the current `string[]`. When v2 lands, update R2.2, R7.4,
-  AC3, AC4, AC5, the pilot package, and these drift notes together.
+- `elegy-plugin-package/v1` is the current authority.
 - `elegy-plugin.lock.json` (`elegy-plugin-lock/v1`) is the new lock
   file contract (added 2026-06-12). All standard publishable plugin
   packages must carry this file alongside `elegy-plugin-package.json`.

@@ -1,0 +1,328 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/elegy-codegraph.graph.v0.json",
+  "title": "Elegy Codegraph — Graph IR v0",
+  "description": "Governed schema for the normalized graph intermediate representation produced by elegy-codegraph extractors. Defines entities (files, modules, symbols, tests, docs), edges (imports, exports, calls, references, tests, documents), provenance, and confidence.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema",
+    "extractor",
+    "entities",
+    "edges"
+  ],
+  "properties": {
+    "schema": {
+      "const": "elegy-codegraph.graph.v0"
+    },
+    "extractor": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "version",
+        "lang"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Extractor name (e.g. 'elegy-codegraph-ts', 'elegy-codegraph-rust')"
+        },
+        "version": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Extractor version string"
+        },
+        "lang": {
+          "type": "string",
+          "enum": [
+            "ts",
+            "rust"
+          ],
+          "description": "Source language extracted"
+        },
+        "warning": {
+          "type": "string",
+          "description": "Non-fatal warning emitted during extraction (e.g. rust-analyzer not found, SCIP unavailable)"
+        }
+      }
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/entity"
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/edge"
+      }
+    }
+  },
+  "$defs": {
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "kind",
+        "layer",
+        "name",
+        "qualifiedName",
+        "file",
+        "provenance"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Stable content-addressable identifier (SHA-1 of qualified name + file + kind)"
+        },
+        "kind": {
+          "$ref": "#/$defs/entityKind"
+        },
+        "layer": {
+          "type": "string",
+          "enum": [
+            "source",
+            "test",
+            "doc",
+            "build",
+            "config"
+          ],
+          "description": "Architectural layer the entity belongs to"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Short name (e.g. 'calculateTotal')"
+        },
+        "qualifiedName": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Fully qualified name (e.g. 'src::math::calculateTotal')"
+        },
+        "file": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Relative file path from repo root"
+        },
+        "span": {
+          "oneOf": [
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "description": "[line, column] — 1-indexed"
+                },
+                "end": {
+                  "type": "array",
+                  "minItems": 2,
+                  "maxItems": 2,
+                  "items": {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  "description": "[line, column] — 1-indexed"
+                }
+              }
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Source location (line/col pair) or null when unknown"
+        },
+        "inputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typeHint"
+          },
+          "description": "Parameter or input descriptions"
+        },
+        "outputs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/typeHint"
+          },
+          "description": "Return or output descriptions"
+        },
+        "sideEffects": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/sideEffect"
+          },
+          "description": "Observed or declared side effects"
+        },
+        "dependencies": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Entity IDs this entity directly depends on"
+        },
+        "tests": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Entity IDs of tests that cover this entity"
+        },
+        "docs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Entity IDs of doc comments that document this entity"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      }
+    },
+    "typeHint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "typeHint": {
+          "type": "string"
+        }
+      },
+      "description": "Named input/output with optional type annotation"
+    },
+    "entityKind": {
+      "type": "string",
+      "enum": [
+        "file",
+        "module",
+        "function",
+        "class",
+        "method",
+        "trait",
+        "impl",
+        "interface",
+        "type",
+        "constant",
+        "enum",
+        "macro",
+        "test",
+        "doc"
+      ],
+      "description": "Kind of code entity"
+    },
+    "sideEffect": {
+      "type": "string",
+      "enum": [
+        "fs.read",
+        "fs.write",
+        "net.http",
+        "net.grpc",
+        "process.exec",
+        "db.read",
+        "db.write",
+        "env.read",
+        "env.write",
+        "os.signal"
+      ],
+      "description": "Closed enumeration of observable side effects. Extensions require a schema revision."
+    },
+    "confidence": {
+      "type": "string",
+      "enum": [
+        "exact",
+        "inferred",
+        "heuristic"
+      ],
+      "description": "Confidence level of the fact. exact: verified from a semantic source. inferred: derived from patterns or conventions. heuristic: best guess with indirect evidence."
+    },
+    "provenance": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "extractor",
+        "confidence"
+      ],
+      "properties": {
+        "extractor": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Name of the extractor that produced this record"
+        },
+        "confidence": {
+          "$ref": "#/$defs/confidence"
+        },
+        "evidenceRefs": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": "References to source evidence (e.g. 'src/foo.ts:42:10')"
+        }
+      }
+    },
+    "edge": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "src",
+        "dst",
+        "kind",
+        "provenance"
+      ],
+      "properties": {
+        "src": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Source entity ID"
+        },
+        "dst": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Destination entity ID"
+        },
+        "kind": {
+          "$ref": "#/$defs/edgeKind"
+        },
+        "provenance": {
+          "$ref": "#/$defs/provenance"
+        }
+      }
+    },
+    "edgeKind": {
+      "type": "string",
+      "enum": [
+        "imports",
+        "exports",
+        "calls",
+        "references",
+        "reads",
+        "writes",
+        "validates",
+        "emits",
+        "owns",
+        "tests",
+        "documents"
+      ],
+      "description": "Kind of relationship between two entities"
+    }
+  }
+}

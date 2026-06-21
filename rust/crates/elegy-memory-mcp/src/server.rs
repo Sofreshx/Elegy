@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use rmcp::{
     handler::server::router::tool::ToolRouter,
-    model::{Implementation, ServerCapabilities, ServerInfo},
+    model::{Implementation, JsonObject, ServerCapabilities, ServerInfo},
     service::RequestContext,
     tool, tool_handler, tool_router, Json, RoleServer, ServerHandler,
 };
@@ -39,6 +39,54 @@ impl WriteAuditor for NoopWriteAuditor {
     }
 }
 
+/// Recursively resolve `$ref` → `$defs` in a schema value.
+fn resolve_refs(value: &mut serde_json::Value, defs: &serde_json::Map<String, serde_json::Value>) {
+    match value {
+        serde_json::Value::Object(obj) => {
+            if let Some(ref_str) = obj.get("$ref").and_then(|v| v.as_str()) {
+                if let Some(def_name) = ref_str.strip_prefix("#/$defs/") {
+                    if let Some(resolved) = defs.get(def_name) {
+                        let mut inlined = resolved.clone();
+                        resolve_refs(&mut inlined, defs);
+                        *value = inlined;
+                        return;
+                    }
+                }
+            }
+            for val in obj.values_mut() {
+                resolve_refs(val, defs);
+            }
+        }
+        serde_json::Value::Array(arr) => {
+            for val in arr.iter_mut() {
+                resolve_refs(val, defs);
+            }
+        }
+        _ => {}
+    }
+}
+
+/// Generate a self-contained JSON schema with all `$ref` resolved inline.
+/// This avoids XGrammar compilation failures when the MCP host wraps
+/// individual tool schemas without merging their `$defs` at the envelope root.
+fn inline_schema_for<T: rmcp::schemars::JsonSchema + std::any::Any>() -> Arc<JsonObject> {
+    let base = rmcp::handler::server::tool::schema_for_type::<T>();
+    let mut map: JsonObject = base.as_ref().clone();
+
+    let defs = map
+        .remove("$defs")
+        .and_then(|v| v.as_object().map(|o| o.clone()))
+        .unwrap_or_default();
+
+    if !defs.is_empty() {
+        for value in map.values_mut() {
+            resolve_refs(value, &defs);
+        }
+    }
+
+    Arc::new(map)
+}
+
 #[derive(Clone)]
 pub struct ElegyMemoryMcpServer {
     memory_repository: Arc<MemoryRepository>,
@@ -64,7 +112,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_search",
         description = "Search memories inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemorySearchArgs>()
+        input_schema = inline_schema_for::<MemorySearchArgs>()
     )]
     async fn memory_search(
         &self,
@@ -86,7 +134,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_recall",
         description = "Recall a single memory by id inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryRecallArgs>()
+        input_schema = inline_schema_for::<MemoryRecallArgs>()
     )]
     async fn memory_recall(
         &self,
@@ -107,7 +155,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_list",
         description = "List memories inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryListArgs>()
+        input_schema = inline_schema_for::<MemoryListArgs>()
     )]
     async fn memory_list(
         &self,
@@ -129,7 +177,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_stats",
         description = "Report memory stats for the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryStatsArgs>()
+        input_schema = inline_schema_for::<MemoryStatsArgs>()
     )]
     async fn memory_stats(
         &self,
@@ -150,7 +198,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_store",
         description = "Store a memory inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryStoreArgs>()
+        input_schema = inline_schema_for::<MemoryStoreArgs>()
     )]
     async fn memory_store(
         &self,
@@ -175,7 +223,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_update",
         description = "Update an existing memory inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryUpdateArgs>()
+        input_schema = inline_schema_for::<MemoryUpdateArgs>()
     )]
     async fn memory_update(
         &self,
@@ -200,7 +248,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_correct",
         description = "Correct a memory through the configured gate-aware correction path",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryCorrectArgs>()
+        input_schema = inline_schema_for::<MemoryCorrectArgs>()
     )]
     async fn memory_correct(
         &self,
@@ -225,7 +273,7 @@ impl ElegyMemoryMcpServer {
     #[tool(
         name = "memory_delete",
         description = "Delete a memory inside the configured agent namespace",
-        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryDeleteArgs>()
+        input_schema = inline_schema_for::<MemoryDeleteArgs>()
     )]
     async fn memory_delete(
         &self,

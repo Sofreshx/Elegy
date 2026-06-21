@@ -331,7 +331,7 @@ export function runChecks(config, repoRoot, options = {}) {
 
   const compositeScore = totalWeight > 0 ? Math.round(weightedSum / totalWeight) : null;
   const passesThreshold = compositeScore != null && compositeScore >= threshold;
-  const overallPass = passesThreshold && !anyGateFailed;
+  const overallPass = passesThreshold && !anyGateFailed && requiredFailures.length === 0;
 
   const groupResults = {};
   for (const [name, result] of Object.entries(results)) {

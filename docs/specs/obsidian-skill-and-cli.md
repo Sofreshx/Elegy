@@ -54,9 +54,6 @@ contracts/fixtures/skill.elegy-obsidian.json      (governed source of truth)
 contracts/fixtures/skill-discovery-index.elegy-obsidian.json   (discovery projection)
         |
         v
-.github/skills/elegy-obsidian/SKILL.md                        (repo-local output, currently absent)
-        |
-        v
 skills/elegy-obsidian/SKILL.md                                 (repo-local skill output)
         |
         v
