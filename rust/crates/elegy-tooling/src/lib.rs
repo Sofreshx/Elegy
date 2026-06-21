@@ -1,11 +1,15 @@
 mod docs;
+pub mod projection;
 
 pub use docs::*;
+pub use projection::codex::generate_codex_plugin_from_package_file;
+pub use projection::{
+    project_plugin_for_host, GeneratedHostExport, GeneratedHostExportComponents, HostTarget,
+};
 
 use elegy_contracts::{
     validate_elegy_plugin_package, validate_mcp_analysis_result, validate_mcp_server_descriptor,
     validate_skill_definition_v2, ElegyPluginInstallReceiptV1, ElegyPluginPackage,
-    ElegyPluginPackageCapabilityProjectionComponent, ElegyPluginPackagePathComponent,
     ElegyPluginReadinessFinding, ElegyPluginReadinessPackageIdentity,
     ElegyPluginReadinessProjectedTool, ElegyPluginReadinessSideEffectSummary,
     ElegyPluginReadinessToolStatus, ElegyPluginReadinessV1, ElegyPluginReadinessVerifiedSkill,
@@ -14,7 +18,6 @@ use elegy_contracts::{
 };
 use elegy_mcp::{generated_skill_id, McpSkillGenerator, McpToolAnalyzer};
 use serde::Serialize;
-use serde_json::json;
 use serde_json::Value;
 use std::collections::BTreeSet;
 use std::fs;
@@ -49,63 +52,6 @@ pub struct GeneratedSkillArtifacts {
     pub generated_skills: Vec<SkillDefinitionV2>,
     pub skipped_tools: Vec<McpToolDefinition>,
     pub written_files: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneratedCodexPluginArtifacts {
-    pub source_package: String,
-    pub plugin_name: String,
-    pub plugin_version: String,
-    pub emitted_components: GeneratedCodexPluginComponents,
-    pub written_files: Vec<String>,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-pub struct GeneratedCodexPluginComponents {
-    pub plugin_manifest: String,
-    pub skills_dir: String,
-    pub skills_count: usize,
-    pub apps_emitted: bool,
-    pub mcp_servers_emitted: bool,
-    pub hooks_emitted: bool,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct CodexPluginManifest {
-    name: String,
-    version: String,
-    description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    author: Option<CodexPluginAuthor>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    homepage: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    license: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    documentation_uri: Option<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    keywords: Vec<String>,
-    skills: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    interface: Option<CodexPluginInterface>,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct CodexPluginAuthor {
-    name: String,
-}
-
-#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-#[serde(rename_all = "camelCase")]
-struct CodexPluginInterface {
-    display_name: String,
-    short_description: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    developer_name: Option<String>,
 }
 
 #[derive(Debug, Error)]
@@ -208,64 +154,6 @@ pub fn generate_skills_from_descriptor_file(
     })
 }
 
-pub fn generate_codex_plugin_from_package_file(
-    package_path: &Path,
-    output_dir: &Path,
-    overwrite: bool,
-) -> Result<GeneratedCodexPluginArtifacts, ToolingError> {
-    let package = load_plugin_package_file(package_path)?;
-    let package_root = package_path.parent().unwrap_or_else(|| Path::new("."));
-    let plugin_output_name = package.identity.name.trim();
-    let manifest = build_codex_plugin_manifest(&package);
-    let skill_documents = collect_codex_skill_documents(&package, package_root)?;
-
-    let plugin_root = output_dir.join(plugin_output_name);
-    let manifest_path = plugin_root.join(".codex-plugin").join("plugin.json");
-    let skills_root = plugin_root.join("skills");
-
-    let mut target_paths = vec![manifest_path.clone()];
-    target_paths.extend(
-        skill_documents
-            .iter()
-            .map(|document| skills_root.join(&document.directory_name).join("SKILL.md")),
-    );
-
-    if overwrite {
-        clear_plugin_output_root(&plugin_root)?;
-    } else {
-        preflight_output_paths(&target_paths, overwrite)?;
-    }
-
-    let mut written_files = Vec::with_capacity(target_paths.len());
-
-    write_json_file(&manifest_path, &manifest, overwrite)?;
-    written_files.push(display_path(&manifest_path));
-
-    for document in &skill_documents {
-        let output_path = skills_root.join(&document.directory_name).join("SKILL.md");
-        if let Err(error) = write_text_file(&output_path, &document.content, overwrite) {
-            cleanup_written_files(&written_files.iter().map(PathBuf::from).collect::<Vec<_>>());
-            return Err(error);
-        }
-        written_files.push(display_path(&output_path));
-    }
-
-    Ok(GeneratedCodexPluginArtifacts {
-        source_package: display_path(package_path),
-        plugin_name: plugin_output_name.to_string(),
-        plugin_version: package.identity.version.clone(),
-        emitted_components: GeneratedCodexPluginComponents {
-            plugin_manifest: display_path(&manifest_path),
-            skills_dir: display_path(&skills_root),
-            skills_count: skill_documents.len(),
-            apps_emitted: false,
-            mcp_servers_emitted: false,
-            hooks_emitted: false,
-        },
-        written_files,
-    })
-}
-
 /// Verify a plugin package against its referenced skill definitions.
 /// Cross-validates capability projections, side-effect classes, and subset declarations.
 /// Returns a readiness receipt with `ready`, `partial`, or `blocked` status.
@@ -308,6 +196,7 @@ pub fn verify_plugin_package(
     > = std::collections::BTreeMap::new();
     let mut skill_host_projections: std::collections::BTreeMap<String, SkillHostProjection> =
         std::collections::BTreeMap::new();
+    let mut has_definition_ref = false;
 
     for component in &package.components.skill_definitions {
         let _skill_key = if let Some(def) = &component.definition {
@@ -328,6 +217,7 @@ pub fn verify_plugin_package(
                 });
             key
         } else if let Some(definition_ref) = &component.definition_ref {
+            has_definition_ref = true;
             // Try to load referenced skill definition from package root
             let skill_path = root.join(definition_ref);
             let key = format!("ref:{}", component.id);
@@ -460,46 +350,47 @@ pub fn verify_plugin_package(
     }
 
     // Check subset declarations
+    // subsetOf lists capabilities that are intentionally omitted from projection.
     let empty_subset = Vec::new();
     let subset_of = package
         .metadata
         .as_ref()
         .map(|m| &m.subset_of)
         .unwrap_or(&empty_subset);
-    if !subset_of.is_empty() {
-        // All projected capabilities must be in subset_of
-        for projection in &package.components.capability_projections {
-            if !subset_of.contains(&projection.capability) {
-                findings.push(ElegyPluginReadinessFinding {
-                    code: "SUBSET-VIOLATION".to_string(),
-                    severity: "warning".to_string(),
-                    message: format!(
-                        "Projection '{}' capability '{}' is not listed in metadata.subsetOf",
-                        projection.id, projection.capability
-                    ),
-                    detail: None,
-                });
-            }
-        }
-    } else {
-        // Check if subset is implied (not all skill capabilities are projected)
-        for (skill_key, caps) in &known_capabilities {
-            let projected_caps: std::collections::BTreeSet<String> = package
-                .components
-                .capability_projections
-                .iter()
-                .filter(|p| &p.skill == skill_key)
-                .map(|p| p.capability.clone())
-                .collect();
 
-            if !projected_caps.is_empty() && projected_caps.len() < caps.len() {
-                let omitted: Vec<String> = caps.difference(&projected_caps).cloned().collect();
-                for cap in &omitted {
-                    readiness
-                        .omitted_capabilities
-                        .push(format!("{}.{}", skill_key, cap));
-                }
-                if subset_of.is_empty() && !omitted.is_empty() {
+    let mut omitted_cap_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+
+    for (skill_key, caps) in &known_capabilities {
+        let projected_caps: std::collections::BTreeSet<String> = package
+            .components
+            .capability_projections
+            .iter()
+            .filter(|p| &p.skill == skill_key)
+            .map(|p| p.capability.clone())
+            .collect();
+
+        if !projected_caps.is_empty() && projected_caps.len() < caps.len() {
+            let omitted: Vec<String> = caps.difference(&projected_caps).cloned().collect();
+            for cap in &omitted {
+                omitted_cap_ids.insert(cap.clone());
+                readiness
+                    .omitted_capabilities
+                    .push(format!("{}.{}", skill_key, cap));
+            }
+            if subset_of.is_empty() {
+                if has_definition_ref && !omitted.is_empty() {
+                    findings.push(ElegyPluginReadinessFinding {
+                        code: "SUBSET-MISSING".to_string(),
+                        severity: "error".to_string(),
+                        message: format!(
+                            "Skill '{}' (via definitionRef) has {} capabilities but only {} are projected. metadata.subsetOf must declare omitted capabilities.",
+                            skill_key,
+                            caps.len(),
+                            projected_caps.len()
+                        ),
+                        detail: Some(format!("Omitted: {}", omitted.join(", "))),
+                    });
+                } else if !omitted.is_empty() {
                     findings.push(ElegyPluginReadinessFinding {
                         code: "SUBSET-IMPLIED".to_string(),
                         severity: "warning".to_string(),
@@ -513,6 +404,32 @@ pub fn verify_plugin_package(
                     });
                 }
             }
+        }
+    }
+
+    // Collect all known capability IDs (both bare and fully-qualified) for bogus-subsetOf check.
+    let all_known_cap_ids: std::collections::BTreeSet<String> = known_capabilities
+        .iter()
+        .flat_map(|(skill_key, caps)| {
+            caps.iter().flat_map(move |c| {
+                vec![c.clone(), format!("{}.{}", skill_key, c)]
+            })
+        })
+        .collect();
+
+    for entry in subset_of {
+        if !all_known_cap_ids.contains(entry)
+            && !omitted_cap_ids.contains(entry)
+        {
+            findings.push(ElegyPluginReadinessFinding {
+                code: "SUBSET-BOGUS".to_string(),
+                severity: "warning".to_string(),
+                message: format!(
+                    "metadata.subsetOf entry '{}' does not match any known capability ID.",
+                    entry
+                ),
+                detail: None,
+            });
         }
     }
 
@@ -887,11 +804,17 @@ fn probe_binary(target: &Path, probe_arg: &str) -> ProbeResult {
 }
 
 /// Supported plugin template kinds.
+///
+/// This is the scaffolder lane: `elegy plugin new --template <kind>` writes a
+/// starter file set for a plugin package. It is **not** the future host-driven
+/// authoring lane (that is tracked as a deferred goal; see
+/// `docs/issues/unresolved-goals.md` GOAL-20260616-01). Adding a new variant
+/// here changes the scaffolder's output shape — it does not change the schema
+/// or the contract.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum PluginTemplateKind {
     SkillOnly,
     CliTool,
-    McpTool,
     Configuration,
     Mixed,
     RustCli,
@@ -905,7 +828,6 @@ impl std::str::FromStr for PluginTemplateKind {
         match s {
             "skill-only" => Ok(Self::SkillOnly),
             "cli-tool" => Ok(Self::CliTool),
-            "mcp-tool" => Ok(Self::McpTool),
             "configuration" => Ok(Self::Configuration),
             "mixed" => Ok(Self::Mixed),
             "rust-cli" => Ok(Self::RustCli),
@@ -913,7 +835,7 @@ impl std::str::FromStr for PluginTemplateKind {
             _ => Err(ToolingError::InvalidPluginPackage {
                 path: PathBuf::from(s),
                 issues: vec![format!(
-                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness",
+                    "Unknown template kind '{}'. Valid options: skill-only, cli-tool, configuration, mixed, rust-cli, rust-harness",
                     s
                 )],
             }),
@@ -922,6 +844,18 @@ impl std::str::FromStr for PluginTemplateKind {
 }
 
 /// Scaffold a new plugin package directory from a template.
+///
+/// This is the **scaffolder** lane: it writes a starter `plugin.json`, a stub
+/// skill definition, a lock file, and a CI workflow. The starter will **not**
+/// pass `elegy plugin verify` on its own — empty capabilities, missing
+/// `hostProjection`, and a stub identity are all expected. The author fills
+/// them in against the schema and the model doc, then re-runs verify until ready.
+///
+/// This function is **not** the host-driven authoring lane. The future
+/// `elegy plugin author` / `elegy plugin doctor` lane will walk the user (or a
+/// harness agent) through capability IDs, side-effect classes, tool binaries,
+/// and the verify loop. That is tracked as a deferred goal; see
+/// `docs/issues/unresolved-goals.md` GOAL-20260616-01.
 pub fn scaffold_plugin_package(
     template: PluginTemplateKind,
     output_dir: &Path,
@@ -948,7 +882,6 @@ pub fn scaffold_plugin_package(
     let dirs_to_create = match template {
         PluginTemplateKind::SkillOnly => vec!["skills", "docs"],
         PluginTemplateKind::CliTool => vec!["skills", "docs", "contracts"],
-        PluginTemplateKind::McpTool => vec!["skills", "docs", "contracts", "mcp"],
         PluginTemplateKind::Configuration => vec!["configuration", "docs"],
         PluginTemplateKind::Mixed => {
             vec!["skills", "docs", "contracts", "mcp", "configuration"]
@@ -987,7 +920,6 @@ pub fn scaffold_plugin_package(
     let readme_description = match template {
         PluginTemplateKind::SkillOnly => "A skill-only plugin package.",
         PluginTemplateKind::CliTool => "A CLI tool plugin package.",
-        PluginTemplateKind::McpTool => "An MCP tool plugin package.",
         PluginTemplateKind::Configuration => "A configuration plugin package.",
         PluginTemplateKind::Mixed => {
             "A mixed plugin package with skills, tools, and configurations."
@@ -1194,26 +1126,6 @@ fn build_scaffold_plugin_json(
                 }
             }]);
         }
-        PluginTemplateKind::McpTool => {
-            components["skillDefinitions"] = serde_json::json!([{
-                "id": format!("{}-skill", package_name),
-                "definition": {
-                    "skillFormat": "elegy-skill-definition",
-                    "skillVersion": 2,
-                    "identity": {
-                        "namespace": "elegy",
-                        "name": package_name,
-                        "version": package_version
-                    },
-                    "capabilities": [],
-                    "lifecycleState": "draft"
-                }
-            }]);
-            components["mcpProjections"] = serde_json::json!([{
-                "id": format!("{}-mcp", package_name),
-                "serverName": package_name
-            }]);
-        }
         PluginTemplateKind::Configuration => {
             components["configurationTemplates"] = serde_json::json!([{
                 "id": format!("{}-template", package_name),
@@ -1236,11 +1148,6 @@ fn build_scaffold_plugin_json(
                     "lifecycleState": "draft"
                 }
             }]);
-            components["cliHelpers"] = serde_json::json!([{
-                "id": format!("{}-cli", package_name),
-                "description": format!("{} CLI helper", package_name),
-                "binary": package_name
-            }]);
             components["capabilityProjections"] = serde_json::json!([{
                 "id": format!("{}-cli-projection", package_name),
                 "capabilityRef": format!("{}.default", package_name),
@@ -1262,12 +1169,6 @@ fn build_scaffold_plugin_json(
                     "capabilities": [],
                     "lifecycleState": "draft"
                 }
-            }]);
-            components["rustToolAdapters"] = serde_json::json!([{
-                "id": format!("{}-adapter", package_name),
-                "crateName": format!("{}-adapter", package_name),
-                "adapterPath": "rust/src/lib.rs",
-                "registerFn": "register_tools"
             }]);
             components["capabilityProjections"] = serde_json::json!([{
                 "id": format!("{}-rust-projection", package_name),
@@ -1296,7 +1197,6 @@ fn build_scaffold_plugin_json(
             "description": format!("A {} Elegy plugin package.", match template {
                 PluginTemplateKind::SkillOnly => "skill-only",
                 PluginTemplateKind::CliTool => "CLI tool",
-                PluginTemplateKind::McpTool => "MCP tool",
                 PluginTemplateKind::Configuration => "configuration",
                 PluginTemplateKind::Mixed => "mixed",
                 PluginTemplateKind::RustCli => "Rust CLI",
@@ -1318,7 +1218,6 @@ pub fn inspect_plugin_package(package_path: &Path) -> Result<serde_json::Value, 
 
     let skill_count = package.components.skill_definitions.len();
     let projection_count = package.components.capability_projections.len();
-    let mcp_count = package.components.mcp_projections.len();
     let config_template_count = package.components.configuration_templates.len();
     let config_profile_count = package.components.configuration_profiles.len();
     let tool_req_count = package.components.tool_requirements.len();
@@ -1336,7 +1235,6 @@ pub fn inspect_plugin_package(package_path: &Path) -> Result<serde_json::Value, 
         "summary": {
             "skillCount": skill_count,
             "capabilityProjectionCount": projection_count,
-            "mcpProjectionCount": mcp_count,
             "configurationTemplateCount": config_template_count,
             "configurationProfileCount": config_profile_count,
             "toolRequirementCount": tool_req_count,
@@ -1453,140 +1351,6 @@ fn walk_dir_recursive(
     Ok(())
 }
 
-/// Project a plugin package for a specific host target.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum HostTarget {
-    Codex,
-    OpenCode,
-    Generic,
-}
-
-impl std::str::FromStr for HostTarget {
-    type Err = ToolingError;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s.to_lowercase().as_str() {
-            "codex" => Ok(Self::Codex),
-            "opencode" => Ok(Self::OpenCode),
-            "generic" => Ok(Self::Generic),
-            _ => Err(ToolingError::InvalidPluginPackage {
-                path: PathBuf::from(s),
-                issues: vec![format!(
-                    "Unknown host target '{}'. Valid options: codex, opencode, generic",
-                    s
-                )],
-            }),
-        }
-    }
-}
-
-/// Project a plugin package for a specific host, emitting host-specific files.
-pub fn project_plugin_for_host(
-    package_path: &Path,
-    host: HostTarget,
-    output_dir: &Path,
-    overwrite: bool,
-    package_root: Option<&Path>,
-) -> Result<GeneratedCodexPluginArtifacts, ToolingError> {
-    match host {
-        HostTarget::Codex => {
-            generate_codex_plugin_from_package_file(package_path, output_dir, overwrite)
-        }
-        HostTarget::OpenCode | HostTarget::Generic => {
-            project_generic_host_plugin(package_path, host, output_dir, overwrite, package_root)
-        }
-    }
-}
-
-fn project_generic_host_plugin(
-    package_path: &Path,
-    host: HostTarget,
-    output_dir: &Path,
-    overwrite: bool,
-    package_root: Option<&Path>,
-) -> Result<GeneratedCodexPluginArtifacts, ToolingError> {
-    let package = load_plugin_package_file(package_path)?;
-    let _root = package_root.unwrap_or_else(|| package_path.parent().unwrap_or(Path::new(".")));
-    let plugin_output_name = package.identity.name.trim();
-
-    let host_name = match host {
-        HostTarget::OpenCode => "opencode",
-        HostTarget::Generic => "generic",
-        _ => "generic",
-    };
-
-    let plugin_root = output_dir.join(plugin_output_name);
-    let manifest_dir = plugin_root.join(format!(".elegy-host-{}", host_name));
-    let manifest_path = manifest_dir.join("plugin.json");
-
-    let target_paths = vec![manifest_path.clone()];
-
-    if overwrite {
-        if plugin_root.exists() {
-            fs::remove_dir_all(&plugin_root).map_err(|source| ToolingError::Io {
-                operation: "remove",
-                path: plugin_root.clone(),
-                source,
-            })?;
-        }
-    } else {
-        preflight_output_paths(&target_paths, overwrite)?;
-    }
-
-    // Build a generic host manifest
-    let host_manifest = serde_json::json!({
-        "schemaVersion": "elegy-host-projection/v1",
-        "host": host_name,
-        "package": {
-            "packageId": package.identity.package_id,
-            "name": package.identity.name,
-            "version": package.identity.version,
-            "displayName": package.identity.display_name
-        },
-        "skills": package.components.skill_definitions.iter().map(|sd| {
-            serde_json::json!({
-                "id": sd.id,
-                "hasDefinition": sd.definition.is_some(),
-                "hasDefinitionRef": sd.definition_ref.is_some()
-            })
-        }).collect::<Vec<_>>(),
-        "capabilityProjections": package.components.capability_projections.iter().map(|cp| {
-            serde_json::json!({
-                "id": cp.id,
-                "skill": cp.skill,
-                "capability": cp.capability,
-                "lane": cp.lane,
-                "functionName": cp.projection.as_ref().and_then(|p| p.function_name.clone())
-            })
-        }).collect::<Vec<_>>(),
-        "toolRequirements": package.components.tool_requirements.iter().map(|tr| {
-            serde_json::json!({
-                "toolName": tr.tool_name,
-                "cliBinary": tr.cli_binary
-            })
-        }).collect::<Vec<_>>()
-    });
-
-    write_json_file(&manifest_path, &host_manifest, overwrite)?;
-
-    let written_files = vec![display_path(&manifest_path)];
-
-    Ok(GeneratedCodexPluginArtifacts {
-        source_package: display_path(package_path),
-        plugin_name: plugin_output_name.to_string(),
-        plugin_version: package.identity.version.clone(),
-        emitted_components: GeneratedCodexPluginComponents {
-            plugin_manifest: display_path(&manifest_path),
-            skills_dir: String::new(),
-            skills_count: 0,
-            apps_emitted: false,
-            mcp_servers_emitted: false,
-            hooks_emitted: false,
-        },
-        written_files,
-    })
-}
-
 fn build_mcp_descriptor(
     request: AuthorMcpDescriptorRequest,
 ) -> Result<McpServerDescriptor, ToolingError> {
@@ -1615,7 +1379,7 @@ fn build_mcp_descriptor(
     Ok(descriptor)
 }
 
-fn load_plugin_package_file(path: &Path) -> Result<ElegyPluginPackage, ToolingError> {
+pub(crate) fn load_plugin_package_file(path: &Path) -> Result<ElegyPluginPackage, ToolingError> {
     let content = fs::read_to_string(path).map_err(|source| ToolingError::Io {
         operation: "read",
         path: path.to_path_buf(),
@@ -1663,381 +1427,6 @@ fn load_mcp_descriptor_file(path: &Path) -> Result<McpServerDescriptor, ToolingE
     }
 
     Ok(descriptor)
-}
-
-fn build_codex_plugin_manifest(package: &ElegyPluginPackage) -> CodexPluginManifest {
-    let description = package
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.description.clone())
-        .unwrap_or_else(|| {
-            format!(
-                "Derived Codex plugin projection for the portable Elegy package '{}'.",
-                package.identity.name
-            )
-        });
-
-    let display_name = package
-        .identity
-        .display_name
-        .clone()
-        .unwrap_or_else(|| package.identity.name.clone());
-
-    let developer_name = package
-        .components
-        .skill_definitions
-        .iter()
-        .filter_map(|component| component.definition.as_ref())
-        .find_map(|definition| {
-            definition
-                .metadata
-                .as_ref()
-                .and_then(|metadata| metadata.author.clone())
-        });
-
-    CodexPluginManifest {
-        name: package.identity.name.clone(),
-        version: package.identity.version.clone(),
-        description: description.clone(),
-        author: developer_name
-            .clone()
-            .map(|name| CodexPluginAuthor { name }),
-        homepage: package
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.homepage.clone()),
-        license: package
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.license.clone()),
-        documentation_uri: package
-            .metadata
-            .as_ref()
-            .and_then(|metadata| metadata.documentation_uri.clone()),
-        keywords: package
-            .metadata
-            .as_ref()
-            .map(|metadata| metadata.tags.clone())
-            .unwrap_or_default(),
-        skills: "./skills/".to_string(),
-        interface: Some(CodexPluginInterface {
-            display_name,
-            short_description: description,
-            developer_name,
-        }),
-    }
-}
-
-fn collect_codex_skill_documents(
-    package: &ElegyPluginPackage,
-    package_root: &Path,
-) -> Result<Vec<CodexSkillDocument>, ToolingError> {
-    let mut documents = Vec::new();
-    let mut seen_names = BTreeSet::new();
-
-    for component in &package.components.skill_definitions {
-        let Some(definition) = load_package_skill_definition(component, package_root)? else {
-            continue;
-        };
-
-        let document =
-            render_codex_skill_document(&definition, &package.components.capability_projections);
-        let normalized = document.directory_name.to_ascii_lowercase();
-        if !seen_names.insert(normalized) {
-            return Err(ToolingError::DuplicateSkillId {
-                skill_id: document.directory_name,
-            });
-        }
-        documents.push(document);
-    }
-
-    for instruction in &package.components.instruction_skills {
-        let document = render_instruction_skill_document(instruction, package_root)?;
-        let normalized = document.directory_name.to_ascii_lowercase();
-        if !seen_names.insert(normalized) {
-            return Err(ToolingError::DuplicateSkillId {
-                skill_id: document.directory_name,
-            });
-        }
-        documents.push(document);
-    }
-
-    Ok(documents)
-}
-
-fn load_package_skill_definition(
-    component: &elegy_contracts::ElegyPluginPackageSkillDefinitionComponent,
-    package_root: &Path,
-) -> Result<Option<SkillDefinitionV2>, ToolingError> {
-    if let Some(definition) = &component.definition {
-        return Ok(Some(definition.clone()));
-    }
-
-    let Some(definition_ref) = component.definition_ref.as_ref() else {
-        return Ok(None);
-    };
-
-    let path = package_root.join(Path::new(definition_ref));
-    let content = fs::read_to_string(&path).map_err(|source| ToolingError::Io {
-        operation: "read",
-        path: path.clone(),
-        source,
-    })?;
-
-    let definition = serde_json::from_str::<SkillDefinitionV2>(&content).map_err(|source| {
-        ToolingError::Json {
-            path: path.clone(),
-            source,
-        }
-    })?;
-
-    if let Err(error) = validate_skill_definition_v2(&definition) {
-        return Err(ToolingError::InvalidSkillDefinition {
-            skill_id: component.id.clone(),
-            issues: vec![error.to_string()],
-        });
-    }
-
-    Ok(Some(definition))
-}
-
-fn render_codex_skill_document(
-    definition: &SkillDefinitionV2,
-    capability_projections: &[ElegyPluginPackageCapabilityProjectionComponent],
-) -> CodexSkillDocument {
-    let name = definition.identity.name.trim().to_string();
-    let title = definition
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.display_name.as_deref())
-        .or(definition.identity.display_name.as_deref())
-        .unwrap_or(name.as_str())
-        .to_string();
-    let description = skill_description(definition);
-
-    let skill_ref = format!(
-        "{}.{}",
-        definition.identity.namespace, definition.identity.name
-    );
-    let plugin_capabilities = capability_projections
-        .iter()
-        .filter(|projection| projection.skill == skill_ref)
-        .collect::<Vec<_>>();
-
-    let mut content = String::new();
-    content.push_str("---\n");
-    content.push_str(&format!("name: {}\n", yaml_scalar(&name)));
-    content.push_str(&format!("description: {}\n", yaml_quoted(&description)));
-    content.push_str("---\n\n");
-    content.push_str(&format!("# {}\n\n", title));
-    content.push_str("This file is a derived Codex skill projection generated from governed Elegy package metadata.\n\n");
-    content.push_str("## When to use\n\n");
-    content.push_str(&format!("- {}\n", description));
-    if let Some(category) = definition
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.category.as_deref())
-    {
-        content.push_str(&format!("- Category: `{category}`.\n"));
-    }
-    if !definition.identity.aliases.is_empty() {
-        content.push_str(&format!(
-            "- Aliases: {}.\n",
-            definition
-                .identity
-                .aliases
-                .iter()
-                .map(|alias| format!("`{alias}`"))
-                .collect::<Vec<_>>()
-                .join(", ")
-        ));
-    }
-
-    if !definition.capabilities.is_empty() {
-        content.push_str("\n## Capabilities\n\n");
-        for capability in &definition.capabilities {
-            content.push_str(&format!(
-                "- `{}`: {}\n",
-                capability.id, capability.description
-            ));
-        }
-    }
-
-    if !plugin_capabilities.is_empty() {
-        content.push_str("\n## Projection Hints\n\n");
-        for projection in plugin_capabilities {
-            let mut details = vec![format!("lane `{}`", projection.lane)];
-            if let Some(projection_metadata) = &projection.projection {
-                if let Some(function_name) = &projection_metadata.function_name {
-                    details.push(format!("function `{function_name}`"));
-                }
-                if let Some(mcp_tool_name) = &projection_metadata.mcp_tool_name {
-                    details.push(format!("mcp tool `{mcp_tool_name}`"));
-                }
-            }
-            content.push_str(&format!(
-                "- `{}` projects as {}.\n",
-                projection.capability,
-                details.join(", ")
-            ));
-        }
-    }
-
-    if let Some(doc_uri) = definition
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.documentation_uri.as_deref())
-    {
-        content.push_str("\n## References\n\n");
-        content.push_str(&format!("- Documentation: `{doc_uri}`\n"));
-    }
-
-    content.push_str("\n## Boundary\n\n");
-    content.push_str("- This Codex skill file is derived output only. Governed skill definitions and package metadata remain authoritative.\n");
-    content.push_str("- Host install, auth, trust, approvals, hooks, and connector state remain outside this generated skill file.\n");
-
-    CodexSkillDocument {
-        directory_name: projected_governed_skill_directory_name(definition),
-        content,
-    }
-}
-
-fn render_instruction_skill_document(
-    component: &ElegyPluginPackagePathComponent,
-    package_root: &Path,
-) -> Result<CodexSkillDocument, ToolingError> {
-    let path = Path::new(&component.path);
-    let directory_name = projected_instruction_skill_directory_name(component);
-
-    let source_path = package_root.join(path);
-    if source_path.is_file() {
-        let content = fs::read_to_string(&source_path).map_err(|source| ToolingError::Io {
-            operation: "read",
-            path: source_path,
-            source,
-        })?;
-
-        return Ok(CodexSkillDocument {
-            directory_name,
-            content,
-        });
-    }
-
-    let description = component.description.clone().unwrap_or_else(|| {
-        format!(
-            "Derived instruction skill projection for '{}'.",
-            component.id
-        )
-    });
-
-    let mut content = String::new();
-    content.push_str("---\n");
-    content.push_str(&format!("name: {}\n", yaml_scalar(&directory_name)));
-    content.push_str(&format!("description: {}\n", yaml_quoted(&description)));
-    content.push_str("---\n\n");
-    content.push_str(&format!("# {}\n\n", component.id));
-    content.push_str("This file is a derived Codex instruction-skill placeholder generated from portable Elegy package metadata.\n\n");
-    content.push_str("## Current status\n\n");
-    content.push_str(&format!(
-        "- The package declares an instruction skill at `{}`.\n",
-        component.path
-    ));
-    content.push_str("- The source package does not embed the original markdown body, so this projection preserves metadata only.\n");
-    content.push_str("- Treat the portable package and any host-local packaged files as the authority for the real instruction content.\n");
-
-    Ok(CodexSkillDocument {
-        directory_name,
-        content,
-    })
-}
-
-fn skill_description(definition: &SkillDefinitionV2) -> String {
-    definition
-        .metadata
-        .as_ref()
-        .and_then(|metadata| metadata.description.clone())
-        .or_else(|| {
-            definition.discovery.as_ref().and_then(|discovery| {
-                discovery
-                    .triggers
-                    .first()
-                    .and_then(|trigger| trigger.description.clone())
-            })
-        })
-        .unwrap_or_else(|| {
-            format!(
-                "Use when work needs the '{}' skill capability surface.",
-                definition.identity.name
-            )
-        })
-}
-
-fn projected_governed_skill_directory_name(definition: &SkillDefinitionV2) -> String {
-    build_projected_skill_directory_name(
-        "skill",
-        &format!(
-            "{}.{}",
-            definition.identity.namespace, definition.identity.name
-        ),
-    )
-}
-
-fn projected_instruction_skill_directory_name(
-    component: &ElegyPluginPackagePathComponent,
-) -> String {
-    let normalized_path = component.path.replace('\\', "/");
-    let without_skill_file = normalized_path
-        .strip_suffix("/SKILL.md")
-        .unwrap_or(&normalized_path);
-    let without_prefix = without_skill_file
-        .strip_prefix("skills/")
-        .unwrap_or(without_skill_file);
-    let key = if without_prefix.is_empty() {
-        component.id.as_str()
-    } else {
-        without_prefix
-    };
-
-    build_projected_skill_directory_name("instruction", key)
-}
-
-fn build_projected_skill_directory_name(prefix: &str, key: &str) -> String {
-    let encoded_key = encode_case_safe_directory_key(key);
-    if encoded_key.is_empty() {
-        prefix.to_string()
-    } else {
-        format!("{prefix}-{encoded_key}")
-    }
-}
-
-fn encode_case_safe_directory_key(value: &str) -> String {
-    let mut encoded = String::new();
-    for byte in value.as_bytes() {
-        let ch = char::from(*byte);
-        if ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-' {
-            encoded.push(ch);
-        } else {
-            encoded.push('_');
-            encoded.push_str(&format!("{:02x}", byte));
-        }
-    }
-
-    encoded
-}
-
-fn yaml_scalar(value: &str) -> String {
-    if value
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || ch == '-' || ch == '_')
-    {
-        value.to_string()
-    } else {
-        yaml_quoted(value)
-    }
-}
-
-fn yaml_quoted(value: &str) -> String {
-    json!(value).to_string()
 }
 
 fn descriptor_validation_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
@@ -2111,7 +1500,10 @@ fn validate_generated_skills(skills: &[SkillDefinitionV2]) -> Result<(), Tooling
     Ok(())
 }
 
-fn preflight_output_paths(paths: &[PathBuf], overwrite: bool) -> Result<(), ToolingError> {
+pub(crate) fn preflight_output_paths(
+    paths: &[PathBuf],
+    overwrite: bool,
+) -> Result<(), ToolingError> {
     if overwrite {
         return Ok(());
     }
@@ -2125,7 +1517,7 @@ fn preflight_output_paths(paths: &[PathBuf], overwrite: bool) -> Result<(), Tool
     Ok(())
 }
 
-fn clear_plugin_output_root(path: &Path) -> Result<(), ToolingError> {
+pub(crate) fn clear_plugin_output_root(path: &Path) -> Result<(), ToolingError> {
     if !path.exists() {
         return Ok(());
     }
@@ -2186,7 +1578,11 @@ fn write_skill_files(
     Ok(written_files)
 }
 
-fn write_text_file(output_path: &Path, content: &str, overwrite: bool) -> Result<(), ToolingError> {
+pub(crate) fn write_text_file(
+    output_path: &Path,
+    content: &str,
+    overwrite: bool,
+) -> Result<(), ToolingError> {
     if output_path.exists() && !overwrite {
         return Err(ToolingError::OutputExists {
             path: output_path.to_path_buf(),
@@ -2208,13 +1604,7 @@ fn write_text_file(output_path: &Path, content: &str, overwrite: bool) -> Result
     })
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct CodexSkillDocument {
-    directory_name: String,
-    content: String,
-}
-
-fn write_json_file<T: Serialize>(
+pub(crate) fn write_json_file<T: Serialize>(
     output_path: &Path,
     value: &T,
     overwrite: bool,
@@ -2246,11 +1636,11 @@ fn write_json_file<T: Serialize>(
     })
 }
 
-fn display_path(path: &Path) -> String {
+pub(crate) fn display_path(path: &Path) -> String {
     path.display().to_string()
 }
 
-fn cleanup_written_files(paths: &[PathBuf]) {
+pub(crate) fn cleanup_written_files(paths: &[PathBuf]) {
     for path in paths {
         let _ = fs::remove_file(path);
     }
@@ -2591,7 +1981,7 @@ mod tests {
           "origin": {
             "materializationKind": "declared",
             "sourceKind": "manual",
-            "sourceRef": "contracts/fixtures/elegy-plugin-package-v1.minimal.json"
+            "sourceRef": "contracts/fixtures/elegy-plugin-package.minimal.json"
           },
           "lifecycleState": "active"
         }
@@ -2602,18 +1992,6 @@ mod tests {
         "id": "demo-instructions",
         "path": "skills/demo/SKILL.md",
         "description": "Optional instruction surface derived from the governed skill definition."
-      }
-    ],
-    "mcpProjections": [
-      {
-        "id": "demo-mcp",
-        "serverName": "elegy-demo-mcp",
-        "capabilityRefs": [
-          {
-            "skill": "elegy.demo-plugin",
-            "capability": "demo-search"
-          }
-        ]
       }
     ],
     "capabilityProjections": [
@@ -2693,6 +2071,9 @@ mod tests {
     "name": "demo-plugin",
     "version": "0.1.0"
   },
+  "metadata": {
+    "subsetOf": ["old-cap"]
+  },
   "components": {
     "skillDefinitions": [
       {
@@ -2745,6 +2126,9 @@ mod tests {
     "packageId": "elegy.demo-plugin",
     "name": "demo-plugin",
     "version": "0.2.0"
+  },
+  "metadata": {
+    "subsetOf": ["new-cap"]
   },
   "components": {
     "skillDefinitions": [
@@ -2819,6 +2203,9 @@ mod tests {
     "packageId": "elegy.demo-plugin",
     "name": "demo-plugin",
     "version": "0.1.0"
+  },
+  "metadata": {
+    "subsetOf": ["acme-search-cap", "contoso-search-cap"]
   },
   "components": {
     "skillDefinitions": [

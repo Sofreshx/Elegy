@@ -1,0 +1,234 @@
+{
+  "skillFormat": "elegy-skill-definition",
+  "skillVersion": 2,
+  "identity": {
+    "namespace": "elegy",
+    "name": "doc-practices",
+    "version": "0.1.0",
+    "displayName": "Elegy Documentation Practices",
+    "aliases": ["elegy-doc-practices", "doc-doctrine", "adr-spec-practices"]
+  },
+  "metadata": {
+    "displayName": "Elegy Documentation Practices",
+    "description": "Central durable doctrine for ADR/spec classification, placement, frontmatter, and adoption across Elegy and downstream repos.",
+    "summary": "Apply the central Elegy documentation doctrine: classify, place, write, validate, and adopt ADRs, specs, guides, notes, and roadmap material consistently.",
+    "category": "documentation",
+    "author": "Elegy Contributors",
+    "license": "Apache-2.0",
+    "tags": ["documentation", "doctrine", "adr", "spec", "frontmatter", "validation", "adoption"],
+    "owners": ["elegy"],
+    "documentationUri": "docs/architecture/documentation-practices.md"
+  },
+  "capabilities": [
+    {
+      "id": "doc-practices-classify",
+      "name": "Classify Documentation Intent",
+      "description": "Decide whether a new doc is an ADR, spec, guide, note, or roadmap entry based on the central Elegy doctrine.",
+      "implementation": {
+        "executionType": "library",
+        "executableName": "elegy-documentation",
+        "arguments": ["check", "--project", "${project}", "--json"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to classify against.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationCheckResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-check-result.schema.json",
+        "description": "Classification hints derived from existing frontmatter, authority roots, and freshness posture."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "doc-practices-scaffold-adr",
+      "name": "Scaffold ADR",
+      "description": "Create a new ADR under docs/adr/ using the compact Elegy ADR template with required frontmatter.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["--non-interactive", "docs", "new", "adr", "--title", "${title}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "ADR title; slug is derived from the title.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationInitResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-init-result.schema.json",
+        "description": "Scaffold result envelope listing the new ADR path and the config posture."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "doc-practices-scaffold-spec",
+      "name": "Scaffold Spec",
+      "description": "Create a new spec under docs/specs/ using the compact Elegy spec template with required frontmatter.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy",
+        "arguments": ["--non-interactive", "docs", "new", "spec", "--title", "${title}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "title",
+            "type": "string",
+            "description": "Spec title; slug is derived from the title.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationInitResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-init-result.schema.json",
+        "description": "Scaffold result envelope listing the new spec path and the config posture."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": true
+      }
+    },
+    {
+      "id": "doc-practices-validate",
+      "name": "Validate Docs Objectively",
+      "description": "Run objective validation across the docs corpus for frontmatter, status, links, dates, and freshness warnings.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--json", "check", "--project", "${project}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to validate.",
+            "required": true
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationCheckResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-check-result.schema.json",
+        "description": "Validation envelope with objective findings grouped by severity."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": true,
+        "hasSideEffects": false
+      }
+    },
+    {
+      "id": "doc-practices-init",
+      "name": "Init Docs Config",
+      "description": "Create .elegy/docs.yaml in a target repo with sensible defaults for ADR/spec paths, derived surfaces, and freshness warnings.",
+      "implementation": {
+        "executionType": "subprocess",
+        "executableName": "elegy-documentation",
+        "arguments": ["--non-interactive", "--json", "init", "--project", "${project}", "--dry-run", "${dry_run}"]
+      },
+      "input": {
+        "parameters": [
+          {
+            "name": "project",
+            "type": "path",
+            "description": "Repository root to initialize.",
+            "required": true
+          },
+          {
+            "name": "dry_run",
+            "type": "boolean",
+            "description": "When true, preview the init without writing the file.",
+            "required": false,
+            "default": false
+          }
+        ]
+      },
+      "output": {
+        "resultType": "DocumentationInitResult",
+        "schemaRef": "https://elegy/contracts/schemas/documentation-init-result.schema.json",
+        "description": "Init result envelope with created and skipped paths."
+      },
+      "execution": {
+        "mode": "requestResponse",
+        "isDeterministic": false,
+        "hasSideEffects": true
+      }
+    }
+  ],
+  "constraints": [
+    {
+      "constraintId": "doctrine-is-centralized",
+      "description": "This skill ships the central doctrine; downstream repos only override local paths and triggers via .elegy/docs.yaml.",
+      "required": true
+    },
+    {
+      "constraintId": "validation-is-objective",
+      "description": "Validation covers only objective properties: metadata, statuses, links, dates, freshness warnings. Prose quality and architecture taste stay with humans.",
+      "required": true
+    }
+  ],
+  "governance": {
+    "riskLevel": "low",
+    "approvalRequirement": "none",
+    "policyRefs": ["docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md", "docs/architecture/documentation-practices.md"],
+    "allowedContexts": ["contributor-routing", "local-cli", "documentation-governance", "adoption"]
+  },
+  "discovery": {
+    "keywords": ["documentation", "doctrine", "adr", "spec", "frontmatter", "validate", "scaffold", "adoption"],
+    "triggers": [
+      {
+        "pattern": "classify this doc",
+        "description": "When a new document needs classification as ADR, spec, guide, note, or roadmap entry."
+      },
+      {
+        "pattern": "scaffold an adr",
+        "description": "When a durable decision needs an ADR scaffolded with the central template."
+      },
+      {
+        "pattern": "scaffold a spec",
+        "description": "When implementation-facing behavior needs a spec scaffolded with the central template."
+      },
+      {
+        "pattern": "validate docs",
+        "description": "When docs need objective validation for metadata, status, links, dates, and freshness."
+      }
+    ],
+    "capabilityHints": [
+      "documentation-classification",
+      "documentation-scaffolding",
+      "documentation-objective-validation",
+      "documentation-adoption"
+    ],
+    "isHidden": false
+  },
+  "origin": {
+    "materializationKind": "declared",
+    "sourceKind": "manual",
+    "sourceRef": "contracts/fixtures/skill.elegy-doc-practices.json",
+    "sourceVersion": "0.1.0"
+  },
+  "lifecycleState": "active"
+}

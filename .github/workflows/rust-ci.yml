@@ -10,9 +10,7 @@ on:
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/**'
-      - 'governance/**'
-      - 'schemas/**'
+      - 'contracts/schemas/**'
       - 'policies/**'
   push:
     branches:
@@ -106,21 +104,6 @@ jobs:
       - name: cargo test --workspace --all-targets --all-features
         working-directory: ./rust
         run: cargo test --workspace --all-targets --all-features
-
-  docs-check:
-    name: docs check (advisory)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
-      - uses: Swatinem/rust-cache@v2.9.1
-        with:
-          workspaces: rust -> rust/target
-      - name: cargo run -p elegy-cli -- docs check --json
-        working-directory: ./rust
-        run: cargo run -p elegy-cli -- --project .. docs check --json
 
   docs-check-v2:
     name: docs check v2 (authoritative)

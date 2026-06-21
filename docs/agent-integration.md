@@ -106,28 +106,28 @@ the durable authority.
 
 ## Portable Plugin Packages
 
-`elegy-plugin-package/v1` and `elegy-plugin-package/v2` are portable package
-metadata contracts for hosts that want one governed package surface over
-multiple components. A package can bundle or reference `skill`
-definitions, instruction skill files, MCP projection metadata, docs, and
-assets. `elegy-plugin-package/v2` also adds local configuration template/profile
-components for deterministic `elegy-configuration` loading.
+`elegy-plugin-package/v1` is the portable package metadata contract for hosts
+that want one governed package surface over multiple components. A package can
+bundle or reference `skill` definitions, instruction skill files, MCP projection
+metadata, docs, and local configuration template/profile components for
+deterministic `elegy-configuration` loading.
 
 The package contract is not a runtime. It must not contain host workspace ids,
 approval state, secret refs, runtime sessions, adapter handles, or local trust
 decisions. Hosts such as Holon import the portable package, then apply local
 policy, readiness, approvals, secrets, evidence, and execution rules.
 
-`SKILL.md` files, including the repo-local `.agents/skills/**` and
-`.github/skills/**` mirrors, MCP descriptors, wrapper folders, and generated
+`SKILL.md` files, MCP descriptors, wrapper folders, and generated
 discovery indexes remain derived or adapter surfaces. The governed package and
 skill schemas under `contracts/schemas/` remain the authority roots.
 
-Portable packages may also be projected into conservative Codex plugin folders
-through `elegy generate codex-plugin`, but those generated `.codex-plugin/`
-and `skills/` outputs remain derived adapter surfaces rather than authority.
+Portable packages may also be projected into host-specific plugin folders
+through `elegy plugin export codex` (Codex plugin export) or `elegy plugin export host`
+(OpenCode skills export). The legacy `elegy generate codex-plugin` command is retained as
+a compatibility alias. Generated outputs remain derived adapter surfaces rather
+than authority.
 
-Local `elegy-plugin-package/v2` files may also be consumed directly by
+Local `elegy-plugin-package/v1` files may also be consumed directly by
 `elegy-configuration` or the umbrella `elegy configuration` commands for
 package-backed deterministic configuration apply/verify flows. The package file
 remains metadata plus packaged assets, not a runtime.
@@ -201,18 +201,18 @@ without re-parsing JSON. `validate_skill_definition_v2` enforces non-empty
 the same skill, and rejects duplicate `functionName` and `capabilityId`
 collisions.
 
-## Runtime Tools (Holon Integration)
+## Runtime Tools (Host Integration)
 
-Elegy tools become Holon runtime tools backed by receipt-installed `elegy-*`
-binaries. The integration pattern:
+Elegy tools become host runtime tools backed by receipt-installed `elegy-*`
+binaries. Holon is one consumer example. The integration pattern:
 
 1. **Discover**: the host reads `hostProjection` from the governed skill
    definition to learn the CLI name, output contract, and side-effect classes.
 2. **Register**: the host registers each `capabilityProjection` as a callable
    runtime tool with the advertised `functionName` and input/output schemas.
-   v2 Holon package fixtures additionally carry the same projections in
-   `components.capabilityProjections` so package-level consumers do not have
-   to dereference `skillDefinitions[].definitionRef` first.
+   Host-oriented package fixtures additionally carry the same projections in
+   `components.capabilityProjections` so package-level consumers do not have to
+   dereference `skillDefinitions[].definitionRef` first.
 3. **Invoke**: the host constructs the CLI invocation from
    `implementation.arguments` (shell-free argv), substitutes parameters, and
    runs the subprocess.
@@ -220,7 +220,8 @@ binaries. The integration pattern:
    the `outputContractId` schema.
 
 Provider function calling is only an allowlisted projection of these runtime
-tools. The runtime tool is the source of execution authority.
+tools. The runtime tool (backed by the installed binary) is the source of
+execution authority.
 
 ## Release Assets and Install Receipts
 
@@ -242,12 +243,10 @@ The governed plugin package fixtures
 (`elegy-plugin-package.elegy-planning.json` and
 `elegy-plugin-package.elegy-skills.json`) carry self-sufficient
 `capabilityProjections` for direct host consumption, alongside the
-`hostProjection` block on the underlying skill definition. To ship in a
-released contract bundle, every package fixture must be listed under its
-schema entry in `contracts/manifests/compatibility-manifest.json` and
-mirrored in `governance/canonical-output-inventory.json`; otherwise the
-`export_contract_bundle` exporter omits it from the directory output and zip
-archive.
+`hostProjection` block on the underlying skill definition. The publication flow
+(`export_contract_bundle`) requires package fixtures to be listed in the
+governed compatibility manifest and canonical output inventory; these metadata
+files are generated as part of the release pipeline.
 
 ## Example Profiles
 

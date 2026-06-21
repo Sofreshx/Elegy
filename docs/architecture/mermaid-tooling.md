@@ -88,6 +88,6 @@ The Mermaid contributor-routing skill follows the same authority split as the ot
 
 1. `contracts/fixtures/skill.elegy-mermaid.json` is authoritative.
 2. `contracts/fixtures/skill-discovery-index.elegy-mermaid.json` is the governed discovery projection.
-3. `.agents/skills/elegy-mermaid/SKILL.md` and `.github/skills/elegy-mermaid/SKILL.md` are repo-local non-authoritative rendered outputs.
+3. SKILL.md mirrors are generated via `elegy plugin export` and are repo-local non-authoritative rendered outputs.
 
 This skill surface exists to help AI-capable tooling discover the Mermaid commands through governed metadata while keeping Mermaid explicitly non-authoritative.

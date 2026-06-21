@@ -1,0 +1,161 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.memory-plugin",
+    "name": "elegy-memory",
+    "version": "0.1.0",
+    "displayName": "Elegy Memory Plugin"
+  },
+  "metadata": {
+    "description": "Portable memory package fixture for bounded local non-authoritative memory operations over the Elegy memory CLI surface.",
+    "tags": ["memory", "local-cli", "mvp", "preview", "non-authoritative", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "memory-skill",
+        "definitionRef": "skill.elegy-memory.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "memory-add-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-add",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_add"
+        }
+      },
+      {
+        "id": "memory-search-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-search",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_search"
+        }
+      },
+      {
+        "id": "memory-list-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-list",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_list"
+        }
+      },
+      {
+        "id": "memory-inspect-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-inspect",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_inspect"
+        }
+      },
+      {
+        "id": "memory-purge-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-purge",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_purge"
+        }
+      },
+      {
+        "id": "memory-health-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-health",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_health"
+        }
+      },
+      {
+        "id": "memory-export-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-export",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_export"
+        }
+      },
+      {
+        "id": "memory-reembed-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-reembed",
+        "lane": "subprocess",
+        "supportsDryRun": false,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_reembed"
+        }
+      },
+      {
+        "id": "memory-contradictions-cli",
+        "skill": "elegy.memory",
+        "capability": "memory-contradictions",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "memory_contradictions"
+        }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-memory",
+        "cliBinary": "elegy-memory",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Memory CLI for bounded local memory operations."
+      }
+    ],
+    "docs": [
+      {
+        "id": "memory-architecture",
+        "path": "rust/crates/elegy-memory/docs/architecture/ARCHITECTURE.md"
+      },
+      {
+        "id": "memory-mvp-scope",
+        "path": "rust/crates/elegy-memory/docs/architecture/mvp-scope.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "disk_write",
+    "requiresApproval": false,
+    "policyTags": ["memory-authority", "scope-aware", "sqlite-backed"]
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

@@ -18,13 +18,6 @@ use thiserror::Error;
 
 const BUILTIN_TEMPLATE_FILES: &[(&str, &str, &str)] = &[
     (
-        "repo-skill-mirror-minimal",
-        include_str!(
-            "../../../../contracts/configuration/templates/repo-skill-mirror-minimal.json"
-        ),
-        "contracts/configuration/builtin/repo-skill-mirror-minimal",
-    ),
-    (
         "repo-opencode-agentic-minimal",
         include_str!(
             "../../../../contracts/configuration/templates/repo-opencode-agentic-minimal.json"
@@ -2131,7 +2124,7 @@ mod tests {
     #[test]
     fn list_builtin_catalog_includes_templates_and_profiles() {
         let catalog = list_builtin_configuration_catalog().expect("catalog");
-        assert!(catalog.template_count >= 3);
+        assert!(catalog.template_count >= 2);
         assert!(catalog.profile_count >= 2);
         assert!(catalog
             .templates
@@ -2140,84 +2133,9 @@ mod tests {
     }
 
     #[test]
-    fn apply_repo_skill_mirror_respects_binding_override() {
-        let temp = tempdir().expect("temp dir");
-        let repo_root = temp.path();
-        fs::create_dir_all(repo_root.join("custom-authority/example-skill"))
-            .expect("authority dir");
-        fs::write(
-            repo_root.join("custom-authority/example-skill/SKILL.md"),
-            "# Example\n",
-        )
-        .expect("write skill");
-
-        let receipt = apply_configuration(ApplyConfigurationRequest {
-            target_root: repo_root.to_path_buf(),
-            dry_run: false,
-            force: false,
-            bindings: BTreeMap::from([
-                (
-                    "authority.skills".to_string(),
-                    "custom-authority".to_string(),
-                ),
-                ("target.skills".to_string(), ".opencode/skills".to_string()),
-            ]),
-            package_path: None,
-            template_id: Some("repo-skill-mirror-minimal".to_string()),
-            template_path: None,
-            profile_id: None,
-            profile_path: None,
-        })
-        .expect("apply");
-
-        assert!(receipt.verified);
-        assert!(repo_root
-            .join(".opencode/skills/example-skill/SKILL.md")
-            .exists());
-    }
-
-    #[test]
-    fn verify_repo_skill_mirror_detects_drift() {
-        let temp = tempdir().expect("temp dir");
-        let repo_root = temp.path();
-        fs::create_dir_all(repo_root.join(".github/skills/example-skill")).expect("authority dir");
-        fs::write(
-            repo_root.join(".github/skills/example-skill/SKILL.md"),
-            "# Example\n",
-        )
-        .expect("write skill");
-        fs::create_dir_all(repo_root.join(".agents/skills/example-skill")).expect("mirror dir");
-        fs::write(
-            repo_root.join(".agents/skills/example-skill/SKILL.md"),
-            "# Drifted\n",
-        )
-        .expect("write drifted skill");
-
-        let receipt = verify_configuration(VerifyConfigurationRequest {
-            target_root: repo_root.to_path_buf(),
-            bindings: BTreeMap::new(),
-            package_path: None,
-            template_id: Some("repo-skill-mirror-minimal".to_string()),
-            template_path: None,
-            profile_id: None,
-            profile_path: None,
-        })
-        .expect("verify");
-
-        assert!(!receipt.verified);
-        assert_eq!(receipt.summary.mismatched, 1);
-    }
-
-    #[test]
     fn apply_opencode_profile_creates_agents_hooks_and_mcp_files() {
         let temp = tempdir().expect("temp dir");
         let repo_root = temp.path();
-        fs::create_dir_all(repo_root.join(".github/skills/example-skill")).expect("authority dir");
-        fs::write(
-            repo_root.join(".github/skills/example-skill/SKILL.md"),
-            "# Example\n",
-        )
-        .expect("write skill");
 
         let receipt = apply_configuration(ApplyConfigurationRequest {
             target_root: repo_root.to_path_buf(),
@@ -2233,9 +2151,6 @@ mod tests {
         .expect("apply");
 
         assert!(receipt.verified);
-        assert!(repo_root
-            .join(".opencode/skills/example-skill/SKILL.md")
-            .exists());
         assert!(repo_root.join("AGENTS.md").exists());
         assert!(repo_root
             .join(".github/hooks/opencode-agentic.json")
@@ -2369,12 +2284,6 @@ mod tests {
     fn apply_dry_run_reports_preview_without_writing() {
         let temp = tempdir().expect("temp dir");
         let repo_root = temp.path();
-        fs::create_dir_all(repo_root.join(".github/skills/example-skill")).expect("authority dir");
-        fs::write(
-            repo_root.join(".github/skills/example-skill/SKILL.md"),
-            "# Example\n",
-        )
-        .expect("write skill");
 
         let receipt = apply_configuration(ApplyConfigurationRequest {
             target_root: repo_root.to_path_buf(),
@@ -2382,7 +2291,7 @@ mod tests {
             force: false,
             bindings: BTreeMap::new(),
             package_path: None,
-            template_id: Some("repo-skill-mirror-minimal".to_string()),
+            template_id: Some("repo-opencode-agentic-minimal".to_string()),
             template_path: None,
             profile_id: None,
             profile_path: None,
@@ -2391,13 +2300,11 @@ mod tests {
 
         assert!(receipt.verified);
         assert_eq!(receipt.mode, ElegyConfigurationReceiptMode::DryRun);
-        assert_eq!(receipt.summary.created, 1);
+        assert!(receipt.summary.created >= 1);
         assert!(matches!(
             receipt.entries[0].action,
             ElegyConfigurationReceiptAction::WouldCreate
         ));
-        assert!(!repo_root
-            .join(".agents/skills/example-skill/SKILL.md")
-            .exists());
+        assert!(!repo_root.join("AGENTS.md").exists());
     }
 }

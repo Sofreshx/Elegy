@@ -8,7 +8,7 @@ The repository is still in a **bootstrap and consolidation stage** after the leg
 
 At this stage:
 
-- `contracts/`, `governance/`, `schemas/`, and `policies/` are the authority roots for governed schemas, fixtures, manifests, support metadata, versioning, and policy
+- `contracts/`, `schemas/`, and `policies/` are the authority roots for governed schemas, fixtures, manifests, support metadata, versioning, and policy
 - exported bundles under `artifacts/contracts` are the supported machine-readable handoff surface for downstream consumers
 - the Rust workspace under `rust/` is the active home for CLI, tooling, host, runtime, and adapter behavior that consumes governed artifacts
 - the current contributor-facing self-authoring slice is the Rust CLI path for `author mcp`, `analyze mcp`, and `generate skills`, backed by `rust/crates/elegy-tooling`
@@ -45,7 +45,7 @@ During bootstrap, response times are best-effort. Maintainers will try to:
 
 The current implemented posture includes repository and runtime safeguards such as:
 
-- canonical output and boundary validation through `scripts/export-contracts.ps1`, `scripts/validate-canonical-outputs.ps1`, and `scripts/validate-package-boundaries.ps1`
+- canonical output and boundary validation through `scripts/export-contracts.ps1` and `scripts/validate-canonical-outputs.ps1`
 - distribution bundle export and archive validation in `.github/workflows/distribution-artifacts.yml`
 - Rust workspace formatting, linting, and test validation in `.github/workflows/rust-ci.yml`
 - dependency review through `cargo-deny` and advisory review through `cargo-audit` in `.github/workflows/security.yml`

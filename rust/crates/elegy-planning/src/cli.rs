@@ -7,15 +7,19 @@ use thiserror::Error;
 
 use crate::envelope::{MachineEnvelope, MachineStatus};
 use crate::{
-    ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput, AddWorkPointInput,
-    AttachWorktreeInput, ClaimProjectRunInput, CreateGoalInput, CreateInsightInput,
-    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, FileScopeIntent, FileScopeRecord,
-    FileScopeSelectorType, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
-    PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunStatus,
-    ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus, RevisePlanInput,
-    ReviseWorkPointInput, RoadmapStatus, SearchInput, Severity, TodoStatus, UpdateStatusInput,
-    WorkPointKind, WorkPointStatus, WorktreeStatus,
+    AcceptanceKind, ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput,
+    AddWorkPointInput, AttachEvidenceInput, AttachWorktreeInput, ClaimProjectRunInput,
+    CreateAcceptanceInput, CreateEvidenceInput, CreateGoalInput, CreateGraphEdgeInput,
+    CreateGraphNodeInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
+    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
+    EntityType, EvidenceKind, FileScopeIntent, FileScopeRecord, FileScopeSelectorType,
+    FinalizeGraphNodeInput, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
+    PlanningEdgeKind, PlanningNodeKind, PlanningStore, PlanningStoreError, Priority,
+    ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput,
+    ReviewPointStatus, ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput,
+    ReviseWorkPointInput, RoadmapStatus, SatisfyAcceptanceInput, SearchInput, Severity, TodoStatus,
+    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput, WorkPointKind,
+    WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -141,6 +145,11 @@ enum Command {
     Worktree {
         #[command(subcommand)]
         command: WorktreeCommand,
+    },
+    #[command(about = "Inspect and manage the planning graph")]
+    Graph {
+        #[command(subcommand)]
+        command: GraphCommand,
     },
 }
 
@@ -895,6 +904,327 @@ struct WorktreeCleanupIntentArgs {
     id: String,
 }
 
+#[derive(Subcommand, Debug)]
+enum GraphCommand {
+    #[command(about = "Manage graph nodes (goals, work items, milestones, etc.)")]
+    Node {
+        #[command(subcommand)]
+        command: GraphNodeCommand,
+    },
+    #[command(about = "Manage graph edges (dependencies, decompositions, etc.)")]
+    Edge {
+        #[command(subcommand)]
+        command: GraphEdgeCommand,
+    },
+    #[command(about = "Manage acceptance criteria (abstract and concrete requirements)")]
+    Acceptance {
+        #[command(subcommand)]
+        command: AcceptanceCommand,
+    },
+    #[command(about = "Manage evidence (test results, artifacts, reviews, etc.)")]
+    Evidence {
+        #[command(subcommand)]
+        command: EvidenceCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum GraphNodeCommand {
+    Create(GraphNodeCreateArgs),
+    Show(GraphNodeShowArgs),
+    List(GraphNodeListArgs),
+    Status(GraphNodeStatusArgs),
+    Revise(GraphNodeReviseArgs),
+    Finalize(GraphNodeFinalizeArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum GraphEdgeCommand {
+    Create(GraphEdgeCreateArgs),
+    Show(GraphEdgeShowArgs),
+    List(GraphEdgeListArgs),
+    Incoming(GraphEdgeIncomingArgs),
+    Outgoing(GraphEdgeOutgoingArgs),
+    Status(GraphEdgeStatusArgs),
+    Revise(GraphEdgeReviseArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum AcceptanceCommand {
+    Create(AcceptanceCreateArgs),
+    Show(AcceptanceShowArgs),
+    List(AcceptanceListArgs),
+    Satisfy(AcceptanceSatisfyArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum EvidenceCommand {
+    Create(EvidenceCreateArgs),
+    Show(EvidenceShowArgs),
+    List(EvidenceListArgs),
+    Attach(EvidenceAttachArgs),
+}
+
+#[derive(Args, Debug)]
+struct AcceptanceCreateArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long, value_enum)]
+    acceptance_kind: AcceptanceKind,
+    #[arg(long)]
+    title: String,
+    #[arg(long)]
+    summary: String,
+    #[arg(long, default_value = "active")]
+    status: String,
+    #[arg(long)]
+    description: String,
+    #[arg(long, default_value = "manual-review")]
+    verification_policy: String,
+    #[arg(long = "required-evidence-kind", value_enum)]
+    required_evidence_kinds: Vec<EvidenceKind>,
+    #[arg(long)]
+    waiver: Option<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct AcceptanceShowArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+}
+
+#[derive(Args, Debug)]
+struct AcceptanceListArgs {
+    #[arg(long, value_enum)]
+    kind: Option<AcceptanceKind>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
+#[derive(Args, Debug)]
+struct AcceptanceSatisfyArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long = "concrete-id")]
+    concrete_node_id: String,
+    #[arg(long = "abstract-id")]
+    abstract_node_id: String,
+    #[arg(long)]
+    rationale: String,
+}
+
+#[derive(Args, Debug)]
+struct EvidenceCreateArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long, value_enum)]
+    evidence_kind: EvidenceKind,
+    #[arg(long)]
+    title: String,
+    #[arg(long)]
+    summary: String,
+    #[arg(long, default_value = "active")]
+    status: String,
+    #[arg(long)]
+    reference: String,
+    #[arg(long)]
+    content: String,
+    #[arg(long)]
+    captured_at: String,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct EvidenceShowArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+}
+
+#[derive(Args, Debug)]
+struct EvidenceListArgs {
+    #[arg(long, value_enum)]
+    kind: Option<EvidenceKind>,
+    #[arg(long, default_value_t = 50)]
+    limit: usize,
+}
+
+#[derive(Args, Debug)]
+struct EvidenceAttachArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long = "evidence-id")]
+    evidence_node_id: String,
+    #[arg(long = "target-id")]
+    target_node_id: String,
+    #[arg(long)]
+    rationale: String,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeCreateArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long, value_enum)]
+    kind: PlanningNodeKind,
+    #[arg(long)]
+    title: String,
+    #[arg(long)]
+    summary: String,
+    #[arg(long)]
+    status: String,
+    #[arg(long = "payload-json")]
+    payload_json: Option<String>,
+    #[arg(long = "payload-file")]
+    payload_file: Option<PathBuf>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeShowArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeListArgs {
+    #[arg(long, value_enum)]
+    kind: Option<PlanningNodeKind>,
+    #[arg(long)]
+    limit: Option<usize>,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeCreateArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long, value_enum)]
+    kind: PlanningEdgeKind,
+    #[arg(long = "source-node-id")]
+    source_node_id: String,
+    #[arg(long = "target-node-id")]
+    target_node_id: String,
+    #[arg(long)]
+    status: String,
+    #[arg(long = "payload-json")]
+    payload_json: Option<String>,
+    #[arg(long = "payload-file")]
+    payload_file: Option<PathBuf>,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeShowArgs {
+    #[arg(long = "edge-id")]
+    edge_id: String,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeListArgs {
+    #[arg(long, value_enum)]
+    kind: Option<PlanningEdgeKind>,
+    #[arg(long)]
+    limit: Option<usize>,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeIncomingArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+    #[arg(long, value_enum)]
+    kind: Option<PlanningEdgeKind>,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeOutgoingArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+    #[arg(long, value_enum)]
+    kind: Option<PlanningEdgeKind>,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeStatusArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    status: String,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeReviseArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    title: Option<String>,
+    #[arg(long)]
+    summary: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long = "payload-json")]
+    payload_json: Option<String>,
+    #[arg(long = "payload-file")]
+    payload_file: Option<PathBuf>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long, default_value_t = false)]
+    clear_tags: bool,
+}
+
+#[derive(Args, Debug)]
+struct GraphNodeFinalizeArgs {
+    #[arg(long = "node-id")]
+    node_id: String,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    status: String,
+    #[arg(long = "accepted-risk")]
+    accepted_risk: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeStatusArgs {
+    #[arg(long = "edge-id")]
+    edge_id: String,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    status: String,
+}
+
+#[derive(Args, Debug)]
+struct GraphEdgeReviseArgs {
+    #[arg(long = "edge-id")]
+    edge_id: String,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    status: Option<String>,
+    #[arg(long = "payload-json")]
+    payload_json: Option<String>,
+    #[arg(long = "payload-file")]
+    payload_file: Option<PathBuf>,
+}
+
 #[derive(Args, Debug)]
 struct ProjectRenderArgs {
     #[arg(long = "entity-type", value_enum)]
@@ -1013,6 +1343,7 @@ where
         Command::Tags(args) => execute_tags(args, &store, &context),
         Command::ProjectRun { command } => execute_project_run(command, &store, &context),
         Command::Worktree { command } => execute_worktree(command, &store, &context),
+        Command::Graph { command } => execute_graph(command, &store, &context),
     }
 }
 
@@ -1934,6 +2265,473 @@ fn execute_worktree(
     }
 }
 
+fn execute_graph(
+    command: GraphCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        GraphCommand::Node { command } => execute_graph_node(command, store, context),
+        GraphCommand::Edge { command } => execute_graph_edge(command, store, context),
+        GraphCommand::Acceptance { command } => execute_graph_acceptance(command, store, context),
+        GraphCommand::Evidence { command } => execute_graph_evidence(command, store, context),
+    }
+}
+
+fn execute_graph_node(
+    command: GraphNodeCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        GraphNodeCommand::Create(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "node", "create"], message, true)
+                }
+            };
+            let payload = parse_graph_payload(&args.payload_json, &args.payload_file)?;
+            let result = store.create_graph_node(CreateGraphNodeInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                kind: args.kind,
+                title: args.title,
+                summary: args.summary,
+                status: args.status,
+                payload,
+                tags: args.tags,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "node", "create"], result)
+        }
+        GraphNodeCommand::Show(args) => {
+            // Pre-check scope before building the full view
+            let node = store.graph_node(&args.node_id)?;
+            if node.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["graph", "node", "show"],
+                    format!(
+                        "graph node `{}` is in scope `{}`, not `{}`",
+                        args.node_id, node.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            let view = store.graph_node_view(&args.node_id, &context.scope_key)?;
+            emit_success(context, vec!["graph", "node", "show"], view)
+        }
+        GraphNodeCommand::List(args) => {
+            let nodes = store.list_graph_nodes(&context.scope_key, args.kind)?;
+            let nodes = if let Some(limit) = args.limit {
+                nodes.into_iter().take(limit).collect::<Vec<_>>()
+            } else {
+                nodes
+            };
+            emit_success(
+                context,
+                vec!["graph", "node", "list"],
+                json!({ "nodes": nodes }),
+            )
+        }
+        GraphNodeCommand::Status(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "node", "status"], message, true)
+                }
+            };
+            let result = store.update_graph_node_status(UpdateGraphNodeStatusInput {
+                node_id: args.node_id,
+                correlation_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                status: args.status,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "node", "status"], result)
+        }
+        GraphNodeCommand::Revise(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "node", "revise"], message, true)
+                }
+            };
+            let payload = parse_graph_payload(&args.payload_json, &args.payload_file)?;
+            let result = store.revise_graph_node(ReviseGraphNodeInput {
+                node_id: args.node_id,
+                correlation_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                title: args.title,
+                summary: args.summary,
+                status: args.status,
+                payload: if args.payload_json.is_some() || args.payload_file.is_some() {
+                    Some(payload)
+                } else {
+                    None
+                },
+                tags: if args.tags.is_empty() && !args.clear_tags {
+                    None
+                } else {
+                    Some(args.tags)
+                },
+                clear_tags: args.clear_tags,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "node", "revise"], result)
+        }
+        GraphNodeCommand::Finalize(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "node", "finalize"], message, true)
+                }
+            };
+            let result = store.finalize_graph_node(FinalizeGraphNodeInput {
+                node_id: args.node_id,
+                correlation_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                status: args.status,
+                accepted_risk: args.accepted_risk,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "node", "finalize"], result)
+        }
+    }
+}
+
+fn execute_graph_edge(
+    command: GraphEdgeCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        GraphEdgeCommand::Create(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "edge", "create"], message, true)
+                }
+            };
+            let payload = parse_graph_payload(&args.payload_json, &args.payload_file)?;
+            let result = store.create_graph_edge(CreateGraphEdgeInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                kind: args.kind,
+                source_node_id: args.source_node_id,
+                target_node_id: args.target_node_id,
+                status: args.status,
+                payload,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "edge", "create"], result)
+        }
+        GraphEdgeCommand::Show(args) => {
+            // Pre-check scope before building the full view
+            let edge = store.graph_edge(&args.edge_id)?;
+            if edge.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["graph", "edge", "show"],
+                    format!(
+                        "graph edge `{}` is in scope `{}`, not `{}`",
+                        args.edge_id, edge.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            let view = store.graph_edge_view(&args.edge_id, &context.scope_key)?;
+            emit_success(context, vec!["graph", "edge", "show"], view)
+        }
+        GraphEdgeCommand::List(args) => {
+            let edges = store.list_graph_edges(&context.scope_key, args.kind)?;
+            let edges = if let Some(limit) = args.limit {
+                edges.into_iter().take(limit).collect::<Vec<_>>()
+            } else {
+                edges
+            };
+            emit_success(
+                context,
+                vec!["graph", "edge", "list"],
+                json!({ "edges": edges }),
+            )
+        }
+        GraphEdgeCommand::Incoming(args) => {
+            // Scope gate: verify the referenced node belongs to the active scope
+            let node = store.graph_node(&args.node_id)?;
+            if node.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["graph", "edge", "incoming"],
+                    format!(
+                        "graph node `{}` is in scope `{}`, not `{}`",
+                        args.node_id, node.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            // Query all edges then filter by active scope (defense-in-depth against SQL corruption)
+            let edges: Vec<_> = store
+                .list_incoming_edges(&args.node_id, args.kind)?
+                .into_iter()
+                .filter(|e| e.scope_key == context.scope_key)
+                .collect();
+            emit_success(
+                context,
+                vec!["graph", "edge", "incoming"],
+                json!({ "edges": edges }),
+            )
+        }
+        GraphEdgeCommand::Outgoing(args) => {
+            // Scope gate: verify the referenced node belongs to the active scope
+            let node = store.graph_node(&args.node_id)?;
+            if node.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["graph", "edge", "outgoing"],
+                    format!(
+                        "graph node `{}` is in scope `{}`, not `{}`",
+                        args.node_id, node.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            // Query all edges then filter by active scope (defense-in-depth against SQL corruption)
+            let edges: Vec<_> = store
+                .list_outgoing_edges(&args.node_id, args.kind)?
+                .into_iter()
+                .filter(|e| e.scope_key == context.scope_key)
+                .collect();
+            emit_success(
+                context,
+                vec!["graph", "edge", "outgoing"],
+                json!({ "edges": edges }),
+            )
+        }
+        GraphEdgeCommand::Status(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "edge", "status"], message, true)
+                }
+            };
+            let result = store.update_graph_edge_status(UpdateGraphEdgeStatusInput {
+                edge_id: args.edge_id,
+                correlation_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                status: args.status,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "edge", "status"], result)
+        }
+        GraphEdgeCommand::Revise(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "edge", "revise"], message, true)
+                }
+            };
+            let payload = parse_graph_payload(&args.payload_json, &args.payload_file)?;
+            let result = store.revise_graph_edge(ReviseGraphEdgeInput {
+                edge_id: args.edge_id,
+                correlation_id,
+                active_scope_key: Some(context.scope_key.clone()),
+                status: args.status,
+                payload: if args.payload_json.is_some() || args.payload_file.is_some() {
+                    Some(payload)
+                } else {
+                    None
+                },
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "edge", "revise"], result)
+        }
+    }
+}
+
+fn execute_graph_acceptance(
+    command: AcceptanceCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        AcceptanceCommand::Create(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(
+                        context,
+                        vec!["graph", "acceptance", "create"],
+                        message,
+                        true,
+                    )
+                }
+            };
+            let result = store.create_acceptance(CreateAcceptanceInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                title: args.title,
+                summary: args.summary,
+                status: args.status,
+                acceptance_kind: args.acceptance_kind,
+                description: args.description,
+                verification_policy: args.verification_policy,
+                required_evidence_kinds: args.required_evidence_kinds,
+                waiver: args.waiver,
+                tags: args.tags,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "acceptance", "create"], result)
+        }
+        AcceptanceCommand::Show(args) => {
+            let view = store.acceptance_view(&args.node_id, &context.scope_key)?;
+            emit_success(context, vec!["graph", "acceptance", "show"], view)
+        }
+        AcceptanceCommand::List(args) => {
+            let kind_filter = args.kind;
+            let mut nodes =
+                store.list_graph_nodes(&context.scope_key, Some(PlanningNodeKind::Acceptance))?;
+            if let Some(filter_kind) = &kind_filter {
+                nodes.retain(|n| {
+                    n.payload
+                        .get("acceptanceKind")
+                        .and_then(|v| v.as_str())
+                        .map(|k| k == filter_kind.as_str())
+                        .unwrap_or(false)
+                });
+            }
+            nodes.truncate(args.limit);
+            emit_success(
+                context,
+                vec!["graph", "acceptance", "list"],
+                serde_json::json!({ "nodes": nodes }),
+            )
+        }
+        AcceptanceCommand::Satisfy(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(
+                        context,
+                        vec!["graph", "acceptance", "satisfy"],
+                        message,
+                        true,
+                    )
+                }
+            };
+            let result = store.satisfy_acceptance(SatisfyAcceptanceInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                concrete_node_id: args.concrete_node_id,
+                abstract_node_id: args.abstract_node_id,
+                rationale: args.rationale,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "acceptance", "satisfy"], result)
+        }
+    }
+}
+
+fn execute_graph_evidence(
+    command: EvidenceCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        EvidenceCommand::Create(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "evidence", "create"], message, true)
+                }
+            };
+            let result = store.create_evidence(CreateEvidenceInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                title: args.title,
+                summary: args.summary,
+                status: args.status,
+                evidence_kind: args.evidence_kind,
+                reference: args.reference,
+                content: args.content,
+                captured_at: args.captured_at,
+                tags: args.tags,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "evidence", "create"], result)
+        }
+        EvidenceCommand::Show(args) => {
+            let view = store.evidence_view(&args.node_id, &context.scope_key)?;
+            emit_success(context, vec!["graph", "evidence", "show"], view)
+        }
+        EvidenceCommand::List(args) => {
+            let kind_filter = args.kind;
+            let mut nodes =
+                store.list_graph_nodes(&context.scope_key, Some(PlanningNodeKind::Evidence))?;
+            if let Some(filter_kind) = &kind_filter {
+                nodes.retain(|n| {
+                    n.payload
+                        .get("evidenceKind")
+                        .and_then(|v| v.as_str())
+                        .map(|k| k == filter_kind.as_str())
+                        .unwrap_or(false)
+                });
+            }
+            nodes.truncate(args.limit);
+            emit_success(
+                context,
+                vec!["graph", "evidence", "list"],
+                serde_json::json!({ "nodes": nodes }),
+            )
+        }
+        EvidenceCommand::Attach(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["graph", "evidence", "attach"], message, true)
+                }
+            };
+            let result = store.attach_evidence(AttachEvidenceInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                evidence_node_id: args.evidence_node_id,
+                target_node_id: args.target_node_id,
+                rationale: args.rationale,
+                run_id: context.correlation_id.clone(),
+            })?;
+            emit_success(context, vec!["graph", "evidence", "attach"], result)
+        }
+    }
+}
+
+fn parse_graph_payload(
+    payload_json: &Option<String>,
+    payload_file: &Option<PathBuf>,
+) -> Result<serde_json::Value, CliError> {
+    match (payload_json, payload_file) {
+        (Some(json_str), None) => Ok(serde_json::from_str(json_str)?),
+        (None, Some(path)) => {
+            let content = std::fs::read_to_string(path).map_err(|e| {
+                CliError::Store(PlanningStoreError::InvalidInput(format!(
+                    "failed to read payload file: {e}"
+                )))
+            })?;
+            Ok(serde_json::from_str(&content)?)
+        }
+        (None, None) => Ok(serde_json::json!({})),
+        (Some(_), Some(_)) => Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "cannot specify both --payload-json and --payload-file".to_string(),
+        ))),
+    }
+}
+
 fn execute_search(
     args: SearchArgs,
     store: &PlanningStore,
@@ -2350,6 +3148,28 @@ fn command_path(command: &Command) -> Vec<String> {
             "worktree".to_string(),
             worktree_command_name(command).to_string(),
         ],
+        Command::Graph { command } => match command {
+            GraphCommand::Node { command } => vec![
+                "graph".to_string(),
+                "node".to_string(),
+                graph_node_command_name(command).to_string(),
+            ],
+            GraphCommand::Edge { command } => vec![
+                "graph".to_string(),
+                "edge".to_string(),
+                graph_edge_command_name(command).to_string(),
+            ],
+            GraphCommand::Acceptance { command } => vec![
+                "graph".to_string(),
+                "acceptance".to_string(),
+                acceptance_command_name(command).to_string(),
+            ],
+            GraphCommand::Evidence { command } => vec![
+                "graph".to_string(),
+                "evidence".to_string(),
+                evidence_command_name(command).to_string(),
+            ],
+        },
     }
 }
 
@@ -2412,6 +3232,47 @@ fn worktree_command_name(command: &WorktreeCommand) -> &'static str {
         WorktreeCommand::Attach(_) => "attach",
         WorktreeCommand::Archive(_) => "archive",
         WorktreeCommand::CleanupIntent(_) => "cleanup-intent",
+    }
+}
+
+fn graph_node_command_name(command: &GraphNodeCommand) -> &'static str {
+    match command {
+        GraphNodeCommand::Create(_) => "create",
+        GraphNodeCommand::Show(_) => "show",
+        GraphNodeCommand::List(_) => "list",
+        GraphNodeCommand::Status(_) => "status",
+        GraphNodeCommand::Revise(_) => "revise",
+        GraphNodeCommand::Finalize(_) => "finalize",
+    }
+}
+
+fn graph_edge_command_name(command: &GraphEdgeCommand) -> &'static str {
+    match command {
+        GraphEdgeCommand::Create(_) => "create",
+        GraphEdgeCommand::Show(_) => "show",
+        GraphEdgeCommand::List(_) => "list",
+        GraphEdgeCommand::Incoming(_) => "incoming",
+        GraphEdgeCommand::Outgoing(_) => "outgoing",
+        GraphEdgeCommand::Status(_) => "status",
+        GraphEdgeCommand::Revise(_) => "revise",
+    }
+}
+
+fn acceptance_command_name(command: &AcceptanceCommand) -> &'static str {
+    match command {
+        AcceptanceCommand::Create(_) => "create",
+        AcceptanceCommand::Show(_) => "show",
+        AcceptanceCommand::List(_) => "list",
+        AcceptanceCommand::Satisfy(_) => "satisfy",
+    }
+}
+
+fn evidence_command_name(command: &EvidenceCommand) -> &'static str {
+    match command {
+        EvidenceCommand::Create(_) => "create",
+        EvidenceCommand::Show(_) => "show",
+        EvidenceCommand::List(_) => "list",
+        EvidenceCommand::Attach(_) => "attach",
     }
 }
 
@@ -2628,6 +3489,23 @@ fn is_command_mutation(command: &Command) -> bool {
             WorktreeCommand::Attach(_)
                 | WorktreeCommand::Archive(_)
                 | WorktreeCommand::CleanupIntent(_)
+        ),
+        Command::Graph { command } => matches!(
+            command,
+            GraphCommand::Node {
+                command: GraphNodeCommand::Create(_)
+                    | GraphNodeCommand::Status(_)
+                    | GraphNodeCommand::Revise(_)
+                    | GraphNodeCommand::Finalize(_)
+            } | GraphCommand::Edge {
+                command: GraphEdgeCommand::Create(_)
+                    | GraphEdgeCommand::Status(_)
+                    | GraphEdgeCommand::Revise(_)
+            } | GraphCommand::Acceptance {
+                command: AcceptanceCommand::Create(_) | AcceptanceCommand::Satisfy(_)
+            } | GraphCommand::Evidence {
+                command: EvidenceCommand::Create(_) | EvidenceCommand::Attach(_)
+            }
         ),
         // Read-only commands
         Command::Validate { .. }

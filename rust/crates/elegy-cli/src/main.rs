@@ -59,7 +59,7 @@ use elegy_tooling::{
     generate_codex_plugin_from_package_file, generate_skills_from_descriptor_file,
     inspect_plugin_package, pack_plugin_package, project_plugin_for_host, scaffold_plugin_package,
     verify_plugin_package, DocsCheckReport, DocsCreateResult, DocsIndexResult, DocsInitResult,
-    GeneratedCodexPluginArtifacts, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
+    GeneratedHostExport, GeneratedSkillArtifacts, HostTarget, NewDocRequest,
     PluginTemplateKind, ToolingError as ToolingSurfaceError,
 };
 
@@ -272,7 +272,7 @@ enum ConfigurationCommand {
 enum PluginCommand {
     /// Create a new plugin package from a template
     New {
-        /// Template kind: skill-only, cli-tool, mcp-tool, configuration, mixed, rust-cli, rust-harness
+        /// Template kind: skill-only, cli-tool, configuration, mixed, rust-cli, rust-harness
         #[arg(long)]
         template: String,
         /// Output directory for the new plugin package
@@ -322,16 +322,16 @@ enum PluginCommand {
         #[arg(long)]
         output: PathBuf,
     },
-    /// Project a plugin package for a specific host
-    Project {
+    /// Export a plugin package for a specific host
+    Export {
         #[command(subcommand)]
-        command: PluginProjectCommand,
+        command: PluginExportCommand,
     },
 }
 
 #[derive(Subcommand, Debug)]
-enum PluginProjectCommand {
-    /// Project a plugin package as a Codex plugin
+enum PluginExportCommand {
+    /// Export a plugin package as a Codex plugin
     Codex {
         /// Path to the plugin package JSON file
         #[arg(long)]
@@ -343,15 +343,15 @@ enum PluginProjectCommand {
         #[arg(long)]
         force: bool,
     },
-    /// Project a plugin package for a specific host
+    /// Export a plugin package for a specific host
     Host {
-        /// Target host: holon, opencode, or generic
+        /// Target host: opencode
         #[arg(long)]
         host: String,
         /// Path to the plugin package JSON file
         #[arg(long)]
         package: PathBuf,
-        /// Output directory for the host projection
+        /// Output directory for the host export
         #[arg(long)]
         output_dir: PathBuf,
         /// Force overwrite existing output
@@ -1676,21 +1676,20 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
             command: PluginCommand::Pack { source, output },
         } => execute_plugin_pack_command(source, output, format),
         Command::Plugin {
-            command:
-                PluginCommand::Project {
-                    command:
-                        PluginProjectCommand::Codex {
-                            package,
-                            output_dir,
-                            force,
-                        },
-                },
+            command: PluginCommand::Export {
+                command:
+                    PluginExportCommand::Codex {
+                        package,
+                        output_dir,
+                        force,
+                    },
+            },
         } => execute_generate_codex_plugin_command(package, output_dir, force, format),
         Command::Plugin {
             command:
-                PluginCommand::Project {
+                PluginCommand::Export {
                     command:
-                        PluginProjectCommand::Host {
+                        PluginExportCommand::Host {
                             host,
                             package,
                             output_dir,
@@ -1698,7 +1697,7 @@ async fn run() -> Result<ExitCode, serde_json::Error> {
                             package_root,
                         },
                 },
-        } => execute_plugin_project_host_command(
+        } => execute_plugin_export_host_command(
             host,
             package,
             output_dir,
@@ -2203,7 +2202,7 @@ fn execute_generate_codex_plugin_command(
     match generate_codex_plugin_from_package_file(&package, &output_dir, force) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Text => print_generated_host_export_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
                     ["generate", "codex-plugin"],
                     "ok",
@@ -2225,6 +2224,14 @@ fn execute_plugin_new_command(
     output: PathBuf,
     format: OutputFormat,
 ) -> Result<ExitCode, serde_json::Error> {
+    // `elegy plugin new` is the scaffolder lane. It writes a starter file set;
+    // the author hand-fills the schema-required fields and iterates against
+    // `elegy plugin verify`. The future host-driven authoring lane
+    // (`elegy plugin author`, `elegy plugin doctor`, `definitionRef`
+    // resolution in the validator) is a deferred goal; see
+    // `docs/issues/unresolved-goals.md` GOAL-20260616-01. It does not
+    // conflict with this command — the scaffolder remains the lowest-friction
+    // starting point even after the authoring lane lands.
     let template_kind = match PluginTemplateKind::from_str(&template) {
         Ok(kind) => kind,
         Err(error) => {
@@ -2394,7 +2401,6 @@ fn execute_plugin_inspect_command(
                         "Capability Projections: {}",
                         summary["capabilityProjectionCount"]
                     );
-                    println!("MCP Projections: {}", summary["mcpProjectionCount"]);
                     println!(
                         "Configuration Templates: {}",
                         summary["configurationTemplateCount"]
@@ -2445,7 +2451,7 @@ fn execute_plugin_pack_command(
     }
 }
 
-fn execute_plugin_project_host_command(
+fn execute_plugin_export_host_command(
     host: String,
     package: PathBuf,
     output_dir: PathBuf,
@@ -2456,7 +2462,7 @@ fn execute_plugin_project_host_command(
     let host_target = match HostTarget::from_str(&host) {
         Ok(target) => target,
         Err(error) => {
-            return emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}));
+            return emit_tooling_error(error, format, vec!["plugin", "export", "host"], json!({}));
         }
     };
 
@@ -2469,9 +2475,9 @@ fn execute_plugin_project_host_command(
     ) {
         Ok(result) => {
             match format {
-                OutputFormat::Text => print_generated_codex_plugin_text(&result),
+                OutputFormat::Text => print_generated_host_export_text(&result),
                 OutputFormat::Json => print_json(&build_envelope(
-                    ["plugin", "project", "host"],
+                    ["plugin", "export", "host"],
                     "ok",
                     Summary::default(),
                     result,
@@ -2481,7 +2487,7 @@ fn execute_plugin_project_host_command(
             Ok(ExitCode::SUCCESS)
         }
         Err(error) => {
-            emit_tooling_error(error, format, vec!["plugin", "project", "host"], json!({}))
+            emit_tooling_error(error, format, vec!["plugin", "export", "host"], json!({}))
         }
     }
 }
@@ -3476,8 +3482,8 @@ fn print_generated_skills_text(result: &GeneratedSkillArtifacts) {
     }
 }
 
-fn print_generated_codex_plugin_text(result: &GeneratedCodexPluginArtifacts) {
-    println!("generated Codex plugin projection");
+fn print_generated_host_export_text(result: &GeneratedHostExport) {
+    println!("generated host export");
     println!("source: {}", result.source_package);
     println!("plugin: {} {}", result.plugin_name, result.plugin_version);
     println!("manifest: {}", result.emitted_components.plugin_manifest);
@@ -3769,6 +3775,14 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
                     .with_hint("use supported doc type, status, owner, and slug values")
             })
             .collect(),
+        ToolingSurfaceError::InvalidGeneratorContract { path, issues } => issues
+            .into_iter()
+            .map(|issue| {
+                Diagnostic::error("CLI-GENERATOR-001", issue)
+                    .with_path(path.display().to_string())
+                    .with_hint("fix the generator contract so it matches the governed schema")
+            })
+            .collect(),
         ToolingSurfaceError::DuplicateSkillId { skill_id } => vec![Diagnostic::error(
             "CLI-SKILL-002",
             format!("duplicate generated skill ID detected: {skill_id}"),
@@ -3783,7 +3797,7 @@ fn tooling_error_diagnostics(error: ToolingSurfaceError) -> Vec<Diagnostic> {
             "CLI-PLUGIN-006",
             format!("unsupported host target: {host}"),
         )
-        .with_hint("valid targets: codex, holon, opencode, generic")],
+        .with_hint("valid targets: codex, opencode")],
     }
 }
 

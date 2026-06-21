@@ -1,12 +1,26 @@
-schemaVersion: elegy-docs/v1
-adrPath: docs/adr
-specPath: docs/specs
-indexPath: docs/docs-index.md
-requiredDocTriggers:
-- architecture-change
-- durable-decision
-- behavior-change
-- cross-repo-impact
-- onboarding-change
+schemaVersion: elegy-documentation/v2
+authorityRoots:
+  current:
+    - docs/adr
+    - docs/specs
+  planning: []
+  research: []
+  generated: []
+entrypoints:
+  - README.md
+derivedSurfaces:
+  sidebars: []
+  manifests: []
+  llms: []
+  bundles:
+    - docs/docs-index.md
+requiredFrontmatter:
+  - title
+  - status
+  - owner
+freshnessWarnings:
+  currentDays: 120
+  planningDays: 45
+  researchDays: 90
 localExceptions:
-- docs/specs/obsidian-skill-and-cli.md
+  - docs/specs/obsidian-skill-and-cli.md

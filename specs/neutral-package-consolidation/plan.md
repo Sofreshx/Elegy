@@ -1,4 +1,20 @@
+---
+spec_id: neutral-package-consolidation-plan
+title: Neutral Plugin And Distribution Consolidation — Implementation Plan
+status: historical
+type: migration-plan
+updated: 2026-06-16
+superseded_by: docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md
+---
+
 # Neutral Plugin And Distribution Consolidation — Implementation Plan
+
+> **Status: historical.** This plan is an archive of the implementation steps
+> that consolidated Elegy's V1/V2 schema split. The work is done. The current
+> schema at `contracts/schemas/elegy-plugin-package.schema.json` is the single
+> unified `elegy-plugin-package/v1`. See
+> [ADR](../../docs/adr/2026-06-16-elegy-plugin-package-v1-unification.md)
+> for the current decision record.
 
 ## Overview
 

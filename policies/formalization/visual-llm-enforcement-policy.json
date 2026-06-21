@@ -1,5 +1,5 @@
 {
-  "policyId": "visual-llm-formalization-enforcement",
+  "policyId": "workflow-branch-environment-precedence",
   "version": "1.0.0",
   "precedence": [
     "workflow",

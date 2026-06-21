@@ -15,7 +15,7 @@ Core model:
 - Rust implements reusable executable behavior over those artifacts
 - skill definitions are the discovery authority for agent capabilities
 - CLI invocation templates are the default execution boundary
-- generated mirrors, wrapper roots, Codex plugin projections, and MCP tool
+- generated mirrors, wrapper roots, Codex plugin exports, and MCP tool
   lists are derived adapter surfaces
 - MCP is an optional projection for MCP-native clients
 
@@ -24,10 +24,9 @@ Core model:
 | Area | Purpose |
 | --- | --- |
 | `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
-| `governance/`, `schemas/`, `policies/` | Version, inventory, schema-line, boundary, and formalization policy. |
+| `policies/` | Formalization policy. |
 | `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
 | `src/Elegy-*` | Contributor-navigation and wrapper-package overlays, not implementation roots. |
-| `.agents/skills/**`, `.github/skills/**` | Rendered skill mirrors for host and contributor routing. |
 | `artifacts/` | Generated bundles, archives, and validation outputs. |
 
 When those surfaces disagree, prefer the governed artifact roots and the
@@ -124,6 +123,8 @@ arguments.
 | `elegy-skills` | Dedicated governed skill registry CLI. |
 | `elegy-configuration` | Dedicated deterministic configuration materialization CLI. |
 | `elegy-documentation` | Dedicated documentation authority CLI. |
+| `elegy-memory-mcp-http` | Optional MCP-over-HTTP transport adapter for `elegy-memory` (OAuth 2.1 + bearer JWT). |
+| `elegy-memory-mcp-stdio` | Optional MCP-over-stdio transport adapter for `elegy-memory` (local subprocess). |
 
 ## Wrapper and Skill Surfaces
 
@@ -136,9 +137,10 @@ Most wrappers delegate to dedicated `elegy-*` Rust binaries. The current
 CLI and keeps Obsidian vault content non-authoritative. Durable planning state
 continues to live in `elegy-planning` and SQLite.
 
-Rendered `SKILL.md` files under `.agents/skills/**`, `.github/skills/**`, and
-wrapper-local `skills/**` directories are routing mirrors. The governed
-`contracts/fixtures/skill.*.json` files remain the skill authority.
+Rendered `SKILL.md` files under wrapper-local `skills/**` directories are routing
+mirrors. The governed `contracts/fixtures/skill.*.json` files remain the skill
+authority. Skill delivery uses plugin packages and host export; repo-local
+`.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
 
 ## Configuration Materialization
 
@@ -167,6 +169,52 @@ elegy-skills list --json
 elegy-skills search --query "repo status" --json
 elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
+
+## Plugin Packages
+
+> Note: the `elegy-codegraph` library crate is a separate portable codebase
+> graph extraction and query tool. It is **not** a plugin package and lives
+> under its own `contracts/schemas/elegy-codegraph.graph.v0.json` contract.
+
+`elegy-plugin-package/v1` is the portable package contract for bundling
+governed skill definitions, capability projections, tool requirements, and
+publishing metadata into a single host-facing surface. Plugin packages are the
+primary setup path for bringing governed capabilities to LLM hosts.
+
+Setup flow:
+
+```bash
+elegy plugin new --template cli-tool --output ./my-plugin
+# edit ./my-plugin/elegy-plugin-package.json
+elegy plugin verify --package ./my-plugin/elegy-plugin-package.json --json
+elegy plugin install-check --package ./my-plugin/elegy-plugin-package.json --install-receipt ./tools/elegy/install-receipt.json --json
+```
+
+`elegy plugin verify` checks package consistency against referenced skill
+definitions, capability projections, side-effect classes, and subset
+declarations. `elegy plugin install-check` checks declared tool requirements
+against an install receipt and optional binary probes. Both commands emit a
+readiness receipt (`ready` | `partial` | `blocked`) governed by
+`contracts/schemas/elegy-plugin-readiness-v1.schema.json`. The receipt is the
+machine-readable answer to "what can this package actually do on this host right
+now?"
+
+Authority schemas:
+
+- `contracts/schemas/elegy-plugin-package.schema.json` — package contract
+- `contracts/schemas/elegy-plugin.lock.json` — pinned contract bundle version
+- `contracts/schemas/elegy-plugin-readiness-v1.schema.json` — readiness receipt
+
+Boundaries: the package is a portable contract bundle, not a runtime,
+marketplace, auth store, approval record, or secret/session container. Hosts own
+install, auth, approvals, runtime sessions, and execution policy.
+
+See the [Elegy Plugin Package Model](docs/architecture/elegy-plugin-package-model.md)
+for the full model, and the [Plugin Tool Availability spec](docs/specs/plugin-tool-availability.md)
+for the verify-only contract rules.
+
+Host export (`elegy plugin export codex` / `elegy plugin export host`) is one optional derived
+projection target, not the main plugin setup path.
 
 ## Optional MCP Projection
 
@@ -219,7 +267,6 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```powershell
-pwsh ./scripts/validate-package-boundaries.ps1
 pwsh ./scripts/export-contracts.ps1
 pwsh ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
 ```

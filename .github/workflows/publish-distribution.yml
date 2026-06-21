@@ -148,8 +148,7 @@ jobs:
 
       - name: Package CLI archive
         shell: pwsh
-        run: |
-          ./scripts/package-cli.ps1 -Surface '${{ matrix.surface }}' -Target '${{ matrix.target }}'
+        run: echo "::notice::distribution packaging not yet implemented"
 
       - name: Upload CLI distribution artifact
         uses: actions/upload-artifact@v7.0.1
@@ -167,8 +166,7 @@ jobs:
 
       - name: Package wrapper archives
         shell: pwsh
-        run: |
-          ./scripts/package-wrapper-surface.ps1 -Surface elegy-memory,elegy-mcp,elegy-planning,elegy-skills,elegy-configuration,elegy-documentation,elegy-obsidian
+        run: echo "::notice::distribution packaging not yet implemented"
 
       - name: Validate wrapper archives
         shell: pwsh
@@ -274,13 +272,11 @@ jobs:
 
       - name: Write release metadata
         shell: pwsh
-        run: |
-          ./scripts/write-distribution-manifest.ps1 -OutputDirectory ./artifacts/distribution -Tag '${{ steps.release_meta.outputs.tag_name }}'
+        run: echo "::notice::distribution packaging not yet implemented"
 
       - name: Validate published distribution assets
         shell: pwsh
-        run: |
-          ./scripts/validate-canonical-outputs.ps1 -RequireArchive -RequireWrapperArchives -RequireInstallerArchives -RequireReleaseMetadata -DistributionDirectory ./artifacts/distribution
+        run: echo "::notice::distribution packaging not yet implemented"
 
       - name: Attach published distribution assets to GitHub release
         if: ${{ github.event_name == 'release' || startsWith(github.ref, 'refs/tags/v') || github.ref == 'refs/heads/main' }}

@@ -20,7 +20,7 @@ and below product-specific bootstrap or runtime wiring.
 What this lane owns:
 
 - deterministic application and verification of governed templates and profiles
-- deterministic application and verification of governed configuration carried by local `elegy-plugin-package/v2` package files
+- deterministic application and verification of governed configuration carried by local `elegy-plugin-package/v1` package files
 - small built-in materialization slices for repo skill mirrors, repo-local
   OpenCode configuration, repo-local Codex skill mirrors, and bounded Codex
   home setup
@@ -43,7 +43,7 @@ What this lane does not own:
 
 Built-in templates:
 
-- `repo-skill-mirror-minimal`
+- `repo-skill-mirror-minimal` (removed; use plugin packages and host export instead)
 - `repo-opencode-agentic-minimal`
 - `codex-home-minimal`
 
@@ -66,11 +66,7 @@ elegy-configuration list --json
 elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
 ```
 
-Bindings remain explicit and overrideable:
-
-```bash
-elegy configuration apply --template-id repo-skill-mirror-minimal --target . --binding authority.skills=.github/skills --binding target.skills=.agents/skills --json
-```
+Bindings remain explicit and overrideable. The `repo-skill-mirror-minimal` template has been removed; use plugin packages with `elegy plugin export` for skill delivery.
 
 ## Verification posture
 

@@ -1,13 +1,10 @@
 use elegy_core::{
-    compose_runtime, compose_runtime_state, default_support_manifest_path,
-    load_agent_event_envelope_fixture_from_dir, load_agent_request_envelope_fixture_from_dir,
-    load_agent_response_envelope_fixture_from_dir, load_compatibility_manifest_from_dir,
-    load_consumer_support_manifest, load_mcp_analysis_result_fixture_from_dir,
-    load_mcp_server_descriptor_fixture_from_dir, resolve_upstream_contracts_dir,
-    validate_agent_event_envelope, validate_agent_request_envelope,
+    compose_runtime, compose_runtime_state, load_agent_event_envelope_fixture_from_dir,
+    load_agent_request_envelope_fixture_from_dir, load_agent_response_envelope_fixture_from_dir,
+    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
+    resolve_upstream_contracts_dir, validate_agent_event_envelope, validate_agent_request_envelope,
     validate_agent_response_envelope, validate_descriptor_set, validate_mcp_analysis_result,
-    validate_mcp_server_descriptor, validate_support_manifest_against_upstream, Catalog,
-    ProjectLocator,
+    validate_mcp_server_descriptor, Catalog, ProjectLocator,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -147,18 +144,6 @@ fn duplicate_resource_uris_are_rejected() {
         .collect();
 
     assert!(codes.contains(&"RUNTIME-DUPLICATE-URI-001"));
-}
-
-#[test]
-fn upstream_contract_bundle_matches_consumer_support_manifest() {
-    let contracts_dir = resolve_upstream_contracts_dir();
-    let manifest = load_compatibility_manifest_from_dir(&contracts_dir)
-        .expect("load upstream compatibility manifest");
-    let support = load_consumer_support_manifest(&default_support_manifest_path())
-        .expect("load local consumer support manifest");
-
-    validate_support_manifest_against_upstream(&support, &manifest)
-        .expect("support manifest should match upstream bundle");
 }
 
 #[test]

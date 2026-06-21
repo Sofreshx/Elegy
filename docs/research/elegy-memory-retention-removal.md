@@ -5,7 +5,6 @@ This note is research-oriented guidance for contributors. It is not the canonica
 Canonical implemented truth stays in:
 
 - `contracts/`
-- `governance/`
 - [docs/architecture/elegy-memory-v1.md](../architecture/elegy-memory-v1.md)
 
 ## Why retain separate supersede and tombstone actions
