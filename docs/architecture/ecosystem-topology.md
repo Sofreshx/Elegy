@@ -17,14 +17,56 @@ The main goal is to keep Elegy reusable across Holon and non-Holon projects whil
 
 Its active design centers are:
 
-- governed schemas, fixtures, manifests, and policies rooted under `contracts/` and `policies/`
+- governed schemas, fixtures, manifests, and policy rooted under `contracts/`
 - the first-party Rust workspace under `rust/`, which owns the reusable executable and operator-facing surfaces
-
-Thin install passthroughs exist under `src/Elegy-*/install.ps1`; they are not repo centers, authority layers, implementation centers, or release surfaces.
 
 Legacy `src/`, `tests/`, solution files, and `.NET` package-family narratives are not active repo centers and should not be described as such in current docs.
 
 Historical `Elegy-Skills`, `Elegy-CLI`, and related sibling repos should be treated as archival or transition references rather than the current implementation home.
+
+### Repo layout
+
+```mermaid
+flowchart TD
+    subgraph governed["contracts/ — authored authority"]
+        schemas["schemas/\ncontract truth"]
+        fixtures["fixtures/\nDiscovery & examples"]
+        compat["compatibility/\nversion evidence"]
+        config["configuration/\ntemplates & profiles"]
+    end
+
+    subgraph rust["rust/ — reusable executable behavior (29 crates)"]
+        core["core/\n9 library crates"]
+        features["features/\n18 crates (8 lib+bin, 10 lib-only)"]
+        bin["bin/\n2 binary crates"]
+    end
+
+    subgraph docs["docs/ — governance & architecture"]
+        governance["governance/\nworkflow & policy"]
+        architecture["architecture/\ndesign decisions"]
+        adr["adr/\ndecision records"]
+        specs["specs/\nimplementation specs"]
+    end
+
+    subgraph derived["artifacts/ — generated outputs"]
+        bundles["contracts/\nexported handoff bundles"]
+        dist["distribution/\nrelease archives"]
+    end
+
+    subgraph ci[".github/workflows/ — CI orchestrator"]
+        orchestrator["publish-orchestrator.yml"]
+        reusable["_reusable-publish.yml"]
+    end
+
+    schemas --> fixtures
+    fixtures --> config
+    governed -->|"consumed by"| rust
+    rust -->|"generates"| derived
+    docs -->|"governs"| governed
+    docs -->|"governs"| rust
+    fixtures -->|"discovered by"| ci
+    ci -->|"builds & publishes"| derived
+```
 
 ## Repo centers
 
@@ -34,7 +76,7 @@ The durable authority in this repo is language-agnostic and lives in authored as
 
 - schemas and fixtures under `contracts/`
 - version and release policy under `contracts/schemas/`
-- formalization policy under `policies/`
+- operational policy (workflow, environment, branch enforcement modes) under `docs/governance/`
 - exported downstream handoff bundles under `artifacts/contracts`
 
 These assets are the source of truth for downstream consumers. They should be preferred over reviving a removed source-package tree.
@@ -68,7 +110,7 @@ What the repo proves today:
 - the in-repo `elegy-skills` surface is shipped as a thin dedicated wrapper over governed skill-registry access and validation
 - the in-repo `elegy-configuration` surface is shipped as a dedicated wrapper over governed template/profile flows
 - the in-repo `elegy-documentation` surface is shipped as a dedicated wrapper over documentation inspection, mapping, and non-authoritative export
-- those commands are backed by shared Rust crates led by `rust/crates/elegy-mcp`, `rust/crates/elegy-skills`, `rust/crates/elegy-planning`, and `rust/crates/elegy-tooling`
+- those commands are backed by shared Rust crates led by `rust/features/elegy-mcp`, `rust/features/elegy-skills`, `rust/features/elegy-planning`, and `rust/core/elegy-tooling`
 - the CLI also carries validation, inspection, and stdio-host startup entrypoints
 - contract bundles can be exported and consumed independently of the Rust workspace
 
@@ -93,22 +135,100 @@ If a capability can be represented as schemas, fixtures, manifests, compatibilit
 
 If a capability depends on host-specific auth, persistence, UI, HTTP endpoints, DI composition, tenant policy, or app orchestration, it belongs in the consuming repo rather than in Elegy.
 
+### Contract authority chain
+
+How governed artifacts flow from authored truth to host consumption:
+
+```mermaid
+flowchart LR
+    subgraph authored["Authored authority"]
+        schemas["contracts/schemas/\nschema truth"]
+        fixtures["contracts/fixtures/\ngoverned examples"]
+    end
+
+    subgraph package["Plugin package"]
+        pkg_json["elegy-plugin-package.json\n+ elegy-plugin.lock.json"]
+        skills["Skill definitions\n+ capability projections\n+ tool requirements"]
+    end
+
+    subgraph installed["Installed surface"]
+        receipt["install-receipt.json\nverification evidence"]
+        bin_dir["bin/\ninstalled binaries"]
+    end
+
+    subgraph host["Host consumption"]
+        registry["Host tool registry\nexecution policy"]
+        llm["LLM tool calling\nagent-facing schema"]
+    end
+
+    schemas --> fixtures
+    schemas --> pkg_json
+    fixtures --> skills
+    pkg_json --> skills
+    skills --> receipt
+    receipt --> registry
+    registry --> llm
+    pkg_json --> bin_dir
+    bin_dir --> registry
+```
+
 ## Dependency shape across the repo
 
 The dependency direction should remain one-way:
 
-1. governed artifacts and policies at the bottom
+1. governed artifacts and operational policy at the bottom
 2. Rust contract consumers and policy crates above those authored assets
 3. runtime-composition and adapter crates above the contract and policy layer
 4. operator surfaces such as `elegy-cli` and `elegy-host-mcp` on top
 5. downstream apps consuming exported bundles, explicit Rust crates, or CLI outputs
 
 That means:
-
-- contracts and policies define the durable boundary
+- contracts and operational policy define the durable boundary
 - Rust crates consume governed artifacts rather than redefining them
 - operator shells remain thin over explicit runtime and tooling crates
 - docs must not imply a removed source-package center just because downstream consumers may still be `.NET`
+
+### Authority hierarchy
+
+The five-layer dependency stack, bottom-up:
+
+```mermaid
+flowchart TB
+    subgraph L0["L0 — Governed artifacts"]
+        schemas["contracts/schemas/\nschema truth"]
+        fixtures["contracts/fixtures/\ndiscovery authority"]
+        policy["docs/governance/\nworkflow policy"]
+    end
+
+    subgraph L1["L1 — Core Rust crates"]
+        contracts["elegy-contracts\nelegy-policy\nelegy-descriptor"]
+        runtime["elegy-runtime\nelegy-core"]
+        tooling["elegy-tooling\nelegy-mcp"]
+    end
+
+    subgraph L2["L2 — Feature crates"]
+        memory["elegy-memory\nelegy-planning"]
+        skills["elegy-skills\nelegy-configuration"]
+        docs_feat["elegy-documentation"]
+        other["elegy-observe\nelegy-mermaid\nelegy-diagram\n..."]
+    end
+
+    subgraph L3["L3 — Operator surfaces"]
+        cli["elegy-cli\numbrella CLI"]
+        host["elegy-host-mcp\nstdio host"]
+        dedicated["elegy-memory\nelegy-planning\nelegy-skills\n..."]
+    end
+
+    subgraph L4["L4 — CI & consumers"]
+        ci["publish-orchestrator\nreusable-publish"]
+        consumers["host consumers\ndownstream repos"]
+    end
+
+    L0 --> L1
+    L1 --> L2
+    L2 --> L3
+    L3 --> L4
+```
 
 ## Consumer guidance
 
@@ -136,6 +256,5 @@ For now, the most coherent working model is:
 - `Elegy` is the single active repo
 - governed authority lives in root artifact and policy directories, not in a removed `.NET` source tree
 - `rust/` is the first-party home for reusable executable surfaces, especially CLI, MCP analysis, descriptor tooling, policy-bounded runtime composition, and host layers
-- `src/Elegy-*/install.ps1` are thin install passthroughs only, not revived package-family centers
 - the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through both the umbrella `elegy` surface and the dedicated `elegy-mcp` / `elegy-skills` binaries
 - built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

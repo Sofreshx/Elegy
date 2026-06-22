@@ -1,0 +1,89 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.configuration-plugin",
+    "name": "elegy-configuration",
+    "version": "0.1.0",
+    "displayName": "Elegy Configuration Plugin"
+  },
+  "metadata": {
+    "description": "Portable deterministic configuration materialization plugin. Wraps the reusable apply/verify behavior over contracts/configuration/* templates and profiles.",
+    "tags": ["configuration", "materialization", "deterministic", "plugin"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/anomalyco/elegy/blob/main/rust/features/elegy-configuration/docs/architecture/ARCHITECTURE.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "configuration-skill",
+        "definitionRef": "skill.elegy-configuration.json"
+      }
+    ],
+    "capabilityProjections": [
+      {
+        "id": "configuration-apply-cli",
+        "skill": "elegy.configuration",
+        "capability": "configuration-apply",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "disk_write",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "configuration_apply"
+        }
+      },
+      {
+        "id": "configuration-verify-cli",
+        "skill": "elegy.configuration",
+        "capability": "configuration-verify",
+        "lane": "subprocess",
+        "supportsDryRun": true,
+        "sideEffectClass": "read_only",
+        "projection": {
+          "projections": ["function_calling", "cli"],
+          "functionName": "configuration_verify"
+        }
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-configuration",
+        "cliBinary": "elegy-configuration",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Configuration CLI for deterministic template and profile materialization."
+      }
+    ],
+    "docs": [
+      {
+        "id": "configuration-architecture",
+        "path": "rust/features/elegy-configuration/docs/architecture/ARCHITECTURE.md"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "disk_write",
+    "requiresApproval": false,
+    "policyTags": ["configuration-authority", "deterministic-materialization"]
+  },
+  "publishing": {
+    "cratePath": "elegy-configuration",
+    "assetKind": "wrapper",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-configuration-wrapper",
+    "assetPrefix": "elegy-configuration-wrapper",
+    "skillBridge": "skills/elegy-configuration/SKILL.md",
+    "installer": "install.sh",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

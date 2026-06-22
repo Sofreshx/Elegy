@@ -1,4 +1,11 @@
-name: Repo Boundaries
+﻿name: Repo Boundaries
+
+# Validates that the contract bundle is internally consistent and that the
+# Rust workspace + docs surface still agree with the governed artifacts.
+# This replaces the legacy `scripts/validate-canonical-outputs.ps1` and
+# `scripts/export-contracts.ps1` flow; the new entry point is
+# `elegy-cli contracts validate`, which is itself backed by the
+# conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`.
 
 on:
   pull_request:
@@ -15,21 +22,24 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  validate-canonical-outputs:
+  contracts-validate:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6.0.2
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.95.0
+        uses: dtolnay/rust-toolchain@1.96.0
 
-      - name: Export contracts artifacts
-        shell: pwsh
-        run: |
-          ./scripts/export-contracts.ps1
+      - name: Cache Rust build
+        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> rust/target
 
-      - name: Validate canonical outputs
-        shell: pwsh
-        run: |
-          ./scripts/validate-canonical-outputs.ps1 -RequireGeneratedOutputs
+      - name: Validate contracts (canonical)
+        working-directory: ./rust
+        run: cargo run -p elegy-cli -- contracts validate --project ..
+
+      - name: Validate contracts (conformance)
+        working-directory: ./rust
+        run: cargo test -p elegy-contracts --test conformance -- --nocapture

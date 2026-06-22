@@ -67,7 +67,16 @@
     "docs": [
       {
         "id": "skills-readme",
-        "path": "rust/crates/elegy-skills/README.md"
+        "path": "rust/features/elegy-skills/README.md"
+      }
+    ],
+    "toolRequirements": [
+      {
+        "toolName": "elegy-skills",
+        "cliBinary": "elegy-skills",
+        "minVersion": "0.1.0",
+        "probeCommand": "--version",
+        "description": "Elegy Skills CLI for skill discovery, resolution, and validation."
       }
     ]
   },
@@ -75,6 +84,22 @@
     "sideEffectClass": "read_only",
     "requiresApproval": false,
     "policyTags": ["skill-registry", "read-only"]
+  },
+  "publishing": {
+    "cratePath": "elegy-skills",
+    "assetKind": "wrapper",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/anomalyco/elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-skills-wrapper",
+    "assetPrefix": "elegy-skills-wrapper",
+    "skillBridge": "skills/elegy-skills/SKILL.md",
+    "installer": "install.sh",
+    "prePublishHook": null,
+    "postPublishHook": null,
+    "targets": null
   },
   "elegyCompatibility": {
     "contractBundleVersion": "1.8.0",

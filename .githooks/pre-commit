@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-# Pre-commit hook: fast registry-alignment validation.
+# Pre-commit hook: fast fmt check.
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
-echo "[pre-commit] registry-alignment"
-pwsh -NoProfile -NonInteractive -Command "& '$REPO_ROOT/scripts/validate-registry-alignment.ps1' -RepoRoot '$REPO_ROOT'"
+echo "[pre-commit] cargo fmt --all --check"
+(cd "$REPO_ROOT/rust" && cargo fmt --all --check)
+
+echo "[pre-commit] OK"

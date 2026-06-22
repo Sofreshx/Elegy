@@ -86,7 +86,7 @@ next-runnable)
   dependencies. Do not attempt direct SQLite repair.
 - File-scope selector grammar: `<type>:<intent>:<selector>`. Types
   are `exact` or `glob`. Intents are `primary`, `review`, or
-  `affected`. Example: `--file-scope glob:primary:rust/crates/elegy-contracts/**`.
+  `affected`. Example: `--file-scope glob:primary:rust/core/elegy-contracts/**`.
 - `--status` on `*-update-status` accepts the entity's lifecycle
   states (e.g. `draft`, `proposed`, `active`, `validated`,
   `invalidated`, `superseded`, `abandoned` for goals). Do not
@@ -365,8 +365,8 @@ Expected: `status: "ok"`, `data.scopeMode = "all"`, `data.scopeKey = "all"`, fin
 - Governed source: `contracts/fixtures/skill.elegy-planning.json`.
 - Discovery projection:
   `contracts/fixtures/skill-discovery-index.elegy-planning.json`.
-- Architecture: `docs/architecture/elegy-planning-v1.md`.
-- Spec: `docs/specs/elegy-planning.md`.
+- Architecture: `rust/features/elegy-planning/docs/architecture/v1.md`.
+- Spec: `rust/features/elegy-planning/docs/specs/index.md`.
 - Result envelope schema:
   `contracts/schemas/planning-result.schema.json`.
 - Companion: `elegy-doc-practices` for cross-repo documentation

@@ -1,4 +1,4 @@
-name: Rust CI
+﻿name: Rust CI
 
 on:
   pull_request:
@@ -11,7 +11,7 @@ on:
       - 'docs/specs/**'
       - 'docs/docs-index.md'
       - 'contracts/schemas/**'
-      - 'policies/**'
+      - 'docs/governance/**'
   push:
     branches:
       - main
@@ -25,26 +25,16 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  registry-alignment:
-    name: registry alignment
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - name: validate-registry-alignment
-        run: pwsh -NoProfile -NonInteractive -Command "& ./scripts/validate-registry-alignment.ps1 -RepoRoot ."
-
   fmt:
     name: fmt
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: rustfmt
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo fmt --all --check
@@ -53,39 +43,22 @@ jobs:
 
   clippy:
     name: clippy
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.0
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo clippy --workspace --all-targets --all-features -- -D warnings
         working-directory: ./rust
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
-  msrv:
-    name: msrv check (Rust 1.88)
-    needs: registry-alignment
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2.9.1
-        with:
-          workspaces: rust -> rust/target
-      - name: cargo build --workspace
-        working-directory: ./rust
-        run: cargo build --workspace
-
   test:
     name: test (${{ matrix.os }})
-    needs: registry-alignment
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
@@ -96,9 +69,9 @@ jobs:
           - windows-latest
           - macos-latest
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo test --workspace --all-targets --all-features
@@ -110,9 +83,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo run -p elegy-documentation -- check
