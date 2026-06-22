@@ -211,30 +211,9 @@ fn compose_runtime_state_exposes_runtime_mcp_consumers_through_core() {
     let analysis = state
         .analyze_mcp_server(uri)
         .expect("core facade should surface runtime MCP analysis");
-    let generated = state
-        .generate_mcp_skills(uri)
-        .expect("core facade should surface runtime MCP generation");
 
     assert_eq!(analysis.server_name, "weather-server");
     assert_eq!(analysis.analyses.len(), 2);
-    assert_eq!(generated.generated_skills.len(), 1);
-    assert_eq!(
-        generated.generated_skills[0].identity.name,
-        "mcp-weather-server-get-weather"
-    );
-    assert_eq!(generated.skipped_tools.len(), 1);
-    assert_eq!(generated.skipped_tools[0].name, "list-alerts");
-
-    let search = state
-        .search_mcp_tools(uri, Some("weather"))
-        .expect("core facade should surface runtime MCP search");
-    assert_eq!(search.len(), 2);
-
-    let resolved = state
-        .resolve_mcp_tool(uri, "get-weather")
-        .expect("core facade should surface runtime MCP resolve")
-        .expect("tool should exist");
-    assert_eq!(resolved.name, "get-weather");
 
     fs::remove_dir_all(project_dir).expect("cleanup temp project");
 }

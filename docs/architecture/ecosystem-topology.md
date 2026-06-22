@@ -55,7 +55,6 @@ flowchart TD
 
     subgraph ci[".github/workflows/ — CI orchestrator"]
         orchestrator["publish-orchestrator.yml"]
-        reusable["_reusable-publish.yml"]
     end
 
     schemas --> fixtures
