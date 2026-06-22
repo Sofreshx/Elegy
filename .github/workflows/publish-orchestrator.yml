@@ -1,31 +1,283 @@
 name: Publish Orchestrator
+
 on:
   workflow_dispatch:
   push:
-    tags: ['v*']
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: publish-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  discover-surfaces:
+  discover:
+    name: discover CLI surfaces
     runs-on: ubuntu-latest
     outputs:
-      surfaces: ${{ steps.discover.outputs.surfaces }}
+      matrix: ${{ steps.discover.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6.0.2
       - id: discover
+        shell: bash
         run: |
-          SURFACES=$(jq -c '.surfaces' distribution/surfaces.json)
-          echo "surfaces=$SURFACES" >> $GITHUB_OUTPUT
+          set -euo pipefail
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_crate: .crate, archiveFamily: .archiveFamily}]' distribution/surfaces.json)"
+          targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
+          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+
   build:
-    needs: discover-surfaces
-    runs-on: ubuntu-latest
+    name: build (${{ matrix.surface_name }}, ${{ matrix.target }})
+    needs: discover
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        surface: ${{ fromJson(needs.discover-surfaces.outputs.surfaces) }}
+        include: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build
-        if: matrix.surface.kind == 'cli'
-        run: cargo build -p ${{ matrix.surface.crate }} --release
-      - name: Test
-        if: matrix.surface.kind == 'cli'
-        run: cargo test -p ${{ matrix.surface.crate }}
+      - uses: actions/checkout@v6.0.2
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: ${{ matrix.target }}
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: rust -> rust/target
+
+      - name: cargo build --release
+        working-directory: ./rust
+        run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_crate }}
+
+      - name: Stage archive
+        id: stage
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive_name="${{ matrix.archiveFamily }}-${{ matrix.target }}-${{ github.sha }}"
+          staging="artifacts/distribution/${archive_name}"
+          mkdir -p "$staging"
+          binary_dir="rust/target/${{ matrix.target }}/release"
+          if [[ ! -d "$binary_dir" ]]; then
+            echo "Missing build output: $binary_dir" >&2
+            exit 1
+          fi
+          cp "$binary_dir"/* "$staging"/ 2>/dev/null || true
+          (cd "$staging" && tar -a -cf "../${archive_name}.zip" .)
+          echo "asset=${archive_name}.zip" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: ${{ matrix.surface_name }}-${{ matrix.target }}-${{ github.sha }}
+          if-no-files-found: error
+          path: artifacts/distribution/${{ steps.stage.outputs.asset }}
+
+  export-contracts:
+    name: export contracts bundle
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: rust -> rust/target
+
+      - name: Validate contracts (canonical)
+        working-directory: ./rust
+        run: cargo run -p elegy-cli -- contracts validate --project ..
+
+      - name: Export contracts bundle
+        working-directory: ./rust
+        run: cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
+
+      - name: Upload contracts distribution archive
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: elegy-contracts-${{ github.sha }}
+          if-no-files-found: error
+          path: artifacts/distribution/elegy-contracts-bundle.zip
+
+  package-installer:
+    name: package installer bootstrap
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Package installer archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          staging="$(mktemp -d)"
+          mkdir -p "artifacts/distribution"
+          cp scripts/install-distribution.sh "$staging/install.sh"
+          cp scripts/install-distribution.ps1 "$staging/install.ps1"
+          cp PACKAGE_README.md "$staging/README.md"
+          (cd "$staging" && zip -r "${GITHUB_WORKSPACE}/artifacts/distribution/elegy-installer-${bundle_version}.zip" .)
+
+      - name: Upload installer distribution artifact
+        uses: actions/upload-artifact@v7.0.1
+        with:
+          name: elegy-installer-${{ github.sha }}
+          if-no-files-found: error
+          path: artifacts/distribution/elegy-installer-*.zip
+
+  publish:
+    name: publish to GitHub Releases
+    needs:
+      - build
+      - export-contracts
+      - package-installer
+    runs-on: ubuntu-latest
+    if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Download all assets
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: "*-${{ github.sha }}"
+          path: artifacts/distribution
+          merge-multiple: true
+
+      - name: Resolve release tag
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            echo "tag_name=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag_name=main-snapshot" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Ensure release exists
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+          PRERELEASE: ${{ steps.release_meta.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          if gh release view "${RELEASE_TAG}" >/dev/null 2>&1; then
+            exit 0
+          fi
+          if [[ "${PRERELEASE}" == "true" ]]; then
+            gh release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --prerelease --notes "Automated snapshot from ${GITHUB_REF}"
+          else
+            gh release create "${RELEASE_TAG}" --title "${RELEASE_TAG}" --notes "Automated release from ${GITHUB_REF}"
+          fi
+
+      - name: Compose manifest + checksums
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/distribution
+          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
+          checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
+
+          mapfile -t zip_files < <(find artifacts/distribution -maxdepth 1 -type f -name '*.zip' | sort)
+          if [[ "${#zip_files[@]}" -eq 0 ]]; then
+            echo "No release archives were staged." >&2
+            exit 1
+          fi
+
+          assets_json='[]'
+          published_targets_json='[]'
+          for file in "${zip_files[@]}"; do
+            base="$(basename "$file")"
+            size="$(stat -c%s "$file")"
+            sha="$(sha256sum "$file" | awk '{print $1}')"
+
+            if [[ "$base" == "elegy-contracts-bundle.zip" ]]; then
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" == elegy-installer-*.zip ]]; then
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)-[0-9a-f]{40}\.zip$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .archiveFamily == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"cli",surface:$sf,target:$tg,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+            else
+              echo "Unexpected release archive name: $base" >&2
+              exit 1
+            fi
+
+            assets_json="$(jq -nc --argjson current "$assets_json" --argjson entry "$asset_entry" '$current + [$entry]')"
+          done
+
+          jq -nc \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg tag "${RELEASE_TAG}" \
+            --arg bundleVersion "${bundle_version}" \
+            --argjson publishedTargets "$published_targets_json" \
+            --argjson assets "$assets_json" \
+            '{
+              documentType: "elegy-release-manifest",
+              schemaVersion: "elegy-release-manifest/v1",
+              repository: $repository,
+              tag: $tag,
+              bundleVersion: $bundleVersion,
+              publishedTargets: $publishedTargets,
+              assets: $assets
+            }' > "$manifest_path"
+
+          entries_json="$(jq -nc --argjson assets "$assets_json" '$assets | map({fileName, sizeBytes, sha256})')"
+          manifest_size="$(stat -c%s "$manifest_path")"
+          manifest_sha="$(sha256sum "$manifest_path" | awk '{print $1}')"
+          entries_json="$(jq -nc --argjson current "$entries_json" --arg fn "$(basename "$manifest_path")" --arg sha "$manifest_sha" --argjson sz "$manifest_size" '$current + [{fileName:$fn,sizeBytes:$sz,sha256:$sha}]')"
+
+          jq -nc \
+            --arg tag "${RELEASE_TAG}" \
+            --argjson entries "$entries_json" \
+            '{
+              documentType: "elegy-release-checksums",
+              schemaVersion: "elegy-release-checksums/v1",
+              tag: $tag,
+              algorithm: "sha256",
+              entries: $entries
+            }' > "$checksums_path"
+
+      - name: Upload release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          while IFS=$'\t' read -r asset_id asset_name; do
+            case "$asset_name" in
+              *.zip|elegy-release-manifest-*.json|elegy-release-checksums-*.json)
+                gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
+                ;;
+            esac
+          done < <(
+            gh api --paginate \
+              "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
+              --jq '.[] | [.id, .name] | @tsv'
+          )
+          mapfile -t assets < <(find artifacts/distribution -maxdepth 1 -type f \( -name '*.zip' -o -name 'elegy-release-*.json' \) | sort)
+          gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber

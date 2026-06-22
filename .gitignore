@@ -60,4 +60,7 @@ signing-key
 clients.json
 refresh-tokens.json
 
+# Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
+C*
+
 

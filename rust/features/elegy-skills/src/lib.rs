@@ -360,9 +360,8 @@ fn score_skill_match(skill: &LoadedSkill, query_lower: &str) -> RegistrySearchMa
     if query_tokens.len() > 1 {
         let mut token_hits = 0u32;
         for token in &query_tokens {
-            if id_lower.contains(token) || name_lower.contains(token) {
-                token_hits += 1;
-            } else if desc_lower.contains(token) {
+            if id_lower.contains(token) || name_lower.contains(token) || desc_lower.contains(token)
+            {
                 token_hits += 1;
             }
         }

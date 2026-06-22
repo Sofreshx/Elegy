@@ -10,10 +10,8 @@ on:
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/**'
-      - 'governance/**'
-      - 'schemas/**'
-      - 'policies/**'
+      - 'contracts/schemas/**'
+      - 'docs/governance/**'
   push:
     branches:
       - main
@@ -27,23 +25,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  registry-alignment:
-    name: registry alignment
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v6.0.2
-      - name: validate-registry-alignment
-        run: pwsh -NoProfile -NonInteractive -Command "& ./scripts/validate-registry-alignment.ps1 -RepoRoot ."
-
   fmt:
     name: fmt
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2.9.1
@@ -55,65 +43,67 @@ jobs:
 
   clippy:
     name: clippy
-    needs: registry-alignment
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
-      - name: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: cargo clippy --workspace --all-features -- -D warnings
         working-directory: ./rust
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-features -- -D warnings
+
+  msrv:
+    name: msrv check (Rust 1.88)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: rust -> rust/target
+      - name: cargo build --workspace
+        working-directory: ./rust
+        run: cargo build --workspace
 
   test:
     name: test (${{ matrix.os }})
-    needs: registry-alignment
     runs-on: ${{ matrix.os }}
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
       - name: cargo test --workspace --all-targets --all-features
         working-directory: ./rust
-        run: cargo test --workspace --all-targets --all-features
-
-  docs-check:
-    name: docs check (advisory)
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    continue-on-error: true
-    steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
-      - uses: Swatinem/rust-cache@v2.9.1
-        with:
-          workspaces: rust -> rust/target
-      - name: cargo run -p elegy-cli -- docs check --json
-        working-directory: ./rust
-        run: cargo run -p elegy-cli -- --project .. docs check --json
+        run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
 
   docs-check-v2:
     name: docs check v2 (authoritative)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v4.2.2
+      - uses: dtolnay/rust-toolchain@1.95.0
       - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target

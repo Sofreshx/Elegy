@@ -155,7 +155,8 @@ pub fn resolve_plugin_root(plugin_path: &Path) -> Result<(PathBuf, PathBuf), Too
             .and_then(|p| p.parent())
             .unwrap_or(Path::new("."));
         return Ok((repo_root.to_path_buf(), manifest));
-    } else if path.is_dir() && path.file_name().is_some_and(|n| n == ".elegy-plugin") {
+    }
+    if path.is_dir() && path.file_name().is_some_and(|n| n == ".elegy-plugin") {
         // .elegy-plugin directory
         let manifest = path.join("plugin.json");
         if !manifest.exists() {
@@ -170,26 +171,27 @@ pub fn resolve_plugin_root(plugin_path: &Path) -> Result<(PathBuf, PathBuf), Too
         }
         let repo_root = path.parent().unwrap_or(Path::new("."));
         return Ok((repo_root.to_path_buf(), manifest));
-    } else if path.is_dir() {
+    }
+    if path.is_dir() {
         // Repo root — look for .elegy-plugin/plugin.json
         let manifest = path.join(".elegy-plugin").join("plugin.json");
         if manifest.exists() {
             return Ok((path.to_path_buf(), manifest));
         }
-        return Err(ToolingError::Io {
+        Err(ToolingError::Io {
             operation: "resolve plugin root",
             path: path.to_path_buf(),
             source: std::io::Error::new(
                 std::io::ErrorKind::NotFound,
                 "No .elegy-plugin/plugin.json found in directory",
             ),
-        });
+        })
     } else {
-        return Err(ToolingError::Io {
+        Err(ToolingError::Io {
             operation: "resolve plugin path",
             path: path.to_path_buf(),
             source: std::io::Error::new(std::io::ErrorKind::NotFound, "Path does not exist"),
-        });
+        })
     }
 }
 
@@ -250,6 +252,19 @@ pub fn generate_skills_from_descriptor_file(
     let mut generated_skills = Vec::new();
     let mut skipped_tools = Vec::new();
     let mut written_files = Vec::new();
+
+    if let Some(output_dir) = output_dir.filter(|_| !overwrite) {
+        for tool_analysis in &analysis.analyses {
+            if !tool_analysis.has_valid_schema {
+                continue;
+            }
+            let skill_name = generated_skill_id(&analysis.server_name, &tool_analysis.tool.name);
+            let skill_path = output_dir.join(skill_name).join("SKILL.md");
+            if skill_path.exists() {
+                return Err(ToolingError::OutputExists { path: skill_path });
+            }
+        }
+    }
 
     // For each tool with a valid schema, generate a SKILL.md file
     for tool_analysis in &analysis.analyses {
@@ -746,10 +761,7 @@ jobs:
     written.push(display_path(&ci_path));
 
     // 10. Verify the generated plugin
-    let verify_result = verify_plugin_v1(&plugin_dir).map_err(|e| {
-        // Verification errors during scaffold are critical
-        e
-    })?;
+    let verify_result = verify_plugin_v1(&plugin_dir)?;
     if !verify_result.valid {
         return Err(ToolingError::InvalidPluginPackage {
             path: output_dir.to_path_buf(),
@@ -1105,7 +1117,7 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), ToolingError> {
         if ty.is_dir() {
             copy_dir_all(&entry.path(), &dst.join(entry.file_name()))?;
         } else if ty.is_file() {
-            fs::copy(&entry.path(), dst.join(entry.file_name())).map_err(|e| ToolingError::Io {
+            fs::copy(entry.path(), dst.join(entry.file_name())).map_err(|e| ToolingError::Io {
                 operation: "copy",
                 path: entry.path(),
                 source: e,
