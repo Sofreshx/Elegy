@@ -1,13 +1,14 @@
+#![allow(unreachable_patterns, dead_code)]
+
 use elegy_contracts::{
     validate_elegy_configuration_profile, validate_elegy_configuration_receipt,
-    validate_elegy_configuration_template, validate_elegy_plugin_package, ContractsError,
-    ElegyConfigurationAssetFamily, ElegyConfigurationOperation, ElegyConfigurationPathBase,
-    ElegyConfigurationPathRef, ElegyConfigurationProfile, ElegyConfigurationReceipt,
-    ElegyConfigurationReceiptAction, ElegyConfigurationReceiptEntry, ElegyConfigurationReceiptMode,
+    validate_elegy_configuration_template, ContractsError, ElegyConfigurationAssetFamily,
+    ElegyConfigurationOperation, ElegyConfigurationPathBase, ElegyConfigurationPathRef,
+    ElegyConfigurationProfile, ElegyConfigurationReceipt, ElegyConfigurationReceiptAction,
+    ElegyConfigurationReceiptEntry, ElegyConfigurationReceiptMode,
     ElegyConfigurationReceiptSourceKind, ElegyConfigurationReceiptSubjectKind,
-    ElegyConfigurationReceiptSummary, ElegyConfigurationTemplate, ElegyPluginPackage,
+    ElegyConfigurationReceiptSummary, ElegyConfigurationTemplate,
     ELEGY_CONFIGURATION_RECEIPT_SCHEMA_VERSION, ELEGY_CONFIGURATION_TEMPLATE_SCHEMA_VERSION,
-    ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION,
 };
 use serde::Serialize;
 use serde_json::Value;
@@ -87,17 +88,6 @@ pub enum ConfigurationError {
     UnknownBuiltinTemplate { template_id: String },
     #[error("unknown built-in profile '{profile_id}'")]
     UnknownBuiltinProfile { profile_id: String },
-    #[error("plugin package in {path} is invalid")]
-    InvalidPluginPackage { path: PathBuf, issues: Vec<String> },
-    #[error("plugin package in {path} requires schemaVersion '{required}'")]
-    UnsupportedPluginPackageVersion {
-        path: PathBuf,
-        required: &'static str,
-    },
-    #[error("plugin package in {path} does not contain configuration template '{template_id}'")]
-    UnknownPackageTemplate { path: PathBuf, template_id: String },
-    #[error("plugin package in {path} does not contain configuration profile '{profile_id}'")]
-    UnknownPackageProfile { path: PathBuf, profile_id: String },
     #[error("missing required binding '{binding_key}'")]
     MissingBinding { binding_key: String },
     #[error("template '{template_id}' references missing template root asset '{path}'")]
@@ -162,7 +152,6 @@ pub struct ApplyConfigurationRequest {
     pub dry_run: bool,
     pub force: bool,
     pub bindings: BTreeMap<String, String>,
-    pub package_path: Option<PathBuf>,
     pub template_id: Option<String>,
     pub template_path: Option<PathBuf>,
     pub profile_id: Option<String>,
@@ -173,7 +162,6 @@ pub struct ApplyConfigurationRequest {
 pub struct VerifyConfigurationRequest {
     pub target_root: PathBuf,
     pub bindings: BTreeMap<String, String>,
-    pub package_path: Option<PathBuf>,
     pub template_id: Option<String>,
     pub template_path: Option<PathBuf>,
     pub profile_id: Option<String>,
@@ -192,12 +180,6 @@ enum TemplateSource {
         template_root: PathBuf,
         template: ElegyConfigurationTemplate,
     },
-    Package {
-        package_path: PathBuf,
-        component_id: String,
-        template_root: PathBuf,
-        template: ElegyConfigurationTemplate,
-    },
 }
 
 impl TemplateSource {
@@ -205,7 +187,6 @@ impl TemplateSource {
         match self {
             Self::Builtin { .. } => ElegyConfigurationReceiptSourceKind::Builtin,
             Self::File { .. } => ElegyConfigurationReceiptSourceKind::File,
-            Self::Package { .. } => ElegyConfigurationReceiptSourceKind::Package,
         }
     }
 
@@ -213,27 +194,18 @@ impl TemplateSource {
         match self {
             Self::Builtin { id, .. } => id.clone(),
             Self::File { path, .. } => path.display().to_string(),
-            Self::Package {
-                package_path,
-                component_id,
-                ..
-            } => format!("{}#{}", package_path.display(), component_id),
         }
     }
 
     fn template(&self) -> &ElegyConfigurationTemplate {
         match self {
-            Self::Builtin { template, .. }
-            | Self::File { template, .. }
-            | Self::Package { template, .. } => template,
+            Self::Builtin { template, .. } | Self::File { template, .. } => template,
         }
     }
 
     fn template_root(&self) -> &Path {
         match self {
-            Self::Builtin { template_root, .. }
-            | Self::File { template_root, .. }
-            | Self::Package { template_root, .. } => template_root,
+            Self::Builtin { template_root, .. } | Self::File { template_root, .. } => template_root,
         }
     }
 }
@@ -249,12 +221,6 @@ enum ProfileSource {
         profile_root: PathBuf,
         profile: ElegyConfigurationProfile,
     },
-    Package {
-        package_path: PathBuf,
-        component_id: String,
-        profile_root: PathBuf,
-        profile: ElegyConfigurationProfile,
-    },
 }
 
 impl ProfileSource {
@@ -262,7 +228,6 @@ impl ProfileSource {
         match self {
             Self::Builtin { .. } => ElegyConfigurationReceiptSourceKind::Builtin,
             Self::File { .. } => ElegyConfigurationReceiptSourceKind::File,
-            Self::Package { .. } => ElegyConfigurationReceiptSourceKind::Package,
         }
     }
 
@@ -270,44 +235,21 @@ impl ProfileSource {
         match self {
             Self::Builtin { id, .. } => id.clone(),
             Self::File { path, .. } => path.display().to_string(),
-            Self::Package {
-                package_path,
-                component_id,
-                ..
-            } => format!("{}#{}", package_path.display(), component_id),
         }
     }
 
     fn profile(&self) -> &ElegyConfigurationProfile {
         match self {
-            Self::Builtin { profile, .. }
-            | Self::File { profile, .. }
-            | Self::Package { profile, .. } => profile,
+            Self::Builtin { profile, .. } | Self::File { profile, .. } => profile,
         }
     }
 
     fn profile_root(&self) -> Option<&Path> {
         match self {
             Self::Builtin { .. } => None,
-            Self::File { profile_root, .. } | Self::Package { profile_root, .. } => {
-                Some(profile_root)
-            }
+            Self::File { profile_root, .. } => Some(profile_root),
         }
     }
-
-    fn package_path(&self) -> Option<&Path> {
-        match self {
-            Self::Package { package_path, .. } => Some(package_path),
-            Self::Builtin { .. } | Self::File { .. } => None,
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
-struct PackageContext {
-    path: PathBuf,
-    root: PathBuf,
-    package: ElegyPluginPackage,
 }
 
 pub fn list_builtin_configuration_catalog() -> Result<ConfigurationCatalog, ConfigurationError> {
@@ -342,16 +284,15 @@ pub fn list_builtin_configuration_catalog() -> Result<ConfigurationCatalog, Conf
 }
 
 pub fn show_configuration_template(
-    package_path: Option<&Path>,
     template_id: Option<&str>,
     template_path: Option<&Path>,
 ) -> Result<ConfigurationShowResult, ConfigurationError> {
-    let template_source = resolve_template_source(package_path, template_id, template_path)?;
+    let template_source = resolve_template_source(template_id, template_path)?;
     Ok(ConfigurationShowResult {
         source_kind: match template_source.source_kind() {
             ElegyConfigurationReceiptSourceKind::Builtin => "builtin",
             ElegyConfigurationReceiptSourceKind::File => "file",
-            ElegyConfigurationReceiptSourceKind::Package => "package",
+            ElegyConfigurationReceiptSourceKind::Package => "file", // Package variant removed
         },
         source_ref: template_source.source_ref(),
         template: template_source.template().clone(),
@@ -362,7 +303,6 @@ pub fn apply_configuration(
     request: ApplyConfigurationRequest,
 ) -> Result<ElegyConfigurationReceipt, ConfigurationError> {
     let plan = resolve_subject(
-        request.package_path.as_deref(),
         request.template_id.as_deref(),
         request.template_path.as_deref(),
         request.profile_id.as_deref(),
@@ -378,7 +318,6 @@ pub fn verify_configuration(
     request: VerifyConfigurationRequest,
 ) -> Result<ElegyConfigurationReceipt, ConfigurationError> {
     let plan = resolve_subject(
-        request.package_path.as_deref(),
         request.template_id.as_deref(),
         request.template_path.as_deref(),
         request.profile_id.as_deref(),
@@ -412,7 +351,6 @@ enum PlannedSubject {
 }
 
 fn resolve_subject(
-    package_path: Option<&Path>,
     template_id: Option<&str>,
     template_path: Option<&Path>,
     profile_id: Option<&str>,
@@ -429,7 +367,7 @@ fn resolve_subject(
     }
 
     if template_selected {
-        let source = resolve_template_source(package_path, template_id, template_path)?;
+        let source = resolve_template_source(template_id, template_path)?;
         let resolved_bindings = resolve_bindings(source.template(), bindings)?;
         return Ok(PlannedSubject::Template {
             source,
@@ -437,7 +375,7 @@ fn resolve_subject(
         });
     }
 
-    let profile_source = resolve_profile_source(package_path, profile_id, profile_path)?;
+    let profile_source = resolve_profile_source(profile_id, profile_path)?;
     let mut planned_templates = Vec::new();
     for selection in &profile_source.profile().templates {
         let source = resolve_profile_template_source(&profile_source, selection)?;
@@ -1052,49 +990,37 @@ fn execute_verify_operation(
 }
 
 fn resolve_template_source(
-    package_path: Option<&Path>,
     template_id: Option<&str>,
     template_path: Option<&Path>,
 ) -> Result<TemplateSource, ConfigurationError> {
-    match (package_path, template_id, template_path) {
-        (Some(package_path), Some(id), None) => load_package_template(package_path, id),
-        (Some(_), None, Some(path)) => load_template_from_file(path),
-        (Some(_), None, None) => Err(ConfigurationError::Contracts(
+    match (template_id, template_path) {
+        (None, None) => Err(ConfigurationError::Contracts(
             "exactly one template selector must be provided".to_string(),
         )),
-        (Some(_), Some(_), Some(_)) => Err(ConfigurationError::Contracts(
-            "exactly one template selector must be provided".to_string(),
+        (Some(_), Some(_)) => Err(ConfigurationError::Contracts(
+            "exactly one template or file selector must be provided, not both".to_string(),
         )),
-        (None, Some(id), None) => load_builtin_template(id),
-        (None, None, Some(path)) => load_template_from_file(path),
-        _ => Err(ConfigurationError::Contracts(
-            "exactly one template selector must be provided".to_string(),
-        )),
+        (Some(id), None) => load_builtin_template(id),
+        (None, Some(path)) => load_template_from_file(path),
     }
 }
 
 fn resolve_profile_source(
-    package_path: Option<&Path>,
     profile_id: Option<&str>,
     profile_path: Option<&Path>,
 ) -> Result<ProfileSource, ConfigurationError> {
-    match (package_path, profile_id, profile_path) {
-        (Some(package_path), Some(id), None) => load_package_profile(package_path, id),
-        (Some(_), None, Some(path)) => load_profile_from_file(path),
-        (Some(_), None, None) => Err(ConfigurationError::Contracts(
+    match (profile_id, profile_path) {
+        (None, None) => Err(ConfigurationError::Contracts(
             "exactly one profile selector must be provided".to_string(),
         )),
-        (Some(_), Some(_), Some(_)) => Err(ConfigurationError::Contracts(
-            "exactly one profile selector must be provided".to_string(),
+        (Some(_), Some(_)) => Err(ConfigurationError::Contracts(
+            "exactly one profile or file selector must be provided, not both".to_string(),
         )),
-        (None, Some(id), None) => Ok(ProfileSource::Builtin {
+        (Some(id), None) => Ok(ProfileSource::Builtin {
             id: id.to_string(),
             profile: load_builtin_profile(id)?,
         }),
-        (None, None, Some(path)) => load_profile_from_file(path),
-        _ => Err(ConfigurationError::Contracts(
-            "exactly one profile selector must be provided".to_string(),
-        )),
+        (None, Some(path)) => load_profile_from_file(path),
     }
 }
 
@@ -1106,18 +1032,7 @@ fn resolve_profile_template_source(
         selection.template_id.as_deref(),
         selection.template_path.as_deref(),
     ) {
-        (Some(template_id), None) => {
-            if let Some(package_path) = profile_source.package_path() {
-                match load_package_template(package_path, template_id) {
-                    Ok(source) => return Ok(source),
-                    Err(ConfigurationError::UnknownPackageTemplate { .. }) => {
-                        return load_builtin_template(template_id)
-                    }
-                    Err(error) => return Err(error),
-                }
-            }
-            load_builtin_template(template_id)
-        }
+        (Some(template_id), None) => load_builtin_template(template_id),
         (None, Some(template_path)) => {
             let resolved_path = profile_source
                 .profile_root()
@@ -1242,119 +1157,6 @@ fn load_profile_from_file(path: &Path) -> Result<ProfileSource, ConfigurationErr
     Ok(ProfileSource::File {
         path: path.to_path_buf(),
         profile_root: path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-        profile,
-    })
-}
-
-fn load_package_context(path: &Path) -> Result<PackageContext, ConfigurationError> {
-    let content = fs::read_to_string(path).map_err(|source| ConfigurationError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    let package = serde_json::from_str::<ElegyPluginPackage>(&content).map_err(|source| {
-        ConfigurationError::Json {
-            path: path.to_path_buf(),
-            source,
-        }
-    })?;
-    let validation = validate_elegy_plugin_package(&package);
-    if !validation.is_valid() {
-        return Err(ConfigurationError::InvalidPluginPackage {
-            path: path.to_path_buf(),
-            issues: validation.issues,
-        });
-    }
-    if package.schema_version != ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION {
-        return Err(ConfigurationError::UnsupportedPluginPackageVersion {
-            path: path.to_path_buf(),
-            required: ELEGY_PLUGIN_PACKAGE_V1_SCHEMA_VERSION,
-        });
-    }
-
-    Ok(PackageContext {
-        path: path.to_path_buf(),
-        root: path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-        package,
-    })
-}
-
-fn load_package_template(
-    path: &Path,
-    template_id: &str,
-) -> Result<TemplateSource, ConfigurationError> {
-    let context = load_package_context(path)?;
-    let Some(component) = context
-        .package
-        .components
-        .configuration_templates
-        .iter()
-        .find(|component| component.id == template_id)
-    else {
-        return Err(ConfigurationError::UnknownPackageTemplate {
-            path: context.path.clone(),
-            template_id: template_id.to_string(),
-        });
-    };
-    let template_path = context.root.join(&component.path);
-    let content = fs::read_to_string(&template_path).map_err(|source| ConfigurationError::Io {
-        path: template_path.clone(),
-        source,
-    })?;
-    let template: ElegyConfigurationTemplate =
-        serde_json::from_str(&content).map_err(|source| ConfigurationError::Json {
-            path: template_path.clone(),
-            source,
-        })?;
-    validate_template_or_error(&template)?;
-    Ok(TemplateSource::Package {
-        package_path: context.path,
-        component_id: component.id.clone(),
-        template_root: template_path
-            .parent()
-            .unwrap_or_else(|| Path::new("."))
-            .to_path_buf(),
-        template,
-    })
-}
-
-fn load_package_profile(
-    path: &Path,
-    profile_id: &str,
-) -> Result<ProfileSource, ConfigurationError> {
-    let context = load_package_context(path)?;
-    let Some(component) = context
-        .package
-        .components
-        .configuration_profiles
-        .iter()
-        .find(|component| component.id == profile_id)
-    else {
-        return Err(ConfigurationError::UnknownPackageProfile {
-            path: context.path.clone(),
-            profile_id: profile_id.to_string(),
-        });
-    };
-    let profile_path = context.root.join(&component.path);
-    let content = fs::read_to_string(&profile_path).map_err(|source| ConfigurationError::Io {
-        path: profile_path.clone(),
-        source,
-    })?;
-    let profile: ElegyConfigurationProfile =
-        serde_json::from_str(&content).map_err(|source| ConfigurationError::Json {
-            path: profile_path.clone(),
-            source,
-        })?;
-    validate_profile_or_error(&profile)?;
-    Ok(ProfileSource::Package {
-        package_path: context.path,
-        component_id: component.id.clone(),
-        profile_root: profile_path
             .parent()
             .unwrap_or_else(|| Path::new("."))
             .to_path_buf(),
@@ -2142,7 +1944,6 @@ mod tests {
             dry_run: false,
             force: true,
             bindings: BTreeMap::new(),
-            package_path: None,
             template_id: None,
             template_path: None,
             profile_id: Some("repo-opencode-minimal".to_string()),
@@ -2168,7 +1969,6 @@ mod tests {
             dry_run: false,
             force: true,
             bindings: BTreeMap::new(),
-            package_path: None,
             template_id: Some("codex-home-minimal".to_string()),
             template_path: None,
             profile_id: None,
@@ -2183,104 +1983,6 @@ mod tests {
     }
 
     #[test]
-    fn apply_package_profile_resolves_package_template_paths() {
-        let temp = tempdir().expect("temp dir");
-        let root = temp.path();
-        let package_dir = root.join("package");
-        fs::create_dir_all(package_dir.join("configuration/assets")).expect("package dirs");
-        fs::write(
-            package_dir.join("configuration/template.json"),
-            r#"{
-  "schemaVersion": "elegy-configuration-template/v1",
-  "templateId": "demo-template",
-  "displayName": "Demo Template",
-  "scope": "repo",
-  "operations": [
-    {
-      "operationType": "copyFile",
-      "operationId": "copy-demo-file",
-      "family": "support-file",
-      "source": {
-        "base": "template-root",
-        "path": "assets/demo.txt"
-      },
-      "destination": {
-        "base": "target-root",
-        "path": "generated/demo.txt"
-      }
-    }
-  ]
-}"#,
-        )
-        .expect("write template");
-        fs::write(
-            package_dir.join("configuration/profile.json"),
-            r#"{
-  "schemaVersion": "elegy-configuration-profile/v1",
-  "profileId": "demo-profile",
-  "templates": [
-    {
-      "templatePath": "template.json"
-    }
-  ]
-}"#,
-        )
-        .expect("write profile");
-        fs::write(package_dir.join("configuration/assets/demo.txt"), "demo\n")
-            .expect("write asset");
-        fs::write(
-            package_dir.join("package.json"),
-            r#"{
-  "schemaVersion": "elegy-plugin-package/v1",
-  "identity": {
-    "packageId": "elegy.demo-config",
-    "name": "demo-config",
-    "version": "0.1.0"
-  },
-  "components": {
-    "configurationTemplates": [
-      {
-        "id": "demo-template",
-        "path": "configuration/template.json"
-      }
-    ],
-    "configurationProfiles": [
-      {
-        "id": "demo-profile",
-        "path": "configuration/profile.json"
-      }
-    ]
-  }
-}"#,
-        )
-        .expect("write package");
-
-        let target = root.join("target");
-        let receipt = apply_configuration(ApplyConfigurationRequest {
-            target_root: target.clone(),
-            dry_run: false,
-            force: true,
-            bindings: BTreeMap::new(),
-            package_path: Some(package_dir.join("package.json")),
-            template_id: None,
-            template_path: None,
-            profile_id: Some("demo-profile".to_string()),
-            profile_path: None,
-        })
-        .expect("apply package profile");
-
-        assert!(receipt.verified);
-        assert_eq!(
-            receipt.source_kind,
-            ElegyConfigurationReceiptSourceKind::Package
-        );
-        assert_eq!(
-            fs::read_to_string(target.join("generated/demo.txt")).expect("generated file"),
-            "demo\n"
-        );
-    }
-
-    #[test]
     fn apply_dry_run_reports_preview_without_writing() {
         let temp = tempdir().expect("temp dir");
         let repo_root = temp.path();
@@ -2290,7 +1992,6 @@ mod tests {
             dry_run: true,
             force: false,
             bindings: BTreeMap::new(),
-            package_path: None,
             template_id: Some("repo-opencode-agentic-minimal".to_string()),
             template_path: None,
             profile_id: None,

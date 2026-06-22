@@ -132,16 +132,6 @@
       "status": "active",
       "summary": "title: Obsidian skill and CLI",
       "title": "Obsidian skill and CLI"
-    },
-    {
-      "authorityClass": "current",
-      "docKind": "spec",
-      "freshness": "fresh",
-      "path": "docs/specs/plugin-tool-availability.md",
-      "sourceOfTruth": "current-canon",
-      "status": "active",
-      "summary": "title: Plugin tool availability",
-      "title": "Plugin tool availability"
     }
   ],
   "entrypoints": [

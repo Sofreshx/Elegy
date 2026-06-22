@@ -42,8 +42,6 @@ enum Command {
     List,
     Show {
         #[arg(long)]
-        package: Option<PathBuf>,
-        #[arg(long)]
         template_id: Option<String>,
         #[arg(long)]
         template_path: Option<PathBuf>,
@@ -53,8 +51,6 @@ enum Command {
         target: PathBuf,
         #[arg(long)]
         dry_run: bool,
-        #[arg(long)]
-        package: Option<PathBuf>,
         #[arg(long)]
         template_id: Option<String>,
         #[arg(long)]
@@ -71,8 +67,6 @@ enum Command {
     Verify {
         #[arg(long)]
         target: PathBuf,
-        #[arg(long)]
-        package: Option<PathBuf>,
         #[arg(long)]
         template_id: Option<String>,
         #[arg(long)]
@@ -116,14 +110,12 @@ fn run() -> Result<ExitCode, serde_json::Error> {
     match cli.command {
         Command::List => execute_list_command(&context),
         Command::Show {
-            package,
             template_id,
             template_path,
-        } => execute_show_command(package, template_id, template_path, &context),
+        } => execute_show_command(template_id, template_path, &context),
         Command::Apply {
             target,
             dry_run,
-            package,
             template_id,
             template_path,
             profile_id,
@@ -133,7 +125,6 @@ fn run() -> Result<ExitCode, serde_json::Error> {
         } => execute_apply_command(
             target,
             dry_run,
-            package,
             template_id,
             template_path,
             profile_id,
@@ -144,7 +135,6 @@ fn run() -> Result<ExitCode, serde_json::Error> {
         ),
         Command::Verify {
             target,
-            package,
             template_id,
             template_path,
             profile_id,
@@ -152,7 +142,6 @@ fn run() -> Result<ExitCode, serde_json::Error> {
             bindings,
         } => execute_verify_command(
             target,
-            package,
             template_id,
             template_path,
             profile_id,
@@ -183,16 +172,11 @@ fn execute_list_command(context: &MachineContext) -> Result<ExitCode, serde_json
 }
 
 fn execute_show_command(
-    package: Option<PathBuf>,
     template_id: Option<String>,
     template_path: Option<PathBuf>,
     context: &MachineContext,
 ) -> Result<ExitCode, serde_json::Error> {
-    match show_configuration_template(
-        package.as_deref(),
-        template_id.as_deref(),
-        template_path.as_deref(),
-    ) {
+    match show_configuration_template(template_id.as_deref(), template_path.as_deref()) {
         Ok(report) => {
             match context.format {
                 OutputFormat::Text => {
@@ -213,7 +197,6 @@ fn execute_show_command(
 fn execute_apply_command(
     target: PathBuf,
     dry_run: bool,
-    package: Option<PathBuf>,
     template_id: Option<String>,
     template_path: Option<PathBuf>,
     profile_id: Option<String>,
@@ -232,7 +215,6 @@ fn execute_apply_command(
         dry_run,
         force,
         bindings,
-        package_path: package,
         template_id,
         template_path,
         profile_id,
@@ -265,7 +247,6 @@ fn execute_apply_command(
 #[allow(clippy::too_many_arguments)]
 fn execute_verify_command(
     target: PathBuf,
-    package: Option<PathBuf>,
     template_id: Option<String>,
     template_path: Option<PathBuf>,
     profile_id: Option<String>,
@@ -281,7 +262,6 @@ fn execute_verify_command(
     match verify_configuration(VerifyConfigurationRequest {
         target_root: target,
         bindings,
-        package_path: package,
         template_id,
         template_path,
         profile_id,

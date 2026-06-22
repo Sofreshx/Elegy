@@ -9,14 +9,9 @@ use elegy_adapter_http::{
 };
 #[cfg(test)]
 use elegy_adapter_http::{HttpClientError, HttpRequest, HttpResponse};
-use elegy_contracts::{
-    validate_mcp_server_descriptor, McpAnalysisResult, McpServerDescriptor, McpToolDefinition,
-};
+use elegy_contracts::{validate_mcp_server_descriptor, McpAnalysisResult, McpServerDescriptor};
 use elegy_descriptor::{Diagnostic, LoadedProject, NormalizedResource, ResourceFamily};
-use elegy_mcp::{
-    McpSkillGenerationResult, McpSkillGenerator, McpToolAnalyzer, McpToolResolveService,
-    McpToolSearchService, McpToolSummary,
-};
+use elegy_mcp::McpToolAnalyzer;
 use elegy_policy::{FilesystemPolicy, HttpPolicy, PolicyConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -224,32 +219,6 @@ impl RuntimeState {
     pub fn analyze_mcp_server(&self, uri: &str) -> Result<McpAnalysisResult, McpRuntimeError> {
         let descriptor = self.load_mcp_server_descriptor(uri)?;
         Ok(McpToolAnalyzer.analyze(&descriptor))
-    }
-
-    pub fn generate_mcp_skills(
-        &self,
-        uri: &str,
-    ) -> Result<McpSkillGenerationResult, McpRuntimeError> {
-        let analysis = self.analyze_mcp_server(uri)?;
-        Ok(McpSkillGenerator.generate(&analysis))
-    }
-
-    pub fn search_mcp_tools(
-        &self,
-        uri: &str,
-        query: Option<&str>,
-    ) -> Result<Vec<McpToolSummary>, McpRuntimeError> {
-        let descriptor = self.load_mcp_server_descriptor(uri)?;
-        Ok(McpToolSearchService.search(&descriptor, query))
-    }
-
-    pub fn resolve_mcp_tool(
-        &self,
-        uri: &str,
-        tool_name: &str,
-    ) -> Result<Option<McpToolDefinition>, McpRuntimeError> {
-        let descriptor = self.load_mcp_server_descriptor(uri)?;
-        Ok(McpToolResolveService.resolve(&descriptor, tool_name))
     }
 
     pub fn read_resource(&self, uri: &str) -> Result<ResourceReadResult, ReadResourceError> {
@@ -830,30 +799,6 @@ mod tests {
         assert_eq!(analysis.analyses[0].tool.name, "get-weather");
         assert!(analysis.analyses[0].has_valid_schema);
         assert!(!analysis.analyses[1].has_valid_schema);
-
-        let generated = state
-            .generate_mcp_skills(uri)
-            .expect("descriptor resource should generate skills");
-        assert_eq!(generated.generated_skills.len(), 1);
-        assert_eq!(
-            generated.generated_skills[0].identity.name,
-            "mcp-weather-server-get-weather"
-        );
-        assert_eq!(generated.skipped_tools.len(), 1);
-        assert_eq!(generated.skipped_tools[0].name, "list-alerts");
-
-        let search = state
-            .search_mcp_tools(uri, Some("weather"))
-            .expect("descriptor resource should support search");
-        assert_eq!(search.len(), 2);
-        assert!(search.iter().any(|tool| tool.name == "get-weather"));
-
-        let resolved = state
-            .resolve_mcp_tool(uri, "get-weather")
-            .expect("descriptor resource should resolve tools")
-            .expect("tool should exist");
-        assert_eq!(resolved.name, "get-weather");
-        assert!(resolved.input_schema.is_some());
     }
 
     #[test]

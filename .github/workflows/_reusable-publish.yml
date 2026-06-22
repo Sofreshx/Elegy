@@ -1,9 +1,7 @@
 ﻿name: _reusable-publish
 
-# Generic per-feature publish workflow. Each per-feature workflow is a thin
-# caller of this one; this workflow knows nothing about specific surfaces.
-# Per-feature publish metadata is owned by the feature's
-# elegy-plugin-package.<feature>.json fixture, not by the workflow.
+# Generic publish workflow. Surface metadata is owned by
+# distribution/surfaces.json, not by per-feature fixtures.
 
 on:
   workflow_call:
@@ -35,14 +33,6 @@ on:
         default: ''
       installer:
         description: "For wrapper assets: filename of the installer script inside the archive (matches publishing.installer in the fixture)"
-        type: string
-        default: ''
-      pre_publish_hook:
-        description: "Optional shell command to run before cargo build"
-        type: string
-        default: ''
-      post_publish_hook:
-        description: "Optional shell command to run after the asset is uploaded"
         type: string
         default: ''
       include_targets:
@@ -86,24 +76,6 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: rust -> rust/target
-
-      - name: Validate per-feature publish metadata fixture exists
-        shell: pwsh
-        run: |
-          if (-not (Test-Path -LiteralPath "${{ inputs.fixture }}")) {
-            throw "Per-feature publish metadata fixture not found: ${{ inputs.fixture }}. Each feature owns its own elegy-plugin-package.<feature>.json fixture; the reusable publish workflow does not maintain a central catalog."
-          }
-          $pkg = Get-Content -LiteralPath "${{ inputs.fixture }}" -Raw | ConvertFrom-Json
-          $expectedArchive = "${{ inputs.archive_family }}"
-          $actualArchive = $pkg.publishing.archiveFamily
-          if ($expectedArchive -ne $actualArchive) {
-            throw "Per-feature fixture archiveFamily mismatch: workflow input '$expectedArchive' != fixture '$actualArchive' in ${{ inputs.fixture }}"
-          }
-
-      - name: Run pre-publish hook
-        if: ${{ inputs.pre_publish_hook != '' }}
-        shell: bash
-        run: ${{ inputs.pre_publish_hook }}
 
       - name: Build
         if: ${{ inputs.crate_path != '' }}
@@ -203,7 +175,4 @@ jobs:
           fi
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
 
-      - name: Run post-publish hook
-        if: ${{ inputs.post_publish_hook != '' }}
-        shell: bash
-        run: ${{ inputs.post_publish_hook }}
+

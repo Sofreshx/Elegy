@@ -21,7 +21,7 @@ behavior over governed artifacts — the registry's authority stays in
 
 - **CLI archive asset family:** `elegy-skills-<cliVersion>-<target>.zip`
 - **Wrapper archive:** `elegy-skills-wrapper-<bundleVersion>.zip`
-- **Plugin package:** `contracts/fixtures/elegy-plugin-package.elegy-skills.json`
+- **Release catalog entry:** `distribution/surfaces.json` (name: `elegy-skills`)
 - **Skill fixture:** `contracts/fixtures/skill.elegy-skills.json`
 - **Versioning:** follows workspace `version`.
 

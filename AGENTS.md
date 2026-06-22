@@ -21,7 +21,7 @@ authority surface.
 - Read `README.md`, then `docs/architecture/ecosystem-topology.md` or `docs/architecture/substrate-governance.md` when changing repo ownership, authority boundaries, or public positioning.
 - Read the smallest relevant doc under `docs/architecture/`, `docs/adr/`, or `docs/specs/` before changing behavior in that lane.
 - Use `docs/agent-integration.md` before changing host onboarding, discovery, invocation envelopes, profiles, MCP projection, side-effect posture, or other agent-facing JSON.
-- Use `docs/architecture/mcp-skill-tooling-placement.md` before changing MCP authoring, analysis, skill generation, portable plugin packages, or ownership boundaries.
+- Use `docs/architecture/mcp-skill-tooling-placement.md` before changing MCP authoring, analysis, skill registry, or ownership boundaries.
 - Use `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` before changing ADR/spec doctrine, docs config, or docs validation behavior.
 - Use `docs/specs/obsidian-skill-and-cli.md` before changing the Obsidian skill, wrapper, result envelope, or vault-boundary guidance.
 - Use `docs/spec-baseline.md` before changing MCP protocol baseline language.
@@ -33,7 +33,6 @@ authority surface.
 - Profiles are allowlists, not approvals. Side effects still require host policy, and side-effecting MCP tools stay blocked unless the call is an explicit dry run or the host is started with `--allow-side-effects`.
 - CLI invocation templates are the default integration contract. Use MCP only when the host specifically needs an MCP protocol boundary.
 - Mermaid reverse projection is bounded analysis. Do not describe it as canonical workflow reconstruction.
-- Portable plugin packages are metadata envelopes, not runtime sessions, approval records, secret stores, or host policy containers.
 - Obsidian is a non-authoritative vault bridge. Do not make it a source of truth for plans, roadmaps, goals, todos, or review state.
 
 ## Documentation Rules

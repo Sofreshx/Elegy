@@ -21,7 +21,7 @@ library layer; this binary is a thin CLI over the same primitives.
 
 - **CLI archive asset family:** `elegy-memory-<cliVersion>-<target>.zip`
 - **Wrapper archive:** `elegy-memory-wrapper-<bundleVersion>.zip`
-- **Plugin package:** `contracts/fixtures/elegy-plugin-package.elegy-memory.json`
+- **Release catalog entry:** `distribution/surfaces.json` (name: `elegy-memory`)
 - **Skill fixture:** `contracts/fixtures/skill.elegy-memory.json`
 - **Versioning:** follows workspace `version`.
 

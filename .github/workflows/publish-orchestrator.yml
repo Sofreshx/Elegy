@@ -1,139 +1,31 @@
-﻿name: publish orchestrator
-
-# Central CI orchestrator for the per-feature publish lane.
-#
-# This workflow is the only entrypoint to the per-feature publish path.
-# It walks `contracts/fixtures/elegy-plugin-package.*.json`, reads each
-# fixture's `publishing` block, and dispatches a build per surface through
-# the reusable publish workflow (`.github/workflows/_reusable-publish.yml`).
-#
-# Adding a new publishable surface requires:
-#   1. A new `elegy-plugin-package.<feature>.json` fixture in
-#      `contracts/fixtures/` with a `publishing` block.
-#   2. Nothing else. No workflow file, no central catalog update.
-#
-# The conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
-# enforce the orchestrator contract: every publishable fixture must declare
-# `cratePath`, `assetKind`, and `archiveFamily`, and `cratePath` must resolve
-# to a real workspace crate.
-
+name: Publish Orchestrator
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'contracts/fixtures/elegy-plugin-package.**.json'
-      - 'rust/**/Cargo.toml'
-      - 'rust/**/src/**'
-  release:
-    types: [published]
   workflow_dispatch:
-
-permissions:
-  contents: write
-
-concurrency:
-  group: publish-orchestrator
-  cancel-in-progress: true
-
+  push:
+    tags: ['v*']
 jobs:
-  discover:
-    name: discover surfaces
+  discover-surfaces:
     runs-on: ubuntu-latest
     outputs:
-      surfaces: ${{ steps.scan.outputs.surfaces }}
+      surfaces: ${{ steps.discover.outputs.surfaces }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v6.0.2
-
-      - name: Walk fixtures and emit surface matrix
-        id: scan
-        shell: pwsh
+      - uses: actions/checkout@v4
+      - id: discover
         run: |
-          $fixturesDir = "contracts/fixtures"
-          $surfaces = New-Object System.Collections.Generic.List[object]
-          $fixtures = Get-ChildItem -LiteralPath $fixturesDir -Filter "elegy-plugin-package.*.json" -ErrorAction SilentlyContinue
-          foreach ($f in $fixtures) {
-            $name = $f.Name
-            # Skip negative tests, the template, demo, and minimal fixtures.
-            if ($name -like "elegy-plugin-package.negative-*") { continue }
-            if ($name -eq "elegy-plugin-package.template.json") { continue }
-            if ($name -eq "elegy-plugin-package.demo-config.json") { continue }
-            if ($name -eq "elegy-plugin-package.minimal.json") { continue }
-            $pkg = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
-            $publishing = $pkg.publishing
-            if (-not $publishing) {
-              Write-Host "::notice::skipping $name (no publishing block)"
-              continue
-            }
-            # Skill-only / external-CLI surfaces may omit cratePath.
-            $cratePath = if ($publishing.cratePath) { $publishing.cratePath } else { "" }
-            $assetKind = if ($publishing.assetKind) { $publishing.assetKind } else { "" }
-            $archiveFamily = if ($publishing.archiveFamily) { $publishing.archiveFamily } else { "" }
-            $skillBridge = if ($publishing.skillBridge) { $publishing.skillBridge } else { "" }
-            $installer = if ($publishing.installer) { $publishing.installer } else { "" }
-            $preHook = if ($publishing.prePublishHook) { $publishing.prePublishHook } else { "" }
-            $postHook = if ($publishing.postPublishHook) { $publishing.postPublishHook } else { "" }
-            if (-not $archiveFamily) {
-              Write-Host "::error::fixture $name has a publishing block but no archiveFamily; the orchestrator cannot derive asset names"
-              exit 1
-            }
-            if (-not $assetKind) {
-              Write-Host "::error::fixture $name has a publishing block but no assetKind; the orchestrator cannot stage assets"
-              exit 1
-            }
-            $surface = $pkg.identity.name
-            $surfaces.Add([pscustomobject]@{
-              surface        = [string]$surface
-              fixture        = "contracts/fixtures/$name"
-              cratePath      = [string]$cratePath
-              archiveFamily  = [string]$archiveFamily
-              assetKind      = [string]$assetKind
-              skillBridge    = [string]$skillBridge
-              installer      = [string]$installer
-              prePublishHook = [string]$preHook
-              postPublishHook= [string]$postHook
-            })
-          }
-          $json = ($surfaces | ConvertTo-Json -Compress -AsArray)
-          "surfaces=$json" | Out-File -FilePath $env:GITHUB_OUTPUT -Encoding utf8 -Append
-
-  validate:
-    name: validate publish metadata
-    needs: discover
+          SURFACES=$(jq -c '.surfaces' distribution/surfaces.json)
+          echo "surfaces=$SURFACES" >> $GITHUB_OUTPUT
+  build:
+    needs: discover-surfaces
     runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.96.0
-      - name: Cache Rust build
-        uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
-        with:
-          workspaces: rust -> rust/target
-      - name: "Conformance: orchestrator-required publishing fields"
-        shell: pwsh
-        run: cargo test -p elegy-contracts --test conformance plugin_package_publishing_blocks_have_orchestrator_required_fields -- --nocapture
-      - name: "Conformance: cratePath resolves to a workspace member"
-        shell: pwsh
-        run: cargo test -p elegy-contracts --test conformance plugin_package_crate_paths_resolve_in_workspace -- --nocapture
-
-  publish:
-    name: publish (${{ matrix.surface.surface }})
-    needs: [discover, validate]
     strategy:
-      fail-fast: false
       matrix:
-        surface: ${{ fromJson(needs.discover.outputs.surfaces) }}
-    uses: ./.github/workflows/_reusable-publish.yml
-    with:
-      surface: ${{ matrix.surface.surface }}
-      fixture: ${{ matrix.surface.fixture }}
-      crate_path: ${{ matrix.surface.cratePath }}
-      archive_family: ${{ matrix.surface.archiveFamily }}
-      asset_kind: ${{ matrix.surface.assetKind }}
-      skill_bridge: ${{ matrix.surface.skillBridge }}
-      installer: ${{ matrix.surface.installer }}
-      pre_publish_hook: ${{ matrix.surface.prePublishHook }}
-      post_publish_hook: ${{ matrix.surface.postPublishHook }}
-    secrets:
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        surface: ${{ fromJson(needs.discover-surfaces.outputs.surfaces) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build
+        if: matrix.surface.kind == 'cli'
+        run: cargo build -p ${{ matrix.surface.crate }} --release
+      - name: Test
+        if: matrix.surface.kind == 'cli'
+        run: cargo test -p ${{ matrix.surface.crate }}

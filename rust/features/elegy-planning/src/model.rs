@@ -226,6 +226,11 @@ pub struct ProjectRunRecord {
     pub session_id: Option<String>,
     pub run_id: Option<String>,
     pub profile_id: Option<String>,
+    pub owner_id: String,
+    pub idempotency_key: Option<String>,
+    pub fencing_token: i64,
+    pub lease_expires_at: String,
+    pub heartbeat_at: String,
     pub status: ProjectRunStatus,
     pub evidence: ProjectRunEvidence,
     pub revision: i64,
@@ -964,4 +969,287 @@ pub fn parse_worktree_status_strict(s: &str) -> Result<WorktreeStatus, String> {
         "cleanup-intent" => Ok(WorktreeStatus::CleanupIntent),
         other => Err(format!("invalid worktree status: {other}")),
     }
+}
+
+// ─── Manifest Types ────────────────────────────────────────────────────────
+
+/// A planning manifest: a complete graph expressed as nodes + edges.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct Manifest {
+    /// Manifest schema version (planning-manifest/v1).
+    #[serde(default = "default_manifest_schema_version")]
+    pub schema_version: String,
+    /// Scope key all entities belong to.
+    pub scope: String,
+    /// Nodes to create or update.
+    #[serde(default)]
+    pub nodes: Vec<ManifestNode>,
+    /// Edges to create or update.
+    #[serde(default)]
+    pub edges: Vec<ManifestEdge>,
+}
+
+fn default_manifest_schema_version() -> String {
+    "planning-manifest/v1".to_string()
+}
+
+/// A node definition in a manifest.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestNode {
+    /// Stable user-provided ID. UUID generated if omitted.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub kind: PlanningNodeKind,
+    pub title: String,
+    pub summary: String,
+    /// Lifecycle status (e.g. "active", "draft", "completed").
+    pub status: String,
+    /// Kind-specific payload JSON object.
+    #[serde(default)]
+    pub payload: serde_json::Value,
+    #[serde(default)]
+    pub tags: Vec<String>,
+
+    // ── Shorthand edge fields (expanded during parsing) ──
+    /// Shorthand: creates `depends-on` edges from this node to each listed ID.
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+    /// Shorthand: creates `blocks` edges from this node to each listed ID.
+    #[serde(default)]
+    pub blocks: Vec<String>,
+    /// Shorthand: creates `decomposes-to` edges from this node to each listed ID.
+    #[serde(default)]
+    pub decomposes_to: Vec<String>,
+    /// Shorthand: creates `planned-by` edges from this node to each listed ID.
+    #[serde(default)]
+    pub planned_by: Vec<String>,
+    /// Shorthand (on plan nodes): creates `planned-by` edges from each listed work ID to this plan.
+    #[serde(default)]
+    pub targeted_work: Vec<String>,
+    /// Shorthand: creates `repairs` edges from this node to each listed ID.
+    #[serde(default)]
+    pub repairs: Vec<String>,
+    /// Shorthand: creates `supersedes` edges from this node to each listed ID.
+    #[serde(default)]
+    pub supersedes: Vec<String>,
+
+    // ── Acceptance-specific fields ──
+    #[serde(default)]
+    pub acceptance_kind: Option<String>,
+    #[serde(default)]
+    pub description: Option<String>,
+    #[serde(default)]
+    pub verification_policy: Option<String>,
+    #[serde(default)]
+    pub required_evidence_kinds: Vec<String>,
+    #[serde(default)]
+    pub waiver: Option<String>,
+
+    // ── Evidence-specific fields ──
+    #[serde(default)]
+    pub evidence_kind: Option<String>,
+    #[serde(default)]
+    pub reference: Option<String>,
+    #[serde(default)]
+    pub content: Option<String>,
+    #[serde(default)]
+    pub captured_at: Option<String>,
+}
+
+/// An edge definition in a manifest.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestEdge {
+    /// Stable user-provided ID. UUID generated if omitted.
+    #[serde(default)]
+    pub id: Option<String>,
+    pub kind: PlanningEdgeKind,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    #[serde(default = "default_edge_status")]
+    pub status: String,
+    #[serde(default)]
+    pub payload: serde_json::Value,
+}
+
+fn default_edge_status() -> String {
+    "active".to_string()
+}
+
+/// Result of a manifest apply or diff operation.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestApplyResult {
+    pub created_nodes: Vec<String>,
+    pub revised_nodes: Vec<String>,
+    pub unchanged_nodes: Vec<String>,
+    pub created_edges: Vec<String>,
+    pub revised_edges: Vec<String>,
+    pub unchanged_edges: Vec<String>,
+    pub conflicts: Vec<ManifestConflict>,
+    pub validation: Option<ValidationReport>,
+    pub total_nodes: usize,
+    pub total_edges: usize,
+}
+
+/// A conflict detected during manifest application.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestConflict {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub reason: String,
+}
+
+/// Result of diffing a manifest against the database.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestDiffResult {
+    pub added_nodes: Vec<String>,
+    pub removed_nodes: Vec<String>,
+    pub changed_nodes: Vec<ManifestDiffEntry>,
+    pub unchanged_nodes: Vec<String>,
+    pub added_edges: Vec<String>,
+    pub removed_edges: Vec<String>,
+    pub changed_edges: Vec<ManifestDiffEntry>,
+    pub unchanged_edges: Vec<String>,
+}
+
+/// A single diff entry for a changed entity.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ManifestDiffEntry {
+    pub entity_id: String,
+    pub diffs: Vec<FieldDiff>,
+}
+
+/// A field-level difference.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FieldDiff {
+    pub field: String,
+    pub manifest_value: serde_json::Value,
+    pub db_value: serde_json::Value,
+}
+
+/// Compact form of a graph node for concise output.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactGraphNode {
+    pub id: String,
+    pub kind: PlanningNodeKind,
+    pub title: String,
+    pub status: String,
+}
+
+/// Compact form of a graph edge for concise output.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct CompactGraphEdge {
+    pub id: String,
+    pub kind: PlanningEdgeKind,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub status: String,
+}
+
+// ─── Graph Runnable Types ──────────────────────────────────────────────────
+
+/// A candidate work node that is runnable in the graph.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphRunnableCandidate {
+    pub node_id: String,
+    pub title: String,
+    pub status: String,
+    /// Why this candidate is runnable: "ready", "urgent_fix", "resolves_blocker".
+    pub reason: String,
+    pub incomplete_dependencies: Vec<String>,
+    pub active_blockers: Vec<String>,
+}
+
+/// A work node that is blocked.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockedGraphCandidate {
+    pub node_id: String,
+    pub title: String,
+    pub reason: String,
+    pub blocker_ids: Vec<String>,
+}
+
+/// Result of a graph runnable query.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct GraphRunnableResult {
+    pub candidates: Vec<GraphRunnableCandidate>,
+    pub blocked: Vec<BlockedGraphCandidate>,
+}
+
+// ─── Bulk Transition Types ─────────────────────────────────────────────────
+
+/// Input for bulk status transitions on graph nodes.
+#[derive(Clone, Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkTransitionInput {
+    pub scope_key: String,
+    pub node_ids: Option<Vec<String>>,
+    pub filter: Option<String>,
+    pub status: String,
+    pub correlation_id: String,
+    pub run_id: Option<String>,
+}
+
+/// A single rejection in a bulk transition.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkTransitionRejection {
+    pub node_id: String,
+    pub reason: String,
+}
+
+/// Result of a bulk transition.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct BulkTransitionResult {
+    pub transitioned: Vec<String>,
+    pub rejected: Vec<BulkTransitionRejection>,
+    pub total_matched: usize,
+    pub total_transitioned: usize,
+}
+
+// ─── Intent Types ───────────────────────────────────────────────────────────
+
+/// A planning intent document — lighter than a full manifest.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PlanningIntent {
+    #[serde(default = "default_intent_schema_version")]
+    pub schema_version: String,
+    pub scope: String,
+    pub intent: String,
+    #[serde(default)]
+    pub constraints: Vec<String>,
+    #[serde(default)]
+    pub non_goals: Vec<String>,
+    #[serde(default)]
+    pub dependencies: Vec<IntentDependency>,
+    #[serde(default)]
+    pub deliverables: Vec<String>,
+    #[serde(default)]
+    pub verification: Vec<String>,
+}
+
+fn default_intent_schema_version() -> String {
+    "planning-intent/v1".to_string()
+}
+
+/// A dependency in an intent document.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct IntentDependency {
+    pub kind: String,
+    pub description: String,
 }

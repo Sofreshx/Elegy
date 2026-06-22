@@ -8,9 +8,9 @@ Use it for:
 - fixtures under `contracts/fixtures`
 
 
-The portable plugin package contract, `elegy-plugin-package/v1`, also lives
-here. It describes bundle metadata and component references for consuming
-hosts; it does not create an Elegy-hosted plugin runtime.
+Plugin contracts (`elegy-plugin/v1`) also live
+here. They describe the thin plugin manifest surface;
+they do not create an Elegy-hosted plugin runtime.
 
 Do not treat `artifacts/contracts` as the authored source of truth. That directory is generated output for consumers and CI.
 
