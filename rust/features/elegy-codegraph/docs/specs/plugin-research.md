@@ -263,7 +263,6 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 
 - `docs/architecture/ecosystem-topology.md`
 - `docs/architecture/mcp-skill-tooling-placement.md`
-- `docs/specs/plugin-tool-availability.md`
 - `contracts/schemas/elegy-codegraph.graph.v0.json`
 - `contracts/fixtures/elegy-codegraph.graph.v0.example.json`
 - `./diff-slice.md`

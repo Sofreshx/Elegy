@@ -146,9 +146,9 @@ flowchart LR
         fixtures["contracts/fixtures/\ngoverned examples"]
     end
 
-    subgraph package["Plugin package"]
-        pkg_json["elegy-plugin-package.json\n+ elegy-plugin.lock.json"]
-        skills["Skill definitions\n+ capability projections\n+ tool requirements"]
+    subgraph package["Plugin"]
+        pkg_json[".elegy-plugin/plugin.json"]
+        skills["Agent Skills\n(SKILL.md)"]
     end
 
     subgraph installed["Installed surface"]
@@ -163,13 +163,10 @@ flowchart LR
 
     schemas --> fixtures
     schemas --> pkg_json
-    fixtures --> skills
     pkg_json --> skills
-    skills --> receipt
-    receipt --> registry
-    registry --> llm
-    pkg_json --> bin_dir
+    skills --> registry
     bin_dir --> registry
+    registry --> llm
 ```
 
 ## Dependency shape across the repo

@@ -13,11 +13,9 @@ Core model:
 
 - governed artifacts are the durable authority
 - Rust implements reusable executable behavior over those artifacts
-- skill definitions are the discovery authority for agent capabilities
-- CLI invocation templates are the default execution boundary
-- generated mirrors, wrapper roots, Codex plugin exports, and MCP tool
-  lists are derived adapter surfaces
-- MCP is an optional projection for MCP-native clients
+- skill definitions (SKILL.md) are the discovery authority for agent capabilities
+- CLI invocation is the default execution boundary
+- MCP is an optional adapter for MCP-native clients
 
 ## Repository Model
 
@@ -147,8 +145,7 @@ CLI and keeps Obsidian vault content non-authoritative. Durable planning state
 continues to live in `elegy-planning` and SQLite.
 
 The governed `contracts/fixtures/skill.*.json` files remain the skill authority.
-Skill delivery uses plugin packages and host export; repo-local
-`.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
+Repo-local `.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
 
 ## Configuration Materialization
 
@@ -159,7 +156,7 @@ home assets from governed templates and profiles.
 ```bash
 elegy configuration list --json
 elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
-elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
+elegy-configuration apply --profile-id demo-profile --target . --dry-run --json
 ```
 
 See [docs/architecture/README.md](docs/architecture/README.md) for built-in
@@ -175,54 +172,32 @@ surface mirrors this for convenience.
 ```bash
 elegy-skills list --json
 elegy-skills search --query "repo status" --json
+elegy-skills describe --skill-id elegy-repo --json
 elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
 
-## Plugin Packages
+## Plugins
 
-> Note: the `elegy-codegraph` library crate is a separate portable codebase
-> graph extraction and query tool. It is **not** a plugin package and lives
-> under its own `contracts/schemas/elegy-codegraph.graph.v0.json` contract.
-
-`elegy-plugin-package/v1` is the portable package contract for bundling
-governed skill definitions, capability projections, tool requirements, and
-publishing metadata into a single host-facing surface. Plugin packages are the
-primary setup path for bringing governed capabilities to LLM hosts.
+`elegy-plugin/v1` is the minimal plugin manifest format for `.elegy-plugin/plugin.json`.
+Plugins declare identity and Agent Skills (SKILL.md) in a single filesystem directory.
 
 Setup flow:
 
 ```bash
 elegy plugin new --template cli-tool --output ./my-plugin
-# edit ./my-plugin/elegy-plugin-package.json
-elegy plugin verify --package ./my-plugin/elegy-plugin-package.json --json
-elegy plugin install-check --package ./my-plugin/elegy-plugin-package.json --install-receipt ./tools/elegy/install-receipt.json --json
+# edit ./.elegy-plugin/plugin.json
+elegy plugin verify --plugin ./my-plugin/.elegy-plugin/plugin.json --json
 ```
 
-`elegy plugin verify` checks package consistency against referenced skill
-definitions, capability projections, side-effect classes, and subset
-declarations. `elegy plugin install-check` checks declared tool requirements
-against an install receipt and optional binary probes. Both commands emit a
-readiness receipt (`ready` | `partial` | `blocked`) governed by
-`contracts/schemas/elegy-plugin-readiness-v1.schema.json`. The receipt is the
-machine-readable answer to "what can this package actually do on this host right
-now?"
+Authority schema:
 
-Authority schemas:
+- `contracts/schemas/elegy-plugin-v1.schema.json` — plugin manifest contract
 
-- `contracts/schemas/elegy-plugin-package.schema.json` — package contract
-- `contracts/schemas/elegy-plugin.lock.json` — pinned contract bundle version
-- `contracts/schemas/elegy-plugin-readiness-v1.schema.json` — readiness receipt
+Release configuration uses `distribution/surfaces.json` as the central release catalog.
 
-Boundaries: the package is a portable contract bundle, not a runtime,
+Boundaries: the plugin manifest is a metadata envelope, not a runtime,
 marketplace, auth store, approval record, or secret/session container. Hosts own
 install, auth, approvals, runtime sessions, and execution policy.
-
-See the [Elegy Plugin Package Model](docs/architecture/elegy-plugin-package-model.md)
-for the full model, and the [Plugin Tool Availability spec](docs/specs/plugin-tool-availability.md)
-for the verify-only contract rules.
-
-Host export (`elegy plugin export codex` / `elegy plugin export host`) is one optional derived
-projection target, not the main plugin setup path.
 
 ## Optional MCP Projection
 

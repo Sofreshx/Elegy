@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/elegy-plugin-v1.schema.json",
+  "title": "Elegy Plugin V1",
+  "description": "Minimal agent capability plugin manifest. Contains agent skills instructions (standard SKILL.md directories), optional MCP server descriptors, minimal identity and discovery metadata, and namespaced extensions. Does not model publishing, workflows, permissions, approvals, trust, configuration systems, runtime state, readiness receipts, or release orchestration.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "name", "version", "description"],
+  "properties": {
+    "schemaVersion": { "const": "elegy-plugin/v1" },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*$",
+      "description": "Plugin name in lowercase kebab-case (letters, digits, hyphens). Must start with a letter."
+    },
+    "version": {
+      "type": "string",
+      "pattern": "^(0|[1-9]\\d*)\\.(0|[1-9]\\d*)\\.(0|[1-9]\\d*)(?:-((?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*)(?:\\.(?:0|[1-9]\\d*|\\d*[a-zA-Z-][0-9a-zA-Z-]*))*))?(?:\\+([0-9a-zA-Z-]+(?:\\.[0-9a-zA-Z-]+)*))?$",
+      "description": "SemVer 2.0.0 version string."
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Short description of the plugin's purpose."
+    },
+    "author": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "minLength": 1 },
+        "email": { "type": "string", "format": "email" },
+        "url": { "type": "string", "format": "uri" }
+      }
+    },
+    "license": {
+      "type": "string",
+      "minLength": 1,
+      "description": "SPDX license identifier (e.g. 'Apache-2.0', 'MIT')."
+    },
+    "repository": {
+      "type": "string",
+      "format": "uri",
+      "description": "Source repository URL."
+    },
+    "skills": {
+      "type": "string",
+      "description": "Package-relative path to the skills directory root containing <skill-name>/SKILL.md directories following the Agent Skills standard.",
+      "$ref": "#/$defs/packageRelativePath"
+    },
+    "mcpServers": {
+      "type": "string",
+      "description": "Package-relative path to the MCP servers directory root containing <server-name>.json descriptors.",
+      "$ref": "#/$defs/packageRelativePath"
+    },
+    "extensions": {
+      "type": "object",
+      "description": "Namespaced extension surface. Keys must be reverse-domain namespaced (contain at least one dot). Unknown extensions are preserved on round-trip and must not be interpreted unless tooling explicitly supports their schema.",
+      "additionalProperties": true,
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9-]*\\.[a-z][a-z0-9-]*(?:\\.[a-z][a-z0-9-]*)*(?:/[a-z][a-z0-9-]*)?$"
+      }
+    }
+  },
+  "$defs": {
+    "packageRelativePath": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "^(?![A-Za-z]:)(?![/\\\\])(?!.*(?:^|[/\\\\])\\.\\.(?:[/\\\\]|$)).+$",
+      "description": "Package-relative path. Rejects absolute paths (starting with / or \\), Windows drive letters (C:), and directory traversal (..)."
+    }
+  }
+}

@@ -34,7 +34,7 @@ In scope:
 - A repo-local skill: `skills/elegy-obsidian/SKILL.md` plus a per-command reference and an install guide.
 - A foundation spec: this document.
 
-Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the canonical installer at `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` and the plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json` is the portable install unit):
+Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the canonical installer at `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` for installation):
 
 Out of scope (follow-up work):
 
@@ -125,7 +125,7 @@ Obsidian is **non-canonical**. Durable planning state continues to flow through 
 
 ## 7. Installation and consumer story
 
-- **Elegy-side** — `elegy-obsidian` is a recognized surface. The repo `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian`. The portable install unit is the plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json`, which carries the skill bundle, the result envelope schema, and the surface metadata. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
+- **Elegy-side** — `elegy-obsidian` is a recognized surface. The repo `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian`. The surface is registered in `distribution/surfaces.json`. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
 - **elegant-obsidian-side on consumer machines** — the user must enable the official CLI once via Obsidian Desktop's Settings -> General -> Command line interface. The plugin package does not ship the binary, does not download it, and does not install it.
 - **elegy-copilot / instruction-engine side** — to make the skill loadable from opencode and from the elegy-copilot runtime, the skill must be mirrored into the consumer repo (`instruction-engine`) under its skill discovery lane. That is a follow-up change in the consumer repo and is tracked as out-of-scope for this foundation PR.
 - **elegy-copilot/obsidian contract** — `instruction-engine/docs/system/obsidian-synced-notes-contract.md` already defines a separate Obsidian integration lane that uses a third-party `obsidian-cli.exe` binary. The new skill is **additive** — it does not modify that contract or replace that binary. The two lanes can coexist.
@@ -148,7 +148,7 @@ The foundation is complete when all of the following are true:
 - `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` and resolves the surface metadata.
 - A runbook exists in `skills/elegy-obsidian/references/install-obsidian-cli.md` that operators can follow to enable the official CLI.
 - The `elegy-obsidian` skill is registered in `skill-discovery-index.elegy-obsidian.json` with `lifecycleState: "draft"`, signaling that the foundation is ready for review but not yet promoted to active.
-- The plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json` carries the surface as a portable install unit.
+- The `distribution/surfaces.json` entry for `elegy-obsidian` registers the surface for release and install.
 
 ## 10. Open questions
 

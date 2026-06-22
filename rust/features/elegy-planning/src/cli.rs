@@ -8,19 +8,20 @@ use thiserror::Error;
 use crate::envelope::{MachineEnvelope, MachineStatus};
 use crate::storage::CURRENT_SCHEMA_VERSION;
 use crate::{
-    AcceptanceKind, ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput,
+    manifest, AcceptanceKind, ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput,
     AddWorkPointInput, AttachEvidenceInput, AttachWorktreeInput, ClaimProjectRunInput,
-    CreateAcceptanceInput, CreateEvidenceInput, CreateGoalInput, CreateGraphEdgeInput,
-    CreateGraphNodeInput, CreateInsightInput, CreateIssueInput, CreatePlanInput,
-    CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput, EffortTier,
-    EntityType, EvidenceKind, FileScopeIntent, FileScopeRecord, FileScopeSelectorType,
-    FinalizeGraphNodeInput, GoalStatus, InsightStatus, InsightType, IssueStatus, PlanStatus,
-    PlanningEdgeKind, PlanningNodeKind, PlanningStore, PlanningStoreError, Priority,
-    ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput,
-    ReviewPointStatus, ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput,
-    ReviseWorkPointInput, RoadmapStatus, SatisfyAcceptanceInput, SearchInput, Severity, TodoStatus,
-    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput, WorkPointKind,
-    WorkPointStatus, WorktreeStatus,
+    CompactGraphEdge, CompactGraphNode, CreateAcceptanceInput, CreateEvidenceInput,
+    CreateGoalInput, CreateGraphEdgeInput, CreateGraphNodeInput, CreateInsightInput,
+    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
+    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, EvidenceKind, FieldDiff,
+    FileScopeIntent, FileScopeRecord, FileScopeSelectorType, FinalizeGraphNodeInput, GoalStatus,
+    InsightStatus, InsightType, IssueStatus, ManifestDiffEntry, ManifestDiffResult, PlanStatus,
+    PlanningEdgeKind, PlanningGraphEdge, PlanningGraphNode, PlanningNodeKind, PlanningStore,
+    PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunStatus, ProjectionFormat,
+    ReleaseProjectRunInput, ReviewPointStatus, ReviseGraphEdgeInput, ReviseGraphNodeInput,
+    RevisePlanInput, ReviseWorkPointInput, RoadmapStatus, SatisfyAcceptanceInput, SearchInput,
+    Severity, TodoStatus, UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput,
+    UpdateStatusInput, WorkPointKind, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -55,6 +56,8 @@ struct Cli {
     scope: String,
     #[arg(long, global = true)]
     db: Option<PathBuf>,
+    #[arg(long, global = true)]
+    compact: bool,
     #[command(subcommand)]
     command: Command,
 }
@@ -154,6 +157,25 @@ enum Command {
         #[command(subcommand)]
         command: GraphCommand,
     },
+    #[command(
+        about = "Apply a planning manifest (YAML/JSON) to create or update a complete graph"
+    )]
+    Manifest(ManifestArgs),
+    #[command(about = "Diff a planning manifest against current database state")]
+    Diff(DiffArgs),
+    #[command(about = "List or render planning manifest templates")]
+    Template {
+        #[command(subcommand)]
+        command: TemplateCommand,
+    },
+    #[command(about = "Expand a planning intent document into a manifest")]
+    Intent(IntentExpandArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum TemplateCommand {
+    List(TemplateListArgs),
+    Render(TemplateRenderArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -952,6 +974,10 @@ enum GraphCommand {
         #[command(subcommand)]
         command: EvidenceCommand,
     },
+    #[command(about = "Find runnable work nodes in the graph")]
+    Runnable(GraphRunnableArgs),
+    #[command(about = "Bulk update status for graph nodes")]
+    Bulk(BulkTransitionArgs),
 }
 
 #[derive(Subcommand, Debug)]
@@ -1252,6 +1278,43 @@ struct GraphEdgeReviseArgs {
 }
 
 #[derive(Args, Debug)]
+struct GraphRunnableArgs {
+    #[arg(long)]
+    limit: Option<usize>,
+}
+
+#[derive(Args, Debug)]
+struct BulkTransitionArgs {
+    #[arg(long = "node-ids", value_delimiter = ',')]
+    node_ids: Option<Vec<String>>,
+    #[arg(long)]
+    filter: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long)]
+    status: String,
+}
+
+#[derive(Args, Debug)]
+struct TemplateListArgs {}
+
+#[derive(Args, Debug)]
+struct TemplateRenderArgs {
+    #[arg(long)]
+    template: String,
+    #[arg(long)]
+    output: Option<PathBuf>,
+}
+
+#[derive(Args, Debug)]
+struct IntentExpandArgs {
+    #[arg(long)]
+    file: PathBuf,
+    #[arg(long)]
+    output: Option<PathBuf>,
+}
+
+#[derive(Args, Debug)]
 struct ProjectRenderArgs {
     #[arg(long = "entity-type", value_enum)]
     entity_type: EntityType,
@@ -1271,6 +1334,7 @@ struct MachineContext {
     scope_key: String,
     db_path: PathBuf,
     command: Vec<String>,
+    compact: bool,
 }
 
 pub fn run_from_env() -> ExitCode {
@@ -1318,6 +1382,7 @@ where
         scope_key: cli.scope,
         db_path: cli.db.unwrap_or_else(default_db_path),
         command: command_path(&cli.command),
+        compact: cli.compact,
     };
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
     if matches!(&cli.command, Command::Capabilities) {
@@ -1376,6 +1441,10 @@ where
         Command::ProjectRun { command } => execute_project_run(command, &store, &context),
         Command::Worktree { command } => execute_worktree(command, &store, &context),
         Command::Graph { command } => execute_graph(command, &store, &context),
+        Command::Manifest(args) => execute_manifest(args, &store, &context),
+        Command::Diff(args) => execute_diff(args, &store, &context),
+        Command::Template { command } => execute_template(command, &store, &context),
+        Command::Intent(args) => execute_intent(args, &store, &context),
     }
 }
 
@@ -2343,6 +2412,8 @@ fn execute_graph(
         GraphCommand::Edge { command } => execute_graph_edge(command, store, context),
         GraphCommand::Acceptance { command } => execute_graph_acceptance(command, store, context),
         GraphCommand::Evidence { command } => execute_graph_evidence(command, store, context),
+        GraphCommand::Runnable(args) => execute_graph_runnable(args, store, context),
+        GraphCommand::Bulk(args) => execute_graph_bulk(args, store, context),
     }
 }
 
@@ -2388,8 +2459,18 @@ fn execute_graph_node(
                     true,
                 );
             }
-            let view = store.graph_node_view(&args.node_id, &context.scope_key)?;
-            emit_success(context, vec!["graph", "node", "show"], view)
+            if context.compact {
+                let compact = CompactGraphNode {
+                    id: node.id,
+                    kind: node.kind,
+                    title: node.title,
+                    status: node.status,
+                };
+                emit_success(context, vec!["graph", "node", "show"], compact)
+            } else {
+                let view = store.graph_node_view(&args.node_id, &context.scope_key)?;
+                emit_success(context, vec!["graph", "node", "show"], view)
+            }
         }
         GraphNodeCommand::List(args) => {
             let nodes = store.list_graph_nodes(&context.scope_key, args.kind)?;
@@ -2398,11 +2479,28 @@ fn execute_graph_node(
             } else {
                 nodes
             };
-            emit_success(
-                context,
-                vec!["graph", "node", "list"],
-                json!({ "nodes": nodes }),
-            )
+            if context.compact {
+                let compact: Vec<CompactGraphNode> = nodes
+                    .into_iter()
+                    .map(|n| CompactGraphNode {
+                        id: n.id,
+                        kind: n.kind,
+                        title: n.title,
+                        status: n.status,
+                    })
+                    .collect();
+                emit_success(
+                    context,
+                    vec!["graph", "node", "list"],
+                    json!({ "nodes": compact }),
+                )
+            } else {
+                emit_success(
+                    context,
+                    vec!["graph", "node", "list"],
+                    json!({ "nodes": nodes }),
+                )
+            }
         }
         GraphNodeCommand::Status(args) => {
             let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
@@ -2511,8 +2609,19 @@ fn execute_graph_edge(
                     true,
                 );
             }
-            let view = store.graph_edge_view(&args.edge_id, &context.scope_key)?;
-            emit_success(context, vec!["graph", "edge", "show"], view)
+            if context.compact {
+                let compact = CompactGraphEdge {
+                    id: edge.id,
+                    kind: edge.kind,
+                    source_node_id: edge.source_node_id,
+                    target_node_id: edge.target_node_id,
+                    status: edge.status,
+                };
+                emit_success(context, vec!["graph", "edge", "show"], compact)
+            } else {
+                let view = store.graph_edge_view(&args.edge_id, &context.scope_key)?;
+                emit_success(context, vec!["graph", "edge", "show"], view)
+            }
         }
         GraphEdgeCommand::List(args) => {
             let edges = store.list_graph_edges(&context.scope_key, args.kind)?;
@@ -2521,11 +2630,29 @@ fn execute_graph_edge(
             } else {
                 edges
             };
-            emit_success(
-                context,
-                vec!["graph", "edge", "list"],
-                json!({ "edges": edges }),
-            )
+            if context.compact {
+                let compact: Vec<CompactGraphEdge> = edges
+                    .into_iter()
+                    .map(|e| CompactGraphEdge {
+                        id: e.id,
+                        kind: e.kind,
+                        source_node_id: e.source_node_id,
+                        target_node_id: e.target_node_id,
+                        status: e.status,
+                    })
+                    .collect();
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "list"],
+                    json!({ "edges": compact }),
+                )
+            } else {
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "list"],
+                    json!({ "edges": edges }),
+                )
+            }
         }
         GraphEdgeCommand::Incoming(args) => {
             // Scope gate: verify the referenced node belongs to the active scope
@@ -2547,11 +2674,29 @@ fn execute_graph_edge(
                 .into_iter()
                 .filter(|e| e.scope_key == context.scope_key)
                 .collect();
-            emit_success(
-                context,
-                vec!["graph", "edge", "incoming"],
-                json!({ "edges": edges }),
-            )
+            if context.compact {
+                let compact: Vec<CompactGraphEdge> = edges
+                    .into_iter()
+                    .map(|e| CompactGraphEdge {
+                        id: e.id,
+                        kind: e.kind,
+                        source_node_id: e.source_node_id,
+                        target_node_id: e.target_node_id,
+                        status: e.status,
+                    })
+                    .collect();
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "incoming"],
+                    json!({ "edges": compact }),
+                )
+            } else {
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "incoming"],
+                    json!({ "edges": edges }),
+                )
+            }
         }
         GraphEdgeCommand::Outgoing(args) => {
             // Scope gate: verify the referenced node belongs to the active scope
@@ -2573,11 +2718,29 @@ fn execute_graph_edge(
                 .into_iter()
                 .filter(|e| e.scope_key == context.scope_key)
                 .collect();
-            emit_success(
-                context,
-                vec!["graph", "edge", "outgoing"],
-                json!({ "edges": edges }),
-            )
+            if context.compact {
+                let compact: Vec<CompactGraphEdge> = edges
+                    .into_iter()
+                    .map(|e| CompactGraphEdge {
+                        id: e.id,
+                        kind: e.kind,
+                        source_node_id: e.source_node_id,
+                        target_node_id: e.target_node_id,
+                        status: e.status,
+                    })
+                    .collect();
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "outgoing"],
+                    json!({ "edges": compact }),
+                )
+            } else {
+                emit_success(
+                    context,
+                    vec!["graph", "edge", "outgoing"],
+                    json!({ "edges": edges }),
+                )
+            }
         }
         GraphEdgeCommand::Status(args) => {
             let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
@@ -2656,8 +2819,19 @@ fn execute_graph_acceptance(
             emit_success(context, vec!["graph", "acceptance", "create"], result)
         }
         AcceptanceCommand::Show(args) => {
-            let view = store.acceptance_view(&args.node_id, &context.scope_key)?;
-            emit_success(context, vec!["graph", "acceptance", "show"], view)
+            if context.compact {
+                let node = store.graph_node(&args.node_id)?;
+                let compact = CompactGraphNode {
+                    id: node.id,
+                    kind: node.kind,
+                    title: node.title,
+                    status: node.status,
+                };
+                emit_success(context, vec!["graph", "acceptance", "show"], compact)
+            } else {
+                let view = store.acceptance_view(&args.node_id, &context.scope_key)?;
+                emit_success(context, vec!["graph", "acceptance", "show"], view)
+            }
         }
         AcceptanceCommand::List(args) => {
             let kind_filter = args.kind;
@@ -2735,8 +2909,19 @@ fn execute_graph_evidence(
             emit_success(context, vec!["graph", "evidence", "create"], result)
         }
         EvidenceCommand::Show(args) => {
-            let view = store.evidence_view(&args.node_id, &context.scope_key)?;
-            emit_success(context, vec!["graph", "evidence", "show"], view)
+            if context.compact {
+                let node = store.graph_node(&args.node_id)?;
+                let compact = CompactGraphNode {
+                    id: node.id,
+                    kind: node.kind,
+                    title: node.title,
+                    status: node.status,
+                };
+                emit_success(context, vec!["graph", "evidence", "show"], compact)
+            } else {
+                let view = store.evidence_view(&args.node_id, &context.scope_key)?;
+                emit_success(context, vec!["graph", "evidence", "show"], view)
+            }
         }
         EvidenceCommand::List(args) => {
             let kind_filter = args.kind;
@@ -2777,6 +2962,300 @@ fn execute_graph_evidence(
             emit_success(context, vec!["graph", "evidence", "attach"], result)
         }
     }
+}
+
+fn execute_graph_runnable(
+    args: GraphRunnableArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let mut result = store.find_runnable_graph_work(&context.scope_key)?;
+    if let Some(limit) = args.limit {
+        result.candidates.truncate(limit);
+        result.blocked.truncate(limit);
+    }
+    emit_success(context, vec!["graph", "runnable"], result)
+}
+
+fn execute_graph_bulk(
+    args: BulkTransitionArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let correlation_id = args.correlation_id.unwrap_or_else(|| {
+        context
+            .correlation_id
+            .clone()
+            .unwrap_or_else(|| "bulk".to_string())
+    });
+    let input = crate::BulkTransitionInput {
+        scope_key: context.scope_key.clone(),
+        node_ids: args.node_ids,
+        filter: args.filter,
+        status: args.status,
+        correlation_id,
+        run_id: context.correlation_id.clone(),
+    };
+    let result = store.bulk_update_graph_node_status(&input)?;
+    emit_success(context, vec!["graph", "bulk"], result)
+}
+
+fn execute_template(
+    command: TemplateCommand,
+    _store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        TemplateCommand::List(_) => {
+            let templates = crate::template::list_templates()?;
+            emit_success(
+                context,
+                vec!["template", "list"],
+                serde_json::json!({ "templates": templates }),
+            )
+        }
+        TemplateCommand::Render(args) => {
+            let content = crate::template::render_template(&args.template)?;
+            if let Some(output) = &args.output {
+                std::fs::write(output, &content).map_err(|e| {
+                    CliError::Store(PlanningStoreError::InvalidInput(format!(
+                        "failed to write template to {}: {e}",
+                        output.display()
+                    )))
+                })?;
+                let result = serde_json::json!({
+                    "template": args.template,
+                    "output": output.to_string_lossy(),
+                });
+                emit_success(context, vec!["template", "render"], result)
+            } else {
+                println!("{content}");
+                Ok(ExitCode::SUCCESS)
+            }
+        }
+    }
+}
+
+fn execute_intent(
+    args: IntentExpandArgs,
+    _store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let content = crate::intent::expand_intent_file(&args.file)?;
+    if let Some(output) = &args.output {
+        std::fs::write(output, &content).map_err(|e| {
+            CliError::Store(PlanningStoreError::InvalidInput(format!(
+                "failed to write manifest to {}: {e}",
+                output.display()
+            )))
+        })?;
+        let result = serde_json::json!({
+            "output": output.to_string_lossy(),
+        });
+        emit_success(context, vec!["intent", "expand"], result)
+    } else {
+        println!("{content}");
+        Ok(ExitCode::SUCCESS)
+    }
+}
+
+fn execute_manifest(
+    args: ManifestArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let correlation_id = context
+        .correlation_id
+        .clone()
+        .unwrap_or_else(|| "manifest-apply".to_string());
+    let raw = manifest::parse_manifest_file(&args.file)?;
+    let parsed = manifest::expand_manifest(raw, &correlation_id);
+
+    let result = store.apply_manifest(&parsed, args.dry_run)?;
+    emit_success(context, vec!["manifest", "apply"], result)
+}
+
+fn execute_diff(
+    args: DiffArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let raw = manifest::parse_manifest_file(&args.manifest)?;
+    let correlation_id = "diff".to_string();
+    let parsed = manifest::expand_manifest(raw, &correlation_id);
+
+    let db_nodes = store.load_all_graph_nodes(&context.scope_key)?;
+    let db_edges = store.load_all_graph_edges(&context.scope_key)?;
+
+    // Build maps from the database
+    let db_node_map: std::collections::HashMap<&str, &PlanningGraphNode> =
+        db_nodes.iter().map(|n| (n.id.as_str(), n)).collect();
+    let _db_edge_map: std::collections::HashMap<&str, &PlanningGraphEdge> =
+        db_edges.iter().map(|e| (e.id.as_str(), e)).collect();
+
+    let manifest_node_ids: std::collections::HashSet<&str> = parsed
+        .nodes
+        .iter()
+        .filter_map(|n| n.id.as_deref())
+        .collect();
+    let manifest_edge_ids: std::collections::HashSet<&str> = parsed
+        .edges
+        .iter()
+        .filter_map(|e| e.id.as_deref())
+        .collect();
+
+    let db_node_ids: std::collections::HashSet<&str> =
+        db_nodes.iter().map(|n| n.id.as_str()).collect();
+    let db_edge_ids: std::collections::HashSet<&str> =
+        db_edges.iter().map(|e| e.id.as_str()).collect();
+
+    // Added nodes: in manifest but not in DB
+    let added_nodes: Vec<String> = manifest_node_ids
+        .difference(&db_node_ids)
+        .map(|s| s.to_string())
+        .collect();
+
+    // Removed nodes: in DB but not in manifest
+    let removed_nodes: Vec<String> = db_node_ids
+        .difference(&manifest_node_ids)
+        .map(|s| s.to_string())
+        .collect();
+
+    // Changed nodes: in both, but fields differ
+    let mut changed_nodes = Vec::new();
+    let mut unchanged_nodes = Vec::new();
+    for manifest_node in &parsed.nodes {
+        if let Some(ref id) = manifest_node.id {
+            if let Some(db_node) = db_node_map.get(id.as_str()) {
+                let diffs = compute_node_diffs(manifest_node, db_node);
+                if diffs.is_empty() {
+                    unchanged_nodes.push(id.clone());
+                } else {
+                    changed_nodes.push(ManifestDiffEntry {
+                        entity_id: id.clone(),
+                        diffs,
+                    });
+                }
+            }
+        }
+    }
+
+    // Added edges: in manifest but not in DB
+    let added_edges: Vec<String> = manifest_edge_ids
+        .difference(&db_edge_ids)
+        .map(|s| s.to_string())
+        .collect();
+    let removed_edges: Vec<String> = db_edge_ids
+        .difference(&manifest_edge_ids)
+        .map(|s| s.to_string())
+        .collect();
+
+    // Changed edges: in both, but fields differ
+    let mut changed_edges = Vec::new();
+    let mut unchanged_edges = Vec::new();
+    let db_edge_map: std::collections::HashMap<&str, &PlanningGraphEdge> =
+        db_edges.iter().map(|e| (e.id.as_str(), e)).collect();
+    for manifest_edge in &parsed.edges {
+        if let Some(ref id) = manifest_edge.id {
+            if let Some(db_edge) = db_edge_map.get(id.as_str()) {
+                let diffs = compute_edge_diffs(manifest_edge, db_edge);
+                if diffs.is_empty() {
+                    unchanged_edges.push(id.clone());
+                } else {
+                    changed_edges.push(ManifestDiffEntry {
+                        entity_id: id.clone(),
+                        diffs,
+                    });
+                }
+            }
+        }
+    }
+
+    let diff = ManifestDiffResult {
+        added_nodes,
+        removed_nodes,
+        changed_nodes,
+        unchanged_nodes,
+        added_edges,
+        removed_edges,
+        changed_edges,
+        unchanged_edges,
+    };
+
+    emit_success(context, vec!["diff"], diff)
+}
+
+fn compute_node_diffs(input: &CreateGraphNodeInput, db: &PlanningGraphNode) -> Vec<FieldDiff> {
+    let mut diffs = Vec::new();
+    if input.title.trim() != db.title {
+        diffs.push(FieldDiff {
+            field: "title".to_string(),
+            manifest_value: serde_json::json!(input.title.trim()),
+            db_value: serde_json::json!(db.title),
+        });
+    }
+    if input.summary.trim() != db.summary {
+        diffs.push(FieldDiff {
+            field: "summary".to_string(),
+            manifest_value: serde_json::json!(input.summary.trim()),
+            db_value: serde_json::json!(db.summary),
+        });
+    }
+    if input.status.trim() != db.status {
+        diffs.push(FieldDiff {
+            field: "status".to_string(),
+            manifest_value: serde_json::json!(input.status.trim()),
+            db_value: serde_json::json!(db.status),
+        });
+    }
+    diffs
+}
+
+fn compute_edge_diffs(input: &CreateGraphEdgeInput, db: &PlanningGraphEdge) -> Vec<FieldDiff> {
+    let mut diffs = Vec::new();
+    if input.status.trim() != db.status {
+        diffs.push(FieldDiff {
+            field: "status".to_string(),
+            manifest_value: serde_json::json!(input.status.trim()),
+            db_value: serde_json::json!(db.status),
+        });
+    }
+    if input.kind.as_str() != db.kind.as_str() {
+        diffs.push(FieldDiff {
+            field: "kind".to_string(),
+            manifest_value: serde_json::json!(input.kind.as_str()),
+            db_value: serde_json::json!(db.kind.as_str()),
+        });
+    }
+    if input.source_node_id != db.source_node_id {
+        diffs.push(FieldDiff {
+            field: "sourceNodeId".to_string(),
+            manifest_value: serde_json::json!(input.source_node_id),
+            db_value: serde_json::json!(db.source_node_id),
+        });
+    }
+    if input.target_node_id != db.target_node_id {
+        diffs.push(FieldDiff {
+            field: "targetNodeId".to_string(),
+            manifest_value: serde_json::json!(input.target_node_id),
+            db_value: serde_json::json!(db.target_node_id),
+        });
+    }
+    diffs
+}
+
+#[derive(Args, Debug)]
+struct ManifestArgs {
+    #[arg(long)]
+    file: PathBuf,
+    #[arg(long)]
+    dry_run: bool,
+}
+
+#[derive(Args, Debug)]
+struct DiffArgs {
+    #[arg(long)]
+    manifest: PathBuf,
 }
 
 fn parse_graph_payload(
@@ -3238,7 +3717,16 @@ fn command_path(command: &Command) -> Vec<String> {
                 "evidence".to_string(),
                 evidence_command_name(command).to_string(),
             ],
+            GraphCommand::Runnable(_) => vec!["graph".to_string(), "runnable".to_string()],
+            GraphCommand::Bulk(_) => vec!["graph".to_string(), "bulk".to_string()],
         },
+        Command::Manifest(_) => vec!["manifest".to_string(), "apply".to_string()],
+        Command::Diff(_) => vec!["diff".to_string()],
+        Command::Template { command } => match command {
+            TemplateCommand::List(_) => vec!["template".to_string(), "list".to_string()],
+            TemplateCommand::Render(_) => vec!["template".to_string(), "render".to_string()],
+        },
+        Command::Intent(_) => vec!["intent".to_string(), "expand".to_string()],
     }
 }
 
@@ -3578,6 +4066,10 @@ fn is_command_mutation(command: &Command) -> bool {
                 command: EvidenceCommand::Create(_) | EvidenceCommand::Attach(_)
             }
         ),
+        Command::Manifest(_) => true,
+        Command::Diff(_) => false,
+        Command::Template { .. } => false,
+        Command::Intent(_) => false,
         // Read-only commands
         Command::Validate { .. }
         | Command::Events

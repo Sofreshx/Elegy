@@ -6062,6 +6062,882 @@ impl PlanningStore {
             collect_rows(rows)
         }
     }
+
+    // ─── Manifest / Upsert / Diff ─────────────────────────────────────────
+
+    /// Upsert a graph node: create if not exists, update if exists in same scope.
+    pub fn upsert_graph_node(
+        &self,
+        input: CreateGraphNodeInput,
+    ) -> Result<(String, bool), PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("title", &input.title)?;
+        require_non_empty("summary", &input.summary)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        ensure_scope_exists(&transaction, &scope_key)?;
+        let now = now_string()?;
+
+        // If user provides an explicit ID, try to find an existing node
+        let (id, created) = if let Some(ref explicit_id) = input.id {
+            require_non_empty("id", explicit_id)?;
+            let existing: Option<PlanningGraphNode> = transaction
+                .query_row(
+                    "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE id = ?1",
+                    params![explicit_id],
+                    row_to_graph_node,
+                )
+                .optional()?;
+
+            if let Some(node) = existing {
+                // Cross-scope guard: reject if the existing node is in a different scope
+                if node.scope_key != scope_key {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "CROSS_SCOPE_CONFLICT: node `{}` exists in scope `{}`, not `{}`",
+                        explicit_id, node.scope_key, scope_key
+                    )));
+                }
+                // Update existing
+                let title = input.title.trim().to_string();
+                let summary = input.summary.trim().to_string();
+                let status = input.status.trim().to_string();
+                let tags = normalize_string_list(input.tags);
+                let new_revision = node.revision + 1;
+
+                transaction.execute(
+                    "UPDATE planning_nodes SET title = ?1, summary = ?2, status = ?3, payload_json = ?4, tags_json = ?5, revision = ?6, updated_at = ?7 WHERE id = ?8",
+                    params![
+                        title,
+                        summary,
+                        status,
+                        to_json_text(&input.payload)?,
+                        to_json_text(&tags)?,
+                        new_revision,
+                        now,
+                        explicit_id,
+                    ],
+                )?;
+
+                (explicit_id.clone(), false)
+            } else {
+                // Insert new
+                let record = PlanningGraphNode {
+                    id: explicit_id.clone(),
+                    scope_key: scope_key.clone(),
+                    kind: input.kind,
+                    title: input.title.trim().to_string(),
+                    summary: input.summary.trim().to_string(),
+                    status: input.status.trim().to_string(),
+                    payload: input.payload,
+                    tags: normalize_string_list(input.tags),
+                    revision: 1,
+                    created_at: now.clone(),
+                    updated_at: now.clone(),
+                };
+
+                transaction.execute(
+                    r#"
+                INSERT INTO planning_nodes (
+                    id, scope_key, kind, title, summary, status,
+                    payload_json, tags_json, revision, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+                "#,
+                    params![
+                        record.id,
+                        record.scope_key,
+                        record.kind.as_str(),
+                        record.title,
+                        record.summary,
+                        record.status,
+                        to_json_text(&record.payload)?,
+                        to_json_text(&record.tags)?,
+                        record.revision,
+                        record.created_at,
+                        record.updated_at,
+                    ],
+                )?;
+
+                append_event(
+                    &transaction,
+                    build_event(
+                        &transaction,
+                        EntityType::GraphNode,
+                        explicit_id,
+                        EntityType::GraphNode,
+                        explicit_id,
+                        &input.correlation_id,
+                        input.run_id,
+                        "graph-node.created",
+                        serde_json::to_value(&record)?,
+                    )?,
+                )?;
+
+                (explicit_id.clone(), true)
+            }
+        } else {
+            // No explicit ID — always create
+            let id = new_id();
+            let record = PlanningGraphNode {
+                id: id.clone(),
+                scope_key: scope_key.clone(),
+                kind: input.kind,
+                title: input.title.trim().to_string(),
+                summary: input.summary.trim().to_string(),
+                status: input.status.trim().to_string(),
+                payload: input.payload.clone(),
+                tags: normalize_string_list(input.tags),
+                revision: 1,
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            };
+
+            transaction.execute(
+                r#"
+            INSERT INTO planning_nodes (
+                id, scope_key, kind, title, summary, status,
+                payload_json, tags_json, revision, created_at, updated_at
+            ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+            "#,
+                params![
+                    record.id,
+                    record.scope_key,
+                    record.kind.as_str(),
+                    record.title,
+                    record.summary,
+                    record.status,
+                    to_json_text(&record.payload)?,
+                    to_json_text(&record.tags)?,
+                    record.revision,
+                    record.created_at,
+                    record.updated_at,
+                ],
+            )?;
+
+            append_event(
+                &transaction,
+                build_event(
+                    &transaction,
+                    EntityType::GraphNode,
+                    &id,
+                    EntityType::GraphNode,
+                    &id,
+                    &input.correlation_id,
+                    input.run_id,
+                    "graph-node.created",
+                    serde_json::to_value(&record)?,
+                )?,
+            )?;
+
+            (id, true)
+        };
+
+        // Rebuild tag index
+        let tags: Vec<String> = transaction
+            .query_row(
+                "SELECT tags_json FROM planning_nodes WHERE id = ?1",
+                params![&id],
+                |row| {
+                    let s: String = row.get(0)?;
+                    Ok(s)
+                },
+            )
+            .optional()?
+            .map(parse_json_column::<Vec<String>>)
+            .unwrap_or_else(|| Ok(Vec::new()))
+            .map_err(PlanningStoreError::from)?;
+        rebuild_tag_index_for_entity(&transaction, EntityType::GraphNode, &id, &tags)?;
+
+        transaction.commit()?;
+        Ok((id, created))
+    }
+
+    /// Upsert a graph edge: create if not exists, skip if duplicate active.
+    pub fn upsert_graph_edge(
+        &self,
+        input: CreateGraphEdgeInput,
+    ) -> Result<(String, bool), PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("source_node_id", &input.source_node_id)?;
+        require_non_empty("target_node_id", &input.target_node_id)?;
+        require_non_empty("status", &input.status)?;
+        require_kebab_token("status", &input.status)?;
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        ensure_scope_exists(&transaction, &scope_key)?;
+
+        // Preflight: verify source and target nodes exist in scope
+        let _source = load_graph_node(&transaction, &input.source_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "sourceNodeId references missing node `{}`",
+                input.source_node_id
+            ))
+        })?;
+        let _target = load_graph_node(&transaction, &input.target_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "targetNodeId references missing node `{}`",
+                input.target_node_id
+            ))
+        })?;
+
+        let now = now_string()?;
+
+        // If user provides an explicit ID, try to find existing
+        let (id, created) = if let Some(ref explicit_id) = input.id {
+            require_non_empty("id", explicit_id)?;
+            let existing: Option<PlanningGraphEdge> = transaction
+                .query_row(
+                    "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE id = ?1",
+                    params![explicit_id],
+                    row_to_graph_edge,
+                )
+                .optional()?;
+
+            if let Some(edge) = existing {
+                if edge.scope_key != scope_key {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "CROSS_SCOPE_CONFLICT: edge `{}` exists in scope `{}`, not `{}`",
+                        explicit_id, edge.scope_key, scope_key
+                    )));
+                }
+                // Update existing
+                let status = input.status.trim().to_string();
+                let new_revision = edge.revision + 1;
+                transaction.execute(
+                    "UPDATE planning_edges SET kind = ?1, source_node_id = ?2, target_node_id = ?3, status = ?4, payload_json = ?5, revision = ?6, updated_at = ?7 WHERE id = ?8",
+                    params![
+                        input.kind.as_str(),
+                        input.source_node_id,
+                        input.target_node_id,
+                        status,
+                        to_json_text(&input.payload)?,
+                        new_revision,
+                        now,
+                        explicit_id,
+                    ],
+                )?;
+                (explicit_id.clone(), false)
+            } else {
+                let record = PlanningGraphEdge {
+                    id: explicit_id.clone(),
+                    scope_key: scope_key.clone(),
+                    kind: input.kind,
+                    source_node_id: input.source_node_id.clone(),
+                    target_node_id: input.target_node_id.clone(),
+                    status: input.status.trim().to_string(),
+                    payload: input.payload,
+                    revision: 1,
+                    created_at: now.clone(),
+                    updated_at: now,
+                };
+                transaction.execute(
+                    r#"INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+                    params![
+                        record.id, record.scope_key, record.kind.as_str(),
+                        record.source_node_id, record.target_node_id,
+                        record.status, to_json_text(&record.payload)?,
+                        record.revision, record.created_at, record.updated_at,
+                    ],
+                )?;
+                (explicit_id.clone(), true)
+            }
+        } else {
+            // Check for existing active edge with same (source, target, kind)
+            let existing_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+                    params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            if let Some(edge_id) = existing_id {
+                // Already exists — return existing ID, no creation
+                (edge_id, false)
+            } else {
+                let id = new_id();
+                let record = PlanningGraphEdge {
+                    id: id.clone(),
+                    scope_key: scope_key.clone(),
+                    kind: input.kind,
+                    source_node_id: input.source_node_id.clone(),
+                    target_node_id: input.target_node_id.clone(),
+                    status: input.status.trim().to_string(),
+                    payload: input.payload,
+                    revision: 1,
+                    created_at: now.clone(),
+                    updated_at: now,
+                };
+                transaction.execute(
+                    r#"INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+                    params![
+                        record.id, record.scope_key, record.kind.as_str(),
+                        record.source_node_id, record.target_node_id,
+                        record.status, to_json_text(&record.payload)?,
+                        record.revision, record.created_at, record.updated_at,
+                    ],
+                )?;
+                (id, true)
+            }
+        };
+
+        transaction.commit()?;
+        Ok((id, created))
+    }
+
+    /// Load all graph nodes in a scope for diff/comparison.
+    pub fn load_all_graph_nodes(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<PlanningGraphNode>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE scope_key = ?1 ORDER BY id ASC"
+        )?;
+        let rows = stmt.query_map(params![normalized], row_to_graph_node)?;
+        collect_rows(rows)
+    }
+
+    /// Load all graph edges in a scope for diff/comparison.
+    pub fn load_all_graph_edges(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<PlanningGraphEdge>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE scope_key = ?1 ORDER BY id ASC"
+        )?;
+        let rows = stmt.query_map(params![normalized], row_to_graph_edge)?;
+        collect_rows(rows)
+    }
+
+    // ─── Graph Runnable ────────────────────────────────────────────────────
+
+    /// Find runnable work nodes in the graph by traversing depends-on and blocks edges.
+    pub fn find_runnable_graph_work(
+        &self,
+        scope_key: &str,
+    ) -> Result<crate::GraphRunnableResult, PlanningStoreError> {
+        use crate::{BlockedGraphCandidate, GraphRunnableCandidate};
+
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+
+        // Load all work nodes in scope with runnable statuses
+        let mut stmt = connection.prepare(
+            "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE scope_key = ?1 AND kind = 'work' AND status IN ('proposed', 'active', 'draft') ORDER BY title ASC"
+        )?;
+        let work_nodes: Vec<PlanningGraphNode> = stmt
+            .query_map(params![&normalized], row_to_graph_node)?
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let mut candidates = Vec::new();
+        let mut blocked_list = Vec::new();
+
+        for node in &work_nodes {
+            // Load outgoing depends-on edges — check if targets are completed
+            let outgoing_deps: Vec<PlanningGraphEdge> = list_outgoing_edges_in_scope(
+                &connection,
+                &node.id,
+                &normalized,
+                Some(PlanningEdgeKind::DependsOn),
+            )?;
+
+            let mut incomplete_deps = Vec::new();
+            for dep_edge in &outgoing_deps {
+                if dep_edge.status != "active" {
+                    continue;
+                }
+                let target = load_graph_node(&connection, &dep_edge.target_node_id)?;
+                if !matches!(target.status.as_str(), "completed" | "validated") {
+                    incomplete_deps.push(target.id.clone());
+                }
+            }
+
+            // Load incoming blocks edges — check if any are active
+            let incoming_blocks: Vec<PlanningGraphEdge> = list_incoming_edges_in_scope(
+                &connection,
+                &node.id,
+                &normalized,
+                Some(PlanningEdgeKind::Blocks),
+            )?;
+
+            let mut active_blockers = Vec::new();
+            for block_edge in &incoming_blocks {
+                if block_edge.status != "active" {
+                    continue;
+                }
+                let blocker = load_graph_node(&connection, &block_edge.source_node_id)?;
+                if !matches!(
+                    blocker.status.as_str(),
+                    "completed" | "cancelled" | "invalidated" | "archived"
+                ) {
+                    active_blockers.push(blocker.id.clone());
+                }
+            }
+
+            if !active_blockers.is_empty() {
+                blocked_list.push(BlockedGraphCandidate {
+                    node_id: node.id.clone(),
+                    title: node.title.clone(),
+                    reason: format!("blocked_by:{}", active_blockers.join(",")),
+                    blocker_ids: active_blockers,
+                });
+            } else if incomplete_deps.is_empty() {
+                candidates.push(GraphRunnableCandidate {
+                    node_id: node.id.clone(),
+                    title: node.title.clone(),
+                    status: node.status.clone(),
+                    reason: "ready".to_string(),
+                    incomplete_dependencies: Vec::new(),
+                    active_blockers: Vec::new(),
+                });
+            } else {
+                // Not runnable — has incomplete deps but no active blockers
+                blocked_list.push(BlockedGraphCandidate {
+                    node_id: node.id.clone(),
+                    title: node.title.clone(),
+                    reason: format!("waiting_on:{}", incomplete_deps.join(",")),
+                    blocker_ids: Vec::new(),
+                });
+            }
+        }
+
+        // Sort candidates: work nodes with status=active first, then proposed, then draft
+        candidates.sort_by(|a, b| {
+            let sa = match a.status.as_str() {
+                "active" => 0,
+                "proposed" => 1,
+                _ => 2,
+            };
+            let sb = match b.status.as_str() {
+                "active" => 0,
+                "proposed" => 1,
+                _ => 2,
+            };
+            sa.cmp(&sb).then_with(|| a.title.cmp(&b.title))
+        });
+
+        Ok(crate::GraphRunnableResult {
+            candidates,
+            blocked: blocked_list,
+        })
+    }
+
+    // ─── Bulk Transition ────────────────────────────────────────────────────
+
+    /// Bulk update status for graph nodes matching IDs or a filter.
+    pub fn bulk_update_graph_node_status(
+        &self,
+        input: &crate::BulkTransitionInput,
+    ) -> Result<crate::BulkTransitionResult, PlanningStoreError> {
+        use crate::{BulkTransitionRejection, BulkTransitionResult};
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let normalized = normalize_scope_key_value(&input.scope_key);
+        let now = now_string()?;
+
+        // Resolve node IDs
+        let node_ids: Vec<String> = if let Some(ref ids) = input.node_ids {
+            ids.clone()
+        } else if let Some(ref filter) = input.filter {
+            let (where_clause, filter_params) = parse_graph_node_filter(filter, &normalized);
+            let sql = format!(
+                "SELECT id FROM planning_nodes WHERE scope_key = ?1 {where_clause} ORDER BY id ASC"
+            );
+            let mut stmt = transaction.prepare(&sql)?;
+            let mut params: Vec<Box<dyn rusqlite::types::ToSql>> = Vec::new();
+            params.push(Box::new(normalized.clone()));
+            for p in filter_params {
+                params.push(Box::new(p));
+            }
+            let param_refs: Vec<&dyn rusqlite::types::ToSql> =
+                params.iter().map(|p| p.as_ref()).collect();
+            let rows = stmt.query_map(param_refs.as_slice(), |row| row.get::<_, String>(0))?;
+            rows.collect::<Result<Vec<_>, _>>()?
+        } else {
+            return Err(PlanningStoreError::InvalidInput(
+                "either --node-ids or --filter is required".to_string(),
+            ));
+        };
+
+        if node_ids.is_empty() {
+            return Ok(BulkTransitionResult {
+                transitioned: Vec::new(),
+                rejected: Vec::new(),
+                total_matched: 0,
+                total_transitioned: 0,
+            });
+        }
+
+        let total_matched = node_ids.len();
+        let mut transitioned = Vec::new();
+        let mut rejected = Vec::new();
+
+        // Validate all transitions first
+        for node_id in &node_ids {
+            let node = match load_graph_node(&transaction, node_id) {
+                Ok(n) => n,
+                Err(_) => {
+                    rejected.push(BulkTransitionRejection {
+                        node_id: node_id.clone(),
+                        reason: "node not found".to_string(),
+                    });
+                    continue;
+                }
+            };
+            if node.scope_key != normalized {
+                rejected.push(BulkTransitionRejection {
+                    node_id: node_id.clone(),
+                    reason: format!("node in scope `{}`, not `{}`", node.scope_key, normalized),
+                });
+                continue;
+            }
+            // Accept any status transition (no lifecycle enforcement in bulk mode)
+        }
+
+        // Commit all valid transitions
+        for node_id in &node_ids {
+            if rejected.iter().any(|r| &r.node_id == node_id) {
+                continue;
+            }
+            let new_revision: i64 = transaction.query_row(
+                "SELECT revision + 1 FROM planning_nodes WHERE id = ?1",
+                params![node_id],
+                |row| row.get(0),
+            )?;
+            transaction.execute(
+                "UPDATE planning_nodes SET status = ?1, revision = ?2, updated_at = ?3 WHERE id = ?4",
+                params![&input.status, new_revision, &now, node_id],
+            )?;
+            transitioned.push(node_id.clone());
+        }
+
+        transaction.commit()?;
+        Ok(BulkTransitionResult {
+            total_matched,
+            total_transitioned: transitioned.len(),
+            transitioned,
+            rejected,
+        })
+    }
+
+    /// Apply a full parsed manifest in a single transaction.
+    /// Returns counts of created/revised/unchanged entities.
+    pub fn apply_manifest(
+        &self,
+        parsed: &crate::manifest::ParsedManifest,
+        dry_run: bool,
+    ) -> Result<crate::ManifestApplyResult, PlanningStoreError> {
+        use crate::{ManifestApplyResult, ManifestConflict};
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+
+        let scope_key = normalize_scope_key_value(&parsed.scope);
+        ensure_scope_exists(&transaction, &scope_key)?;
+
+        let mut created_nodes = Vec::new();
+        let mut revised_nodes = Vec::new();
+        let mut unchanged_nodes = Vec::new();
+        let mut created_edges = Vec::new();
+        let mut unchanged_edges = Vec::new();
+        let mut conflicts = Vec::new();
+
+        // Phase 1: Upsert all nodes
+        for node_input in &parsed.nodes {
+            match self.upsert_graph_node_in_tx(&transaction, node_input, &scope_key) {
+                Ok((id, true)) => created_nodes.push(id),
+                Ok((id, false)) => {
+                    // Check if anything actually changed
+                    let existing = load_graph_node(&transaction, &id)?;
+                    if existing.title == node_input.title.trim()
+                        && existing.summary == node_input.summary.trim()
+                        && existing.status == node_input.status.trim()
+                    {
+                        unchanged_nodes.push(id);
+                    } else {
+                        revised_nodes.push(id);
+                    }
+                }
+                Err(e) => {
+                    conflicts.push(ManifestConflict {
+                        entity_type: "node".to_string(),
+                        entity_id: node_input.id.clone().unwrap_or_else(|| "auto".to_string()),
+                        reason: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        // Phase 2: Upsert all edges
+        for edge_input in &parsed.edges {
+            match self.upsert_graph_edge_in_tx(&transaction, edge_input, &scope_key) {
+                Ok((id, true)) => created_edges.push(id),
+                Ok((id, false)) => unchanged_edges.push(id),
+                Err(e) => {
+                    conflicts.push(ManifestConflict {
+                        entity_type: "edge".to_string(),
+                        entity_id: edge_input.id.clone().unwrap_or_else(|| "auto".to_string()),
+                        reason: e.to_string(),
+                    });
+                }
+            }
+        }
+
+        if dry_run {
+            transaction.rollback()?;
+        } else {
+            transaction.commit()?;
+        }
+
+        Ok(ManifestApplyResult {
+            total_nodes: parsed.nodes.len(),
+            total_edges: parsed.edges.len(),
+            created_nodes,
+            revised_nodes,
+            unchanged_nodes,
+            created_edges,
+            revised_edges: Vec::new(),
+            unchanged_edges,
+            conflicts,
+            validation: None,
+        })
+    }
+
+    /// Internal: upsert a graph node within an existing transaction.
+    fn upsert_graph_node_in_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        input: &CreateGraphNodeInput,
+        scope_key: &str,
+    ) -> Result<(String, bool), PlanningStoreError> {
+        let now = now_string()?;
+
+        if let Some(ref explicit_id) = input.id {
+            let existing: Option<PlanningGraphNode> = transaction
+                .query_row(
+                    "SELECT id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at FROM planning_nodes WHERE id = ?1",
+                    params![explicit_id],
+                    row_to_graph_node,
+                )
+                .optional()?;
+
+            if let Some(node) = existing {
+                if node.scope_key != *scope_key {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "CROSS_SCOPE_CONFLICT: node `{}` exists in scope `{}`, not `{}`",
+                        explicit_id, node.scope_key, scope_key
+                    )));
+                }
+                let new_revision = node.revision + 1;
+                transaction.execute(
+                    "UPDATE planning_nodes SET title = ?1, summary = ?2, status = ?3, payload_json = ?4, tags_json = ?5, revision = ?6, updated_at = ?7 WHERE id = ?8",
+                    params![
+                        input.title.trim(),
+                        input.summary.trim(),
+                        input.status.trim(),
+                        to_json_text(&input.payload)?,
+                        to_json_text(&normalize_string_list(input.tags.clone()))?,
+                        new_revision,
+                        now,
+                        explicit_id,
+                    ],
+                )?;
+                return Ok((explicit_id.clone(), false));
+            }
+        }
+
+        // Create new
+        let id = input.id.clone().unwrap_or_else(new_id);
+        let record = PlanningGraphNode {
+            id: id.clone(),
+            scope_key: scope_key.to_string(),
+            kind: input.kind,
+            title: input.title.trim().to_string(),
+            summary: input.summary.trim().to_string(),
+            status: input.status.trim().to_string(),
+            payload: input.payload.clone(),
+            tags: normalize_string_list(input.tags.clone()),
+            revision: 1,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        transaction.execute(
+            r#"INSERT INTO planning_nodes (id, scope_key, kind, title, summary, status, payload_json, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)"#,
+            params![
+                record.id, record.scope_key, record.kind.as_str(),
+                record.title, record.summary, record.status,
+                to_json_text(&record.payload)?, to_json_text(&record.tags)?,
+                record.revision, record.created_at, record.updated_at,
+            ],
+        )?;
+        Ok((id, true))
+    }
+
+    /// Internal: upsert a graph edge within an existing transaction.
+    fn upsert_graph_edge_in_tx(
+        &self,
+        transaction: &Transaction<'_>,
+        input: &CreateGraphEdgeInput,
+        scope_key: &str,
+    ) -> Result<(String, bool), PlanningStoreError> {
+        // Preflight checks (same invariants as create_graph_edge)
+        require_non_empty("source_node_id", &input.source_node_id)?;
+        require_non_empty("target_node_id", &input.target_node_id)?;
+        require_kebab_token("status", &input.status)?;
+
+        if input.source_node_id == input.target_node_id {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "self-referential {} edge is not allowed: source and target must be different nodes",
+                input.kind.as_str(),
+            )));
+        }
+
+        let source = load_graph_node(transaction, &input.source_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "sourceNodeId references missing node `{}`",
+                input.source_node_id
+            ))
+        })?;
+        let target = load_graph_node(transaction, &input.target_node_id).map_err(|_| {
+            PlanningStoreError::InvalidInput(format!(
+                "targetNodeId references missing node `{}`",
+                input.target_node_id
+            ))
+        })?;
+
+        if source.scope_key != *scope_key || target.scope_key != *scope_key {
+            return Err(PlanningStoreError::InvalidInput(
+                "source and target nodes must belong to the same scope as the edge".to_string(),
+            ));
+        }
+
+        validate_edge_kind_pair(&input.kind, &source.kind, &target.kind)?;
+
+        if let Some(ref explicit_id) = input.id {
+            let existing: Option<PlanningGraphEdge> = transaction
+                .query_row(
+                    "SELECT id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at FROM planning_edges WHERE id = ?1",
+                    params![explicit_id],
+                    row_to_graph_edge,
+                )
+                .optional()?;
+
+            if let Some(edge) = existing {
+                if edge.scope_key != *scope_key {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "CROSS_SCOPE_CONFLICT: edge `{}` exists in scope `{}`, not `{}`",
+                        explicit_id, edge.scope_key, scope_key
+                    )));
+                }
+                let new_revision = edge.revision + 1;
+                let now = now_string()?;
+                transaction.execute(
+                    "UPDATE planning_edges SET kind = ?1, source_node_id = ?2, target_node_id = ?3, status = ?4, payload_json = ?5, revision = ?6, updated_at = ?7 WHERE id = ?8",
+                    params![
+                        input.kind.as_str(), input.source_node_id, input.target_node_id,
+                        input.status.trim(), to_json_text(&input.payload)?,
+                        new_revision, now, explicit_id,
+                    ],
+                )?;
+                return Ok((explicit_id.clone(), false));
+            }
+            // Edge doesn't exist by ID, but check for a matching tuple edge (same kind, source, target)
+            let existing_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+                    params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            if let Some(edge_id) = existing_id {
+                return Ok((edge_id, false));
+            }
+        } else {
+            let existing_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+                    params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            if let Some(edge_id) = existing_id {
+                return Ok((edge_id, false));
+            }
+        }
+
+        // Create new — check for cycles and active duplicates
+        if input.status.trim() == "active" {
+            let dup_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM planning_edges WHERE scope_key = ?1 AND kind = ?2 AND source_node_id = ?3 AND target_node_id = ?4 AND status = 'active'",
+                params![scope_key, input.kind.as_str(), input.source_node_id, input.target_node_id],
+                |row| row.get(0),
+            )?;
+            if dup_count > 0 {
+                return Err(PlanningStoreError::InvalidInput(format!(
+                    "duplicate active {} edge from `{}` to `{}` in scope `{}`",
+                    input.kind.as_str(),
+                    input.source_node_id,
+                    input.target_node_id,
+                    scope_key
+                )));
+            }
+            match input.kind {
+                PlanningEdgeKind::DecomposesTo | PlanningEdgeKind::DependsOn
+                    if would_create_graph_cycle(
+                        transaction,
+                        &input.source_node_id,
+                        &input.target_node_id,
+                        &input.kind,
+                    )? =>
+                {
+                    return Err(PlanningStoreError::InvalidInput(format!(
+                        "adding this {} edge from `{}` to `{}` would create a cycle",
+                        input.kind.as_str(),
+                        input.source_node_id,
+                        input.target_node_id
+                    )));
+                }
+                _ => {}
+            }
+        }
+
+        let id = input.id.clone().unwrap_or_else(new_id);
+        let now = now_string()?;
+        let record = PlanningGraphEdge {
+            id: id.clone(),
+            scope_key: scope_key.to_string(),
+            kind: input.kind,
+            source_node_id: input.source_node_id.clone(),
+            target_node_id: input.target_node_id.clone(),
+            status: input.status.trim().to_string(),
+            payload: input.payload.clone(),
+            revision: 1,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+        transaction.execute(
+            r#"INSERT INTO planning_edges (id, scope_key, kind, source_node_id, target_node_id, status, payload_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)"#,
+            params![
+                record.id, record.scope_key, record.kind.as_str(),
+                record.source_node_id, record.target_node_id,
+                record.status, to_json_text(&record.payload)?,
+                record.revision, record.created_at, record.updated_at,
+            ],
+        )?;
+        Ok((id, true))
+    }
 }
 
 fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
@@ -8631,6 +9507,35 @@ fn require_current_lease(
 
 fn new_id() -> String {
     Uuid::new_v4().to_string()
+}
+
+/// Parse a key=value [AND key=value]* filter string for graph node queries.
+/// Returns (WHERE clause fragment, params).
+fn parse_graph_node_filter(filter: &str, _scope_key: &str) -> (String, Vec<String>) {
+    let mut conditions = Vec::new();
+    let mut params = Vec::new();
+    for part in filter.split("AND").map(|s| s.trim()) {
+        if let Some((key, value)) = part.split_once('=') {
+            let key = key.trim();
+            let value = value.trim();
+            match key {
+                "kind" | "status" | "title" => {
+                    conditions.push(format!("{key} = ?{}", params.len() + 2));
+                    params.push(value.to_string());
+                }
+                "tag" => {
+                    conditions.push(format!("tags_json LIKE ?{}", params.len() + 2));
+                    params.push(format!("%\"{value}\"%"));
+                }
+                _ => {} // ignore unknown keys
+            }
+        }
+    }
+    if conditions.is_empty() {
+        ("".to_string(), params)
+    } else {
+        (format!("AND ({})", conditions.join(" AND ")), params)
+    }
 }
 
 fn require_non_empty(field: &str, value: &str) -> Result<(), PlanningStoreError> {

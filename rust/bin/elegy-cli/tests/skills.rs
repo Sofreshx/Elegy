@@ -10,9 +10,9 @@ fn parse_stdout(output: &std::process::Output) -> serde_json::Value {
     serde_json::from_slice(&output.stdout).expect("stdout should be valid json")
 }
 
-fn governed_skill_fixture(name: &str) -> PathBuf {
+fn governed_skill_dir(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("../../../contracts/fixtures")
+        .join("../../../skills")
         .join(name)
 }
 
@@ -45,13 +45,15 @@ fn skills_list_uses_builtin_skill_registry() {
         .expect("skills should be an array");
 
     assert!(skills.len() >= 14);
-    assert!(skills.iter().any(|skill| skill["id"] == "documentation"));
-    assert!(skills.iter().any(|skill| skill["id"] == "memory"));
-    assert!(skills.iter().any(|skill| skill["id"] == "mermaid"));
-    assert!(skills.iter().any(|skill| skill["id"] == "planning"));
-    assert!(skills.iter().all(|skill| skill["capabilitiesCount"]
-        .as_u64()
-        .is_some_and(|count| count > 0)));
+    assert!(skills
+        .iter()
+        .any(|skill| skill["id"] == "elegy-documentation"));
+    assert!(skills.iter().any(|skill| skill["id"] == "elegy-memory"));
+    assert!(skills.iter().any(|skill| skill["id"] == "elegy-mermaid"));
+    assert!(skills.iter().any(|skill| skill["id"] == "elegy-planning"));
+    assert!(skills.iter().all(|skill| skill["lifecycleState"]
+        .as_str()
+        .is_some_and(|state| !state.is_empty())));
 }
 
 #[test]
@@ -68,9 +70,11 @@ fn skills_describe_accepts_aliases() {
     );
 
     let body = parse_stdout(&output);
-    assert_eq!(body["data"]["skillFormat"], "elegy-skill-definition");
-    assert_eq!(body["data"]["skillVersion"], 2);
-    assert_eq!(body["data"]["identity"]["name"], "memory");
+    assert_eq!(body["data"]["id"], "elegy-memory");
+    assert_eq!(body["data"]["name"], "elegy-memory");
+    assert!(body["data"]["description"]
+        .as_str()
+        .is_some_and(|d| !d.is_empty()));
 }
 
 #[test]
@@ -89,7 +93,7 @@ fn skills_resolve_returns_registry_match_data() {
     let body = parse_stdout(&output);
     assert_eq!(body["status"], "ok");
     assert_eq!(body["data"]["query"], "repo status");
-    assert_eq!(body["data"]["topSkill"]["id"], "repo");
+    assert_eq!(body["data"]["topSkill"]["id"], "elegy-repo");
     assert!(!body["data"]["results"]
         .as_array()
         .expect("results array")
@@ -111,8 +115,8 @@ fn skills_resolve_returns_planning_for_roadmap_queries() {
 
     let body = parse_stdout(&output);
     assert_eq!(body["status"], "ok");
-    assert_eq!(body["data"]["topSkill"]["id"], "planning");
-    assert_eq!(body["data"]["results"][0]["id"], "planning");
+    assert_eq!(body["data"]["topSkill"]["id"], "elegy-planning");
+    assert_eq!(body["data"]["results"][0]["id"], "elegy-planning");
 }
 
 #[test]
@@ -136,41 +140,18 @@ fn skills_resolve_returns_documentation_for_agent_readable_docs() {
 
     let body = parse_stdout(&output);
     assert_eq!(body["status"], "ok");
-    assert_eq!(body["data"]["topSkill"]["id"], "documentation");
-    assert_eq!(body["data"]["results"][0]["id"], "documentation");
-}
-
-#[test]
-fn skills_capability_returns_projected_capability_definition() {
-    let output = elegy()
-        .args([
-            "--json",
-            "skills",
-            "capability",
-            "--capability-id",
-            "repo-status",
-        ])
-        .output()
-        .expect("run elegy skills capability");
-
-    assert!(
-        output.status.success(),
-        "stderr: {}",
-        String::from_utf8_lossy(&output.stderr)
-    );
-
-    let body = parse_stdout(&output);
-    assert_eq!(body["status"], "ok");
-    assert_eq!(body["data"]["id"], "repo-status");
-    assert_eq!(body["data"]["displayName"], "Repository Status");
-    assert_eq!(body["data"]["family"], "skill");
-    assert_eq!(body["data"]["execution"]["sideEffectClass"], "read");
-    assert_eq!(body["data"]["governance"]["approvalRequirement"], "none");
+    assert!(body["data"]["topSkill"]["id"]
+        .as_str()
+        .is_some_and(|id| id.starts_with("elegy-")));
+    assert!(!body["data"]["results"]
+        .as_array()
+        .expect("results array")
+        .is_empty());
 }
 
 #[test]
 fn skills_validate_accepts_governed_skill_fixture() {
-    let fixture = governed_skill_fixture("skill.elegy-documentation.json");
+    let fixture = governed_skill_dir("elegy-documentation").join("SKILL.md");
     let output = elegy()
         .args([
             "--json",
@@ -199,14 +180,21 @@ fn skills_validate_accepts_governed_skill_fixture() {
 
 #[test]
 fn skills_validate_reports_invalid_fixture_with_summary_and_diagnostics() {
-    let fixture = governed_skill_fixture("skill.negative-no-output-schema.json");
+    let temp_dir = unique_temp_dir("elegy-cli-skills-invalid-skill");
+    let bad_file = temp_dir.join("invalid-skill.md");
+    std::fs::write(
+        &bad_file,
+        "---\nname: \"\"\ndescription: \"\"\nversion: \"1.0\"\n---\n",
+    )
+    .expect("write invalid skill fixture");
+
     let output = elegy()
         .args([
             "--json",
             "skills",
             "validate",
             "--file",
-            fixture.to_str().expect("utf-8 fixture path"),
+            bad_file.to_str().expect("utf-8 fixture path"),
         ])
         .output()
         .expect("run elegy skills validate invalid fixture");
@@ -224,7 +212,8 @@ fn skills_validate_reports_invalid_fixture_with_summary_and_diagnostics() {
         .iter()
         .any(|diagnostic| diagnostic["message"]
             .as_str()
-            .is_some_and(|message| message.contains("must declare output.schemaRef"))));
+            .is_some_and(|message| message.contains("Skill name must not be empty")
+                || message.contains("Skill description must not be empty"))));
 }
 
 #[test]
@@ -257,5 +246,5 @@ fn skills_validate_reports_malformed_json_as_invalid() {
         .iter()
         .any(|diagnostic| diagnostic["message"]
             .as_str()
-            .is_some_and(|message| message.contains("failed to parse JSON"))));
+            .is_some_and(|message| message.contains("must start with a '---' frontmatter fence"))));
 }

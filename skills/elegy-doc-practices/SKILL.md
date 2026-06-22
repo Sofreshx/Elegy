@@ -58,5 +58,4 @@ Every spec additionally needs `doc_kind` (one of `adr`, `spec`, `guide`,
 - [Centralize documentation practices doctrine ADR](../../adr/2026-05-25-centralize-documentation-practices-doctrine.md)
 - [Documentation practices architecture doc](../../architecture/documentation-practices.md)
 - [Documentation practices skill and CLI spec](../../specs/documentation-practices-skill-and-cli.md)
-- [Plugin package fixture: elegy-plugin-package.elegy-doc-practices.json](../../contracts/fixtures/elegy-plugin-package.elegy-doc-practices.json)
-- [Governed skill: skill.elegy-doc-practices.json](../../contracts/fixtures/skill.elegy-doc-practices.json)
+- [Governed skill fixture: skill.elegy-doc-practices.json (deleted, replaced by this skill)](../../contracts/fixtures/skill.elegy-doc-practices.json)

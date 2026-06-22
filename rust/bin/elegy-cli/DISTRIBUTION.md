@@ -27,9 +27,9 @@ flow into the plugin package tooling shared with `rust/core/elegy-tooling`.
   for the release channel contract.
 - **Wrapper archive:** `elegy-cli-wrapper-<bundleVersion>.zip` (when applicable).
 - **Plugin package:** `elegy-cli` does not currently have a dedicated
-  `elegy-plugin-package.elegy-cli.json`; the umbrella surface is documented by
-  this `DISTRIBUTION.md` and the umbrella `elegy-plugin-package.minimal.json`
-  contract.
+  plugin manifest; the umbrella surface is documented by
+  this `DISTRIBUTION.md` and the `distribution/surfaces.json`
+  catalog.
 
 ## Install
 

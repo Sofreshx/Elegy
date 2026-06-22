@@ -8,14 +8,16 @@
 - Discovery indexes, generated bundles under `artifacts/`, and other materialized outputs are derived surfaces, not authored truth.
 - Do not add or revive v1 `skill-definition.*.json` files.
 
-## Authoring a new plugin package
+## Plugin Authority
 
-- Copy `contracts/fixtures/elegy-plugin-package.template.json` to `contracts/fixtures/elegy-plugin-package.<your-feature>.json` and replace every `<FILL-IN: ...>` placeholder. The template's `_template_instructions` extension field lists the steps end-to-end.
-- Each plugin package is owned by the feature tree that publishes it. The `elegy-plugin-package.<feature>.json` fixture is the **single source of truth** for that feature's publish metadata: archive family, asset prefix, skill bridge path, installer filename, and optional pre/post publish hooks. There is no central catalog and no per-feature workflow file.
-- For features with a binary or wrapper, the `publishing` block is required when `toolRequirements` is non-empty. The conformance test `plugin_package_fixtures_with_tool_requirements_have_publishing_metadata` enforces this. Two further conformance tests enforce the central-orchestrator contract: `plugin_package_publishing_blocks_have_orchestrator_required_fields` and `plugin_package_crate_paths_resolve_in_workspace`.
-- The central publish orchestrator (`.github/workflows/publish-orchestrator.yml`) discovers surfaces by walking `contracts/fixtures/elegy-plugin-package.*.json`, reading each `publishing` block, and dispatching a build per surface through `._reusable-publish.yml`. Adding a new surface = add a fixture + nothing else. No workflow file to write, no central catalog to update.
-- The `publishing` block's `cratePath` and `assetKind` fields are the orchestrator's build inputs. `cratePath` is the workspace crate name (e.g. `elegy-memory`) and is passed to `cargo build -p`. `assetKind` is `cli` (binary-only archive) or `wrapper` (binary + SKILL.md bridge + installer). Skill-only surfaces without a Rust build omit `cratePath`.
-- Validate with `cargo run --manifest-path rust/Cargo.toml -p elegy-cli -- contracts validate --project .` then `cargo test -p elegy-contracts --test conformance all_plugin_package_fixtures_match_current_schema -- --nocapture`, `cargo test -p elegy-contracts --test conformance plugin_package_fixtures_with_tool_requirements_have_publishing_metadata -- --nocapture`, `cargo test -p elegy-contracts --test conformance plugin_package_publishing_blocks_have_orchestrator_required_fields -- --nocapture`, and `cargo test -p elegy-contracts --test conformance plugin_package_crate_paths_resolve_in_workspace -- --nocapture` against the smallest target that proves the change.
+The thin `.elegy-plugin/plugin.json` manifest (`elegy-plugin/v1`) is the single plugin authority. Plugin packages (`elegy-plugin-package/v1`) are retired.
+
+- `contracts/schemas/elegy-plugin-v1.schema.json` — Plugin manifest schema
+- `contracts/fixtures/elegy-plugin-v1.fixture.json` — Upstream plugin fixture
+
+Skill definitions and their discovery indexes have been replaced by Agent Skills directories (`skills/<name>/SKILL.md`).
+
+Validate with `cargo test -p elegy-contracts`.
 
 ## Change Rules
 
