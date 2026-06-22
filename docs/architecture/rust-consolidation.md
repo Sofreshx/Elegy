@@ -206,7 +206,7 @@ Contributor-facing validation should point to the smallest real flows that still
 
 ```bash
 cd rust && cargo run -p elegy-cli -- contracts validate --project ..
-cd rust && cargo run -p elegy-cli -- contracts export --output ../artifacts/contracts --create-archive --archive-output ../artifacts/distribution/elegy-contracts-bundle.zip
+cd rust && cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
 ```
 
 ### Rust executable surfaces

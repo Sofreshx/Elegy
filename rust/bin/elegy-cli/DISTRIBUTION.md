@@ -55,7 +55,7 @@ cargo run -p elegy-cli -- --version --json
 
 - `cargo test -p elegy-cli` for the umbrella command surface
 - `cargo clippy -p elegy-cli -- -D warnings`
-- For governed artifact changes, run `cargo run -p elegy-cli -- contracts export --output ../artifacts/contracts --create-archive --archive-output ../artifacts/distribution/elegy-contracts-bundle.zip` from the `rust/` directory first
+- For governed artifact changes, run `cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip` from the `rust/` directory first
   so the umbrella CLI can resolve the contract bundle from
   `artifacts/contracts/`.
 

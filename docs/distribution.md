@@ -28,12 +28,11 @@ Bundle version and CLI version are intentionally independent. Consumers should r
 
 | Family | Pattern | Notes |
 | --- | --- | --- |
-| Contracts bundle | `elegy-contracts-<bundleVersion>.zip` | Governed schemas, fixtures, compatibility metadata. The canonical machine-readable handoff. |
+| Contracts bundle | `elegy-contracts-bundle.zip` | Governed schemas, fixtures, compatibility metadata. The canonical machine-readable handoff. |
 | Standalone installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Carries `install-distribution.sh` (canonical) + `install-distribution.ps1` (thin shim) + `README.md`. |
-| Release manifest | `elegy-release-manifest-<bundleVersion>.json` | Finalized by `.github/workflows/release-finalize.yml` on `release: published` events. |
-| Release checksums | `elegy-release-checksums-<bundleVersion>.json` | SHA-256 of every published asset. Same workflow. |
-| CLI archive | `elegy-<surface>-<cliVersion>-<target>.zip` | Per binary surface, per target. Self-describing. |
-| Wrapper archive | `elegy-<surface>-wrapper-<bundleVersion>.zip` | Per-feature bounded integration surface bundling a CLI binary + SKILL.md mirror + installer. |
+| Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
+| Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published archive and the manifest. |
+| CLI archive | `<archiveFamily>-<target>-<commitSha>.zip` | Per binary surface and target, resolved through `distribution/surfaces.json`. |
 
 ## Surface Catalog
 
@@ -63,10 +62,10 @@ The installer resolves the release manifest and checksums, verifies asset size a
 ## Contracts bundle
 
 ```bash
-cd rust && cargo run -p elegy-cli -- contracts export --output ../artifacts/contracts --create-archive --archive-output ../artifacts/distribution/elegy-contracts-bundle.zip
+cd rust && cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
 ```
 
-Output: `artifacts/distribution/elegy-contracts-*.zip`. The contracts bundle is the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
+Output: `artifacts/distribution/elegy-contracts-bundle.zip`. The contracts bundle is the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
 
 ## Downstream guidance
 
@@ -80,6 +79,7 @@ Output: `artifacts/distribution/elegy-contracts-*.zip`. The contracts bundle is 
 ## Where to read more
 
 - Per-feature distribution: each `rust/features/<feature>/DISTRIBUTION.md` and `rust/bin/elegy-cli/DISTRIBUTION.md` etc.
-- Release finalization (manifest + checksums): `.github/workflows/release-finalize.yml`.
+- Release publishing (CLI archives, aggregate artifacts, manifest, checksums): `.github/workflows/publish-orchestrator.yml`.
+- Manual metadata recovery for an existing release: `.github/workflows/release-finalize.yml`.
 - Aggregate artifacts (contracts bundle, installer bootstrap): `.github/workflows/distribution-artifacts.yml`.
 - Authority surfaces: [`docs/architecture/ecosystem-topology.md`](./architecture/ecosystem-topology.md).
