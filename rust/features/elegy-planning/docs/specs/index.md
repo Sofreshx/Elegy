@@ -3,7 +3,7 @@ title: elegy-planning Spec
 status: active
 owner: Elegy
 created: 2026-05-25
-updated: 2026-06-13
+updated: 2026-06-19
 doc_kind: spec
 summary: Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.
 schema_version: elegy-planning/v1
@@ -230,8 +230,11 @@ stateDiagram-v2
 | Cross-scope parent references | Rejected at preflight |
 | Scope transfer leaves dependent entities | Rejected at preflight |
 | ProjectRun must link to a goal, roadmap, and work point | Preflight check before insert |
-| Active ProjectRun lease on a work point blocks other claims | Preflight rejection (`ACTIVE-LEASE-CONFLICT`) |
-| Work point with active lease is excluded from `next-runnable` | Read-side filter |
+| Live ProjectRun lease on a work point blocks other claims | Atomic immediate transaction and `ACTIVE-LEASE-CONFLICT` |
+| Expired ProjectRun lease | Released during the next claim; no longer blocks runnable queries |
+| Replayed claim idempotency key | Same payload returns the original record; mismatch rejects |
+| Stale fencing token | Activate, heartbeat, evidence, and release reject before mutation |
+| Work point with live lease is excluded from `next-runnable` | Expiry-aware read-side filter |
 | `add-evidence` rejected when run is `completed` or `released` | Status check at preflight |
 | Completed project run with no evidence refs | Validation finding (`PROJECT-RUN-COMPLETED-WITHOUT-EVIDENCE`, warning) |
 | Project run attached to a cancelled or invalidated work point | Validation finding (`PROJECT-RUN-WORK-POINT-INVALID`, error) |
@@ -361,9 +364,10 @@ via the session ID without needing `--correlation-id` on every call.
 | Search | cross-entity `search`, entity-specific `* search` |
 | Validate | `all` |
 | Health | `health` |
+| Compatibility metadata | `capabilities` |
 | Events | `events` |
 | Project | `render`, `export` |
-| Project run | `claim`, `activate`, `release`, `add-evidence`, `list`, `show` |
+| Project run | `claim`, `activate`, `heartbeat`, `release`, `add-evidence`, `list`, `show` |
 
 ---
 

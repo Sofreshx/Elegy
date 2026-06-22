@@ -23,7 +23,7 @@ files are projections only.
 
 - **CLI archive asset family:** `elegy-planning-<cliVersion>-<target>.zip`
 - **Wrapper archive:** `elegy-planning-wrapper-<bundleVersion>.zip`
-- **Plugin package:** `contracts/fixtures/elegy-plugin-package.elegy-planning.json`
+- **Release catalog entry:** `distribution/surfaces.json` (name: `elegy-planning`)
 - **Skill fixture:** `contracts/fixtures/skill.elegy-planning.json`
 - **Versioning:** follows workspace `version`.
 

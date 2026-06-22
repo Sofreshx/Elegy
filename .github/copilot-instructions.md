@@ -13,7 +13,7 @@ Before writing any code, read the relevant architecture docs:
 
 - `README.md` - current public project shape and shipped surfaces.
 - `docs/agent-integration.md` - host onboarding, discovery, invocation templates, profiles, JSON envelopes, and MCP projection.
-- `docs/architecture/mcp-skill-tooling-placement.md` - MCP, skill generation, portable package, and ownership boundaries.
+- `docs/architecture/mcp-skill-tooling-placement.md` - MCP, skill registry, and ownership boundaries.
 - `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` - ADR/spec doctrine and docs validation posture.
 - `docs/spec-baseline.md` - current MCP protocol baseline.
 - `rust/features/elegy-memory/docs/architecture/ARCHITECTURE.md` and `rust/features/elegy-memory/docs/architecture/mvp-scope.md` - memory architecture and MVP scope.
@@ -31,7 +31,7 @@ Before writing any code, read the relevant architecture docs:
 ## Agent Tool Discovery
 
 - Prefer `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
-- Use `elegy-skills list/search/resolve/get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
+- Use `elegy-skills list/search/resolve/get/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
 - skill definitions in `contracts/fixtures/skill.*.json` are the supported skill contract.
 - Do not reintroduce v1 `skill-definition.*.json` files.
 - `elegy run` exposes an optional MCP stdio adapter over governed capabilities. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.

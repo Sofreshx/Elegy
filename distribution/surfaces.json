@@ -1,0 +1,146 @@
+{
+  "description": "Elegy monorepo release catalog. Maps workspace crates and surfaces to their release configuration. No pre/post publish hooks — workflows express build behavior directly.",
+  "surfaces": [
+    {
+      "name": "elegy-cli",
+      "crate": "elegy-cli",
+      "kind": "cli",
+      "archiveFamily": "elegy-cli",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Umbrella CLI with all Elegy capabilities."
+    },
+    {
+      "name": "elegy-planning",
+      "crate": "elegy-planning",
+      "kind": "cli",
+      "archiveFamily": "elegy-planning",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Durable planning CLI over SQLite."
+    },
+    {
+      "name": "elegy-skills",
+      "crate": "elegy-skills",
+      "kind": "cli",
+      "archiveFamily": "elegy-skills",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Skill registry and discovery CLI."
+    },
+    {
+      "name": "elegy-memory",
+      "crate": "elegy-memory",
+      "kind": "cli",
+      "archiveFamily": "elegy-memory",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Memory CLI with embeddings and retrieval."
+    },
+    {
+      "name": "elegy-mcp",
+      "crate": "elegy-mcp",
+      "kind": "cli",
+      "archiveFamily": "elegy-mcp",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "MCP analysis and authoring CLI."
+    },
+    {
+      "name": "elegy-documentation",
+      "crate": "elegy-documentation",
+      "kind": "cli",
+      "archiveFamily": "elegy-documentation",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Documentation inspection and validation CLI."
+    },
+    {
+      "name": "elegy-configuration",
+      "crate": "elegy-configuration",
+      "kind": "cli",
+      "archiveFamily": "elegy-configuration",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Configuration materialization CLI."
+    },
+    {
+      "name": "elegy-obsidian",
+      "crate": null,
+      "kind": "skill-only",
+      "archiveFamily": "elegy-obsidian",
+      "description": "Obsidian vault bridge skill (wrapper around external Obsidian CLI). No Rust binary."
+    },
+    {
+      "name": "elegy-diagram",
+      "crate": "elegy-diagram",
+      "kind": "cli",
+      "archiveFamily": "elegy-diagram",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Semantic diagram CLI."
+    },
+    {
+      "name": "elegy-mermaid",
+      "crate": "elegy-mermaid",
+      "kind": "cli",
+      "archiveFamily": "elegy-mermaid",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Mermaid diagram rendering CLI."
+    },
+    {
+      "name": "elegy-web",
+      "crate": "elegy-web",
+      "kind": "cli",
+      "archiveFamily": "elegy-web",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "HTTP fetch and ping CLI."
+    },
+    {
+      "name": "elegy-repo",
+      "crate": "elegy-repo",
+      "kind": "cli",
+      "archiveFamily": "elegy-repo",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Git repository inspection CLI."
+    },
+    {
+      "name": "elegy-data",
+      "crate": "elegy-data",
+      "kind": "cli",
+      "archiveFamily": "elegy-data",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Data format conversion CLI."
+    },
+    {
+      "name": "elegy-notify",
+      "crate": "elegy-notify",
+      "kind": "cli",
+      "archiveFamily": "elegy-notify",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Desktop notification CLI."
+    },
+    {
+      "name": "elegy-observe",
+      "crate": "elegy-observe",
+      "kind": "cli",
+      "archiveFamily": "elegy-observe",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "System observation CLI."
+    },
+    {
+      "name": "elegy-desktop",
+      "crate": "elegy-desktop",
+      "kind": "cli",
+      "archiveFamily": "elegy-desktop",
+      "targets": ["x86_64-pc-windows-msvc", "x86_64-unknown-linux-gnu", "aarch64-apple-darwin"],
+      "description": "Desktop automation CLI."
+    },
+    {
+      "name": "elegy-skill-authoring",
+      "crate": null,
+      "kind": "skill-only",
+      "archiveFamily": "elegy-skill-authoring",
+      "description": "Skill authoring doctrine instructions. No Rust binary."
+    },
+    {
+      "name": "elegy-doc-practices",
+      "crate": null,
+      "kind": "skill-only",
+      "archiveFamily": "elegy-doc-practices",
+      "description": "Documentation practices instructions. No Rust binary."
+    }
+  ]
+}

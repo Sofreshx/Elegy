@@ -1,13 +1,9 @@
 use elegy_contracts::{
     validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
-    McpServerDescriptor, McpToolAnalysis, McpToolDefinition, McpTransportKind, SkillCapability,
-    SkillCapabilityExecution, SkillCapabilityInput, SkillCapabilityOutput, SkillDefinitionV2,
-    SkillDiscovery, SkillGovernance, SkillIdentityV2, SkillImplementation, SkillMetadataV2,
-    SkillOriginV2, SkillTrigger,
+    McpServerDescriptor, McpToolAnalysis, McpToolDefinition, McpTransportKind, SkillTrigger,
 };
 use serde::Serialize;
 use serde_json::Value;
-use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -83,18 +79,6 @@ pub fn analyze_mcp_descriptor_file(path: &Path) -> Result<McpAnalysisResult, Mcp
     Ok(analysis)
 }
 
-#[derive(Clone, Debug, Default, PartialEq)]
-pub struct McpSkillGenerationResult {
-    pub generated_skills: Vec<SkillDefinitionV2>,
-    pub skipped_tools: Vec<McpToolDefinition>,
-}
-
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct McpToolSummary {
-    pub name: String,
-    pub description: Option<String>,
-}
-
 pub struct McpToolAnalyzer;
 
 impl McpToolAnalyzer {
@@ -113,113 +97,6 @@ impl McpToolAnalyzer {
                 .collect(),
         }
     }
-}
-
-pub struct McpSkillGenerator;
-
-impl McpSkillGenerator {
-    pub fn generate(&self, analysis_result: &McpAnalysisResult) -> McpSkillGenerationResult {
-        let mut generated = Vec::new();
-        let mut skipped = Vec::new();
-
-        for analysis in &analysis_result.analyses {
-            if !analysis.has_valid_schema {
-                skipped.push(analysis.tool.clone());
-                continue;
-            }
-
-            let skill_id = generated_skill_id(&analysis_result.server_name, &analysis.tool.name);
-            let slug = build_slug(&analysis_result.server_name, &analysis.tool.name);
-            let source_ref = format!("mcp://{}/tools/{slug}", analysis_result.server_name);
-
-            generated.push(SkillDefinitionV2 {
-                skill_format: "elegy-skill-definition".to_string(),
-                skill_version: 2,
-                identity: SkillIdentityV2 {
-                    namespace: analysis_result.server_name.clone(),
-                    name: skill_id.clone(),
-                    version: "0.1.0".to_string(),
-                    display_name: Some(analysis.tool.name.clone()),
-                    aliases: vec![analysis.tool.name.clone()],
-                },
-                metadata: Some(SkillMetadataV2 {
-                    display_name: Some(analysis.tool.name.clone()),
-                    description: analysis.tool.description.clone(),
-                    summary: analysis.tool.description.clone(),
-                    category: Some("mcp".to_string()),
-                    tags: build_keywords(&analysis_result.server_name, &analysis.tool.name),
-                    ..SkillMetadataV2::default()
-                }),
-                capabilities: vec![SkillCapability {
-                    id: skill_id.clone(),
-                    name: analysis.tool.name.clone(),
-                    description: analysis
-                        .tool
-                        .description
-                        .clone()
-                        .unwrap_or_else(|| format!("Call MCP tool '{}'.", analysis.tool.name)),
-                    implementation: Some(SkillImplementation {
-                        execution_type: "mcp".to_string(),
-                        executable_name: analysis_result.server_name.clone(),
-                        arguments: vec![analysis.tool.name.clone()],
-                    }),
-                    input: Some(SkillCapabilityInput {
-                        schema_ref: analysis
-                            .tool
-                            .input_schema
-                            .as_ref()
-                            .map(|_| format!("{source_ref}/input-schema")),
-                        ..SkillCapabilityInput::default()
-                    }),
-                    output: Some(SkillCapabilityOutput {
-                        description: analysis.tool.description.clone(),
-                        ..SkillCapabilityOutput::default()
-                    }),
-                    execution: Some(SkillCapabilityExecution {
-                        mode: Some("requestResponse".to_string()),
-                        is_deterministic: false,
-                        has_side_effects: false,
-                        ..SkillCapabilityExecution::default()
-                    }),
-                    ..SkillCapability::default()
-                }],
-                governance: Some(SkillGovernance {
-                    risk_level: Some("low".to_string()),
-                    approval_requirement: Some("none".to_string()),
-                    allowed_contexts: vec!["mcp".to_string()],
-                    ..SkillGovernance::default()
-                }),
-                discovery: Some(SkillDiscovery {
-                    keywords: build_keywords(&analysis_result.server_name, &analysis.tool.name),
-                    triggers: analysis.extracted_triggers.clone(),
-                    capability_hints: analysis
-                        .extracted_triggers
-                        .iter()
-                        .map(|trigger| trigger.pattern.clone())
-                        .collect(),
-                    ..SkillDiscovery::default()
-                }),
-                origin: Some(SkillOriginV2 {
-                    materialization_kind: Some("declared".to_string()),
-                    source_kind: Some("generated".to_string()),
-                    source_ref: Some(source_ref),
-                    ..SkillOriginV2::default()
-                }),
-                lifecycle_state: "draft".to_string(),
-                ..SkillDefinitionV2::default()
-            });
-        }
-
-        McpSkillGenerationResult {
-            generated_skills: generated,
-            skipped_tools: skipped,
-        }
-    }
-}
-
-pub fn generated_skill_id(server_name: &str, tool_name: &str) -> String {
-    let slug = build_slug(server_name, tool_name);
-    format!("mcp-{slug}")
 }
 
 fn build_mcp_descriptor(
@@ -276,9 +153,7 @@ fn load_mcp_descriptor_file(path: &Path) -> Result<McpServerDescriptor, McpSurfa
 }
 
 fn descriptor_validation_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
-    let mut issues = validate_mcp_server_descriptor(descriptor).issues;
-    issues.extend(generator_collision_issues(descriptor));
-    issues
+    validate_mcp_server_descriptor(descriptor).issues
 }
 
 fn analyze_descriptor(descriptor: &McpServerDescriptor) -> McpAnalysisResult {
@@ -296,31 +171,6 @@ fn analyze_descriptor(descriptor: &McpServerDescriptor) -> McpAnalysisResult {
 
 fn is_supported_input_schema(value: &Value) -> bool {
     matches!(value, Value::Object(_))
-}
-
-fn generator_collision_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
-    let mut distinct_ids = BTreeSet::new();
-    let mut issues = Vec::new();
-
-    for tool in &descriptor.tools {
-        let Some(schema) = tool.input_schema.as_ref() else {
-            continue;
-        };
-
-        if !is_supported_input_schema(schema) {
-            continue;
-        }
-
-        let skill_id = generated_skill_id(&descriptor.server_name, &tool.name);
-        let normalized_skill_id = skill_id.to_ascii_lowercase();
-        if !distinct_ids.insert(normalized_skill_id) {
-            issues.push(format!(
-                "MCP descriptor tools must not collapse to the same generated skill ID; {skill_id} is duplicated."
-            ));
-        }
-    }
-
-    issues
 }
 
 fn write_json_file<T: Serialize>(
@@ -358,59 +208,6 @@ fn write_json_file<T: Serialize>(
 
 fn display_path(path: &Path) -> String {
     path.display().to_string()
-}
-
-pub struct McpToolSearchService;
-
-impl McpToolSearchService {
-    pub fn search(
-        &self,
-        descriptor: &McpServerDescriptor,
-        query: Option<&str>,
-    ) -> Vec<McpToolSummary> {
-        match query.map(str::trim).filter(|query| !query.is_empty()) {
-            None => descriptor
-                .tools
-                .iter()
-                .map(|tool| McpToolSummary {
-                    name: tool.name.clone(),
-                    description: tool.description.clone(),
-                })
-                .collect(),
-            Some(query) => descriptor
-                .tools
-                .iter()
-                .filter(|tool| {
-                    tool.name.contains(query)
-                        || tool
-                            .description
-                            .as_ref()
-                            .is_some_and(|description| contains_ignore_case(description, query))
-                        || contains_ignore_case(&tool.name, query)
-                })
-                .map(|tool| McpToolSummary {
-                    name: tool.name.clone(),
-                    description: tool.description.clone(),
-                })
-                .collect(),
-        }
-    }
-}
-
-pub struct McpToolResolveService;
-
-impl McpToolResolveService {
-    pub fn resolve(
-        &self,
-        descriptor: &McpServerDescriptor,
-        tool_name: &str,
-    ) -> Option<McpToolDefinition> {
-        descriptor
-            .tools
-            .iter()
-            .find(|tool| tool.name == tool_name)
-            .cloned()
-    }
 }
 
 fn extract_triggers(tool_name: &str) -> Vec<SkillTrigger> {
@@ -473,102 +270,11 @@ fn split_camel_case(part: &str) -> Vec<String> {
     words
 }
 
-fn build_slug(server_name: &str, tool_name: &str) -> String {
-    let combined = format!("{server_name}-{tool_name}");
-    let mut slug = String::new();
-
-    for character in combined.chars() {
-        if character.is_ascii_alphanumeric() {
-            slug.push(character.to_ascii_lowercase());
-        } else if matches!(character, '-' | '_') {
-            slug.push('-');
-        }
-    }
-
-    slug.trim_matches('-').to_string()
-}
-
-fn build_keywords(server_name: &str, tool_name: &str) -> Vec<String> {
-    let mut seen = std::collections::BTreeSet::new();
-    let mut keywords = Vec::new();
-
-    for keyword in std::iter::once(server_name)
-        .chain(tool_name.split(['-', '_', ' ']))
-        .filter(|keyword| !keyword.trim().is_empty())
-        .map(|keyword| keyword.to_ascii_lowercase())
-    {
-        if seen.insert(keyword.clone()) {
-            keywords.push(keyword);
-        }
-    }
-
-    keywords
-}
-
-fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
-    haystack
-        .to_ascii_lowercase()
-        .contains(&needle.to_ascii_lowercase())
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{
-        generated_skill_id, McpSkillGenerator, McpToolAnalyzer, McpToolResolveService,
-        McpToolSearchService,
-    };
+    use super::{McpToolAnalyzer, SkillTrigger};
     use elegy_contracts::{McpServerDescriptor, McpToolAnalysis, McpToolDefinition};
     use serde_json::json;
-
-    fn create_test_descriptor() -> McpServerDescriptor {
-        McpServerDescriptor {
-            server_name: "test-server".to_string(),
-            tools: vec![
-                McpToolDefinition {
-                    name: "list-files".to_string(),
-                    description: Some("List directory contents".to_string()),
-                    input_schema: Some(json!({})),
-                },
-                McpToolDefinition {
-                    name: "read-file".to_string(),
-                    description: Some("Read a file by path".to_string()),
-                    input_schema: Some(json!({})),
-                },
-                McpToolDefinition {
-                    name: "search-code".to_string(),
-                    description: Some("Search code with regex".to_string()),
-                    input_schema: Some(json!({})),
-                },
-            ],
-            ..McpServerDescriptor::default()
-        }
-    }
-
-    fn create_test_analysis() -> elegy_contracts::McpAnalysisResult {
-        elegy_contracts::McpAnalysisResult {
-            server_name: "test-server".to_string(),
-            analyses: vec![
-                create_analysis("list-files", "List all files", true),
-                create_analysis("read-content", "Read file contents", true),
-                create_analysis("no-schema-tool", "Tool without schema", false),
-            ],
-        }
-    }
-
-    fn create_analysis(name: &str, description: &str, valid_schema: bool) -> McpToolAnalysis {
-        McpToolAnalysis {
-            tool: McpToolDefinition {
-                name: name.to_string(),
-                description: Some(description.to_string()),
-                input_schema: valid_schema.then(|| json!({})),
-            },
-            extracted_triggers: vec![elegy_contracts::SkillTrigger {
-                pattern: name.replace('-', " "),
-                description: None,
-            }],
-            has_valid_schema: valid_schema,
-        }
-    }
 
     #[test]
     fn analyze_tool_with_valid_schema_extracts_triggers_and_marks_valid() {
@@ -621,37 +327,6 @@ mod tests {
     }
 
     #[test]
-    fn generated_skill_id_and_source_ref_preserve_mcp_prefixed_server_names() {
-        let generator = McpSkillGenerator;
-        let analysis = elegy_contracts::McpAnalysisResult {
-            server_name: "mcp-server".to_string(),
-            analyses: vec![create_analysis("list-items", "List items", true)],
-        };
-
-        let generated = generator.generate(&analysis);
-
-        assert_eq!(generated.generated_skills.len(), 1);
-        assert_eq!(
-            generated_skill_id("mcp-server", "list-items"),
-            "mcp-mcp-server-list-items"
-        );
-        assert_eq!(
-            generated.generated_skills[0]
-                .origin
-                .as_ref()
-                .and_then(|origin| origin.source_ref.as_deref()),
-            Some("mcp://mcp-server/tools/mcp-server-list-items")
-        );
-        assert_eq!(
-            generated.generated_skills[0].capabilities[0]
-                .input
-                .as_ref()
-                .and_then(|input| input.schema_ref.as_deref()),
-            Some("mcp://mcp-server/tools/mcp-server-list-items/input-schema")
-        );
-    }
-
-    #[test]
     fn analyze_mixed_tools_returns_correct_count_and_results() {
         let analyzer = McpToolAnalyzer;
         let descriptor = McpServerDescriptor {
@@ -692,122 +367,5 @@ mod tests {
             result.analyses[2].extracted_triggers[0].pattern,
             "fetch order details"
         );
-    }
-
-    #[test]
-    fn generate_valid_tools_creates_skills_with_mcp_prefix() {
-        let generator = McpSkillGenerator;
-        let result = generator.generate(&create_test_analysis());
-
-        assert_eq!(result.generated_skills.len(), 2);
-        assert!(result
-            .generated_skills
-            .iter()
-            .all(|skill| skill.identity.name.starts_with("mcp-")));
-    }
-
-    #[test]
-    fn generate_invalid_schema_skips_tools() {
-        let generator = McpSkillGenerator;
-        let result = generator.generate(&create_test_analysis());
-
-        assert_eq!(result.skipped_tools.len(), 1);
-        assert_eq!(result.skipped_tools[0].name, "no-schema-tool");
-    }
-
-    #[test]
-    fn generate_uses_canonical_origin_and_discovery_metadata() {
-        let generator = McpSkillGenerator;
-        let result = generator.generate(&create_test_analysis());
-
-        for skill in result.generated_skills {
-            assert_eq!(
-                skill
-                    .origin
-                    .as_ref()
-                    .and_then(|origin| origin.source_kind.as_deref()),
-                Some("generated")
-            );
-            assert_eq!(
-                skill
-                    .origin
-                    .as_ref()
-                    .and_then(|origin| origin.materialization_kind.as_deref()),
-                Some("declared")
-            );
-            assert!(skill
-                .origin
-                .as_ref()
-                .and_then(|origin| origin.source_ref.as_deref())
-                .is_some_and(|value| value.starts_with("mcp://test-server/tools/")));
-            assert!(skill
-                .discovery
-                .as_ref()
-                .is_some_and(|discovery| discovery.keywords.contains(&"test-server".to_string())));
-        }
-    }
-
-    #[test]
-    fn generate_lifecycle_state_is_draft() {
-        let generator = McpSkillGenerator;
-        let result = generator.generate(&create_test_analysis());
-
-        assert!(result
-            .generated_skills
-            .iter()
-            .all(|skill| skill.lifecycle_state == "draft"));
-    }
-
-    #[test]
-    fn generate_input_schema_ref_present_when_tool_has_schema() {
-        let generator = McpSkillGenerator;
-        let result = generator.generate(&create_test_analysis());
-
-        assert!(result
-            .generated_skills
-            .iter()
-            .all(|skill| skill.capabilities[0]
-                .input
-                .as_ref()
-                .and_then(|input| input.schema_ref.as_deref())
-                .is_some_and(|value| value.contains("/input-schema"))));
-    }
-
-    #[test]
-    fn search_null_query_returns_all() {
-        let search = McpToolSearchService;
-        let results = search.search(&create_test_descriptor(), None);
-
-        assert_eq!(results.len(), 3);
-        assert!(results.iter().all(|result| !result.name.is_empty()));
-    }
-
-    #[test]
-    fn search_filter_query_narrows_results() {
-        let search = McpToolSearchService;
-        let results = search.search(&create_test_descriptor(), Some("file"));
-
-        assert_eq!(results.len(), 2);
-        assert!(results.iter().any(|result| result.name == "list-files"));
-        assert!(results.iter().any(|result| result.name == "read-file"));
-    }
-
-    #[test]
-    fn resolve_existing_tool_returns_full_definition() {
-        let resolve = McpToolResolveService;
-        let result = resolve.resolve(&create_test_descriptor(), "search-code");
-
-        assert!(result.is_some());
-        let result = result.expect("existing tool");
-        assert_eq!(result.name, "search-code");
-        assert!(result.input_schema.is_some());
-    }
-
-    #[test]
-    fn resolve_missing_tool_returns_none() {
-        let resolve = McpToolResolveService;
-        let result = resolve.resolve(&create_test_descriptor(), "nonexistent");
-
-        assert!(result.is_none());
     }
 }

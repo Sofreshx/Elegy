@@ -1,10 +1,13 @@
 pub mod cli;
 pub mod envelope;
 mod error;
+pub mod intent;
+pub mod manifest;
 mod model;
 mod service;
 pub mod session;
 mod storage;
+pub mod template;
 mod validation;
 
 pub use envelope::*;
@@ -16,8 +19,8 @@ pub use storage::{
     AttachEvidenceInput, ClaimProjectRunInput, CreateAcceptanceInput, CreateEvidenceInput,
     CreateGoalInput, CreateGraphEdgeInput, CreateGraphNodeInput, CreateInsightInput,
     CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateScopeInput, CreateTodoInput, FinalizeGraphNodeInput, PlanningStore,
-    ReleaseProjectRunInput, ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput,
-    ReviseWorkPointInput, SatisfyAcceptanceInput, SearchInput, UpdateGraphEdgeStatusInput,
-    UpdateGraphNodeStatusInput, UpdateStatusInput,
+    CreateScopeInput, CreateTodoInput, FinalizeGraphNodeInput, HeartbeatProjectRunInput,
+    PlanningStore, ReleaseProjectRunInput, ReviseGraphEdgeInput, ReviseGraphNodeInput,
+    RevisePlanInput, ReviseWorkPointInput, SatisfyAcceptanceInput, SearchInput,
+    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput,
 };

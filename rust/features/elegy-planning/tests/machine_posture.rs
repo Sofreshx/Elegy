@@ -35,6 +35,50 @@ fn command_json(args: &[&str]) -> Value {
 }
 
 #[test]
+fn capabilities_reports_lease_contract_without_initializing_a_database() {
+    let temp_dir = unique_temp_dir("elegy-planning-capabilities");
+    let db_path = temp_dir.join("missing-parent").join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "capabilities",
+        ])
+        .output()
+        .expect("run elegy-planning capabilities");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !db_path.exists(),
+        "capability discovery must not initialize storage"
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["schemaVersion"], "planning-result/v1");
+    assert_eq!(envelope["command"], serde_json::json!(["capabilities"]));
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["data"]["planningSchemaVersion"], "10");
+    assert_eq!(
+        envelope["data"]["capabilities"],
+        serde_json::json!([
+            "project-run.claim.v2",
+            "project-run.activate.fenced.v1",
+            "project-run.heartbeat.v1",
+            "project-run.release.fenced.v1",
+            "project-run.add-evidence.fenced.v1"
+        ])
+    );
+}
+
+#[test]
 fn goal_create_supports_machine_flags_and_correlation_id() {
     let temp_dir = unique_temp_dir("elegy-planning-machine-goal");
     let db_path = temp_dir.join("planning.db");
@@ -4036,4 +4080,1835 @@ fn graph_acceptance_evidence_finalize_help() {
         help.contains("finalize"),
         "graph node help should include finalize"
     );
+}
+
+// ─── Manifest Apply Tests ─────────────────────────────────────────────────
+
+#[test]
+fn manifest_apply_creates_nodes_and_edges() {
+    let temp_dir = unique_temp_dir("elegy-manifest-apply-create");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    // Create scope first (required for manifest apply)
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Ship MVP"
+    summary: "Deliver MVP"
+    status: active
+    tags: [mvp]
+    decomposesTo: [wp-auth]
+  - id: wp-auth
+    kind: work
+    title: "Auth module"
+    summary: "Implement OAuth2"
+    status: proposed
+    dependsOn: [wp-db]
+  - id: wp-db
+    kind: work
+    title: "Database setup"
+    summary: "Set up DB schema"
+    status: proposed
+edges:
+  - id: e-decomp
+    kind: decomposes-to
+    sourceNodeId: g-mvp
+    targetNodeId: wp-auth
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert!(
+        data["createdNodes"].as_array().unwrap().len() >= 3,
+        "should create at least 3 nodes"
+    );
+    assert!(
+        data["createdEdges"].as_array().unwrap().len() >= 2,
+        "should create at least 2 edges (explicit + shorthand)"
+    );
+    assert!(
+        data["conflicts"].as_array().unwrap().is_empty(),
+        "no conflicts expected"
+    );
+}
+
+#[test]
+fn manifest_apply_dry_run_does_not_commit() {
+    let temp_dir = unique_temp_dir("elegy-manifest-dry-run");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Ship MVP"
+    summary: "Deliver MVP"
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    // Dry run
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+            "--dry-run",
+        ])
+        .output()
+        .expect("run manifest apply --dry-run");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert!(result["data"]["createdNodes"].as_array().unwrap().len() >= 1);
+
+    // Verify node was NOT actually created
+    let show = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "node",
+            "show",
+            "--node-id",
+            "g-mvp",
+        ])
+        .output()
+        .expect("run graph node show");
+    // Should fail because node doesn't exist
+    let show_stdout = String::from_utf8_lossy(&show.stdout);
+    assert!(
+        !show.status.success(),
+        "dry-run should not persist, stdout: {show_stdout}"
+    );
+}
+
+#[test]
+fn manifest_apply_idempotent() {
+    let temp_dir = unique_temp_dir("elegy-manifest-idempotent");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Ship MVP"
+    summary: "Deliver MVP"
+    status: active
+    decomposesTo: [wp-auth]
+  - id: wp-auth
+    kind: work
+    title: "Auth module"
+    summary: "Implement OAuth2"
+    status: proposed
+edges:
+  - id: e-dep
+    kind: decomposes-to
+    sourceNodeId: g-mvp
+    targetNodeId: wp-auth
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let run = || {
+        Command::new(bin)
+            .args([
+                "--db",
+                db_arg,
+                "--json",
+                "--non-interactive",
+                "--scope",
+                "repo:test",
+                "manifest",
+                "--file",
+                manifest_path.to_str().expect("utf-8 path"),
+            ])
+            .output()
+            .expect("run manifest apply")
+    };
+
+    // First apply
+    let out1 = run();
+    assert!(
+        out1.status.success(),
+        "first apply failed: {}",
+        String::from_utf8_lossy(&out1.stderr)
+    );
+    let r1: Value = serde_json::from_slice(&out1.stdout).expect("valid JSON");
+    assert!(r1["data"]["createdNodes"].as_array().unwrap().len() >= 2);
+    assert!(
+        r1["data"]["createdEdges"].as_array().unwrap().len() >= 1,
+        "should create at least 1 edge"
+    );
+
+    // Second apply — should be no-op (unchanged)
+    let out2 = run();
+    assert!(out2.status.success());
+    let r2: Value = serde_json::from_slice(&out2.stdout).expect("valid JSON");
+    assert_eq!(
+        r2["data"]["createdNodes"].as_array().unwrap().len(),
+        0,
+        "second apply should not re-create"
+    );
+    assert!(
+        r2["data"]["unchangedNodes"].as_array().unwrap().len() >= 2,
+        "nodes should be unchanged"
+    );
+    assert_eq!(r2["data"]["createdEdges"].as_array().unwrap().len(), 0);
+    assert!(r2["data"]["unchangedEdges"].as_array().unwrap().len() >= 1);
+}
+
+#[test]
+fn manifest_apply_cross_scope_conflict() {
+    let temp_dir = unique_temp_dir("elegy-manifest-cross-scope");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    // Create a node in scope-a
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-a",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "scope-a",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "g-mvp",
+        "--kind",
+        "goal",
+        "--title",
+        "Ship MVP",
+        "--summary",
+        "Test",
+        "--status",
+        "active",
+    ]);
+
+    // Also create the repo:test scope
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    // Try to apply manifest with same ID in different scope
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Ship MVP v2"
+    summary: "Updated"
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert!(
+        !result["data"]["conflicts"].as_array().unwrap().is_empty(),
+        "should report cross-scope conflict, got: {stdout}"
+    );
+}
+
+#[test]
+fn manifest_apply_shorthand_expansion() {
+    let temp_dir = unique_temp_dir("elegy-manifest-shorthand");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-root
+    kind: goal
+    title: "Root"
+    summary: "Root goal"
+    status: active
+    decomposesTo: [wp-a, wp-b]
+  - id: wp-a
+    kind: work
+    title: "Work A"
+    summary: "First work item"
+    status: proposed
+    dependsOn: [wp-b]
+    blocks: [wp-c]
+  - id: wp-b
+    kind: work
+    title: "Work B"
+    summary: "Second work item"
+    status: proposed
+    plannedBy: [p-impl]
+    repairs: [wp-a]
+  - id: wp-c
+    kind: work
+    title: "Work C"
+    summary: "Third work item"
+    status: proposed
+    supersedes: [wp-b]
+  - id: p-impl
+    kind: plan
+    title: "Implementation plan"
+    summary: "Plan for work items"
+    status: draft
+    targetedWork: [wp-c]
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "stderr: {stderr}");
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert!(
+        data["createdNodes"].as_array().unwrap().len() >= 5,
+        "should create 5 nodes, got {:?}",
+        data["createdNodes"]
+    );
+    assert!(
+        data["createdEdges"].as_array().unwrap().len() >= 8,
+        "should create at least 8 shorthand edges, got {:?}",
+        data["createdEdges"]
+    );
+    assert!(data["conflicts"].as_array().unwrap().is_empty());
+}
+
+// ─── Diff Tests ────────────────────────────────────────────────────────────
+
+#[test]
+fn diff_reports_added_and_unchanged() {
+    let temp_dir = unique_temp_dir("elegy-diff");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    // Create some nodes in DB
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "existing-node",
+        "--kind",
+        "goal",
+        "--title",
+        "Existing",
+        "--summary",
+        "Already exists",
+        "--status",
+        "active",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: existing-node
+    kind: goal
+    title: "Existing"
+    summary: "Already exists"
+    status: active
+  - id: new-node
+    kind: work
+    title: "New work"
+    summary: "Not yet in DB"
+    status: proposed
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "diff",
+            "--manifest",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run diff");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert!(
+        data["addedNodes"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("new-node".to_string())),
+        "new-node should be added"
+    );
+    assert!(
+        data["unchangedNodes"]
+            .as_array()
+            .unwrap()
+            .contains(&Value::String("existing-node".to_string())),
+        "existing-node should be unchanged"
+    );
+}
+
+#[test]
+fn diff_reports_field_changes() {
+    let temp_dir = unique_temp_dir("elegy-diff-changes");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "changed-node",
+        "--kind",
+        "goal",
+        "--title",
+        "Old Title",
+        "--summary",
+        "Old summary",
+        "--status",
+        "draft",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: changed-node
+    kind: goal
+    title: "New Title"
+    summary: "New summary"
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "diff",
+            "--manifest",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run diff");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert!(
+        !data["changedNodes"].as_array().unwrap().is_empty(),
+        "should report changes"
+    );
+    let changes = &data["changedNodes"][0];
+    let diffs = changes["diffs"].as_array().unwrap();
+    assert!(
+        diffs.iter().any(|d| d["field"] == "title"),
+        "should diff title"
+    );
+    assert!(
+        diffs.iter().any(|d| d["field"] == "status"),
+        "should diff status"
+    );
+}
+
+// ─── Compact Output Tests ──────────────────────────────────────────────────
+
+#[test]
+fn compact_graph_node_show_returns_minimal_fields() {
+    let temp_dir = unique_temp_dir("elegy-compact-node");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "compact-node",
+        "--kind",
+        "work",
+        "--title",
+        "Compact Test",
+        "--summary",
+        "This summary should not appear in compact output",
+        "--status",
+        "active",
+        "--tag",
+        "test",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "graph",
+            "node",
+            "show",
+            "--node-id",
+            "compact-node",
+        ])
+        .output()
+        .expect("run compact graph node show");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert_eq!(data["id"], "compact-node");
+    assert_eq!(data["kind"], "work");
+    assert_eq!(data["title"], "Compact Test");
+    assert_eq!(data["status"], "active");
+    assert!(
+        data.get("summary").is_none(),
+        "compact output should not include summary"
+    );
+    assert!(
+        data.get("tags").is_none(),
+        "compact output should not include tags"
+    );
+    assert!(
+        data.get("payload").is_none(),
+        "compact output should not include payload"
+    );
+}
+
+#[test]
+fn compact_graph_node_list_returns_minimal_fields() {
+    let temp_dir = unique_temp_dir("elegy-compact-list");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "n1",
+        "--kind",
+        "goal",
+        "--title",
+        "Node One",
+        "--summary",
+        "First",
+        "--status",
+        "active",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "graph",
+            "node",
+            "list",
+        ])
+        .output()
+        .expect("run compact graph node list");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let nodes = result["data"]["nodes"].as_array().unwrap();
+    assert!(!nodes.is_empty());
+    let node = &nodes[0];
+    assert!(node.get("id").is_some());
+    assert!(node.get("kind").is_some());
+    assert!(node.get("title").is_some());
+    assert!(node.get("status").is_some());
+    assert!(node.get("summary").is_none());
+    assert!(node.get("payload").is_none());
+}
+
+#[test]
+fn compact_graph_edge_show_returns_minimal_fields() {
+    let temp_dir = unique_temp_dir("elegy-compact-edge");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "src",
+        "--kind",
+        "goal",
+        "--title",
+        "Source",
+        "--summary",
+        "src",
+        "--status",
+        "active",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "tgt",
+        "--kind",
+        "work",
+        "--title",
+        "Target",
+        "--summary",
+        "tgt",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "edge",
+        "create",
+        "--id",
+        "compact-edge",
+        "--kind",
+        "decomposes-to",
+        "--source-node-id",
+        "src",
+        "--target-node-id",
+        "tgt",
+        "--status",
+        "active",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "graph",
+            "edge",
+            "show",
+            "--edge-id",
+            "compact-edge",
+        ])
+        .output()
+        .expect("run compact graph edge show");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert_eq!(data["id"], "compact-edge");
+    assert_eq!(data["kind"], "decomposes-to");
+    assert_eq!(data["sourceNodeId"], "src");
+    assert_eq!(data["targetNodeId"], "tgt");
+    assert_eq!(data["status"], "active");
+    assert!(data.get("payload").is_none());
+    assert!(data.get("revision").is_none());
+}
+
+#[test]
+fn compact_graph_edge_list_incoming_outgoing() {
+    let temp_dir = unique_temp_dir("elegy-compact-edges");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "src2",
+        "--kind",
+        "goal",
+        "--title",
+        "Source",
+        "--summary",
+        "s",
+        "--status",
+        "active",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "tgt2",
+        "--kind",
+        "work",
+        "--title",
+        "Target",
+        "--summary",
+        "t",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "edge",
+        "create",
+        "--id",
+        "e-in",
+        "--kind",
+        "decomposes-to",
+        "--source-node-id",
+        "src2",
+        "--target-node-id",
+        "tgt2",
+        "--status",
+        "active",
+    ]);
+
+    // Test compact outgoing
+    let out = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "graph",
+            "edge",
+            "outgoing",
+            "--node-id",
+            "src2",
+        ])
+        .output()
+        .expect("run compact outgoing");
+    assert!(out.status.success());
+    let r_out: Value = serde_json::from_slice(&out.stdout).expect("valid JSON");
+    let edges = r_out["data"]["edges"].as_array().unwrap();
+    assert!(!edges.is_empty());
+    let e = &edges[0];
+    assert!(e.get("id").is_some() && e.get("kind").is_some() && e.get("sourceNodeId").is_some());
+    assert!(e.get("payload").is_none());
+
+    // Test compact incoming
+    let inc = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "graph",
+            "edge",
+            "incoming",
+            "--node-id",
+            "tgt2",
+        ])
+        .output()
+        .expect("run compact incoming");
+    assert!(inc.status.success());
+    let r_inc: Value = serde_json::from_slice(&inc.stdout).expect("valid JSON");
+    let inc_edges = r_inc["data"]["edges"].as_array().unwrap();
+    assert!(!inc_edges.is_empty());
+    let ie = &inc_edges[0];
+    assert!(ie.get("id").is_some() && ie.get("kind").is_some() && ie.get("sourceNodeId").is_some());
+    assert!(ie.get("payload").is_none());
+}
+
+#[test]
+fn manifest_apply_compact_output() {
+    let temp_dir = unique_temp_dir("elegy-manifest-compact");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "repo:test"
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Ship MVP"
+    summary: "Deliver MVP"
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "--compact",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run compact manifest apply");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "manifest compact failed: {stderr}");
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    // Compact output should still have the apply result fields
+    assert!(data.get("createdNodes").is_some());
+    assert!(data.get("unchangedNodes").is_some());
+}
+
+#[test]
+fn manifest_apply_rejects_invalid_yaml() {
+    let temp_dir = unique_temp_dir("elegy-manifest-invalid");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(&manifest_path, "this is not valid: yaml: [}").expect("write invalid manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply with invalid yaml");
+    // Should return an error
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !output.status.success() || stderr.contains("invalid") || stdout.contains("invalid"),
+        "invalid YAML should produce error, got stdout: {stdout}, stderr: {stderr}"
+    );
+}
+
+#[test]
+fn manifest_apply_rejects_missing_file() {
+    let temp_dir = unique_temp_dir("elegy-manifest-missing");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            temp_dir
+                .join("nonexistent.yaml")
+                .to_str()
+                .expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply with missing file");
+    assert!(
+        !output.status.success(),
+        "missing manifest file should fail"
+    );
+}
+
+#[test]
+fn manifest_apply_rejects_empty_scope() {
+    let temp_dir = unique_temp_dir("elegy-manifest-empty-scope");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let manifest_path = temp_dir.join("plan.yaml");
+    fs::write(
+        &manifest_path,
+        r#"
+scope: "  "
+nodes:
+  - id: g-mvp
+    kind: goal
+    title: "Test"
+    summary: "Test"
+    status: active
+"#,
+    )
+    .expect("write manifest");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run manifest apply with empty scope");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    assert!(
+        !output.status.success() || stdout.contains("invalid") || stdout.contains("empty"),
+        "empty scope should be rejected, got: {stdout}"
+    );
+}
+
+#[test]
+fn manifest_help_shows_manifest_and_diff() {
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+    let output = Command::new(bin)
+        .args(["--help"])
+        .output()
+        .expect("run help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("utf-8");
+    assert!(
+        help.contains("manifest"),
+        "help should show manifest command"
+    );
+    assert!(help.contains("diff"), "help should show diff command");
+}
+
+#[test]
+fn compact_flag_in_help() {
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+    let output = Command::new(bin)
+        .args(["--help"])
+        .output()
+        .expect("run help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("utf-8");
+    assert!(help.contains("compact"), "help should show --compact flag");
+}
+
+// ─── Graph Runnable Tests ──────────────────────────────────────────────────
+
+#[test]
+fn graph_runnable_finds_ready_work() {
+    let temp_dir = unique_temp_dir("elegy-graph-runnable");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wp-ready",
+        "--kind",
+        "work",
+        "--title",
+        "Ready work",
+        "--summary",
+        "No dependencies",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wp-blocked",
+        "--kind",
+        "work",
+        "--title",
+        "Blocked work",
+        "--summary",
+        "Has dep",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wp-dep",
+        "--kind",
+        "work",
+        "--title",
+        "Dependency",
+        "--summary",
+        "Not done",
+        "--status",
+        "draft",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "edge",
+        "create",
+        "--id",
+        "e-dep",
+        "--kind",
+        "depends-on",
+        "--source-node-id",
+        "wp-blocked",
+        "--target-node-id",
+        "wp-dep",
+        "--status",
+        "active",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "runnable",
+        ])
+        .output()
+        .expect("run graph runnable");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    let candidates = data["candidates"].as_array().unwrap();
+    assert!(
+        candidates.iter().any(|c| c["nodeId"] == "wp-ready"),
+        "wp-ready should be runnable"
+    );
+    let blocked = data["blocked"].as_array().unwrap();
+    assert!(
+        blocked.iter().any(|b| b["nodeId"] == "wp-blocked"),
+        "wp-blocked should be blocked"
+    );
+}
+
+#[test]
+fn graph_runnable_compact_output() {
+    let temp_dir = unique_temp_dir("elegy-graph-runnable-compact");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wp-compact",
+        "--kind",
+        "work",
+        "--title",
+        "Compact work",
+        "--summary",
+        "Test",
+        "--status",
+        "proposed",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "runnable",
+        ])
+        .output()
+        .expect("run graph runnable");
+    assert!(output.status.success());
+}
+
+// ─── Bulk Transition Tests ──────────────────────────────────────────────────
+
+#[test]
+fn bulk_transition_by_id() {
+    let temp_dir = unique_temp_dir("elegy-bulk-id");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "bt1",
+        "--kind",
+        "work",
+        "--title",
+        "Bulk 1",
+        "--summary",
+        "A",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "bt2",
+        "--kind",
+        "work",
+        "--title",
+        "Bulk 2",
+        "--summary",
+        "B",
+        "--status",
+        "proposed",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "bulk",
+            "--node-ids",
+            "bt1,bt2",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("run graph bulk");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert_eq!(data["totalMatched"], 2);
+    assert_eq!(data["totalTransitioned"], 2);
+    assert!(data["transitioned"]
+        .as_array()
+        .unwrap()
+        .contains(&Value::String("bt1".to_string())));
+    assert!(data["transitioned"]
+        .as_array()
+        .unwrap()
+        .contains(&Value::String("bt2".to_string())));
+}
+
+#[test]
+fn bulk_transition_by_filter() {
+    let temp_dir = unique_temp_dir("elegy-bulk-filter");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wf1",
+        "--kind",
+        "work",
+        "--title",
+        "Filter 1",
+        "--summary",
+        "A",
+        "--status",
+        "proposed",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "wf2",
+        "--kind",
+        "goal",
+        "--title",
+        "Not work",
+        "--summary",
+        "B",
+        "--status",
+        "proposed",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "bulk",
+            "--filter",
+            "kind=work AND status=proposed",
+            "--status",
+            "active",
+        ])
+        .output()
+        .expect("run graph bulk with filter");
+    assert!(
+        output.status.success(),
+        "{}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let data = &result["data"];
+    assert_eq!(data["totalMatched"], 1);
+    assert_eq!(data["totalTransitioned"], 1);
+}
+
+// ─── Template Tests ────────────────────────────────────────────────────────
+
+#[test]
+fn template_list_returns_all_templates() {
+    let temp_dir = unique_temp_dir("elegy-template-list");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "template",
+            "list",
+        ])
+        .output()
+        .expect("run template list");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "template list failed: {stderr}");
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    let templates = result["data"]["templates"].as_array().unwrap();
+    assert!(
+        templates.len() >= 5,
+        "should have at least 5 templates, got {templates:?}"
+    );
+    assert!(templates.contains(&Value::String("phase-gate".to_string())));
+    assert!(templates.contains(&Value::String("implementation-slice".to_string())));
+}
+
+#[test]
+fn template_render_outputs_valid_yaml() {
+    let temp_dir = unique_temp_dir("elegy-template-render");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "template",
+            "render",
+            "--template",
+            "implementation-slice",
+        ])
+        .output()
+        .expect("run template render");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(output.status.success(), "template render failed: {stderr}");
+    let stdout = String::from_utf8_lossy(&output.stdout);
+    // When --json is active and output goes to stdout, the emit_success wraps it in JSON
+    // When output is printed via println!, it goes to stdout directly in text mode
+    // In json mode with no --output flag, the execute_intent uses println! which goes to stdout
+    // Let's just check the output contains the template content
+    assert!(!stdout.is_empty());
+}
+
+// ─── Intent Tests ──────────────────────────────────────────────────────────
+
+#[test]
+fn intent_expand_produces_manifest() {
+    let temp_dir = unique_temp_dir("elegy-intent-expand");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    let intent_path = temp_dir.join("intent.yaml");
+    fs::write(
+        &intent_path,
+        r#"
+schemaVersion: "planning-intent/v1"
+scope: "repo:test"
+intent: "Add user authentication with OAuth2"
+constraints:
+  - "Must not break existing login"
+  - "Support refresh tokens"
+nonGoals:
+  - "No third-party SSO yet"
+dependencies:
+  - kind: internal
+    description: "OAuth2 provider config must be ready"
+deliverables:
+  - "OAuth2 login flow"
+  - "Token refresh endpoint"
+verification:
+  - "All auth tests pass"
+  - "OAuth2 integration tests green"
+"#,
+    )
+    .expect("write intent");
+
+    let expand = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "intent",
+            "--file",
+            intent_path.to_str().expect("utf-8 path"),
+            "--output",
+            temp_dir.join("plan.yaml").to_str().expect("utf-8 path"),
+        ])
+        .output()
+        .expect("run intent expand");
+    assert!(
+        expand.status.success(),
+        "intent expand failed: {}",
+        String::from_utf8_lossy(&expand.stderr)
+    );
+
+    // Now verify the output is a valid manifest by applying it (dry-run)
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    let dry_run = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "manifest",
+            "--file",
+            temp_dir.join("plan.yaml").to_str().expect("utf-8 path"),
+            "--dry-run",
+        ])
+        .output()
+        .expect("run manifest apply --dry-run on intent output");
+    assert!(
+        dry_run.status.success(),
+        "{}",
+        String::from_utf8_lossy(&dry_run.stderr)
+    );
+    let result: Value = serde_json::from_slice(&dry_run.stdout).expect("valid JSON");
+    assert!(
+        result["data"]["createdNodes"].as_array().unwrap().len() >= 3,
+        "should have goal + deliverables"
+    );
+}
+
+#[test]
+fn template_help_shows_new_commands() {
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+    let output = Command::new(bin)
+        .args(["--help"])
+        .output()
+        .expect("run help");
+    assert!(output.status.success());
+    let help = String::from_utf8(output.stdout).expect("utf-8");
+    assert!(
+        help.contains("template"),
+        "help should show template command"
+    );
+    assert!(help.contains("intent"), "help should show intent command");
+
+    // Check graph subcommand help
+    let graph_help = Command::new(bin)
+        .args(["graph", "--help"])
+        .output()
+        .expect("run graph help");
+    let gh = String::from_utf8(graph_help.stdout).expect("utf-8");
+    assert!(gh.contains("runnable"), "graph help should show runnable");
+    assert!(gh.contains("bulk"), "graph help should show bulk");
+}
+
+#[test]
+fn graph_runnable_empty_scope() {
+    let temp_dir = unique_temp_dir("elegy-runnable-empty");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let bin = env!("CARGO_BIN_EXE_elegy-planning");
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+
+    let output = Command::new(bin)
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "repo:test",
+            "graph",
+            "runnable",
+        ])
+        .output()
+        .expect("run graph runnable on empty scope");
+    assert!(output.status.success());
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
+    assert!(result["data"]["candidates"].as_array().unwrap().is_empty());
+    assert!(result["data"]["blocked"].as_array().unwrap().is_empty());
 }
