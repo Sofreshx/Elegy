@@ -3,10 +3,10 @@
 on:
   pull_request:
     paths:
-      - 'rust/crates/elegy-memory/**'
-      - 'rust/crates/elegy-planning/**'
-      - 'rust/crates/elegy-skills/**'
-      - 'rust/crates/elegy-contracts/**'
+      - 'rust/features/elegy-memory/**'
+      - 'rust/features/elegy-planning/**'
+      - 'rust/features/elegy-skills/**'
+      - 'rust/core/elegy-contracts/**'
       - 'rust/Cargo.toml'
       - '.github/workflows/publish-crate.yml'
   push:
@@ -20,7 +20,7 @@ on:
       crate-path:
         description: Path from repo root to the crate directory
         required: false
-        default: rust/crates/elegy-memory
+        default: rust/features/elegy-memory
         type: string
       crate-name:
         description: Crate name to verify
@@ -36,7 +36,7 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  CRATE_PATH: ${{ github.event.inputs.crate-path || 'rust/crates/elegy-memory' }}
+  CRATE_PATH: ${{ github.event.inputs.crate-path || 'rust/features/elegy-memory' }}
   CRATE_NAME: ${{ github.event.inputs.crate-name || 'elegy-memory' }}
 
 jobs:
