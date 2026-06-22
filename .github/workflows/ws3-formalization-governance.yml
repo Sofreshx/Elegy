@@ -13,11 +13,6 @@ on:
         description: Final WS3 governance gate decision.
         value: ${{ jobs.ws3-governance.outputs.gate-decision }}
   workflow_dispatch:
-  pull_request:
-  push:
-    branches:
-      - main
-      - 'release/**'
 
 permissions:
   contents: read

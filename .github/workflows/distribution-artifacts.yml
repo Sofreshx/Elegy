@@ -1,13 +1,9 @@
 name: Distribution Artifacts
 
-# Slimmed: each per-feature publish workflow now owns its own build/package/
-# upload steps via ./.github/workflows/_reusable-publish.yml. This workflow
-# only handles the two aggregate artifacts that are still centralized:
+# Pull-request validation for the two aggregate distribution artifacts:
 #   - the contracts bundle (governed schemas, fixtures, compatibility metadata)
 #   - the installer bootstrap archive (install-distribution.sh + .ps1 shim + README)
-# Release manifest + checksums are computed by ./.github/workflows/release-finalize.yml
-# on release events, not here. Per-feature CLI/wrapper archives are no longer
-# built in this workflow.
+# Publish Orchestrator builds the complete release asset set on main and tags.
 
 on:
   pull_request:
@@ -45,7 +41,7 @@ jobs:
 
       - name: Export contracts bundle
         working-directory: ./rust
-        run: cargo run -p elegy-cli -- contracts export --output ../artifacts/contracts --create-archive --archive-output ../artifacts/distribution/elegy-contracts-bundle.zip
+        run: cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
 
       - name: Upload contracts distribution archive
         uses: actions/upload-artifact@v7.0.1
@@ -53,7 +49,7 @@ jobs:
           name: elegy-contracts-${{ github.sha }}
           if-no-files-found: error
           path: |
-            artifacts/distribution/elegy-contracts-*.zip
+            artifacts/distribution/elegy-contracts-bundle.zip
 
   package-installer:
     name: package installer bootstrap
@@ -66,13 +62,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle_version=$(jq -r '.contractBundleVersion' contracts/schemas/schema-version.json 2>/dev/null || echo "0.0.0")
+          bundle_version=$(jq -r '.schemaVersion' contracts/schemas/schema-version.json 2>/dev/null || echo "0.0.0")
           staging=$(mktemp -d)
           mkdir -p "artifacts/distribution"
           cp scripts/install-distribution.sh "$staging/install.sh"
           cp scripts/install-distribution.ps1 "$staging/install.ps1"
           cp PACKAGE_README.md "$staging/README.md"
-          (cd "$staging" && zip -r "../../artifacts/distribution/elegy-installer-${bundle_version}.zip" .)
+          (cd "$staging" && zip -r "${GITHUB_WORKSPACE}/artifacts/distribution/elegy-installer-${bundle_version}.zip" .)
 
       - name: Upload installer distribution artifact
         uses: actions/upload-artifact@v7.0.1

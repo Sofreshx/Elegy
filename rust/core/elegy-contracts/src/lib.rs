@@ -441,7 +441,7 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
         if author
             .email
             .as_deref()
-            .map_or(false, |e| e.trim().is_empty())
+            .is_some_and(|e| e.trim().is_empty())
         {
             issues.push("author.email must not be empty.".into());
         }
