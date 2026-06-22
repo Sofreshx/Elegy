@@ -12,9 +12,11 @@ publish = false
 time = { workspace = true, features = ["parsing"] }
 serde.workspace = true
 serde_json.workspace = true
+serde_yaml = "0.9"
 thiserror.workspace = true
 url.workspace = true
 zip.workspace = true
+semver = "1"
 
 [lints]
 workspace = true

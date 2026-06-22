@@ -219,13 +219,13 @@ How a fixture change becomes a published artifact:
 ```mermaid
 flowchart LR
     trigger["Fixture or Rust source change\non main branch"] --> validate["contracts validate\n(elegy-cli contracts validate)"]
-    validate --> discover["Discover publishable surfaces\n(walk elegy-plugin-package.*.json\nread publishing block)"]
+    validate --> discover["Discover publishable surfaces\n(walk distribution/surfaces.json)"]
     discover --> matrix["Matrix build per surface\n cargo build -p cratePath"]
     matrix --> publish["Publish artifacts\nto GitHub Releases"]
     publish --> archive["Archive family\nper asset kind"]
 ```
 
-Adding a new publishable surface requires **one step**: add a `contracts/fixtures/elegy-plugin-package.<feature>.json` with a `publishing` block. No workflow file, no central catalog update.
+Adding a new publishable surface requires **one step**: add an entry in `distribution/surfaces.json`. No workflow file, no per-feature fixture needed.
 
 ## Current next sequence
 

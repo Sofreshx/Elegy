@@ -13,9 +13,8 @@ Some page titles were retained from earlier cleanup phases for continuity. Unles
 - [Agent skill bridge mirrors](agent-skill-bridge-mirrors.md) - OBSOLETE: former repo-local SKILL.md mirror policy
 - [Codex plugin projection](codex-plugin-projection.md) - optional Codex projection slice (derived adapter surface, not the primary plugin path)
 - [Piloting Moved To Holon](piloting-moved-to-holon.md) - migration note: piloting authority, protocol, and execution have moved to the Holon Rust runtime
-- [Elegy Plugin Package Model](elegy-plugin-package-model.md) - primary plugin package model: shape, setup flow, authority chain, and boundaries
+- [Elegy Plugin Model](elegy-plugin-model.md) - thin plugin manifest model: shape, CLI surface, and boundaries
 - [Authoring lane (deferred)](../issues/unresolved-goals.md#goal-20260616-01) - the polished host-driven plugin authoring lane (`elegy plugin author`, `definitionRef` resolution) is deferred; current authoring is hand-edited via `elegy plugin new` plus manual verify-iterate
-- [Elegy Plugin Readiness](elegy-plugin-readiness.md) - host-neutral package metadata and publishing posture for LLM agent hosts
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) - placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Documentation practices](documentation-practices.md) - central ADR/spec doctrine, placement rules, and the lean `elegy docs` validation posture
 - [Terminology](terminology.md) - neutral vocabulary for artifact authority, projections, and runtime ownership

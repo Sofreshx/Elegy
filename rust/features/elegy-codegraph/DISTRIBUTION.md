@@ -6,9 +6,9 @@ Portable codebase graph extraction and query CLI for TypeScript and Rust.
 Extracts an entity/edge graph (symbols, files, types, edges), persists it in
 a redb store, and answers symbol/edge/impact/summary queries.
 
-This binary is **not** a plugin package and does not have an
-`elegy-plugin-package.elegy-codegraph.json` fixture. The portable contract for
-its graph IR is `contracts/schemas/elegy-codegraph.graph.v0.json`.
+This binary is **not** a plugin package and has no `distribution/surfaces.json`
+entry for release as a plugin. The portable contract for its graph IR is
+`contracts/schemas/elegy-codegraph.graph.v0.json`.
 
 ## Binary surface
 
@@ -27,7 +27,7 @@ its graph IR is `contracts/schemas/elegy-codegraph.graph.v0.json`.
 - **CLI archive asset family:** `elegy-codegraph-<cliVersion>-<target>.zip`
 - **Versioning:** follows workspace `version`.
 - **Plugin package:** none — codegraph ships as a standalone graph tool, not
-  a portable plugin package.
+  a plugin.
 
 ## Install
 

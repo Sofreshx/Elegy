@@ -62,7 +62,7 @@ Primary Evidence:
 
 - [docs/distribution.md](../distribution.md)
 - [.github/workflows/distribution-artifacts.yml](../../.github/workflows/distribution-artifacts.yml)
-- [.github/workflows/publish-orchestrator.yml](../../.github/workflows/publish-orchestrator.yml) (auto-discovers surfaces from `contracts/fixtures/elegy-plugin-package.*.json`)
+- [.github/workflows/publish-orchestrator.yml](../../.github/workflows/publish-orchestrator.yml) (auto-discovers surfaces from `distribution/surfaces.json`)
 - [scripts/install-distribution.sh](../../scripts/install-distribution.sh) (canonical)
 - [scripts/install-distribution.ps1](../../scripts/install-distribution.ps1) (thin shim that forwards to the bash script)
 - `cargo run -p elegy-cli -- contracts validate` (replaces `scripts/validate-canonical-outputs.ps1`)
