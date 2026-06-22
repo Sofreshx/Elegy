@@ -1,34 +1,33 @@
 [workspace]
 members = [
-    "core/elegy-adapter-fs",
-    "core/elegy-adapter-http",
-    "core/elegy-agent-events",
-    "core/elegy-contracts",
-    "core/elegy-core",
-    "core/elegy-descriptor",
-    "core/elegy-policy",
-    "core/elegy-runtime",
-    "core/elegy-tooling",
-    "bin/elegy-cli",
-    "bin/elegy-host-mcp",
-    "features/elegy-codegraph",
-    "features/elegy-configuration",
-    "features/elegy-data",
-    "features/elegy-desktop",
-    "features/elegy-desktop-win32",
-    "features/elegy-diagram",
-    "features/elegy-documentation",
-    "features/elegy-mcp",
-    "features/elegy-memory",
-    "features/elegy-memory-mcp",
-    "features/elegy-mermaid",
-    "features/elegy-notify",
-    "features/elegy-observe",
-    "features/elegy-observe-win32",
-    "features/elegy-planning",
-    "features/elegy-repo",
-    "features/elegy-skills",
-    "features/elegy-web",
+    "crates/elegy-agent-events",
+    "crates/elegy-mermaid",
+    "crates/elegy-contracts",
+    "crates/elegy-documentation",
+    "crates/elegy-memory",
+    "crates/elegy-memory-mcp",
+    "crates/elegy-planning",
+    "crates/elegy-policy",
+    "crates/elegy-mcp",
+    "crates/elegy-skills",
+    "crates/elegy-tooling",
+    "crates/elegy-descriptor",
+    "crates/elegy-configuration",
+    "crates/elegy-adapter-fs",
+    "crates/elegy-adapter-http",
+    "crates/elegy-runtime",
+    "crates/elegy-core",
+    "crates/elegy-host-mcp",
+    "crates/elegy-cli",
+    "crates/elegy-diagram",
+    "crates/elegy-observe-win32",
+    "crates/elegy-observe",
+    "crates/elegy-desktop-win32",
+    "crates/elegy-desktop",
+    "crates/elegy-repo",
+    "crates/elegy-web",
+    "crates/elegy-data",
+    "crates/elegy-notify",
 ]
 resolver = "2"
 
@@ -37,10 +36,11 @@ resolver = "2"
 [workspace.package]
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.96"
 license = "Apache-2.0"
 authors = ["Elegy Contributors"]
-repository = "https://github.com/Sofreshx/Elegy"
-homepage = "https://github.com/Sofreshx/Elegy"
+repository = "https://github.com/sfrsh/Elegy"
+homepage = "https://github.com/sfrsh/Elegy"
 documentation = "https://github.com/Sofreshx/Elegy/blob/main/README.md"
 readme = "../README.md"
 
