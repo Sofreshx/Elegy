@@ -1,0 +1,19 @@
+[package]
+name = "elegy-contracts"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[dependencies]
+time = { workspace = true, features = ["parsing"] }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+url.workspace = true
+zip.workspace = true
+
+[lints]
+workspace = true

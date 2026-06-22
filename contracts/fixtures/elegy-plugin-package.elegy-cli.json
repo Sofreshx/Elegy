@@ -1,0 +1,50 @@
+{
+  "schemaVersion": "elegy-plugin-package/v1",
+  "identity": {
+    "packageId": "elegy.elegy-cli-plugin",
+    "name": "elegy-cli",
+    "version": "0.1.0",
+    "displayName": "Elegy Umbrella CLI Plugin"
+  },
+  "metadata": {
+    "description": "Umbrella `elegy` CLI binary: thin host over the reusable Rust surface tree. The binary dispatches all per-feature subcommands and is the compatibility/general surface for hosts that want a single, bounded binary.",
+    "tags": ["umbrella", "cli", "host", "compatibility"],
+    "license": "Apache-2.0",
+    "documentationUri": "https://github.com/Sofreshx/Elegy/blob/main/README.md"
+  },
+  "components": {
+    "skillDefinitions": [
+      {
+        "id": "elegy-cli-skill",
+        "definitionRef": "skill.elegy-skill-router.json"
+      }
+    ],
+    "capabilityProjections": [],
+    "toolRequirements": [
+      {
+        "toolName": "elegy",
+        "cliBinary": "elegy"
+      }
+    ]
+  },
+  "hostPolicyHints": {
+    "sideEffectClass": "process_spawn",
+    "policyTags": ["umbrella-cli", "host-compatibility"]
+  },
+  "publishing": {
+    "cratePath": "elegy-cli",
+    "assetKind": "cli",
+    "marketplaceTarget": "github-releases",
+    "importMode": "package",
+    "sourceRepository": "https://github.com/Sofreshx/Elegy",
+    "sourceRef": "main",
+    "compatibility": [],
+    "archiveFamily": "elegy-cli",
+    "assetPrefix": "elegy-cli",
+    "targets": null
+  },
+  "elegyCompatibility": {
+    "contractBundleVersion": "1.8.0",
+    "schemaLine": "1.x"
+  }
+}

@@ -32,13 +32,13 @@ In scope:
 - A discovery projection: `contracts/fixtures/skill-discovery-index.elegy-obsidian.json`.
 - A result envelope schema: `contracts/schemas/obsidian-result.schema.json`.
 - A repo-local skill: `skills/elegy-obsidian/SKILL.md` plus a per-command reference and an install guide.
-- A wrapper surface: `src/Elegy-obsidian/` (entrypoint, README, install.ps1, helper lanes, surface-local bridge).
-- Installer wiring: `elegy-obsidian` added to `Get-WrapperSurfaceMetadata` in `scripts/install-distribution.ps1`.
 - A foundation spec: this document.
+
+Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the canonical installer at `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` and the plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json` is the portable install unit):
 
 Out of scope (follow-up work):
 
-- A Rust crate at `rust/crates/elegy-obsidian/`. The current implementation is the user's installed `obsidian` CLI.
+- A Rust crate at `rust/features/elegy-obsidian/`. The current implementation is the user's installed `obsidian` CLI.
 - New subcommands on `elegy-planning` (`obsidian mirror/attach/resolve/list`) and the mirror schemas that go with them. See `docs/research/obsidian-figma-and-vision-models-for-elegy.md` for the proposed shape.
 - Wiring this skill into `instruction-engine`'s own skill catalog (catalog-assets or opencode-assets). That is the consumer-repo change and belongs in a separate PR against `instruction-engine`.
 - Replacement of the third-party `obsidian-cli.exe` referenced by `instruction-engine/docs/system/obsidian-synced-notes-contract.md`. That contract governs a separate obsidian integration lane and remains non-canonical; the new skill does not change its authority.
@@ -54,13 +54,13 @@ contracts/fixtures/skill.elegy-obsidian.json      (governed source of truth)
 contracts/fixtures/skill-discovery-index.elegy-obsidian.json   (discovery projection)
         |
         v
-skills/elegy-obsidian/SKILL.md                                 (repo-local skill output)
+contracts/fixtures/instruction-skills/elegy-obsidian.SKILL.md  (packaged human-readable)
         |
         v
-src/Elegy-obsidian/skills/elegy-obsidian/SKILL.md              (wrapper surface bridge)
+skills/elegy-obsidian/SKILL.md                                 (repo-local skill authoring source)
 ```
 
-`src/Elegy-obsidian/` is a **wrapper overlay** in the sense the Elegy `AGENTS.md` defines for `src/Elegy-*` directories: contributor-navigation, not authority. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
+`skills/elegy-obsidian/` is the repo-local skill authoring source, not a wrapper overlay. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
 
 The wrapper surface points to the external executable explicitly:
 
@@ -125,8 +125,8 @@ Obsidian is **non-canonical**. Durable planning state continues to flow through 
 
 ## 7. Installation and consumer story
 
-- **Elegy-side** — `elegy-obsidian` is now a recognized wrapper surface. The repo `scripts/install-distribution.ps1` accepts `-WrapperSurfaces @('elegy-obsidian')`. The `elegy-obsidian-wrapper-<bundleVersion>.zip` archive ships the contracts bundle and the wrapper surface. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
-- **elegant-obsidian-side on consumer machines** — the user must enable the official CLI once via Obsidian Desktop's Settings -> General -> Command line interface. The wrapper does not ship the binary, does not download it, and does not install it.
+- **Elegy-side** — `elegy-obsidian` is a recognized surface. The repo `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian`. The portable install unit is the plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json`, which carries the skill bundle, the result envelope schema, and the surface metadata. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
+- **elegant-obsidian-side on consumer machines** — the user must enable the official CLI once via Obsidian Desktop's Settings -> General -> Command line interface. The plugin package does not ship the binary, does not download it, and does not install it.
 - **elegy-copilot / instruction-engine side** — to make the skill loadable from opencode and from the elegy-copilot runtime, the skill must be mirrored into the consumer repo (`instruction-engine`) under its skill discovery lane. That is a follow-up change in the consumer repo and is tracked as out-of-scope for this foundation PR.
 - **elegy-copilot/obsidian contract** — `instruction-engine/docs/system/obsidian-synced-notes-contract.md` already defines a separate Obsidian integration lane that uses a third-party `obsidian-cli.exe` binary. The new skill is **additive** — it does not modify that contract or replace that binary. The two lanes can coexist.
 
@@ -137,7 +137,7 @@ The research note describes the longer-term direction: add `elegy-planning obsid
 - the fixture's `lifecycleState` is `draft`, not `active`. Promotion to `active` will accompany the mirror command set, not this foundation alone.
 - The skill's `capabilityHints` are listed in priority order in the research note; the foundation implements priorities 2 (vault/file/daily/tag/task capabilities), 3 (search), 4 (command/eval escape hatch via `obsidian-command`), and 7 (`obsidian-version` precondition). Priorities 1 (mirror commands), 5 (link/follow/unlinked), and 6 (bookmarks) remain future work.
 - The mirror frontmatter convention is documented in `skills/elegy-obsidian/references/obsidian-cli-command-reference.md` and will be the parsing contract for the future `elegy-planning obsidian resolve` and `attach` commands.
-- The wrapper surface structure mirrors the existing `src/Elegy-planning/` shape, so adding a future `rust/crates/elegy-obsidian/` crate is a localized change: drop in a new `cliCrate` in `delegatesTo`, add an entry in `Get-CliSurfaceMetadata`, and add a new install layout key.
+- Adding a future `rust/features/elegy-obsidian/` crate is a localized change: drop in a new `cliCrate` in `delegatesTo`, add a new entry in the canonical installer's `Get-CliSurfaceMetadata` table, and update the plugin package's `instructionSkills` projection.
 
 ## 9. Acceptance criteria for this foundation
 
@@ -145,10 +145,10 @@ The foundation is complete when all of the following are true:
 
 - the fixture validates against `contracts/schemas/skill.schema.json` and the discovery index validates against `contracts/schemas/skill-discovery-index.schema.json`.
 - The result envelope schema validates against the JSON Schema 2020-12 grammar.
-- `scripts/install-distribution.ps1` accepts `-WrapperSurfaces @('elegy-obsidian')` and resolves the wrapper surface metadata.
+- `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` and resolves the surface metadata.
 - A runbook exists in `skills/elegy-obsidian/references/install-obsidian-cli.md` that operators can follow to enable the official CLI.
 - The `elegy-obsidian` skill is registered in `skill-discovery-index.elegy-obsidian.json` with `lifecycleState: "draft"`, signaling that the foundation is ready for review but not yet promoted to active.
-- No file under `src/Elegy-obsidian/` claims implementation authority — the surface remains a wrapper overlay.
+- The plugin package `contracts/fixtures/elegy-plugin-package.elegy-obsidian.json` carries the surface as a portable install unit.
 
 ## 10. Open questions
 

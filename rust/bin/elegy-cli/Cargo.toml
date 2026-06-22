@@ -1,0 +1,37 @@
+[package]
+name = "elegy-cli"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "elegy"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+elegy-contracts = { version = "0.1.0", path = "../../core/elegy-contracts" }
+elegy-configuration = { version = "0.1.0", path = "../../features/elegy-configuration" }
+elegy-core = { version = "0.1.0", path = "../../core/elegy-core" }
+elegy-desktop = { version = "0.1.0", path = "../../features/elegy-desktop" }
+elegy-data = { version = "0.1.0", path = "../../features/elegy-data" }
+elegy-host-mcp = { version = "0.1.0", path = "../elegy-host-mcp" }
+elegy-mermaid = { version = "0.1.0", path = "../../features/elegy-mermaid" }
+elegy-diagram = { version = "0.1.0", path = "../../features/elegy-diagram" }
+elegy-mcp = { version = "0.1.0", path = "../../features/elegy-mcp" }
+elegy-memory = { version = "0.1.0", path = "../../features/elegy-memory" }
+elegy-notify = { version = "0.1.0", path = "../../features/elegy-notify" }
+elegy-observe = { version = "0.1.0", path = "../../features/elegy-observe" }
+elegy-repo = { version = "0.1.0", path = "../../features/elegy-repo" }
+elegy-skills = { version = "0.1.0", path = "../../features/elegy-skills" }
+elegy-tooling = { version = "0.1.0", path = "../../core/elegy-tooling" }
+elegy-web = { version = "0.1.0", path = "../../features/elegy-web" }
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true

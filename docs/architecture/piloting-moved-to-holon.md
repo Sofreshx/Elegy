@@ -26,7 +26,7 @@ Holon now owns piloting end to end:
 
 The following files have been removed from Elegy as part of this migration:
 
-- `rust/crates/elegy-contracts/src/piloting.rs`
+- `rust/core/elegy-contracts/src/piloting.rs`
 - `contracts/schemas/piloting-*.schema.json` (12 files)
 - `contracts/fixtures/piloting-*.minimal.json` (8 files)
 - `contracts/fixtures/elegy-plugin-package-v2.piloting-blender.json` (deleted as part of the v1 unification)

@@ -1,0 +1,134 @@
+﻿name: release-finalize
+
+# Generic release finalizer. Runs on release: published events. Walks all
+# uploaded assets via `gh release view --json assets`, computes SHA-256
+# checksums, writes the release manifest + checksums artifacts, and uploads
+# them. Knows nothing about specific surfaces; each per-feature workflow
+# owns its own asset upload.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      release_tag:
+        description: "Release tag to finalize (only used in workflow_dispatch mode)"
+        type: string
+        default: ''
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-finalize-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  finalize:
+    name: finalize release
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Resolve release tag
+        id: release_meta
+        shell: bash
+        run: |
+          set -euo pipefail
+          tag_name=""
+          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
+            tag_name="${{ github.event.release.tag_name }}"
+          else
+            tag_name="${{ inputs.release_tag }}"
+          fi
+          if [[ -z "${tag_name}" ]]; then
+            echo "No release tag resolved; aborting."
+            exit 1
+          fi
+          echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
+
+      - name: Read release assets
+        id: list
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          release_json="$(gh release view "${RELEASE_TAG}" --json tagName,isPrerelease,targetCommitish,assets,body,name)"
+          echo "${release_json}" > artifacts/release-metadata.json
+          echo "assets=$(echo "${release_json}" | jq -c '.assets')" >> "$GITHUB_OUTPUT"
+          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Compute checksums
+        id: checksums
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/distribution
+          mapfile -t asset_urls < <(gh release view "${RELEASE_TAG}" --json assets | jq -r '.assets[] | "\(.name)\t\(.url)"')
+          entries_json="["
+          first=true
+          for row in "${asset_urls[@]}"; do
+            name="${row%%$'\t'*}"
+            url="${row#*$'\t'}"
+            sha=$(curl --fail --silent --show-error --location "${url}" | sha256sum | awk '{print $1}')
+            size=$(gh release view "${RELEASE_TAG}" --json assets | jq --arg n "${name}" '.assets[] | select(.name == $n) | .size')
+            if [[ "${first}" == "true" ]]; then
+              first=false
+            else
+              entries_json+=","
+            fi
+            entries_json+="{\"fileName\":\"${name}\",\"sizeBytes\":${size},\"sha256\":\"${sha}\"}"
+          done
+          entries_json+="]"
+          echo "{\"schemaVersion\":\"elegy-release-checksums/v1\",\"releaseTag\":\"${RELEASE_TAG}\",\"entries\":${entries_json}}" > artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json
+          echo "checksums_path=artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json" >> "$GITHUB_OUTPUT"
+
+      - name: Compose release manifest
+        id: manifest
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          $releaseMetadata = Get-Content -LiteralPath 'artifacts/release-metadata.json' -Raw | ConvertFrom-Json
+          $checksums = Get-Content -LiteralPath "artifacts/distribution/elegy-release-checksums-${env:RELEASE_TAG}.json" -Raw | ConvertFrom-Json
+          $bundleVersion = (Get-Content -LiteralPath 'contracts/schemas/schema-version.json' -Raw | ConvertFrom-Json).schemaVersion
+          $manifest = [ordered]@{
+              documentType       = 'elegy-release-manifest'
+              schemaVersion      = 'elegy-release-manifest/v1'
+              releaseTag         = $releaseMetadata.tagName
+              bundleVersion      = $bundleVersion
+              targetCommitish    = $releaseMetadata.targetCommitish
+              isPrerelease       = [bool]$releaseMetadata.isPrerelease
+              releaseName        = $releaseMetadata.name
+              entries            = $checksums.entries
+          }
+          $manifestPath = "artifacts/distribution/elegy-release-manifest-${env:RELEASE_TAG}.json"
+          $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding utf8
+          "manifest_path=${manifestPath}" >> $env:GITHUB_OUTPUT
+
+      - name: Upload manifest + checksums to release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          gh release upload "${RELEASE_TAG}" \
+            "artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json" \
+            "artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json" \
+            --clobber
+
+      - name: Upload finalize artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: elegy-release-finalized-${{ steps.release_meta.outputs.tag_name }}-${{ github.sha }}
+          if-no-files-found: error
+          path: |
+            artifacts/distribution/elegy-release-manifest-*.json
+            artifacts/distribution/elegy-release-checksums-*.json
