@@ -2101,11 +2101,9 @@ mod tests {
             "UPDATE memories SET content = 'hacked' WHERE id = 'trigger-test-id'",
             [],
         );
-        assert!(
-            result.is_err(),
-            "expected protective triggers to block UPDATE on protected column content"
-        );
-        let error_text = result.unwrap_err().to_string();
+        let error_text = result
+            .expect_err("expected protective triggers to block UPDATE on protected column content")
+            .to_string();
         assert!(
             error_text.contains("capability violation"),
             "trigger error must mention 'capability violation', got: {error_text}",
@@ -2154,11 +2152,9 @@ mod tests {
             res
         };
 
-        assert!(
-            result.is_err(),
-            "runner must return Err when a migration writes to protected columns",
-        );
-        let error_text = result.unwrap_err().to_string();
+        let error_text = result
+            .expect_err("runner must return Err when a migration writes to protected columns")
+            .to_string();
         assert!(
             error_text.contains("capability violation"),
             "error must mention capability violation, got: {error_text}",
@@ -2689,8 +2685,9 @@ mod tests {
 
         let txn = must(connection.transaction(), "begin ff txn");
         let result = run_migrations(&txn, &[&migration]);
-        assert!(result.is_err(), "must fail when provider is down at start");
-        let err_msg = result.unwrap_err().to_string();
+        let err_msg = result
+            .expect_err("must fail when provider is down at start")
+            .to_string();
         assert!(
             err_msg.contains("provider unavailable at start"),
             "error must mention provider unavailable, got: {err_msg}"
