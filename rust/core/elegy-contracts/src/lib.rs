@@ -438,11 +438,7 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
         if let Some(url) = &author.url {
             validate_uri("author.url", url, &mut issues);
         }
-        if author
-            .email
-            .as_deref()
-            .is_some_and(|e| e.trim().is_empty())
-        {
+        if author.email.as_deref().is_some_and(|e| e.trim().is_empty()) {
             issues.push("author.email must not be empty.".into());
         }
     }

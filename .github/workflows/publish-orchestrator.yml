@@ -70,7 +70,7 @@ jobs:
             exit 1
           fi
           cp "$binary_dir"/* "$staging"/ 2>/dev/null || true
-          (cd "$staging" && zip -r "../${archive_name}.zip" .)
+          (cd "$staging" && tar -a -cf "../${archive_name}.zip" .)
           echo "asset=${archive_name}.zip" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact

@@ -272,8 +272,8 @@ fn split_camel_case(part: &str) -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{McpToolAnalyzer, SkillTrigger};
-    use elegy_contracts::{McpServerDescriptor, McpToolAnalysis, McpToolDefinition};
+    use super::McpToolAnalyzer;
+    use elegy_contracts::{McpServerDescriptor, McpToolDefinition};
     use serde_json::json;
 
     #[test]

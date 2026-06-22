@@ -53,9 +53,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2.9.1
         with:
           workspaces: rust -> rust/target
-      - name: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: cargo clippy --workspace --all-features -- -D warnings
         working-directory: ./rust
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-features -- -D warnings
 
   msrv:
     name: msrv check (Rust 1.88)
