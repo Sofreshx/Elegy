@@ -33,14 +33,14 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: Validate contracts (canonical)
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-cli -- contracts validate --project ..
 
       - name: Export contracts bundle
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
 
       - name: Upload contracts distribution archive

@@ -5,7 +5,7 @@ name: Repo Boundaries
 # This replaces the legacy `scripts/validate-canonical-outputs.ps1` and
 # `scripts/export-contracts.ps1` flow; the new entry point is
 # `elegy-cli contracts validate`, which is itself backed by the
-# conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`.
+# conformance tests in `shared/contracts/tests/conformance.rs`.
 
 on:
   pull_request:
@@ -34,12 +34,12 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: Validate contracts (canonical)
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-cli -- contracts validate --project ..
 
       - name: Validate contracts (conformance)
-        working-directory: ./rust
+        working-directory: .
         run: cargo test -p elegy-contracts --test conformance -- --nocapture

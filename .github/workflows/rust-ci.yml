@@ -3,7 +3,15 @@ name: Rust CI
 on:
   pull_request:
     paths:
-      - 'rust/**'
+      - 'plugins/**'
+      - 'shared/**'
+      - 'hosts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'rustfmt.toml'
+      - 'deny.toml'
+      - '.cargo/**'
       - '.github/workflows/rust-ci.yml'
       - 'scripts/**'
       - '.elegy/docs.yaml'
@@ -36,9 +44,9 @@ jobs:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo fmt --all --check
-        working-directory: ./rust
+        working-directory: .
         run: cargo fmt --all --check
 
   clippy:
@@ -52,9 +60,9 @@ jobs:
           components: clippy
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo clippy --workspace --all-features -- -D warnings
-        working-directory: ./rust
+        working-directory: .
         run: cargo clippy --workspace --all-features -- -D warnings
 
   msrv:
@@ -66,9 +74,9 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.88.0
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo build --workspace
-        working-directory: ./rust
+        working-directory: .
         run: cargo build --workspace
 
   test:
@@ -92,9 +100,9 @@ jobs:
           targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo test --workspace --all-targets --all-features
-        working-directory: ./rust
+        working-directory: .
         run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
 
   docs-check-v2:
@@ -106,7 +114,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo run -p elegy-documentation -- check
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-documentation -- check --project ..

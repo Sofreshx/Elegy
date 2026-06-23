@@ -12,7 +12,7 @@ authority surface.
 
 - `contracts/` is the neutral authority root for contracts, schemas, fixtures, compatibility, schema-line metadata, and policy. Workflow and operational governance policy lives at `docs/governance/`.
 - `contracts/fixtures/skill.*.json` is the governed discovery authority for built-in skills. Do not add or revive v1 `skill-definition.*.json` files.
-- `rust/` is the first-party runtime family for reusable executable behavior over governed artifacts.
+- `plugins/<name>/` holds one tree per agent capability plugin. `hosts/<name>/` holds the thin host and umbrella CLI entrypoints. `shared/<name>/` holds library crates shared across multiple plugins. The first-party Rust executable surface is at the repo root, with the workspace `Cargo.toml` at the top.
 - `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs, configured by `.elegy/docs.yaml`.
 - The `Elegy-obsidian` surface delegates to the official Obsidian Desktop CLI. Do not describe it as a Rust binary or as durable planning authority.
 
@@ -46,7 +46,7 @@ authority surface.
 ## Validation
 
 - Prefer the narrowest validation that proves the changed boundary.
-- Run validation from `rust/` for Rust behavior and use repo-root scripts for governed/export boundaries.
+- Run validation from the repo root for Rust behavior (`cargo test -p <crate>`, `cargo run -p elegy-cli -- contracts validate --project .`) and use repo-root scripts for governed/export boundaries.
 - If docs or fixtures changed without code, inspect emitted JSON or generated contract output instead of only proofreading Markdown.
 - When capability behavior changes, verify both the Rust implementation and the governed fixture/projection that exposes it to agents.
 - When wrapper roots or generated projections change, verify the canonical-output or package-boundary path that covers that generated surface.
