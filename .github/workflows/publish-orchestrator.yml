@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_crate: .crate, archiveFamily: .archiveFamily}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_crate: .name, archiveFamily: .name}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
           matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"

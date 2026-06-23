@@ -544,8 +544,8 @@ fn elegy_plugin_v1_rejects_bad_paths() {
             "description": "testing",
             "skills": path
         });
-        let plugin: ElegyPluginV1 =
-            serde_json::from_value(json.clone()).expect(&format!("deserialize {} plugin", label));
+        let plugin: ElegyPluginV1 = serde_json::from_value(json.clone())
+            .unwrap_or_else(|_| panic!("deserialize {} plugin", label));
         let validation = validate_elegy_plugin_v1(&plugin);
         assert!(
             !validation.is_valid(),
@@ -630,7 +630,7 @@ fn elegy_plugin_v1_rejects_invalid_semver() {
             "description": "testing"
         });
         let plugin: ElegyPluginV1 = serde_json::from_value(json)
-            .expect(&format!("deserialize plugin with version '{}'", version));
+            .unwrap_or_else(|_| panic!("deserialize plugin with version '{}'", version));
         let validation = validate_elegy_plugin_v1(&plugin);
         assert!(
             !validation.is_valid(),
@@ -727,7 +727,7 @@ fn elegy_plugin_v1_rejects_null_roots() {
         plugin.is_ok(),
         "Option<String> with null should deserialize to None"
     );
-    let plugin = plugin.unwrap();
+    let plugin = plugin.expect("Option<String> with null should deserialize to None");
     assert!(plugin.skills.is_none(), "skills should be None");
     let validation = validate_elegy_plugin_v1(&plugin);
     assert!(
@@ -792,7 +792,7 @@ fn elegy_plugin_v1_accepts_valid_semver() {
             "skills": "./skills"
         });
         let plugin: ElegyPluginV1 = serde_json::from_value(json)
-            .expect(&format!("deserialize plugin with version '{}'", version));
+            .unwrap_or_else(|_| panic!("deserialize plugin with version '{}'", version));
         let validation = validate_elegy_plugin_v1(&plugin);
         assert!(
             validation.is_valid(),
@@ -815,7 +815,7 @@ fn elegy_plugin_v1_accepts_valid_names() {
             "skills": "./skills"
         });
         let plugin: ElegyPluginV1 = serde_json::from_value(json)
-            .expect(&format!("deserialize plugin with name '{}'", name));
+            .unwrap_or_else(|_| panic!("deserialize plugin with name '{}'", name));
         let validation = validate_elegy_plugin_v1(&plugin);
         assert!(
             validation.is_valid(),
