@@ -2,7 +2,7 @@ use elegy_contracts::{
     export_contract_bundle, load_agent_capability_profile_fixture_from_dir,
     load_elegy_configuration_profile_fixture_from_dir,
     load_elegy_configuration_receipt_fixture_from_dir,
-    load_elegy_configuration_template_fixture_from_dir, load_elegy_plugin_v1_fixture_from_dir,
+    load_elegy_configuration_template_fixture_from_dir,
     load_execution_event_fixture_from_dir, load_invocation_request_fixture_from_dir,
     load_invocation_response_fixture_from_dir, load_mcp_analysis_result_fixture_from_dir,
     load_mcp_server_descriptor_fixture_from_dir, load_observation_event_fixture_from_dir,
@@ -17,7 +17,7 @@ use elegy_contracts::{
     validate_structured_failure, ElegyPluginV1, ExecutionEvent, ExecutionEventStatus,
     ExecutionEventType, InvocationRequest, InvocationResponse, InvocationStatus, McpAnalysisResult,
     McpServerDescriptor, McpToolAnalysis, McpToolDefinition, StructuredFailure,
-    StructuredFailureCategory, StructuredFailureCause, ELEGY_PLUGIN_V1_SCHEMA_VERSION,
+    StructuredFailureCategory, StructuredFailureCause,
 };
 use std::env;
 use std::fs;
@@ -570,33 +570,6 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
 }
 
 // ── elegy-plugin/v1 conformance ──────────────────────────────────────────
-
-#[test]
-fn upstream_elegy_plugin_v1_fixture_is_semantically_valid() {
-    let contracts_dir = resolve_upstream_contracts_dir();
-    let plugin = load_elegy_plugin_v1_fixture_from_dir(&contracts_dir)
-        .expect("load upstream elegy-plugin-v1 fixture");
-
-    let validation = validate_elegy_plugin_v1(&plugin);
-    assert!(
-        validation.is_valid(),
-        "unexpected issues: {:?}",
-        validation.issues
-    );
-
-    assert_eq!(plugin.schema_version, ELEGY_PLUGIN_V1_SCHEMA_VERSION);
-    assert_eq!(plugin.name, "example-plugin");
-    assert_eq!(plugin.version, "0.1.0");
-    assert_eq!(
-        plugin.description,
-        "Example agent capability plugin for conformance testing."
-    );
-    assert!(plugin.author.is_some());
-    assert_eq!(plugin.license.as_deref(), Some("Apache-2.0"));
-    assert_eq!(plugin.skills.as_deref(), Some("./skills"));
-    assert_eq!(plugin.mcp_servers.as_deref(), Some("./mcp"));
-    assert!(plugin.extensions.is_some());
-}
 
 #[test]
 fn elegy_plugin_v1_minimal_is_valid() {

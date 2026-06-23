@@ -1436,23 +1436,6 @@ pub fn load_agent_capability_profile_fixture_from_dir(
     )
 }
 
-/// Load the upstream ElegyPluginV1 fixture from a contracts directory.
-pub fn load_elegy_plugin_v1_fixture_from_dir(
-    contracts_dir: &Path,
-) -> Result<ElegyPluginV1, ContractsError> {
-    let fixture_path = contracts_dir
-        .join("fixtures")
-        .join("elegy-plugin-v1.fixture.json");
-    let json = fs::read_to_string(&fixture_path).map_err(|source| ContractsError::Io {
-        path: fixture_path.clone(),
-        source,
-    })?;
-    serde_json::from_str(&json).map_err(|source| ContractsError::Json {
-        path: fixture_path,
-        source,
-    })
-}
-
 pub fn load_mcp_server_descriptor_fixture_from_dir(
     dir: &Path,
 ) -> Result<McpServerDescriptor, ContractsError> {
