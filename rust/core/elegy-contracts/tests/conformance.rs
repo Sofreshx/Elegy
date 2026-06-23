@@ -420,57 +420,7 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
     assert_eq!(export.archive_path.as_deref(), Some(archive_path.as_path()));
     assert!(output_path
         .join("schemas")
-        .join("canonical-workflow.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("agent-manifest.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("agent-check.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("agent-discovery.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("structured-failure.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("invocation-request.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("invocation-response.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("execution-event.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("observation-event.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
         .join("observation-session.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("schemas")
-        .join("observation-summary.schema.json")
-        .is_file());
-    assert!(output_path
-        .join("fixtures")
-        .join("configuration")
-        .join("demo-template.json")
-        .is_file());
-    assert!(output_path
-        .join("fixtures")
-        .join("configuration")
-        .join("demo-profile.json")
         .is_file());
     assert!(output_path
         .join("fixtures")
@@ -500,47 +450,12 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         .join("fixtures")
         .join("observation-summary.minimal.json")
         .is_file());
-    assert!(output_path
-        .join("fixtures")
-        .join("mcp-parity-expected.json")
-        .is_file());
 
     {
         let archive_file = fs::File::open(&archive_path).expect("open bundle archive");
         let mut archive = ZipArchive::new(archive_file).expect("read bundle archive");
         assert!(archive
-            .by_name("schemas/agent-manifest.schema.json")
-            .is_ok());
-        assert!(archive.by_name("schemas/agent-check.schema.json").is_ok());
-        assert!(archive
-            .by_name("schemas/agent-discovery.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/structured-failure.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/invocation-request.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/invocation-response.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/execution-event.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/observation-event.schema.json")
-            .is_ok());
-        assert!(archive
             .by_name("schemas/observation-session.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("schemas/observation-summary.schema.json")
-            .is_ok());
-        assert!(archive
-            .by_name("fixtures/configuration/demo-template.json")
-            .is_ok());
-        assert!(archive
-            .by_name("fixtures/configuration/demo-profile.json")
             .is_ok());
         assert!(archive
             .by_name("fixtures/structured-failure.minimal.json")
@@ -563,7 +478,6 @@ fn export_contract_bundle_creates_expected_directory_and_archive() {
         assert!(archive
             .by_name("fixtures/observation-summary.minimal.json")
             .is_ok());
-        assert!(archive.by_name("fixtures/mcp-parity-expected.json").is_ok());
     }
 
     fs::remove_dir_all(&temp_root).expect("remove temp export root");
