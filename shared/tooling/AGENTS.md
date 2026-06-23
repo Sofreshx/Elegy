@@ -2,8 +2,8 @@
 
 ## Start Here
 
-- Read `../../../docs/architecture/mcp-skill-tooling-placement.md` before changing crate ownership or generation boundaries.
-- Inspect governed MCP and skill artifacts under `../../../contracts/` when changing emitted file shapes.
+- Read `../../docs/architecture/mcp-skill-tooling-placement.md` before changing crate ownership or generation boundaries.
+- Inspect governed MCP and skill artifacts under `../../contracts/` when changing emitted file shapes.
 
 ## Boundaries
 

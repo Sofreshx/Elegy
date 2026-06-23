@@ -2,8 +2,8 @@
 
 ## Start Here
 
-- Read `../../../docs/architecture/skill-core-v1.md` before changing the dedicated skill-registry surface.
-- Inspect governed skill artifacts under `../../../contracts/` when changing registry semantics or validation behavior.
+- Read `../../docs/architecture/skill-core-v1.md` before changing the dedicated skill-registry surface.
+- Inspect governed skill artifacts under `../../contracts/` when changing registry semantics or validation behavior.
 
 ## Boundaries
 

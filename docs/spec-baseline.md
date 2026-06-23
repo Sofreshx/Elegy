@@ -17,7 +17,7 @@ Record the protocol baseline Elegy is targeting so governed contracts, exported 
 Elegy is currently centered on two implementation anchors:
 
 - governed contract artifacts under `contracts/` and operational policy under `docs/governance/`
-- the first-party Rust workspace under `rust/`
+- the first-party Rust workspace at the repo root
 
 Protocol-baseline drift would now affect:
 
@@ -63,7 +63,7 @@ Until that happens, the repository baseline remains `2025-11-25`.
 - contract authority: `contracts/`
 - exported machine-readable handoff: `artifacts/contracts`
 - current CLI posture: dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation` binaries for bounded surfaces, with `elegy` kept as the general/compatibility CLI
-- current operator slice: Rust CLI author/analyze/generate with narrow validation and inspection flows under `rust/`
+- current operator slice: Rust CLI author/analyze/generate with narrow validation and inspection flows from the repo root
 - runtime model: runtime composition with a resources-first posture
 - future target: broader MCP-hosted or skill-driven self-authoring only after it is implemented and validated in-repo
 - OSS license baseline: Apache-2.0
@@ -73,4 +73,4 @@ Until that happens, the repository baseline remains `2025-11-25`.
 - [Architecture overview](architecture/README.md)
 - [Distribution and downstream consumption](distribution.md)
 - [Repository README](../README.md)
-- [Rust workspace README](../rust/README.md)
+- [Rust workspace README](../README.md)

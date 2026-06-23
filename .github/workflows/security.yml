@@ -25,7 +25,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
       - uses: taiki-e/install-action@cargo-deny
       - name: cargo deny check
-        working-directory: ./rust
+        working-directory: .
         run: cargo deny check advisories licenses bans sources
 
   cargo-audit:
@@ -36,7 +36,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
       - uses: taiki-e/install-action@cargo-audit
       - name: cargo audit
-        working-directory: ./rust
+        working-directory: .
         run: cargo audit
 
   gitleaks:
@@ -65,7 +65,7 @@ jobs:
         with:
           languages: rust
       - name: Build Rust workspace
-        working-directory: ./rust
+        working-directory: .
         run: cargo build --workspace --all-features --locked
       - name: Analyze
         uses: github/codeql-action/analyze@v3

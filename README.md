@@ -23,7 +23,7 @@ Core model:
 | --- | --- |
 | `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
 | `docs/governance/` | Operational policy (workflow/environment/branch enforcement modes). |
-| `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
+| `hosts/`, `plugins/`, `shared/` | First-party Rust libraries and binaries that consume governed artifacts. |
 | `artifacts/` | Generated bundles, archives, and validation outputs. |
 
 When those surfaces disagree, prefer the governed artifact roots and the
@@ -97,7 +97,7 @@ bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -C
 
 ```bash
 git clone https://github.com/Sofreshx/Elegy.git
-cd Elegy/rust
+cd Elegy
 cargo build -p elegy-cli
 cargo run -p elegy-cli -- --version --json
 ```
@@ -126,16 +126,16 @@ require editing this README.
 
 | Binary | Crate | Per-feature note |
 | --- | --- | --- |
-| `elegy` | `rust/bin/elegy-cli/` | [DISTRIBUTION.md](rust/bin/elegy-cli/DISTRIBUTION.md) |
-| `elegy-memory` | `rust/features/elegy-memory/` | [DISTRIBUTION.md](rust/features/elegy-memory/DISTRIBUTION.md) |
-| `elegy-mcp` | `rust/features/elegy-mcp/` | [DISTRIBUTION.md](rust/features/elegy-mcp/DISTRIBUTION.md) |
-| `elegy-planning` | `rust/features/elegy-planning/` | [DISTRIBUTION.md](rust/features/elegy-planning/DISTRIBUTION.md) |
-| `elegy-skills` | `rust/features/elegy-skills/` | [DISTRIBUTION.md](rust/features/elegy-skills/DISTRIBUTION.md) |
-| `elegy-configuration` | `rust/features/elegy-configuration/` | [DISTRIBUTION.md](rust/features/elegy-configuration/DISTRIBUTION.md) |
-| `elegy-documentation` | `rust/features/elegy-documentation/` | [DISTRIBUTION.md](rust/features/elegy-documentation/DISTRIBUTION.md) |
-| `elegy-memory-mcp-stdio` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
-| `elegy-memory-mcp-http` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
-| `elegy-codegraph` | `rust/features/elegy-codegraph/` | [DISTRIBUTION.md](rust/features/elegy-codegraph/DISTRIBUTION.md) |
+| `elegy` | `hosts/cli/` | [DISTRIBUTION.md](hosts/cli/DISTRIBUTION.md) |
+| `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
+| `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
+| `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
+| `elegy-skills` | `plugins/skills/` | [DISTRIBUTION.md](plugins/skills/DISTRIBUTION.md) |
+| `elegy-configuration` | `plugins/configuration/` | [DISTRIBUTION.md](plugins/configuration/DISTRIBUTION.md) |
+| `elegy-documentation` | `plugins/documentation/` | [DISTRIBUTION.md](plugins/documentation/DISTRIBUTION.md) |
+| `elegy-memory-mcp-stdio` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
+| `elegy-memory-mcp-http` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
+| `elegy-codegraph` | `plugins/codegraph/` | [DISTRIBUTION.md](plugins/codegraph/DISTRIBUTION.md) |
 
 ## Wrapper and Skill Surfaces
 
@@ -223,7 +223,6 @@ for one-off invocations.
 ## Contributing From Source
 
 ```bash
-cd rust
 cargo build -p elegy-cli
 cargo test --workspace --all-targets --all-features
 ```
@@ -242,7 +241,6 @@ elegy-documentation check --project . --json
 Common Rust checks:
 
 ```bash
-cd rust
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
@@ -251,7 +249,7 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```bash
-cd rust && cargo run -p elegy-cli -- contracts validate --project .. && cargo test -p elegy-contracts --test conformance
+cargo run -p elegy-cli -- contracts validate --project . && cargo test -p elegy-contracts --test conformance
 ```
 
 ## License
