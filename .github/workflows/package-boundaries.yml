@@ -38,7 +38,7 @@ jobs:
 
       - name: Validate contracts (canonical)
         working-directory: .
-        run: cargo run -p elegy-cli -- contracts validate --project ..
+        run: cargo run -p elegy-cli -- contracts validate --project .
 
       - name: Validate contracts (conformance)
         working-directory: .

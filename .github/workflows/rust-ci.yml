@@ -117,4 +117,4 @@ jobs:
           workspaces: . -> target
       - name: cargo run -p elegy-documentation -- check
         working-directory: .
-        run: cargo run -p elegy-documentation -- check --project ..
+        run: cargo run -p elegy-documentation -- check --project .

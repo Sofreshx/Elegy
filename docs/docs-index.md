@@ -106,7 +106,7 @@
       "updated": "2026-06-02",
       "docKind": "spec",
       "freshness": "fresh",
-      "path": "rust/features/elegy-planning/docs/specs/index.md",
+      "path": "plugins/planning/docs/specs/index.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "Durable planning authority for goals, roadmaps, plans, todos, issues, review points, work-point graphs, project-run leases, validation, and projection rendering.",
@@ -117,7 +117,7 @@
       "created": "2026-06-02",
       "docKind": "spec",
       "freshness": "fresh",
-      "path": "rust/features/elegy-planning/docs/specs/state-machine.md",
+      "path": "plugins/planning/docs/specs/state-machine.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "title: elegy-planning state machine",
@@ -150,8 +150,8 @@
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/documentation-practices-skill-and-cli.md",
-    "rust/features/elegy-planning/docs/specs/index.md",
-    "rust/features/elegy-planning/docs/specs/state-machine.md"
+    "plugins/planning/docs/specs/index.md",
+    "plugins/planning/docs/specs/state-machine.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

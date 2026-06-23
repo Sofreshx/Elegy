@@ -2,8 +2,8 @@
 
 ## Start Here
 
-- Read `../../../docs/agent-integration.md` for host policy and side-effect boundaries.
-- Inspect `../../../contracts/fixtures/skill.elegy-desktop.json` before changing agent-visible desktop capability semantics.
+- Read `../../docs/agent-integration.md` for host policy and side-effect boundaries.
+- Inspect `../../contracts/fixtures/skill.elegy-desktop.json` before changing agent-visible desktop capability semantics.
 
 ## Boundaries
 

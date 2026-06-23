@@ -25,7 +25,7 @@ skill surface.
 
 The `elegy-plugin/v1` thin manifest schema and its fixture were also removed
 during the purge: no `.elegy-plugin/plugin.json` file exists in this repo,
-and the Rust struct (`ElegyPluginV1` in `rust/core/elegy-contracts`) is kept
+and the Rust struct (`ElegyPluginV1` in `shared/contracts`) is kept
 only because `elegy-tooling` uses it to scaffold plugin directories. The
 scaffolder writes a `plugin.json` at scaffold time but no real plugin in
 this repo uses that file as its agent-facing manifest.
@@ -54,8 +54,8 @@ this repo uses that file as its agent-facing manifest.
 
 - Use the narrowest contract or Rust validation that covers the edited
   artifact.
-- For schema and fixture changes: `cd rust && cargo run -p elegy-cli --
-  contracts validate --project ..` and `cargo test -p elegy-contracts`.
+- For schema and fixture changes: `cargo run -p elegy-cli --
+  contracts validate --project .` and `cargo test -p elegy-contracts`.
 - For host-facing capability changes, inspect the JSON emitted by
   `elegy agent manifest/discover --detail --json` and, when relevant,
   `elegy-skills get/capability/validate --json` or the umbrella
