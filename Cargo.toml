@@ -1,0 +1,72 @@
+[workspace]
+members = [
+    "hosts/cli",
+    "hosts/host-mcp",
+    "plugins/codegraph",
+    "plugins/configuration",
+    "plugins/data",
+    "plugins/desktop",
+    "plugins/diagram",
+    "plugins/documentation",
+    "plugins/mcp",
+    "plugins/memory",
+    "plugins/memory-mcp",
+    "plugins/mermaid",
+    "plugins/notify",
+    "plugins/observe",
+    "plugins/planning",
+    "plugins/repo",
+    "plugins/skills",
+    "plugins/web",
+    "shared/adapter-fs",
+    "shared/adapter-http",
+    "shared/agent-events",
+    "shared/contracts",
+    "shared/core",
+    "shared/descriptor",
+    "shared/desktop-win32",
+    "shared/observe-win32",
+    "shared/policy",
+    "shared/runtime",
+    "shared/tooling",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.88"
+license = "Apache-2.0"
+authors = ["Elegy Contributors"]
+repository = "https://github.com/Sofreshx/Elegy"
+homepage = "https://github.com/Sofreshx/Elegy"
+documentation = "https://github.com/Sofreshx/Elegy/blob/main/README.md"
+readme = "README.md"
+
+[workspace.dependencies]
+async-trait = "0.1.89"
+base64 = "0.22.1"
+clap = { version = "4.5.30", features = ["derive"] }
+glob = "0.3.2"
+reqwest = { version = "0.12.12", default-features = false, features = ["blocking", "rustls-tls"] }
+rmcp = { version = "1.2.0", features = ["server", "transport-io", "transport-streamable-http-server"] }
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.138"
+serde_yaml = "0.9.34"
+thiserror = "2.0.11"
+time = { version = "0.3.41", features = ["formatting"] }
+tokio = { version = "1.44.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "time", "process"] }
+toml = "0.8.20"
+url = { version = "2.5.4", features = ["serde"] }
+zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
+arboard = "3.4"
+png = "0.17"
+sysinfo = "0.33"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+dbg_macro = "deny"
+todo = "deny"
+unwrap_used = "deny"

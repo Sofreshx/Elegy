@@ -50,10 +50,10 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: cargo build --release
-        working-directory: ./rust
+        working-directory: .
         run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_crate }}
 
       - name: Stage archive
@@ -64,7 +64,7 @@ jobs:
           archive_name="${{ matrix.archiveFamily }}-${{ matrix.target }}-${{ github.sha }}"
           staging="artifacts/distribution/${archive_name}"
           mkdir -p "$staging"
-          binary_dir="rust/target/${{ matrix.target }}/release"
+          binary_dir="target/${{ matrix.target }}/release"
           if [[ ! -d "$binary_dir" ]]; then
             echo "Missing build output: $binary_dir" >&2
             exit 1
@@ -91,14 +91,14 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: Validate contracts (canonical)
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-cli -- contracts validate --project ..
 
       - name: Export contracts bundle
-        working-directory: ./rust
+        working-directory: .
         run: cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
 
       - name: Upload contracts distribution archive
