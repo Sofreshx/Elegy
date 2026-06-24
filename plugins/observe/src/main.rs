@@ -74,13 +74,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             serde_json::to_value(&info).map_err(|e| e.to_string())
         }
         Command::Windows { filter } => {
-            let windows = elegy_observe::list_windows(filter.as_deref()).map_err(|e| e.to_string())?;
+            let windows =
+                elegy_observe::list_windows(filter.as_deref()).map_err(|e| e.to_string())?;
             serde_json::to_value(&windows).map_err(|e| e.to_string())
         }
         Command::Screen { monitor, output } => {
-            let result =
-                elegy_observe::capture_screen(Some(*monitor), output.as_deref())
-                    .map_err(|e| e.to_string())?;
+            let result = elegy_observe::capture_screen(Some(*monitor), output.as_deref())
+                .map_err(|e| e.to_string())?;
             serde_json::to_value(&result).map_err(|e| e.to_string())
         }
         Command::Clipboard => {

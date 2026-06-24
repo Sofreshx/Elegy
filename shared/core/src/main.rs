@@ -4,7 +4,10 @@ use serde_json::Value;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "elegy-contracts", about = "Elegy contract and configuration tools")]
+#[command(
+    name = "elegy-contracts",
+    about = "Elegy contract and configuration tools"
+)]
 struct Cli {
     /// Path to the project root or elegy.toml file
     #[arg(long, default_value = ".")]
@@ -110,8 +113,7 @@ fn run_command(cli: &Cli) -> Result<Value, (CliFailureKind, String)> {
                     archive_output.as_deref(),
                 )
                 .map_err(|e| (CliFailureKind::Runtime, e.to_string()))?;
-                serde_json::to_value(&export)
-                    .map_err(|e| (CliFailureKind::Runtime, e.to_string()))
+                serde_json::to_value(&export).map_err(|e| (CliFailureKind::Runtime, e.to_string()))
             }
             ContractsAction::Validate => {
                 // Export to a temp dir to validate the bundle process
@@ -152,8 +154,7 @@ fn run_command(cli: &Cli) -> Result<Value, (CliFailureKind, String)> {
             ValidateTarget::Runtime => {
                 let catalog = compose_runtime(locator)
                     .map_err(|e| (CliFailureKind::Runtime, e.to_string()))?;
-                serde_json::to_value(&catalog)
-                    .map_err(|e| (CliFailureKind::Runtime, e.to_string()))
+                serde_json::to_value(&catalog).map_err(|e| (CliFailureKind::Runtime, e.to_string()))
             }
         },
         Command::Inspect(target) => match target {

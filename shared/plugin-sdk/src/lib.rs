@@ -536,6 +536,7 @@ where
     }
 }
 
+#[allow(dead_code)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
@@ -2121,13 +2122,12 @@ fn load_mcp_descriptor_file(path: &Path) -> Result<McpServerDescriptor, ToolingE
         source,
     })?;
 
-    let descriptor =
-        serde_json::from_str::<McpServerDescriptor>(&content).map_err(|source| {
-            ToolingError::Json {
-                path: path.to_path_buf(),
-                source,
-            }
-        })?;
+    let descriptor = serde_json::from_str::<McpServerDescriptor>(&content).map_err(|source| {
+        ToolingError::Json {
+            path: path.to_path_buf(),
+            source,
+        }
+    })?;
 
     let issues = descriptor_validation_issues(&descriptor);
     if !issues.is_empty() {
@@ -2182,11 +2182,10 @@ pub(crate) fn write_json_file<T: Serialize>(
         })?;
     }
 
-    let mut content =
-        serde_json::to_string_pretty(value).map_err(|source| ToolingError::Json {
-            path: output_path.to_path_buf(),
-            source,
-        })?;
+    let mut content = serde_json::to_string_pretty(value).map_err(|source| ToolingError::Json {
+        path: output_path.to_path_buf(),
+        source,
+    })?;
     content.push('\n');
 
     fs::write(output_path, content).map_err(|source| ToolingError::Io {
@@ -2207,8 +2206,8 @@ mod tests {
     use super::{
         analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, export_plugin_v1,
         generate_skills_from_descriptor_file, inspect_plugin_v1, scaffold_plugin_v1_repository,
-        verify_plugin_v1, AuthorMcpDescriptorRequest, AuthorMcpToolRequest,
-        McpServerDescriptor, McpToolAnalyzer, McpToolDefinition,
+        verify_plugin_v1, AuthorMcpDescriptorRequest, AuthorMcpToolRequest, McpServerDescriptor,
+        McpToolAnalyzer, McpToolDefinition,
     };
     use serde_json::json;
     use std::fs;
@@ -2436,8 +2435,8 @@ mod tests {
         assert!(verify_result.has_skills);
         assert_eq!(verify_result.skill_count, 1);
 
-        let inspect_result = inspect_plugin_v1(&output_dir.join(".elegy-plugin"))
-            .expect("inspect should succeed");
+        let inspect_result =
+            inspect_plugin_v1(&output_dir.join(".elegy-plugin")).expect("inspect should succeed");
         assert_eq!(inspect_result["name"], "my-plugin");
     }
 
@@ -2464,6 +2463,10 @@ mod tests {
         assert_eq!(result.plugin_name, "my-plugin");
         assert_eq!(result.emitted_components.skills_count, 1);
         assert!(result.written_files.len() >= 1);
-        assert!(export_dir.join("skills").join("my-plugin").join("SKILL.md").exists());
+        assert!(export_dir
+            .join("skills")
+            .join("my-plugin")
+            .join("SKILL.md")
+            .exists());
     }
 }
