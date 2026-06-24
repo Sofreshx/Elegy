@@ -9,15 +9,19 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-elegy-agent-events = { version = "0.1.0", path = "../agent-events" }
-elegy-contracts = { version = "0.1.0", path = "../contracts" }
 elegy-descriptor = { version = "0.1.0", path = "../descriptor" }
 elegy-policy = { version = "0.1.0", path = "../policy" }
 elegy-runtime = { version = "0.1.0", path = "../runtime" }
+semver = "1"
 serde.workspace = true
+serde_json.workspace = true
+serde_yaml.workspace = true
+thiserror.workspace = true
+url.workspace = true
+zip.workspace = true
 
 [dev-dependencies]
-serde_json.workspace = true
+elegy-mcp = { version = "0.1.0", path = "../../plugins/mcp" }
 
 [lints]
 workspace = true

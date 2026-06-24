@@ -1571,11 +1571,6 @@ fn machine_output_conforms_to_planning_result_schema() {
 
     // Load the schema
     let schema_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .parent()
-        .expect("CARGO_MANIFEST_DIR should have a parent (crate root)")
-        .parent()
-        .expect("crate root should have a parent (repo root)")
-        .join("contracts")
         .join("schemas")
         .join("planning-result.schema.json");
     let schema_json: Value =

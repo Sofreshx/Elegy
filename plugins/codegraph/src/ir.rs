@@ -1,6 +1,6 @@
 //! Normalized graph intermediate representation types.
 //!
-//! Mirrors the governed schema at `contracts/schemas/elegy-codegraph.graph.v0.json`.
+//! Mirrors the governed schema at `schemas/elegy-codegraph.graph.v0.json`.
 
 use serde::{Deserialize, Serialize};
 
@@ -254,10 +254,10 @@ mod tests {
     /// Load the contract fixture and verify serde round-trip.
     #[test]
     fn round_trip_contract_fixture() {
-        // From CARGO_MANIFEST_DIR (plugins/codegraph/), go up 3 levels to repo root
+        // From CARGO_MANIFEST_DIR (plugins/codegraph/), fixture is at ./fixtures/
         let fixture_path = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../../contracts/fixtures/elegy-codegraph.graph.v0.example.json"
+            "/fixtures/elegy-codegraph.graph.v0.example.json"
         );
         let json = std::fs::read_to_string(fixture_path).expect("Failed to read contract fixture");
 

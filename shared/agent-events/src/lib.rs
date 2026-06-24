@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use elegy_contracts::{
+use elegy_core::{
     validate_agent_event_envelope, validate_agent_request_envelope,
     validate_agent_response_envelope, AgentEventEnvelope, AgentEventPayload, AgentEventSource,
     AgentEventType, AgentRequestEnvelope, AgentResponseEnvelope, AgentResponseStatus,
@@ -485,7 +485,7 @@ fn format_timestamp() -> Result<String, AgentBrokerError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use elegy_contracts::{AgentMessage, AgentMessageRole, AgentRequestContext};
+    use elegy_core::{AgentMessage, AgentMessageRole, AgentRequestContext};
 
     fn request_fixture() -> AgentRequestEnvelope {
         AgentRequestEnvelope {

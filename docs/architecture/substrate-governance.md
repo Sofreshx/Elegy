@@ -24,8 +24,8 @@ These are the durable authority roots and must stay language-agnostic.
 
 | Surface | Responsibility |
 | --- | --- |
-| `contracts/schemas/` | Governed JSON schema authority |
-| `contracts/fixtures/` | Minimal and parity fixtures |
+| `plugins/<name>/schemas/` | Governed JSON schema authority, co-located per plugin |
+| `plugins/<name>/fixtures/` | Minimal and parity fixtures, co-located per plugin |
 
 ### Layer 2: Rust executable crates
 
@@ -33,16 +33,16 @@ These crates consume governed artifacts and provide reusable executable behavior
 
 | Surface | Responsibility |
 | --- | --- |
-| `rust/core/elegy-contracts` | Rust consumption of governed contracts |
-| `rust/core/elegy-policy` | Policy enforcement helpers |
-| `rust/features/elegy-memory` | Dedicated bounded-memory executable behavior and CLI surface |
-| `rust/features/elegy-mcp` | Dedicated MCP descriptor authoring/analysis behavior and CLI surface |
-| `rust/features/elegy-skills` | Dedicated MCP-to-skill generation behavior and CLI surface |
-| `rust/core/elegy-tooling` | Shared helper and compatibility infrastructure for descriptor and skill workflows |
-| `rust/core/elegy-descriptor` | Descriptor loading and normalization |
-| `rust/core/elegy-adapter-fs` and `rust/core/elegy-adapter-http` | Bounded adapter behavior |
-| `rust/core/elegy-runtime` and `rust/core/elegy-core` | Reusable runtime composition |
-| `rust/bin/elegy-host-mcp` and `rust/bin/elegy-cli` | Thin host and umbrella general/compatibility surfaces |
+| `shared/core` | Rust consumption of governed contracts (package `elegy-core`) |
+| `shared/policy` | Policy enforcement helpers |
+| `plugins/memory` | Dedicated bounded-memory executable behavior and CLI surface |
+| `plugins/mcp` | Dedicated MCP descriptor authoring/analysis behavior and CLI surface |
+| `plugins/skills` | Dedicated MCP-to-skill generation behavior and CLI surface |
+| `shared/tooling` | Shared helper and compatibility infrastructure for descriptor and skill workflows |
+| `shared/descriptor` | Descriptor loading and normalization |
+| `shared/adapter-fs` and `shared/adapter-http` | Bounded adapter behavior |
+| `shared/runtime` and `shared/core` | Reusable runtime composition |
+| `hosts/host-mcp` and `hosts/cli` | Thin host and umbrella general/compatibility surfaces |
 
 ### Layer 3: export and validation surfaces
 
@@ -52,7 +52,7 @@ These surfaces validate and ship the governed and executable layers without rede
 | --- | --- |
 | `elegy-cli contracts export` | Bundle export |
 | `elegy-cli contracts validate` | Canonical output validation |
-| Conformance tests in `rust/core/elegy-contracts/tests/conformance.rs` | Per-feature publish-metadata contract |
+| Per-plugin conformance tests in `plugins/*/tests/conformance.rs` | Per-feature publish-metadata contract |
 | `.github/workflows/*.yml` | CI enforcement for artifacts, Rust, security, and distribution |
 
 ## Dependency direction rules
@@ -106,7 +106,7 @@ Shared contracts, fixtures, manifests, and policy artifacts are governed central
 That means:
 
 1. the authoritative source lives in `Elegy`, not in downstream consuming repos
-2. versioning rules are defined in `contracts/schemas/schema-version.json`
+2. versioning rules are defined in `docs/schema-version.json`
 3. first-party Rust crates and downstream consumers should consume published artifacts or versioned files, not co-own the truth through copy-paste drift
 4. coordinated change procedures are required before a governed contract family becomes a wider dependency
 
@@ -128,7 +128,7 @@ Current enforcement lives in these surfaces:
 
 - `elegy-cli contracts export`
 - `elegy-cli contracts validate`
-- Conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
+- Per-plugin conformance tests in `plugins/*/tests/conformance.rs`
 - `.github/workflows/distribution-artifacts.yml`
 - `.github/workflows/rust-ci.yml`
 - Rust workspace tests that exercise CLI and tooling behavior

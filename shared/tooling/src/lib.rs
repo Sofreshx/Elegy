@@ -2,12 +2,13 @@ mod docs;
 
 pub use docs::*;
 
-use elegy_contracts::{
-    validate_elegy_plugin_v1, validate_kebab_case_name, validate_mcp_analysis_result,
-    validate_mcp_server_descriptor, validate_semver, ElegyPluginV1, McpAnalysisResult,
-    McpServerDescriptor, McpToolDefinition, McpTransportKind,
+use elegy_core::{
+    validate_elegy_plugin_v1, validate_kebab_case_name, validate_semver, ElegyPluginV1,
 };
-use elegy_mcp::McpToolAnalyzer;
+use elegy_mcp::{
+    validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
+    McpServerDescriptor, McpToolDefinition, McpTransportKind, McpToolAnalyzer,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fs;
@@ -1467,7 +1468,7 @@ mod tests {
         generate_skills_from_descriptor_file, inspect_plugin_v1, scaffold_plugin_v1_repository,
         verify_plugin_v1, AuthorMcpDescriptorRequest, AuthorMcpToolRequest, ToolingError,
     };
-    use elegy_contracts::{validate_mcp_server_descriptor, McpTransportKind};
+    use elegy_mcp::{validate_mcp_server_descriptor, McpTransportKind};
     use std::fs;
     use std::path::PathBuf;
     use std::time::{SystemTime, UNIX_EPOCH};

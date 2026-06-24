@@ -10,7 +10,7 @@ repository.workspace = true
 
 [dependencies]
 async-trait.workspace = true
-elegy-contracts = { version = "0.1.0", path = "../contracts" }
+elegy-core = { version = "0.1.0", path = "../core" }
 thiserror.workspace = true
 time.workspace = true
 tokio.workspace = true

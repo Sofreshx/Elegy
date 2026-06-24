@@ -9,7 +9,6 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
-elegy-contracts = { version = "0.1.0", path = "../contracts" }
 elegy-mcp = { version = "0.1.0", path = "../../plugins/mcp" }
 elegy-adapter-fs = { version = "0.1.0", path = "../adapter-fs" }
 elegy-adapter-http = { version = "0.1.0", path = "../adapter-http" }

@@ -8,7 +8,7 @@ use serde::Serialize;
 use serde_json::json;
 
 const SUMMARY_ONLY_FIXTURE_JSON: &str =
-    include_str!("../../../contracts/fixtures/summary-only-session-context-envelope.minimal.json");
+    include_str!("../fixtures/summary-only-session-context-envelope.minimal.json");
 const GOVERNED_RECORD_FIXTURE_JSON: &str = r#"{
   "artifactKind": "governed-memory-record",
   "recordId": "memory-record-1",

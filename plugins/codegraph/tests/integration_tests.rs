@@ -1,8 +1,8 @@
 //! Integration tests for the elegy-codegraph extraction and query pipeline.
 //!
 //! Tests extract + query against the in-tree fixture repos:
-//! - `rust/tests/fixtures/rust-mini/` — small Rust crate
-//! - `rust/tests/fixtures/ts-mini/` — small TypeScript project
+//! - `tests/fixtures/rust-mini/` — small Rust crate
+//! - `tests/fixtures/ts-mini/` — small TypeScript project
 //!
 //! Structural assertions: entity counts, expected kinds/names, edge types,
 //! provenance presence, and query correctness.
@@ -11,10 +11,10 @@ use elegy_codegraph::ir::{Confidence, EdgeKind, EntityKind};
 
 /// Helper: find fixture path relative to the crate root.
 fn fixture_path(name: &str) -> String {
-    // CARGO_MANIFEST_DIR is rust/features/elegy-codegraph/
-    // Fixtures are at rust/tests/fixtures/ — go up two levels, then into tests/fixtures
+    // CARGO_MANIFEST_DIR is plugins/codegraph/
+    // Fixtures are at plugins/codegraph/tests/fixtures/
     format!(
-        "{}/../../tests/fixtures/{}",
+        "{}/tests/fixtures/{}",
         env!("CARGO_MANIFEST_DIR"),
         name
     )

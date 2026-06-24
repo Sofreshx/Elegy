@@ -1,4 +1,4 @@
-use elegy_contracts::{
+use elegy_core::{
     validate_execution_event, validate_invocation_request, validate_invocation_response,
     validate_structured_failure, ExecutionEvent, ExecutionEventStatus, ExecutionEventType,
     InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus, StructuredFailure,
@@ -66,9 +66,6 @@ fn build_invocation_context(
 #[test]
 fn analyze_command_machine_output_maps_cleanly_to_invocation_contracts() {
     let descriptor = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("..")
-        .join("..")
-        .join("contracts")
         .join("fixtures")
         .join("mcp-server-descriptor.parity.json");
 

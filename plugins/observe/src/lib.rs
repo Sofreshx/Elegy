@@ -16,7 +16,7 @@ use std::time::Duration;
 #[cfg(windows)]
 use std::io::Cursor;
 
-use elegy_contracts::{
+use elegy_core::{
     ObservationBounds, ObservationEvent, ObservationKind, ObservationRecorderKind,
     ObservationRepresentation, ObservationSalientEvent, ObservationScope, ObservationSession,
     ObservationSummary, ObservationTimeRange, ObservationTokenEstimate, ObservationWindow,

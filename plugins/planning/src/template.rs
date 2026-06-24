@@ -1,27 +1,27 @@
 use crate::PlanningStoreError;
 
-const TEMPLATE_DIR: &str = "contracts/templates/planning";
+const TEMPLATE_DIR: &str = "../templates";
 
 const TEMPLATES: &[(&str, &str)] = &[
     (
         "phase-gate",
-        include_str!("../../../contracts/templates/planning/phase-gate.yaml"),
+        include_str!("../templates/phase-gate.yaml"),
     ),
     (
         "implementation-slice",
-        include_str!("../../../contracts/templates/planning/implementation-slice.yaml"),
+        include_str!("../templates/implementation-slice.yaml"),
     ),
     (
         "research-decision",
-        include_str!("../../../contracts/templates/planning/research-decision.yaml"),
+        include_str!("../templates/research-decision.yaml"),
     ),
     (
         "migration",
-        include_str!("../../../contracts/templates/planning/migration.yaml"),
+        include_str!("../templates/migration.yaml"),
     ),
     (
         "production-readiness",
-        include_str!("../../../contracts/templates/planning/production-readiness.yaml"),
+        include_str!("../templates/production-readiness.yaml"),
     ),
 ];
 

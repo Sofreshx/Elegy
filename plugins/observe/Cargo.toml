@@ -8,7 +8,7 @@ license.workspace = true
 description = "Desktop and OS observation for agentic workflows. Process snapshots, window tracking, clipboard, screen capture, and filesystem diffing."
 
 [dependencies]
-elegy-contracts = { version = "0.1.0", path = "../../shared/contracts" }
+elegy-core = { version = "0.1.0", path = "../../shared/core" }
 base64.workspace = true
 png.workspace = true
 serde.workspace = true

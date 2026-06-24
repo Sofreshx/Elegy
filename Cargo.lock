@@ -687,7 +687,7 @@ name = "elegy-agent-events"
 version = "0.1.0"
 dependencies = [
  "async-trait",
- "elegy-contracts",
+ "elegy-core",
  "thiserror 2.0.18",
  "time",
  "tokio",
@@ -699,7 +699,6 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "elegy-configuration",
- "elegy-contracts",
  "elegy-core",
  "elegy-data",
  "elegy-desktop",
@@ -745,7 +744,7 @@ name = "elegy-configuration"
 version = "0.1.0"
 dependencies = [
  "clap",
- "elegy-contracts",
+ "elegy-core",
  "serde",
  "serde_json",
  "tempfile",
@@ -753,30 +752,20 @@ dependencies = [
 ]
 
 [[package]]
-name = "elegy-contracts"
+name = "elegy-core"
 version = "0.1.0"
 dependencies = [
+ "elegy-descriptor",
+ "elegy-mcp",
+ "elegy-policy",
+ "elegy-runtime",
  "semver",
  "serde",
  "serde_json",
  "serde_yaml",
  "thiserror 2.0.18",
- "time",
  "url",
  "zip",
-]
-
-[[package]]
-name = "elegy-core"
-version = "0.1.0"
-dependencies = [
- "elegy-agent-events",
- "elegy-contracts",
- "elegy-descriptor",
- "elegy-policy",
- "elegy-runtime",
- "serde",
- "serde_json",
 ]
 
 [[package]]
@@ -839,7 +828,7 @@ name = "elegy-documentation"
 version = "0.1.0"
 dependencies = [
  "clap",
- "elegy-contracts",
+ "elegy-core",
  "elegy-tooling",
  "serde",
  "serde_json",
@@ -853,7 +842,6 @@ name = "elegy-host-mcp"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
- "elegy-contracts",
  "elegy-core",
  "elegy-skills",
  "rmcp",
@@ -868,7 +856,7 @@ name = "elegy-mcp"
 version = "0.1.0"
 dependencies = [
  "clap",
- "elegy-contracts",
+ "elegy-core",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -881,7 +869,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "elegy-contracts",
+ "elegy-core",
  "reqwest 0.12.28",
  "rusqlite",
  "serde",
@@ -946,7 +934,7 @@ version = "0.1.0"
 dependencies = [
  "arboard",
  "base64 0.22.1",
- "elegy-contracts",
+ "elegy-core",
  "elegy-observe-win32",
  "png 0.17.16",
  "serde",
@@ -1006,7 +994,6 @@ version = "0.1.0"
 dependencies = [
  "elegy-adapter-fs",
  "elegy-adapter-http",
- "elegy-contracts",
  "elegy-descriptor",
  "elegy-mcp",
  "elegy-policy",
@@ -1019,7 +1006,7 @@ name = "elegy-skills"
 version = "0.1.0"
 dependencies = [
  "clap",
- "elegy-contracts",
+ "elegy-core",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1029,7 +1016,7 @@ dependencies = [
 name = "elegy-tooling"
 version = "0.1.0"
 dependencies = [
- "elegy-contracts",
+ "elegy-core",
  "elegy-mcp",
  "jsonschema 0.17.1",
  "serde",

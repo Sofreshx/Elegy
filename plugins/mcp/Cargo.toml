@@ -14,10 +14,12 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-elegy-contracts = { version = "0.1.0", path = "../../shared/contracts" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
+elegy-core = { version = "0.1.0", path = "../../shared/core" }
 
 [lints]
 workspace = true
