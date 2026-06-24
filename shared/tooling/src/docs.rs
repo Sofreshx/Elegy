@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::BTreeSet;
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use time::format_description;
 use time::OffsetDateTime;
 
 const DOCS_CONFIG_SCHEMA_VERSION: &str = "elegy-docs/v1";
@@ -1220,16 +1219,8 @@ fn is_valid_iso_date(value: &str) -> bool {
 }
 
 fn current_utc_date() -> Result<String, ToolingError> {
-    let format = format_description::parse("[year]-[month]-[day]").map_err(|error| {
-        ToolingError::InvalidDocsRequest {
-            issues: vec![format!("failed to prepare date formatter: {error}")],
-        }
-    })?;
-    OffsetDateTime::now_utc()
-        .format(&format)
-        .map_err(|error| ToolingError::InvalidDocsRequest {
-            issues: vec![format!("failed to render current UTC date: {error}")],
-        })
+    let (year, month, day) = OffsetDateTime::now_utc().date().to_calendar_date();
+    Ok(format!("{year:04}-{month:02}-{day:02}"))
 }
 
 fn normalize_rel_string(value: &str) -> String {
