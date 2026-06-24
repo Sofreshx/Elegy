@@ -5,9 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
-use time::format_description;
 use time::format_description::well_known::Rfc3339;
-use time::{Date, OffsetDateTime};
+use time::{Date, Month, OffsetDateTime};
 
 /// Repo-relative path to the documentation config file.
 pub const DOCS_CONFIG_PATH: &str = ".elegy/docs.yaml";
@@ -1969,12 +1968,29 @@ fn is_parseable_date(value: &str) -> bool {
 }
 
 fn parse_dateish(value: &str) -> Option<Date> {
-    let date_only = format_description::parse("[year]-[month]-[day]").ok()?;
-    Date::parse(value, &date_only).ok().or_else(|| {
+    parse_iso_date(value).or_else(|| {
         OffsetDateTime::parse(value, &Rfc3339)
             .ok()
             .map(|value| value.date())
     })
+}
+
+fn parse_iso_date(value: &str) -> Option<Date> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 10 || bytes[4] != b'-' || bytes[7] != b'-' {
+        return None;
+    }
+    if !(bytes[..4].iter().all(u8::is_ascii_digit)
+        && bytes[5..7].iter().all(u8::is_ascii_digit)
+        && bytes[8..10].iter().all(u8::is_ascii_digit))
+    {
+        return None;
+    }
+
+    let year = value[..4].parse::<i32>().ok()?;
+    let month = Month::try_from(value[5..7].parse::<u8>().ok()?).ok()?;
+    let day = value[8..10].parse::<u8>().ok()?;
+    Date::from_calendar_date(year, month, day).ok()
 }
 
 fn freshness_state(
