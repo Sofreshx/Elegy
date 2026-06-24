@@ -7,20 +7,20 @@ Elegy is distributed through GitHub release assets, not package feeds or sibling
 ## Distribution model
 
 - **Contracts bundle**: governed schemas, fixtures, and compatibility metadata. The canonical machine-readable handoff.
-- **CLI archives**: executable distributions for each binary surface, per published target. Self-describing.
+- **CLI assets**: executable distributions for each binary surface, per published target.
 - **Wrapper archives**: bounded repo-local integration surfaces for dedicated tools.
 - **Installer bootstrap**: the generic install helper packaged as its own downloadable archive.
 - **Release metadata**: manifest + checksums used by installer and validation flows.
 
 ## Asset family conventions
 
-- `elegy-cli-<cliVersion>-<target>.zip` — umbrella CLI archive
-- `elegy-<surface>-<cliVersion>-<target>.zip` — per-binary CLI archive
-- `elegy-<surface>-wrapper-<bundleVersion>.zip` — per-binary wrapper archive
-- `elegy-contracts-<bundleVersion>.zip` — governed contracts bundle
+- `elegy-<surface>-<target>` — per-binary CLI asset for Linux/macOS
+- `elegy-<surface>-<target>.exe` — per-binary CLI asset for Windows
+- `elegy-<surface>-<target>[.exe].sha256` — SHA-256 sidecar for each CLI asset
+- `elegy-contracts-bundle.zip` — governed contracts bundle
 - `elegy-installer-<bundleVersion>.zip` — standalone installer bootstrap
-- `elegy-release-manifest-<bundleVersion>.json` — release manifest (required)
-- `elegy-release-checksums-<bundleVersion>.json` — release checksums (required)
+- `elegy-release-manifest-<tag>.json` — release manifest (required)
+- `elegy-release-checksums-<tag>.json` — release checksums (required)
 
 `<surface>` and `<target>` values, exact archive family names, and per-binary
 install steps are owned by each binary's per-feature distribution note
@@ -39,10 +39,8 @@ binary does not require editing it.
 - Main user-facing guide: `README.md`
 - Distribution index (release channels, targets, per-binary link list): `docs/distribution.md`
 - Per-binary distribution note: each binary's `<crate>/DISTRIBUTION.md`
-- Generic installer (Bash, canonical): `bash ./scripts/install-distribution.sh -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
-- Generic installer (PowerShell, thin shim that forwards to bash; requires bash in PATH): `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
-- Local artifact installer (Bash): `bash ./scripts/install-distribution.sh -LocalArtifactsRoot ./artifacts/distribution -Destination <path> -CliSurfaces <surface[,surface...]> -WrapperSurfaces <surface[,surface...]>`
+- Generic installer (Bash, canonical): `bash ./scripts/install-distribution.sh --tag <releaseTag> --destination <path> --surface <surface> [--force]`
+- Generic installer (PowerShell, thin shim that maps PowerShell args to bash; requires bash in PATH): `pwsh ./scripts/install-distribution.ps1 -Tag <releaseTag> -Destination <path> -Surface <surface> [-Force]`
 
-The installer resolves the release manifest and checksums first, verifies
-asset size, SHA-256, and required archive entries, then writes
-`install-receipt.json` into the destination root.
+The installer downloads one surface-specific release asset plus its `.sha256`
+sidecar, verifies the SHA-256, and writes the executable into `bin/`.

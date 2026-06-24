@@ -2,7 +2,7 @@ name: Repo Boundaries
 
 # Validates that the contract bundle is internally consistent and that the
 # Rust workspace + docs surface still agree with the governed artifacts.
-# The `elegy-cli contracts validate` step is backed by `shared/core/tests/bootstrap_slice.rs`
+# The `elegy-contracts contracts validate` step is backed by `shared/core/tests/bootstrap_slice.rs`
 # and per-plugin conformance tests under `plugins/*/tests/conformance.rs`.
 
 on:
@@ -36,7 +36,7 @@ jobs:
 
       - name: Validate contracts (canonical)
         working-directory: .
-        run: cargo run -p elegy-cli -- contracts validate --project .
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 
       - name: Validate contracts (conformance)
         working-directory: .

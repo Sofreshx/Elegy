@@ -14,7 +14,7 @@ Thanks for your interest in contributing.
 Please keep these rules in mind:
 
 1. **Be honest about current status.** Do not document commands, examples, or capabilities that do not exist yet.
-2. **Respect the accepted direction.** `contracts/`, `plugins/`, `shared/`, and `hosts/` remain the canonical owned surfaces.
+2. **Respect the accepted direction.** `plugins/`, `shared/`, and `hosts/` remain the canonical owned surfaces.
 3. **Keep v1 intentionally narrow.** The current protocol/runtime target is Rust-first, runtime composition, resources-first MCP behavior, and conservative policy defaults.
 4. **Prefer safe defaults.** Validation, policy, and security posture are core project behavior, not extras.
 5. **Do not widen scope casually.** Changes that affect protocol scope, trust boundaries, packaging topology, or repo-split direction should start with an issue or design discussion.
@@ -62,7 +62,7 @@ The pre-push hook runs `cargo fmt --all --check`, `cargo clippy --workspace --al
 Use targeted checks such as:
 
 ```bash
-cargo run -p elegy-cli -- contracts validate --project .
+cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .
 cargo test -p elegy-contracts --test conformance
 ```
 

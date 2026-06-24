@@ -1,23 +1,20 @@
 {
-  "description": "Elegy monorepo release catalog. Each surface is identified by name and kind; the crate name equals the surface name for cli surfaces.",
+  "description": "Elegy monorepo release catalog. Each surface is identified by name and kind; CLI surfaces build from `package` when present, otherwise from the surface name.",
   "surfaces": [
-    { "name": "elegy-cli", "kind": "cli", "description": "Umbrella CLI with all Elegy capabilities." },
-    { "name": "elegy-planning", "kind": "cli", "description": "Durable planning CLI over SQLite." },
-    { "name": "elegy-skills", "kind": "cli", "description": "Skill registry and discovery CLI." },
-    { "name": "elegy-memory", "kind": "cli", "description": "Memory CLI with embeddings and retrieval." },
-    { "name": "elegy-mcp", "kind": "cli", "description": "MCP analysis and authoring CLI." },
-    { "name": "elegy-documentation", "kind": "cli", "description": "Documentation inspection and validation CLI." },
+    { "name": "elegy-codegraph", "kind": "cli", "description": "Code graph analysis CLI." },
     { "name": "elegy-configuration", "kind": "cli", "description": "Configuration materialization CLI." },
-    { "name": "elegy-obsidian", "kind": "skill-only", "description": "Obsidian vault bridge skill (wrapper around external Obsidian CLI). No Rust binary." },
-    { "name": "elegy-diagram", "kind": "cli", "description": "Semantic diagram CLI." },
-    { "name": "elegy-mermaid", "kind": "cli", "description": "Mermaid diagram rendering CLI." },
-    { "name": "elegy-web", "kind": "cli", "description": "HTTP fetch and ping CLI." },
-    { "name": "elegy-repo", "kind": "cli", "description": "Git repository inspection CLI." },
-    { "name": "elegy-data", "kind": "cli", "description": "Data format conversion CLI." },
-    { "name": "elegy-notify", "kind": "cli", "description": "Desktop notification CLI." },
-    { "name": "elegy-observe", "kind": "cli", "description": "System observation CLI." },
+    { "name": "elegy-contracts", "kind": "cli", "package": "elegy-core", "description": "Contract export, validation, and project inspection CLI." },
     { "name": "elegy-desktop", "kind": "cli", "description": "Desktop automation CLI." },
-    { "name": "elegy-skill-authoring", "kind": "skill-only", "description": "Skill authoring doctrine instructions. No Rust binary." },
-    { "name": "elegy-doc-practices", "kind": "skill-only", "description": "Documentation practices instructions. No Rust binary." }
+    { "name": "elegy-doc-practices", "kind": "skill-only", "description": "Documentation practices skill for ADR/spec doctrine and docs config validation." },
+    { "name": "elegy-documentation", "kind": "cli", "description": "Documentation inspection and validation CLI." },
+    { "name": "elegy-mcp", "kind": "cli", "description": "MCP analysis and authoring CLI." },
+    { "name": "elegy-memory", "kind": "cli", "description": "Memory CLI with embeddings and retrieval." },
+    { "name": "elegy-observe", "kind": "cli", "description": "System observation CLI." },
+    { "name": "elegy-obsidian", "kind": "skill-only", "description": "Obsidian vault bridge skill for read/write/search against local Obsidian vaults." },
+    { "name": "elegy-planning", "kind": "cli", "description": "Durable planning CLI over SQLite." },
+    { "name": "elegy-run", "kind": "cli", "package": "elegy-host-mcp", "description": "MCP stdio host for running Elegy as an agent server." },
+    { "name": "elegy-skill-authoring", "kind": "skill-only", "description": "Portable agent skill authoring skill for creating and refining SKILL.md files." },
+    { "name": "elegy-skill-router", "kind": "skill-only", "description": "Vault-first skill routing and discovery on-demand skill resolver." },
+    { "name": "elegy-skills", "kind": "cli", "description": "Skill registry and discovery CLI." }
   ]
 }

@@ -8,12 +8,17 @@ license.workspace = true
 description = "Safe desktop automation for agentic workflows. Mouse clicks, keyboard input, window management with dry-run and evidence capture."
 
 [dependencies]
+clap.workspace = true
 elegy-desktop-win32 = { version = "0.1.0", path = "../../shared/desktop-win32" }
 elegy-observe = { version = "0.1.0", path = "../observe" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 time.workspace = true
+
+[[bin]]
+name = "elegy-desktop"
+path = "src/main.rs"
 
 [lints]
 workspace = true

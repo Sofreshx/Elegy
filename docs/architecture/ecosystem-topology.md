@@ -35,10 +35,10 @@ flowchart TD
         config["plugins/&lt;name&gt;/contracts/\nconfiguration artifacts"]
     end
 
-    subgraph exec["hosts/ + plugins/ + shared/ — Rust workspace (28 crates)"]
-        hosts["hosts/\n2 binary crates\n(elegy-cli, elegy-host-mcp)"]
-        plugins["plugins/\n17 capability crates\n(mcp, skills, planning, ...)"]
-        shared["shared/\n10 library crates\n(core, runtime, tooling, ...)"]
+    subgraph exec["hosts/ + plugins/ + shared/ — Rust workspace (22 crates)"]
+        hosts["hosts/\n1 binary crate\n(elegy-run MCP host)"]
+        plugins["plugins/\n10 capability crates\n(mcp, skills, planning, ...)"]
+        shared["shared/\n11 library crates\n(core, runtime, tooling,\nplugin-sdk, ...)"]
     end
 
     subgraph docs["docs/ — governance & architecture"]
@@ -84,7 +84,7 @@ These assets are the source of truth for downstream consumers. They should be pr
 
 The first-party executable and runtime layer is organized as a Cargo workspace at the repo root with three top-level subtrees:
 
-- **`hosts/`** — umbrella CLI and host binaries
+- **`hosts/`** — thin binary entrypoints (elegy-run MCP host)
 - **`plugins/`** — capability crates, each owning its schemas, fixtures, and tests
 - **`shared/`** — library crates reused across hosts and plugins
 
@@ -95,33 +95,36 @@ The key current crates are:
 - `elegy-descriptor` (`shared/descriptor`) for governed-descriptor types
 - `elegy-policy` (`shared/policy`) for bounded policy enforcement
 - `elegy-tooling` (`shared/tooling`) for descriptor authoring, analysis, and skill generation
+- `elegy-plugin-sdk` (`shared/plugin-sdk`) for the publishable external plugin SDK
 - `elegy-mcp` (`plugins/mcp`) for MCP analysis and related runtime behavior over governed descriptors
 - `elegy-skills` (`plugins/skills`) for governed skill-registry access and validation
 - `elegy-planning` (`plugins/planning`) for durable planning authority
 - `elegy-memory` (`plugins/memory`) for bounded local memory surfaces
 - `elegy-documentation` (`plugins/documentation`) for documentation inspection, mapping, and export
 - `elegy-configuration` (`plugins/configuration`) for governed template and profile flows
-- `elegy-cli` (`hosts/cli`) for the umbrella human-facing operator surface
-- `elegy-host-mcp` (`hosts/host-mcp`) for the thin stdio host
+- `elegy-run` (`hosts/host-mcp`) for the thin stdio MCP host
 
 ### Current shipped operator slice
 
 The current shipped operator path is intentionally narrow.
 
-The current shipped operator surfaces are `elegy`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-documentation`.
+The current shipped operator surfaces are each shipped as dedicated binaries: `elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`, `elegy-documentation`, `elegy-configuration`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`.
 
 What the repo proves today:
 
-- the Rust `elegy` CLI exposes `author mcp`, `analyze mcp`, umbrella `skills ...`, and lower-level `generate skills` / `plugin export codex`
-- the `plugins/memory` surface is shipped as a bounded local operator surface
-- the `plugins/mcp` surface is shipped as a thin dedicated wrapper over descriptor authoring and descriptor analysis
-- the `plugins/planning` surface is shipped as a dedicated wrapper over durable planning authority
-- the `plugins/skills` surface is shipped as a thin dedicated wrapper over governed skill-registry access and validation
-- the `plugins/configuration` surface is shipped as a dedicated wrapper over governed template/profile flows
-- the `plugins/documentation` surface is shipped as a dedicated wrapper over documentation inspection, mapping, and non-authoritative export
-- those commands are backed by shared Rust crates led by `plugins/mcp`, `plugins/skills`, `plugins/planning`, and `shared/tooling`
-- the CLI also carries validation, inspection, and stdio-host startup entrypoints
-- contract bundles can be exported and consumed independently of the Rust workspace
+- `elegy-mcp` provides MCP descriptor authoring and analysis
+- `elegy-skills` provides governed skill-registry access and validation
+- `elegy-planning` provides durable planning authority
+- `elegy-memory` provides a bounded local operator surface
+- `elegy-configuration` provides governed template and profile flows
+- `elegy-documentation` provides documentation inspection, mapping, and export
+- `elegy-observe` provides system observation
+- `elegy-desktop` provides desktop automation
+- `elegy-contracts` provides contract export, validation, and project inspection
+- `elegy-codegraph` provides code graph analysis
+- `elegy-run` provides the stdio MCP host
+- those commands are backed by shared Rust crates led by `shared/core`, `shared/tooling`, and the `plugins/` tree
+- contract exports can be produced and consumed independently of the Rust workspace via `elegy-contracts`
 
 What the repo does **not** yet prove as a completed product surface:
 
@@ -185,7 +188,7 @@ The dependency direction should remain one-way:
 1. governed artifacts and operational policy at the bottom
 2. shared Rust contract consumers and policy crates above those authored assets
 3. plugin capability crates above the shared layer
-4. operator surfaces such as `hosts/cli` and `hosts/host-mcp` on top
+4. operator surfaces such as `hosts/host-mcp` (`elegy-run`) on top
 5. downstream apps consuming exported bundles, explicit Rust crates, or CLI outputs
 
 That means:
@@ -217,13 +220,12 @@ flowchart TB
         memory["elegy-memory\nelegy-planning"]
         skills["elegy-skills\nelegy-configuration"]
         docs_feat["elegy-documentation\nelegy-mcp"]
-        other["elegy-observe\nelegy-mermaid\nelegy-diagram\n..."]
+        other["elegy-observe\nelegy-desktop\nelegy-codegraph\n..."]
     end
 
     subgraph L3["L3 — Operator surfaces"]
-        cli["elegy-cli\numbrella CLI"]
-        host["elegy-host-mcp\nstdio host"]
-        dedicated["elegy-memory\nelegy-planning\nelegy-skills\n..."]
+        run["elegy-run\nstdio MCP host"]
+        dedicated["elegy-memory\nelegy-planning\nelegy-skills\nelegy-mcp\nelegy-contracts\nelegy-codegraph\n..."]
     end
 
     subgraph L4["L4 — CI & consumers"]
@@ -262,6 +264,6 @@ For now, the most coherent working model is:
 
 - `Elegy` is the single active repo
 - governed authority lives in co-located plugin artifacts (`plugins/<name>/schemas/`, `plugins/<name>/fixtures/`, `plugins/<name>/contracts/`) and cross-cutting `shared/core/fixtures/`, not in a removed `.NET` source tree or a centralized `contracts/` directory
-- `hosts/`, `plugins/`, and `shared/` form the first-party home for reusable executable surfaces, especially CLI, MCP analysis, descriptor tooling, policy-bounded runtime composition, and host layers
-- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through both the umbrella `elegy` surface and the dedicated `plugins/mcp` / `plugins/skills` binaries
+- `hosts/`, `plugins/`, and `shared/` form the first-party home for reusable executable surfaces — MCP analysis, descriptor tooling, policy-bounded runtime composition, and the `elegy-run` MCP host
+- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through the dedicated `elegy-mcp` / `elegy-skills` binaries
 - built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

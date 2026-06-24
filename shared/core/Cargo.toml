@@ -9,6 +9,7 @@ authors.workspace = true
 repository.workspace = true
 
 [dependencies]
+clap.workspace = true
 elegy-descriptor = { version = "0.1.0", path = "../descriptor" }
 elegy-policy = { version = "0.1.0", path = "../policy" }
 elegy-runtime = { version = "0.1.0", path = "../runtime" }
@@ -22,6 +23,10 @@ zip.workspace = true
 
 [dev-dependencies]
 elegy-mcp = { version = "0.1.0", path = "../../plugins/mcp" }
+
+[[bin]]
+name = "elegy-contracts"
+path = "src/main.rs"
 
 [lints]
 workspace = true
