@@ -7,10 +7,6 @@ pub mod paths;
 
 pub use cli_envelope::*;
 pub use configuration::*;
-pub use error::*;
-pub use fixtures::*;
-pub use machine_types::*;
-pub use paths::*;
 use elegy_descriptor::{
     load_project_from_root_config, LoadedProject, RawPolicyConfig, ValidationError,
 };
@@ -18,6 +14,10 @@ use elegy_policy::{FilesystemPolicy, HttpPolicy, PolicyConfig};
 use elegy_runtime::{
     compose_catalog, compose_runtime_state as compose_runtime_state_impl, CompositionError,
 };
+pub use error::*;
+pub use fixtures::*;
+pub use machine_types::*;
+pub use paths::*;
 use serde::{Deserialize, Serialize};
 use std::fmt;
 use std::path::{Path, PathBuf};

@@ -13,11 +13,7 @@ use elegy_codegraph::ir::{Confidence, EdgeKind, EntityKind};
 fn fixture_path(name: &str) -> String {
     // CARGO_MANIFEST_DIR is plugins/codegraph/
     // Fixtures are at plugins/codegraph/tests/fixtures/
-    format!(
-        "{}/tests/fixtures/{}",
-        env!("CARGO_MANIFEST_DIR"),
-        name
-    )
+    format!("{}/tests/fixtures/{}", env!("CARGO_MANIFEST_DIR"), name)
 }
 
 // ── Rust fixture tests ──────────────────────────────────────────

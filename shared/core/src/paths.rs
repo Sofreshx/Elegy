@@ -165,9 +165,7 @@ pub fn export_contract_bundle(
                                 if path.extension().and_then(std::ffi::OsStr::to_str)
                                     == Some("json")
                                 {
-                                    if let Ok(relative) =
-                                        path.strip_prefix(&repo_root)
-                                    {
+                                    if let Ok(relative) = path.strip_prefix(&repo_root) {
                                         relative_files.insert(relative.to_path_buf());
                                     }
                                 }

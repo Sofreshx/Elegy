@@ -119,7 +119,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           staging="$(mktemp -d)"
           mkdir -p "artifacts/distribution"
           cp scripts/install-distribution.sh "$staging/install.sh"
@@ -189,7 +189,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/distribution
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
           checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
 

@@ -62,7 +62,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bundle_version=$(jq -r '.schemaVersion' contracts/schemas/schema-version.json 2>/dev/null || echo "0.0.0")
+          bundle_version=$(jq -r '.schemaVersion' docs/schema-version.json 2>/dev/null || echo "0.0.0")
           staging=$(mktemp -d)
           mkdir -p "artifacts/distribution"
           cp scripts/install-distribution.sh "$staging/install.sh"

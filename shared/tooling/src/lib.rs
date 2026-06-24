@@ -7,7 +7,7 @@ use elegy_core::{
 };
 use elegy_mcp::{
     validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
-    McpServerDescriptor, McpToolDefinition, McpTransportKind, McpToolAnalyzer,
+    McpServerDescriptor, McpToolAnalyzer, McpToolDefinition, McpTransportKind,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

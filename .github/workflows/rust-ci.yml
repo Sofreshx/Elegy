@@ -18,7 +18,11 @@ on:
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/schemas/**'
+      - 'plugins/**/schemas/**'
+      - 'plugins/**/fixtures/**'
+      - 'plugins/**/templates/**'
+      - 'shared/core/fixtures/**'
+      - 'docs/schema-version.json'
       - 'docs/governance/**'
   push:
     branches:

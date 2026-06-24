@@ -9,8 +9,10 @@ use elegy_adapter_http::{
 };
 #[cfg(test)]
 use elegy_adapter_http::{HttpClientError, HttpRequest, HttpResponse};
-use elegy_mcp::{validate_mcp_server_descriptor, McpAnalysisResult, McpServerDescriptor, McpToolAnalyzer};
 use elegy_descriptor::{Diagnostic, LoadedProject, NormalizedResource, ResourceFamily};
+use elegy_mcp::{
+    validate_mcp_server_descriptor, McpAnalysisResult, McpServerDescriptor, McpToolAnalyzer,
+};
 use elegy_policy::{FilesystemPolicy, HttpPolicy, PolicyConfig};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;

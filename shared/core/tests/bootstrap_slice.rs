@@ -153,10 +153,9 @@ fn load_mcp_fixture<T: serde::de::DeserializeOwned>(
     name: &str,
 ) -> Result<T, String> {
     let path = dir.join("fixtures").join(name);
-    let content = fs::read_to_string(&path)
-        .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
-    serde_json::from_str(&content)
-        .map_err(|e| format!("failed to parse {}: {e}", path.display()))
+    let content =
+        fs::read_to_string(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    serde_json::from_str(&content).map_err(|e| format!("failed to parse {}: {e}", path.display()))
 }
 
 #[test]
