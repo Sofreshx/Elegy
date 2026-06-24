@@ -2,10 +2,8 @@ name: Repo Boundaries
 
 # Validates that the contract bundle is internally consistent and that the
 # Rust workspace + docs surface still agree with the governed artifacts.
-# This replaces the legacy `scripts/validate-canonical-outputs.ps1` and
-# `scripts/export-contracts.ps1` flow; the new entry point is
-# `elegy-cli contracts validate`, which is itself backed by the
-# conformance tests in `shared/contracts/tests/conformance.rs`.
+# The `elegy-cli contracts validate` step is backed by `shared/core/tests/bootstrap_slice.rs`
+# and per-plugin conformance tests under `plugins/*/tests/conformance.rs`.
 
 on:
   pull_request:
@@ -42,4 +40,4 @@ jobs:
 
       - name: Validate contracts (conformance)
         working-directory: .
-        run: cargo test -p elegy-contracts --test conformance -- --nocapture
+        run: cargo test -p elegy-skills --test conformance -p elegy-mcp --test conformance -p elegy-configuration --test conformance -p elegy-memory --test conformance -- --nocapture

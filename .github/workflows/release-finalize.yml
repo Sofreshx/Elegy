@@ -51,7 +51,7 @@ jobs:
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
         run: |
           set -euo pipefail
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
           checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
 

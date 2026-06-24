@@ -35,29 +35,44 @@ pub fn load_invocation_request_fixture_from_dir(
 pub fn load_invocation_response_fixture_from_dir(
     dir: &Path,
 ) -> Result<InvocationResponse, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("invocation-response.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("invocation-response.minimal.json"),
+    )
 }
 
 pub fn load_agent_capability_profile_fixture_from_dir(
     dir: &Path,
 ) -> Result<crate::machine_types::AgentCapabilityProfile, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("agent-capability-profile.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-capability-profile.minimal.json"),
+    )
 }
 
 pub fn load_agent_request_envelope_fixture_from_dir(
     dir: &Path,
 ) -> Result<AgentRequestEnvelope, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("agent-request-envelope.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-request-envelope.minimal.json"),
+    )
 }
 
 pub fn load_agent_response_envelope_fixture_from_dir(
     dir: &Path,
 ) -> Result<AgentResponseEnvelope, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("agent-response-envelope.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-response-envelope.minimal.json"),
+    )
 }
 
 pub fn load_agent_event_envelope_fixture_from_dir(
     dir: &Path,
 ) -> Result<AgentEventEnvelope, ContractsError> {
-    load_json_file(&dir.join("fixtures").join("agent-event-envelope.minimal.json"))
+    load_json_file(
+        &dir.join("fixtures")
+            .join("agent-event-envelope.minimal.json"),
+    )
 }

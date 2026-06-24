@@ -24,8 +24,8 @@ use elegy_diagram::{CanonicalDiagram, DiagramEdge, DiagramNode, DiagramPatch};
 use elegy_host_mcp::{serve_stdio_with_options, HostError, HostOptions};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
-    AuthorMcpToolRequest, AuthoredMcpDescriptor, McpAnalysisResult, McpTransportKind,
-    McpSurfaceError,
+    AuthorMcpToolRequest, AuthoredMcpDescriptor, McpAnalysisResult, McpSurfaceError,
+    McpTransportKind,
 };
 use elegy_memory::{
     GovernedMemoryRecord, GovernedMemoryRecordImportOptions, LocalMemoryCatalogEntry,

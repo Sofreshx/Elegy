@@ -3,10 +3,7 @@ use crate::PlanningStoreError;
 const TEMPLATE_DIR: &str = "../templates";
 
 const TEMPLATES: &[(&str, &str)] = &[
-    (
-        "phase-gate",
-        include_str!("../templates/phase-gate.yaml"),
-    ),
+    ("phase-gate", include_str!("../templates/phase-gate.yaml")),
     (
         "implementation-slice",
         include_str!("../templates/implementation-slice.yaml"),
@@ -15,10 +12,7 @@ const TEMPLATES: &[(&str, &str)] = &[
         "research-decision",
         include_str!("../templates/research-decision.yaml"),
     ),
-    (
-        "migration",
-        include_str!("../templates/migration.yaml"),
-    ),
+    ("migration", include_str!("../templates/migration.yaml")),
     (
         "production-readiness",
         include_str!("../templates/production-readiness.yaml"),

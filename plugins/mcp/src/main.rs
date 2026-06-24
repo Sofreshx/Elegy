@@ -18,7 +18,7 @@ const CLI_SCHEMA_VERSION: &str = "elegy.cli/v1";
 struct CliEnvelope<T: Serialize> {
     schema_version: &'static str,
     correlation_id: String,
-    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    #[serde(skip_serializing_if = "is_false")]
     non_interactive: bool,
     command: Vec<String>,
     status: String,
@@ -133,10 +133,7 @@ fn resolve_correlation_id(correlation_id: Option<String>, prefix: &str) -> Strin
         })
 }
 
-fn build_success_envelope<T: Serialize>(
-    context: &MachineContext,
-    data: T,
-) -> CliEnvelope<T> {
+fn build_success_envelope<T: Serialize>(context: &MachineContext, data: T) -> CliEnvelope<T> {
     CliEnvelope {
         schema_version: CLI_SCHEMA_VERSION,
         correlation_id: context.correlation_id.clone(),
@@ -268,10 +265,7 @@ fn execute_author_command(
     }
 }
 
-fn execute_analyze_command(
-    descriptor: PathBuf,
-    ctx: &MachineContext,
-) -> ExitCode {
+fn execute_analyze_command(descriptor: PathBuf, ctx: &MachineContext) -> ExitCode {
     match analyze_mcp_descriptor_file(&descriptor) {
         Ok(analysis) => {
             match ctx.format {
