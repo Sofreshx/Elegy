@@ -15,7 +15,7 @@ The repository now converges on this shape:
 
 - `shared/` holds library/core crates for reusable executable behavior
 - `plugins/` holds feature crates with plugin-owned artifacts co-located in each plugin's directory
-- `hosts/` holds thin binary crates (CLI and MCP host)
+- `hosts/` holds thin binary crates (elegy-run MCP host)
 - root docs and root scripts define the contributor and validation path
 
 This is no longer a story about keeping a removed legacy package tree authoritative. The current question is simpler: which responsibilities belong in governed artifacts, which belong in Rust executable crates, and which should stay consumer-local.
@@ -24,49 +24,44 @@ This is no longer a story about keeping a removed legacy package tree authoritat
 
 ```mermaid
 flowchart TD
-    subgraph shared["shared/ — 10 library crates"]
+    subgraph shared["shared/ — 11 library crates"]
         core["elegy-core\nschema & fixture consumption,\nreusable composition"]
         policy["elegy-policy\nbounded policy enforcement"]
         tooling["elegy-tooling\ndescriptor authoring & analysis"]
         descriptor["elegy-descriptor\nMCP descriptor model"]
         runtime["elegy-runtime\nruntime composition"]
+        plugin_sdk["elegy-plugin-sdk\nexternal plugin SDK"]
         agent_events["elegy-agent-events"]
         adapter_fs["elegy-adapter-fs"]
         adapter_http["elegy-adapter-http"]
+        desktop_win32["elegy-desktop-win32"]
+        observe_win32["elegy-observe-win32"]
     end
 
-    subgraph plugins["plugins/ — 16 crates"]
-        subgraph hybrid["8 hybrid lib+bin"]
+    subgraph plugins["plugins/ — 10 crates"]
+        subgraph hybrid["7 hybrid lib+bin"]
             mem["elegy-memory"]
             plan["elegy-planning"]
             skills_f["elegy-skills"]
             cfg["elegy-configuration"]
             docs_f["elegy-documentation"]
             mcp["elegy-mcp"]
-            mem_mcp["elegy-memory-mcp"]
             codegraph["elegy-codegraph"]
         end
 
-        subgraph libonly["8 lib-only"]
-            mermaid["elegy-mermaid"]
-            diagram["elegy-diagram"]
+        subgraph libplus["3 lib+extra-bin"]
             observe["elegy-observe"]
-            repo["elegy-repo"]
-            data["elegy-data"]
             desktop["elegy-desktop"]
-            web["elegy-web"]
-            notify["elegy-notify"]
+            mem_mcp["elegy-memory-mcp"]
         end
     end
 
-    subgraph hosts["hosts/ — 2 binary crates"]
-        cli["elegy-cli\numbrella CLI shell"]
-        host["elegy-host-mcp\nstdio MCP host"]
+    subgraph hosts["hosts/ — 1 binary crate"]
+        run["elegy-run\nstdio MCP host"]
     end
 
     shared -->|"provides behavior to"| plugins
     plugins -->|"exposed through"| hosts
-    cli -->|"dispatches to"| plugins
 ```
 
 ## What stays authoritative now
@@ -86,10 +81,9 @@ The Rust workspace is the first-party home for:
 
 - governed-contract consumption in executable form
 - MCP descriptor authoring, analysis, and skill generation tooling
-- the dedicated `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, and `elegy-configuration` binaries
+- dedicated binaries: `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, `elegy-documentation`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`
 - runtime composition and bounded adapter behavior
-- the thin stdio MCP host
-- the human-facing `elegy` CLI
+- the thin stdio MCP host (`elegy-run`)
 
 The currently shipped self-authoring surface is the Rust CLI path for:
 
@@ -98,51 +92,47 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `generate skills`
 - `generate codex-plugin`
 
-Those commands are backed by shared Rust crates led by `plugins/mcp` and `shared/tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the workspace.
+Those commands are backed by shared Rust crates led by `plugins/mcp` and `shared/tooling`, exposed through the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the workspace.
 
 ### Crate dependency graph
 
 ```mermaid
 flowchart TB
     subgraph leaves["Leaf crates (no intra-workspace deps)"]
-        contracts["elegy-contracts"]
         descriptor["elegy-descriptor"]
         policy["elegy-policy"]
         planning["elegy-planning"]
         codegraph["elegy-codegraph"]
-        diagram["elegy-diagram"]
-        mermaid["elegy-mermaid"]
-        repo["elegy-repo"]
-        web["elegy-web"]
-        data["elegy-data"]
-        notify["elegy-notify"]
+        plugin_sdk["elegy-plugin-sdk"]
+        desktop_win32["elegy-desktop-win32"]
+        observe_win32["elegy-observe-win32"]
     end
 
     subgraph midlow["Middle-low crates"]
-        mcp["elegy-mcp\n→ contracts"]
-        agent_ev["elegy-agent-events\n→ contracts"]
+        mcp["elegy-mcp"]
+        agent_ev["elegy-agent-events"]
         adapter_fs["elegy-adapter-fs\n→ descriptor, policy"]
         adapter_http["elegy-adapter-http\n→ descriptor, policy"]
         runtime["elegy-runtime\n→ contracts, mcp, adapters, descriptor, policy"]
     end
 
     subgraph mid["Core crates"]
-        core["elegy-core\n→ agent-events, contracts,\ndescriptor, policy, runtime"]
+        core["elegy-core\n→ agent-events, descriptor, policy, runtime\n(bin: elegy-contracts)"]
         tooling["elegy-tooling\n→ contracts, mcp"]
     end
 
     subgraph features["Feature crates"]
-        memory["elegy-memory\n→ contracts"]
-        skills["elegy-skills\n→ contracts"]
-        cfg["elegy-configuration\n→ contracts"]
-        docs["elegy-documentation\n→ contracts, tooling"]
+        memory["elegy-memory\n→ core"]
+        skills["elegy-skills\n→ core"]
+        cfg["elegy-configuration\n→ core"]
+        docs["elegy-documentation\n→ core, tooling"]
         mem_mcp["elegy-memory-mcp\n→ memory"]
-        observe["elegy-observe\n→ contracts"]
+        observe["elegy-observe\n→ core"]
+        desktop["elegy-desktop\n→ desktop-win32, observe"]
     end
 
-    subgraph top["Binary crates"]
-        host["elegy-host-mcp\n→ contracts, core, skills"]
-        cli["elegy-cli\n→ 16 workspace deps"]
+    subgraph top["Binary entrypoints"]
+        run["elegy-run\n→ core, skills"]
     end
 
     leaves --> midlow
@@ -162,7 +152,7 @@ These remain forward-looking targets rather than completed surfaces:
 - broad autonomous agent workflows layered directly into the runtime by default
 - claims that REST/OpenAPI ingestion, hosted MCP runtime execution, or autonomous registration are already shipped because the thin dedicated CLIs now exist
 
-`elegy-host-mcp` exists, and the CLI includes runtime validation, inspection, and run entrypoints, but those facts do not by themselves justify a claim that the broader self-authoring experience is already delivered.
+`elegy-run` exists, and the dedicated binaries include runtime validation, inspection, and host entrypoints, but those facts do not by themselves justify a claim that the broader self-authoring experience is already delivered.
 
 ## Replacement rule
 
@@ -193,8 +183,8 @@ Contributor-facing validation should point to the smallest real flows that still
 ### Contracts and exports
 
 ```bash
-cargo run -p elegy-cli -- contracts validate --project .
-cargo run -p elegy-cli -- contracts export --output-path distribution/contracts --create-archive --archive-output-path distribution/elegy-contracts-bundle.zip
+cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .
+cargo run -p elegy-core --bin elegy-contracts -- contracts export --output-path distribution/contracts --create-archive --archive-output-path distribution/elegy-contracts-bundle.zip
 ```
 
 ### Rust executable surfaces
@@ -215,7 +205,7 @@ How a fixture change becomes a published artifact:
 
 ```mermaid
 flowchart LR
-    trigger["Fixture or Rust source change\non main branch"] --> validate["contracts validate\n(elegy-cli contracts validate)"]
+    trigger["Fixture or Rust source change\non main branch"] --> validate["contracts validate\n(elegy-contracts contracts validate)"]
     validate --> discover["Discover publishable surfaces\n(walk distribution/surfaces.json)"]
     discover --> matrix["Matrix build per surface\n cargo build -p cratePath"]
     matrix --> publish["Publish artifacts\nto GitHub Releases"]

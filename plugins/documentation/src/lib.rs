@@ -1,4 +1,3 @@
-use elegy_tooling::DocsConfig as LegacyDocsConfig;
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
@@ -7,6 +6,160 @@ use std::path::{Component, Path, PathBuf};
 use thiserror::Error;
 use time::format_description::well_known::Rfc3339;
 use time::{Date, Month, OffsetDateTime};
+
+// ── Legacy v1 DocsConfig types (moved from shared/tooling docs.rs) ────────
+
+const DOCS_CONFIG_SCHEMA_VERSION: &str = "elegy-docs/v1";
+const DEFAULT_ADR_PATH: &str = "docs/adr";
+const DEFAULT_SPEC_PATH: &str = "docs/specs";
+const DEFAULT_INDEX_PATH: &str = "docs/docs-index.md";
+const KNOWN_REQUIRED_DOC_TRIGGERS: &[&str] = &[
+    "architecture-change",
+    "durable-decision",
+    "behavior-change",
+    "cross-repo-impact",
+    "onboarding-change",
+];
+
+/// Repo-local documentation practices configuration.
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct LegacyDocsConfig {
+    #[serde(default = "default_docs_schema_version", alias = "schema_version")]
+    pub schema_version: String,
+    #[serde(default = "default_adr_path", alias = "adr_path")]
+    pub adr_path: String,
+    #[serde(default = "default_spec_path", alias = "spec_path")]
+    pub spec_path: String,
+    #[serde(default = "default_index_path", alias = "index_path")]
+    pub index_path: String,
+    #[serde(
+        default = "default_required_doc_triggers",
+        alias = "required_doc_triggers"
+    )]
+    pub required_doc_triggers: Vec<String>,
+    #[serde(default, alias = "local_exceptions")]
+    pub local_exceptions: Vec<String>,
+}
+
+impl Default for LegacyDocsConfig {
+    fn default() -> Self {
+        Self {
+            schema_version: default_docs_schema_version(),
+            adr_path: default_adr_path(),
+            spec_path: default_spec_path(),
+            index_path: default_index_path(),
+            required_doc_triggers: default_required_doc_triggers(),
+            local_exceptions: Vec::new(),
+        }
+    }
+}
+
+fn default_docs_schema_version() -> String {
+    DOCS_CONFIG_SCHEMA_VERSION.to_string()
+}
+fn default_adr_path() -> String {
+    DEFAULT_ADR_PATH.to_string()
+}
+fn default_spec_path() -> String {
+    DEFAULT_SPEC_PATH.to_string()
+}
+fn default_index_path() -> String {
+    DEFAULT_INDEX_PATH.to_string()
+}
+fn default_required_doc_triggers() -> Vec<String> {
+    KNOWN_REQUIRED_DOC_TRIGGERS
+        .iter()
+        .map(|value| (*value).to_string())
+        .collect()
+}
+
+/// Input for `elegy docs new ...`.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NewDocRequest {
+    pub title: String,
+    pub owner: Option<String>,
+    pub slug: Option<String>,
+    pub status: Option<String>,
+}
+
+/// Result of `elegy docs init`.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsInitResult {
+    pub root_path: String,
+    pub config_found: bool,
+    pub config_path: String,
+    pub config: LegacyDocsConfig,
+    pub created: Vec<String>,
+    pub skipped: Vec<String>,
+}
+
+/// Result of `elegy docs new adr|spec`.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsCreateResult {
+    pub root_path: String,
+    pub doc_type: String,
+    pub title: String,
+    pub status: String,
+    pub owner: String,
+    pub slug: String,
+    pub output_path: String,
+    pub config_path: String,
+}
+
+/// One discovered ADR or spec document.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsDocumentSummary {
+    pub doc_type: String,
+    pub path: String,
+    pub title: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub status: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub owner: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub date: Option<String>,
+}
+
+/// One objective documentation validation issue.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsCheckIssue {
+    pub code: String,
+    pub path: String,
+    pub message: String,
+}
+
+/// Result of `elegy docs check`.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsCheckReport {
+    pub valid: bool,
+    pub root_path: String,
+    pub config_found: bool,
+    pub config_path: String,
+    pub config: LegacyDocsConfig,
+    pub files_checked: usize,
+    pub docs_checked: usize,
+    pub documents: Vec<DocsDocumentSummary>,
+    pub issues: Vec<DocsCheckIssue>,
+}
+
+/// Result of `elegy docs index`.
+#[derive(Clone, Debug, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DocsIndexResult {
+    pub root_path: String,
+    pub config_found: bool,
+    pub config_path: String,
+    pub output_path: String,
+    pub adr_count: usize,
+    pub spec_count: usize,
+    pub documents: Vec<DocsDocumentSummary>,
+}
 
 /// Repo-relative path to the documentation config file.
 pub const DOCS_CONFIG_PATH: &str = ".elegy/docs.yaml";

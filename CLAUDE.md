@@ -29,8 +29,8 @@ For elegy-memory specifically:
 ## Discovery Surface
 
 - Use `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
-- Use `elegy-skills list/search/resolve/get/capability/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
-- skill definitions in `contracts/fixtures/skill.*.json` are authoritative. Do not add v1 skill-definition files.
+- Use `elegy-skills list/search/resolve/get/capability/validate --json` when developing or inspecting the governed skill registry.
+- skill definitions in `skills/<name>/SKILL.md` are the discovery authority. Do not add v1 skill-definition files.
 - `elegy run` is the optional MCP stdio adapter over governed capabilities. Side-effecting MCP calls require explicit dry-run input or a host started with `--allow-side-effects`.
 - Profiles are allowlists, not approvals.
 
@@ -59,7 +59,7 @@ cargo clippy -p <crate-name> --all-targets --all-features -- -D warnings
 Use the Rust CLI for governed exports and contract validation:
 
 ```bash
-cargo run -p elegy-cli -- contracts validate --project .
+cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .
 cargo test -p elegy-contracts --test conformance
 ```
 

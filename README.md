@@ -57,24 +57,24 @@ the bash script is the single canonical implementation.
 
 ```bash
 # Canonical installer (recommended; works on any platform with bash)
-bash ./install-distribution.sh -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+bash ./install-distribution.sh -d .elegy -s elegy-planning -f
 ```
 
 ```powershell
-# Native-pwsh entry point: thin shim that forwards all args to bash (requires bash in PATH)
-pwsh ./install-distribution.ps1 -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+# Native-pwsh entry point: thin shim that maps PowerShell flags to bash (requires bash in PATH)
+pwsh ./install-distribution.ps1 -Destination .\.elegy -Surface elegy-planning -Force
 ```
 
 Pin a specific release:
 
 ```bash
-bash ./install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory,elegy-planning -Force
+bash ./install-distribution.sh -t vX.Y.Z -d ./tools/elegy -s elegy-planning -f
 ```
 
 Track the rolling `main-snapshot` prerelease:
 
 ```bash
-bash ./install-distribution.sh -Tag main-snapshot -Destination ./tools/elegy-main -CliSurfaces elegy-cli -Force
+bash ./install-distribution.sh -t main-snapshot -d ./tools/elegy-main -s elegy-planning -f
 ```
 
 The same installer is also available at `scripts/install-distribution.{sh,ps1}` from
@@ -85,14 +85,13 @@ a repo checkout.
 On Linux or macOS, use the Bash installer from a repo checkout:
 
 ```bash
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+bash ./scripts/install-distribution.sh -t vX.Y.Z -d ./tools/elegy -s elegy-planning -f
 ```
 
 ### Installed layout
 
 - `bin/<surface>/` — installed CLI binaries
 - `bundle/` — assembled governed artifacts from plugin directories
-- `wrappers/<surface>/` — installed wrapper surfaces when requested
 - `install-receipt.json` — verification evidence and installed asset metadata
 
 ### From source
@@ -100,8 +99,8 @@ bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -C
 ```bash
 git clone https://github.com/Sofreshx/Elegy.git
 cd Elegy
-cargo build -p elegy-cli
-cargo run -p elegy-cli -- --version --json
+cargo build
+cargo run -p elegy-planning -- --version --json
 ```
 
 Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
@@ -118,8 +117,8 @@ elegy repo status --json
 elegy docs check --json
 ```
 
-From a repo checkout, use `cargo run -p elegy-cli -- ...` with the same
-arguments.
+From a repo checkout, use `cargo run -p <crate> -- ...` with the same
+arguments, using the appropriate dedicated binary crate.
 
 ## Per-binary surface
 
@@ -128,7 +127,10 @@ require editing this README.
 
 | Binary | Crate | Per-feature note |
 | --- | --- | --- |
-| `elegy` | `hosts/cli/` | [DISTRIBUTION.md](hosts/cli/DISTRIBUTION.md) |
+| `elegy-run` | `hosts/host-mcp/` | [DISTRIBUTION.md](hosts/host-mcp/DISTRIBUTION.md) |
+| `elegy-contracts` | `shared/core/` | _No dedicated distribution note yet_ |
+| `elegy-desktop` | `plugins/desktop/` | _No dedicated distribution note yet_ |
+| `elegy-observe` | `plugins/observe/` | _No dedicated distribution note yet_ |
 | `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
 | `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
 | `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
@@ -139,19 +141,16 @@ require editing this README.
 | `elegy-memory-mcp-http` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
 | `elegy-codegraph` | `plugins/codegraph/` | [DISTRIBUTION.md](plugins/codegraph/DISTRIBUTION.md) |
 
-## Wrapper and Skill Surfaces
+## Skill Surfaces
 
-Elegy ships dedicated `elegy-*` Rust binaries for each capability surface. The
-`Elegy-obsidian` surface is different: it wraps the official Obsidian Desktop
-CLI and keeps Obsidian vault content non-authoritative. Durable planning state
-continues to live in `elegy-planning` and SQLite.
+Elegy ships dedicated `elegy-*` Rust binaries for each capability surface.
 
 Skill definitions live under `skills/<name>/SKILL.md`. They are the governed
 discovery authority for agent capabilities.
 
 ## Configuration Materialization
 
-The umbrella CLI and dedicated `elegy-configuration` binary support
+Dedicated binaries (e.g., `elegy-configuration`) support
 deterministic materialization and drift verification of agent-facing repo and
 home assets from governed templates and profiles.
 
@@ -168,8 +167,7 @@ templates and profile details.
 
 Elegy's skills product is registry-first. Governed skill definitions under
 `skills/<name>/SKILL.md` are the discovery authority. The `elegy-skills`
-CLI provides search, resolve, inspect, and validation. The umbrella `elegy skills ...`
-surface mirrors this for convenience.
+CLI provides search, resolve, inspect, and validation.
 
 ```bash
 elegy-skills list --json
@@ -222,7 +220,7 @@ for one-off invocations.
 ## Contributing From Source
 
 ```bash
-cargo build -p elegy-cli
+cargo build
 cargo test --workspace --all-targets --all-features
 ```
 
@@ -248,7 +246,7 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```bash
-cargo run -p elegy-cli -- contracts validate --project .
+cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 ```
 
 ## License

@@ -17,7 +17,7 @@ fn direct_skills_binary_lists_builtin_registry() {
         serde_json::from_slice(&output.stdout).expect("list stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
     let skills = stdout["data"]["skills"].as_array().expect("skills array");
-    assert!(skills.iter().any(|skill| skill["id"] == "elegy-repo"));
+    assert!(skills.iter().any(|skill| skill["id"] == "elegy-planning"));
     assert!(skills.iter().any(|skill| skill["id"] == "elegy-skills"));
     assert!(skills
         .iter()
@@ -25,9 +25,9 @@ fn direct_skills_binary_lists_builtin_registry() {
 }
 
 #[test]
-fn direct_skills_binary_resolves_repo_status() {
+fn direct_skills_binary_resolves_planning() {
     let output = Command::new(env!("CARGO_BIN_EXE_elegy-skills"))
-        .args(["--format", "json", "resolve", "--query", "repo"])
+        .args(["--format", "json", "resolve", "--query", "plan"])
         .output()
         .expect("run elegy-skills resolve");
 
@@ -40,7 +40,7 @@ fn direct_skills_binary_resolves_repo_status() {
     let stdout: serde_json::Value =
         serde_json::from_slice(&output.stdout).expect("resolve stdout should be valid json");
     assert_eq!(stdout["status"], "ok");
-    assert_eq!(stdout["data"]["topSkill"]["id"], "elegy-repo");
+    assert_eq!(stdout["data"]["topSkill"]["id"], "elegy-planning");
     assert!(!stdout["data"]["results"]
         .as_array()
         .expect("results array")

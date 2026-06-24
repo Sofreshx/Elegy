@@ -37,11 +37,11 @@ jobs:
 
       - name: Validate contracts (canonical)
         working-directory: .
-        run: cargo run -p elegy-cli -- contracts validate --project .
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 
       - name: Export contracts bundle
         working-directory: .
-        run: cargo run -p elegy-cli -- contracts export --output-path artifacts/contracts --create-archive --archive-output-path artifacts/distribution/elegy-contracts-bundle.zip
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts export --output-dir artifacts/contracts --archive --archive-output artifacts/distribution/elegy-contracts-bundle.zip
 
       - name: Upload contracts distribution archive
         uses: actions/upload-artifact@v7.0.1

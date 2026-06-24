@@ -31,8 +31,8 @@ Before writing any code, read the relevant architecture docs:
 ## Agent Tool Discovery
 
 - Prefer `elegy agent check/manifest/discover --json` for host onboarding and profile-filtered progressive discovery.
-- Use `elegy-skills list/search/resolve/get/validate --json` or the umbrella `elegy skills ...` compatibility surface when developing or inspecting the governed skill registry.
-- skill definitions in `contracts/fixtures/skill.*.json` are the supported skill contract.
+- Use `elegy-skills list/search/resolve/get/validate --json` when developing or inspecting the governed skill registry.
+- skill definitions in `skills/<name>/SKILL.md` are the discovery authority.
 - Do not reintroduce v1 `skill-definition.*.json` files.
 - `elegy run` exposes an optional MCP stdio adapter over governed capabilities. Side-effecting tools are blocked by default unless dry-run input is provided or the host was started with `--allow-side-effects`.
 - Profiles are allowlists, not approvals.
@@ -49,6 +49,6 @@ Before writing any code, read the relevant architecture docs:
 
 ## File Organization
 
-- `contracts/` holds the governed contract and policy surfaces. Operational policy lives at `docs/governance/`.
-- `plugins/<name>/` holds one tree per agent capability plugin. `hosts/<name>/` holds the thin host and umbrella CLI entrypoints. `shared/<name>/` holds library crates shared across multiple plugins.
+- Governed contracts and schemas are co-located within their owning plugins under `plugins/<name>/`. Operational policy lives at `docs/governance/`.
+- `plugins/<name>/` holds one tree per agent capability plugin. `hosts/<name>/` holds thin host entrypoints. `shared/<name>/` holds library crates shared across multiple plugins.
 - `docs/adr/` and `docs/specs/` are the configured current documentation authority roots for durable decisions and implementation-facing specs.

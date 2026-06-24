@@ -22,17 +22,15 @@ The installer only resolves those exact release targets and fails closed on unsu
 
 Both channels publish the same asset families. The difference is lifecycle and stability promise, not package coverage.
 
-Bundle version and CLI version are intentionally independent. Consumers should resolve both assets from the same release tag rather than assuming `bundleVersion == cliVersion`.
-
 ## Asset families (conventions)
 
 | Family | Pattern | Notes |
 | --- | --- | --- |
-| Contracts bundle | `elegy-contracts-bundle.zip` | Governed schemas, fixtures, compatibility metadata. The canonical machine-readable handoff. |
 | Standalone installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Carries `install-distribution.sh` (canonical) + `install-distribution.ps1` (thin shim) + `README.md`. |
 | Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
-| Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published archive and the manifest. |
-| CLI archive | `<name>-<target>-<commitSha>.zip` | Per binary surface and target, resolved through `distribution/surfaces.json`. |
+| Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
+| CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through `distribution/surfaces.json`. |
+| CLI asset checksum | `<name>-<target>[.exe].sha256` | Sidecar checksum used by the installer. |
 
 ## Surface Catalog
 
@@ -40,32 +38,23 @@ Release configuration uses `distribution/surfaces.json` as the central catalog. 
 
 To add a new release surface, add an entry to `distribution/surfaces.json` and ensure the crate builds. No per-feature workflow files are needed.
 
+Each dedicated binary is listed in the catalog with kind `cli`. Most build from a package with the same name; surfaces with a different package declare `package` explicitly. Skill-only surfaces (those without a corresponding Rust binary) are listed with kind `skill-only`.
+
 ## Install
 
-The canonical installer is `scripts/install-distribution.sh`. The `scripts/install-distribution.ps1` file is a thin shim that forwards all arguments to the bash script via `bash`. The shim exists for Windows users who want a native-pwsh entry point; it carries no install logic of its own.
+The canonical installer is `scripts/install-distribution.sh`. The `scripts/install-distribution.ps1` file is a thin shim that maps PowerShell-style flags to the bash script and then delegates via `bash`.
+
+The installer is a simplified script that downloads one flat binary asset plus its `.sha256` sidecar. It does not depend on jq or archive extraction.
 
 ```bash
-# From a repo checkout
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory -Force
+# From a repo checkout or release archive
+bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy --surface elegy-planning --force
 
-# From a release archive
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory -Force
-
-# PowerShell entry point (forwards to bash)
-pwsh ./scripts/install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory -Force
+# PowerShell entry point
+pwsh ./scripts/install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -Surface elegy-planning -Force
 ```
 
-The installer downloads the contracts bundle first, extracts it, and uses `distribution/surfaces.json` from the repo or release to derive the per-surface build list. To install a surface, the surface must exist in the catalog.
-
-The installer resolves the release manifest and checksums, verifies asset size and SHA-256, then writes an install receipt into the destination root.
-
-## Contracts bundle
-
-```bash
-cargo run -p elegy-cli -- contracts export --output-path artifacts/contracts --create-archive --archive-output-path artifacts/distribution/elegy-contracts-bundle.zip
-```
-
-Output: `artifacts/distribution/elegy-contracts-bundle.zip`. The contracts bundle is the canonical machine-readable handoff for schemas, fixtures, compatibility metadata, and parity fixtures.
+To install a surface, the surface must exist in the release assets and have a published `.sha256` sidecar. The installer verifies the downloaded asset SHA-256 before writing the executable into the destination `bin/` directory.
 
 ## Downstream guidance
 
@@ -73,13 +62,13 @@ Output: `artifacts/distribution/elegy-contracts-bundle.zip`. The contracts bundl
 - Pin an explicit Elegy semver release tag in downstream repositories and install into a repo-local tools directory.
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
+- Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, scaffolding, and export.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
 - Treat the rolling `main-snapshot` prerelease as an integration/debug lane, not a pinned downstream contract.
 
 ## Where to read more
 
-- Per-feature distribution: each `plugins/<feature>/DISTRIBUTION.md` and `hosts/cli/DISTRIBUTION.md` etc.
 - Release publishing (CLI archives, aggregate artifacts, manifest, checksums): `.github/workflows/publish-orchestrator.yml`.
 - Manual metadata recovery for an existing release: `.github/workflows/release-finalize.yml`.
-- Aggregate artifacts (contracts bundle, installer bootstrap): `.github/workflows/distribution-artifacts.yml`.
+- Aggregate artifacts (installer bootstrap): `.github/workflows/distribution-artifacts.yml`.
 - Authority surfaces: [`docs/architecture/ecosystem-topology.md`](./architecture/ecosystem-topology.md).
