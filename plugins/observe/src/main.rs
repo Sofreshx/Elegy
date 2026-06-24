@@ -113,12 +113,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     match result {
         Ok(value) => {
-            if cli.json {
-                println!("{}", serde_json::to_string_pretty(&value).unwrap());
-            } else {
-                // Human-readable: pretty-print the JSON
-                println!("{}", serde_json::to_string_pretty(&value).unwrap());
-            }
+            let rendered = serde_json::to_string_pretty(&value)?;
+            println!("{rendered}");
         }
         Err(msg) => {
             eprintln!("Error: {}", msg);
