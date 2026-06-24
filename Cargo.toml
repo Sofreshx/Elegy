@@ -21,7 +21,6 @@ members = [
     "shared/adapter-fs",
     "shared/adapter-http",
     "shared/agent-events",
-    "shared/contracts",
     "shared/core",
     "shared/descriptor",
     "shared/desktop-win32",

@@ -11,7 +11,7 @@ default execution boundary.
 
 Core model:
 
-- governed artifacts are the durable authority
+- governed artifacts are co-located with owning plugins
 - Rust implements reusable executable behavior over those artifacts
 - skill definitions (SKILL.md) are the discovery authority for agent capabilities
 - CLI invocation is the default execution boundary
@@ -21,13 +21,15 @@ Core model:
 
 | Area | Purpose |
 | --- | --- |
-| `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
 | `docs/governance/` | Operational policy (workflow/environment/branch enforcement modes). |
-| `hosts/`, `plugins/`, `shared/` | First-party Rust libraries and binaries that consume governed artifacts. |
-| `artifacts/` | Generated bundles, archives, and validation outputs. |
+| `hosts/` | Thin CLI entrypoints and umbrella host crates. |
+| `plugins/` | Self-contained capability crates — each owns its schemas, fixtures, and configuration inside the plugin directory. |
+| `shared/` | Cross-cutting library crates (e.g. `shared/core/` holds shared types). |
+| `skills/` | Governed skill definitions (`skills/<name>/SKILL.md`). |
+| `artifacts/` | CI-generated bundles, archives, and validation outputs. |
 
-When those surfaces disagree, prefer the governed artifact roots and the
-smallest relevant architecture or spec document under `docs/`.
+When those surfaces disagree, prefer the governed artifacts within their owning
+plugin and the smallest relevant architecture or spec document under `docs/`.
 
 ## Install
 
@@ -88,10 +90,10 @@ bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -C
 
 ### Installed layout
 
-- `contracts/` - extracted governed contracts bundle
-- `bin/<surface>/` - installed CLI binaries
-- `wrappers/<surface>/` - installed wrapper surfaces when requested
-- `install-receipt.json` - verification evidence and installed asset metadata
+- `bin/<surface>/` — installed CLI binaries
+- `bundle/` — assembled governed artifacts from plugin directories
+- `wrappers/<surface>/` — installed wrapper surfaces when requested
+- `install-receipt.json` — verification evidence and installed asset metadata
 
 ### From source
 
@@ -144,8 +146,8 @@ Elegy ships dedicated `elegy-*` Rust binaries for each capability surface. The
 CLI and keeps Obsidian vault content non-authoritative. Durable planning state
 continues to live in `elegy-planning` and SQLite.
 
-The governed `contracts/fixtures/skill.*.json` files remain the skill authority.
-Repo-local `.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
+Skill definitions live under `skills/<name>/SKILL.md`. They are the governed
+discovery authority for agent capabilities.
 
 ## Configuration Materialization
 
@@ -165,7 +167,7 @@ templates and profile details.
 ## Skill Tools
 
 Elegy's skills product is registry-first. Governed skill definitions under
-`contracts/fixtures/skill.*.json` are the discovery authority. The `elegy-skills`
+`skills/<name>/SKILL.md` are the discovery authority. The `elegy-skills`
 CLI provides search, resolve, inspect, and validation. The umbrella `elegy skills ...`
 surface mirrors this for convenience.
 
@@ -173,13 +175,14 @@ surface mirrors this for convenience.
 elegy-skills list --json
 elegy-skills search --query "repo status" --json
 elegy-skills describe --skill-id elegy-repo --json
-elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
 ```
 
 ## Plugins
 
 `elegy-plugin/v1` is the minimal plugin manifest format for `.elegy-plugin/plugin.json`.
 Plugins declare identity and Agent Skills (SKILL.md) in a single filesystem directory.
+The `ElegyPluginV1` struct (a Rust type in the plugin infrastructure) defines the
+in-code contract; there is no standalone JSON schema file.
 
 Setup flow:
 
@@ -188,10 +191,6 @@ elegy plugin new --template cli-tool --output ./my-plugin
 # edit ./.elegy-plugin/plugin.json
 elegy plugin verify --plugin ./my-plugin/.elegy-plugin/plugin.json --json
 ```
-
-Authority schema:
-
-- `contracts/schemas/elegy-plugin-v1.schema.json` — plugin manifest contract
 
 Release configuration uses `distribution/surfaces.json` as the central release catalog.
 
@@ -249,7 +248,7 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```bash
-cargo run -p elegy-cli -- contracts validate --project . && cargo test -p elegy-contracts --test conformance
+cargo run -p elegy-cli -- contracts validate --project .
 ```
 
 ## License

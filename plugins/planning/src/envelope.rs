@@ -24,7 +24,7 @@ impl MachineStatus {
 /// Typed envelope for all machine-mode CLI output.
 ///
 /// Conforms to `planning-result/v1` wire format declared in
-/// `contracts/schemas/planning-result.schema.json`.
+/// `schemas/planning-result.schema.json`.
 #[derive(Clone, Debug, Serialize, schemars::JsonSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct MachineEnvelope<T>

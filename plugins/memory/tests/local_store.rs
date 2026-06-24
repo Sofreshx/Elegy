@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 const SUMMARY_ONLY_FIXTURE_JSON: &str =
-    include_str!("../../../contracts/fixtures/summary-only-session-context-envelope.minimal.json");
+    include_str!("../fixtures/summary-only-session-context-envelope.minimal.json");
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
     let unique = SystemTime::now()

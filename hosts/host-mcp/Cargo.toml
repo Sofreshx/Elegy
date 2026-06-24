@@ -10,7 +10,6 @@ repository.workspace = true
 
 [dependencies]
 base64.workspace = true
-elegy-contracts = { version = "0.1.0", path = "../../shared/contracts" }
 elegy-core = { version = "0.1.0", path = "../../shared/core" }
 elegy-skills = { version = "0.1.0", path = "../../plugins/skills" }
 rmcp.workspace = true

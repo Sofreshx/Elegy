@@ -1,6 +1,6 @@
 #![allow(unreachable_patterns, dead_code)]
 
-use elegy_contracts::{
+use elegy_core::{
     validate_elegy_configuration_profile, validate_elegy_configuration_receipt,
     validate_elegy_configuration_template, ContractsError, ElegyConfigurationAssetFamily,
     ElegyConfigurationOperation, ElegyConfigurationPathBase, ElegyConfigurationPathRef,
@@ -20,26 +20,24 @@ use thiserror::Error;
 const BUILTIN_TEMPLATE_FILES: &[(&str, &str, &str)] = &[
     (
         "repo-opencode-agentic-minimal",
-        include_str!(
-            "../../../contracts/configuration/templates/repo-opencode-agentic-minimal.json"
-        ),
-        "contracts/configuration/builtin/repo-opencode-agentic-minimal",
+        include_str!("../contracts/templates/repo-opencode-agentic-minimal.json"),
+        "plugins/configuration/contracts/builtin/repo-opencode-agentic-minimal",
     ),
     (
         "codex-home-minimal",
-        include_str!("../../../contracts/configuration/templates/codex-home-minimal.json"),
-        "contracts/configuration/builtin/codex-home-minimal",
+        include_str!("../contracts/templates/codex-home-minimal.json"),
+        "plugins/configuration/contracts/builtin/codex-home-minimal",
     ),
 ];
 
 const BUILTIN_PROFILE_FILES: &[(&str, &str)] = &[
     (
         "repo-opencode-minimal",
-        include_str!("../../../contracts/configuration/profiles/repo-opencode-minimal.json"),
+        include_str!("../contracts/profiles/repo-opencode-minimal.json"),
     ),
     (
         "repo-codex-minimal",
-        include_str!("../../../contracts/configuration/profiles/repo-codex-minimal.json"),
+        include_str!("../contracts/profiles/repo-codex-minimal.json"),
     ),
 ];
 
@@ -1026,7 +1024,7 @@ fn resolve_profile_source(
 
 fn resolve_profile_template_source(
     profile_source: &ProfileSource,
-    selection: &elegy_contracts::ElegyConfigurationProfileTemplateSelection,
+    selection: &elegy_core::ElegyConfigurationProfileTemplateSelection,
 ) -> Result<TemplateSource, ConfigurationError> {
     match (
         selection.template_id.as_deref(),
@@ -1781,11 +1779,11 @@ fn maybe_issue_on_conflict(
     }
 }
 
-fn format_scope(scope: &elegy_contracts::ElegyConfigurationScope) -> String {
+fn format_scope(scope: &elegy_core::ElegyConfigurationScope) -> String {
     match scope {
-        elegy_contracts::ElegyConfigurationScope::UserGlobal => "user-global",
-        elegy_contracts::ElegyConfigurationScope::Repo => "repo",
-        elegy_contracts::ElegyConfigurationScope::Workspace => "workspace",
+        elegy_core::ElegyConfigurationScope::UserGlobal => "user-global",
+        elegy_core::ElegyConfigurationScope::Repo => "repo",
+        elegy_core::ElegyConfigurationScope::Workspace => "workspace",
     }
     .to_string()
 }

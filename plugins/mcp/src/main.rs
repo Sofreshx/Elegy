@@ -1,19 +1,61 @@
 use clap::{Parser, Subcommand, ValueEnum};
-use elegy_contracts::{
-    build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
-    CliFailureKind, CliMachineContext, CliMachineEnvelope, McpAnalysisResult, McpTransportKind,
-};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
-    AuthorMcpToolRequest,
+    AuthorMcpToolRequest, McpAnalysisResult, McpTransportKind,
 };
 use serde::Serialize;
+use serde_json::Value;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use std::sync::OnceLock;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
-const EXIT_CODE_RUNTIME_FAILURE: u8 = 2;
+
+const CLI_SCHEMA_VERSION: &str = "elegy.cli/v1";
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CliEnvelope<T: Serialize> {
+    schema_version: &'static str,
+    correlation_id: String,
+    #[serde(skip_serializing_if = "std::ops::Not::not")]
+    non_interactive: bool,
+    command: Vec<String>,
+    status: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data_schema: Option<&'static str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    data: Option<T>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    failure: Option<StructuredFailure>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StructuredFailure {
+    code: String,
+    message: String,
+    #[serde(default)]
+    category: String,
+    retryable: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    correlation_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    details: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    cause: Option<StructuredFailureCause>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct StructuredFailureCause {
+    code: String,
+    message: String,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy-mcp")]
@@ -35,15 +77,6 @@ struct Cli {
 enum OutputFormat {
     Text,
     Json,
-}
-
-static CLI_MACHINE_CONTEXT: OnceLock<MachineContext> = OnceLock::new();
-
-#[derive(Clone, Debug)]
-struct MachineContext {
-    format: OutputFormat,
-    machine: CliMachineContext,
-    command: Vec<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -81,39 +114,80 @@ impl From<CliTransport> for McpTransportKind {
     }
 }
 
-fn main() -> ExitCode {
-    match run() {
-        Ok(code) => code,
-        Err(error) => {
-            if let Some(context) = CLI_MACHINE_CONTEXT.get() {
-                if context.format == OutputFormat::Json
-                    && print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
-                        &context.machine,
-                        context.command.clone(),
-                        CliFailureKind::Runtime,
-                        error.to_string(),
-                        None,
-                    ))
-                    .is_ok()
-                {
-                    return exit_runtime();
-                }
-            }
+struct MachineContext {
+    format: OutputFormat,
+    non_interactive: bool,
+    correlation_id: String,
+    command: Vec<String>,
+}
 
-            eprintln!("unexpected CLI failure: {error}");
-            exit_runtime()
-        }
+fn resolve_correlation_id(correlation_id: Option<String>, prefix: &str) -> String {
+    correlation_id
+        .filter(|id| !id.trim().is_empty())
+        .unwrap_or_else(|| {
+            let timestamp = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map(|d| d.as_nanos())
+                .unwrap_or(0);
+            format!("{prefix}-{timestamp}")
+        })
+}
+
+fn build_success_envelope<T: Serialize>(
+    context: &MachineContext,
+    data: T,
+) -> CliEnvelope<T> {
+    CliEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: context.correlation_id.clone(),
+        non_interactive: context.non_interactive,
+        command: context.command.clone(),
+        status: "ok".to_string(),
+        data_schema: None,
+        data: Some(data),
+        failure: None,
     }
 }
 
-fn run() -> Result<ExitCode, serde_json::Error> {
-    let cli = Cli::parse();
-    let context = MachineContext {
-        format: resolve_output_format(cli.json, cli.format),
-        machine: build_cli_machine_context(cli.non_interactive, cli.correlation_id, "elegy-mcp"),
-        command: vec![command_name(&cli.command).to_string()],
+fn build_failure_envelope<T: Serialize>(
+    context: &MachineContext,
+    kind: &str,
+    message: String,
+    correlation_id: String,
+) -> CliEnvelope<T> {
+    let (status, code, category) = match kind {
+        "invalid_input" => ("invalid", "CLI-INVALID-INPUT", "invalidInput"),
+        "runtime" => ("error", "CLI-RUNTIME-FAILURE", "internal"),
+        _ => ("error", "CLI-RUNTIME-FAILURE", "internal"),
     };
-    let _ = CLI_MACHINE_CONTEXT.set(context.clone());
+    CliEnvelope {
+        schema_version: CLI_SCHEMA_VERSION,
+        correlation_id: correlation_id.clone(),
+        non_interactive: context.non_interactive,
+        command: context.command.clone(),
+        status: status.to_string(),
+        data_schema: None,
+        data: None,
+        failure: Some(StructuredFailure {
+            code: code.to_string(),
+            message,
+            category: category.to_string(),
+            retryable: false,
+            correlation_id: Some(correlation_id),
+            details: None,
+            cause: None,
+        }),
+    }
+}
+
+fn main() -> ExitCode {
+    let cli = Cli::parse();
+    let output_format = if cli.json {
+        OutputFormat::Json
+    } else {
+        cli.format
+    };
+    let correlation_id = resolve_correlation_id(cli.correlation_id, "elegy-mcp");
 
     match cli.command {
         Command::Author {
@@ -122,8 +196,24 @@ fn run() -> Result<ExitCode, serde_json::Error> {
             transport,
             tools,
             force,
-        } => execute_author_command(server_name, output, transport, tools, force, &context),
-        Command::Analyze { descriptor } => execute_analyze_command(descriptor, &context),
+        } => {
+            let ctx = MachineContext {
+                format: output_format,
+                non_interactive: cli.non_interactive,
+                correlation_id: correlation_id.clone(),
+                command: vec!["author".to_string()],
+            };
+            execute_author_command(server_name, output, transport, tools, force, &ctx)
+        }
+        Command::Analyze { descriptor } => {
+            let ctx = MachineContext {
+                format: output_format,
+                non_interactive: cli.non_interactive,
+                correlation_id: correlation_id.clone(),
+                command: vec!["analyze".to_string()],
+            };
+            execute_analyze_command(descriptor, &ctx)
+        }
     }
 }
 
@@ -133,11 +223,18 @@ fn execute_author_command(
     transport: CliTransport,
     tools: Vec<String>,
     force: bool,
-    context: &MachineContext,
-) -> Result<ExitCode, serde_json::Error> {
+    ctx: &MachineContext,
+) -> ExitCode {
     let tools = match parse_tool_specs(&tools) {
         Ok(tools) => tools,
-        Err(message) => return emit_error(context, "author", message, exit_invalid()),
+        Err(message) => {
+            if ctx.format == OutputFormat::Json {
+                print_json_failure(ctx, "invalid_input", message);
+            } else {
+                eprintln!("{message}");
+            }
+            return ExitCode::from(EXIT_CODE_INVALID_INPUT);
+        }
     };
 
     match author_mcp_descriptor_to_path(
@@ -150,88 +247,59 @@ fn execute_author_command(
         force,
     ) {
         Ok(result) => {
-            match context.format {
+            match ctx.format {
                 OutputFormat::Text => print_authored_mcp_text(&result),
                 OutputFormat::Json => {
-                    print_json(&build_success_envelope(context, ["author"], result))?
+                    if let Err(e) = print_json(&build_success_envelope(ctx, result)) {
+                        eprintln!("json serialization error: {e}");
+                    }
                 }
             }
-
-            Ok(ExitCode::SUCCESS)
+            ExitCode::SUCCESS
         }
-        Err(error) => emit_error(context, "author", error.to_string(), exit_invalid()),
+        Err(error) => {
+            if ctx.format == OutputFormat::Json {
+                print_json_failure(ctx, "invalid_input", error.to_string());
+            } else {
+                eprintln!("{error}");
+            }
+            ExitCode::from(EXIT_CODE_INVALID_INPUT)
+        }
     }
 }
 
 fn execute_analyze_command(
     descriptor: PathBuf,
-    context: &MachineContext,
-) -> Result<ExitCode, serde_json::Error> {
+    ctx: &MachineContext,
+) -> ExitCode {
     match analyze_mcp_descriptor_file(&descriptor) {
         Ok(analysis) => {
-            match context.format {
+            match ctx.format {
                 OutputFormat::Text => print_mcp_analysis_text(&analysis),
                 OutputFormat::Json => {
-                    print_json(&build_success_envelope(context, ["analyze"], analysis))?
+                    if let Err(e) = print_json(&build_success_envelope(ctx, analysis)) {
+                        eprintln!("json serialization error: {e}");
+                    }
                 }
             }
-
-            Ok(ExitCode::SUCCESS)
+            ExitCode::SUCCESS
         }
-        Err(error) => emit_error(context, "analyze", error.to_string(), exit_invalid()),
-    }
-}
-
-fn emit_error(
-    context: &MachineContext,
-    command: &str,
-    message: String,
-    code: ExitCode,
-) -> Result<ExitCode, serde_json::Error> {
-    match context.format {
-        OutputFormat::Text => eprintln!("{message}"),
-        OutputFormat::Json => print_json(&build_cli_failure_envelope::<serde_json::Value, _>(
-            &context.machine,
-            [command],
-            if code == exit_invalid() {
-                CliFailureKind::InvalidInput
+        Err(error) => {
+            if ctx.format == OutputFormat::Json {
+                print_json_failure(ctx, "invalid_input", error.to_string());
             } else {
-                CliFailureKind::Runtime
-            },
-            message,
-            None,
-        ))?,
-    }
-
-    Ok(code)
-}
-
-fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
-    if json {
-        OutputFormat::Json
-    } else {
-        format
+                eprintln!("{error}");
+            }
+            ExitCode::from(EXIT_CODE_INVALID_INPUT)
+        }
     }
 }
 
-fn build_success_envelope<T, S>(
-    context: &MachineContext,
-    command: impl IntoIterator<Item = S>,
-    data: T,
-) -> CliMachineEnvelope<T>
-where
-    T: Serialize,
-    S: Into<String>,
-{
-    build_cli_success_envelope(&context.machine, command, data)
-}
-
-fn exit_invalid() -> ExitCode {
-    ExitCode::from(EXIT_CODE_INVALID_INPUT)
-}
-
-fn exit_runtime() -> ExitCode {
-    ExitCode::from(EXIT_CODE_RUNTIME_FAILURE)
+fn print_json_failure(ctx: &MachineContext, kind: &str, message: String) {
+    let envelope = build_failure_envelope::<Value>(ctx, kind, message, ctx.correlation_id.clone());
+    if let Err(e) = print_json(&envelope) {
+        eprintln!("json serialization error: {e}");
+    }
 }
 
 fn print_authored_mcp_text(result: &elegy_mcp::AuthoredMcpDescriptor) {
@@ -291,17 +359,7 @@ fn parse_tool_specs(values: &[String]) -> Result<Vec<AuthorMcpToolRequest>, Stri
         .collect()
 }
 
-fn command_name(command: &Command) -> &'static str {
-    match command {
-        Command::Author { .. } => "author",
-        Command::Analyze { .. } => "analyze",
-    }
-}
-
-fn print_json<T>(value: &T) -> Result<(), serde_json::Error>
-where
-    T: Serialize,
-{
+fn print_json(value: &impl Serialize) -> Result<(), serde_json::Error> {
     let text = serde_json::to_string_pretty(value)?;
     println!("{text}");
     Ok(())

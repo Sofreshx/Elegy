@@ -1,4 +1,4 @@
-use elegy_contracts::{
+use elegy_core::{
     validate_execution_event, validate_invocation_request, validate_invocation_response,
     validate_structured_failure, ExecutionEvent, ExecutionEventStatus, ExecutionEventType,
     InvocationContext, InvocationRequest, InvocationResponse, InvocationStatus, StructuredFailure,

@@ -1,9 +1,6 @@
-use crate::ContractsError;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::{BTreeMap, BTreeSet};
-use std::fs;
-use std::path::Path;
 
 pub const ELEGY_CONFIGURATION_TEMPLATE_SCHEMA_VERSION: &str = "elegy-configuration-template/v1";
 pub const ELEGY_CONFIGURATION_PROFILE_SCHEMA_VERSION: &str = "elegy-configuration-profile/v1";
@@ -486,33 +483,6 @@ pub fn validate_elegy_configuration_receipt(
     ElegyConfigurationReceiptValidationResult { issues }
 }
 
-pub fn load_elegy_configuration_template_fixture_from_dir(
-    dir: &Path,
-) -> Result<ElegyConfigurationTemplate, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("elegy-configuration-template-v1.minimal.json"),
-    )
-}
-
-pub fn load_elegy_configuration_profile_fixture_from_dir(
-    dir: &Path,
-) -> Result<ElegyConfigurationProfile, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("elegy-configuration-profile-v1.minimal.json"),
-    )
-}
-
-pub fn load_elegy_configuration_receipt_fixture_from_dir(
-    dir: &Path,
-) -> Result<ElegyConfigurationReceipt, ContractsError> {
-    load_json_file(
-        &dir.join("fixtures")
-            .join("elegy-configuration-receipt-v1.minimal.json"),
-    )
-}
-
 fn validate_string_key_map(
     field: &str,
     keys: impl IntoIterator<Item = String>,
@@ -566,18 +536,4 @@ fn validate_exactly_one_content_source(
     if let Some(content_path) = content_path {
         validate_path_ref("contentPath", content_path, issues);
     }
-}
-
-fn load_json_file<T>(path: &Path) -> Result<T, ContractsError>
-where
-    T: for<'de> Deserialize<'de>,
-{
-    let content = fs::read_to_string(path).map_err(|source| ContractsError::Io {
-        path: path.to_path_buf(),
-        source,
-    })?;
-    serde_json::from_str(&content).map_err(|source| ContractsError::Json {
-        path: path.to_path_buf(),
-        source,
-    })
 }

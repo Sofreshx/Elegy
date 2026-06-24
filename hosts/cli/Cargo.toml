@@ -14,7 +14,6 @@ path = "src/main.rs"
 
 [dependencies]
 clap.workspace = true
-elegy-contracts = { version = "0.1.0", path = "../../shared/contracts" }
 elegy-configuration = { version = "0.1.0", path = "../../plugins/configuration" }
 elegy-core = { version = "0.1.0", path = "../../shared/core" }
 elegy-desktop = { version = "0.1.0", path = "../../plugins/desktop" }

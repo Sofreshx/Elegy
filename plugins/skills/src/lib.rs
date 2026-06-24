@@ -1,4 +1,4 @@
-use elegy_contracts::{
+use elegy_core::{
     parse_agent_skill_frontmatter, validate_agent_skill_frontmatter, AgentSkillFrontmatter,
     ContractsError,
 };

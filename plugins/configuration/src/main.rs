@@ -4,7 +4,7 @@ use elegy_configuration::{
     verify_configuration, ApplyConfigurationRequest, ConfigurationError,
     VerifyConfigurationRequest,
 };
-use elegy_contracts::{
+use elegy_core::{
     build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
     CliFailureKind, CliMachineContext, CliMachineEnvelope,
 };

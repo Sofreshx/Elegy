@@ -1,10 +1,12 @@
 use elegy_core::{
     compose_runtime, compose_runtime_state, load_agent_event_envelope_fixture_from_dir,
     load_agent_request_envelope_fixture_from_dir, load_agent_response_envelope_fixture_from_dir,
-    load_mcp_analysis_result_fixture_from_dir, load_mcp_server_descriptor_fixture_from_dir,
     resolve_upstream_contracts_dir, validate_agent_event_envelope, validate_agent_request_envelope,
-    validate_agent_response_envelope, validate_descriptor_set, validate_mcp_analysis_result,
-    validate_mcp_server_descriptor, Catalog, ProjectLocator,
+    validate_agent_response_envelope, validate_descriptor_set, Catalog, ProjectLocator,
+};
+use elegy_mcp::{
+    validate_mcp_analysis_result, validate_mcp_server_descriptor, McpAnalysisResult,
+    McpServerDescriptor,
 };
 use std::fs;
 use std::path::PathBuf;
@@ -134,7 +136,7 @@ fn http_openapi_example_still_rejects_openapi_runtime_execution() {
 
 #[test]
 fn duplicate_resource_uris_are_rejected() {
-    let fixture = repo_root().join("tests/fixtures/fs/duplicate-uri");
+    let fixture = repo_root().join("shared/core/tests/fixtures/fs/duplicate-uri");
     let error =
         compose_runtime(ProjectLocator::Path(fixture)).expect_err("duplicate URI should fail");
     let codes: Vec<&str> = error
@@ -146,13 +148,26 @@ fn duplicate_resource_uris_are_rejected() {
     assert!(codes.contains(&"RUNTIME-DUPLICATE-URI-001"));
 }
 
+fn load_mcp_fixture<T: serde::de::DeserializeOwned>(
+    dir: &PathBuf,
+    name: &str,
+) -> Result<T, String> {
+    let path = dir.join("fixtures").join(name);
+    let content = fs::read_to_string(&path)
+        .map_err(|e| format!("failed to read {}: {e}", path.display()))?;
+    serde_json::from_str(&content)
+        .map_err(|e| format!("failed to parse {}: {e}", path.display()))
+}
+
 #[test]
 fn upstream_mcp_contract_fixtures_validate_through_core_facade() {
     let contracts_dir = resolve_upstream_contracts_dir();
-    let descriptor = load_mcp_server_descriptor_fixture_from_dir(&contracts_dir)
-        .expect("load upstream mcp-server-descriptor fixture");
-    let analysis = load_mcp_analysis_result_fixture_from_dir(&contracts_dir)
-        .expect("load upstream mcp-analysis-result fixture");
+    let descriptor: McpServerDescriptor =
+        load_mcp_fixture(&contracts_dir, "mcp-server-descriptor.minimal.json")
+            .expect("load upstream mcp-server-descriptor fixture");
+    let analysis: McpAnalysisResult =
+        load_mcp_fixture(&contracts_dir, "mcp-analysis-result.minimal.json")
+            .expect("load upstream mcp-analysis-result fixture");
 
     let descriptor_validation = validate_mcp_server_descriptor(&descriptor);
     assert!(

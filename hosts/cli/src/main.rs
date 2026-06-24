@@ -15,19 +15,17 @@ use elegy_configuration::{
     verify_configuration, ApplyConfigurationRequest, ConfigurationError,
     VerifyConfigurationRequest,
 };
-use elegy_contracts::{
-    export_contract_bundle, ContractsBundleExport, ContractsError, ObservationSession,
-};
 use elegy_core::{
-    compose_runtime, validate_descriptor_set, Catalog, ConfigInspection, CoreError, Diagnostic,
-    McpAnalysisResult, McpTransportKind, ProjectLocator, ResourceFamily, Severity,
-    CLI_SCHEMA_VERSION,
+    compose_runtime, export_contract_bundle, validate_descriptor_set, Catalog, ConfigInspection,
+    ContractsBundleExport, ContractsError, CoreError, Diagnostic, ObservationSession,
+    ProjectLocator, ResourceFamily, Severity, CLI_SCHEMA_VERSION,
 };
 use elegy_diagram::{CanonicalDiagram, DiagramEdge, DiagramNode, DiagramPatch};
 use elegy_host_mcp::{serve_stdio_with_options, HostError, HostOptions};
 use elegy_mcp::{
     analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, AuthorMcpDescriptorRequest,
-    AuthorMcpToolRequest, AuthoredMcpDescriptor, McpSurfaceError,
+    AuthorMcpToolRequest, AuthoredMcpDescriptor, McpAnalysisResult, McpTransportKind,
+    McpSurfaceError,
 };
 use elegy_memory::{
     GovernedMemoryRecord, GovernedMemoryRecordImportOptions, LocalMemoryCatalogEntry,
@@ -484,8 +482,8 @@ enum ContractsCommand {
         archive_output_path: Option<PathBuf>,
     },
     /// Validate the contract bundle against the current schema and conformance rules.
-    /// Walks `contracts/schemas/` and `contracts/fixtures/`. Exits 0 on success,
-    /// non-zero on any validation failure.
+    /// Walks `plugins/*/schemas/`, `plugins/*/fixtures/`, and `shared/core/fixtures/`.
+    /// Exits 0 on success, non-zero on any validation failure.
     Validate {
         /// Optional path to the project root. Defaults to the current working directory.
         #[arg(long)]
@@ -2692,95 +2690,118 @@ fn validate_contract_bundle(project_root: &std::path::Path) -> ContractValidatio
         project_root: project_root.display().to_string(),
         ..Default::default()
     };
-    let contracts_dir = project_root.join("contracts");
-    if !contracts_dir.is_dir() {
-        report.diagnostics.push(ContractValidationDiagnostic {
-            code: "CONTRACTS-VALIDATE-001".to_string(),
-            location: "contracts/".to_string(),
-            message: format!(
-                "contracts directory not found at {}; cannot validate",
-                contracts_dir.display()
-            ),
-        });
-        return report;
+
+    // Collect schema and fixture directories from plugins/ and shared/
+    let mut schema_dirs: Vec<PathBuf> = Vec::new();
+    let mut fixture_dirs: Vec<PathBuf> = Vec::new();
+
+    // Walk plugins/*/ for schemas/, fixtures/, and contracts/ subdirectories
+    let plugins_dir = project_root.join("plugins");
+    if let Ok(entries) = std::fs::read_dir(&plugins_dir) {
+        for entry in entries.flatten() {
+            let plugin_dir = entry.path();
+            if !plugin_dir.is_dir() {
+                continue;
+            }
+            let schemas = plugin_dir.join("schemas");
+            if schemas.is_dir() {
+                schema_dirs.push(schemas);
+            }
+            let fixtures = plugin_dir.join("fixtures");
+            if fixtures.is_dir() {
+                fixture_dirs.push(fixtures);
+            }
+            let contracts = plugin_dir.join("contracts");
+            if contracts.is_dir() {
+                fixture_dirs.push(contracts);
+            }
+        }
     }
-    let schemas_dir = contracts_dir.join("schemas");
-    let fixtures_dir = contracts_dir.join("fixtures");
-    // 1) Every schema file is parseable JSON.
-    let schema_entries = match std::fs::read_dir(&schemas_dir) {
-        Ok(rd) => rd,
-        Err(err) => {
-            report.diagnostics.push(ContractValidationDiagnostic {
-                code: "CONTRACTS-VALIDATE-002".to_string(),
-                location: "contracts/schemas/".to_string(),
-                message: format!("failed to read schemas directory: {err}"),
-            });
-            return report;
-        }
-    };
-    for entry in schema_entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("json") {
-            continue;
-        }
-        report.schema_count += 1;
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
+
+    // Walk shared/core/fixtures/
+    let shared_fixtures = project_root.join("shared").join("core").join("fixtures");
+    if shared_fixtures.is_dir() {
+        fixture_dirs.push(shared_fixtures);
+    }
+
+    // Validate all schema directories
+    for schema_dir in &schema_dirs {
+        let entries = match std::fs::read_dir(schema_dir) {
+            Ok(rd) => rd,
             Err(err) => {
+                report.diagnostics.push(ContractValidationDiagnostic {
+                    code: "CONTRACTS-VALIDATE-001".to_string(),
+                    location: schema_dir.display().to_string(),
+                    message: format!("failed to read schema directory: {err}"),
+                });
+                continue;
+            }
+        };
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            report.schema_count += 1;
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(err) => {
+                    report.diagnostics.push(ContractValidationDiagnostic {
+                        code: "CONTRACTS-VALIDATE-002".to_string(),
+                        location: path.display().to_string(),
+                        message: format!("failed to read schema file: {err}"),
+                    });
+                    continue;
+                }
+            };
+            if let Err(err) = serde_json::from_str::<serde_json::Value>(&content) {
                 report.diagnostics.push(ContractValidationDiagnostic {
                     code: "CONTRACTS-VALIDATE-003".to_string(),
                     location: path.display().to_string(),
-                    message: format!("failed to read schema file: {err}"),
+                    message: format!("schema is not valid JSON: {err}"),
+                });
+            }
+        }
+    }
+
+    // Validate all fixture directories
+    for fixture_dir in &fixture_dirs {
+        let entries = match std::fs::read_dir(fixture_dir) {
+            Ok(rd) => rd,
+            Err(err) => {
+                report.diagnostics.push(ContractValidationDiagnostic {
+                    code: "CONTRACTS-VALIDATE-004".to_string(),
+                    location: fixture_dir.display().to_string(),
+                    message: format!("failed to read fixture directory: {err}"),
                 });
                 continue;
             }
         };
-        if let Err(err) = serde_json::from_str::<serde_json::Value>(&content) {
-            report.diagnostics.push(ContractValidationDiagnostic {
-                code: "CONTRACTS-VALIDATE-004".to_string(),
-                location: path.display().to_string(),
-                message: format!("schema is not valid JSON: {err}"),
-            });
-        }
-    }
-    // 2) Every fixture is parseable JSON.
-    let fixture_entries = match std::fs::read_dir(&fixtures_dir) {
-        Ok(rd) => rd,
-        Err(err) => {
-            report.diagnostics.push(ContractValidationDiagnostic {
-                code: "CONTRACTS-VALIDATE-005".to_string(),
-                location: "contracts/fixtures/".to_string(),
-                message: format!("failed to read fixtures directory: {err}"),
-            });
-            return report;
-        }
-    };
-    for entry in fixture_entries.flatten() {
-        let path = entry.path();
-        if path.extension().and_then(|s| s.to_str()) != Some("json") {
-            continue;
-        }
-        report.fixture_count += 1;
-        let content = match std::fs::read_to_string(&path) {
-            Ok(c) => c,
-            Err(err) => {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) != Some("json") {
+                continue;
+            }
+            report.fixture_count += 1;
+            let content = match std::fs::read_to_string(&path) {
+                Ok(c) => c,
+                Err(err) => {
+                    report.diagnostics.push(ContractValidationDiagnostic {
+                        code: "CONTRACTS-VALIDATE-005".to_string(),
+                        location: path.display().to_string(),
+                        message: format!("failed to read fixture: {err}"),
+                    });
+                    continue;
+                }
+            };
+            if let Err(err) = serde_json::from_str::<serde_json::Value>(&content) {
                 report.diagnostics.push(ContractValidationDiagnostic {
                     code: "CONTRACTS-VALIDATE-006".to_string(),
                     location: path.display().to_string(),
-                    message: format!("failed to read fixture: {err}"),
+                    message: format!("fixture is not valid JSON: {err}"),
                 });
-                continue;
             }
-        };
-        if let Err(err) = serde_json::from_str::<serde_json::Value>(&content) {
-            report.diagnostics.push(ContractValidationDiagnostic {
-                code: "CONTRACTS-VALIDATE-007".to_string(),
-                location: path.display().to_string(),
-                message: format!("fixture is not valid JSON: {err}"),
-            });
-            continue;
         }
-        // (Plugin-package validation removed with legacy format deletion)
     }
     report
 }
@@ -3276,7 +3297,7 @@ fn session_context_inspection() -> SessionContextInspection {
     SessionContextInspection {
         capability: "summary-only-session-context-envelope",
         contract_field: "summary-only-session-context-envelope.sessionContext",
-        schema_file: "contracts/schemas/summary-only-session-context-envelope.schema.json",
+        schema_file: "plugins/memory/schemas/summary-only-session-context-envelope.schema.json",
         representation: "summary-only",
         supported_scopes: vec!["run", "session", "workspace"],
         intended_consumers: vec!["instruction-engine", "workspace-bootstrap", "agent-runtime"],
@@ -3866,7 +3887,7 @@ fn configuration_error_diagnostics(error: ConfigurationError) -> Vec<Diagnostic>
 }
 
 fn configuration_receipt_diagnostics(
-    receipt: &elegy_contracts::ElegyConfigurationReceipt,
+    receipt: &elegy_core::ElegyConfigurationReceipt,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     for issue in &receipt.issues {
@@ -3875,8 +3896,8 @@ fn configuration_receipt_diagnostics(
     for entry in &receipt.entries {
         if matches!(
             entry.action,
-            elegy_contracts::ElegyConfigurationReceiptAction::Mismatched
-                | elegy_contracts::ElegyConfigurationReceiptAction::Conflict
+            elegy_core::ElegyConfigurationReceiptAction::Mismatched
+                | elegy_core::ElegyConfigurationReceiptAction::Conflict
         ) {
             let mut diagnostic = Diagnostic::error(
                 "CLI-CONFIG-019",

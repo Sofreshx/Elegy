@@ -13,71 +13,68 @@ The main Elegy repo is now the intended long-term home for both:
 
 The repository now converges on this shape:
 
-- `contracts/` remains the authored authority root
-- `artifacts/contracts` remains the generated downstream handoff surface
-- `rust/` is the in-repo Cargo workspace for reusable executable behavior
+- `shared/` holds library/core crates for reusable executable behavior
+- `plugins/` holds feature crates with plugin-owned artifacts co-located in each plugin's directory
+- `hosts/` holds thin binary crates (CLI and MCP host)
 - root docs and root scripts define the contributor and validation path
 
 This is no longer a story about keeping a removed legacy package tree authoritative. The current question is simpler: which responsibilities belong in governed artifacts, which belong in Rust executable crates, and which should stay consumer-local.
 
-### Rust workspace layout
+### Workspace layout
 
 ```mermaid
 flowchart TD
-    subgraph rust["rust/ — Cargo workspace (29 crates)"]
-        subgraph core["core/ — 9 library crates"]
-            contracts["elegy-contracts\nschema & fixture consumption"]
-            policy["elegy-policy\nbounded policy enforcement"]
-            core_main["elegy-core\nelegy-runtime\nreusable composition"]
-            tooling["elegy-tooling\ndescriptor authoring & analysis"]
-            mcp["elegy-mcp\nMCP analysis & runtime"]
-            descriptor["elegy-descriptor\nMCP descriptor model"]
-            adapters["elegy-adapter-fs\nadapter-http\nagent-events"]
+    subgraph shared["shared/ — 10 library crates"]
+        core["elegy-core\nschema & fixture consumption,\nreusable composition"]
+        policy["elegy-policy\nbounded policy enforcement"]
+        tooling["elegy-tooling\ndescriptor authoring & analysis"]
+        descriptor["elegy-descriptor\nMCP descriptor model"]
+        runtime["elegy-runtime\nruntime composition"]
+        agent_events["elegy-agent-events"]
+        adapter_fs["elegy-adapter-fs"]
+        adapter_http["elegy-adapter-http"]
+    end
+
+    subgraph plugins["plugins/ — 16 crates"]
+        subgraph hybrid["8 hybrid lib+bin"]
+            mem["elegy-memory"]
+            plan["elegy-planning"]
+            skills_f["elegy-skills"]
+            cfg["elegy-configuration"]
+            docs_f["elegy-documentation"]
+            mcp["elegy-mcp"]
+            mem_mcp["elegy-memory-mcp"]
+            codegraph["elegy-codegraph"]
         end
 
-        subgraph features["features/ — 18 crates"]
-            subgraph hybrid["8 hybrid lib+bin"]
-                mem["elegy-memory"]
-                plan["elegy-planning"]
-                skills_f["elegy-skills"]
-                cfg["elegy-configuration"]
-                docs_f["elegy-documentation"]
-                mcp_f["elegy-mcp"]
-                mem_mcp["elegy-memory-mcp"]
-                codegraph["elegy-codegraph"]
-            end
-
-            subgraph libonly["10 lib-only"]
-                mermaid["elegy-mermaid"]
-                diagram["elegy-diagram"]
-                observe["elegy-observe"]
-                repo["elegy-repo"]
-                data["elegy-data"]
-                desktop["elegy-desktop"]
-                web["elegy-web"]
-                notify["elegy-notify"]
-                observe_w32["elegy-observe-win32"]
-                desktop_w32["elegy-desktop-win32"]
-            end
-        end
-
-        subgraph bin["bin/ — 2 binary crates"]
-            cli["elegy-cli\numbrella CLI shell"]
-            host["elegy-host-mcp\nstdio MCP host"]
+        subgraph libonly["8 lib-only"]
+            mermaid["elegy-mermaid"]
+            diagram["elegy-diagram"]
+            observe["elegy-observe"]
+            repo["elegy-repo"]
+            data["elegy-data"]
+            desktop["elegy-desktop"]
+            web["elegy-web"]
+            notify["elegy-notify"]
         end
     end
 
-    core -->|"provides behavior to"| features
-    features -->|"exposed through"| bin
-    cli -->|"dispatches to"| features
+    subgraph hosts["hosts/ — 2 binary crates"]
+        cli["elegy-cli\numbrella CLI shell"]
+        host["elegy-host-mcp\nstdio MCP host"]
+    end
+
+    shared -->|"provides behavior to"| plugins
+    plugins -->|"exposed through"| hosts
+    cli -->|"dispatches to"| plugins
 ```
 
 ## What stays authoritative now
 
 The following remain canonical in the repo today:
 
-- governed schemas and fixtures under `contracts/`
-- version and release policy under `contracts/schemas/`
+- governed schemas and fixtures co-located in each plugin's directory
+- version and release policy under plugin-owned `schemas/` directories
 - operational policy under `docs/governance/`
 - export and validation scripts at the repo root
 
@@ -101,7 +98,7 @@ The currently shipped self-authoring surface is the Rust CLI path for:
 - `generate skills`
 - `generate codex-plugin`
 
-Those commands are backed by shared Rust crates led by `rust/features/elegy-mcp` and `rust/core/elegy-tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the Rust workspace.
+Those commands are backed by shared Rust crates led by `plugins/mcp` and `shared/tooling`, exposed through both the umbrella `elegy` CLI and the dedicated `elegy-mcp` / `elegy-skills` binaries, and exercised by CLI and tooling tests in the workspace.
 
 ### Crate dependency graph
 
@@ -196,13 +193,13 @@ Contributor-facing validation should point to the smallest real flows that still
 ### Contracts and exports
 
 ```bash
-cd rust && cargo run -p elegy-cli -- contracts validate --project ..
-cd rust && cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
+cargo run -p elegy-cli -- contracts validate --project .
+cargo run -p elegy-cli -- contracts export --output-path distribution/contracts --create-archive --archive-output-path distribution/elegy-contracts-bundle.zip
 ```
 
 ### Rust executable surfaces
 
-Run from `rust/`:
+Run from repo root:
 
 ```bash
 cargo fmt --all --check
@@ -230,7 +227,7 @@ Adding a new publishable surface requires **one step**: add an entry in `distrib
 ## Current next sequence
 
 1. keep hardening the Rust CLI, tooling crates, and host/runtime surfaces that ship from the in-repo workspace
-2. keep the governed contract, operational policy, and export roots under `contracts/` and `docs/governance/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
+2. keep the governed contract, operational policy, and export roots co-located in each plugin's directory and under `docs/governance/` cleanly versioned and validated with the repo-root PowerShell bundle scripts
 3. finish removing stale docs that still imply deleted source, test, or package-family centers
 4. only document broader built-in self-authoring or MCP-hosted operator experiences once the Rust workspace proves them as runnable, contributor-facing surfaces
 
