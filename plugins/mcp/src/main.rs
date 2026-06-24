@@ -53,6 +53,7 @@ struct StructuredFailureCause {
     message: String,
 }
 
+#[allow(dead_code)]
 fn is_false(value: &bool) -> bool {
     !*value
 }
