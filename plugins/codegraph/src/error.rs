@@ -5,7 +5,7 @@ pub enum Error {
     Io(#[from] std::io::Error),
 
     #[error("Storage error: {0}")]
-    Storage(#[from] redb::Error),
+    Storage(#[source] Box<redb::Error>),
 
     #[error("Serialization error: {0}")]
     Serde(#[from] serde_json::Error),
@@ -22,3 +22,9 @@ pub enum Error {
 
 /// Crate-level result alias.
 pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<redb::Error> for Error {
+    fn from(error: redb::Error) -> Self {
+        Self::Storage(Box::new(error))
+    }
+}

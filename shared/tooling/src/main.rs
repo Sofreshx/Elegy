@@ -142,9 +142,9 @@ fn main() -> ExitCode {
             };
 
             let default_binary_name = match (&binary, &binary_name) {
-                (Some(binary_path), None) => binary_path.file_name().map(|name| {
-                    format!("bin/{}", name.to_string_lossy())
-                }),
+                (Some(binary_path), None) => binary_path
+                    .file_name()
+                    .map(|name| format!("bin/{}", name.to_string_lossy())),
                 _ => None,
             };
             let binary_archive_name = binary_name.or(default_binary_name);
@@ -165,12 +165,12 @@ fn main() -> ExitCode {
             };
 
             let pack_result = match binary_spec {
-                Some(binary_spec) => pack_plugin_v1_with_binary(&plugin, &output_path, Some(binary_spec)),
+                Some(binary_spec) => {
+                    pack_plugin_v1_with_binary(&plugin, &output_path, Some(binary_spec))
+                }
                 None => {
                     if plugin_requires_binary(&plugin) {
-                        eprintln!(
-                            "Error: plugin archive for a CLI surface must include --binary."
-                        );
+                        eprintln!("Error: plugin archive for a CLI surface must include --binary.");
                         return ExitCode::from(2);
                     }
                     pack_plugin_v1(&plugin, &output_path)

@@ -1,6 +1,7 @@
 # Distribution and downstream consumption
 
-Elegy ships capability binaries through GitHub release assets, not through package feeds or sibling-repo workspace references. The release contract is intentionally narrow:
+Elegy ships release assets through GitHub Releases, not package feeds or
+sibling-repo workspace assumptions.
 
 - **Stable semver tags** (e.g. `v1.3.2`) are the supported downstream contract that consumers should pin.
 - **Rolling prerelease `main-snapshot`** is refreshed on every push to `main` and is intended for validation, debugging, and latest-branch integration checks. Same asset families, different lifecycle promise.
@@ -20,7 +21,8 @@ The installer only resolves those exact release targets and fails closed on unsu
 | Stable semver (e.g. `v1.3.2`) | Tagged release | Pin in downstream consumers |
 | `main-snapshot` rolling prerelease | Every push to `main` | Validation, debug, latest-branch integration |
 
-Both channels publish the same asset families. The difference is lifecycle and stability promise, not package coverage.
+Both channels publish the same asset families. The difference is lifecycle and
+stability promise.
 
 ## Asset families (conventions)
 
@@ -48,15 +50,15 @@ Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
 elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
 ```
 
-Non-plugin surfaces install via `scripts/install-distribution.sh` (legacy bash installer):
+Non-plugin surfaces install via `scripts/install-distribution.sh`:
 
 ```bash
 # Legacy flat binary install (non-plugin surfaces only)
 bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy --surface elegy-codegraph --force
 ```
 
-The bash installer is a compatibility lane for non-plugin surfaces. Plugin-packaged surfaces
-should use `elegy-plugin-packaging install` as the primary install lane.
+Plugin-packaged surfaces should use `elegy-plugin-packaging install` as the
+primary install lane.
 
 To install a surface, the surface must exist in the release assets and have a published `.sha256` sidecar. The installer verifies the downloaded asset SHA-256 before writing the executable into the destination `bin/` directory.
 
@@ -73,7 +75,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 
 ## Where to read more
 
-- Release publishing (CLI archives, aggregate artifacts, manifest, checksums): `.github/workflows/publish-orchestrator.yml`.
-- Manual metadata recovery for an existing release: `.github/workflows/release-finalize.yml`.
-- Aggregate artifacts (installer bootstrap): `.github/workflows/distribution-artifacts.yml`.
+- Release publishing: `.github/workflows/publish-orchestrator.yml`
+- Release finalize: `.github/workflows/release-finalize.yml`
+- Installer/bootstrap artifacts: `.github/workflows/distribution-artifacts.yml`
 - Authority surfaces: [`docs/architecture/ecosystem-topology.md`](./architecture/ecosystem-topology.md).

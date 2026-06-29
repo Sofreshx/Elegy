@@ -5,7 +5,6 @@ This directory contains the current architectural guidance for the Elegy repo. T
 ## Current references
 
 - [Ecosystem topology](ecosystem-topology.md) — current repo centers, dependency direction, and contributor-facing scope
-- [Rust consolidation](rust-consolidation.md) — current cleanup baseline for governed roots, exports, and Rust executable ownership
 - [Substrate governance](substrate-governance.md) — active artifact/runtime boundary and validation rules
 - [Skill Core V1](skill-core-v1.md) — current skill authority split between governed artifacts and Rust executable behavior
 - [Codex plugin projection](codex-plugin-projection.md) — optional Codex projection slice (derived adapter surface, not the primary plugin path)

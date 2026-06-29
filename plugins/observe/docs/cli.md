@@ -1,19 +1,22 @@
 # Observe CLI
 
-`elegy observe ...` is Elegy's read-only desktop and OS observation surface. It ships inside the umbrella `elegy` CLI and gives hosts a bounded subprocess interface for local inspection without turning observation into host-owned runtime authority.
+`elegy-observe` is Elegy's read-only desktop and OS observation surface. It
+gives hosts a bounded subprocess interface for local inspection without turning
+observation into host-owned runtime authority.
 
 ## What It Ships Today
 
-The current observe family is a mix of snapshot commands plus one bounded recorder command:
+The current observe family is a mix of snapshot commands plus one bounded
+recorder command:
 
-- `elegy observe processes`
-- `elegy observe window`
-- `elegy observe windows`
-- `elegy observe screen`
-- `elegy observe clipboard`
-- `elegy observe filesystem`
-- `elegy observe system`
-- `elegy observe record`
+- `elegy-observe processes`
+- `elegy-observe window`
+- `elegy-observe windows`
+- `elegy-observe screen`
+- `elegy-observe clipboard`
+- `elegy-observe filesystem`
+- `elegy-observe system`
+- `elegy-observe record`
 
 All commands support `--json` machine output through the standard CLI envelope.
 
@@ -21,10 +24,11 @@ All commands support `--json` machine output through the standard CLI envelope.
 
 Snapshot commands return one immediate observation result.
 
-`elegy observe record` is the current bounded recorder slice. It is a one-shot command, not a daemon or a start or stop lifecycle:
+`elegy-observe record` is the current bounded recorder slice. It is a one-shot
+command, not a daemon or a start or stop lifecycle:
 
 ```bash
-elegy observe record --duration-seconds 5 --poll-interval-ms 250 --json
+elegy-observe record --duration-seconds 5 --poll-interval-ms 250 --json
 ```
 
 Today that recorder:
@@ -42,7 +46,8 @@ This is the intended MVP shape for downstream hosts such as Holon that need one 
 
 Most observe commands return an `ObserveResult` envelope payload.
 
-`elegy observe record --json` is the exception because it returns a governed observation artifact:
+`elegy-observe record --json` is the exception because it returns a governed
+observation artifact:
 
 - `status: "ok"`
 - `dataSchema: "https://elegy/plugins/observe/schemas/observation-session.schema.json"`
@@ -69,35 +74,27 @@ Minimal governed examples live in:
 
 ## Install And Distribution
 
-`observe` does not have its own dedicated binary. It is part of the umbrella `elegy` CLI archive described in `docs/distribution.md`.
+`observe` ships as the dedicated `elegy-observe` binary.
 
 Typical local development flow:
 
 ```bash
-cd rust
-cargo run -p elegy-cli -- observe system --json
-cargo run -p elegy-cli -- observe record --duration-seconds 1 --poll-interval-ms 50 --json
+cargo run -p elegy-observe -- system --json
+cargo run -p elegy-observe -- record --duration-seconds 1 --poll-interval-ms 50 --json
 ```
 
 Typical downstream consumption flow:
 
-- install the umbrella `elegy-cli-<cliVersion>-<target>.zip` asset
-- resolve the extracted `elegy` executable directly
-- keep governed contract consumption anchored to the installed `contracts/` directory
+- install `elegy-observe` or the plugin archive that carries it
+- resolve the extracted `elegy-observe` executable directly
+- keep governed contract consumption anchored to the installed bundle
 
 ## Discovery Surface
 
-The governed discovery authority for this surface is `plugins/observe/fixtures/skill.elegy-observe.json`.
+The governed discovery authority for this surface is the observe plugin's
+`SKILL.md` and fixtures. Repo-local inspection can use:
 
-Hosts should prefer:
-
-- `elegy agent check --json`
-- `elegy agent manifest --json`
-- `elegy agent discover --query <task> --detail --json`
-
-Repo-local inspection can use:
-
-- `elegy skills describe --skill-id observe --json`
+- `elegy-skills describe --skill-id elegy-observe --json`
 
 ## What Is Still Missing
 
@@ -110,6 +107,6 @@ Not shipped yet:
 - host-supplied recorder session ids
 - raw event persistence as the default CLI contract
 - daemon or start/stop recorder lifecycle commands
-- a dedicated observe binary or separate recorder archive
+- a separate recorder archive
 
 Those remain deferred until there is real evidence that the bounded one-shot `observe record` lane is insufficient.

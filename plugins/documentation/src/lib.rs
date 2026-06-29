@@ -74,7 +74,7 @@ fn default_required_doc_triggers() -> Vec<String> {
         .collect()
 }
 
-/// Input for `elegy docs new ...`.
+/// Input for `elegy-documentation new ...`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct NewDocRequest {
     pub title: String,
@@ -83,7 +83,7 @@ pub struct NewDocRequest {
     pub status: Option<String>,
 }
 
-/// Result of `elegy docs init`.
+/// Result of `elegy-documentation init`.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DocsInitResult {
@@ -95,7 +95,7 @@ pub struct DocsInitResult {
     pub skipped: Vec<String>,
 }
 
-/// Result of `elegy docs new adr|spec`.
+/// Result of `elegy-documentation new adr|spec`.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DocsCreateResult {
@@ -133,7 +133,7 @@ pub struct DocsCheckIssue {
     pub message: String,
 }
 
-/// Result of `elegy docs check`.
+/// Result of `elegy-documentation check`.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DocsCheckReport {
@@ -148,7 +148,7 @@ pub struct DocsCheckReport {
     pub issues: Vec<DocsCheckIssue>,
 }
 
-/// Result of `elegy docs index`.
+/// Result of `elegy-documentation index`.
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]
 pub struct DocsIndexResult {

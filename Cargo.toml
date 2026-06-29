@@ -13,7 +13,6 @@ members = [
     "plugins/skills",
     "shared/adapter-fs",
     "shared/adapter-http",
-    "shared/agent-events",
     "shared/core",
     "shared/descriptor",
     "shared/desktop-win32",

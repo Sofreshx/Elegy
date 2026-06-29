@@ -39,7 +39,7 @@ Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the skill 
 Out of scope (follow-up work):
 
 - No dedicated Rust binary. This is a skill-only surface that wraps the user's installed Obsidian CLI.
-- New subcommands on `elegy-planning` (`obsidian mirror/attach/resolve/list`) and the mirror schemas that go with them. See `docs/research/obsidian-figma-and-vision-models-for-elegy.md` for the proposed shape.
+- New subcommands on `elegy-planning` (`obsidian mirror/attach/resolve/list`) and the mirror schemas that go with them.
 - Wiring this skill into `instruction-engine`'s own skill catalog (catalog-assets or opencode-assets). That is the consumer-repo change and belongs in a separate PR against `instruction-engine`.
 - Replacement of the third-party `obsidian-cli.exe` referenced by `instruction-engine/docs/system/obsidian-synced-notes-contract.md`. That contract governs a separate obsidian integration lane and remains non-canonical; the new skill does not change its authority.
 
@@ -121,7 +121,7 @@ Obsidian is **non-canonical**. Durable planning state continues to flow through 
    - `external-binary-dependency` — the skill shells out to the official CLI; no custom binary.
    - `non-authoritative-vault` — the skill must never be the source of truth for planning entities.
    - `no-projection-of-authority` — the skill must not write into paths that shadow planning authority (`.copilot/backlogs`, `~/.copilot/backlogs/{repo}/planning/`, etc.).
-2. In the SKILL.md and the wrapper README, mirror notes that the skill produces must carry the `ie_kind: planning-mirror` frontmatter described in `docs/research/obsidian-figma-and-vision-models-for-elegy.md`. The frontmatter is the future contract that `elegy-planning obsidian resolve` and `attach` will rely on.
+2. In the SKILL.md and the wrapper README, mirror notes that the skill produces must carry the `ie_kind: planning-mirror` frontmatter. The frontmatter is the future contract that `elegy-planning obsidian resolve` and `attach` will rely on.
 
 ## 7. Installation and consumer story
 

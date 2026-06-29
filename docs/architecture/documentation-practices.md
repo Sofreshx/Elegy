@@ -2,25 +2,15 @@
 
 ## Purpose
 
-This document defines the current central documentation doctrine for ADRs, specs,
-guides, notes, and roadmap material in the Elegy ecosystem.
+This document defines the current documentation doctrine for Elegy.
 
-The v1 posture is intentionally lean:
+## Doctrine
 
-- centralize doctrine in `elegy`
-- distribute behavior as a reusable skill package
-- use a deterministic CLI only for file creation and objective validation
-- keep subjective review with humans
-
-## Current Split
-
-The current split is:
-
-- `elegy-doc-practices/` holds the reusable instruction package, doctrine references, templates, eval fixtures, and adoption examples
-- `elegy docs ...` provides deterministic file creation, indexing, and objective validation
-- `.elegy/docs.yaml` in a consuming repo defines local ADR/spec/index paths plus narrow overrides
-
-The skill is the instructions layer. The CLI is the tool layer.
+- Keep present-state docs short and current.
+- Keep durable decisions in ADRs.
+- Keep implementation-facing behavior in specs.
+- Delete migration notes once the migration is complete.
+- Do not preserve wrong current-state docs for historical comfort.
 
 ## Document Types
 
@@ -28,29 +18,29 @@ The skill is the instructions layer. The CLI is the tool layer.
 - Spec: intended behavior plus acceptance criteria and validation
 - Guide: recurring contributor or operator instructions
 - Note: narrow local context that does not justify stronger governance
-- Roadmap: ordered future work across multiple slices
+- Roadmap: active future work only
 
 ## Placement
 
-- shared doctrine and cross-project conventions belong in `elegy`
-- product-specific ADRs and specs belong in the owning repo
-- cross-repo decisions belong centrally and should be linked locally from affected repos
-
-Do not duplicate the shared doctrine into every downstream repo.
+- Root `README.md` is the public entrypoint.
+- `docs/architecture/` holds current-state architecture guidance.
+- `docs/adr/` holds durable decisions.
+- `docs/specs/` holds implementation-facing specs.
+- Historical material should be removed once it is no longer current or required.
 
 ## CLI Scope
 
 Current commands:
 
 ```text
-elegy docs init
-elegy docs new adr --title <title>
-elegy docs new spec --title <title>
-elegy docs check
-elegy docs index
+elegy-documentation init
+elegy-documentation new adr --title <title>
+elegy-documentation new spec --title <title>
+elegy-documentation check
+elegy-documentation index
 ```
 
-The CLI validates only objective properties:
+The CLI validates objective properties only:
 
 - config shape
 - metadata presence
@@ -61,29 +51,10 @@ The CLI validates only objective properties:
 
 The CLI does not judge prose quality or architectural correctness.
 
-## Enforcement Phases
+## Review Rules
 
-Phase 1:
-
-- PR checklist
-- contributor instructions for documentation impact review
-
-Phase 2:
-
-- non-blocking `elegy docs check` in CI
-
-Phase 3:
-
-- blocking CI only for objective failures and explicitly configured high-impact changes
-
-Do not block automatically on subjective document quality.
-
-## Adoption
-
-Consumer repos such as `holon` and `elegy-copilot` should:
-
-1. reference the shared `elegy-doc-practices` skill
-2. define only local path and trigger overrides in `.elegy/docs.yaml`
-3. keep product ADRs and specs local unless the decision is cross-repo
-
-See `elegy-doc-practices/adoption/` for copy-paste snippets.
+- Prefer one canonical current-state doc over multiple overlapping summaries.
+- Prefer links over repeated policy text.
+- Remove stale paths, stale binary names, and stale migration framing in the
+  same change that makes them obsolete.
+- Run `elegy-documentation check --project .` after documentation changes.

@@ -22,10 +22,7 @@ pub enum SkillsSurfaceError {
     #[error("skill registry contract error: {0}")]
     Contracts(#[from] ContractsError),
     #[error("plugin manifest at {path} is invalid: {issues:?}")]
-    InvalidPluginManifest {
-        path: PathBuf,
-        issues: Vec<String>,
-    },
+    InvalidPluginManifest { path: PathBuf, issues: Vec<String> },
     #[error("duplicate skill ID '{id}' found at {first_path} and {second_path}")]
     DuplicateSkillId {
         id: String,
@@ -76,6 +73,7 @@ struct LoadedSkill {
     summary: RegistrySkillSummary,
     frontmatter: AgentSkillFrontmatter,
     path: PathBuf,
+    #[allow(dead_code)]
     provenance: SkillProvenance,
 }
 
@@ -167,13 +165,12 @@ impl SkillRegistry {
                         path: manifest_path.clone(),
                         source: e,
                     })?;
-                let plugin: ElegyPluginV1 =
-                    serde_json::from_str(&raw).map_err(|e| {
-                        SkillsSurfaceError::PluginManifestJson {
-                            path: manifest_path.clone(),
-                            source: e,
-                        }
-                    })?;
+                let plugin: ElegyPluginV1 = serde_json::from_str(&raw).map_err(|e| {
+                    SkillsSurfaceError::PluginManifestJson {
+                        path: manifest_path.clone(),
+                        source: e,
+                    }
+                })?;
                 let validation = validate_elegy_plugin_v1(&plugin);
                 if !validation.is_valid() {
                     return Err(SkillsSurfaceError::InvalidPluginManifest {
@@ -198,11 +195,10 @@ impl SkillRegistry {
         }
 
         // ── Phase 2: Standalone root skill discovery ────────────────────
-        let root_entries =
-            fs::read_dir(&repo_root).map_err(|e| SkillsSurfaceError::Io {
-                path: repo_root.clone(),
-                source: e,
-            })?;
+        let root_entries = fs::read_dir(&repo_root).map_err(|e| SkillsSurfaceError::Io {
+            path: repo_root.clone(),
+            source: e,
+        })?;
 
         for entry in root_entries.flatten() {
             let dir = entry.path();

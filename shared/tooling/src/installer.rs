@@ -1,4 +1,4 @@
-use elegy_plugin_sdk::{ElegyPluginV1, validate_elegy_plugin_v1};
+use elegy_plugin_sdk::{validate_elegy_plugin_v1, ElegyPluginV1};
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::io::{self, Read};
@@ -36,7 +36,11 @@ impl std::fmt::Display for InstallError {
             Self::InvalidManifest(msg) => write!(f, "Invalid plugin manifest: {msg}"),
             Self::MissingManifest => write!(f, "Plugin archive missing plugin.json"),
             Self::AlreadyInstalled { name, path } => {
-                write!(f, "Plugin '{name}' is already installed at {}", path.display())
+                write!(
+                    f,
+                    "Plugin '{name}' is already installed at {}",
+                    path.display()
+                )
             }
             Self::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
         }
@@ -80,10 +84,7 @@ pub fn install_from_archive(
         let name = archive.by_index(i)?.name().to_string();
         if name == "plugin.json" || name.ends_with("/plugin.json") {
             let mut content = String::new();
-            archive
-                .by_index(i)?
-                .read_to_string(&mut content)
-                .map_err(std::io::Error::from)?;
+            archive.by_index(i)?.read_to_string(&mut content)?;
             let plugin: ElegyPluginV1 = serde_json::from_str(&content)
                 .map_err(|e| InstallError::InvalidManifest(format!("JSON parse: {e}")))?;
             let validation = validate_elegy_plugin_v1(&plugin);
@@ -124,8 +125,8 @@ pub fn install_from_archive(
             continue;
         }
 
-        let relative_path = validate_archive_entry_path(&entry_name)
-            .map_err(InstallError::InvalidManifest)?;
+        let relative_path =
+            validate_archive_entry_path(&entry_name).map_err(InstallError::InvalidManifest)?;
         let dest_path = install_dir.join(&relative_path);
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent)?;
@@ -156,12 +157,9 @@ pub fn install_from_archive(
 
 /// Install a plugin from a URL (download then delegate to install_from_archive).
 #[cfg(feature = "reqwest")]
-pub fn install_from_url(
-    url: &str,
-    install_root: &Path,
-) -> Result<InstallReceipt, InstallError> {
-    let response = reqwest::blocking::get(url)
-        .map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
+pub fn install_from_url(url: &str, install_root: &Path) -> Result<InstallReceipt, InstallError> {
+    let response =
+        reqwest::blocking::get(url).map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
     if !response.status().is_success() {
         return Err(InstallError::DownloadFailed(format!(
             "HTTP {}",
@@ -180,10 +178,7 @@ pub fn install_from_url(
 
 /// Stub for URL install when reqwest feature is not enabled.
 #[cfg(not(feature = "reqwest"))]
-pub fn install_from_url(
-    _url: &str,
-    _install_root: &Path,
-) -> Result<InstallReceipt, InstallError> {
+pub fn install_from_url(_url: &str, _install_root: &Path) -> Result<InstallReceipt, InstallError> {
     Err(InstallError::DownloadFailed(
         "URL install requires the 'reqwest' feature. Rebuild with --features reqwest.".into(),
     ))
@@ -243,7 +238,9 @@ fn validate_archive_entry_path(entry_name: &str) -> Result<PathBuf, String> {
             Component::Normal(part) => normalized.push(part),
             Component::CurDir => {}
             Component::ParentDir => {
-                return Err(format!("archive entry '{entry_name}' escapes the install root"));
+                return Err(format!(
+                    "archive entry '{entry_name}' escapes the install root"
+                ));
             }
             Component::RootDir | Component::Prefix(_) => {
                 return Err(format!("archive entry '{entry_name}' is absolute"));

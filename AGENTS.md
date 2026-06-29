@@ -39,6 +39,7 @@ authority surface.
 - Create or update specs for implementation-facing behavior, acceptance criteria, and validation evidence.
 - Use `elegy-documentation inspect/map/check --project . --json` for authority-aware documentation inspection and objective validation.
 - Objective docs validation does not prove prose quality or architecture correctness; still inspect reasoning and authority boundaries manually.
+- Keep harness files thin. Root `AGENTS.md` is the repo authority; other harness instruction files should mostly point back here.
 
 ## Validation
 
