@@ -2,7 +2,7 @@
 // Self-contained SDK for building Elegy plugin repositories.
 // Zero internal Elegy workspace dependencies.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
@@ -140,15 +140,152 @@ pub struct ElegyPluginV1Author {
 /// Codex-specific extension metadata under `extensions["codex.plugin/v1"]`.
 /// Declares host-specific fields that do not belong in the base manifest.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
-#[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[serde(rename_all = "camelCase")]
 pub struct CodexPluginExtensionV1 {
     pub schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<CodexPluginInterface>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub apps: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hooks: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_servers: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundled_content_variant: Option<String>,
     /// Relative path(s) to additional non-skill assets to include in the Codex export.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub assets: Option<Vec<String>>,
     /// Relative path to the plugin's binary within the plugin package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub binary: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexPluginInterface {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub short_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub long_description: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub developer_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub category: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capabilities: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub website_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub privacy_policy_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terms_of_service_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_prompt: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub composer_icon: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub logo: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screenshots: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub brand_color: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexPluginManifest {
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<ElegyPluginV1Author>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub apps: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hooks: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_servers: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<CodexPluginInterface>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub bundled_content_variant: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binary: Option<String>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct CodexAppsFile {
+    #[serde(default)]
+    pub apps: BTreeMap<String, CodexAppReference>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexAppReference {
+    pub id: String,
+    #[serde(default)]
+    pub required: bool,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+pub struct CodexHooksConfig {
+    #[serde(default)]
+    pub hooks: BTreeMap<String, Vec<CodexHookMatcher>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexHookMatcher {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub matcher: Option<String>,
+    #[serde(default)]
+    pub hooks: Vec<CodexHookHandler>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct CodexHookHandler {
+    #[serde(rename = "type")]
+    pub handler_type: String,
+    pub command: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub command_windows: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub timeout: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status_message: Option<String>,
+    #[serde(
+        default,
+        rename = "async",
+        alias = "async_",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub async_: Option<bool>,
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
 }
 
 /// Extract the `codex.plugin/v1` extension from a plugin manifest's extensions map.
@@ -262,10 +399,89 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
                     }
                 }
             }
+
+            if let Some(codex_ext) = extract_codex_extension_v1(&plugin.extensions) {
+                validate_codex_extension_v1(&codex_ext, &mut issues);
+            }
         }
     }
 
     ElegyPluginV1ValidationResult { issues }
+}
+
+fn validate_codex_extension_v1(codex_ext: &CodexPluginExtensionV1, issues: &mut Vec<String>) {
+    if codex_ext.schema_version.trim().is_empty() {
+        issues.push("codex.plugin/v1 extension schemaVersion must not be empty.".into());
+    }
+
+    for (field_name, path) in [
+        ("extensions.codex.plugin/v1.apps", &codex_ext.apps),
+        ("extensions.codex.plugin/v1.hooks", &codex_ext.hooks),
+        (
+            "extensions.codex.plugin/v1.mcpServers",
+            &codex_ext.mcp_servers,
+        ),
+        ("extensions.codex.plugin/v1.binary", &codex_ext.binary),
+    ] {
+        if let Some(path) = path {
+            if !is_safe_package_relative_path(path) {
+                issues.push(format!(
+                    "{field_name} path '{path}' is not a safe package-relative path.",
+                ));
+            }
+        }
+    }
+
+    if let Some(assets) = &codex_ext.assets {
+        for asset in assets {
+            if !is_safe_package_relative_path(asset) {
+                issues.push(format!(
+                    "extensions.codex.plugin/v1.assets path '{asset}' is not a safe package-relative path.",
+                ));
+            }
+        }
+    }
+
+    if let Some(interface) = &codex_ext.interface {
+        validate_codex_interface_paths(interface, issues);
+        for (field, value) in [
+            ("interface.websiteURL", &interface.website_url),
+            ("interface.privacyPolicyURL", &interface.privacy_policy_url),
+            (
+                "interface.termsOfServiceURL",
+                &interface.terms_of_service_url,
+            ),
+        ] {
+            if let Some(value) = value {
+                validate_uri(field, value, issues);
+            }
+        }
+    }
+}
+
+fn validate_codex_interface_paths(interface: &CodexPluginInterface, issues: &mut Vec<String>) {
+    for (field_name, path) in [
+        ("interface.composerIcon", &interface.composer_icon),
+        ("interface.logo", &interface.logo),
+    ] {
+        if let Some(path) = path {
+            if !is_safe_package_relative_path(path) && !path_is_uri(path) {
+                issues.push(format!(
+                    "{field_name} path '{path}' is not a safe package-relative path or URI.",
+                ));
+            }
+        }
+    }
+
+    if let Some(screenshots) = &interface.screenshots {
+        for screenshot in screenshots {
+            if !is_safe_package_relative_path(screenshot) && !path_is_uri(screenshot) {
+                issues.push(format!(
+                    "interface.screenshots path '{screenshot}' is not a safe package-relative path or URI.",
+                ));
+            }
+        }
+    }
 }
 
 pub fn validate_plugin_mcp_tool_references(
@@ -273,6 +489,61 @@ pub fn validate_plugin_mcp_tool_references(
     _plugin_root: &Path,
 ) -> Vec<String> {
     Vec::new()
+}
+
+pub fn import_codex_plugin_v1(codex_plugin_path: &Path) -> Result<ElegyPluginV1, ToolingError> {
+    let (package_root, manifest_path) = resolve_codex_plugin_root(codex_plugin_path)?;
+    let raw = fs::read_to_string(&manifest_path).map_err(|e| ToolingError::Io {
+        operation: "read",
+        path: manifest_path.clone(),
+        source: e,
+    })?;
+    let codex: CodexPluginManifest =
+        serde_json::from_str(&raw).map_err(|e| ToolingError::Json {
+            path: manifest_path,
+            source: e,
+        })?;
+
+    let mut codex_ext = CodexPluginExtensionV1 {
+        schema_version: "codex.plugin/v1".to_string(),
+        homepage: codex.homepage,
+        keywords: codex.keywords,
+        interface: codex.interface,
+        apps: codex.apps,
+        hooks: codex.hooks,
+        mcp_servers: codex.mcp_servers,
+        bundled_content_variant: codex.bundled_content_variant,
+        binary: codex.binary,
+        extra: codex.extra,
+        ..CodexPluginExtensionV1::default()
+    };
+
+    let assets = collect_codex_interface_assets(&package_root, &codex_ext.interface);
+    if !assets.is_empty() {
+        codex_ext.assets = Some(assets);
+    }
+
+    let mut extensions = serde_json::Map::new();
+    extensions.insert(
+        "codex.plugin/v1".to_string(),
+        serde_json::to_value(codex_ext).map_err(|source| ToolingError::Json {
+            path: PathBuf::from("codex.plugin/v1"),
+            source,
+        })?,
+    );
+
+    Ok(ElegyPluginV1 {
+        schema_version: ELEGY_PLUGIN_V1_SCHEMA_VERSION.to_string(),
+        name: codex.name,
+        version: codex.version,
+        description: codex.description,
+        author: codex.author,
+        license: codex.license,
+        repository: codex.repository,
+        skills: codex.skills,
+        mcp_servers: None,
+        extensions: Some(extensions),
+    })
 }
 
 // ── Agent Skill Frontmatter ───────────────────────────────────────────────
@@ -400,6 +671,52 @@ pub fn validate_uri(field: &str, value: &str, issues: &mut Vec<String>) {
         Ok(url) if !url.scheme().is_empty() => {}
         _ => issues.push(format!("{field} must be a valid URI.")),
     }
+}
+
+fn path_is_uri(value: &str) -> bool {
+    url::Url::parse(value).is_ok()
+}
+
+fn collect_codex_interface_assets(
+    package_root: &Path,
+    interface: &Option<CodexPluginInterface>,
+) -> Vec<String> {
+    let Some(interface) = interface else {
+        return Vec::new();
+    };
+
+    let mut assets = BTreeSet::new();
+    for path in [&interface.composer_icon, &interface.logo]
+        .into_iter()
+        .flatten()
+    {
+        add_existing_relative_asset(package_root, path, &mut assets);
+    }
+    if let Some(screenshots) = &interface.screenshots {
+        for screenshot in screenshots {
+            add_existing_relative_asset(package_root, screenshot, &mut assets);
+        }
+    }
+
+    assets.into_iter().collect()
+}
+
+fn add_existing_relative_asset(package_root: &Path, path: &str, assets: &mut BTreeSet<String>) {
+    if path_is_uri(path) || !is_safe_package_relative_path(path) {
+        return;
+    }
+    let normalized = normalize_package_relative_path(path);
+    if package_root.join(&normalized).exists() {
+        assets.insert(normalized);
+    }
+}
+
+fn normalize_package_relative_path(path: &str) -> String {
+    path.strip_prefix("./").unwrap_or(path).replace('\\', "/")
+}
+
+fn resolve_package_path(package_root: &Path, path: &str) -> PathBuf {
+    package_root.join(normalize_package_relative_path(path))
 }
 
 // ── CLI Machine Envelope types ────────────────────────────────────────────
@@ -990,6 +1307,51 @@ pub fn resolve_plugin_root(plugin_path: &Path) -> Result<(PathBuf, PathBuf), Too
     }
 }
 
+fn resolve_codex_plugin_root(plugin_path: &Path) -> Result<(PathBuf, PathBuf), ToolingError> {
+    if plugin_path.is_file() && plugin_path.file_name().is_some_and(|n| n == "plugin.json") {
+        let manifest = plugin_path.to_path_buf();
+        let repo_root = plugin_path
+            .parent()
+            .and_then(|p| p.parent())
+            .map(Path::to_path_buf)
+            .ok_or_else(|| ToolingError::Io {
+                operation: "resolve parent",
+                path: plugin_path.to_path_buf(),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::InvalidInput,
+                    "plugin.json must be inside .codex-plugin",
+                ),
+            })?;
+        return Ok((repo_root, manifest));
+    }
+
+    if plugin_path.is_dir()
+        && plugin_path
+            .file_name()
+            .is_some_and(|n| n == ".codex-plugin")
+    {
+        let manifest = plugin_path.join("plugin.json");
+        if manifest.exists() {
+            let repo_root = plugin_path.parent().unwrap_or(Path::new(".")).to_path_buf();
+            return Ok((repo_root, manifest));
+        }
+    }
+
+    let manifest = plugin_path.join(".codex-plugin").join("plugin.json");
+    if manifest.exists() {
+        return Ok((plugin_path.to_path_buf(), manifest));
+    }
+
+    Err(ToolingError::Io {
+        operation: "resolve Codex plugin",
+        path: plugin_path.to_path_buf(),
+        source: std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "could not find .codex-plugin/plugin.json",
+        ),
+    })
+}
+
 /// Resolve plugin root and load the ElegyPluginV1 manifest.
 pub fn resolve_and_load_plugin_v1(
     plugin_path: &Path,
@@ -1577,6 +1939,12 @@ pub struct PluginV1VerifyResult {
     pub skill_count: usize,
     pub has_mcp: bool,
     pub mcp_server_count: usize,
+    pub has_apps: bool,
+    pub app_count: usize,
+    pub has_hooks: bool,
+    pub hook_event_count: usize,
+    pub has_codex_interface: bool,
+    pub has_codex_mcp_servers: bool,
     pub issues: Vec<String>,
 }
 
@@ -1670,6 +2038,70 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
         (false, 0)
     };
 
+    let codex_ext = extract_codex_extension_v1(&plugin.extensions);
+    let (has_apps, app_count) =
+        if let Some(apps_path) = codex_ext.as_ref().and_then(|ext| ext.apps.as_ref()) {
+            let apps_file_path = resolve_package_path(package_root, apps_path);
+            match load_codex_apps_file(&apps_file_path) {
+                Ok(apps_file) => {
+                    for issue in validate_codex_apps_file(&apps_file) {
+                        issues.push(format!("apps file '{}': {issue}", apps_path));
+                    }
+                    (true, apps_file.apps.len())
+                }
+                Err(err) => {
+                    issues.push(format!("apps file '{}' is invalid: {err}", apps_path));
+                    (false, 0)
+                }
+            }
+        } else {
+            (false, 0)
+        };
+
+    let (has_hooks, hook_event_count) =
+        if let Some(hooks_path) = codex_ext.as_ref().and_then(|ext| ext.hooks.as_ref()) {
+            let hooks_file_path = resolve_package_path(package_root, hooks_path);
+            match load_codex_hooks_config(&hooks_file_path) {
+                Ok(hooks_config) => {
+                    for issue in validate_codex_hooks_config(&hooks_config) {
+                        issues.push(format!("hooks file '{}': {issue}", hooks_path));
+                    }
+                    (true, hooks_config.hooks.len())
+                }
+                Err(err) => {
+                    issues.push(format!("hooks file '{}' is invalid: {err}", hooks_path));
+                    (false, 0)
+                }
+            }
+        } else {
+            let default_hooks_path = package_root.join("hooks").join("hooks.json");
+            if default_hooks_path.exists() {
+                match load_codex_hooks_config(&default_hooks_path) {
+                    Ok(hooks_config) => {
+                        for issue in validate_codex_hooks_config(&hooks_config) {
+                            issues.push(format!("hooks/hooks.json: {issue}"));
+                        }
+                        (true, hooks_config.hooks.len())
+                    }
+                    Err(err) => {
+                        issues.push(format!("hooks/hooks.json is invalid: {err}"));
+                        (false, 0)
+                    }
+                }
+            } else {
+                (false, 0)
+            }
+        };
+
+    let has_codex_interface = codex_ext
+        .as_ref()
+        .and_then(|ext| ext.interface.as_ref())
+        .is_some();
+    let has_codex_mcp_servers = codex_ext
+        .as_ref()
+        .and_then(|ext| ext.mcp_servers.as_ref())
+        .is_some();
+
     Ok(PluginV1VerifyResult {
         valid: manifest_valid && issues.is_empty(),
         plugin_name: plugin.name,
@@ -1678,6 +2110,12 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
         skill_count,
         has_mcp,
         mcp_server_count,
+        has_apps,
+        app_count,
+        has_hooks,
+        hook_event_count,
+        has_codex_interface,
+        has_codex_mcp_servers,
         issues,
     })
 }
@@ -1694,6 +2132,7 @@ pub fn inspect_plugin_v1(package_dir: &Path) -> Result<serde_json::Value, Toolin
         path: plugin_path,
         source: e,
     })?;
+    let codex_ext = extract_codex_extension_v1(&plugin.extensions);
 
     Ok(serde_json::json!({
         "schemaVersion": plugin.schema_version,
@@ -1709,6 +2148,10 @@ pub fn inspect_plugin_v1(package_dir: &Path) -> Result<serde_json::Value, Toolin
         "repository": plugin.repository,
         "hasSkills": plugin.skills.is_some(),
         "hasMcpServers": plugin.mcp_servers.is_some(),
+        "hasCodexApps": codex_ext.as_ref().and_then(|e| e.apps.as_ref()).is_some(),
+        "hasCodexHooks": codex_ext.as_ref().and_then(|e| e.hooks.as_ref()).is_some(),
+        "hasCodexInterface": codex_ext.as_ref().and_then(|e| e.interface.as_ref()).is_some(),
+        "hasCodexMcpServers": codex_ext.as_ref().and_then(|e| e.mcp_servers.as_ref()).is_some(),
         "extensionKeys": plugin.extensions.as_ref().map(|e| e.keys().collect::<Vec<_>>()),
     }))
 }
@@ -1740,6 +2183,8 @@ pub fn export_plugin_v1(
     let mut written_files = Vec::new();
     let mut skills_count = 0usize;
     let mut mcp_servers_emitted = false;
+    let mut apps_emitted = false;
+    let mut hooks_emitted = false;
 
     // Determine host-specific output layout
     let (host_skills_dir, needs_codex_manifest, needs_claude_manifest) = match host {
@@ -1828,24 +2273,67 @@ pub fn export_plugin_v1(
     // Copy Codex-specific assets if present
     if host == "codex" {
         if let Some(ref ext) = codex_ext {
+            if let Some(ref apps_path) = ext.apps {
+                let apps_src = resolve_package_path(&package_root, apps_path);
+                let apps_dest = output_dir.join(normalize_package_relative_path(apps_path));
+                copy_file_component(&apps_src, &apps_dest, overwrite)?;
+                written_files.push(display_path(&apps_dest));
+                apps_emitted = true;
+            }
+
+            if let Some(ref hooks_path) = ext.hooks {
+                let hooks_src = resolve_package_path(&package_root, hooks_path);
+                let hooks_dest = output_dir.join(normalize_package_relative_path(hooks_path));
+                copy_file_component(&hooks_src, &hooks_dest, overwrite)?;
+                written_files.push(display_path(&hooks_dest));
+                hooks_emitted = true;
+            } else {
+                let default_hooks_src = package_root.join("hooks").join("hooks.json");
+                if default_hooks_src.exists() {
+                    let default_hooks_dest = output_dir.join("hooks").join("hooks.json");
+                    copy_file_component(&default_hooks_src, &default_hooks_dest, overwrite)?;
+                    written_files.push(display_path(&default_hooks_dest));
+                    hooks_emitted = true;
+                }
+            }
+
+            if let Some(ref mcp_path) = ext.mcp_servers {
+                let mcp_src = resolve_package_path(&package_root, mcp_path);
+                let mcp_dest = output_dir.join(normalize_package_relative_path(mcp_path));
+                if mcp_src.is_dir() {
+                    if mcp_dest.exists() && !overwrite {
+                        return Err(ToolingError::OutputExists { path: mcp_dest });
+                    }
+                    copy_dir_all(&mcp_src, &mcp_dest)?;
+                    if let Ok(walked) = walk_dir_files(&mcp_dest) {
+                        for f in walked {
+                            written_files.push(display_path(&f));
+                        }
+                    }
+                } else {
+                    copy_file_component(&mcp_src, &mcp_dest, overwrite)?;
+                    written_files.push(display_path(&mcp_dest));
+                }
+                mcp_servers_emitted = true;
+            }
+
             if let Some(ref assets) = ext.assets {
                 for asset_rel in assets {
-                    let asset_src = package_root.join(asset_rel);
-                    let asset_dest = output_dir.join(asset_rel);
+                    let asset_src = resolve_package_path(&package_root, asset_rel);
+                    let asset_dest = output_dir.join(normalize_package_relative_path(asset_rel));
                     if asset_src.exists() {
-                        if let Some(parent) = asset_dest.parent() {
-                            fs::create_dir_all(parent).map_err(|e| ToolingError::Io {
-                                operation: "create directory",
-                                path: parent.to_path_buf(),
-                                source: e,
-                            })?;
-                        }
-                        if asset_src.is_file() {
-                            fs::copy(&asset_src, &asset_dest).map_err(|e| ToolingError::Io {
-                                operation: "copy",
-                                path: asset_src.clone(),
-                                source: e,
-                            })?;
+                        if asset_src.is_dir() {
+                            if asset_dest.exists() && !overwrite {
+                                return Err(ToolingError::OutputExists { path: asset_dest });
+                            }
+                            copy_dir_all(&asset_src, &asset_dest)?;
+                            if let Ok(walked) = walk_dir_files(&asset_dest) {
+                                for f in walked {
+                                    written_files.push(display_path(&f));
+                                }
+                            }
+                        } else if asset_src.is_file() {
+                            copy_file_component(&asset_src, &asset_dest, overwrite)?;
                             written_files.push(display_path(&asset_dest));
                         }
                     }
@@ -1872,8 +2360,40 @@ pub fn export_plugin_v1(
             "skills": "./skills",
         });
         if let Some(ref ext) = codex_ext {
+            if let Some(ref homepage) = ext.homepage {
+                codex_manifest["homepage"] = serde_json::json!(homepage);
+            }
+            if let Some(ref keywords) = ext.keywords {
+                codex_manifest["keywords"] = serde_json::json!(keywords);
+            }
+            if let Some(ref apps) = ext.apps {
+                codex_manifest["apps"] = serde_json::json!(apps);
+            }
+            if let Some(ref hooks) = ext.hooks {
+                codex_manifest["hooks"] = serde_json::json!(hooks);
+            } else if hooks_emitted {
+                codex_manifest["hooks"] = serde_json::json!("./hooks/hooks.json");
+            }
+            if let Some(ref mcp_servers) = ext.mcp_servers {
+                codex_manifest["mcpServers"] = serde_json::json!(mcp_servers);
+            }
+            if let Some(ref interface) = ext.interface {
+                codex_manifest["interface"] =
+                    serde_json::to_value(interface).map_err(|source| ToolingError::Json {
+                        path: PathBuf::from("codex.plugin/v1.interface"),
+                        source,
+                    })?;
+            }
+            if let Some(ref variant) = ext.bundled_content_variant {
+                codex_manifest["bundledContentVariant"] = serde_json::json!(variant);
+            }
             if let Some(ref binary) = ext.binary {
                 codex_manifest["binary"] = serde_json::json!(binary);
+            }
+            for (key, value) in &ext.extra {
+                if !codex_manifest.get(key).is_some() {
+                    codex_manifest[key] = value.clone();
+                }
             }
         }
         let manifest_path = manifest_dir.join("plugin.json");
@@ -1912,9 +2432,9 @@ pub fn export_plugin_v1(
             },
             skills_dir: host.to_string(),
             skills_count,
-            apps_emitted: false,
+            apps_emitted,
             mcp_servers_emitted,
-            hooks_emitted: false,
+            hooks_emitted,
         },
         written_files,
     })
@@ -1952,6 +2472,29 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), ToolingError> {
             })?;
         }
     }
+    Ok(())
+}
+
+fn copy_file_component(src: &Path, dst: &Path, overwrite: bool) -> Result<(), ToolingError> {
+    if dst.exists() && !overwrite {
+        return Err(ToolingError::OutputExists {
+            path: dst.to_path_buf(),
+        });
+    }
+
+    if let Some(parent) = dst.parent() {
+        fs::create_dir_all(parent).map_err(|e| ToolingError::Io {
+            operation: "create directory",
+            path: parent.to_path_buf(),
+            source: e,
+        })?;
+    }
+
+    fs::copy(src, dst).map_err(|e| ToolingError::Io {
+        operation: "copy",
+        path: src.to_path_buf(),
+        source: e,
+    })?;
     Ok(())
 }
 
@@ -2021,6 +2564,7 @@ pub fn pack_plugin_v1_with_binary(
         path: manifest_path.clone(),
         source: e,
     })?;
+    let codex_ext = extract_codex_extension_v1(&plugin.extensions);
 
     // Collect all files to include
     let mut entries: Vec<(PathBuf, String)> = Vec::new();
@@ -2035,13 +2579,26 @@ pub fn pack_plugin_v1_with_binary(
         .collect();
 
     for root_str in &component_roots {
-        let root_path = if let Some(stripped) = root_str.strip_prefix("./") {
-            repo_root.join(stripped)
-        } else {
-            repo_root.join(root_str)
-        };
-        if root_path.exists() && root_path.is_dir() {
-            collect_files_recursive(&repo_root, &root_path, &mut entries)?;
+        collect_component_path(&repo_root, root_str, &mut entries)?;
+    }
+
+    if let Some(ext) = &codex_ext {
+        for path in [&ext.apps, &ext.hooks, &ext.mcp_servers]
+            .into_iter()
+            .flatten()
+        {
+            collect_component_path(&repo_root, path, &mut entries)?;
+        }
+        if ext.hooks.is_none() {
+            let default_hooks = repo_root.join("hooks").join("hooks.json");
+            if default_hooks.exists() {
+                entries.push((default_hooks, "hooks/hooks.json".to_string()));
+            }
+        }
+        if let Some(assets) = &ext.assets {
+            for asset in assets {
+                collect_component_path(&repo_root, asset, &mut entries)?;
+            }
         }
     }
 
@@ -2061,6 +2618,7 @@ pub fn pack_plugin_v1_with_binary(
 
     // Sort for deterministic archives
     entries.sort_by(|a, b| a.1.cmp(&b.1));
+    entries.dedup_by(|a, b| a.1 == b.1);
 
     // Create the zip archive
     let file = fs::File::create(output_zip).map_err(|source| ToolingError::Io {
@@ -2154,6 +2712,21 @@ fn collect_files_recursive(
     Ok(())
 }
 
+fn collect_component_path(
+    repo_root: &Path,
+    component_path: &str,
+    entries: &mut Vec<(PathBuf, String)>,
+) -> Result<(), ToolingError> {
+    let normalized = normalize_package_relative_path(component_path);
+    let path = repo_root.join(&normalized);
+    if path.is_dir() {
+        collect_files_recursive(repo_root, &path, entries)?;
+    } else if path.is_file() {
+        entries.push((path, normalized));
+    }
+    Ok(())
+}
+
 /// Check if a relative path should be excluded from the plugin archive.
 fn should_exclude_from_pack(relative_str: &str) -> bool {
     let parts: Vec<&str> = relative_str.split('/').collect();
@@ -2227,6 +2800,105 @@ fn load_mcp_descriptor_file(path: &Path) -> Result<McpServerDescriptor, ToolingE
     Ok(descriptor)
 }
 
+fn load_codex_apps_file(path: &Path) -> Result<CodexAppsFile, ToolingError> {
+    let content = fs::read_to_string(path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: path.to_path_buf(),
+        source,
+    })?;
+
+    serde_json::from_str::<CodexAppsFile>(&content).map_err(|source| ToolingError::Json {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn validate_codex_apps_file(apps_file: &CodexAppsFile) -> Vec<String> {
+    let mut issues = Vec::new();
+    if apps_file.apps.is_empty() {
+        issues.push("apps must contain at least one connector reference.".to_string());
+    }
+    for (app_name, app_ref) in &apps_file.apps {
+        if !validate_codex_app_key(app_name) {
+            issues.push(format!(
+                "app key '{app_name}' must use lowercase letters, digits, hyphens, or underscores."
+            ));
+        }
+        if app_ref.id.trim().is_empty() {
+            issues.push(format!("app '{app_name}' id must not be empty."));
+        }
+    }
+    issues
+}
+
+fn validate_codex_app_key(name: &str) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    let bytes = name.as_bytes();
+    if !bytes[0].is_ascii_lowercase() {
+        return false;
+    }
+    bytes
+        .iter()
+        .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-' || *b == b'_')
+}
+
+fn load_codex_hooks_config(path: &Path) -> Result<CodexHooksConfig, ToolingError> {
+    let content = fs::read_to_string(path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: path.to_path_buf(),
+        source,
+    })?;
+
+    serde_json::from_str::<CodexHooksConfig>(&content).map_err(|source| ToolingError::Json {
+        path: path.to_path_buf(),
+        source,
+    })
+}
+
+fn validate_codex_hooks_config(hooks_config: &CodexHooksConfig) -> Vec<String> {
+    let mut issues = Vec::new();
+    if hooks_config.hooks.is_empty() {
+        issues.push("hooks must contain at least one event.".to_string());
+    }
+    for (event_name, matchers) in &hooks_config.hooks {
+        if event_name.trim().is_empty() {
+            issues.push("hook event name must not be empty.".to_string());
+        }
+        if matchers.is_empty() {
+            issues.push(format!(
+                "hook event '{event_name}' must contain at least one matcher group."
+            ));
+        }
+        for matcher in matchers {
+            if matcher.hooks.is_empty() {
+                issues.push(format!(
+                    "hook event '{event_name}' matcher group must contain at least one handler."
+                ));
+            }
+            for handler in &matcher.hooks {
+                if handler.handler_type.trim().is_empty() {
+                    issues.push(format!(
+                        "hook event '{event_name}' handler type must not be empty."
+                    ));
+                } else if handler.handler_type != "command" {
+                    issues.push(format!(
+                        "hook event '{event_name}' handler type '{}' is not supported; use 'command'.",
+                        handler.handler_type
+                    ));
+                }
+                if handler.command.trim().is_empty() {
+                    issues.push(format!(
+                        "hook event '{event_name}' command must not be empty."
+                    ));
+                }
+            }
+        }
+    }
+    issues
+}
+
 fn descriptor_validation_issues(descriptor: &McpServerDescriptor) -> Vec<String> {
     validate_mcp_server_descriptor(descriptor).issues
 }
@@ -2292,10 +2964,10 @@ pub(crate) fn display_path(path: &Path) -> String {
 mod tests {
     use super::{
         analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, export_plugin_v1,
-        generate_skills_from_descriptor_file, inspect_plugin_v1, pack_plugin_v1_with_binary,
-        scaffold_plugin_v1_repository, verify_plugin_v1, AuthorMcpDescriptorRequest,
-        AuthorMcpToolRequest, McpServerDescriptor, McpToolAnalyzer, McpToolDefinition,
-        PluginArchiveBinary,
+        generate_skills_from_descriptor_file, import_codex_plugin_v1, inspect_plugin_v1,
+        pack_plugin_v1_with_binary, scaffold_plugin_v1_repository, verify_plugin_v1,
+        AuthorMcpDescriptorRequest, AuthorMcpToolRequest, CodexPluginExtensionV1,
+        McpServerDescriptor, McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary,
     };
     use serde_json::json;
     use std::fs;
@@ -2556,6 +3228,228 @@ mod tests {
             .join("my-plugin")
             .join("SKILL.md")
             .exists());
+    }
+
+    #[test]
+    fn export_plugin_v1_codex_emits_apps_hooks_interface_and_assets() {
+        let temp_dir = unique_temp_dir("elegy-export-codex");
+        let plugin_dir = temp_dir.join("github-plugin");
+
+        scaffold_plugin_v1_repository(
+            "github-plugin",
+            "Test plugin for Codex export",
+            "0.1.0",
+            &plugin_dir,
+            "Test Author",
+            "MIT",
+            "https://github.com/example/github-plugin",
+        )
+        .expect("scaffold should succeed");
+
+        fs::create_dir_all(plugin_dir.join("assets")).expect("create assets");
+        fs::write(plugin_dir.join("assets").join("logo.png"), b"logo").expect("write logo");
+        fs::write(
+            plugin_dir.join(".app.json"),
+            r#"{"apps":{"google_drive":{"id":"connector_test","required":true}}}"#,
+        )
+        .expect("write apps");
+        fs::create_dir_all(plugin_dir.join("hooks")).expect("create hooks");
+        fs::write(
+            plugin_dir.join("hooks").join("hooks.json"),
+            r#"{"hooks":{"SessionStart":[{"matcher":"startup","hooks":[{"type":"command","command":"echo ok","statusMessage":"Starting"}]}]}}"#,
+        )
+        .expect("write hooks");
+
+        let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read manifest"))
+                .expect("parse manifest");
+        manifest["extensions"]["codex.plugin/v1"] = json!({
+            "schemaVersion": "codex.plugin/v1",
+            "homepage": "https://github.com/",
+            "keywords": ["github", "pull-request"],
+            "apps": "./.app.json",
+            "hooks": "./hooks/hooks.json",
+            "assets": ["./assets/logo.png"],
+            "interface": {
+                "displayName": "GitHub",
+                "shortDescription": "Work with GitHub",
+                "developerName": "OpenAI",
+                "category": "Developer Tools",
+                "capabilities": ["Interactive", "Write"],
+                "websiteURL": "https://github.com/",
+                "defaultPrompt": ["Inspect a pull request"],
+                "logo": "./assets/logo.png",
+                "screenshots": []
+            }
+        });
+        fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        let verify_result =
+            verify_plugin_v1(&plugin_dir.join(".elegy-plugin")).expect("verify should succeed");
+        assert!(
+            verify_result.valid,
+            "unexpected issues: {:?}",
+            verify_result.issues
+        );
+        assert!(verify_result.has_apps);
+        assert_eq!(verify_result.app_count, 1);
+        assert!(verify_result.has_hooks);
+        assert_eq!(verify_result.hook_event_count, 1);
+        assert!(verify_result.has_codex_interface);
+
+        let export_dir = temp_dir.join("exported");
+        let result = export_plugin_v1(&plugin_dir, "codex", &export_dir, false)
+            .expect("export should succeed");
+
+        assert!(result.emitted_components.apps_emitted);
+        assert!(result.emitted_components.hooks_emitted);
+        assert!(export_dir.join(".app.json").is_file());
+        assert!(export_dir.join("hooks").join("hooks.json").is_file());
+        assert!(export_dir.join("assets").join("logo.png").is_file());
+
+        let codex_manifest: serde_json::Value = serde_json::from_str(
+            &fs::read_to_string(export_dir.join(".codex-plugin").join("plugin.json"))
+                .expect("read Codex manifest"),
+        )
+        .expect("parse Codex manifest");
+        assert_eq!(codex_manifest["apps"], "./.app.json");
+        assert_eq!(codex_manifest["hooks"], "./hooks/hooks.json");
+        assert_eq!(codex_manifest["interface"]["displayName"], "GitHub");
+        assert_eq!(codex_manifest["keywords"][0], "github");
+    }
+
+    #[test]
+    fn import_codex_plugin_v1_preserves_codex_specific_fields() {
+        let temp_dir = unique_temp_dir("codex-import");
+        let plugin_dir = temp_dir.join("github");
+        fs::create_dir_all(plugin_dir.join(".codex-plugin")).expect("create manifest dir");
+        fs::create_dir_all(plugin_dir.join("assets")).expect("create assets");
+        fs::write(plugin_dir.join("assets").join("logo.png"), b"logo").expect("write logo");
+        fs::write(
+            plugin_dir.join(".codex-plugin").join("plugin.json"),
+            r##"{
+  "name": "github",
+  "version": "0.1.5",
+  "description": "GitHub connector workflow",
+  "author": {"name": "OpenAI", "email": "support@openai.com", "url": "https://openai.com/"},
+  "homepage": "https://github.com/",
+  "repository": "https://github.com/openai/plugins",
+  "license": "MIT",
+  "keywords": ["github", "ci"],
+  "skills": "./skills/",
+  "apps": "./.app.json",
+  "interface": {
+    "displayName": "GitHub",
+    "shortDescription": "Triage PRs",
+    "logo": "./assets/logo.png",
+    "brandColor": "#24292F"
+  },
+  "bundledContentVariant": "backend-specific",
+  "futureField": {"kept": true}
+}"##,
+        )
+        .expect("write Codex manifest");
+
+        let imported = import_codex_plugin_v1(&plugin_dir).expect("import should succeed");
+        assert_eq!(imported.schema_version, "elegy-plugin/v1");
+        assert_eq!(imported.name, "github");
+        assert_eq!(imported.skills.as_deref(), Some("./skills/"));
+
+        let ext = imported
+            .extensions
+            .as_ref()
+            .and_then(|extensions| extensions.get("codex.plugin/v1"))
+            .cloned()
+            .and_then(|value| serde_json::from_value::<CodexPluginExtensionV1>(value).ok())
+            .expect("Codex extension should be present");
+
+        assert_eq!(ext.homepage.as_deref(), Some("https://github.com/"));
+        assert_eq!(ext.apps.as_deref(), Some("./.app.json"));
+        assert_eq!(
+            ext.assets.as_deref(),
+            Some(&vec!["assets/logo.png".to_string()][..])
+        );
+        assert_eq!(
+            ext.interface
+                .as_ref()
+                .and_then(|interface| interface.display_name.as_deref()),
+            Some("GitHub")
+        );
+        assert_eq!(ext.extra["futureField"]["kept"], true);
+    }
+
+    #[test]
+    fn verify_plugin_v1_rejects_invalid_codex_apps_and_hooks() {
+        let temp_dir = unique_temp_dir("elegy-invalid-codex");
+        let plugin_dir = temp_dir.join("bad-plugin");
+
+        scaffold_plugin_v1_repository(
+            "bad-plugin",
+            "Test plugin for invalid Codex components",
+            "0.1.0",
+            &plugin_dir,
+            "Test Author",
+            "MIT",
+            "",
+        )
+        .expect("scaffold should succeed");
+
+        fs::write(
+            plugin_dir.join(".app.json"),
+            r#"{"apps":{"github":{"id":"","required":true}}}"#,
+        )
+        .expect("write apps");
+        fs::create_dir_all(plugin_dir.join("hooks")).expect("create hooks");
+        fs::write(
+            plugin_dir.join("hooks").join("hooks.json"),
+            r#"{"hooks":{"SessionStart":[{"hooks":[{"type":"prompt","command":"","async":true}]}]}}"#,
+        )
+        .expect("write hooks");
+
+        let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
+        let mut manifest: serde_json::Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read manifest"))
+                .expect("parse manifest");
+        manifest["extensions"]["codex.plugin/v1"] = json!({
+            "schemaVersion": "codex.plugin/v1",
+            "apps": "./.app.json",
+            "hooks": "./hooks/hooks.json"
+        });
+        fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        let verify_result =
+            verify_plugin_v1(&plugin_dir.join(".elegy-plugin")).expect("verify should run");
+
+        assert!(!verify_result.valid);
+        assert!(verify_result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("app 'github' id must not be empty")));
+        assert!(verify_result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("handler type 'prompt' is not supported")));
+        assert!(verify_result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("command must not be empty")));
+
+        let hooks_config =
+            super::load_codex_hooks_config(&plugin_dir.join("hooks").join("hooks.json"))
+                .expect("hooks parse should preserve async");
+        let handler = &hooks_config.hooks["SessionStart"][0].hooks[0];
+        assert_eq!(handler.async_, Some(true));
+        let serialized = serde_json::to_value(handler).expect("serialize hook handler");
+        assert_eq!(serialized["async"], true);
     }
 
     #[test]
