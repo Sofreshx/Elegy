@@ -2391,7 +2391,7 @@ pub fn export_plugin_v1(
                 codex_manifest["binary"] = serde_json::json!(binary);
             }
             for (key, value) in &ext.extra {
-                if !codex_manifest.get(key).is_some() {
+                if codex_manifest.get(key).is_none() {
                     codex_manifest[key] = value.clone();
                 }
             }
