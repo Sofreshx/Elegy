@@ -45,20 +45,20 @@ Most observe commands return an `ObserveResult` envelope payload.
 `elegy observe record --json` is the exception because it returns a governed observation artifact:
 
 - `status: "ok"`
-- `dataSchema: "https://elegy/contracts/schemas/observation-session.schema.json"`
+- `dataSchema: "https://elegy/plugins/observe/schemas/observation-session.schema.json"`
 - `data`: `ObservationSession`
 
 The durable contract authority for the recorder output lives in:
 
-- `contracts/schemas/observation-session.schema.json`
-- `contracts/schemas/observation-event.schema.json`
-- `contracts/schemas/observation-summary.schema.json`
+- `plugins/observe/schemas/observation-session.schema.json`
+- `plugins/observe/schemas/observation-event.schema.json`
+- `plugins/observe/schemas/observation-summary.schema.json`
 
 Minimal governed examples live in:
 
-- `contracts/fixtures/observation-session.minimal.json`
-- `contracts/fixtures/observation-event.minimal.json`
-- `contracts/fixtures/observation-summary.minimal.json`
+- `plugins/observe/fixtures/observation-session.minimal.json`
+- `plugins/observe/fixtures/observation-event.minimal.json`
+- `plugins/observe/fixtures/observation-summary.minimal.json`
 
 ## Platform Notes
 
@@ -87,7 +87,7 @@ Typical downstream consumption flow:
 
 ## Discovery Surface
 
-The governed discovery authority for this surface is `contracts/fixtures/skill.elegy-observe.json`.
+The governed discovery authority for this surface is `plugins/observe/fixtures/skill.elegy-observe.json`.
 
 Hosts should prefer:
 

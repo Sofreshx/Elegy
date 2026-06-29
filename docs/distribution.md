@@ -26,10 +26,10 @@ Both channels publish the same asset families. The difference is lifecycle and s
 
 | Family | Pattern | Notes |
 | --- | --- | --- |
-| Standalone installer bootstrap | `elegy-installer-<bundleVersion>.zip` | Carries `install-distribution.sh` (canonical) + `install-distribution.ps1` (thin shim) + `README.md`. |
 | Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
 | Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
-| CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through `distribution/surfaces.json`. |
+| Plugin archive | `<name>-v<version>.plugin.zip` | Primary release for plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
+| CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in .plugin.zip. |
 | CLI asset checksum | `<name>-<target>[.exe].sha256` | Sidecar checksum used by the installer. |
 
 ## Surface Catalog
@@ -42,17 +42,21 @@ Each dedicated binary is listed in the catalog with kind `cli`. Most build from 
 
 ## Install
 
-The canonical installer is `scripts/install-distribution.sh`. The `scripts/install-distribution.ps1` file is a thin shim that maps PowerShell-style flags to the bash script and then delegates via `bash`.
-
-The installer is a simplified script that downloads one flat binary asset plus its `.sha256` sidecar. It does not depend on jq or archive extraction.
+Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
 
 ```bash
-# From a repo checkout or release archive
-bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy --surface elegy-planning --force
-
-# PowerShell entry point
-pwsh ./scripts/install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -Surface elegy-planning -Force
+elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
 ```
+
+Non-plugin surfaces install via `scripts/install-distribution.sh` (legacy bash installer):
+
+```bash
+# Legacy flat binary install (non-plugin surfaces only)
+bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy --surface elegy-codegraph --force
+```
+
+The bash installer is a compatibility lane for non-plugin surfaces. Plugin-packaged surfaces
+should use `elegy-plugin-packaging install` as the primary install lane.
 
 To install a surface, the surface must exist in the release assets and have a published `.sha256` sidecar. The installer verifies the downloaded asset SHA-256 before writing the executable into the destination `bin/` directory.
 
@@ -63,6 +67,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
 - Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, scaffolding, and export.
+- Prefer `.plugin.zip` archives over flat binaries for plugin-packaged surfaces. The archive carries the manifest, skills, and built binary in a single verifiable artifact.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
 - Treat the rolling `main-snapshot` prerelease as an integration/debug lane, not a pinned downstream contract.
 

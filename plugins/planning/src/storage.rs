@@ -11318,7 +11318,7 @@ mod tests {
                 allow_parallel_overlap: false,
                 file_scopes: vec![crate::FileScopeRecord {
                     selector_type: crate::FileScopeSelectorType::Glob,
-                    selector: "rust/features/elegy-planning/src/**".to_string(),
+                    selector: "plugins/planning/src/**".to_string(),
                     intent: crate::FileScopeIntent::Primary,
                 }],
                 status: PlanStatus::Active,

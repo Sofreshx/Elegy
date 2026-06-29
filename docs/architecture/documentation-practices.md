@@ -16,7 +16,7 @@ The v1 posture is intentionally lean:
 
 The current split is:
 
-- `skills/elegy-doc-practices/` holds the reusable instruction package, doctrine references, templates, eval fixtures, and adoption examples
+- `elegy-doc-practices/` holds the reusable instruction package, doctrine references, templates, eval fixtures, and adoption examples
 - `elegy docs ...` provides deterministic file creation, indexing, and objective validation
 - `.elegy/docs.yaml` in a consuming repo defines local ADR/spec/index paths plus narrow overrides
 
@@ -86,4 +86,4 @@ Consumer repos such as `holon` and `elegy-copilot` should:
 2. define only local path and trigger overrides in `.elegy/docs.yaml`
 3. keep product ADRs and specs local unless the decision is cross-repo
 
-See `skills/elegy-doc-practices/adoption/` for copy-paste snippets.
+See `elegy-doc-practices/adoption/` for copy-paste snippets.

@@ -96,8 +96,8 @@ Output: JSON validation report with findings keyed by severity (error, warning, 
 ## Implementation Links
 
 - `./plugin-research.md` — parent v0 spec
-- `contracts/schemas/elegy-codegraph.graph.v0.json` — governed IR schema
-- `rust/features/elegy-codegraph/src/main.rs` — TODO stubs for deferred commands
+- `plugins/codegraph/src/ir.rs` — governed IR schema
+- `plugins/codegraph/src/main.rs` — TODO stubs for deferred commands
 
 ## Drift Notes
 

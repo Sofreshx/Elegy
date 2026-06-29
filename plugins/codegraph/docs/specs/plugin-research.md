@@ -20,7 +20,7 @@ Agents need better structural evidence about a codebase than repeated full-file 
 2. Implement a TypeScript extractor that uses the TypeScript Compiler API for files, modules, symbols, calls, exports, test detection, and doc links.
 3. Implement a Rust extractor that uses tree-sitter-rust for syntax, cargo metadata for the crate graph, and SCIP from rust-analyzer for calls/references edges.
 4. Store the normalized graph IR in redb with entities and edges keyed for fast symbol lookup and neighbor traversal.
-5. Publish a governed JSON Schema contract at `contracts/schemas/elegy-codegraph.graph.v0.json` with an example fixture.
+5. Publish a governed JSON Schema contract at `plugins/codegraph/src/ir.rs` with an example fixture.
 
 ## Design Decisions
 
@@ -59,7 +59,7 @@ Tree-sitter-rust and `cargo metadata` remain always-on for syntax-level facts (m
 
 ### Contract Governance: Locked Enums in v0
 
-The IR contract at `contracts/schemas/elegy-codegraph.graph.v0.json` locks two enums as closed sets:
+The IR contract at `plugins/codegraph/src/ir.rs` locks two enums as closed sets:
 
 **`Confidence`:** `exact | inferred | heuristic`
 - `exact`: the extractor has verified this fact from a semantic source (e.g., SCIP `references` edge, TypeScript type-checker resolved call).
@@ -72,8 +72,8 @@ Every `Entity` and `Edge` must carry a `Provenance` struct with `extractor`, `co
 
 ## Context Evidence
 
-- `contracts/schemas/elegy-codegraph.graph.v0.json`: governed IR contract schema (Entity, Edge, Provenance, Confidence, SideEffect enums)
-- `contracts/fixtures/elegy-codegraph.graph.v0.example.json`: example valid graph for contract validation
+- `plugins/codegraph/src/ir.rs`: governed IR contract schema (Entity, Edge, Provenance, Confidence, SideEffect enums)
+- `plugins/codegraph/fixtures/elegy-codegraph.graph.v0.example.json`: example valid graph for contract validation
 - `./diff-slice.md`: deferred-commands stub spec (diff, review, validate — follow-up after v0)
 - `docs/specs/elegy-codegraph-plugin-v0.md`: implementation plan (this spec's companion — TODO: create alongside prototype)
 
@@ -81,7 +81,7 @@ Every `Entity` and `Edge` must carry a `Provenance` struct with `extractor`, `co
 
 ### Product Shape (v0)
 
-The v0 prototype ships as a single Rust binary `elegy-codegraph` in `rust/features/elegy-codegraph/` with two subcommands:
+The v0 prototype ships as a single Rust binary `elegy-codegraph` in `plugins/codegraph/` with two subcommands:
 
 ```
 elegy-codegraph extract --lang ts|rust --repo <path> --out <graph.bin> [--use-scip]
@@ -157,7 +157,7 @@ Implemented in `extractor/rust_scip.rs`. Invoked when `--use-scip` is passed to 
 
 ### Normalized Graph IR
 
-The language-specific extractors feed a language-neutral graph IR defined by the governed schema at `contracts/schemas/elegy-codegraph.graph.v0.json`.
+The language-specific extractors feed a language-neutral graph IR defined by the governed schema at `plugins/codegraph/src/ir.rs`.
 
 **Entity fields:**
 
@@ -256,15 +256,15 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 3. A prototype can index at least one TypeScript fixture repo and one Rust fixture repo for files, modules, symbols, imports/exports, and test/doc links (validated by `rust/tests/fixtures/ts-mini/` and `rust/tests/fixtures/rust-mini/`).
 4. Query results include `provenance` and `confidence` on every record; absent fields are a validation failure.
 5. The plugin boundary stays host-neutral: no host imports in the `elegy-codegraph` crate; CLI emits JSON only.
-6. A governed contract artifact exists at `contracts/schemas/elegy-codegraph.graph.v0.json` with a validating example fixture at `contracts/fixtures/elegy-codegraph.graph.v0.example.json`.
+6. A governed contract artifact exists at `plugins/codegraph/src/ir.rs` with a validating example fixture at `plugins/codegraph/fixtures/elegy-codegraph.graph.v0.example.json`.
 7. A stub spec for deferred commands exists at `./diff-slice.md` capturing the design intent for `diff`, `review`, and `validate`.
 
 ## Implementation Links
 
 - `docs/architecture/ecosystem-topology.md`
 - `docs/architecture/mcp-skill-tooling-placement.md`
-- `contracts/schemas/elegy-codegraph.graph.v0.json`
-- `contracts/fixtures/elegy-codegraph.graph.v0.example.json`
+- `plugins/codegraph/src/ir.rs`
+- `plugins/codegraph/fixtures/elegy-codegraph.graph.v0.example.json`
 - `./diff-slice.md`
 
 ## Validation Evidence
@@ -272,7 +272,7 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 - **Extractor strategies:** Concrete TS and Rust strategies documented above with known gaps explicitly listed. ✅
 - **Fixture repos:** `rust/tests/fixtures/ts-mini/` and `rust/tests/fixtures/rust-mini/` committed in-tree with expected graph snapshots. ✅
 - **Integration tests:** `cargo test -p elegy-codegraph` — **46 tests pass** (32 unit + 14 integration). Exercises extract + query against both fixtures through both the library API and the CLI binary (`CARGO_BIN_EXE_elegy-codegraph`); asserts entity counts, expected kinds, tests edges, provenance presence, error envelopes, snapshot idempotency, and TS --use-scip warning. ✅
-- **Contract validation:** `contracts/fixtures/elegy-codegraph.graph.v0.example.json` validates against `contracts/schemas/elegy-codegraph.graph.v0.json` via the `ir::tests::round_trip_contract_fixture` test. ✅
+- **Contract validation:** `plugins/codegraph/fixtures/elegy-codegraph.graph.v0.example.json` validates against `plugins/codegraph/src/ir.rs` via the `ir::tests::round_trip_contract_fixture` test. ✅
 - **Design decisions:** All architectural choices (redb over sled, SCIP over LSP, locked enums) documented in the Design Decisions section with rationale and alternatives considered. ✅
 - **Clippy:** `cargo clippy -p elegy-codegraph -- -D warnings` clean (0 warnings). ✅
 - **Host neutrality:** No host imports in the `elegy-codegraph` crate; CLI emits JSON only. Verified by code review. ✅

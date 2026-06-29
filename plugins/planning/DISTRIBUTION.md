@@ -4,61 +4,52 @@
 
 Dedicated CLI for durable planning state: goals, roadmaps, sections, work
 points, plans, todos, issues, review points, insights, validation, project-run
-leases, and the planning graph (work-point graph, run-trace context,
-acceptance evidence).
+leases, and the planning graph (work-point graph, run-trace context, acceptance
+evidence).
 
 SQLite via `elegy-planning` is the planning MVP authority. Markdown and JSON
 files are projections only.
 
+This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is in
+`distribution/surfaces.json`.
+
 ## Binary surface
 
-- **Crate:** `rust/features/elegy-planning/`
+- **Crate:** `plugins/planning/`
 - **Binary name:** `elegy-planning`
-- **Source:** `rust/features/elegy-planning/src/main.rs`
-- **Library consumers:** `rust/bin/elegy-cli` (umbrella `elegy planning` subcommands),
-  `rust/features/elegy-skills` (the planning skill fixture references the
-  planning binary via capability projection).
+- **Source:** `plugins/planning/src/main.rs`
+- **Plugin manifest:** `.elegy-plugin/plugin.json`
+- **Plugin skills:** `plugins/planning/skills/elegy-planning/`
 
 ## Distribution shape
 
-- **CLI archive asset family:** `elegy-planning-<cliVersion>-<target>.zip`
-- **Wrapper archive:** `elegy-planning-wrapper-<bundleVersion>.zip`
-- **Release catalog entry:** `distribution/surfaces.json` (name: `elegy-planning`)
-- **Skill fixture:** `contracts/fixtures/skill.elegy-planning.json`
+- **Plugin archive:** `elegy-planning-v<version>.plugin.zip` (primary release contract)
+- **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
 - **Versioning:** follows workspace `version`.
 
 ## Install
 
 ```bash
-# Canonical installer (recommended)
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-planning -Force
-```
+# Install as a plugin package (primary lane)
+elegy-plugin-packaging install --archive elegy-planning-v<version>.plugin.zip
 
-```powershell
-# Native-pwsh entry point: thin shim that forwards all args to bash (requires bash in PATH)
-pwsh ./scripts/install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-planning -Force
+# Export for Codex host (derived lane)
+elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
 
 ## Build from source
 
 ```bash
-cd rust
 cargo build -p elegy-planning
 cargo run -p elegy-planning -- --help
 ```
 
 ## Validation
 
-- `cargo test -p elegy-planning` (covers `storage.rs` test suite, `machine_posture.rs` integration tests)
-- For machine output changes, verify `--json --non-interactive --correlation-id` behavior explicitly
+- `cargo test -p elegy-planning`
+- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/planning`
 
 ## Where to read more
 
-- Planning architecture:
-  [`docs/architecture/ARCHITECTURE.md`](./docs/architecture/ARCHITECTURE.md)
-- Planning MVP scope:
-  [`docs/architecture/mvp-scope.md`](./docs/architecture/mvp-scope.md)
-- Planning v1: [`docs/architecture/v1.md`](./docs/architecture/v1.md)
-- Crate boundaries: [`rust/features/elegy-planning/AGENTS.md`](./AGENTS.md)
-- Planning specs (graph, state machine, run-trace, acceptance):
-  [`docs/specs/`](./docs/specs/)
+- Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
+- Crate boundaries: [`AGENTS.md`](./AGENTS.md)

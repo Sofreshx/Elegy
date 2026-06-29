@@ -18,7 +18,7 @@ Elegy treats planning state as durable and authoritative in SQLite via the `eleg
 Today there is no first-party Elegy skill for that. The pablo-mano/Obsidian-CLI-skill demonstrates a viable shape (a thin skill wrapping the official Obsidian CLI), but Elegy needs a version that:
 
 - Sits inside the Elegy contracts and discovery surface (`skill`, `skill-discovery-index`).
-- Is installable through the same `scripts/install-distribution.ps1` flow as other Elegy surfaces.
+- Distributed as a standalone skill-only package at the repo root (`elegy-obsidian/SKILL.md`). No binary to install — skill is consumed by hosts directly.
 - Exposes a uniform `obsidian-result/v1` envelope so callers in any agent can reason about outcomes.
 - Leaves a clean extension point for future mirror commands without committing to them yet.
 
@@ -28,17 +28,17 @@ This document captures the foundation slice.
 
 In scope:
 
-- A governed skill definition: `contracts/fixtures/skill.elegy-obsidian.json`.
-- A discovery projection: `contracts/fixtures/skill-discovery-index.elegy-obsidian.json`.
-- A result envelope schema: `contracts/schemas/obsidian-result.schema.json`.
-- A repo-local skill: `skills/elegy-obsidian/SKILL.md` plus a per-command reference and an install guide.
+- A governed skill definition: `elegy-obsidian/SKILL.md` (standalone root package).
+- Discovery projection: the `elegy-skills` registry discovers this standalone skill from the repo root.
+- Result envelope schema: defined in the shared `plugin-sdk` (`AgentSkillFrontmatter` struct).
+- A standalone root skill: `elegy-obsidian/SKILL.md` plus per-command reference and install guidance in the skill body.
 - A foundation spec: this document.
 
-Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the canonical installer at `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` for installation):
+Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the skill package is a standalone root directory (`elegy-obsidian/`). Hosts discover it through the `elegy-skills` registry.):
 
 Out of scope (follow-up work):
 
-- A Rust crate at `rust/features/elegy-obsidian/`. The current implementation is the user's installed `obsidian` CLI.
+- No dedicated Rust binary. This is a skill-only surface that wraps the user's installed Obsidian CLI.
 - New subcommands on `elegy-planning` (`obsidian mirror/attach/resolve/list`) and the mirror schemas that go with them. See `docs/research/obsidian-figma-and-vision-models-for-elegy.md` for the proposed shape.
 - Wiring this skill into `instruction-engine`'s own skill catalog (catalog-assets or opencode-assets). That is the consumer-repo change and belongs in a separate PR against `instruction-engine`.
 - Replacement of the third-party `obsidian-cli.exe` referenced by `instruction-engine/docs/system/obsidian-synced-notes-contract.md`. That contract governs a separate obsidian integration lane and remains non-canonical; the new skill does not change its authority.
@@ -48,19 +48,19 @@ Out of scope (follow-up work):
 The skill follows the standard Elegy one-way authority chain:
 
 ```
-contracts/fixtures/skill.elegy-obsidian.json      (governed source of truth)
+elegy-obsidian/SKILL.md                           (standalone root package — governed source of truth)
         |
         v
-contracts/fixtures/skill-discovery-index.elegy-obsidian.json   (discovery projection)
+elegy-skills registry                              (discovery projection)
         |
         v
-contracts/fixtures/instruction-skills/elegy-obsidian.SKILL.md  (packaged human-readable)
+elegy-obsidian/SKILL.md                                 (standalone root skill package)
         |
         v
-skills/elegy-obsidian/SKILL.md                                 (repo-local skill authoring source)
+elegy-obsidian/SKILL.md                                 (standalone root skill package)
 ```
 
-`skills/elegy-obsidian/` is the repo-local skill authoring source, not a wrapper overlay. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
+`elegy-obsidian/` is the standalone root skill package, not a wrapper overlay. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
 
 The wrapper surface points to the external executable explicitly:
 
@@ -97,7 +97,7 @@ Side-effect classification:
 
 ## 5. Result envelope
 
-`contracts/schemas/obsidian-result.schema.json` defines a minimal, forward-compatible envelope:
+The result envelope, defined in the shared `plugin-sdk` (`AgentSkillFrontmatter` struct), provides a minimal, forward-compatible envelope:
 
 ```json
 {
@@ -125,7 +125,7 @@ Obsidian is **non-canonical**. Durable planning state continues to flow through 
 
 ## 7. Installation and consumer story
 
-- **Elegy-side** — `elegy-obsidian` is a recognized surface. The repo `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian`. The surface is registered in `distribution/surfaces.json`. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
+- **Elegy-side** — `elegy-obsidian` is a recognized surface. The skill package is registered in `distribution/surfaces.json` as `kind: skill-only`. Hosts resolve it through the `elegy-skills` registry. There is no `bin/elegy-obsidian/` directory because there is no Rust binary.
 - **elegant-obsidian-side on consumer machines** — the user must enable the official CLI once via Obsidian Desktop's Settings -> General -> Command line interface. The plugin package does not ship the binary, does not download it, and does not install it.
 - **elegy-copilot / instruction-engine side** — to make the skill loadable from opencode and from the elegy-copilot runtime, the skill must be mirrored into the consumer repo (`instruction-engine`) under its skill discovery lane. That is a follow-up change in the consumer repo and is tracked as out-of-scope for this foundation PR.
 - **elegy-copilot/obsidian contract** — `instruction-engine/docs/system/obsidian-synced-notes-contract.md` already defines a separate Obsidian integration lane that uses a third-party `obsidian-cli.exe` binary. The new skill is **additive** — it does not modify that contract or replace that binary. The two lanes can coexist.
@@ -136,18 +136,18 @@ The research note describes the longer-term direction: add `elegy-planning obsid
 
 - the fixture's `lifecycleState` is `draft`, not `active`. Promotion to `active` will accompany the mirror command set, not this foundation alone.
 - The skill's `capabilityHints` are listed in priority order in the research note; the foundation implements priorities 2 (vault/file/daily/tag/task capabilities), 3 (search), 4 (command/eval escape hatch via `obsidian-command`), and 7 (`obsidian-version` precondition). Priorities 1 (mirror commands), 5 (link/follow/unlinked), and 6 (bookmarks) remain future work.
-- The mirror frontmatter convention is documented in `skills/elegy-obsidian/references/obsidian-cli-command-reference.md` and will be the parsing contract for the future `elegy-planning obsidian resolve` and `attach` commands.
-- Adding a future `rust/features/elegy-obsidian/` crate is a localized change: drop in a new `cliCrate` in `delegatesTo`, add a new entry in the canonical installer's `Get-CliSurfaceMetadata` table, and update the plugin package's `instructionSkills` projection.
+- The mirror frontmatter convention is documented in the skill's SKILL.md body content (refer to skill frontmatter for invocation details) and will be the parsing contract for the future `elegy-planning obsidian resolve` and `attach` commands.
+- Adding a future plugin crate (under `plugins/`) is a localized change: drop in a new `cliCrate` in `delegatesTo`, add a new entry in the canonical installer's `Get-CliSurfaceMetadata` table, and update the plugin package's `instructionSkills` projection.
 
 ## 9. Acceptance criteria for this foundation
 
 The foundation is complete when all of the following are true:
 
-- the fixture validates against `contracts/schemas/skill.schema.json` and the discovery index validates against `contracts/schemas/skill-discovery-index.schema.json`.
+- the SKILL.md frontmatter validates against the `AgentSkillFrontmatter` struct in `shared/plugin-sdk`. Registry discovery validates through the `SkillRegistry` in `plugins/skills`.
 - The result envelope schema validates against the JSON Schema 2020-12 grammar.
-- `scripts/install-distribution.sh` accepts `-CliSurfaces elegy-obsidian` and resolves the surface metadata.
-- A runbook exists in `skills/elegy-obsidian/references/install-obsidian-cli.md` that operators can follow to enable the official CLI.
-- The `elegy-obsidian` skill is registered in `skill-discovery-index.elegy-obsidian.json` with `lifecycleState: "draft"`, signaling that the foundation is ready for review but not yet promoted to active.
+- The `elegy-skills` registry resolves the surface metadata from the standalone root package.
+- Installation guidance lives in the skill body content of `elegy-obsidian/SKILL.md` that operators can follow to enable the official CLI.
+- The `elegy-obsidian` skill is registered in the `elegy-skills` registry with `lifecycleState: "draft"`, signaling that the foundation is ready for review but not yet promoted to active.
 - The `distribution/surfaces.json` entry for `elegy-obsidian` registers the surface for release and install.
 
 ## 10. Open questions

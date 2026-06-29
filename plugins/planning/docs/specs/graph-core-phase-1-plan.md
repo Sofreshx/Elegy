@@ -67,7 +67,7 @@ belong to later phases once the graph substrate is proven.
 
 ### Step 1: Add Model Types
 
-File: `rust/features/elegy-planning/src/model.rs`
+File: `plugins/planning/src/model.rs`
 
 Add string enums using the existing `string_enum!` macro:
 
@@ -136,7 +136,7 @@ match the rest of the planning JSON surface.
 
 ### Step 2: Add Storage Input Types
 
-File: `rust/features/elegy-planning/src/storage.rs`
+File: `plugins/planning/src/storage.rs`
 
 Add internal/public input structs near the existing create inputs:
 
@@ -168,7 +168,7 @@ service work can use typed APIs instead of ad hoc SQL.
 
 ### Step 3: Add Schema Version 9
 
-File: `rust/features/elegy-planning/src/storage.rs`
+File: `plugins/planning/src/storage.rs`
 
 Update `CURRENT_SCHEMA_VERSION` from `"8"` to `"9"`.
 
@@ -229,7 +229,7 @@ It must not backfill graph data from existing v1 tables.
 
 ### Step 4: Add Row Mapping Helpers
 
-File: `rust/features/elegy-planning/src/storage.rs`
+File: `plugins/planning/src/storage.rs`
 
 Add:
 
@@ -242,7 +242,7 @@ orders explicit and consistent across all graph SELECT statements.
 
 ### Step 5: Add Graph Storage Methods
 
-File: `rust/features/elegy-planning/src/storage.rs`
+File: `plugins/planning/src/storage.rs`
 
 Add methods on `PlanningStore`:
 
@@ -270,7 +270,7 @@ Every create method must:
 
 ### Step 6: Add Edge Preflight Invariants
 
-File: `rust/features/elegy-planning/src/storage.rs`
+File: `plugins/planning/src/storage.rs`
 
 Before inserting a graph edge:
 
@@ -315,14 +315,14 @@ execution/readiness phase.
 
 ### Step 7: Add Service Re-exports Only If Needed
 
-File: `rust/features/elegy-planning/src/lib.rs`
+File: `plugins/planning/src/lib.rs`
 
 Export the new model and storage input types so integration tests and later
 phases can use them. Avoid adding CLI commands in this phase.
 
 ### Step 8: Add Tests
 
-Preferred location: `rust/features/elegy-planning/tests/integration.rs`
+Preferred location: `plugins/planning/tests/integration.rs`
 
 Add focused tests:
 

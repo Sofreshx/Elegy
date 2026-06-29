@@ -25,7 +25,7 @@ Core model:
 | `hosts/` | Thin CLI entrypoints and umbrella host crates. |
 | `plugins/` | Self-contained capability crates — each owns its schemas, fixtures, and configuration inside the plugin directory. |
 | `shared/` | Cross-cutting library crates (e.g. `shared/core/` holds shared types). |
-| `skills/` | Governed skill definitions (`skills/<name>/SKILL.md`). |
+| `plugins/<name>/skills/` | Plugin-owned skill definitions. |
 | `artifacts/` | CI-generated bundles, archives, and validation outputs. |
 
 When those surfaces disagree, prefer the governed artifacts within their owning
@@ -50,43 +50,19 @@ Published targets:
 
 ### Install
 
-Download `elegy-installer-<bundleVersion>.zip` from GitHub Releases, extract,
-and run the canonical installer. The `install-distribution.ps1` file in the
-archive is a thin shim that forwards all arguments to `install-distribution.sh`;
-the bash script is the single canonical implementation.
+Plugin surfaces ship as portable plugin archives (`.plugin.zip`). The `elegy-plugin-packaging` CLI
+verifies, packs, exports, and installs plugin packages.
 
 ```bash
-# Canonical installer (recommended; works on any platform with bash)
-bash ./install-distribution.sh -d .elegy -s elegy-planning -f
+# Install a plugin from a local archive
+elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
+
+# Export for a specific host
+elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
 
-```powershell
-# Native-pwsh entry point: thin shim that maps PowerShell flags to bash (requires bash in PATH)
-pwsh ./install-distribution.ps1 -Destination .\.elegy -Surface elegy-planning -Force
-```
-
-Pin a specific release:
-
-```bash
-bash ./install-distribution.sh -t vX.Y.Z -d ./tools/elegy -s elegy-planning -f
-```
-
-Track the rolling `main-snapshot` prerelease:
-
-```bash
-bash ./install-distribution.sh -t main-snapshot -d ./tools/elegy-main -s elegy-planning -f
-```
-
-The same installer is also available at `scripts/install-distribution.{sh,ps1}` from
-a repo checkout.
-
-### Bash installer
-
-On Linux or macOS, use the Bash installer from a repo checkout:
-
-```bash
-bash ./scripts/install-distribution.sh -t vX.Y.Z -d ./tools/elegy -s elegy-planning -f
-```
+Non-plugin surfaces ship as standalone CLI binaries. See [docs/distribution.md](docs/distribution.md)
+for the per-binary install guide.
 
 ### Installed layout
 
@@ -100,6 +76,8 @@ bash ./scripts/install-distribution.sh -t vX.Y.Z -d ./tools/elegy -s elegy-plann
 git clone https://github.com/Sofreshx/Elegy.git
 cd Elegy
 cargo build
+# Verify a plugin package
+cargo run -p elegy-tooling -- verify --plugin plugins/planning
 cargo run -p elegy-planning -- --version --json
 ```
 
@@ -129,8 +107,8 @@ require editing this README.
 | --- | --- | --- |
 | `elegy-run` | `hosts/host-mcp/` | [DISTRIBUTION.md](hosts/host-mcp/DISTRIBUTION.md) |
 | `elegy-contracts` | `shared/core/` | _No dedicated distribution note yet_ |
-| `elegy-desktop` | `plugins/desktop/` | _No dedicated distribution note yet_ |
-| `elegy-observe` | `plugins/observe/` | _No dedicated distribution note yet_ |
+| `elegy-desktop` | `plugins/desktop/` | [DISTRIBUTION.md](plugins/desktop/DISTRIBUTION.md) |
+| `elegy-observe` | `plugins/observe/` | [DISTRIBUTION.md](plugins/observe/DISTRIBUTION.md) |
 | `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
 | `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
 | `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
@@ -145,8 +123,10 @@ require editing this README.
 
 Elegy ships dedicated `elegy-*` Rust binaries for each capability surface.
 
-Skill definitions live under `skills/<name>/SKILL.md`. They are the governed
-discovery authority for agent capabilities.
+Plugin-owned skills live under `plugins/<name>/skills/elegy-<name>/SKILL.md`.
+Standalone skill-only packages live at the repo root (`elegy-<name>/SKILL.md`).
+The `elegy-skills` CLI discovers skills from plugin manifests first, then standalone
+root packages, failing on duplicate skill IDs.
 
 ## Configuration Materialization
 
@@ -165,9 +145,9 @@ templates and profile details.
 
 ## Skill Tools
 
-Elegy's skills product is registry-first. Governed skill definitions under
-`skills/<name>/SKILL.md` are the discovery authority. The `elegy-skills`
-CLI provides search, resolve, inspect, and validation.
+Elegy's skills product is registry-first. Plugin-owned skills under
+`plugins/<name>/skills/` and standalone root packages are the discovery authority.
+The `elegy-skills` CLI provides search, resolve, inspect, and validation.
 
 ```bash
 elegy-skills list --json
@@ -185,9 +165,7 @@ in-code contract; there is no standalone JSON schema file.
 Setup flow:
 
 ```bash
-elegy plugin new --template cli-tool --output ./my-plugin
-# edit ./.elegy-plugin/plugin.json
-elegy plugin verify --plugin ./my-plugin/.elegy-plugin/plugin.json --json
+elegy-plugin-packaging verify --plugin ./my-plugin
 ```
 
 Release configuration uses `distribution/surfaces.json` as the central release catalog.
