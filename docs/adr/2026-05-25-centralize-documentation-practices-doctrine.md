@@ -21,7 +21,7 @@ owner: Elegy
 
 - Keep the durable doctrine in the central `elegy-doc-practices/`
   package plus repo-visible architecture docs in `elegy`.
-- Add a narrow `elegy docs ...` CLI only for deterministic file creation,
+- Add a narrow `elegy-documentation ...` CLI only for deterministic file creation,
   objective validation, and docs index generation.
 - Require downstream repos such as `holon` and `elegy-copilot` to adopt the
   same central doctrine with only local path, trigger, and exception overrides

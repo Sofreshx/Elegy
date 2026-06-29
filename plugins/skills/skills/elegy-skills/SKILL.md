@@ -165,7 +165,7 @@ fixture. For an invalid fixture: `status: "invalid"` with
 - This skill owns: governed skill registry discovery, resolution,
   get, list, and validation.
 - This skill does not own: skill content (bodies are in SKILL.md
-  files), host projection or onboarding (use `elegy agent ...`),
+  files), host projection or onboarding (use the host's own discovery lane),
   MCP to skill generation (use `elegy-mcp`).
 - Companion skills:
   - `elegy-skill-authoring` — for writing and auditing SKILL.md

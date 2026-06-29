@@ -4,10 +4,7 @@
 
 use crate::error::{Error, Result};
 use crate::ir::{Edge, EdgeKind, Entity, EntityId};
-use redb::{
-    Database, ReadableDatabase, ReadableTable, ReadableTableMetadata, TableDefinition,
-    WriteTransaction,
-};
+use redb::{Database, ReadableTable, ReadableTableMetadata, TableDefinition, WriteTransaction};
 
 // ---------------------------------------------------------------------------
 // Table definitions
@@ -51,7 +48,7 @@ pub enum Direction {
 /// `TransactionError`, `CommitError`, `CompactionError`) implement
 /// `Into<redb::Error>`.
 fn map_err<E: Into<redb::Error>>(e: E) -> Error {
-    Error::Storage(e.into())
+    Error::Storage(Box::new(e.into()))
 }
 
 /// Helper: open every known table inside a write transaction, creating them

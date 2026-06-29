@@ -2,17 +2,10 @@
 
 ## Purpose
 
-This document is the canonical governance baseline (historical) for the current Elegy repo.
-
-It defines:
-
-- the governed artifact boundary
-- the Rust executable boundary
-- allowed dependency direction between those layers
-- the rules for promoting concepts into durable repo-owned surfaces
-- the shared-contract governance model for schemas, fixtures, manifests, and policy artifacts
-
-This document is intentionally narrower than the broader ecosystem topology doc. The topology doc explains the high-level repo relationship. This document explains the concrete governance needed for the repo that exists today.
+This document defines the active dependency and ownership rules for the current
+Elegy repo. Use it with
+[`ecosystem-topology.md`](ecosystem-topology.md): topology explains the repo
+shape; this document defines what each layer may own.
 
 ## Repository layers
 
@@ -20,12 +13,14 @@ Elegy now has three practical layers.
 
 ### Layer 1: governed artifacts
 
-These are the durable authority roots and must stay language-agnostic.
+These are the durable authority roots and stay language-agnostic.
 
 | Surface | Responsibility |
 | --- | --- |
 | `plugins/<name>/schemas/` | Governed JSON schema authority, co-located per plugin |
 | `plugins/<name>/fixtures/` | Minimal and parity fixtures, co-located per plugin |
+| `plugins/<name>/contracts/` | Plugin-local templates, profiles, and install-facing governed material |
+| `shared/core/fixtures/` | Cross-cutting fixtures shared across plugins |
 
 ### Layer 2: Rust executable crates
 
@@ -38,11 +33,11 @@ These crates consume governed artifacts and provide reusable executable behavior
 | `plugins/memory` | Dedicated bounded-memory executable behavior and CLI surface |
 | `plugins/mcp` | Dedicated MCP descriptor authoring/analysis behavior and CLI surface |
 | `plugins/skills` | Dedicated MCP-to-skill generation behavior and CLI surface |
-| `shared/tooling` | Shared helper and compatibility infrastructure for descriptor and skill workflows |
+| `shared/tooling` | Binary-only operator tooling package (`elegy-plugin-packaging`) over the plugin SDK |
 | `shared/descriptor` | Descriptor loading and normalization |
 | `shared/adapter-fs` and `shared/adapter-http` | Bounded adapter behavior |
 | `shared/runtime` and `shared/core` | Reusable runtime composition |
-| `hosts/host-mcp` and `hosts/cli` | Thin host and umbrella general/compatibility surfaces |
+| `hosts/host-mcp` | Thin MCP host entrypoint (`elegy-run`) |
 
 ### Layer 3: export and validation surfaces
 
@@ -50,8 +45,7 @@ These surfaces validate and ship the governed and executable layers without rede
 
 | Surface | Responsibility |
 | --- | --- |
-| `elegy-cli contracts export` | Bundle export |
-| `elegy-cli contracts validate` | Canonical output validation |
+| `elegy-contracts contracts validate` | Canonical bundle validation |
 | Per-plugin conformance tests in `plugins/*/tests/conformance.rs` | Per-feature publish-metadata contract |
 | `.github/workflows/*.yml` | CI enforcement for artifacts, Rust, security, and distribution |
 
@@ -62,20 +56,10 @@ The following rules are mandatory until a later architecture decision changes th
 1. Governed artifacts are the authority boundary and must not depend on Rust implementation details.
 2. Rust crates may consume governed artifacts, but they must not silently redefine schema, fixture, manifest, or policy authority.
 3. Runtime-composition crates may depend on lower Rust crates and governed artifacts, but lower layers must never depend upward on CLI or host shells.
-4. Operator surfaces such as `elegy-cli` and `elegy-host-mcp` must remain thin over explicit runtime and tooling crates.
+4. Operator binaries such as `elegy-run`, `elegy-contracts`, and other dedicated `elegy-*` CLIs must remain thin over explicit runtime and tooling crates.
 5. Export scripts and workflows validate or package the repo surfaces; they are not alternate places to invent contract truth.
 6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
 7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists.
-
-## Post-legacy rule
-
-Elegy no longer has an active first-party `.NET` source-package family in-repo.
-
-That means:
-
-1. docs must not describe `src/` or `tests/` as active repo centers
-2. any downstream `.NET` consumer is now just that: a consumer of governed outputs, not a co-owned in-repo authority surface
-3. new shared responsibilities should be expressed either as governed artifacts or as Rust executable behavior, not by reintroducing legacy compatibility framing
 
 ## Public-surface graduation rule
 
@@ -126,20 +110,8 @@ When a schema, fixture, or manifest is changed, the governed corpus must be revi
 
 Current enforcement lives in these surfaces:
 
-- `elegy-cli contracts export`
-- `elegy-cli contracts validate`
+- `cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate`
 - Per-plugin conformance tests in `plugins/*/tests/conformance.rs`
 - `.github/workflows/distribution-artifacts.yml`
 - `.github/workflows/rust-ci.yml`
 - Rust workspace tests that exercise CLI and tooling behavior
-
-## Completion standard
-
-The governance baseline is only complete when the repo is not just described but enforced.
-
-The minimum bar is:
-
-1. governed artifact roots are documented
-2. export and canonical-output validation are runnable from the repo root
-3. Rust executable surfaces are linted and tested from the Rust workspace
-4. contributor docs point to the real validation and export path rather than to removed solution-era flows

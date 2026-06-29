@@ -35,10 +35,10 @@ flowchart TD
         config["plugins/&lt;name&gt;/contracts/\nconfiguration artifacts"]
     end
 
-    subgraph exec["hosts/ + plugins/ + shared/ — Rust workspace (22 crates)"]
+    subgraph exec["hosts/ + plugins/ + shared/ — Rust workspace (21 crates)"]
         hosts["hosts/\n1 binary crate\n(elegy-run MCP host)"]
         plugins["plugins/\n10 capability crates\n(mcp, skills, planning, ...)"]
-        shared["shared/\n11 library crates\n(core, runtime, tooling,\nplugin-sdk, ...)"]
+        shared["shared/\n10 crates\n(libraries + operator tooling:\ncore, runtime, tooling,\nplugin-sdk, ...)"]
     end
 
     subgraph docs["docs/ — governance & architecture"]
@@ -94,7 +94,7 @@ The key current crates are:
 - `elegy-runtime` (`shared/runtime`) for runtime composition
 - `elegy-descriptor` (`shared/descriptor`) for governed-descriptor types
 - `elegy-policy` (`shared/policy`) for bounded policy enforcement
-- `elegy-tooling` (`shared/tooling`) for plugin verify/pack/export/install, descriptor authoring, analysis, and skill generation
+- `elegy-tooling` (`shared/tooling`) as the binary-only home of `elegy-plugin-packaging` for plugin verify/pack/export/install
 - `elegy-plugin-sdk` (`shared/plugin-sdk`) for the publishable external plugin SDK
 - `elegy-mcp` (`plugins/mcp`) for MCP analysis and related runtime behavior over governed descriptors
 - `elegy-skills` (`plugins/skills`) for governed skill-registry access and validation
@@ -129,7 +129,7 @@ What the repo proves today:
 - `elegy-contracts` provides contract export, validation, and project inspection
 - `elegy-codegraph` provides code graph analysis
 - `elegy-run` provides the stdio MCP host
-- those commands are backed by shared Rust crates led by `shared/core`, `shared/tooling`, and the `plugins/` tree
+- those commands are backed by shared Rust crates led by `shared/core`, the `elegy-plugin-packaging` operator package under `shared/tooling`, and the `plugins/` tree
 - contract exports can be produced and consumed independently of the Rust workspace via `elegy-contracts`
 
 What the repo does **not** yet prove as a completed product surface:
@@ -219,7 +219,7 @@ flowchart TB
     subgraph L1["L1 — Shared library crates"]
         contracts["elegy-descriptor\nelegy-policy"]
         runtime["elegy-runtime\nelegy-core"]
-        tooling["elegy-tooling"]
+        tooling["elegy-tooling\n(binary-only operator crate)"]
     end
 
     subgraph L2["L2 — Plugin capability crates"]
