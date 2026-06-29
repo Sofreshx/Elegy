@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_package: (.package // .name)}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
           matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
@@ -72,9 +72,25 @@ jobs:
             echo "Missing build output: $binary_path" >&2
             exit 1
           fi
-          asset_name="${{ matrix.surface_name }}-${{ matrix.target }}${ext}"
-          asset_path="artifacts/distribution/${asset_name}"
-          cp "$binary_path" "$asset_path"
+          if [[ "${{ matrix.surface_packaging }}" == "plugin" ]]; then
+            plugin_root="${{ matrix.plugin_root }}"
+            if [[ -z "$plugin_root" ]]; then
+              echo "Missing pluginRoot for plugin-packaged surface ${{ matrix.surface_name }}" >&2
+              exit 1
+            fi
+            asset_name="${{ matrix.surface_name }}-plugin-${{ matrix.target }}.zip"
+            asset_path="artifacts/distribution/${asset_name}"
+            cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
+              pack \
+              --plugin "$plugin_root" \
+              --output "$asset_path" \
+              --binary "$binary_path" \
+              --binary-name "bin/${binary_name}"
+          else
+            asset_name="${{ matrix.surface_name }}-${{ matrix.target }}${ext}"
+            asset_path="artifacts/distribution/${asset_name}"
+            cp "$binary_path" "$asset_path"
+          fi
           sha256sum "$asset_path" | awk '{print $1}' > "${asset_path}.sha256"
           echo "asset=${asset_name}" >> "$GITHUB_OUTPUT"
 
@@ -222,6 +238,16 @@ jobs:
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
             elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"

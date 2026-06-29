@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-planning",
+  "version": "0.1.0",
+  "description": "Durable AI planning state management over SQLite. Goals, roadmaps, plans, work points, todos, issues, reviews, insights, and project runs.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1"
+    }
+  }
+}

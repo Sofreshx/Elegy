@@ -9,38 +9,36 @@ flows over the SQLite-backed store owned by the `elegy-memory` library.
 Salience, correction, scope binding, and provenance are enforced at the
 library layer; this binary is a thin CLI over the same primitives.
 
+This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is in
+`distribution/surfaces.json`.
+
 ## Binary surface
 
-- **Crate:** `rust/features/elegy-memory/`
+- **Crate:** `plugins/memory/`
 - **Binary name:** `elegy-memory`
-- **Source:** `rust/features/elegy-memory/src/cli.rs`
-- **Library consumers:** `rust/features/elegy-memory-mcp` (transport adapter),
-  `rust/bin/elegy-cli` (umbrella CLI subcommands).
+- **Source:** `plugins/memory/src/main.rs`
+- **Plugin manifest:** `.elegy-plugin/plugin.json`
+- **Plugin skills:** `plugins/memory/skills/elegy-memory/`
 
 ## Distribution shape
 
-- **CLI archive asset family:** `elegy-memory-<cliVersion>-<target>.zip`
-- **Wrapper archive:** `elegy-memory-wrapper-<bundleVersion>.zip`
-- **Release catalog entry:** `distribution/surfaces.json` (name: `elegy-memory`)
-- **Skill fixture:** `contracts/fixtures/skill.elegy-memory.json`
+- **Plugin archive:** `elegy-memory-v<version>.plugin.zip` (primary release contract)
+- **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
 - **Versioning:** follows workspace `version`.
 
 ## Install
 
 ```bash
-# Canonical installer (recommended)
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-memory -Force
-```
+# Install as a plugin package (primary lane)
+elegy-plugin-packaging install --archive elegy-memory-v<version>.plugin.zip
 
-```powershell
-# Native-pwsh entry point: thin shim that forwards all args to bash (requires bash in PATH)
-pwsh ./scripts/install-distribution.ps1 -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-memory -Force
+# Export for Codex host (derived lane)
+elegy-plugin-packaging export --plugin plugins/memory --host codex --output ./export
 ```
 
 ## Build from source
 
 ```bash
-cd rust
 cargo build -p elegy-memory
 cargo run -p elegy-memory -- --help
 ```
@@ -48,17 +46,11 @@ cargo run -p elegy-memory -- --help
 ## Validation
 
 - `cargo test -p elegy-memory`
-- Library contract tests under
-  `rust/features/elegy-memory/tests/{cli,conformance,governed_memory,integration,local_store}.rs`
+- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/memory`
 
 ## Where to read more
 
-- Memory architecture and MVP scope:
-  [`docs/architecture/mvp-scope.md`](./docs/architecture/mvp-scope.md)
-- Memory model (scopes, scoring, decay, confidence, provenance):
-  [`docs/architecture/memory-model.md`](./docs/architecture/memory-model.md)
-- Memory storage schema:
-  [`docs/architecture/storage-schema.md`](./docs/architecture/storage-schema.md)
-- Crate boundaries: [`rust/features/elegy-memory/AGENTS.md`](./AGENTS.md)
+- Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
+- Crate boundaries: [`AGENTS.md`](./AGENTS.md)
 - Memory MCP transport adapter (separate binary):
-  [`../elegy-memory-mcp/DISTRIBUTION.md`](../elegy-memory-mcp/DISTRIBUTION.md)
+  [`../memory-mcp/DISTRIBUTION.md`](../memory-mcp/DISTRIBUTION.md)

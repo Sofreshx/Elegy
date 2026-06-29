@@ -15,7 +15,7 @@ owner: Elegy
 
 ## Goals
 
-- Provide a central `skills/elegy-doc-practices/` package with compact workflow
+- Provide a central `elegy-doc-practices/` package with compact workflow
   instructions, deeper references, templates, and adoption snippets.
 - Add `elegy docs init`, `elegy docs new adr`, `elegy docs new spec`,
   `elegy docs check`, and `elegy docs index`.
@@ -47,7 +47,7 @@ owner: Elegy
 
 ## Acceptance Criteria
 
-- [x] A central `skills/elegy-doc-practices/` package exists with `SKILL.md`,
+- [x] A central `elegy-doc-practices/` package exists with `SKILL.md`,
   doctrine references, assets, eval fixtures, and adoption examples.
 - [x] `elegy docs init/new/check/index` are implemented on the umbrella CLI.
 - [x] Objective validation catches invalid metadata, invalid statuses, filename

@@ -75,7 +75,7 @@ compatibility path. Both resolve against the same catalog.
      vector as the CLI invocation template.
 3. Validate before publishing a change.
    - Run `validate` on every modified fixture and on the
-     `contracts/fixtures/` directory before opening a PR.
+     `plugins/skills/fixtures/` directory before opening a PR.
      Incomplete or broken fixtures fail CI downstream.
 4. List for visibility checks.
    - `list` with `--lifecycle active` shows what is currently in
@@ -94,7 +94,7 @@ compatibility path. Both resolve against the same catalog.
 
 - Envelope: `SkillDiscoveryResult` for search, resolve, and
   validate (declared in
-  `contracts/schemas/skill-discovery-result.schema.json`).
+   `plugins/skills/schemas/skill-discovery-result.schema.json`).
 - `search` / `resolve`: `data.results[]` contains ranked matches.
   Each match has `skillId`, `name`, `description`, `matchReason`,
   `matchedCapabilities[]`, and `contextCostEstimate`.
@@ -121,7 +121,7 @@ compatibility path. Both resolve against the same catalog.
 - Minimum supported `elegy-skills` version: `0.1.0`. The CLI shares
   workspace version with the root `elegy`; check `elegy --version`.
 - The governed registry format is declared by
-  `contracts/schemas/skill.schema.json`. Validate every fixture
+   `plugins/skills/schemas/skill.schema.json`. Validate every fixture
   against this schema before publishing.
 
 ## Examples
@@ -153,7 +153,7 @@ Expected:
 ### Example 2 — validate a single fixture
 
 ```text
-elegy-skills validate --file contracts/fixtures/skill.minimal.json --json
+elegy-skills validate --file plugins/skills/fixtures/skill.minimal.json --json
 ```
 
 Expected: `status: "ok"` with no diagnostics for a well-formed
@@ -177,10 +177,10 @@ fixture. For an invalid fixture: `status: "invalid"` with
 
 ## References
 
-- Governed source: `contracts/fixtures/skill.elegy-skills.json`.
+- Governed source: `plugins/skills/fixtures/skill.elegy-skills.json`.
 - Discovery projection:
-  `contracts/fixtures/skill-discovery-index.elegy-skills.json`.
+  `plugins/skills/fixtures/skill-discovery-index.elegy-skills.json`.
 - Architecture: `docs/architecture/skill-core-v1.md`.
 - Tooling placement: `docs/architecture/mcp-skill-tooling-placement.md`.
 - Result envelope:
-  `contracts/schemas/skill-discovery-result.schema.json`.
+  `plugins/skills/schemas/skill-discovery-result.schema.json`.

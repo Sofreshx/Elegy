@@ -132,7 +132,7 @@ The validation engine runs automatically after every mutation. See [Validation E
 
 ## Links
 
-- Source crate: `rust/features/elegy-planning/`
+- Source crate: `plugins/planning/`
 - Spec: This document
 - Agent-Safe Planning Core spec: [agent-safe-planning-core](agent-safe-planning-core/spec.md)
 - Architecture: [elegy-planning-v1](../architecture/v1.md)

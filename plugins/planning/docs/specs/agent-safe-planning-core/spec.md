@@ -15,15 +15,15 @@ Enhance `elegy-planning` so agents make fewer consistency mistakes by default. M
 
 ## Context Evidence
 
-- `rust/features/elegy-planning/src/model.rs:53-184` — Status enums for all entity types. No transition rules enforced; any status can be set from any other.
-- `rust/features/elegy-planning/src/storage.rs:1849-2159` — `update_status()` method. Parses status string into enum and writes to DB. No transition validation exists for Goal, Roadmap, WorkPoint, Plan, Todo, Issue, ReviewPoint, or Insight. Only ProjectRun has explicit gate checks at lines 2586-2755.
-- `rust/features/elegy-planning/src/storage.rs:3082-3169` — `find_runnable_work_points()`. Ranks only by `ordering_index ASC, id ASC`. No priority/urgency/lease-rank awareness.
-- `rust/features/elegy-planning/src/storage.rs:1628-1704` — `session_context()`. Returns only `entitiesTouched`, `insightsRecorded`, `validationSummary`, `tokenEstimate`. No active project runs, work points, plans, pending todos, open blockers, or recommended next action.
-- `rust/features/elegy-planning/src/storage.rs:4310-4347` — Scope enforcement. Mutations currently allow silent `default` scope in `--json --non-interactive` mode.
-- `rust/features/elegy-planning/src/validation.rs:1-737` — 28 validation findings. All advisory-only (warn/error severity, none block writes). No findings for corrective work without targets, blocked downstream work, or session/lease consistency.
-- `rust/features/elegy-planning/src/model.rs:338-355` — WorkPointRecord has `dependency_ids`, `validation_expectations`, `effort_tier`, `file_scopes`, `tags`. No `kind`, `priority`, `repairsWorkPointIds`, `supersedesWorkPointIds`, or `blocksWorkPointIds`.
-- `rust/features/elegy-planning/src/model.rs:503-511` — `SessionContextBundle` definition. No fields for active runs, work points, plans, pending todos, or blockers.
-- `rust/features/elegy-planning/src/session.rs:1-125` — Session file model. Tracks session ID, scope, timestamps. No active work metadata.
+- `plugins/planning/src/model.rs:53-184` — Status enums for all entity types. No transition rules enforced; any status can be set from any other.
+- `plugins/planning/src/storage.rs:1849-2159` — `update_status()` method. Parses status string into enum and writes to DB. No transition validation exists for Goal, Roadmap, WorkPoint, Plan, Todo, Issue, ReviewPoint, or Insight. Only ProjectRun has explicit gate checks at lines 2586-2755.
+- `plugins/planning/src/storage.rs:3082-3169` — `find_runnable_work_points()`. Ranks only by `ordering_index ASC, id ASC`. No priority/urgency/lease-rank awareness.
+- `plugins/planning/src/storage.rs:1628-1704` — `session_context()`. Returns only `entitiesTouched`, `insightsRecorded`, `validationSummary`, `tokenEstimate`. No active project runs, work points, plans, pending todos, open blockers, or recommended next action.
+- `plugins/planning/src/storage.rs:4310-4347` — Scope enforcement. Mutations currently allow silent `default` scope in `--json --non-interactive` mode.
+- `plugins/planning/src/validation.rs:1-737` — 28 validation findings. All advisory-only (warn/error severity, none block writes). No findings for corrective work without targets, blocked downstream work, or session/lease consistency.
+- `plugins/planning/src/model.rs:338-355` — WorkPointRecord has `dependency_ids`, `validation_expectations`, `effort_tier`, `file_scopes`, `tags`. No `kind`, `priority`, `repairsWorkPointIds`, `supersedesWorkPointIds`, or `blocksWorkPointIds`.
+- `plugins/planning/src/model.rs:503-511` — `SessionContextBundle` definition. No fields for active runs, work points, plans, pending todos, or blockers.
+- `plugins/planning/src/session.rs:1-125` — Session file model. Tracks session ID, scope, timestamps. No active work metadata.
 - `../index.md:469-474` — Current spec explicitly defers lifecycle transition enforcement to v1. This spec delivers that deferred feature.
 - `../index.md` (Critical Analysis, item 3) — "No lifecycle transition enforcement…this is the biggest practical risk. Without transition rules, update-status is semantically equivalent to setting a free-text tag."
 - `../index.md` (Critical Analysis, item 2) — "Advisory-first validation is the right call for an LLM-operated tool." This spec promotes 12 structural-integrity findings to preflight rejection. An ADR (`docs/adr/planning-preflight-boundary.md`) should document the promotion principle and agent UX tradeoffs. See `Drift Notes`.
@@ -395,13 +395,13 @@ These findings remain advisory (warning/error in validation but do not block wri
 
 ## Implementation Links
 
-- `rust/features/elegy-planning/src/model.rs` — Add `WorkPointKind` enum, new `WorkPointRecord` fields, new `SessionContextBundle` fields
-- `rust/features/elegy-planning/src/storage.rs` — Schema migration v8, transition enforcement, `find_runnable_work_points()` ranking, session context builder, scope-explicit gate
-- `rust/features/elegy-planning/src/validation.rs` — New validation findings, promotion of existing findings to preflight
-- `rust/features/elegy-planning/src/cli.rs` — New CLI arguments (`--kind`, `--priority`, `--override-transition`, `--repairs-work-point-id`, `--supersedes-work-point-id`, `--blocks-work-point-id`)
-- `rust/features/elegy-planning/src/service.rs` — Service-layer updates for new arguments and rejection flows
-- `rust/features/elegy-planning/src/session.rs` — Extended session file model with `activeProjectRun`, `lastActiveWorkPointId`, `lastCompletedWorkPointId`
-- `rust/features/elegy-planning/tests/` — Integration tests for all acceptance checks
+- `plugins/planning/src/model.rs` — Add `WorkPointKind` enum, new `WorkPointRecord` fields, new `SessionContextBundle` fields
+- `plugins/planning/src/storage.rs` — Schema migration v8, transition enforcement, `find_runnable_work_points()` ranking, session context builder, scope-explicit gate
+- `plugins/planning/src/validation.rs` — New validation findings, promotion of existing findings to preflight
+- `plugins/planning/src/cli.rs` — New CLI arguments (`--kind`, `--priority`, `--override-transition`, `--repairs-work-point-id`, `--supersedes-work-point-id`, `--blocks-work-point-id`)
+- `plugins/planning/src/service.rs` — Service-layer updates for new arguments and rejection flows
+- `plugins/planning/src/session.rs` — Extended session file model with `activeProjectRun`, `lastActiveWorkPointId`, `lastCompletedWorkPointId`
+- `plugins/planning/tests/` — Integration tests for all acceptance checks
 - `../index.md` — Update to reflect delivered lifecycle enforcement (remove "deferred to v1" note)
 
 ## Validation Evidence

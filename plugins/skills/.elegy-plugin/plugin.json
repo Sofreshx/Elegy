@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-skills",
+  "version": "0.1.0",
+  "description": "Governed skill registry — CLI-first discovery, resolution, validation, and generation of Elegy agent capabilities.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1"
+    }
+  }
+}

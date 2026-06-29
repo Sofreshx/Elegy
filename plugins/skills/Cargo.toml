@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 clap.workspace = true
 elegy-core = { version = "0.1.0", path = "../../shared/core" }
+elegy-plugin-sdk = { version = "0.1.0", path = "../../shared/plugin-sdk" }
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

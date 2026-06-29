@@ -137,6 +137,35 @@ pub struct ElegyPluginV1Author {
     pub url: Option<String>,
 }
 
+/// Codex-specific extension metadata under `extensions["codex.plugin/v1"]`.
+/// Declares host-specific fields that do not belong in the base manifest.
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct CodexPluginExtensionV1 {
+    pub schema_version: String,
+    /// Relative path(s) to additional non-skill assets to include in the Codex export.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Vec<String>>,
+    /// Relative path to the plugin's binary within the plugin package.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub binary: Option<String>,
+}
+
+/// Extract the `codex.plugin/v1` extension from a plugin manifest's extensions map.
+pub fn extract_codex_extension_v1(
+    extensions: &Option<serde_json::Map<String, serde_json::Value>>,
+) -> Option<CodexPluginExtensionV1> {
+    let map = extensions.as_ref()?;
+    let raw = map.get("codex.plugin/v1")?;
+    serde_json::from_value::<CodexPluginExtensionV1>(raw.clone()).ok()
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct PluginArchiveBinary<'a> {
+    pub source_path: &'a Path,
+    pub archive_path: String,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ElegyPluginV1ValidationResult {
     pub issues: Vec<String>,
@@ -1706,6 +1735,8 @@ pub fn export_plugin_v1(
         source: e,
     })?;
 
+    let codex_ext = extract_codex_extension_v1(&plugin.extensions);
+
     let mut written_files = Vec::new();
     let mut skills_count = 0usize;
     let mut mcp_servers_emitted = false;
@@ -1794,6 +1825,35 @@ pub fn export_plugin_v1(
         }
     }
 
+    // Copy Codex-specific assets if present
+    if host == "codex" {
+        if let Some(ref ext) = codex_ext {
+            if let Some(ref assets) = ext.assets {
+                for asset_rel in assets {
+                    let asset_src = package_root.join(asset_rel);
+                    let asset_dest = output_dir.join(asset_rel);
+                    if asset_src.exists() {
+                        if let Some(parent) = asset_dest.parent() {
+                            fs::create_dir_all(parent).map_err(|e| ToolingError::Io {
+                                operation: "create directory",
+                                path: parent.to_path_buf(),
+                                source: e,
+                            })?;
+                        }
+                        if asset_src.is_file() {
+                            fs::copy(&asset_src, &asset_dest).map_err(|e| ToolingError::Io {
+                                operation: "copy",
+                                path: asset_src.clone(),
+                                source: e,
+                            })?;
+                            written_files.push(display_path(&asset_dest));
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     // Write host-specific plugin manifest if applicable
     if needs_codex_manifest {
         let manifest_dir = output_dir.join(".codex-plugin");
@@ -1802,7 +1862,7 @@ pub fn export_plugin_v1(
             path: manifest_dir.clone(),
             source: e,
         })?;
-        let codex_manifest = serde_json::json!({
+        let mut codex_manifest = serde_json::json!({
             "name": plugin.name,
             "version": plugin.version,
             "description": plugin.description,
@@ -1811,6 +1871,11 @@ pub fn export_plugin_v1(
             "repository": plugin.repository,
             "skills": "./skills",
         });
+        if let Some(ref ext) = codex_ext {
+            if let Some(ref binary) = ext.binary {
+                codex_manifest["binary"] = serde_json::json!(binary);
+            }
+        }
         let manifest_path = manifest_dir.join("plugin.json");
         write_json_file(&manifest_path, &codex_manifest, overwrite)?;
         written_files.push(display_path(&manifest_path));
@@ -1924,6 +1989,15 @@ fn walk_dir_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) -> Result<(), 
 /// The manifest entry is placed at the archive root as `plugin.json`.
 /// Only declared component directories are included.
 pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, ToolingError> {
+    pack_plugin_v1_with_binary(plugin_path, output_zip, None)
+}
+
+/// Pack a v1-format plugin into a portable zip archive, optionally including a compiled binary.
+pub fn pack_plugin_v1_with_binary(
+    plugin_path: &Path,
+    output_zip: &Path,
+    binary: Option<PluginArchiveBinary<'_>>,
+) -> Result<String, ToolingError> {
     let (repo_root, _manifest_path) = resolve_plugin_root(plugin_path)?;
     let plugin_dir = repo_root.join(".elegy-plugin");
     let manifest_path = plugin_dir.join("plugin.json");
@@ -1949,10 +2023,10 @@ pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, T
     })?;
 
     // Collect all files to include
-    let mut entries: Vec<PathBuf> = Vec::new();
+    let mut entries: Vec<(PathBuf, String)> = Vec::new();
 
     // Include the manifest file (will be renamed to plugin.json at root)
-    entries.push(manifest_path.clone());
+    entries.push((manifest_path.clone(), "plugin.json".to_string()));
 
     // Include declared component directories
     let component_roots: Vec<&str> = vec![plugin.skills.as_deref(), plugin.mcp_servers.as_deref()]
@@ -1967,12 +2041,26 @@ pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, T
             repo_root.join(root_str)
         };
         if root_path.exists() && root_path.is_dir() {
-            collect_files_recursive(&root_path, &mut entries)?;
+            collect_files_recursive(&repo_root, &root_path, &mut entries)?;
         }
     }
 
+    if let Some(binary) = binary {
+        if !binary.source_path.exists() || !binary.source_path.is_file() {
+            return Err(ToolingError::Io {
+                operation: "read",
+                path: binary.source_path.to_path_buf(),
+                source: std::io::Error::new(
+                    std::io::ErrorKind::NotFound,
+                    "binary path does not exist or is not a file",
+                ),
+            });
+        }
+        entries.push((binary.source_path.to_path_buf(), binary.archive_path));
+    }
+
     // Sort for deterministic archives
-    entries.sort();
+    entries.sort_by(|a, b| a.1.cmp(&b.1));
 
     // Create the zip archive
     let file = fs::File::create(output_zip).map_err(|source| ToolingError::Io {
@@ -1987,22 +2075,9 @@ pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, T
 
     let mut buffer = Vec::new();
 
-    for entry_path in &entries {
-        // Determine the relative path in the archive
-        let relative_str = if entry_path == &manifest_path {
-            // Manifest entry goes to archive root as plugin.json
-            "plugin.json".to_string()
-        } else if let Ok(rel) = entry_path.strip_prefix(&repo_root) {
-            rel.to_string_lossy().replace('\\', "/")
-        } else {
-            entry_path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_default()
-        };
-
+    for (entry_path, relative_str) in &entries {
         // Skip excluded patterns
-        if should_exclude_from_pack(&relative_str) {
+        if should_exclude_from_pack(relative_str) {
             continue;
         }
 
@@ -2010,7 +2085,7 @@ pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, T
             .start_file(relative_str.clone(), options)
             .map_err(|source| ToolingError::Io {
                 operation: "write zip entry",
-                path: PathBuf::from(&relative_str),
+                path: PathBuf::from(relative_str),
                 source: source.into(),
             })?;
 
@@ -2046,7 +2121,11 @@ pub fn pack_plugin_v1(plugin_path: &Path, output_zip: &Path) -> Result<String, T
     Ok(display_path(output_zip))
 }
 
-fn collect_files_recursive(dir: &Path, entries: &mut Vec<PathBuf>) -> Result<(), ToolingError> {
+fn collect_files_recursive(
+    repo_root: &Path,
+    dir: &Path,
+    entries: &mut Vec<(PathBuf, String)>,
+) -> Result<(), ToolingError> {
     for entry in fs::read_dir(dir).map_err(|source| ToolingError::Io {
         operation: "read directory",
         path: dir.to_path_buf(),
@@ -2059,9 +2138,17 @@ fn collect_files_recursive(dir: &Path, entries: &mut Vec<PathBuf>) -> Result<(),
         })?;
         let path = entry.path();
         if path.is_dir() {
-            collect_files_recursive(&path, entries)?;
+            collect_files_recursive(repo_root, &path, entries)?;
         } else if path.is_file() {
-            entries.push(path);
+            let relative = path
+                .strip_prefix(repo_root)
+                .map(|rel| rel.to_string_lossy().replace('\\', "/"))
+                .unwrap_or_else(|_| {
+                    path.file_name()
+                        .map(|name| name.to_string_lossy().to_string())
+                        .unwrap_or_default()
+                });
+            entries.push((path, relative));
         }
     }
     Ok(())
@@ -2205,9 +2292,10 @@ pub(crate) fn display_path(path: &Path) -> String {
 mod tests {
     use super::{
         analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, export_plugin_v1,
-        generate_skills_from_descriptor_file, inspect_plugin_v1, scaffold_plugin_v1_repository,
-        verify_plugin_v1, AuthorMcpDescriptorRequest, AuthorMcpToolRequest, McpServerDescriptor,
-        McpToolAnalyzer, McpToolDefinition,
+        generate_skills_from_descriptor_file, inspect_plugin_v1, pack_plugin_v1_with_binary,
+        scaffold_plugin_v1_repository, verify_plugin_v1, AuthorMcpDescriptorRequest,
+        AuthorMcpToolRequest, McpServerDescriptor, McpToolAnalyzer, McpToolDefinition,
+        PluginArchiveBinary,
     };
     use serde_json::json;
     use std::fs;
@@ -2468,5 +2556,48 @@ mod tests {
             .join("my-plugin")
             .join("SKILL.md")
             .exists());
+    }
+
+    #[test]
+    fn pack_plugin_v1_with_binary_includes_compiled_binary() {
+        let temp_dir = unique_temp_dir("elegy-pack-plugin-binary");
+        let plugin_dir = temp_dir.join("my-plugin");
+
+        scaffold_plugin_v1_repository(
+            "my-plugin",
+            "Test plugin for packing",
+            "0.1.0",
+            &plugin_dir,
+            "Test Author",
+            "MIT",
+            "",
+        )
+        .expect("scaffold should succeed");
+
+        let binary_path = temp_dir.join("my-plugin.exe");
+        fs::write(&binary_path, b"binary-bytes").expect("write fake binary");
+
+        let archive_path = temp_dir.join("my-plugin.plugin.zip");
+        pack_plugin_v1_with_binary(
+            &plugin_dir,
+            &archive_path,
+            Some(PluginArchiveBinary {
+                source_path: &binary_path,
+                archive_path: "bin/my-plugin.exe".to_string(),
+            }),
+        )
+        .expect("pack should succeed");
+
+        let file = fs::File::open(&archive_path).expect("open archive");
+        let mut zip = zip::ZipArchive::new(file).expect("read archive");
+        let mut names = Vec::new();
+        for i in 0..zip.len() {
+            names.push(zip.by_index(i).expect("zip entry").name().to_string());
+        }
+        names.sort();
+
+        assert!(names.iter().any(|name| name == "plugin.json"));
+        assert!(names.iter().any(|name| name == "skills/my-plugin/SKILL.md"));
+        assert!(names.iter().any(|name| name == "bin/my-plugin.exe"));
     }
 }

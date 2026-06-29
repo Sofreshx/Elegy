@@ -10,7 +10,7 @@ Elegy is a modular AI agent infrastructure project. It provides independent syst
 
 | System | Crate | Status | Description |
 |--------|-------|--------|-------------|
-| **elegy-memory** | `rust/features/elegy-memory` | 🟢 MVP complete + implemented v1/v2 features | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation, corrections, learning, sharing, and safety workflows |
+| **elegy-memory** | `plugins/memory/` | 🟢 MVP complete + implemented v1/v2 features | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation, corrections, learning, sharing, and safety workflows |
 
 ## Design Philosophy
 

@@ -49,7 +49,9 @@ elegy skills search --query "diagram" --json
 elegy skills describe --skill-id diagram --json
 ```
 
-The skill definitions in `contracts/fixtures/skill.*.json` remain the discovery authority. The contract schemas under `contracts/schemas/` remain the durable authority.
+Skill definitions in `plugins/<name>/skills/<skill-id>/SKILL.md` and standalone root
+`<skill-id>/SKILL.md` packages are the discovery authority. Contract schemas live
+under `plugins/<name>/schemas/` and cross-cutting fixtures under `shared/core/fixtures/`.
 
 ## Optional MCP Adapter
 
@@ -77,6 +79,10 @@ Tagged releases include dedicated CLI archives for each runtime surface:
 - `elegy-mcp` binary
 - `elegy-configuration` binary
 - `elegy-documentation` binary
+
+Plugin-packaged surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`,
+`elegy-documentation`, `elegy-observe`, `elegy-desktop`) ship as `.plugin.zip` archives
+containing manifest, skills, and binary. Non-plugin surfaces ship as standalone binaries.
 
 See [Distribution](distribution.md) for the full list of asset families, targets, and install commands.
 

@@ -94,7 +94,7 @@ The key current crates are:
 - `elegy-runtime` (`shared/runtime`) for runtime composition
 - `elegy-descriptor` (`shared/descriptor`) for governed-descriptor types
 - `elegy-policy` (`shared/policy`) for bounded policy enforcement
-- `elegy-tooling` (`shared/tooling`) for descriptor authoring, analysis, and skill generation
+- `elegy-tooling` (`shared/tooling`) for plugin verify/pack/export/install, descriptor authoring, analysis, and skill generation
 - `elegy-plugin-sdk` (`shared/plugin-sdk`) for the publishable external plugin SDK
 - `elegy-mcp` (`plugins/mcp`) for MCP analysis and related runtime behavior over governed descriptors
 - `elegy-skills` (`plugins/skills`) for governed skill-registry access and validation
@@ -109,6 +109,12 @@ The key current crates are:
 The current shipped operator path is intentionally narrow.
 
 The current shipped operator surfaces are each shipped as dedicated binaries: `elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`, `elegy-documentation`, `elegy-configuration`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`.
+
+Seven surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`,
+`elegy-documentation`, `elegy-observe`, `elegy-desktop`) are packaged as
+`elegy-plugin/v1` plugin archives. The portable plugin archive (`.plugin.zip`)
+is the primary release contract; per-host Codex exports are derived host projections.
+The remaining surfaces ship as standalone CLI binaries.
 
 What the repo proves today:
 
@@ -238,6 +244,11 @@ flowchart TB
     L2 --> L3
     L3 --> L4
 ```
+
+Plugin-surfaced binaries in L3 are discovered through their
+`.elegy-plugin/plugin.json` manifests rather than listed as flat binaries.
+`elegy-run`, `elegy-contracts`, and `elegy-codegraph` remain standalone
+CLI surfaces without a plugin wrapper.
 
 ## Consumer guidance
 

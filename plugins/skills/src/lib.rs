@@ -2,7 +2,9 @@ use elegy_core::{
     parse_agent_skill_frontmatter, validate_agent_skill_frontmatter, AgentSkillFrontmatter,
     ContractsError,
 };
+use elegy_plugin_sdk::{validate_elegy_plugin_v1, ElegyPluginV1};
 use serde::Serialize;
+use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -19,6 +21,23 @@ pub enum SkillsSurfaceError {
     Yaml { path: PathBuf, details: String },
     #[error("skill registry contract error: {0}")]
     Contracts(#[from] ContractsError),
+    #[error("plugin manifest at {path} is invalid: {issues:?}")]
+    InvalidPluginManifest {
+        path: PathBuf,
+        issues: Vec<String>,
+    },
+    #[error("duplicate skill ID '{id}' found at {first_path} and {second_path}")]
+    DuplicateSkillId {
+        id: String,
+        first_path: PathBuf,
+        second_path: PathBuf,
+    },
+    #[error("plugin manifest JSON parse error at {path}: {source}")]
+    PluginManifestJson {
+        path: PathBuf,
+        #[source]
+        source: serde_json::Error,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -51,12 +70,25 @@ pub struct RegistrySkillEntry {
     pub match_result: Option<RegistrySearchMatch>,
 }
 
-/// A loaded skill from the skills/ directory with parsed frontmatter.
+/// A loaded skill from a SKILL.md file with parsed frontmatter and provenance.
 #[derive(Clone, Debug)]
 struct LoadedSkill {
     summary: RegistrySkillSummary,
     frontmatter: AgentSkillFrontmatter,
     path: PathBuf,
+    provenance: SkillProvenance,
+}
+
+#[derive(Clone, Debug)]
+#[allow(dead_code)]
+enum SkillProvenance {
+    Plugin {
+        plugin_name: String,
+        manifest_path: PathBuf,
+    },
+    Standalone {
+        root_dir: PathBuf,
+    },
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq)]
@@ -100,75 +132,125 @@ pub struct SkillRegistry {
 }
 
 impl SkillRegistry {
-    /// Build registry by scanning `skills/` directory at the repo root.
+    /// Build registry by discovering skills from plugin manifests, then standalone root skills.
     pub fn builtin() -> Result<Self, SkillsSurfaceError> {
-        // From plugins/skills/Cargo.toml, go up 2 levels to repo root
         let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         let repo_root = manifest_dir
             .parent()
             .and_then(|p| p.parent())
             .map(|p| p.to_path_buf())
             .unwrap_or_else(|| PathBuf::from("../.."));
-        let skills_dir = repo_root.join("skills");
 
-        Self::from_skills_dir(&skills_dir)
-    }
+        let mut skills: Vec<LoadedSkill> = Vec::new();
 
-    /// Build registry from a specific `skills/` directory.
-    pub fn from_skills_dir(skills_dir: &Path) -> Result<Self, SkillsSurfaceError> {
-        let mut skills = Vec::new();
+        // ── Phase 1: Plugin manifest discovery ──────────────────────────
+        let plugins_dir = repo_root.join("plugins");
+        if plugins_dir.exists() && plugins_dir.is_dir() {
+            let plugin_entries =
+                fs::read_dir(&plugins_dir).map_err(|e| SkillsSurfaceError::Io {
+                    path: plugins_dir.clone(),
+                    source: e,
+                })?;
 
-        if !skills_dir.exists() || !skills_dir.is_dir() {
-            return Ok(Self { skills });
+            for entry in plugin_entries.flatten() {
+                let plugin_dir = entry.path();
+                if !plugin_dir.is_dir() {
+                    continue;
+                }
+                let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
+                if !manifest_path.exists() {
+                    continue;
+                }
+
+                let raw =
+                    fs::read_to_string(&manifest_path).map_err(|e| SkillsSurfaceError::Io {
+                        path: manifest_path.clone(),
+                        source: e,
+                    })?;
+                let plugin: ElegyPluginV1 =
+                    serde_json::from_str(&raw).map_err(|e| {
+                        SkillsSurfaceError::PluginManifestJson {
+                            path: manifest_path.clone(),
+                            source: e,
+                        }
+                    })?;
+                let validation = validate_elegy_plugin_v1(&plugin);
+                if !validation.is_valid() {
+                    return Err(SkillsSurfaceError::InvalidPluginManifest {
+                        path: manifest_path,
+                        issues: validation.issues,
+                    });
+                }
+
+                if let Some(skills_rel) = &plugin.skills {
+                    let skills_abs = plugin_dir.join(skills_rel);
+                    let plugin_name = plugin.name.clone();
+                    let plugin_skills = scan_skills_dir(
+                        &skills_abs,
+                        SkillProvenance::Plugin {
+                            plugin_name,
+                            manifest_path: manifest_path.clone(),
+                        },
+                    )?;
+                    skills.extend(plugin_skills);
+                }
+            }
         }
 
-        let entries = fs::read_dir(skills_dir).map_err(|e| SkillsSurfaceError::Io {
-            path: skills_dir.to_path_buf(),
-            source: e,
-        })?;
-
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            let skill_md = path.join("SKILL.md");
-            if !skill_md.exists() {
-                continue;
-            }
-
-            let content = fs::read_to_string(&skill_md).map_err(|e| SkillsSurfaceError::Io {
-                path: skill_md.clone(),
+        // ── Phase 2: Standalone root skill discovery ────────────────────
+        let root_entries =
+            fs::read_dir(&repo_root).map_err(|e| SkillsSurfaceError::Io {
+                path: repo_root.clone(),
                 source: e,
             })?;
 
-            let (frontmatter, _body) =
-                parse_agent_skill_frontmatter(&content).map_err(|e| SkillsSurfaceError::Yaml {
-                    path: skill_md.clone(),
-                    details: e,
-                })?;
-
-            let validation_issues = validate_agent_skill_frontmatter(&frontmatter);
-            if !validation_issues.is_empty() {
-                // Skip invalid skills
+        for entry in root_entries.flatten() {
+            let dir = entry.path();
+            if !dir.is_dir() {
                 continue;
             }
-
-            let summary = RegistrySkillSummary {
-                id: frontmatter.name.clone(),
-                name: frontmatter.name.clone(),
-                description: frontmatter.description.clone(),
-                aliases: Vec::new(),
-                lifecycle_state: "active".to_string(),
-            };
-
-            skills.push(LoadedSkill {
-                summary,
-                frontmatter,
-                path,
-            });
+            let skill_md = dir.join("SKILL.md");
+            if !skill_md.exists() {
+                continue;
+            }
+            // Skip directories that are actually plugins
+            if dir.join(".elegy-plugin").join("plugin.json").exists() {
+                continue;
+            }
+            let loaded = load_skill_file(
+                &skill_md,
+                dir.clone(),
+                SkillProvenance::Standalone {
+                    root_dir: dir.clone(),
+                },
+            )?;
+            skills.push(loaded);
         }
 
+        // ── Phase 3: Duplicate detection ────────────────────────────────
+        let mut seen: HashMap<String, PathBuf> = HashMap::new();
+        for skill in &skills {
+            if let Some(first_path) = seen.get(&skill.summary.id) {
+                return Err(SkillsSurfaceError::DuplicateSkillId {
+                    id: skill.summary.id.clone(),
+                    first_path: first_path.clone(),
+                    second_path: skill.path.clone(),
+                });
+            }
+            seen.insert(skill.summary.id.clone(), skill.path.clone());
+        }
+
+        Ok(Self { skills })
+    }
+
+    /// Build registry from a specific `skills/` directory (standalone skills).
+    pub fn from_skills_dir(skills_dir: &Path) -> Result<Self, SkillsSurfaceError> {
+        let skills = scan_skills_dir(
+            skills_dir,
+            SkillProvenance::Standalone {
+                root_dir: skills_dir.to_owned(),
+            },
+        )?;
         Ok(Self { skills })
     }
 
@@ -298,6 +380,81 @@ pub fn validate_skill_directory(
 
 // ── Internal helpers ────────────────────────────────────────────────
 
+/// Scan a `skills/`-style directory for skill subdirectories, each
+/// containing a `SKILL.md` file.
+fn scan_skills_dir(
+    dir: &Path,
+    provenance: SkillProvenance,
+) -> Result<Vec<LoadedSkill>, SkillsSurfaceError> {
+    let mut skills = Vec::new();
+
+    if !dir.exists() || !dir.is_dir() {
+        return Ok(skills);
+    }
+
+    let entries = fs::read_dir(dir).map_err(|e| SkillsSurfaceError::Io {
+        path: dir.to_path_buf(),
+        source: e,
+    })?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        let skill_md = path.join("SKILL.md");
+        if !skill_md.exists() {
+            continue;
+        }
+        let loaded = load_skill_file(&skill_md, path, provenance.clone())?;
+        skills.push(loaded);
+    }
+
+    Ok(skills)
+}
+
+/// Load a single skill from a `SKILL.md` file path.
+fn load_skill_file(
+    skill_md: &Path,
+    dir: PathBuf,
+    provenance: SkillProvenance,
+) -> Result<LoadedSkill, SkillsSurfaceError> {
+    let content = fs::read_to_string(skill_md).map_err(|e| SkillsSurfaceError::Io {
+        path: skill_md.to_path_buf(),
+        source: e,
+    })?;
+
+    let (frontmatter, _body) =
+        parse_agent_skill_frontmatter(&content).map_err(|e| SkillsSurfaceError::Yaml {
+            path: skill_md.to_path_buf(),
+            details: e,
+        })?;
+
+    let validation_issues = validate_agent_skill_frontmatter(&frontmatter);
+    if !validation_issues.is_empty() {
+        // Skip invalid skills — caller handles the Err
+        return Err(SkillsSurfaceError::Yaml {
+            path: skill_md.to_path_buf(),
+            details: format!("validation failed: {:?}", validation_issues),
+        });
+    }
+
+    let summary = RegistrySkillSummary {
+        id: frontmatter.name.clone(),
+        name: frontmatter.name.clone(),
+        description: frontmatter.description.clone(),
+        aliases: Vec::new(),
+        lifecycle_state: "active".to_string(),
+    };
+
+    Ok(LoadedSkill {
+        summary,
+        frontmatter,
+        path: dir,
+        provenance,
+    })
+}
+
 fn matches_query(skill: &LoadedSkill, query: &SkillRegistryQuery) -> bool {
     query.lifecycle.as_ref().is_none_or(|lifecycle| {
         skill
@@ -401,11 +558,41 @@ fn compare_match_score(a: &RegistrySkillEntry, b: &RegistrySkillEntry) -> std::c
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn unique_temp_dir(prefix: &str) -> PathBuf {
+        let unique = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("current time should be after unix epoch")
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
+        fs::create_dir_all(&dir).expect("create temp directory");
+        dir
+    }
 
     #[test]
     fn builtin_registry_search_finds_repo_status() {
         let registry = SkillRegistry::builtin().expect("builtin registry should load");
         let results = registry.search("repo", false);
         assert!(!results.is_empty());
+    }
+
+    #[test]
+    fn standalone_skill_directory_fails_on_invalid_skill() {
+        let temp_dir = unique_temp_dir("elegy-skills-invalid");
+        let skill_dir = temp_dir.join("broken-skill");
+        fs::create_dir_all(&skill_dir).expect("create skill directory");
+        fs::write(
+            skill_dir.join("SKILL.md"),
+            "---\nname: broken-skill\n---\n# Broken\n",
+        )
+        .expect("write invalid skill");
+
+        let err = SkillRegistry::from_skills_dir(&temp_dir).expect_err("must fail");
+        assert!(
+            matches!(err, SkillsSurfaceError::Yaml { .. }),
+            "unexpected error: {err}"
+        );
     }
 }

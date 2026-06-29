@@ -264,12 +264,12 @@ elegy-planning diff --manifest plan.yaml --compact
 
 ## Implementation Links
 
-- `rust/features/elegy-planning/src/manifest.rs` — New module: manifest types, parser, expansion
-- `rust/features/elegy-planning/src/storage.rs` — Upsert methods, transactional apply, diff queries
-- `rust/features/elegy-planning/src/cli.rs` — New Command::Manifest variant, diff command, --compact flag
-- `rust/features/elegy-planning/src/model.rs` — Manifest types, apply result types
-- `rust/features/elegy-planning/contracts/schemas/planning-manifest.schema.json` — JSON Schema for manifest format
-- `rust/features/elegy-planning/tests/integration.rs` — Integration tests for manifest apply, diff, compact output
+- `plugins/planning/src/manifest.rs` — New module: manifest types, parser, expansion
+- `plugins/planning/src/storage.rs` — Upsert methods, transactional apply, diff queries
+- `plugins/planning/src/cli.rs` — New Command::Manifest variant, diff command, --compact flag
+- `plugins/planning/src/model.rs` — Manifest types, apply result types
+- `plugins/planning/schemas/planning-manifest.schema.json` — JSON Schema for manifest format
+- `plugins/planning/tests/integration.rs` — Integration tests for manifest apply, diff, compact output
 
 ## Links
 

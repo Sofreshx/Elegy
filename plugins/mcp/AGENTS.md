@@ -3,7 +3,7 @@
 ## Start Here
 
 - Read `../../docs/architecture/mcp-skill-tooling-placement.md` before changing ownership or adding new MCP-facing behavior.
-- Inspect governed MCP artifacts under `../../contracts/` when changing descriptor or analysis semantics.
+- Inspect governed MCP artifacts under `../fixtures/` and schemas under `../schemas/` when changing descriptor or analysis semantics.
 
 ## Boundaries
 

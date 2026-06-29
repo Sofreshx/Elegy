@@ -2,7 +2,7 @@
 
 ## What this crate is
 
-`rust/bin/elegy-host-mcp/` is a **library** crate, not a binary. It is the
+`hosts/host-mcp/` is a **library** crate, not a binary. It is the
 host-side MCP transport adapter library used by the umbrella `elegy` CLI.
 
 It re-exports `serve_stdio`, `serve_stdio_with_options`, `ElegyMcpHost`, and
@@ -11,12 +11,12 @@ hosting without rebuilding the transport here.
 
 ## Library surface
 
-- **Crate:** `rust/bin/elegy-host-mcp/`
+- **Crate:** `hosts/host-mcp/`
 - **Library name:** `elegy-host-mcp`
-- **Source files:** `rust/bin/elegy-host-mcp/src/lib.rs` (re-exports),
+- **Source files:** `hosts/host-mcp/src/lib.rs` (re-exports),
   `host.rs` (transport), `error.rs` (typed errors)
 - **Library consumers:**
-  - `rust/bin/elegy-cli` (the umbrella `elegy` binary) for the
+  - the umbrella `elegy` binary for the
     `elegy mcp host` subcommand
 - **Binary consumers:** none — this crate has no `[[bin]]` and no
   `src/main.rs`. It compiles only to a library.
@@ -35,13 +35,12 @@ There is no separate install. The umbrella `elegy-cli` archive carries the
 host transport.
 
 ```bash
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy --surface elegy-cli -Force
 ```
 
 ## Build from source
 
 ```bash
-cd rust
 cargo build -p elegy-host-mcp
 ```
 
