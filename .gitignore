@@ -1,5 +1,7 @@
 # Build outputs
 **/[Bb]in/
+!shared/plugin-sdk/src/bin/
+!shared/plugin-sdk/src/bin/*.rs
 **/[Oo]bj/
 target/
 

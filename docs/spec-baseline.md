@@ -1,6 +1,6 @@
 ---
 created: 2026-03-19
-updated: 2026-05-29
+updated: 2026-06-30
 category: architecture
 status: active
 doc_kind: reference

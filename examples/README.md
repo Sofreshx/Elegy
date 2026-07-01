@@ -82,4 +82,4 @@ What it does **not** currently prove is OpenAPI operation execution or successfu
 ## Reference links
 
 - [Rust workspace README](../README.md)
-- [Rust consolidation note](../../docs/architecture/rust-consolidation.md)
+- [Documentation practices](../docs/architecture/documentation-practices.md)

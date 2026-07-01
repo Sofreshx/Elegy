@@ -6,6 +6,3 @@ Claude-specific note:
 - Read `README.md`, then the smallest relevant doc under `docs/`.
 - For memory work, also read the architecture docs under `plugins/memory/docs/architecture/`.
 
-Claude-only reminder:
-
-- Keep this file thin. Put durable repo policy in `AGENTS.md`, not here.

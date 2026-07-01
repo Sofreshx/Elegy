@@ -1,7 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use elegy_plugin_sdk::{
-    export_plugin_v1, inspect_plugin_v1, pack_plugin_v1, pack_plugin_v1_with_binary,
-    resolve_plugin_root, verify_plugin_v1, PluginArchiveBinary,
+    export_plugin_v1_with_codex_mode_and_binary, inspect_plugin_v1, pack_plugin_v1,
+    pack_plugin_v1_with_binary, resolve_plugin_root, scaffold_plugin_v1_repository_with_mode,
+    verify_plugin_v1, CodexProjectionMode, PluginArchiveBinary, PluginScaffoldMode,
 };
 use serde_json::Value;
 use std::path::{Path, PathBuf};
@@ -20,6 +21,25 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
+    /// Scaffold a minimal Elegy plugin repository
+    Scaffold {
+        #[arg(long)]
+        name: String,
+        #[arg(long)]
+        description: String,
+        #[arg(long, default_value = "0.1.0")]
+        version: String,
+        #[arg(long)]
+        output: PathBuf,
+        #[arg(long)]
+        author: String,
+        #[arg(long, default_value = "")]
+        license: String,
+        #[arg(long, default_value = "")]
+        repository: String,
+        #[arg(long, value_enum, default_value_t = ScaffoldMode::SkillOnly)]
+        mode: ScaffoldMode,
+    },
     /// Verify a plugin package (validates manifest and skills)
     Verify {
         /// Path to plugin directory, .elegy-plugin dir, or plugin.json
@@ -55,6 +75,15 @@ enum Command {
         /// Overwrite existing output
         #[arg(long, default_value_t = false)]
         overwrite: bool,
+        /// Emit documented experimental Codex manifest fields
+        #[arg(long, default_value_t = false)]
+        experimental_codex: bool,
+        /// Optional compiled binary to include in the host export.
+        #[arg(long)]
+        binary: Option<PathBuf>,
+        /// Host-relative path for the compiled binary (default: bin/<filename>).
+        #[arg(long)]
+        binary_name: Option<String>,
     },
     /// Install a plugin from a local archive or URL
     Install {
@@ -70,9 +99,56 @@ enum Command {
     },
 }
 
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+enum ScaffoldMode {
+    #[default]
+    SkillOnly,
+    RustCli,
+    McpServer,
+}
+
+impl From<ScaffoldMode> for PluginScaffoldMode {
+    fn from(value: ScaffoldMode) -> Self {
+        match value {
+            ScaffoldMode::SkillOnly => Self::SkillOnly,
+            ScaffoldMode::RustCli => Self::RustCli,
+            ScaffoldMode::McpServer => Self::McpServer,
+        }
+    }
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
+        Command::Scaffold {
+            name,
+            description,
+            version,
+            output,
+            author,
+            license,
+            repository,
+            mode,
+        } => match scaffold_plugin_v1_repository_with_mode(
+            &name,
+            &description,
+            &version,
+            &output,
+            &author,
+            &license,
+            &repository,
+            mode.into(),
+        ) {
+            Ok(files) => {
+                println!("Plugin scaffolded successfully.");
+                println!("  mode: {mode:?}  files: {}", files.len());
+                ExitCode::SUCCESS
+            }
+            Err(error) => {
+                eprintln!("Error: {error}");
+                ExitCode::from(2)
+            }
+        },
         Command::Verify { plugin } => {
             // verify_plugin_v1 expects the .elegy-plugin directory directly.
             let (repo_root, _manifest) = match resolve_plugin_root(&plugin) {
@@ -193,24 +269,64 @@ fn main() -> ExitCode {
             host,
             output,
             overwrite,
-        } => match export_plugin_v1(&plugin, &host, &output, overwrite) {
-            Ok(result) => {
-                println!(
-                    "Exported {} to {}: {} files",
-                    result.plugin_name,
-                    host,
-                    result.written_files.len()
-                );
-                for file in &result.written_files {
-                    println!("  {file}");
+            experimental_codex,
+            binary,
+            binary_name,
+        } => {
+            let default_binary_name = match (&binary, &binary_name) {
+                (Some(binary_path), None) => binary_path
+                    .file_name()
+                    .map(|name| format!("bin/{}", name.to_string_lossy())),
+                _ => None,
+            };
+            let binary_archive_name = binary_name.or(default_binary_name);
+            let binary_spec = match (&binary, &binary_archive_name) {
+                (Some(binary_path), Some(archive_path)) => Some(PluginArchiveBinary {
+                    source_path: binary_path.as_path(),
+                    archive_path: archive_path.clone(),
+                }),
+                (Some(_), None) => {
+                    eprintln!(
+                        "Error: --binary requires --binary-name when no filename can be inferred."
+                    );
+                    return ExitCode::from(2);
                 }
-                ExitCode::SUCCESS
+                (None, Some(_)) => {
+                    eprintln!("Error: --binary-name requires --binary.");
+                    return ExitCode::from(2);
+                }
+                (None, None) => None,
+            };
+            match export_plugin_v1_with_codex_mode_and_binary(
+                &plugin,
+                &host,
+                &output,
+                overwrite,
+                if experimental_codex {
+                    CodexProjectionMode::Experimental
+                } else {
+                    CodexProjectionMode::Current
+                },
+                binary_spec,
+            ) {
+                Ok(result) => {
+                    println!(
+                        "Exported {} to {}: {} files",
+                        result.plugin_name,
+                        host,
+                        result.written_files.len()
+                    );
+                    for file in &result.written_files {
+                        println!("  {file}");
+                    }
+                    ExitCode::SUCCESS
+                }
+                Err(e) => {
+                    eprintln!("Error: {e}");
+                    ExitCode::from(2)
+                }
             }
-            Err(e) => {
-                eprintln!("Error: {e}");
-                ExitCode::from(2)
-            }
-        },
+        }
         Command::Install {
             archive,
             url,
