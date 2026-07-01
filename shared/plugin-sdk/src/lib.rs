@@ -125,7 +125,18 @@ pub struct ElegyPluginV1 {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub mcp_servers: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_catalog: Option<ElegyPluginCapabilityCatalog>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub extensions: Option<serde_json::Map<String, serde_json::Value>>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginCapabilityCatalog {
+    pub path: String,
+    pub schema_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub readiness_command: Option<String>,
 }
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
@@ -577,6 +588,18 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
         }
     }
 
+    if let Some(catalog) = &plugin.capability_catalog {
+        if !is_safe_package_relative_path(&catalog.path) {
+            issues.push(format!(
+                "capabilityCatalog path '{}' is not a safe package-relative path.",
+                catalog.path
+            ));
+        }
+        if catalog.schema_version.trim().is_empty() {
+            issues.push("capabilityCatalog.schemaVersion must not be empty.".into());
+        }
+    }
+
     if let Some(author) = &plugin.author {
         if author.name.trim().is_empty() {
             issues.push("author.name must not be empty when author is present.".into());
@@ -752,6 +775,7 @@ pub fn import_codex_plugin_v1(codex_plugin_path: &Path) -> Result<ElegyPluginV1,
         repository: codex.repository,
         skills: codex.skills,
         mcp_servers: None,
+        capability_catalog: None,
         extensions: Some(extensions),
     })
 }

@@ -8,9 +8,9 @@
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
-  "skills": "skills/",
+  "skills": "./skills/",
   "capabilityCatalog": {
-    "path": "capability-catalog.json",
+    "path": "./capability-catalog.json",
     "schemaVersion": "elegy-capability-catalog/v1",
     "readinessCommand": "elegy-planning capabilities --detail"
   },

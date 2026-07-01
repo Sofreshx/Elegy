@@ -1,5 +1,27 @@
 {
   "$defs": {
+    "ElegyPluginCapabilityCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "readinessCommand": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
     "ElegyPluginV1Author": {
       "additionalProperties": false,
       "properties": {
@@ -32,6 +54,16 @@
       "anyOf": [
         {
           "$ref": "#/$defs/ElegyPluginV1Author"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "capabilityCatalog": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginCapabilityCatalog"
         },
         {
           "type": "null"
