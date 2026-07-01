@@ -1,5 +1,6 @@
-use elegy_plugin_sdk::{validate_elegy_plugin_v1, ElegyPluginV1};
+use elegy_plugin_sdk::{is_safe_package_relative_path, validate_elegy_plugin_v1, ElegyPluginV1};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Read};
@@ -27,6 +28,8 @@ pub enum InstallError {
     MissingManifest,
     AlreadyInstalled { name: String, path: PathBuf },
     DownloadFailed(String),
+    ChecksumMismatch { expected: String, actual: String },
+    IdentityMismatch(String),
 }
 
 impl std::fmt::Display for InstallError {
@@ -44,6 +47,10 @@ impl std::fmt::Display for InstallError {
                 )
             }
             Self::DownloadFailed(msg) => write!(f, "Download failed: {msg}"),
+            Self::ChecksumMismatch { expected, actual } => {
+                write!(f, "Checksum mismatch: expected {expected}, found {actual}")
+            }
+            Self::IdentityMismatch(message) => write!(f, "Plugin identity mismatch: {message}"),
         }
     }
 }
@@ -75,6 +82,31 @@ pub fn install_from_archive(
     archive_path: &Path,
     install_root: &Path,
 ) -> Result<InstallReceipt, InstallError> {
+    install_from_archive_with_identity(archive_path, install_root, None, None)
+}
+
+pub fn install_from_archive_with_identity(
+    archive_path: &Path,
+    install_root: &Path,
+    expected_name: Option<&str>,
+    expected_version: Option<&str>,
+) -> Result<InstallReceipt, InstallError> {
+    install_from_archive_with_identity_and_source(
+        archive_path,
+        install_root,
+        expected_name,
+        expected_version,
+        None,
+    )
+}
+
+fn install_from_archive_with_identity_and_source(
+    archive_path: &Path,
+    install_root: &Path,
+    expected_name: Option<&str>,
+    expected_version: Option<&str>,
+    source_override: Option<&str>,
+) -> Result<InstallReceipt, InstallError> {
     let file = fs::File::open(archive_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
 
@@ -91,8 +123,10 @@ pub fn install_from_archive(
             }
             let mut content = String::new();
             archive.by_index(i)?.read_to_string(&mut content)?;
-            let plugin: ElegyPluginV1 = serde_json::from_str(&content)
+            let mut plugin: ElegyPluginV1 = serde_json::from_str(&content)
                 .map_err(|e| InstallError::InvalidManifest(format!("JSON parse: {e}")))?;
+            normalize_legacy_component_path(&mut plugin.skills);
+            normalize_legacy_component_path(&mut plugin.mcp_servers);
             let validation = validate_elegy_plugin_v1(&plugin);
             if !validation.is_valid() {
                 return Err(InstallError::InvalidManifest(validation.issues.join("; ")));
@@ -104,6 +138,22 @@ pub fn install_from_archive(
 
     let manifest = manifest.ok_or(InstallError::MissingManifest)?;
     let manifest_index = manifest_index.ok_or(InstallError::MissingManifest)?;
+    if let Some(expected_name) = expected_name {
+        if manifest.name != expected_name {
+            return Err(InstallError::IdentityMismatch(format!(
+                "expected name '{expected_name}', found '{}'",
+                manifest.name
+            )));
+        }
+    }
+    if let Some(expected_version) = expected_version {
+        if manifest.version != expected_version {
+            return Err(InstallError::IdentityMismatch(format!(
+                "expected version '{expected_version}', found '{}'",
+                manifest.version
+            )));
+        }
+    }
 
     let mut archive_entries = Vec::new();
     let mut seen_paths = BTreeSet::new();
@@ -136,20 +186,36 @@ pub fn install_from_archive(
         });
     }
 
-    // Extract all files
-    fs::create_dir_all(&install_dir)?;
+    // Extract into a same-volume staging directory, then publish atomically.
+    fs::create_dir_all(install_root)?;
+    let staging = tempfile::Builder::new()
+        .prefix(".elegy-install-")
+        .tempdir_in(install_root)?;
+    let staged_install_dir = staging.path().join(&manifest.name);
+    fs::create_dir_all(&staged_install_dir)?;
     let mut installed_files = Vec::new();
 
     for (i, relative_path) in archive_entries {
         let mut entry = archive.by_index(i)?;
-        let dest_path = install_dir.join(&relative_path);
+        let dest_path = staged_install_dir.join(&relative_path);
+        let normalized = relative_path.to_string_lossy().replace('\\', "/");
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent)?;
         }
         let mut dest_file = fs::File::create(&dest_path)?;
         io::copy(&mut entry, &mut dest_file)?;
-        installed_files.push(relative_path.to_string_lossy().replace('\\', "/"));
+        drop(dest_file);
+        make_binary_executable(&dest_path, &normalized)?;
+        installed_files.push(normalized);
     }
+
+    let manifest_json = serde_json::to_string_pretty(&manifest)
+        .map_err(|e| InstallError::InvalidManifest(format!("manifest serialize: {e}")))?;
+    let installed_manifest_dir = staged_install_dir.join(".elegy-plugin");
+    fs::create_dir_all(&installed_manifest_dir)?;
+    fs::write(installed_manifest_dir.join("plugin.json"), manifest_json)?;
+    installed_files.retain(|path| path != ".elegy-plugin/plugin.json");
+    installed_files.push(".elegy-plugin/plugin.json".to_string());
 
     // Write install-receipt.json
     let receipt = InstallReceipt {
@@ -157,22 +223,50 @@ pub fn install_from_archive(
         name: manifest.name.clone(),
         version: manifest.version.clone(),
         installed_at: manual_iso8601_timestamp(),
-        source: archive_path.display().to_string(),
+        source: source_override
+            .map(str::to_string)
+            .unwrap_or_else(|| archive_path.display().to_string()),
         install_dir: install_dir.display().to_string(),
         files: installed_files,
     };
 
-    let receipt_path = install_dir.join("install-receipt.json");
+    let receipt_path = staged_install_dir.join("install-receipt.json");
     let receipt_json = serde_json::to_string_pretty(&receipt)
         .map_err(|e| InstallError::InvalidManifest(format!("receipt serialize: {e}")))?;
     fs::write(&receipt_path, receipt_json)?;
+    fs::rename(&staged_install_dir, &install_dir)?;
 
     Ok(receipt)
 }
 
-/// Install a plugin from a URL (download then delegate to install_from_archive).
-#[cfg(feature = "reqwest")]
-pub fn install_from_url(url: &str, install_root: &Path) -> Result<InstallReceipt, InstallError> {
+/// Install a plugin from a URL after verifying its SHA-256 sidecar.
+pub fn install_from_url(
+    url: &str,
+    checksum_url: &str,
+    install_root: &Path,
+    expected_name: Option<&str>,
+    expected_version: Option<&str>,
+) -> Result<InstallReceipt, InstallError> {
+    let checksum_response = reqwest::blocking::get(checksum_url)
+        .map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
+    if !checksum_response.status().is_success() {
+        return Err(InstallError::DownloadFailed(format!(
+            "checksum HTTP {}",
+            checksum_response.status()
+        )));
+    }
+    let checksum_text = checksum_response
+        .text()
+        .map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
+    let expected_checksum = checksum_text
+        .split_whitespace()
+        .next()
+        .filter(|value| value.len() == 64 && value.chars().all(|c| c.is_ascii_hexdigit()))
+        .ok_or_else(|| {
+            InstallError::DownloadFailed("checksum response is not a SHA-256 digest".to_string())
+        })?
+        .to_ascii_lowercase();
+
     let response =
         reqwest::blocking::get(url).map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
     if !response.status().is_success() {
@@ -184,19 +278,46 @@ pub fn install_from_url(url: &str, install_root: &Path) -> Result<InstallReceipt
     let bytes = response
         .bytes()
         .map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
+    verify_sha256(&bytes, &expected_checksum)?;
 
     let tmp = tempfile::NamedTempFile::new()?;
     fs::write(tmp.path(), &bytes)?;
 
-    install_from_archive(tmp.path(), install_root)
+    install_from_archive_with_identity_and_source(
+        tmp.path(),
+        install_root,
+        expected_name,
+        expected_version,
+        Some(url),
+    )
 }
 
-/// Stub for URL install when reqwest feature is not enabled.
-#[cfg(not(feature = "reqwest"))]
-pub fn install_from_url(_url: &str, _install_root: &Path) -> Result<InstallReceipt, InstallError> {
-    Err(InstallError::DownloadFailed(
-        "URL install requires the 'reqwest' feature. Rebuild with --features reqwest.".into(),
-    ))
+fn verify_sha256(bytes: &[u8], expected_checksum: &str) -> Result<(), InstallError> {
+    let actual_checksum = format!("{:x}", Sha256::digest(bytes));
+    if actual_checksum != expected_checksum {
+        return Err(InstallError::ChecksumMismatch {
+            expected: expected_checksum.to_string(),
+            actual: actual_checksum,
+        });
+    }
+    Ok(())
+}
+
+#[cfg(unix)]
+fn make_binary_executable(path: &Path, archive_path: &str) -> Result<(), InstallError> {
+    use std::os::unix::fs::PermissionsExt;
+
+    if archive_path.starts_with("bin/") {
+        let mut permissions = fs::metadata(path)?.permissions();
+        permissions.set_mode(0o755);
+        fs::set_permissions(path, permissions)?;
+    }
+    Ok(())
+}
+
+#[cfg(not(unix))]
+fn make_binary_executable(_path: &Path, _archive_path: &str) -> Result<(), InstallError> {
+    Ok(())
 }
 
 /// Generate a manual ISO 8601 timestamp without pulling in chrono.
@@ -240,6 +361,19 @@ fn manual_iso8601_timestamp() -> String {
     format!("{year:04}-{month:02}-{day:02}T{hours:02}:{minutes:02}:{seconds:02}Z")
 }
 
+fn normalize_legacy_component_path(path: &mut Option<String>) {
+    let Some(value) = path.as_ref() else {
+        return;
+    };
+    if value.starts_with("./") {
+        return;
+    }
+    let candidate = format!("./{value}");
+    if is_safe_package_relative_path(&candidate) {
+        *path = Some(candidate);
+    }
+}
+
 fn is_leap(year: i64) -> bool {
     (year % 4 == 0 && year % 100 != 0) || year % 400 == 0
 }
@@ -272,8 +406,10 @@ fn validate_archive_entry_path(entry_name: &str) -> Result<PathBuf, String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{install_from_archive, InstallError};
-    use elegy_plugin_sdk::{pack_plugin_v1, scaffold_plugin_v1_repository};
+    use super::{
+        install_from_archive, install_from_archive_with_identity, verify_sha256, InstallError,
+    };
+    use elegy_plugin_sdk::{pack_plugin_v1, scaffold_plugin_v1_repository, verify_plugin_v1};
     use std::fs;
     use std::io::Write;
 
@@ -362,13 +498,118 @@ mod tests {
         let installed = install_root.join("roundtrip-plugin");
         assert!(installed.join("install-receipt.json").is_file());
         assert!(installed
+            .join(".elegy-plugin")
+            .join("plugin.json")
+            .is_file());
+        assert!(installed
             .join("skills")
             .join("roundtrip-plugin")
             .join("SKILL.md")
             .is_file());
+        assert!(
+            verify_plugin_v1(&installed.join(".elegy-plugin"))
+                .expect("verify installed plugin")
+                .valid
+        );
         assert!(matches!(
             install_from_archive(&archive_path, &install_root),
             Err(InstallError::AlreadyInstalled { .. })
         ));
+    }
+
+    #[test]
+    fn install_rejects_unexpected_marketplace_identity_before_writing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let archive_path = temp.path().join("plugin.zip");
+        write_zip(
+            &archive_path,
+            &[
+                (
+                    "plugin.json",
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"actual-plugin","version":"1.0.0","description":"desc","skills":"./skills/"}"#,
+                ),
+                ("skills/example/SKILL.md", "fixture"),
+            ],
+        );
+        let install_root = temp.path().join("installed");
+
+        let error = install_from_archive_with_identity(
+            &archive_path,
+            &install_root,
+            Some("expected-plugin"),
+            Some("1.0.0"),
+        )
+        .expect_err("identity mismatch must fail");
+
+        assert!(matches!(error, InstallError::IdentityMismatch(_)));
+        assert!(!install_root.join("actual-plugin").exists());
+    }
+
+    #[test]
+    fn install_normalizes_legacy_component_paths_and_writes_manifest() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let archive_path = temp.path().join("legacy.zip");
+        write_zip(
+            &archive_path,
+            &[
+                (
+                    "plugin.json",
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"legacy-plugin","version":"1.0.0","description":"desc","skills":"skills/"}"#,
+                ),
+                ("skills/example/SKILL.md", "fixture"),
+            ],
+        );
+        let install_root = temp.path().join("installed");
+
+        let receipt = install_from_archive(&archive_path, &install_root).expect("install");
+        let installed_manifest = fs::read_to_string(
+            install_root
+                .join("legacy-plugin")
+                .join(".elegy-plugin")
+                .join("plugin.json"),
+        )
+        .expect("read installed manifest");
+        let installed: serde_json::Value =
+            serde_json::from_str(&installed_manifest).expect("parse installed manifest");
+
+        assert_eq!(installed["skills"], "./skills/");
+        assert!(receipt
+            .files
+            .contains(&".elegy-plugin/plugin.json".to_string()));
+    }
+
+    #[test]
+    fn checksum_mismatch_fails_closed() {
+        let error = verify_sha256(b"archive", &"0".repeat(64)).expect_err("checksum must fail");
+        assert!(matches!(error, InstallError::ChecksumMismatch { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn install_marks_bin_entries_executable() {
+        use std::os::unix::fs::PermissionsExt;
+
+        let temp = tempfile::tempdir().expect("tempdir");
+        let archive_path = temp.path().join("unix.zip");
+        write_zip(
+            &archive_path,
+            &[
+                (
+                    "plugin.json",
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"unix-plugin","version":"1.0.0","description":"desc","skills":"./skills/"}"#,
+                ),
+                ("skills/example/SKILL.md", "fixture"),
+                ("bin/unix-plugin", "binary"),
+            ],
+        );
+        let install_root = temp.path().join("installed");
+
+        install_from_archive(&archive_path, &install_root).expect("install");
+        let mode = fs::metadata(install_root.join("unix-plugin/bin/unix-plugin"))
+            .expect("binary metadata")
+            .permissions()
+            .mode();
+
+        assert_eq!(mode & 0o111, 0o111);
     }
 }

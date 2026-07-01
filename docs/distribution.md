@@ -60,6 +60,22 @@ bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy 
 Plugin-packaged surfaces should use `elegy-plugin-packaging install` as the
 primary install lane.
 
+Marketplace consumers use the generated static index:
+
+```bash
+elegy-plugin-packaging marketplace list --source . --json
+elegy-plugin-packaging marketplace install elegy-planning --source .
+```
+
+The same `--source` contract accepts an HTTPS base URL, so Holon and other
+consumers are not tied to this repository. Remote archives require SHA-256
+sidecars and are checked against the public wrapper manifest before install.
+
+Private-source plugins may publish public proprietary binaries. Their wrapper
+metadata, skills, scripts, and descriptors are public. Keep private behavior in
+the compiled binary or behind a hosted service; hosts own all credentials and
+OAuth state.
+
 To install a surface, the surface must exist in the release assets and have a published `.sha256` sidecar. The installer verifies the downloaded asset SHA-256 before writing the executable into the destination `bin/` directory.
 
 ## Downstream guidance

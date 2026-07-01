@@ -138,6 +138,172 @@ pub struct ElegyPluginV1Author {
     pub url: Option<String>,
 }
 
+pub const ELEGY_MARKETPLACE_V1_SCHEMA_VERSION: &str = "elegy-marketplace/v1";
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplaceV1 {
+    pub schema_version: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<ElegyMarketplaceInterface>,
+    pub plugins: Vec<ElegyMarketplacePlugin>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplaceInterface {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_name: Option<String>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplacePlugin {
+    pub name: String,
+    pub source: ElegyMarketplaceSource,
+    pub category: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ElegyMarketplaceArtifact>,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplaceSource {
+    pub source: String,
+    pub path: String,
+}
+
+#[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplaceArtifact {
+    pub target: String,
+    pub url: String,
+    pub checksum_url: String,
+}
+
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct ElegyMarketplaceValidationResult {
+    pub issues: Vec<String>,
+}
+
+impl ElegyMarketplaceValidationResult {
+    pub fn is_valid(&self) -> bool {
+        self.issues.is_empty()
+    }
+}
+
+pub fn validate_elegy_marketplace_v1(
+    marketplace: &ElegyMarketplaceV1,
+) -> ElegyMarketplaceValidationResult {
+    let mut issues = Vec::new();
+    if marketplace.schema_version != ELEGY_MARKETPLACE_V1_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{}', found '{}'.",
+            ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, marketplace.schema_version
+        ));
+    }
+    if !validate_kebab_case_name(&marketplace.name) {
+        issues.push("marketplace name must be lowercase kebab-case.".to_string());
+    }
+    if marketplace.plugins.is_empty() {
+        issues.push("plugins must contain at least one entry.".to_string());
+    }
+
+    let mut names = BTreeSet::new();
+    for plugin in &marketplace.plugins {
+        if !validate_kebab_case_name(&plugin.name) {
+            issues.push(format!(
+                "plugin name '{}' must be lowercase kebab-case.",
+                plugin.name
+            ));
+        } else if !names.insert(plugin.name.clone()) {
+            issues.push(format!("duplicate plugin name '{}'.", plugin.name));
+        }
+        if plugin.source.source != "local" {
+            issues.push(format!(
+                "plugin '{}' source.source must be 'local'.",
+                plugin.name
+            ));
+        }
+        if !is_safe_marketplace_source_path(&plugin.source.path) {
+            issues.push(format!(
+                "plugin '{}' source.path must be a safe ./-prefixed relative path.",
+                plugin.name
+            ));
+        }
+        if plugin.category.trim().is_empty() {
+            issues.push(format!(
+                "plugin '{}' category must not be blank.",
+                plugin.name
+            ));
+        }
+
+        let mut targets = BTreeSet::new();
+        for artifact in &plugin.artifacts {
+            if !matches!(
+                artifact.target.as_str(),
+                "any"
+                    | "x86_64-pc-windows-msvc"
+                    | "x86_64-unknown-linux-gnu"
+                    | "aarch64-apple-darwin"
+            ) {
+                issues.push(format!(
+                    "plugin '{}' has unsupported artifact target '{}'.",
+                    plugin.name, artifact.target
+                ));
+            } else if !targets.insert(artifact.target.clone()) {
+                issues.push(format!(
+                    "plugin '{}' has duplicate artifact target '{}'.",
+                    plugin.name, artifact.target
+                ));
+            }
+            validate_https_url(
+                &format!("plugin '{}' artifact url", plugin.name),
+                &artifact.url,
+                &mut issues,
+            );
+            validate_https_url(
+                &format!("plugin '{}' artifact checksumUrl", plugin.name),
+                &artifact.checksum_url,
+                &mut issues,
+            );
+        }
+    }
+
+    ElegyMarketplaceValidationResult { issues }
+}
+
+fn is_safe_marketplace_source_path(path: &str) -> bool {
+    is_safe_package_relative_path(path)
+        && path
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || "/._-".contains(character))
+}
+
+pub fn select_marketplace_artifact<'a>(
+    plugin: &'a ElegyMarketplacePlugin,
+    target: &str,
+) -> Option<&'a ElegyMarketplaceArtifact> {
+    plugin
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.target == target)
+        .or_else(|| {
+            plugin
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.target == "any")
+        })
+}
+
+fn validate_https_url(field: &str, value: &str, issues: &mut Vec<String>) {
+    match url::Url::parse(value) {
+        Ok(url) if url.scheme() == "https" && url.host_str().is_some() => {}
+        _ => issues.push(format!("{field} must be an absolute HTTPS URL.")),
+    }
+}
+
 /// Codex-specific extension metadata under `extensions["codex.plugin/v1"]`.
 /// Declares host-specific fields that do not belong in the base manifest.
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -304,8 +470,9 @@ pub fn extract_codex_extension_v1(
     serde_json::from_value::<CodexPluginExtensionV1>(raw.clone()).ok()
 }
 
-pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 3] = [
+pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 4] = [
     ("elegy-plugin-v1.schema.json", "elegy-plugin/v1"),
+    ("elegy-marketplace-v1.schema.json", "elegy-marketplace/v1"),
     ("codex-plugin-extension-v1.schema.json", "codex.plugin/v1"),
     ("codex-plugin-manifest.schema.json", "codex-plugin-manifest"),
 ];
@@ -318,10 +485,14 @@ pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, Strin
         ),
         (
             PLUGIN_SCHEMA_ARTIFACTS[1].0,
-            serde_json::to_value(schema_for!(CodexPluginExtensionV1)),
+            serde_json::to_value(schema_for!(ElegyMarketplaceV1)),
         ),
         (
             PLUGIN_SCHEMA_ARTIFACTS[2].0,
+            serde_json::to_value(schema_for!(CodexPluginExtensionV1)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[3].0,
             serde_json::to_value(schema_for!(CodexPluginManifest)),
         ),
     ];
@@ -3025,8 +3196,13 @@ pub fn pack_plugin_v1_with_binary(
             continue;
         }
 
+        let entry_options = options.unix_permissions(if relative_str.starts_with("bin/") {
+            0o755
+        } else {
+            0o644
+        });
         zip_writer
-            .start_file(relative_str.clone(), options)
+            .start_file(relative_str.clone(), entry_options)
             .map_err(|source| ToolingError::Io {
                 operation: "write zip entry",
                 path: PathBuf::from(relative_str),
@@ -3417,11 +3593,13 @@ mod tests {
         generate_plugin_schema_artifacts, generate_skills_from_descriptor_file,
         import_codex_plugin_v1, inspect_plugin_v1, is_safe_package_relative_path, pack_plugin_v1,
         pack_plugin_v1_with_binary, scaffold_plugin_v1_repository,
-        scaffold_plugin_v1_repository_with_mode, validate_elegy_plugin_v1, verify_plugin_v1,
-        walk_dir_files, AuthorMcpDescriptorRequest, AuthorMcpToolRequest, CodexPluginExtensionV1,
-        CodexProjectionMode, ElegyPluginV1, McpServerDescriptor, McpToolAnalyzer,
-        McpToolDefinition, PluginArchiveBinary, PluginScaffoldMode, ToolingError,
-        ELEGY_PLUGIN_V1_SCHEMA_VERSION,
+        scaffold_plugin_v1_repository_with_mode, select_marketplace_artifact,
+        validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, walk_dir_files,
+        AuthorMcpDescriptorRequest, AuthorMcpToolRequest, CodexPluginExtensionV1,
+        CodexProjectionMode, ElegyMarketplaceArtifact, ElegyMarketplacePlugin,
+        ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, McpServerDescriptor,
+        McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary, PluginScaffoldMode, ToolingError,
+        ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_V1_SCHEMA_VERSION,
     };
     use serde_json::{json, Value};
     use std::fs;
@@ -3472,6 +3650,88 @@ mod tests {
         ] {
             assert!(!is_safe_package_relative_path(invalid), "{invalid}");
         }
+    }
+
+    #[test]
+    fn marketplace_validation_and_target_selection_are_deterministic() {
+        let marketplace = ElegyMarketplaceV1 {
+            schema_version: ELEGY_MARKETPLACE_V1_SCHEMA_VERSION.to_string(),
+            name: "elegy".to_string(),
+            interface: None,
+            plugins: vec![ElegyMarketplacePlugin {
+                name: "elegy-planning".to_string(),
+                source: ElegyMarketplaceSource {
+                    source: "local".to_string(),
+                    path: "./plugins/planning".to_string(),
+                },
+                category: "Developer Tools".to_string(),
+                artifacts: vec![
+                    ElegyMarketplaceArtifact {
+                        target: "any".to_string(),
+                        url: "https://example.com/portable.zip".to_string(),
+                        checksum_url: "https://example.com/portable.zip.sha256".to_string(),
+                    },
+                    ElegyMarketplaceArtifact {
+                        target: "x86_64-pc-windows-msvc".to_string(),
+                        url: "https://example.com/windows.zip".to_string(),
+                        checksum_url: "https://example.com/windows.zip.sha256".to_string(),
+                    },
+                ],
+            }],
+        };
+
+        assert!(validate_elegy_marketplace_v1(&marketplace).is_valid());
+        let plugin = &marketplace.plugins[0];
+        assert_eq!(
+            select_marketplace_artifact(plugin, "x86_64-pc-windows-msvc")
+                .map(|artifact| artifact.target.as_str()),
+            Some("x86_64-pc-windows-msvc")
+        );
+        assert_eq!(
+            select_marketplace_artifact(plugin, "aarch64-apple-darwin")
+                .map(|artifact| artifact.target.as_str()),
+            Some("any")
+        );
+    }
+
+    #[test]
+    fn marketplace_validation_rejects_unsafe_and_duplicate_entries() {
+        let marketplace = ElegyMarketplaceV1 {
+            schema_version: ELEGY_MARKETPLACE_V1_SCHEMA_VERSION.to_string(),
+            name: "elegy".to_string(),
+            interface: None,
+            plugins: vec![
+                ElegyMarketplacePlugin {
+                    name: "plugin".to_string(),
+                    source: ElegyMarketplaceSource {
+                        source: "local".to_string(),
+                        path: "./../escape".to_string(),
+                    },
+                    category: String::new(),
+                    artifacts: Vec::new(),
+                },
+                ElegyMarketplacePlugin {
+                    name: "plugin".to_string(),
+                    source: ElegyMarketplaceSource {
+                        source: "git".to_string(),
+                        path: "./plugins/plugin".to_string(),
+                    },
+                    category: "Other".to_string(),
+                    artifacts: Vec::new(),
+                },
+            ],
+        };
+
+        let result = validate_elegy_marketplace_v1(&marketplace);
+        assert!(!result.is_valid());
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("duplicate plugin name")));
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("source.path")));
     }
 
     #[test]
@@ -4200,6 +4460,13 @@ mod tests {
         assert!(names.iter().any(|name| name == "plugin.json"));
         assert!(names.iter().any(|name| name == "skills/my-plugin/SKILL.md"));
         assert!(names.iter().any(|name| name == "bin/my-plugin.exe"));
+        assert_eq!(
+            zip.by_name("bin/my-plugin.exe")
+                .expect("binary entry")
+                .unix_mode()
+                .map(|mode| mode & 0o777),
+            Some(0o755)
+        );
     }
 
     #[test]
