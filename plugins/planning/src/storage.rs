@@ -4681,31 +4681,37 @@ impl PlanningStore {
         self.get_worktree(id, scope_key)
     }
 
-    /// List recent sessions from the events table.
+    /// List recent sessions backed by project-run ownership.
     pub fn list_sessions(&self, limit: i64) -> Result<Vec<SessionSummary>, PlanningStoreError> {
         let conn = self.open_connection()?;
         let now = now_string()?;
         let mut stmt = conn.prepare(
             "SELECT
-                COALESCE(e.session_id, 'unknown') as sid,
-                COUNT(*) as event_count,
-                MAX(e.created_at) as last_seen,
-                (SELECT COUNT(*) FROM project_runs pr WHERE pr.session_id = e.session_id AND pr.status IN ('claimed','active','interrupted') AND julianday(pr.lease_expires_at) > julianday(?2)) as active_runs
-             FROM planning_events e
-             WHERE e.session_id IS NOT NULL AND e.session_id != ''
-             GROUP BY e.session_id
+                pr.session_id,
+                MAX(pr.scope_key) AS scope_key,
+                MIN(pr.created_at) AS created_at,
+                MAX(pr.updated_at) AS last_seen,
+                (SELECT COUNT(*) FROM planning_events e WHERE e.correlation_id = pr.session_id) AS event_count,
+                SUM(CASE
+                    WHEN pr.status IN ('claimed','active','interrupted')
+                        AND julianday(pr.lease_expires_at) > julianday(?1)
+                    THEN 1 ELSE 0
+                END) AS active_runs
+             FROM project_runs pr
+             WHERE pr.session_id IS NOT NULL AND TRIM(pr.session_id) != ''
+             GROUP BY pr.session_id
              ORDER BY last_seen DESC
-             LIMIT ?1"
+             LIMIT ?2"
         )?;
 
-        let rows = stmt.query_map(params![limit, now], |row| {
+        let rows = stmt.query_map(params![now, limit], |row| {
             Ok(SessionSummary {
                 session_id: row.get(0)?,
-                scope: String::new(),
-                created_at: None,
-                last_seen: row.get::<_, Option<String>>(2)?,
-                event_count: row.get(1)?,
-                active_project_runs: row.get(3)?,
+                scope: row.get(1)?,
+                created_at: row.get(2)?,
+                last_seen: row.get(3)?,
+                event_count: row.get(4)?,
+                active_project_runs: row.get(5)?,
             })
         })?;
 
@@ -16812,6 +16818,23 @@ mod tests {
         assert!(conflict
             .to_string()
             .contains("PROJECT-RUN-IDEMPOTENCY-CONFLICT"));
+    }
+
+    #[test]
+    fn session_list_uses_project_run_session_ownership() {
+        let dir = tempdir().expect("tempdir");
+        let store = PlanningStore::new(dir.path().join("planning.db"));
+        store.init().expect("init");
+        create_lease_fixture(&store);
+        store
+            .claim_project_run(lease_claim("lease-run-1", "session-a", "session-key", 30))
+            .expect("claim");
+
+        let sessions = store.list_sessions(10).expect("list sessions");
+        assert_eq!(sessions.len(), 1);
+        assert_eq!(sessions[0].session_id, "session-a");
+        assert_eq!(sessions[0].scope, DEFAULT_SCOPE_KEY);
+        assert_eq!(sessions[0].active_project_runs, 1);
     }
 
     #[test]

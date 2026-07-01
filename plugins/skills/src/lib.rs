@@ -575,6 +575,15 @@ mod tests {
     }
 
     #[test]
+    fn builtin_registry_discovers_standalone_obsidian_skill() {
+        let registry = SkillRegistry::builtin().expect("builtin registry should load");
+        let skill = registry
+            .skill("elegy-obsidian")
+            .expect("standalone elegy-obsidian skill should be discovered");
+        assert_eq!(skill.summary.id, "elegy-obsidian");
+    }
+
+    #[test]
     fn standalone_skill_directory_fails_on_invalid_skill() {
         let temp_dir = unique_temp_dir("elegy-skills-invalid");
         let skill_dir = temp_dir.join("broken-skill");
