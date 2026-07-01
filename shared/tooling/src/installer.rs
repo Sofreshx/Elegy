@@ -1,5 +1,6 @@
 use elegy_plugin_sdk::{validate_elegy_plugin_v1, ElegyPluginV1};
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 use std::fs;
 use std::io::{self, Read};
 use std::path::{Component, Path, PathBuf};
@@ -82,7 +83,12 @@ pub fn install_from_archive(
     let mut manifest_index = None;
     for i in 0..archive.len() {
         let name = archive.by_index(i)?.name().to_string();
-        if name == "plugin.json" || name.ends_with("/plugin.json") {
+        if name == "plugin.json" {
+            if manifest.is_some() {
+                return Err(InstallError::InvalidManifest(
+                    "archive contains duplicate root plugin.json entries".to_string(),
+                ));
+            }
             let mut content = String::new();
             archive.by_index(i)?.read_to_string(&mut content)?;
             let plugin: ElegyPluginV1 = serde_json::from_str(&content)
@@ -93,11 +99,33 @@ pub fn install_from_archive(
             }
             manifest = Some(plugin);
             manifest_index = Some(i);
-            break;
         }
     }
 
     let manifest = manifest.ok_or(InstallError::MissingManifest)?;
+    let manifest_index = manifest_index.ok_or(InstallError::MissingManifest)?;
+
+    let mut archive_entries = Vec::new();
+    let mut seen_paths = BTreeSet::new();
+    for i in 0..archive.len() {
+        if i == manifest_index {
+            continue;
+        }
+        let entry = archive.by_index(i)?;
+        let entry_name = entry.name().to_string();
+        if entry_name.ends_with('/') {
+            continue;
+        }
+        let relative_path =
+            validate_archive_entry_path(&entry_name).map_err(InstallError::InvalidManifest)?;
+        let normalized = relative_path.to_string_lossy().replace('\\', "/");
+        if !seen_paths.insert(normalized.clone()) {
+            return Err(InstallError::InvalidManifest(format!(
+                "archive contains duplicate entry '{normalized}'"
+            )));
+        }
+        archive_entries.push((i, relative_path));
+    }
 
     // Determine install directory
     let install_dir = install_root.join(&manifest.name);
@@ -112,21 +140,8 @@ pub fn install_from_archive(
     fs::create_dir_all(&install_dir)?;
     let mut installed_files = Vec::new();
 
-    for i in 0..archive.len() {
-        // Skip the manifest entry (already read)
-        if Some(i) == manifest_index {
-            continue;
-        }
+    for (i, relative_path) in archive_entries {
         let mut entry = archive.by_index(i)?;
-        let entry_name = entry.name().to_string();
-
-        // Skip directories
-        if entry_name.ends_with('/') {
-            continue;
-        }
-
-        let relative_path =
-            validate_archive_entry_path(&entry_name).map_err(InstallError::InvalidManifest)?;
         let dest_path = install_dir.join(&relative_path);
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent)?;
@@ -258,6 +273,7 @@ fn validate_archive_entry_path(entry_name: &str) -> Result<PathBuf, String> {
 #[cfg(test)]
 mod tests {
     use super::{install_from_archive, InstallError};
+    use elegy_plugin_sdk::{pack_plugin_v1, scaffold_plugin_v1_repository};
     use std::fs;
     use std::io::Write;
 
@@ -284,7 +300,7 @@ mod tests {
             &[
                 (
                     "plugin.json",
-                    r#"{"schemaVersion":"elegy-plugin/v1","name":"safe-plugin","version":"0.1.0","description":"desc","skills":"skills/"}"#,
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"safe-plugin","version":"0.1.0","description":"desc","skills":"./skills/"}"#,
                 ),
                 ("../escape.txt", "nope"),
             ],
@@ -295,5 +311,64 @@ mod tests {
             matches!(err, InstallError::InvalidManifest(ref message) if message.contains("escapes the install root")),
             "unexpected error: {err}"
         );
+        assert!(!temp.path().join("safe-plugin").exists());
+    }
+
+    #[test]
+    fn install_rejects_duplicate_entries_before_writing() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let archive_path = temp.path().join("duplicate.plugin.zip");
+        write_zip(
+            &archive_path,
+            &[
+                (
+                    "plugin.json",
+                    r#"{"schemaVersion":"elegy-plugin/v1","name":"safe-plugin","version":"0.1.0","description":"desc","skills":"./skills/"}"#,
+                ),
+                ("skills/example/SKILL.md", "one"),
+                ("skills/example/./SKILL.md", "two"),
+            ],
+        );
+
+        let err = install_from_archive(&archive_path, temp.path()).expect_err("must fail");
+        assert!(
+            matches!(err, InstallError::InvalidManifest(ref message) if message.contains("duplicate entry")),
+            "unexpected error: {err}"
+        );
+        assert!(!temp.path().join("safe-plugin").exists());
+    }
+
+    #[test]
+    fn packed_plugin_installs_with_receipt() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let plugin_root = temp.path().join("source");
+        scaffold_plugin_v1_repository(
+            "roundtrip-plugin",
+            "Round-trip fixture",
+            "0.1.0",
+            &plugin_root,
+            "Elegy",
+            "Apache-2.0",
+            "",
+        )
+        .expect("scaffold");
+        let archive_path = temp.path().join("roundtrip.plugin.zip");
+        pack_plugin_v1(&plugin_root, &archive_path).expect("pack");
+        let install_root = temp.path().join("installed");
+
+        let receipt = install_from_archive(&archive_path, &install_root).expect("install");
+
+        assert_eq!(receipt.name, "roundtrip-plugin");
+        let installed = install_root.join("roundtrip-plugin");
+        assert!(installed.join("install-receipt.json").is_file());
+        assert!(installed
+            .join("skills")
+            .join("roundtrip-plugin")
+            .join("SKILL.md")
+            .is_file());
+        assert!(matches!(
+            install_from_archive(&archive_path, &install_root),
+            Err(InstallError::AlreadyInstalled { .. })
+        ));
     }
 }

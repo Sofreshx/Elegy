@@ -25,7 +25,7 @@ Review:
 
 - [README.md](README.md)
 - [docs/architecture/README.md](docs/architecture/README.md)
-- [plugins/memory/docs/architecture/v1.md](plugins/memory/docs/architecture/v1.md) when changing governed memory or repo-local non-authoritative skill-routing surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
+- [plugins/memory/docs/architecture/ARCHITECTURE.md](plugins/memory/docs/architecture/ARCHITECTURE.md) when changing governed memory or repo-local non-authoritative skill-routing surfaces; keep the authority chain explicit and prefer `elegy-memory` command examples over the temporary `elegy` compatibility bridge
 - [docs/spec-baseline.md](docs/spec-baseline.md)
 - [SECURITY.md](SECURITY.md)
 
