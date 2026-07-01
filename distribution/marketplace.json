@@ -1,0 +1,49 @@
+{
+  "schemaVersion": "elegy-plugin-marketplace/v1",
+  "name": "Elegy Plugin Marketplace",
+  "description": "Bundled plugin marketplace for the Elegy monorepo. Indexes shipped plugins by name and relative source path. Authority for versions, capabilities, skills, executables, and interface metadata lives in each plugin's .elegy-plugin/plugin.json. Marketplace policy is installation metadata, never execution trust or approval. Local relative sources only in this slice.",
+  "plugins": [
+    {
+      "name": "elegy-planning",
+      "source": "plugins/planning",
+      "policy": "default",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-memory",
+      "source": "plugins/memory",
+      "policy": "default",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-skills",
+      "source": "plugins/skills",
+      "policy": "available",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-mcp",
+      "source": "plugins/mcp",
+      "policy": "available",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-desktop",
+      "source": "plugins/desktop",
+      "policy": "available",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-documentation",
+      "source": "plugins/documentation",
+      "policy": "available",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-observe",
+      "source": "plugins/observe",
+      "policy": "available",
+      "manifest": ".elegy-plugin/plugin.json"
+    }
+  ]
+}

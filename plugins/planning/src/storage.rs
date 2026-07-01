@@ -15,7 +15,9 @@ use uuid::Uuid;
 
 use crate::{
     validation::validate_entity, AcceptanceKind, AcceptanceView, AttachWorktreeInput,
-    BlockedCandidate, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeRecord,
+    BlockedCandidate, DiscoveryCheckpointRecord, DiscoveryClassification, DiscoveryRecord,
+    DiscoveryRelationshipKind, DiscoveryRelationshipRecord, DiscoverySourceEntry, DiscoveryStatus,
+    DiscoveryView, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeRecord,
     FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, GraphEdgeView, GraphNodeView,
     InsightRecord, InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView,
     MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEdgeKind, PlanningEvent,
@@ -25,11 +27,11 @@ use crate::{
     RoadmapRecord, RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
     RunnableWorkPointCandidate, ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord,
     TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity,
-    WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord, WorkPointStatus,
-    WorkPointView, WorktreeRecord, WorktreeStatus,
+    VerificationState, WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord,
+    WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
 };
 
-pub const CURRENT_SCHEMA_VERSION: &str = "10";
+pub const CURRENT_SCHEMA_VERSION: &str = "11";
 const DEFAULT_LEASE_SECONDS: i64 = 900;
 const SCHEMA_VERSION_KEY: &str = "schema_version";
 const DEFAULT_SCOPE_KEY: &str = "default";
@@ -168,6 +170,46 @@ pub struct CreateIssueInput {
     pub related_entity_id: Option<String>,
     pub tags: Vec<String>,
     pub run_id: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateDiscoveryInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub correlation_id: String,
+    pub classification: DiscoveryClassification,
+    pub verification_state: VerificationState,
+    pub severity: Severity,
+    pub claim: String,
+    pub impact: Option<String>,
+    pub next_action: Option<String>,
+    pub verification_step: Option<String>,
+    pub recurrence_key: Option<String>,
+    pub fingerprint: Option<String>,
+    pub observed_at: Vec<String>,
+    pub occurrence_count: Option<i64>,
+    pub source_lineage: Vec<DiscoverySourceEntry>,
+    pub review_date: Option<String>,
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateDiscoveryRelationshipInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub source_id: String,
+    pub target_id: String,
+    pub relationship_kind: DiscoveryRelationshipKind,
+    pub metadata: Option<serde_json::Value>,
+}
+
+#[derive(Clone, Debug)]
+pub struct CreateDiscoveryCheckpointInput {
+    pub id: Option<String>,
+    pub scope_key: Option<String>,
+    pub run_id: String,
+    pub event: String,
+    pub snapshot: Option<serde_json::Value>,
 }
 
 #[derive(Clone, Debug)]
@@ -2033,6 +2075,32 @@ impl PlanningStore {
             Vec::new()
         };
         let tags = load_entity_tags(&connection, entity_type, entity_id)?;
+
+        // Load active discoveries for this entity
+        let mut disc_stmt = connection.prepare(
+            "SELECT dn.id FROM discovery_nodes dn
+             INNER JOIN discovery_relationships dr ON dr.source_id = dn.id
+             WHERE dr.target_id = ?1 AND dr.relationship_kind = 'applies-to'
+             AND dn.status IN ('candidate', 'triaged', 'reopened')
+             AND dn.scope_key = ?2
+             ORDER BY CASE dn.severity 
+               WHEN 'critical' THEN 0 
+               WHEN 'high' THEN 1 
+               WHEN 'medium' THEN 2 
+               ELSE 3 
+             END, dn.created_at DESC
+             LIMIT 20",
+        )?;
+        let disc_rows = disc_stmt.query_map(params![entity_id, normalized], |row| {
+            row.get::<_, String>(0)
+        })?;
+        let mut entity_discoveries = Vec::new();
+        for disc_id in disc_rows.flatten() {
+            if let Ok(disc) = load_discovery(&connection, &disc_id) {
+                entity_discoveries.push(disc);
+            }
+        }
+
         let validation = load_validation_report(&connection, entity_type, entity_id)?;
         let entity_tokens = estimate_tokens(&entity_json.to_string());
         let children_tokens: usize = children
@@ -2053,6 +2121,7 @@ impl PlanningStore {
             insights,
             related_insights,
             tags,
+            discoveries: entity_discoveries,
             validation,
             token_estimate: crate::TokenEstimate {
                 entity_tokens,
@@ -2205,6 +2274,18 @@ impl PlanningStore {
             }
         }
 
+        // Active discoveries in scope (unresolved, ordered by severity)
+        let mut disc_stmt = connection.prepare(
+            "SELECT id FROM discovery_nodes WHERE scope_key = ?1 AND status IN ('candidate', 'triaged', 'reopened') ORDER BY CASE severity WHEN 'critical' THEN 0 WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END, created_at DESC LIMIT 20",
+        )?;
+        let disc_rows = disc_stmt.query_map(params![normalized], |row| row.get::<_, String>(0))?;
+        let mut active_discoveries = Vec::new();
+        for disc_id in disc_rows.flatten() {
+            if let Ok(disc) = load_discovery(&connection, &disc_id) {
+                active_discoveries.push(disc);
+            }
+        }
+
         // Recommended next action
         let incomplete_todo_count: i64 = connection.query_row(
             "SELECT COUNT(*) FROM todos WHERE scope_key = ?1 AND status IN ('pending', 'in-progress', 'blocked')",
@@ -2307,6 +2388,7 @@ impl PlanningStore {
             open_blocking_review_points,
             recommended_next_action,
             context_warnings,
+            active_discoveries,
         })
     }
 
@@ -2558,7 +2640,11 @@ fn allowed_transitions(
                 )))
             }
         },
-        EntityType::RoadmapSection | EntityType::Scope => {
+        EntityType::RoadmapSection
+        | EntityType::Scope
+        | EntityType::DiscoveryNode
+        | EntityType::DiscoveryRelationship
+        | EntityType::DiscoveryCheckpoint => {
             return Err(PlanningStoreError::InvalidInput(format!(
                 "status transitions are not supported for {}",
                 entity_type.as_str()
@@ -2587,7 +2673,11 @@ impl PlanningStore {
         let active_scope_key = normalized_scope_key(input.active_scope_key.clone());
 
         match input.entity_type {
-            EntityType::RoadmapSection | EntityType::Scope => {
+            EntityType::RoadmapSection
+            | EntityType::Scope
+            | EntityType::DiscoveryNode
+            | EntityType::DiscoveryRelationship
+            | EntityType::DiscoveryCheckpoint => {
                 return Err(PlanningStoreError::InvalidInput(format!(
                     "status transitions are not supported for {}",
                     input.entity_type.as_str()
@@ -3103,7 +3193,10 @@ impl PlanningStore {
             | EntityType::Scope
             | EntityType::ProjectRun
             | EntityType::GraphNode
-            | EntityType::GraphEdge => {
+            | EntityType::GraphEdge
+            | EntityType::DiscoveryNode
+            | EntityType::DiscoveryRelationship
+            | EntityType::DiscoveryCheckpoint => {
                 return Err(PlanningStoreError::InvalidInput(format!(
                     "status transitions are not supported for {}",
                     input.entity_type.as_str()
@@ -3499,6 +3592,279 @@ impl PlanningStore {
         )?;
         let rows =
             statement.query_map(params![normalize_scope_key_value(scope_key)], row_to_issue)?;
+        collect_rows(rows)
+    }
+
+    // ── Discovery CRUD ─────────────────────────────────────────────────────────
+
+    pub fn create_discovery(
+        &self,
+        input: CreateDiscoveryInput,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("claim", &input.claim)?;
+
+        let connection = self.open_connection()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+
+        connection.execute(
+            "INSERT INTO discovery_nodes (id, scope_key, correlation_id, classification, verification_state, severity, status, claim, impact, next_action, verification_step, recurrence_key, fingerprint, observed_at_json, occurrence_count, source_lineage_json, review_date, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21)",
+            params![
+                id, scope_key, input.correlation_id,
+                input.classification.as_str(), input.verification_state.as_str(),
+                input.severity.as_str(), DiscoveryStatus::Candidate.as_str(),
+                input.claim, input.impact, input.next_action, input.verification_step,
+                input.recurrence_key, input.fingerprint,
+                to_json_text(&input.observed_at)?,
+                input.occurrence_count.unwrap_or(1),
+                to_json_text(&input.source_lineage)?,
+                input.review_date,
+                to_json_text(&input.tags)?,
+                1, &now, &now,
+            ],
+        )?;
+
+        self.discovery_by_id(&id)
+    }
+
+    pub fn discovery_by_id(
+        &self,
+        discovery_id: &str,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        load_discovery(&connection, discovery_id)
+    }
+
+    pub fn list_discoveries(
+        &self,
+        scope_key: &str,
+        status_filter: Option<DiscoveryStatus>,
+        classification_filter: Option<DiscoveryClassification>,
+    ) -> Result<Vec<DiscoveryRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let mut sql = String::from(
+            "SELECT id, scope_key, correlation_id, classification, verification_state, severity, status, claim, impact, next_action, verification_step, recurrence_key, fingerprint, observed_at_json, occurrence_count, source_lineage_json, review_date, resolved_at, resolution_rationale, promoted_entity_type, promoted_entity_id, tags_json, revision, created_at, updated_at FROM discovery_nodes WHERE scope_key = ?1"
+        );
+        let mut param_values: Vec<Box<dyn rusqlite::types::ToSql>> = vec![Box::new(normalized)];
+        let mut param_index = 2;
+
+        if let Some(ref status) = status_filter {
+            sql.push_str(&format!(" AND status = ?{param_index}"));
+            param_values.push(Box::new(status.as_str().to_string()));
+            param_index += 1;
+        }
+        if let Some(ref classification) = classification_filter {
+            sql.push_str(&format!(" AND classification = ?{param_index}"));
+            param_values.push(Box::new(classification.as_str().to_string()));
+            param_index += 1;
+        }
+
+        let _ = param_index;
+        sql.push_str(" ORDER BY created_at DESC, id ASC");
+
+        let mut statement = connection.prepare(&sql)?;
+        let rows = statement.query_map(params_from_iter(param_values), row_to_discovery)?;
+        collect_rows(rows)
+    }
+
+    pub fn update_discovery_status(
+        &self,
+        discovery_id: &str,
+        status: DiscoveryStatus,
+        scope_key: &str,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let now = now_string()?;
+
+        let affected = connection.execute(
+            "UPDATE discovery_nodes SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3 AND scope_key = ?4",
+            params![status.as_str(), now, discovery_id, normalized],
+        )?;
+        if affected == 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "discovery node `{discovery_id}` not found in scope `{normalized}`"
+            )));
+        }
+        self.discovery_by_id(discovery_id)
+    }
+
+    pub fn resolve_discovery(
+        &self,
+        discovery_id: &str,
+        rationale: &str,
+        evidence_refs: Vec<String>,
+        scope_key: &str,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let now = now_string()?;
+
+        let affected = connection.execute(
+            "UPDATE discovery_nodes SET status = ?1, resolution_rationale = ?2, resolved_at = ?3, tags_json = ?4, revision = revision + 1, updated_at = ?5 WHERE id = ?6 AND scope_key = ?7",
+            params![
+                DiscoveryStatus::Resolved.as_str(),
+                rationale,
+                &now,
+                to_json_text(&evidence_refs)?,
+                &now,
+                discovery_id,
+                normalized,
+            ],
+        )?;
+        if affected == 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "discovery node `{discovery_id}` not found in scope `{normalized}`"
+            )));
+        }
+        self.discovery_by_id(discovery_id)
+    }
+
+    pub fn reopen_discovery(
+        &self,
+        discovery_id: &str,
+        scope_key: &str,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let now = now_string()?;
+
+        let affected = connection.execute(
+            "UPDATE discovery_nodes SET status = ?1, resolved_at = NULL, resolution_rationale = NULL, revision = revision + 1, updated_at = ?2 WHERE id = ?3 AND scope_key = ?4",
+            params![DiscoveryStatus::Reopened.as_str(), now, discovery_id, normalized],
+        )?;
+        if affected == 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "discovery node `{discovery_id}` not found in scope `{normalized}`"
+            )));
+        }
+        self.discovery_by_id(discovery_id)
+    }
+
+    pub fn promote_discovery(
+        &self,
+        discovery_id: &str,
+        entity_type: EntityType,
+        entity_id: &str,
+        scope_key: &str,
+    ) -> Result<DiscoveryRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let now = now_string()?;
+
+        let affected = connection.execute(
+            "UPDATE discovery_nodes SET status = ?1, promoted_entity_type = ?2, promoted_entity_id = ?3, revision = revision + 1, updated_at = ?4 WHERE id = ?5 AND scope_key = ?6",
+            params![
+                DiscoveryStatus::Promoted.as_str(),
+                entity_type.as_str(),
+                entity_id,
+                now,
+                discovery_id,
+                normalized,
+            ],
+        )?;
+        if affected == 0 {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "discovery node `{discovery_id}` not found in scope `{normalized}`"
+            )));
+        }
+        self.discovery_by_id(discovery_id)
+    }
+
+    pub fn discovery_view(&self, discovery_id: &str) -> Result<DiscoveryView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let discovery = load_discovery(&connection, discovery_id)?;
+        let relationships = list_discovery_relationships_for_source(&connection, discovery_id)?;
+        let validation =
+            load_validation_report(&connection, EntityType::DiscoveryNode, discovery_id)?;
+        Ok(DiscoveryView {
+            discovery,
+            relationships,
+            validation,
+        })
+    }
+
+    // ── Discovery Relationships ─────────────────────────────────────────────
+
+    pub fn add_discovery_relationship(
+        &self,
+        input: CreateDiscoveryRelationshipInput,
+    ) -> Result<DiscoveryRelationshipRecord, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+
+        connection.execute(
+            "INSERT INTO discovery_relationships (id, scope_key, source_id, target_id, relationship_kind, metadata_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                id, scope_key, input.source_id, input.target_id,
+                input.relationship_kind.as_str(),
+                input.metadata.map(|m| m.to_string()),
+                now,
+            ],
+        )?;
+
+        connection.query_row(
+            "SELECT id, scope_key, source_id, target_id, relationship_kind, metadata_json, created_at FROM discovery_relationships WHERE id = ?1",
+            params![id],
+            row_to_discovery_relationship,
+        )
+        .map_err(|error| map_not_found(error, EntityType::DiscoveryRelationship, &id))
+    }
+
+    pub fn list_discovery_relationships(
+        &self,
+        discovery_id: &str,
+    ) -> Result<Vec<DiscoveryRelationshipRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        list_discovery_relationships_for_source(&connection, discovery_id)
+    }
+
+    // ── Discovery Checkpoints ───────────────────────────────────────────────
+
+    pub fn create_discovery_checkpoint(
+        &self,
+        input: CreateDiscoveryCheckpointInput,
+    ) -> Result<DiscoveryCheckpointRecord, PlanningStoreError> {
+        require_non_empty("runId", &input.run_id)?;
+        require_non_empty("event", &input.event)?;
+
+        let connection = self.open_connection()?;
+        let scope_key = normalized_scope_key(input.scope_key);
+        let now = now_string()?;
+        let id = input.id.unwrap_or_else(new_id);
+
+        connection.execute(
+            "INSERT INTO discovery_checkpoints (id, scope_key, run_id, event, snapshot_json, created_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![
+                id, scope_key, input.run_id, input.event,
+                input.snapshot.map(|s| s.to_string()),
+                now,
+            ],
+        )?;
+
+        connection.query_row(
+            "SELECT id, scope_key, run_id, event, snapshot_json, created_at FROM discovery_checkpoints WHERE id = ?1",
+            params![id],
+            row_to_discovery_checkpoint,
+        )
+        .map_err(|error| map_not_found(error, EntityType::DiscoveryCheckpoint, &id))
+    }
+
+    pub fn list_discovery_checkpoints(
+        &self,
+        scope_key: &str,
+    ) -> Result<Vec<DiscoveryCheckpointRecord>, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized = normalize_scope_key_value(scope_key);
+        let mut statement = connection.prepare(
+            "SELECT id, scope_key, run_id, event, snapshot_json, created_at FROM discovery_checkpoints WHERE scope_key = ?1 ORDER BY created_at DESC, id ASC",
+        )?;
+        let rows = statement.query_map(params![normalized], row_to_discovery_checkpoint)?;
         collect_rows(rows)
     }
 
@@ -7256,6 +7622,67 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
         "#,
     )?;
 
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS discovery_nodes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            correlation_id TEXT NOT NULL,
+            classification TEXT NOT NULL,
+            verification_state TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            status TEXT NOT NULL,
+            claim TEXT NOT NULL,
+            impact TEXT,
+            next_action TEXT,
+            verification_step TEXT,
+            recurrence_key TEXT,
+            fingerprint TEXT,
+            observed_at_json TEXT NOT NULL DEFAULT '[]',
+            occurrence_count INTEGER NOT NULL DEFAULT 1,
+            source_lineage_json TEXT NOT NULL DEFAULT '[]',
+            review_date TEXT,
+            resolved_at TEXT,
+            resolution_rationale TEXT,
+            promoted_entity_type TEXT,
+            promoted_entity_id TEXT,
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_status ON discovery_nodes(status);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_classification ON discovery_nodes(classification);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_recurrence ON discovery_nodes(recurrence_key);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_fingerprint ON discovery_nodes(fingerprint);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_severity ON discovery_nodes(severity);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_scope ON discovery_nodes(scope_key);
+
+        CREATE TABLE IF NOT EXISTS discovery_relationships (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            relationship_kind TEXT NOT NULL,
+            metadata_json TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_source ON discovery_relationships(source_id);
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_target ON discovery_relationships(target_id);
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_kind ON discovery_relationships(relationship_kind);
+
+        CREATE TABLE IF NOT EXISTS discovery_checkpoints (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            event TEXT NOT NULL,
+            snapshot_json TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_checkpoints_run ON discovery_checkpoints(run_id);
+        "#,
+    )?;
+
     Ok(())
 }
 
@@ -7287,7 +7714,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("2") => {
             migrate_v2_to_v3(connection)?;
@@ -7297,7 +7725,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("3") => {
             migrate_v3_to_v4(connection)?;
@@ -7306,7 +7735,8 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("4") => {
             migrate_v4_to_v5(connection)?;
@@ -7314,31 +7744,40 @@ fn ensure_schema_version(connection: &Transaction<'_>) -> Result<(), PlanningSto
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("5") => {
             migrate_v5_to_v6(connection)?;
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("6") => {
             migrate_v6_to_v7(connection)?;
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("7") => {
             migrate_v7_to_v8(connection)?;
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
         Some("8") => {
             migrate_v8_to_v9(connection)?;
-            migrate_v9_to_v10(connection)
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
         }
-        Some("9") => migrate_v9_to_v10(connection),
+        Some("9") => {
+            migrate_v9_to_v10(connection)?;
+            migrate_v10_to_v11(connection)
+        }
+        Some("10") => migrate_v10_to_v11(connection),
         Some(other) => Err(PlanningStoreError::InvalidInput(format!(
             "unsupported planning schema version {other}; expected {CURRENT_SCHEMA_VERSION}"
         ))),
@@ -7741,6 +8180,74 @@ fn migrate_v9_to_v10(connection: &Transaction<'_>) -> Result<(), PlanningStoreEr
     Ok(())
 }
 
+fn migrate_v10_to_v11(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute_batch(
+        r#"
+        CREATE TABLE IF NOT EXISTS discovery_nodes (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            correlation_id TEXT NOT NULL,
+            classification TEXT NOT NULL,
+            verification_state TEXT NOT NULL,
+            severity TEXT NOT NULL,
+            status TEXT NOT NULL,
+            claim TEXT NOT NULL,
+            impact TEXT,
+            next_action TEXT,
+            verification_step TEXT,
+            recurrence_key TEXT,
+            fingerprint TEXT,
+            observed_at_json TEXT NOT NULL DEFAULT '[]',
+            occurrence_count INTEGER NOT NULL DEFAULT 1,
+            source_lineage_json TEXT NOT NULL DEFAULT '[]',
+            review_date TEXT,
+            resolved_at TEXT,
+            resolution_rationale TEXT,
+            promoted_entity_type TEXT,
+            promoted_entity_id TEXT,
+            tags_json TEXT NOT NULL DEFAULT '[]',
+            revision INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_status ON discovery_nodes(status);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_classification ON discovery_nodes(classification);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_recurrence ON discovery_nodes(recurrence_key);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_fingerprint ON discovery_nodes(fingerprint);
+        CREATE INDEX IF NOT EXISTS idx_discovery_nodes_severity ON discovery_nodes(severity);
+
+        CREATE TABLE IF NOT EXISTS discovery_relationships (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            source_id TEXT NOT NULL,
+            target_id TEXT NOT NULL,
+            relationship_kind TEXT NOT NULL,
+            metadata_json TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_source ON discovery_relationships(source_id);
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_target ON discovery_relationships(target_id);
+        CREATE INDEX IF NOT EXISTS idx_discovery_rel_kind ON discovery_relationships(relationship_kind);
+
+        CREATE TABLE IF NOT EXISTS discovery_checkpoints (
+            id TEXT PRIMARY KEY,
+            scope_key TEXT NOT NULL,
+            run_id TEXT NOT NULL,
+            event TEXT NOT NULL,
+            snapshot_json TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_discovery_checkpoints_run ON discovery_checkpoints(run_id);
+        "#
+    )?;
+
+    connection.execute(
+        "UPDATE planning_config SET value = '11' WHERE key = ?1",
+        params![SCHEMA_VERSION_KEY],
+    )?;
+    Ok(())
+}
+
 fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
     connection.execute("DELETE FROM tag_index", [])?;
     for (table, entity_type) in [
@@ -7752,6 +8259,7 @@ fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningS
         ("issues", EntityType::Issue),
         ("insights", EntityType::Insight),
         ("planning_nodes", EntityType::GraphNode),
+        ("discovery_nodes", EntityType::DiscoveryNode),
     ] {
         let mut statement =
             connection.prepare(&format!("SELECT id, scope_key, tags_json FROM {table}"))?;
@@ -8009,6 +8517,23 @@ fn ensure_entity_exists(
             )
             .map(|_| ())
             .map_err(|error| map_not_found(error, EntityType::GraphEdge, entity_id)),
+        EntityType::DiscoveryNode => load_discovery(connection, entity_id).map(|_| ()),
+        EntityType::DiscoveryRelationship => connection
+            .query_row(
+                "SELECT id FROM discovery_relationships WHERE id = ?1",
+                params![entity_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|_| ())
+            .map_err(|error| map_not_found(error, EntityType::DiscoveryRelationship, entity_id)),
+        EntityType::DiscoveryCheckpoint => connection
+            .query_row(
+                "SELECT id FROM discovery_checkpoints WHERE id = ?1",
+                params![entity_id],
+                |row| row.get::<_, String>(0),
+            )
+            .map(|_| ())
+            .map_err(|error| map_not_found(error, EntityType::DiscoveryCheckpoint, entity_id)),
     };
 
     match lookup {
@@ -8159,6 +8684,13 @@ fn scope_key_for_entity(
         EntityType::ProjectRun => "SELECT scope_key FROM project_runs WHERE id = ?1",
         EntityType::GraphNode => "SELECT scope_key FROM planning_nodes WHERE id = ?1",
         EntityType::GraphEdge => "SELECT scope_key FROM planning_edges WHERE id = ?1",
+        EntityType::DiscoveryNode => "SELECT scope_key FROM discovery_nodes WHERE id = ?1",
+        EntityType::DiscoveryRelationship => {
+            "SELECT scope_key FROM discovery_relationships WHERE id = ?1"
+        }
+        EntityType::DiscoveryCheckpoint => {
+            "SELECT scope_key FROM discovery_checkpoints WHERE id = ?1"
+        }
     };
 
     connection
@@ -8643,6 +9175,21 @@ pub(crate) fn collect_entities(
         "planning_edges",
         EntityType::GraphEdge,
     )?);
+    entities.extend(entity_ids(
+        connection,
+        "discovery_nodes",
+        EntityType::DiscoveryNode,
+    )?);
+    entities.extend(entity_ids(
+        connection,
+        "discovery_relationships",
+        EntityType::DiscoveryRelationship,
+    )?);
+    entities.extend(entity_ids(
+        connection,
+        "discovery_checkpoints",
+        EntityType::DiscoveryCheckpoint,
+    )?);
     Ok(entities)
 }
 
@@ -8733,6 +9280,27 @@ pub(crate) fn collect_entities_in_scope(
         "planning_edges",
         "scope_key",
         EntityType::GraphEdge,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "discovery_nodes",
+        "scope_key",
+        EntityType::DiscoveryNode,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "discovery_relationships",
+        "scope_key",
+        EntityType::DiscoveryRelationship,
+        scope_key,
+    )?);
+    entities.extend(entity_ids_in_scope(
+        connection,
+        "discovery_checkpoints",
+        "scope_key",
+        EntityType::DiscoveryCheckpoint,
         scope_key,
     )?);
     Ok(entities)
@@ -8839,6 +9407,9 @@ pub(crate) fn attached_entity_correlation_id(
         }
         EntityType::GraphNode => Ok(format!("corr-graph-node-{entity_id}")),
         EntityType::GraphEdge => Ok(format!("corr-graph-edge-{entity_id}")),
+        EntityType::DiscoveryNode => Ok(load_discovery(connection, entity_id)?.correlation_id),
+        EntityType::DiscoveryRelationship => Ok(format!("corr-discovery-rel-{entity_id}")),
+        EntityType::DiscoveryCheckpoint => Ok(format!("corr-discovery-cp-{entity_id}")),
     }
 }
 
@@ -9067,6 +9638,9 @@ fn entity_revision(
         EntityType::ProjectRun => ("project_runs", "id"),
         EntityType::GraphNode => ("planning_nodes", "id"),
         EntityType::GraphEdge => ("planning_edges", "id"),
+        EntityType::DiscoveryNode => ("discovery_nodes", "id"),
+        EntityType::DiscoveryRelationship => ("discovery_relationships", "id"),
+        EntityType::DiscoveryCheckpoint => ("discovery_checkpoints", "id"),
     };
     let sql = format!("SELECT revision FROM {table} WHERE {id_column} = ?1");
     connection
@@ -9756,6 +10330,122 @@ fn parse_insight_type(value: String) -> Result<InsightType, rusqlite::Error> {
     value.parse().map_err(text_parse_error)
 }
 
+fn parse_discovery_classification(
+    value: String,
+) -> Result<DiscoveryClassification, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_verification_state(value: String) -> Result<VerificationState, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_discovery_status(value: String) -> Result<DiscoveryStatus, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn parse_discovery_relationship_kind(
+    value: String,
+) -> Result<DiscoveryRelationshipKind, rusqlite::Error> {
+    value.parse().map_err(text_parse_error)
+}
+
+fn row_to_discovery(row: &Row<'_>) -> Result<DiscoveryRecord, rusqlite::Error> {
+    let observed_at_json: String = row.get("observed_at_json")?;
+    let source_lineage_json: String = row.get("source_lineage_json")?;
+    let tags_json: String = row.get("tags_json")?;
+
+    Ok(DiscoveryRecord {
+        id: row.get("id")?,
+        scope_key: row.get("scope_key")?,
+        correlation_id: row.get("correlation_id")?,
+        classification: parse_discovery_classification(row.get::<_, String>("classification")?)?,
+        verification_state: parse_verification_state(row.get::<_, String>("verification_state")?)?,
+        severity: parse_severity(row.get::<_, String>("severity")?)?,
+        status: parse_discovery_status(row.get::<_, String>("status")?)?,
+        claim: row.get("claim")?,
+        impact: row.get("impact")?,
+        next_action: row.get("next_action")?,
+        verification_step: row.get("verification_step")?,
+        recurrence_key: row.get("recurrence_key")?,
+        fingerprint: row.get("fingerprint")?,
+        observed_at: parse_json_column(observed_at_json)?,
+        occurrence_count: row.get("occurrence_count")?,
+        source_lineage: parse_json_column(source_lineage_json)?,
+        review_date: row.get("review_date")?,
+        resolved_at: row.get("resolved_at")?,
+        resolution_rationale: row.get("resolution_rationale")?,
+        promoted_entity_type: row
+            .get::<_, Option<String>>("promoted_entity_type")?
+            .map(parse_entity_type)
+            .transpose()?,
+        promoted_entity_id: row.get("promoted_entity_id")?,
+        tags: parse_json_column(tags_json)?,
+        revision: row.get("revision")?,
+        created_at: row.get("created_at")?,
+        updated_at: row.get("updated_at")?,
+    })
+}
+
+fn row_to_discovery_relationship(
+    row: &Row<'_>,
+) -> Result<DiscoveryRelationshipRecord, rusqlite::Error> {
+    Ok(DiscoveryRelationshipRecord {
+        id: row.get("id")?,
+        scope_key: row.get("scope_key")?,
+        source_id: row.get("source_id")?,
+        target_id: row.get("target_id")?,
+        relationship_kind: parse_discovery_relationship_kind(
+            row.get::<_, String>("relationship_kind")?,
+        )?,
+        metadata: row
+            .get::<_, Option<String>>("metadata_json")?
+            .map(|s| serde_json::from_str(&s).map_err(to_sql_error))
+            .transpose()?,
+        created_at: row.get("created_at")?,
+    })
+}
+
+fn row_to_discovery_checkpoint(
+    row: &Row<'_>,
+) -> Result<DiscoveryCheckpointRecord, rusqlite::Error> {
+    Ok(DiscoveryCheckpointRecord {
+        id: row.get("id")?,
+        scope_key: row.get("scope_key")?,
+        run_id: row.get("run_id")?,
+        event: row.get("event")?,
+        snapshot: row
+            .get::<_, Option<String>>("snapshot_json")?
+            .map(|s| serde_json::from_str(&s).map_err(to_sql_error))
+            .transpose()?,
+        created_at: row.get("created_at")?,
+    })
+}
+
+fn list_discovery_relationships_for_source(
+    connection: &Connection,
+    source_id: &str,
+) -> Result<Vec<DiscoveryRelationshipRecord>, PlanningStoreError> {
+    let mut statement = connection.prepare(
+        "SELECT id, scope_key, source_id, target_id, relationship_kind, metadata_json, created_at FROM discovery_relationships WHERE source_id = ?1 ORDER BY created_at ASC, id ASC",
+    )?;
+    let rows = statement.query_map(params![source_id], row_to_discovery_relationship)?;
+    collect_rows(rows)
+}
+
+pub(crate) fn load_discovery(
+    connection: &Connection,
+    id: &str,
+) -> Result<DiscoveryRecord, PlanningStoreError> {
+    connection
+        .query_row(
+            "SELECT id, scope_key, correlation_id, classification, verification_state, severity, status, claim, impact, next_action, verification_step, recurrence_key, fingerprint, observed_at_json, occurrence_count, source_lineage_json, review_date, resolved_at, resolution_rationale, promoted_entity_type, promoted_entity_id, tags_json, revision, created_at, updated_at FROM discovery_nodes WHERE id = ?1",
+            params![id],
+            row_to_discovery,
+        )
+        .map_err(|error| map_not_found(error, EntityType::DiscoveryNode, id))
+}
+
 pub(crate) fn load_insight(
     connection: &Connection,
     id: &str,
@@ -10122,6 +10812,7 @@ fn resolve_search_result(
         "review-point" => load_review_point(connection, entity_id).map(|r| r.title),
         "insight" => load_insight(connection, entity_id).map(|r| r.title),
         "scope" => load_scope(connection, entity_id).map(|r| r.scope_key),
+        "discovery-node" => load_discovery(connection, entity_id).map(|r| r.claim),
         _ => Ok(String::new()),
     };
     title.or_else(|_| Ok(String::new()))
@@ -10257,6 +10948,27 @@ fn load_entity_json(
                 )
                 .map_err(|e| map_not_found(e, EntityType::GraphEdge, entity_id))?;
             serde_json::to_string(&edge)
+        }
+        EntityType::DiscoveryNode => serde_json::to_string(&load_discovery(connection, entity_id)?),
+        EntityType::DiscoveryRelationship => {
+            let rel = connection
+                .query_row(
+                    "SELECT id, scope_key, source_id, target_id, relationship_kind, metadata_json, created_at FROM discovery_relationships WHERE id = ?1",
+                    params![entity_id],
+                    row_to_discovery_relationship,
+                )
+                .map_err(|e| map_not_found(e, EntityType::DiscoveryRelationship, entity_id))?;
+            serde_json::to_string(&rel)
+        }
+        EntityType::DiscoveryCheckpoint => {
+            let cp = connection
+                .query_row(
+                    "SELECT id, scope_key, run_id, event, snapshot_json, created_at FROM discovery_checkpoints WHERE id = ?1",
+                    params![entity_id],
+                    row_to_discovery_checkpoint,
+                )
+                .map_err(|e| map_not_found(e, EntityType::DiscoveryCheckpoint, entity_id))?;
+            serde_json::to_string(&cp)
         }
     };
     let text = json_str.map_err(PlanningStoreError::from)?;
@@ -11942,8 +12654,8 @@ mod tests {
             )
             .expect("get schema version");
         assert_eq!(
-            version, "10",
-            "fresh database should have schema version 10"
+            version, "11",
+            "fresh database should have schema version 11"
         );
 
         // Verify graph tables exist and accept inserts
@@ -12020,7 +12732,7 @@ mod tests {
                 |row| row.get(0),
             )
             .expect("get schema version");
-        assert_eq!(version, "10", "should have migrated through v10");
+        assert_eq!(version, "11", "should have migrated through v11");
 
         // Assert v8 tables remain readable
         let goal_title: String = conn
@@ -13187,7 +13899,7 @@ mod tests {
         let health = store.health().expect("health");
         assert_eq!(health.graph_node_count, 2, "should count 2 graph nodes");
         assert_eq!(health.graph_edge_count, 1, "should count 1 graph edge");
-        assert_eq!(health.schema_version, "10", "schema version should be 10");
+        assert_eq!(health.schema_version, "11", "schema version should be 11");
     }
 
     #[test]
