@@ -1882,3 +1882,961 @@ fn project_run_session_state() {
         "lastCompletedWorkPointId should be wp-ac12"
     );
 }
+
+// ===================================================================
+// DISCOVERY-CRUD: Discovery CRUD lifecycle
+// ===================================================================
+#[test]
+fn discovery_crud_lifecycle() {
+    let temp_dir = unique_temp_dir("elegy-integration-discovery-crud");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-crud";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Create discovery
+    let record = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--severity",
+        "high",
+        "--claim",
+        "test defect",
+    ]);
+    assert_eq!(record["status"], "ok");
+    let discovery_id = record["data"]["id"]
+        .as_str()
+        .expect("discovery id")
+        .to_string();
+
+    // Show — assert initial status is "candidate"
+    let show = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "show",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(show["status"], "ok");
+    assert_eq!(show["data"]["discovery"]["status"], "candidate");
+
+    // Triage — status becomes "triaged"
+    let triage = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "triage",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(triage["status"], "ok");
+    let show2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "show",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(show2["data"]["discovery"]["status"], "triaged");
+
+    // Resolve — status becomes "resolved", resolvedAt set
+    let resolve = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "resolve",
+        "--discovery-id",
+        &discovery_id,
+        "--rationale",
+        "fixed",
+        "--evidence-ref",
+        "commit-abc",
+    ]);
+    assert_eq!(resolve["status"], "ok");
+    let show3 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "show",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(show3["data"]["discovery"]["status"], "resolved");
+    assert!(
+        show3["data"]["discovery"]["resolvedAt"].is_string(),
+        "resolvedAt should be set after resolve"
+    );
+
+    // Reopen — status becomes "reopened"
+    let reopen = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "reopen",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(reopen["status"], "ok");
+    let show4 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "show",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(show4["data"]["discovery"]["status"], "reopened");
+}
+
+// ===================================================================
+// DISCOVERY-CLASS: Discovery classification types
+// ===================================================================
+#[test]
+fn discovery_supports_all_classifications() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-class");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-class";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    let classifications = [
+        "defect",
+        "deferred-work",
+        "review-finding",
+        "insight",
+        "observation",
+    ];
+    for class in &classifications {
+        let result = command_json(&[
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            scope,
+            "discovery",
+            "record",
+            "--classification",
+            class,
+            "--claim",
+            &format!("test {}", class),
+        ]);
+        assert_eq!(result["status"], "ok");
+        assert_eq!(
+            result["data"]["classification"].as_str(),
+            Some(*class),
+            "classification should be {}",
+            class
+        );
+    }
+}
+
+// ===================================================================
+// DISCOVERY-VER: Discovery verification states
+// ===================================================================
+#[test]
+fn discovery_verification_states() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-ver");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-ver";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Default (unverified)
+    let r1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "default unverified",
+    ]);
+    assert_eq!(r1["status"], "ok");
+    assert_eq!(r1["data"]["verificationState"], "unverified");
+
+    // Verified
+    let r2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "explicit verified",
+        "--verification-state",
+        "verified",
+    ]);
+    assert_eq!(r2["status"], "ok");
+    assert_eq!(r2["data"]["verificationState"], "verified");
+
+    // Rejected
+    let r3 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "explicit rejected",
+        "--verification-state",
+        "rejected",
+    ]);
+    assert_eq!(r3["status"], "ok");
+    assert_eq!(r3["data"]["verificationState"], "rejected");
+}
+
+// ===================================================================
+// DISCOVERY-REC: Discovery recurrence key and fingerprint
+// ===================================================================
+#[test]
+fn discovery_recurrence_key_and_fingerprint() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-rec");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-rec";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Create with recurrence_key and fingerprint
+    let r1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "recurring bug",
+        "--recurrence-key",
+        "bug-123",
+        "--fingerprint",
+        "fp-abc",
+    ]);
+    assert_eq!(r1["status"], "ok");
+    assert_eq!(r1["data"]["recurrenceKey"], "bug-123");
+    assert_eq!(r1["data"]["fingerprint"], "fp-abc");
+
+    // Create another with same recurrence_key
+    let r2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "recurring bug 2",
+        "--recurrence-key",
+        "bug-123",
+    ]);
+    assert_eq!(r2["status"], "ok");
+    assert_eq!(r2["data"]["recurrenceKey"], "bug-123");
+
+    // List: both discoveries with recurrence_key bug-123 should appear
+    let list = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "list",
+    ]);
+    assert_eq!(list["status"], "ok");
+    let discoveries = list["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    let matching = discoveries
+        .iter()
+        .filter(|d| d["recurrenceKey"].as_str() == Some("bug-123"))
+        .count();
+    assert_eq!(
+        matching, 2,
+        "both discoveries with recurrence_key bug-123 should appear"
+    );
+
+    // Verify occurrence_count defaults to 1
+    assert_eq!(
+        r1["data"]["occurrenceCount"], 1,
+        "first discovery occurrence_count should be 1"
+    );
+    assert_eq!(
+        r2["data"]["occurrenceCount"], 1,
+        "second discovery occurrence_count should be 1"
+    );
+}
+
+// ===================================================================
+// DISCOVERY-APP: Discovery applies-to relationship
+// ===================================================================
+#[test]
+fn discovery_applies_to_relationship() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-app");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-app";
+
+    setup_scope_goal_roadmap(&temp_dir, db_arg, scope, "goal-app", "rm-app", "c1");
+
+    // Create discovery with applies-to relationship
+    let record = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "review-finding",
+        "--severity",
+        "low",
+        "--claim",
+        "applies-to test",
+        "--applies-to-entity-type",
+        "goal",
+        "--applies-to-entity-id",
+        "goal-app",
+    ]);
+    assert_eq!(record["status"], "ok");
+    let discovery_id = record["data"]["id"]
+        .as_str()
+        .expect("discovery id")
+        .to_string();
+
+    // Show discovery — verify relationships array
+    let show = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "show",
+        "--discovery-id",
+        &discovery_id,
+    ]);
+    assert_eq!(show["status"], "ok");
+    let relationships = show["data"]["relationships"]
+        .as_array()
+        .expect("relationships array");
+    let has_applies_to = relationships.iter().any(|r| {
+        r["relationshipKind"].as_str() == Some("applies-to")
+            && r["targetId"].as_str() == Some("goal-app")
+    });
+    assert!(
+        has_applies_to,
+        "relationships should contain applies-to for goal-app"
+    );
+
+    // Context --entity-type goal --entity-id <goal_id> — verify discoveries includes it
+    let ctx = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "context",
+        "--entity-type",
+        "goal",
+        "--entity-id",
+        "goal-app",
+    ]);
+    assert_eq!(ctx["status"], "ok");
+    let ctx_discoveries = ctx["data"]["discoveries"]
+        .as_array()
+        .expect("context discoveries array");
+    let discovery_in_context = ctx_discoveries
+        .iter()
+        .any(|d| d["id"].as_str() == Some(&discovery_id));
+    assert!(
+        discovery_in_context,
+        "goal-app context should include the applied discovery"
+    );
+}
+
+// ===================================================================
+// DISCOVERY-SESSION: Discovery session context includes active discoveries
+// ===================================================================
+#[test]
+fn discovery_session_context_includes_active_discoveries() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-session");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-session";
+    let cid = "session-ctx-cid";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "--correlation-id",
+        cid,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Create discovery
+    let record = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "--correlation-id",
+        cid,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--severity",
+        "medium",
+        "--claim",
+        "session discovery",
+    ]);
+    assert_eq!(record["status"], "ok");
+    let discovery_id = record["data"]["id"]
+        .as_str()
+        .expect("discovery id")
+        .to_string();
+
+    // Session context
+    let ctx = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "--correlation-id",
+        cid,
+        "context",
+        "--session",
+    ]);
+    assert_eq!(ctx["status"], "ok");
+
+    // Verify activeDiscoveries field exists
+    assert!(
+        ctx["data"].get("activeDiscoveries").is_some(),
+        "session context should have activeDiscoveries field"
+    );
+
+    // Verify the discovery is in the activeDiscoveries list
+    let active = ctx["data"]["activeDiscoveries"]
+        .as_array()
+        .expect("activeDiscoveries array");
+    let has_discovery = active
+        .iter()
+        .any(|d| d["id"].as_str() == Some(&discovery_id));
+    assert!(
+        has_discovery,
+        "session context activeDiscoveries should include the discovery"
+    );
+}
+
+// ===================================================================
+// DISCOVERY-ISO: Discovery scope isolation
+// ===================================================================
+#[test]
+fn discovery_scope_isolation() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-iso");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+
+    // Create scope s1 and discovery in s1
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s1",
+        "scope",
+        "create",
+        "--scope-key",
+        "s1",
+    ]);
+    let r1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s1",
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "s1 discovery",
+    ]);
+    assert_eq!(r1["status"], "ok");
+    let id_s1 = r1["data"]["id"]
+        .as_str()
+        .expect("discovery id s1")
+        .to_string();
+
+    // Create scope s2 and discovery in s2
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s2",
+        "scope",
+        "create",
+        "--scope-key",
+        "s2",
+    ]);
+    let r2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s2",
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--claim",
+        "s2 discovery",
+    ]);
+    assert_eq!(r2["status"], "ok");
+    let id_s2 = r2["data"]["id"]
+        .as_str()
+        .expect("discovery id s2")
+        .to_string();
+
+    // List in scope s1 — should see only s1's discovery
+    let list_s1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s1",
+        "discovery",
+        "list",
+    ]);
+    assert_eq!(list_s1["status"], "ok");
+    let disc_s1 = list_s1["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    assert_eq!(disc_s1.len(), 1, "s1 should have exactly 1 discovery");
+    assert_eq!(disc_s1[0]["id"], id_s1, "s1 discovery should match");
+
+    // List in scope s2 — should see only s2's discovery
+    let list_s2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "s2",
+        "discovery",
+        "list",
+    ]);
+    assert_eq!(list_s2["status"], "ok");
+    let disc_s2 = list_s2["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    assert_eq!(disc_s2.len(), 1, "s2 should have exactly 1 discovery");
+    assert_eq!(disc_s2[0]["id"], id_s2, "s2 discovery should match");
+
+    // Show s1's discovery from scope s2 — should fail due to scope isolation
+    let cross = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "s2",
+            "discovery",
+            "show",
+            "--discovery-id",
+            &id_s1,
+        ])
+        .output()
+        .expect("run discovery show cross-scope");
+    let cross_result: Value = serde_json::from_slice(&cross.stdout).expect("valid json");
+    assert_eq!(
+        cross_result["status"], "invalid",
+        "showing s1 discovery from scope s2 should be rejected"
+    );
+}
+
+// ===================================================================
+// DISCOVERY-CP: Discovery checkpoint records event
+// ===================================================================
+#[test]
+fn discovery_checkpoint_records_event() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-cp");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-cp";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Checkpoint 1: scan-started
+    let cp1 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "checkpoint",
+        "--run-id",
+        "run-1",
+        "--event",
+        "scan-started",
+    ]);
+    assert_eq!(cp1["status"], "ok");
+    assert_eq!(cp1["data"]["runId"], "run-1");
+    assert_eq!(cp1["data"]["event"], "scan-started");
+
+    // Checkpoint 2: scan-completed with snapshot
+    let cp2 = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "checkpoint",
+        "--run-id",
+        "run-1",
+        "--event",
+        "scan-completed",
+        "--snapshot-json",
+        r#"{"count":5}"#,
+    ]);
+    assert_eq!(cp2["status"], "ok");
+    assert_eq!(cp2["data"]["runId"], "run-1");
+    assert_eq!(cp2["data"]["event"], "scan-completed");
+    assert!(
+        cp2["data"]["snapshot"].is_object(),
+        "second checkpoint should have a snapshot object"
+    );
+    assert_eq!(cp2["data"]["snapshot"]["count"], 5);
+}
+
+// ===================================================================
+// DISCOVERY-LIST: Discovery list with filters
+// ===================================================================
+#[test]
+fn discovery_list_with_filters() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-list-filter");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-list";
+
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "scope",
+        "create",
+        "--scope-key",
+        scope,
+    ]);
+
+    // Create discoveries with different classifications and severities
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--severity",
+        "high",
+        "--claim",
+        "defect-high",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "defect",
+        "--severity",
+        "low",
+        "--claim",
+        "defect-low",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "insight",
+        "--severity",
+        "medium",
+        "--claim",
+        "insight-med",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "record",
+        "--classification",
+        "observation",
+        "--severity",
+        "low",
+        "--claim",
+        "observation-low",
+    ]);
+
+    // List with --classification defect filter
+    let list_defect = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "list",
+        "--classification",
+        "defect",
+    ]);
+    assert_eq!(list_defect["status"], "ok");
+    let defects = list_defect["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    assert_eq!(defects.len(), 2, "should find 2 defects");
+    for d in defects {
+        assert_eq!(d["classification"], "defect");
+    }
+
+    // List with --status candidate filter
+    let list_candidate = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "list",
+        "--status",
+        "candidate",
+    ]);
+    assert_eq!(list_candidate["status"], "ok");
+    let candidates = list_candidate["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    // All 4 are candidates by default
+    assert_eq!(
+        candidates.len(),
+        4,
+        "all 4 discoveries should be candidates"
+    );
+
+    // List with no filters (should return all)
+    let list_all = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "discovery",
+        "list",
+    ]);
+    assert_eq!(list_all["status"], "ok");
+    let all = list_all["data"]["discoveries"]
+        .as_array()
+        .expect("discoveries array");
+    assert_eq!(all.len(), 4, "should return all 4 discoveries");
+}
+
+// ===================================================================
+// DISCOVERY-WARN: Discovery warnings in envelope
+// ===================================================================
+#[test]
+fn discovery_warnings_in_envelope() {
+    let temp_dir = unique_temp_dir("elegy-integration-disc-warn");
+    let db_path = temp_dir.join("planning.db");
+    let db_arg = db_path.to_str().expect("utf-8 db path");
+    let scope = "d-warn";
+
+    // Run capabilities to inspect the envelope
+    let output = command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        scope,
+        "capabilities",
+    ]);
+    assert_eq!(output["status"], "ok");
+
+    // The envelope should support a warnings field (nullable array of strings)
+    // It may be absent or null when no warnings exist
+    if let Some(warnings) = output.get("warnings") {
+        assert!(
+            warnings.is_null() || warnings.as_array().is_some(),
+            "warnings must be null or an array if present"
+        );
+    }
+}
