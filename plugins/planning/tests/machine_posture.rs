@@ -7,6 +7,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde_json::Value;
+use sha2::{Digest as Sha2Digest, Sha256};
 
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
@@ -67,7 +68,7 @@ fn capabilities_reports_lease_contract_without_initializing_a_database() {
     assert_eq!(envelope["schemaVersion"], "planning-result/v1");
     assert_eq!(envelope["command"], serde_json::json!(["capabilities"]));
     assert_eq!(envelope["status"], "ok");
-    assert_eq!(envelope["data"]["planningSchemaVersion"], "10");
+    assert_eq!(envelope["data"]["planningSchemaVersion"], "11");
     assert_eq!(
         envelope["data"]["capabilities"],
         serde_json::json!([
@@ -5906,4 +5907,206 @@ fn graph_runnable_empty_scope() {
     let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
     assert!(result["data"]["candidates"].as_array().unwrap().is_empty());
     assert!(result["data"]["blocked"].as_array().unwrap().is_empty());
+}
+
+// ===================================================================
+// Static Capability Catalog Tests
+// ===================================================================
+
+/// Helper: load the static catalog as a Value.
+fn load_catalog() -> Value {
+    serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/capability-catalog.json"
+    )))
+    .expect("valid capability catalog JSON")
+}
+
+#[test]
+fn capabilities_detail_returns_full_catalog() {
+    let catalog = load_catalog();
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(["--json", "--non-interactive", "capabilities", "--detail"])
+        .output()
+        .expect("run capabilities --detail");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["command"], serde_json::json!(["capabilities"]));
+
+    let detail_data = &envelope["data"];
+
+    // Verify top-level catalog fields match
+    assert_eq!(
+        detail_data["schemaVersion"], catalog["schemaVersion"],
+        "schemaVersion should match catalog"
+    );
+    assert_eq!(
+        detail_data["plugin"], catalog["plugin"],
+        "plugin should match catalog"
+    );
+    assert_eq!(
+        detail_data["pluginVersion"], catalog["pluginVersion"],
+        "pluginVersion should match catalog"
+    );
+    assert_eq!(
+        detail_data["digest"], catalog["digest"],
+        "digest should match catalog"
+    );
+
+    // Verify capabilities arrays match
+    assert_eq!(
+        detail_data["capabilities"], catalog["capabilities"],
+        "capabilities array should match catalog"
+    );
+
+    // Verify no database path was needed (capabilities is pre-db)
+    assert_eq!(envelope["status"], "ok");
+}
+
+#[test]
+fn capabilities_detail_contains_all_compact_ids() {
+    // The compact (non-detail) output lists capability IDs as strings.
+    // Every ID in the compact list must appear in the detail catalog.
+    let compact_output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(["--json", "--non-interactive", "capabilities"])
+        .output()
+        .expect("run capabilities (compact)");
+
+    assert!(compact_output.status.success());
+    let compact_envelope: Value =
+        serde_json::from_slice(&compact_output.stdout).expect("valid json");
+    let compact_ids: Vec<&str> = compact_envelope["data"]["capabilities"]
+        .as_array()
+        .expect("capabilities array")
+        .iter()
+        .filter_map(|v| v.as_str())
+        .collect();
+
+    let catalog = load_catalog();
+    let detail_ids: Vec<&str> = catalog["capabilities"]
+        .as_array()
+        .expect("catalog capabilities array")
+        .iter()
+        .filter_map(|cap| cap["id"].as_str())
+        .collect();
+
+    for cid in &compact_ids {
+        assert!(
+            detail_ids.contains(cid),
+            "compact capability `{cid}` must appear in detail catalog"
+        );
+    }
+    assert!(
+        !compact_ids.is_empty(),
+        "should have at least one capability"
+    );
+}
+
+#[test]
+fn capabilities_catalog_digest_valid() {
+    // Load the catalog and verify the digest matches
+    let catalog = load_catalog();
+    let declared_digest = catalog["digest"]
+        .as_str()
+        .expect("catalog must have digest field");
+
+    // Compute SHA-256 of the capabilities array (sorted keys, no whitespace)
+    let capabilities = &catalog["capabilities"];
+    let canonical = serde_json::to_string(&capabilities).expect("serialize capabilities");
+    let mut hasher = Sha256::new();
+    hasher.update(canonical.as_bytes());
+    let computed = format!("sha256:{}", hex::encode(hasher.finalize()));
+
+    assert_eq!(
+        computed, declared_digest,
+        "SHA-256 digest of capabilities array must match declared digest"
+    );
+}
+
+#[test]
+fn capabilities_detail_does_not_initialize_database() {
+    let temp_dir = unique_temp_dir("elegy-planning-capabilities-detail-no-db");
+    let db_path = temp_dir.join("missing-parent").join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "capabilities",
+            "--detail",
+        ])
+        .output()
+        .expect("run capabilities --detail with missing db");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !db_path.exists(),
+        "capabilities --detail must not initialize storage"
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["status"], "ok");
+}
+
+#[test]
+fn capabilities_compact_backward_compat() {
+    // Verify the non-detail output still works and has the expected structure
+    let temp_dir = unique_temp_dir("elegy-planning-capabilities-compat");
+    let db_path = temp_dir.join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "--non-interactive",
+            "capabilities",
+        ])
+        .output()
+        .expect("run capabilities (compact)");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        !db_path.exists(),
+        "capability discovery must not initialize storage"
+    );
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["schemaVersion"], "planning-result/v1");
+    assert_eq!(envelope["command"], serde_json::json!(["capabilities"]));
+    assert_eq!(envelope["status"], "ok");
+    assert!(envelope["data"]["cliVersion"].is_string());
+    assert!(envelope["data"]["resultSchemaVersion"].is_string());
+    assert!(envelope["data"]["planningSchemaVersion"].is_string());
+    assert_eq!(
+        envelope["data"]["capabilities"],
+        serde_json::json!([
+            "project-run.claim.v2",
+            "project-run.activate.fenced.v1",
+            "project-run.heartbeat.v1",
+            "project-run.release.fenced.v1",
+            "project-run.add-evidence.fenced.v1"
+        ])
+    );
 }

@@ -1,0 +1,160 @@
+{
+  "schemaVersion": "elegy-capability-catalog/v1",
+  "plugin": "elegy-planning",
+  "pluginVersion": "0.1.0",
+  "generatedAt": "2026-06-30T00:00:00Z",
+  "digest": "sha256:3035490f53026dc09a7edb5ea34336803e02988212c15dad1a5b62aa614034c2",
+  "capabilities": [
+    {
+      "id": "project-run.claim.v2",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v2",
+      "description": "Claim a project run for execution tracking. Creates a new run record linked to a goal, roadmap, and work point.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["project-run", "claim"],
+        "requiredArgs": ["goal-id", "roadmap-id", "work-point-id"],
+        "optionalArgs": ["id", "repo-id", "branch", "worktree-id", "session-id", "profile-id", "correlation-id", "owner-id", "idempotency-key", "lease-seconds"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["goalId", "roadmapId", "workPointId"],
+        "properties": {
+          "goalId": { "type": "string", "description": "Parent goal ID" },
+          "roadmapId": { "type": "string", "description": "Parent roadmap ID" },
+          "workPointId": { "type": "string", "description": "Work point ID" },
+          "id": { "type": "string", "description": "Optional run ID override" },
+          "repoId": { "type": "string", "description": "Repository identifier" },
+          "branch": { "type": "string", "description": "Branch name" },
+          "worktreeId": { "type": "string", "description": "Worktree identifier" },
+          "sessionId": { "type": "string", "description": "Session identifier" },
+          "profileId": { "type": "string", "description": "Profile identifier" },
+          "correlationId": { "type": "string", "description": "Correlation ID for tracing" },
+          "ownerId": { "type": "string", "description": "Owner identifier" },
+          "idempotencyKey": { "type": "string", "description": "Idempotency key for safe retry" },
+          "leaseSeconds": { "type": "integer", "description": "Lease duration in seconds", "default": 900 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The created project run ID" },
+          "status": { "type": "string", "description": "Initial run status" },
+          "leaseExpiresAt": { "type": "string", "description": "ISO 8601 lease expiry timestamp" }
+        }
+      }
+    },
+    {
+      "id": "project-run.activate.fenced.v1",
+      "sideEffectClass": "fenced-mutation",
+      "contractVersion": "v1",
+      "description": "Activate a claimed project run with fencing token. Fencing prevents concurrent activation.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["project-run", "activate"],
+        "requiredArgs": ["project-run-id"],
+        "optionalArgs": ["fencing-token"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["projectRunId"],
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The project run ID to activate" },
+          "fencingToken": { "type": "integer", "description": "Fencing token for concurrency control" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The activated project run ID" },
+          "status": { "type": "string", "description": "Activated run status" }
+        }
+      }
+    },
+    {
+      "id": "project-run.heartbeat.v1",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Send a heartbeat to extend the lease on an active project run.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["project-run", "heartbeat"],
+        "requiredArgs": ["project-run-id"],
+        "optionalArgs": ["fencing-token", "lease-seconds"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["projectRunId"],
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The project run ID to heartbeat" },
+          "fencingToken": { "type": "integer", "description": "Fencing token for concurrency control" },
+          "leaseSeconds": { "type": "integer", "description": "Lease duration in seconds", "default": 900 }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The heartbeated project run ID" },
+          "leaseExpiresAt": { "type": "string", "description": "ISO 8601 updated lease expiry timestamp" }
+        }
+      }
+    },
+    {
+      "id": "project-run.release.fenced.v1",
+      "sideEffectClass": "fenced-mutation",
+      "contractVersion": "v1",
+      "description": "Release (complete) a project run with a final status. Fencing prevents concurrent release.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["project-run", "release"],
+        "requiredArgs": ["project-run-id", "status"],
+        "optionalArgs": ["evidence-json", "fencing-token"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["projectRunId", "status"],
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The project run ID to release" },
+          "status": { "type": "string", "enum": ["completed", "failed", "cancelled"], "description": "Final run status" },
+          "evidenceJson": { "type": "string", "description": "JSON-encoded evidence payload" },
+          "fencingToken": { "type": "integer", "description": "Fencing token for concurrency control" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The released project run ID" },
+          "status": { "type": "string", "description": "Final run status" }
+        }
+      }
+    },
+    {
+      "id": "project-run.add-evidence.fenced.v1",
+      "sideEffectClass": "fenced-mutation",
+      "contractVersion": "v1",
+      "description": "Add evidence to an active project run. Fencing prevents concurrent evidence addition.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["project-run", "add-evidence"],
+        "requiredArgs": ["project-run-id", "evidence-json"],
+        "optionalArgs": ["fencing-token"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["projectRunId", "evidenceJson"],
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The project run ID to add evidence to" },
+          "evidenceJson": { "type": "string", "description": "JSON-encoded evidence payload" },
+          "fencingToken": { "type": "integer", "description": "Fencing token for concurrency control" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "projectRunId": { "type": "string", "description": "The project run ID" },
+          "evidenceCount": { "type": "integer", "description": "Total evidence entries after addition" }
+        }
+      }
+    }
+  ]
+}

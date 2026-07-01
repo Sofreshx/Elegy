@@ -34,6 +34,9 @@ pub(crate) fn validate_entity(
         EntityType::ProjectRun => validate_project_run(connection, entity_id),
         EntityType::GraphNode => validate_graph_node(connection, entity_id),
         EntityType::GraphEdge => validate_graph_edge(connection, entity_id),
+        EntityType::DiscoveryNode => Ok(Vec::new()),
+        EntityType::DiscoveryRelationship => Ok(Vec::new()),
+        EntityType::DiscoveryCheckpoint => Ok(Vec::new()),
     }
 }
 

@@ -10,18 +10,20 @@ use crate::storage::CURRENT_SCHEMA_VERSION;
 use crate::{
     manifest, AcceptanceKind, ActivateProjectRunInput, AddEvidenceInput, AddRoadmapSectionInput,
     AddWorkPointInput, AttachEvidenceInput, AttachWorktreeInput, ClaimProjectRunInput,
-    CompactGraphEdge, CompactGraphNode, CreateAcceptanceInput, CreateEvidenceInput,
-    CreateGoalInput, CreateGraphEdgeInput, CreateGraphNodeInput, CreateInsightInput,
-    CreateIssueInput, CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput,
-    CreateScopeInput, CreateTodoInput, EffortTier, EntityType, EvidenceKind, FieldDiff,
-    FileScopeIntent, FileScopeRecord, FileScopeSelectorType, FinalizeGraphNodeInput, GoalStatus,
-    InsightStatus, InsightType, IssueStatus, ManifestDiffEntry, ManifestDiffResult, PlanStatus,
-    PlanningEdgeKind, PlanningGraphEdge, PlanningGraphNode, PlanningNodeKind, PlanningStore,
-    PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunStatus, ProjectionFormat,
-    ReleaseProjectRunInput, ReviewPointStatus, ReviseGraphEdgeInput, ReviseGraphNodeInput,
-    RevisePlanInput, ReviseWorkPointInput, RoadmapStatus, SatisfyAcceptanceInput, SearchInput,
-    Severity, TodoStatus, UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput,
-    UpdateStatusInput, WorkPointKind, WorkPointStatus, WorktreeStatus,
+    CompactGraphEdge, CompactGraphNode, CreateAcceptanceInput, CreateDiscoveryCheckpointInput,
+    CreateDiscoveryInput, CreateDiscoveryRelationshipInput, CreateEvidenceInput, CreateGoalInput,
+    CreateGraphEdgeInput, CreateGraphNodeInput, CreateInsightInput, CreateIssueInput,
+    CreatePlanInput, CreateReviewPointInput, CreateRoadmapInput, CreateScopeInput, CreateTodoInput,
+    DiscoveryClassification, DiscoveryRelationshipKind, DiscoveryStatus, EffortTier, EntityType,
+    EvidenceKind, FieldDiff, FileScopeIntent, FileScopeRecord, FileScopeSelectorType,
+    FinalizeGraphNodeInput, GoalStatus, InsightStatus, InsightType, IssueStatus, ManifestDiffEntry,
+    ManifestDiffResult, PlanStatus, PlanningEdgeKind, PlanningGraphEdge, PlanningGraphNode,
+    PlanningNodeKind, PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence,
+    ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus,
+    ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput, ReviseWorkPointInput,
+    RoadmapStatus, SatisfyAcceptanceInput, SearchInput, Severity, TodoStatus,
+    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput, VerificationState,
+    WorkPointKind, WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -120,7 +122,10 @@ enum Command {
     #[command(about = "Check planning database health")]
     Health,
     #[command(about = "Report machine-readable CLI compatibility metadata")]
-    Capabilities,
+    Capabilities {
+        #[arg(long)]
+        detail: bool,
+    },
     #[command(about = "Manage project-level configuration")]
     Project {
         #[command(subcommand)]
@@ -163,6 +168,13 @@ enum Command {
     Manifest(ManifestArgs),
     #[command(about = "Diff a planning manifest against current database state")]
     Diff(DiffArgs),
+    #[command(
+        about = "Record and manage discoveries — defects, deferred work, review findings, insights, and observations"
+    )]
+    Discovery {
+        #[command(subcommand)]
+        command: DiscoveryCommand,
+    },
     #[command(about = "List or render planning manifest templates")]
     Template {
         #[command(subcommand)]
@@ -234,6 +246,113 @@ enum IssueCommand {
     List,
     Show(IssueShowArgs),
     Search(EntitySearchArgs),
+}
+
+#[allow(clippy::large_enum_variant)]
+#[derive(Subcommand, Debug)]
+enum DiscoveryCommand {
+    Record(DiscoveryRecordArgs),
+    Show(DiscoveryShowArgs),
+    List(DiscoveryListArgs),
+    Triage(DiscoveryTriageArgs),
+    Promote(DiscoveryPromoteArgs),
+    Resolve(DiscoveryResolveArgs),
+    Reopen(DiscoveryReopenArgs),
+    Checkpoint(DiscoveryCheckpointArgs),
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryRecordArgs {
+    #[arg(long)]
+    id: Option<String>,
+    #[arg(long)]
+    correlation_id: Option<String>,
+    #[arg(long, value_enum)]
+    classification: DiscoveryClassification,
+    #[arg(long, value_enum, default_value_t = VerificationState::Unverified)]
+    verification_state: VerificationState,
+    #[arg(long, value_enum, default_value_t = Severity::Medium)]
+    severity: Severity,
+    #[arg(long)]
+    claim: String,
+    #[arg(long)]
+    impact: Option<String>,
+    #[arg(long = "next-action")]
+    next_action: Option<String>,
+    #[arg(long = "verification-step")]
+    verification_step: Option<String>,
+    #[arg(long = "recurrence-key")]
+    recurrence_key: Option<String>,
+    #[arg(long)]
+    fingerprint: Option<String>,
+    #[arg(long = "observed-at")]
+    observed_at: Vec<String>,
+    #[arg(long = "occurrence-count")]
+    occurrence_count: Option<i64>,
+    #[arg(long = "review-date")]
+    review_date: Option<String>,
+    #[arg(long = "tag")]
+    tags: Vec<String>,
+    #[arg(long = "applies-to-entity-type", value_enum)]
+    applies_to_entity_type: Option<EntityType>,
+    #[arg(long = "applies-to-entity-id")]
+    applies_to_entity_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryShowArgs {
+    #[arg(long = "discovery-id")]
+    discovery_id: String,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryListArgs {
+    #[arg(long, value_enum)]
+    status: Option<DiscoveryStatus>,
+    #[arg(long, value_enum)]
+    classification: Option<DiscoveryClassification>,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryTriageArgs {
+    #[arg(long = "discovery-id")]
+    discovery_id: String,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryPromoteArgs {
+    #[arg(long = "discovery-id")]
+    discovery_id: String,
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: EntityType,
+    #[arg(long = "entity-id")]
+    entity_id: String,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryResolveArgs {
+    #[arg(long = "discovery-id")]
+    discovery_id: String,
+    #[arg(long)]
+    rationale: String,
+    #[arg(long = "evidence-ref")]
+    evidence_refs: Vec<String>,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryReopenArgs {
+    #[arg(long = "discovery-id")]
+    discovery_id: String,
+}
+
+#[derive(Args, Debug)]
+struct DiscoveryCheckpointArgs {
+    #[arg(long = "run-id")]
+    run_id: String,
+    #[arg(long)]
+    event: String,
+    #[arg(long = "snapshot-json")]
+    snapshot_json: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -1352,6 +1471,7 @@ pub fn run_from_env() -> ExitCode {
                             _ => MachineStatus::Error,
                         },
                         error.to_string(),
+                        None,
                     ))
                     .is_ok()
                 {
@@ -1385,8 +1505,8 @@ where
         compact: cli.compact,
     };
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
-    if matches!(&cli.command, Command::Capabilities) {
-        return execute_capabilities(&context);
+    if let Command::Capabilities { detail } = &cli.command {
+        return execute_capabilities(&context, *detail);
     }
     let store = PlanningStore::new(&context.db_path);
     store.init()?;
@@ -1429,7 +1549,7 @@ where
         Command::Validate { command } => execute_validate(command, &store, &context),
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
-        Command::Capabilities => {
+        Command::Capabilities { .. } => {
             unreachable!("capabilities returns before database initialization")
         }
         Command::Project { command } => execute_project(command, &store, &context),
@@ -1443,6 +1563,7 @@ where
         Command::Graph { command } => execute_graph(command, &store, &context),
         Command::Manifest(args) => execute_manifest(args, &store, &context),
         Command::Diff(args) => execute_diff(args, &store, &context),
+        Command::Discovery { command } => execute_discovery(command, &store, &context),
         Command::Template { command } => execute_template(command, &store, &context),
         Command::Intent(args) => execute_intent(args, &store, &context),
     }
@@ -1569,6 +1690,7 @@ fn handle_parse_error(error: clap::Error, raw_args: &[OsString]) -> Result<ExitC
             command,
             MachineStatus::Invalid,
             error.to_string(),
+            None,
         ))?;
         return Ok(exit_invalid());
     }
@@ -2166,6 +2288,127 @@ fn execute_issue(
     }
 }
 
+fn execute_discovery(
+    command: DiscoveryCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        DiscoveryCommand::Record(args) => {
+            let correlation_id = match resolve_correlation_id(args.correlation_id, context) {
+                Ok(value) => value,
+                Err(message) => {
+                    return emit_error(context, vec!["discovery", "record"], message, true)
+                }
+            };
+            let record = store.create_discovery(CreateDiscoveryInput {
+                id: args.id,
+                scope_key: Some(context.scope_key.clone()),
+                correlation_id,
+                classification: args.classification,
+                verification_state: args.verification_state,
+                severity: args.severity,
+                claim: args.claim,
+                impact: args.impact,
+                next_action: args.next_action,
+                verification_step: args.verification_step,
+                recurrence_key: args.recurrence_key,
+                fingerprint: args.fingerprint,
+                observed_at: args.observed_at,
+                occurrence_count: args.occurrence_count,
+                source_lineage: Vec::new(),
+                review_date: args.review_date,
+                tags: args.tags,
+            })?;
+
+            // If applies-to is specified, create a relationship
+            if let (Some(entity_type), Some(entity_id)) =
+                (args.applies_to_entity_type, args.applies_to_entity_id)
+            {
+                let _ = store.add_discovery_relationship(CreateDiscoveryRelationshipInput {
+                    id: None,
+                    scope_key: Some(context.scope_key.clone()),
+                    source_id: record.id.clone(),
+                    target_id: entity_id,
+                    relationship_kind: DiscoveryRelationshipKind::AppliesTo,
+                    metadata: Some(serde_json::json!({"entityType": entity_type.as_str()})),
+                });
+            }
+
+            emit_success(context, vec!["discovery", "record"], record)
+        }
+        DiscoveryCommand::Show(args) => {
+            let view = store.discovery_view(&args.discovery_id)?;
+            if view.discovery.scope_key != context.scope_key {
+                return emit_error(
+                    context,
+                    vec!["discovery", "show"],
+                    format!(
+                        "discovery `{}` is in scope `{}`, not `{}`",
+                        args.discovery_id, view.discovery.scope_key, context.scope_key
+                    ),
+                    true,
+                );
+            }
+            emit_success(context, vec!["discovery", "show"], view)
+        }
+        DiscoveryCommand::List(args) => {
+            let discoveries =
+                store.list_discoveries(&context.scope_key, args.status, args.classification)?;
+            // Return active (unresolved) discoveries first, ordered by severity
+            emit_success(
+                context,
+                vec!["discovery", "list"],
+                serde_json::json!({ "discoveries": discoveries }),
+            )
+        }
+        DiscoveryCommand::Triage(args) => {
+            let record = store.update_discovery_status(
+                &args.discovery_id,
+                DiscoveryStatus::Triaged,
+                &context.scope_key,
+            )?;
+            emit_success(context, vec!["discovery", "triage"], record)
+        }
+        DiscoveryCommand::Promote(args) => {
+            let record = store.promote_discovery(
+                &args.discovery_id,
+                args.entity_type,
+                &args.entity_id,
+                &context.scope_key,
+            )?;
+            emit_success(context, vec!["discovery", "promote"], record)
+        }
+        DiscoveryCommand::Resolve(args) => {
+            let record = store.resolve_discovery(
+                &args.discovery_id,
+                &args.rationale,
+                args.evidence_refs,
+                &context.scope_key,
+            )?;
+            emit_success(context, vec!["discovery", "resolve"], record)
+        }
+        DiscoveryCommand::Reopen(args) => {
+            let record = store.reopen_discovery(&args.discovery_id, &context.scope_key)?;
+            emit_success(context, vec!["discovery", "reopen"], record)
+        }
+        DiscoveryCommand::Checkpoint(args) => {
+            let snapshot: Option<serde_json::Value> = match args.snapshot_json {
+                Some(json_str) => Some(serde_json::from_str(&json_str).map_err(CliError::Json)?),
+                None => None,
+            };
+            let checkpoint = store.create_discovery_checkpoint(CreateDiscoveryCheckpointInput {
+                id: None,
+                scope_key: Some(context.scope_key.clone()),
+                run_id: args.run_id,
+                event: args.event,
+                snapshot,
+            })?;
+            emit_success(context, vec!["discovery", "checkpoint"], checkpoint)
+        }
+    }
+}
+
 fn execute_review_point(
     command: ReviewPointCommand,
     store: &PlanningStore,
@@ -2236,23 +2479,30 @@ fn execute_health(store: &PlanningStore, context: &MachineContext) -> Result<Exi
     emit_success(context, vec!["health"], store.health()?)
 }
 
-fn execute_capabilities(context: &MachineContext) -> Result<ExitCode, CliError> {
-    emit_success(
-        context,
-        vec!["capabilities"],
-        json!({
-            "cliVersion": env!("CARGO_PKG_VERSION"),
-            "resultSchemaVersion": RESULT_SCHEMA_VERSION,
-            "planningSchemaVersion": CURRENT_SCHEMA_VERSION,
-            "capabilities": [
-                "project-run.claim.v2",
-                "project-run.activate.fenced.v1",
-                "project-run.heartbeat.v1",
-                "project-run.release.fenced.v1",
-                "project-run.add-evidence.fenced.v1"
-            ]
-        }),
-    )
+fn execute_capabilities(context: &MachineContext, detail: bool) -> Result<ExitCode, CliError> {
+    if detail {
+        let catalog: serde_json::Value =
+            serde_json::from_str(include_str!("../capability-catalog.json"))
+                .map_err(CliError::Json)?;
+        emit_success(context, vec!["capabilities"], catalog)
+    } else {
+        emit_success(
+            context,
+            vec!["capabilities"],
+            json!({
+                "cliVersion": env!("CARGO_PKG_VERSION"),
+                "resultSchemaVersion": RESULT_SCHEMA_VERSION,
+                "planningSchemaVersion": CURRENT_SCHEMA_VERSION,
+                "capabilities": [
+                    "project-run.claim.v2",
+                    "project-run.activate.fenced.v1",
+                    "project-run.heartbeat.v1",
+                    "project-run.release.fenced.v1",
+                    "project-run.add-evidence.fenced.v1"
+                ]
+            }),
+        )
+    }
 }
 
 fn execute_project(
@@ -3486,6 +3736,18 @@ fn emit_success<T>(
 where
     T: Serialize,
 {
+    emit_success_impl(context, command, data, None)
+}
+
+fn emit_success_impl<T>(
+    context: &MachineContext,
+    command: Vec<&str>,
+    data: T,
+    warnings: Option<Vec<String>>,
+) -> Result<ExitCode, CliError>
+where
+    T: Serialize,
+{
     match context.format {
         OutputFormat::Text => {
             let text = serde_json::to_string_pretty(&data)?;
@@ -3496,6 +3758,7 @@ where
             context.non_interactive,
             command.iter().map(|item| (*item).to_string()).collect(),
             data,
+            warnings,
         ))?,
     }
     Ok(ExitCode::SUCCESS)
@@ -3506,6 +3769,16 @@ fn emit_error(
     command: Vec<&str>,
     message: String,
     invalid: bool,
+) -> Result<ExitCode, CliError> {
+    emit_error_impl(context, command, message, invalid, None)
+}
+
+fn emit_error_impl(
+    context: &MachineContext,
+    command: Vec<&str>,
+    message: String,
+    invalid: bool,
+    warnings: Option<Vec<String>>,
 ) -> Result<ExitCode, CliError> {
     match context.format {
         OutputFormat::Text => eprintln!("{message}"),
@@ -3519,6 +3792,7 @@ fn emit_error(
                 MachineStatus::Error
             },
             message,
+            warnings,
         ))?,
     }
     Ok(if invalid {
@@ -3672,7 +3946,7 @@ fn command_path(command: &Command) -> Vec<String> {
         ],
         Command::Events => vec!["events".to_string(), "list".to_string()],
         Command::Health => vec!["health".to_string()],
-        Command::Capabilities => vec!["capabilities".to_string()],
+        Command::Capabilities { .. } => vec!["capabilities".to_string()],
         Command::Project { command } => vec![
             "project".to_string(),
             project_command_name(command).to_string(),
@@ -3722,6 +3996,12 @@ fn command_path(command: &Command) -> Vec<String> {
         },
         Command::Manifest(_) => vec!["manifest".to_string(), "apply".to_string()],
         Command::Diff(_) => vec!["diff".to_string()],
+        Command::Discovery { command } => {
+            vec![
+                "discovery".to_string(),
+                discovery_command_name(command).to_string(),
+            ]
+        }
         Command::Template { command } => match command {
             TemplateCommand::List(_) => vec!["template".to_string(), "list".to_string()],
             TemplateCommand::Render(_) => vec!["template".to_string(), "render".to_string()],
@@ -3868,6 +4148,19 @@ fn review_point_command_name(command: &ReviewPointCommand) -> &'static str {
     match command {
         ReviewPointCommand::Record(_) => "record",
         ReviewPointCommand::UpdateStatus(_) => "update-status",
+    }
+}
+
+fn discovery_command_name(command: &DiscoveryCommand) -> &'static str {
+    match command {
+        DiscoveryCommand::Record(_) => "record",
+        DiscoveryCommand::Show(_) => "show",
+        DiscoveryCommand::List(_) => "list",
+        DiscoveryCommand::Triage(_) => "triage",
+        DiscoveryCommand::Promote(_) => "promote",
+        DiscoveryCommand::Resolve(_) => "resolve",
+        DiscoveryCommand::Reopen(_) => "reopen",
+        DiscoveryCommand::Checkpoint(_) => "checkpoint",
     }
 }
 
@@ -4068,13 +4361,22 @@ fn is_command_mutation(command: &Command) -> bool {
         ),
         Command::Manifest(_) => true,
         Command::Diff(_) => false,
+        Command::Discovery { command } => matches!(
+            command,
+            DiscoveryCommand::Record(_)
+                | DiscoveryCommand::Triage(_)
+                | DiscoveryCommand::Promote(_)
+                | DiscoveryCommand::Resolve(_)
+                | DiscoveryCommand::Reopen(_)
+                | DiscoveryCommand::Checkpoint(_)
+        ),
         Command::Template { .. } => false,
         Command::Intent(_) => false,
         // Read-only commands
         Command::Validate { .. }
         | Command::Events
         | Command::Health
-        | Command::Capabilities
+        | Command::Capabilities { .. }
         | Command::Project { .. }
         | Command::Search(_)
         | Command::Context(_)
