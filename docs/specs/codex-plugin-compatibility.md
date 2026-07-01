@@ -93,6 +93,15 @@ to `ElegyPluginV1`, and preserves Codex-only fields under
 `extensions["codex.plugin/v1"]`. Unknown Codex fields stay in the extension's
 `extra` map. Import preservation does not imply default-export support.
 
+## Marketplace projection
+
+`elegy-plugin-packaging marketplace export-codex` converts an
+`elegy-marketplace/v1` root into a Codex marketplace tree. It exports each local
+wrapper under `plugins/<name>/`, preserves entry order and category, defaults
+Codex policy to `AVAILABLE` and `ON_INSTALL`, resolves the selected target's
+verified binary, and omits Elegy artifact fields from the generated index. The
+Codex index is derived output.
+
 ## Non-goals
 
 - Do not model OAuth scopes, app actions, token storage, or connector approval

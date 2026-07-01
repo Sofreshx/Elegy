@@ -122,8 +122,8 @@ The `elegy-skills` CLI provides search, resolve, inspect, and validation.
 
 `elegy-plugin/v1` is the minimal plugin manifest format for `.elegy-plugin/plugin.json`.
 Plugins declare identity and Agent Skills (SKILL.md) in a single filesystem directory.
-The `ElegyPluginV1` struct (a Rust type in the plugin infrastructure) defines the
-in-code contract; there is no standalone JSON schema file.
+The `ElegyPluginV1` Rust type defines the contract. Generated JSON schemas under
+`shared/plugin-sdk/schemas/` provide machine-readable projections.
 
 Setup flow:
 
@@ -132,6 +132,13 @@ elegy-plugin-packaging verify --plugin ./my-plugin
 ```
 
 Release configuration uses `distribution/surfaces.json` as the central release catalog.
+
+The generated marketplace lives at `.elegy/marketplace.json`:
+
+```bash
+elegy-plugin-packaging marketplace list --source . --json
+elegy-plugin-packaging marketplace search planning --source . --json
+```
 
 Boundaries: the plugin manifest is a metadata envelope, not a runtime,
 marketplace, auth store, approval record, or secret/session container. Hosts own

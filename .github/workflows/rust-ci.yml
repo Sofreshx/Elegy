@@ -122,6 +122,12 @@ jobs:
       - name: verify planning plugin packaging CLI
         working-directory: .
         run: cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
+      - name: verify marketplace schemas and generated index
+        working-directory: .
+        run: |
+          cargo run -p elegy-plugin-sdk --bin elegy-plugin-schemas -- --check
+          cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace generate --project . --check
+          cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace validate --source .
 
   docs-check-v2:
     name: docs check v2 (authoritative)

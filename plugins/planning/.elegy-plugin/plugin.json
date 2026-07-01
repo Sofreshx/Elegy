@@ -8,5 +8,19 @@
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Planning",
+        "shortDescription": "Manage durable goals, plans, and review state",
+        "longDescription": "Coordinate durable goals, roadmaps, implementation plans, work items, and review evidence.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Create a durable implementation plan."]
+      }
+    }
+  }
 }

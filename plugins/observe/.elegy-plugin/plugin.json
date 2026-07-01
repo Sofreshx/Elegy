@@ -8,5 +8,19 @@
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
-  "skills": "./skills/"
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Observe",
+        "shortDescription": "Capture bounded system observations",
+        "longDescription": "Collect bounded, policy-aware system observations for agent workflows.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Capture the current system state."]
+      }
+    }
+  }
 }
