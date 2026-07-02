@@ -14,7 +14,8 @@
     { "name": "elegy-planning", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/planning", "marketplaceCategory": "Productivity", "description": "Durable planning CLI over SQLite." },
     { "name": "elegy-run", "kind": "cli", "package": "elegy-host-mcp", "description": "MCP stdio host for running Elegy as an agent server." },
     { "name": "elegy-skill-authoring", "kind": "skill-only", "description": "Portable agent skill authoring skill for creating and refining SKILL.md files." },
-    { "name": "elegy-skill-router", "kind": "skill-only", "description": "Vault-first skill routing and discovery on-demand skill resolver." },
+    { "name": "elegy-memory-mcp-stdio", "kind": "cli", "description": "MCP stdio transport adapter for the memory plugin." },
+    { "name": "elegy-memory-mcp-http", "kind": "cli", "description": "MCP HTTP transport adapter for the memory plugin." },
     { "name": "elegy-skills", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/skills", "description": "Skill registry and discovery CLI." }
   ]
 }
