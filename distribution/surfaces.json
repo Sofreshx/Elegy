@@ -1,0 +1,20 @@
+{
+  "description": "Elegy monorepo release catalog. Each surface is identified by name and kind; CLI surfaces build from `package` when present, otherwise from the surface name.",
+  "surfaces": [
+    { "name": "elegy-codegraph", "kind": "cli", "description": "Code graph analysis CLI." },
+    { "name": "elegy-configuration", "kind": "cli", "description": "Configuration materialization CLI." },
+    { "name": "elegy-contracts", "kind": "cli", "package": "elegy-core", "description": "Contract export, validation, and project inspection CLI." },
+    { "name": "elegy-desktop", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/desktop", "description": "Desktop automation CLI." },
+    { "name": "elegy-doc-practices", "kind": "skill-only", "description": "Documentation practices skill for ADR/spec doctrine and docs config validation." },
+    { "name": "elegy-documentation", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/documentation", "description": "Documentation inspection and validation CLI." },
+    { "name": "elegy-mcp", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/mcp", "description": "MCP analysis and authoring CLI." },
+    { "name": "elegy-memory", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/memory", "description": "Memory CLI with embeddings and retrieval." },
+    { "name": "elegy-observe", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/observe", "description": "System observation CLI." },
+    { "name": "elegy-obsidian", "kind": "skill-only", "description": "Obsidian vault bridge skill for read/write/search against local Obsidian vaults." },
+    { "name": "elegy-planning", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/planning", "description": "Durable planning CLI over SQLite." },
+    { "name": "elegy-run", "kind": "cli", "package": "elegy-host-mcp", "description": "MCP stdio host for running Elegy as an agent server." },
+    { "name": "elegy-skill-authoring", "kind": "skill-only", "description": "Portable agent skill authoring skill for creating and refining SKILL.md files." },
+    { "name": "elegy-skill-router", "kind": "skill-only", "description": "Vault-first skill routing and discovery on-demand skill resolver." },
+    { "name": "elegy-skills", "kind": "cli", "packaging": "plugin", "pluginRoot": "plugins/skills", "description": "Skill registry and discovery CLI." }
+  ]
+}

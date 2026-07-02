@@ -1,73 +1,8 @@
-# Skill Core V1
+# Skill Core
 
-## Purpose
+Agent Skills are standard SKILL.md files. Plugin-owned skills live under
+`plugins/<name>/skills/<skill-id>/SKILL.md`; standalone skill-only packages live at
+the repo root (`<skill-id>/SKILL.md`). The `elegy-skills` registry discovers skills
+from plugin manifests first, then standalone root skills, and fails on duplicate IDs.
 
-This document retains its earlier title for continuity, but its content reflects the current post-legacy repo shape.
-
-The goal is to keep skill authority in neutral governed artifacts while keeping reusable executable behavior in the Rust workspace.
-
-## Authority decision
-
-The canonical skill model lives in the governed skill artifact family exported from `contracts/` and versioned through `contracts/schemas/`.
-
-That means:
-
-- the stable skill shape and compatibility expectations belong to governed schemas, fixtures, manifests, and support metadata
-- discovery index entries are projections of the authoritative governed contract
-- `SKILL.md` materialization is an output format, not the source of truth
-- Rust crates and downstream consumers should consume or emit the governed skill contract rather than silently inventing parallel shapes
-
-The implemented `elegy-memory` surface follows that rule directly: `contracts/fixtures/skill.elegy-memory.json` is authoritative, `contracts/fixtures/skill-discovery-index.elegy-memory.json` is the governed projection derived from it, and the repo-local `SKILL.md` lanes remain non-authoritative rendered mirrors only.
-
-The `src/Elegy-*/` wrapper installer lanes are retired. Skill delivery uses plugin packages and host export; repo-local `.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
-
-## Current executable ownership
-
-The Rust workspace owns the reusable executable path around those governed skill artifacts.
-
-- `rust/core/elegy-tooling` owns reusable authoring, analysis, and MCP-to-skill generation behavior over governed descriptors and skill projections
-- `rust/bin/elegy-cli` exposes the general/compatibility skills commands: `skills list/search/resolve/get/capability/validate`
-- `rust/features/elegy-skills` owns the reusable registry API plus the dedicated `elegy-skills` registry CLI surface
-- `rust/features/elegy-mcp` exposes the current dedicated MCP descriptor authoring and analysis flow
-- `rust/features/elegy-mcp` and related runtime crates may interpret governed MCP and skill artifacts, but they do not redefine skill authority
-- consuming applications keep host-specific registration, auth, persistence, and orchestration local
-
-## Current registry scope
-
-What the repo proves today:
-
-- governed built-in skill registry loading with strict validation
-- dedicated `elegy-skills` search, resolve, inspect, and validation commands over the governed registry
-- direct Rust skill-registry access for downstream Rust hosts that should avoid CLI subprocess overhead
-- MCP and umbrella CLI reuse over the same registry metadata instead of re-parsing unrelated ad hoc shapes
-- skill generation from analyzed MCP descriptor inputs through the general CLI/tooling path when contributor tooling still needs it
-- deterministic export of governed skill artifacts for downstream consumers
-- a clean split between neutral artifact authority and Rust executable ownership
-- the current operator CLI surfaces remain `elegy`, `elegy-memory`, `elegy-mcp`, and `elegy-skills`
-
-What the repo does not yet prove as a finished product surface:
-
-- a built-in remote skill package or install ecosystem
-- runtime-owned autonomous registration or hosted skill orchestration
-- license to describe all future skill-hosting ideas as already implemented
-
-## Current skill tools
-
-The high-level skills model is now:
-
-- `elegy-skills` is the dedicated skill registry tool
-- `elegy skills ...` is the umbrella compatibility surface for the same registry features
-- `elegy agent discover` is the host/profile-filtered router over that same registry
-- built-in validation is part of the registry surface, not an afterthought
-- MCP-to-skill generation remains lower-level contributor tooling, not the main skills product story
-
-## Verification posture
-
-Current confidence comes from the surviving validation and export flows:
-
-- `cargo run -p elegy-cli -- contracts validate` and the conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
-- Rust CI for formatting, linting, and tests in `.github/workflows/rust-ci.yml`
-
-Future work should build on this split rather than reopening skill authority. New reusable execution logic belongs in Rust, and new durable skill truth belongs in governed artifacts.
-
-See [Agent Skill Bridge Mirrors](agent-skill-bridge-mirrors.md) for the retired repo-local `.agents/skills/**` and `.github/skills/**` mirror split.
+The skill registry does not project capabilities, MCP tools, invocation templates, or side-effect metadata. It validates YAML frontmatter and serves skill metadata for agent discovery.

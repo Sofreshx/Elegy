@@ -1,0 +1,15 @@
+[package]
+name = "elegy-adapter-fs"
+version.workspace = true
+publish = false
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+elegy-descriptor = { version = "0.1.0", path = "../descriptor" }
+elegy-policy = { version = "0.1.0", path = "../policy" }
+
+[lints]
+workspace = true

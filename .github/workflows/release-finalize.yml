@@ -1,20 +1,12 @@
 ﻿name: release-finalize
 
-# Generic release finalizer. Runs on release: published events. Walks all
-# uploaded assets via `gh release view --json assets`, computes SHA-256
-# checksums, writes the release manifest + checksums artifacts, and uploads
-# them. Knows nothing about specific surfaces; each per-feature workflow
-# owns its own asset upload.
-
 on:
-  release:
-    types: [published]
   workflow_dispatch:
     inputs:
       release_tag:
-        description: "Release tag to finalize (only used in workflow_dispatch mode)"
+        description: "Release tag to finalize"
         type: string
-        default: ''
+        required: true
 
 permissions:
   contents: write
@@ -36,33 +28,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          tag_name=""
-          if [[ "${GITHUB_EVENT_NAME}" == "release" ]]; then
-            tag_name="${{ github.event.release.tag_name }}"
-          else
-            tag_name="${{ inputs.release_tag }}"
-          fi
+          tag_name="${{ inputs.release_tag }}"
           if [[ -z "${tag_name}" ]]; then
-            echo "No release tag resolved; aborting."
+            echo "No release tag resolved; aborting." >&2
             exit 1
           fi
           echo "tag_name=${tag_name}" >> "$GITHUB_OUTPUT"
 
-      - name: Read release assets
-        id: list
-        shell: bash
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
-        run: |
-          set -euo pipefail
-          release_json="$(gh release view "${RELEASE_TAG}" --json tagName,isPrerelease,targetCommitish,assets,body,name)"
-          echo "${release_json}" > artifacts/release-metadata.json
-          echo "assets=$(echo "${release_json}" | jq -c '.assets')" >> "$GITHUB_OUTPUT"
-          echo "tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
-
-      - name: Compute checksums
-        id: checksums
+      - name: Download release archives
         shell: bash
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -70,47 +43,99 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/distribution
-          mapfile -t asset_urls < <(gh release view "${RELEASE_TAG}" --json assets | jq -r '.assets[] | "\(.name)\t\(.url)"')
-          entries_json="["
-          first=true
-          for row in "${asset_urls[@]}"; do
-            name="${row%%$'\t'*}"
-            url="${row#*$'\t'}"
-            sha=$(curl --fail --silent --show-error --location "${url}" | sha256sum | awk '{print $1}')
-            size=$(gh release view "${RELEASE_TAG}" --json assets | jq --arg n "${name}" '.assets[] | select(.name == $n) | .size')
-            if [[ "${first}" == "true" ]]; then
-              first=false
-            else
-              entries_json+=","
-            fi
-            entries_json+="{\"fileName\":\"${name}\",\"sizeBytes\":${size},\"sha256\":\"${sha}\"}"
-          done
-          entries_json+="]"
-          echo "{\"schemaVersion\":\"elegy-release-checksums/v1\",\"releaseTag\":\"${RELEASE_TAG}\",\"entries\":${entries_json}}" > artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json
-          echo "checksums_path=artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json" >> "$GITHUB_OUTPUT"
+          gh release download "${RELEASE_TAG}" --dir artifacts/distribution --clobber
 
-      - name: Compose release manifest
-        id: manifest
-        shell: pwsh
+      - name: Compose manifest + checksums
+        shell: bash
         env:
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
         run: |
-          $releaseMetadata = Get-Content -LiteralPath 'artifacts/release-metadata.json' -Raw | ConvertFrom-Json
-          $checksums = Get-Content -LiteralPath "artifacts/distribution/elegy-release-checksums-${env:RELEASE_TAG}.json" -Raw | ConvertFrom-Json
-          $bundleVersion = (Get-Content -LiteralPath 'contracts/schemas/schema-version.json' -Raw | ConvertFrom-Json).schemaVersion
-          $manifest = [ordered]@{
-              documentType       = 'elegy-release-manifest'
-              schemaVersion      = 'elegy-release-manifest/v1'
-              releaseTag         = $releaseMetadata.tagName
-              bundleVersion      = $bundleVersion
-              targetCommitish    = $releaseMetadata.targetCommitish
-              isPrerelease       = [bool]$releaseMetadata.isPrerelease
-              releaseName        = $releaseMetadata.name
-              entries            = $checksums.entries
-          }
-          $manifestPath = "artifacts/distribution/elegy-release-manifest-${env:RELEASE_TAG}.json"
-          $manifest | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath $manifestPath -Encoding utf8
-          "manifest_path=${manifestPath}" >> $env:GITHUB_OUTPUT
+          set -euo pipefail
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
+          manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
+          checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
+
+          mapfile -t asset_files < <(find artifacts/distribution -maxdepth 1 -type f | sort)
+          if [[ "${#asset_files[@]}" -eq 0 ]]; then
+            echo "Release ${RELEASE_TAG} has no downloadable assets." >&2
+            exit 1
+          fi
+
+          assets_json='[]'
+          published_targets_json='[]'
+          for file in "${asset_files[@]}"; do
+            base="$(basename "$file")"
+            case "$base" in
+              *.sha256|elegy-release-manifest-*.json|elegy-release-checksums-*.json)
+                continue
+                ;;
+            esac
+            size="$(stat -c%s "$file")"
+            sha="$(sha256sum "$file" | awk '{print $1}')"
+
+            if [[ "$base" == "elegy-contracts-bundle.zip" ]]; then
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" == elegy-installer-*.zip ]]; then
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"cli",surface:$sf,target:$tg,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+            else
+              echo "Unexpected release archive name: $base" >&2
+              exit 1
+            fi
+
+            assets_json="$(jq -nc --argjson current "$assets_json" --argjson entry "$asset_entry" '$current + [$entry]')"
+          done
+
+          jq -nc \
+            --arg repository "${GITHUB_REPOSITORY}" \
+            --arg tag "${RELEASE_TAG}" \
+            --arg bundleVersion "${bundle_version}" \
+            --argjson publishedTargets "$published_targets_json" \
+            --argjson assets "$assets_json" \
+            '{
+              documentType: "elegy-release-manifest",
+              schemaVersion: "elegy-release-manifest/v1",
+              repository: $repository,
+              tag: $tag,
+              bundleVersion: $bundleVersion,
+              publishedTargets: $publishedTargets,
+              assets: $assets
+            }' > "$manifest_path"
+
+          entries_json="$(jq -nc --argjson assets "$assets_json" '$assets | map({fileName, sizeBytes, sha256})')"
+          manifest_size="$(stat -c%s "$manifest_path")"
+          manifest_sha="$(sha256sum "$manifest_path" | awk '{print $1}')"
+          entries_json="$(jq -nc --argjson current "$entries_json" --arg fn "$(basename "$manifest_path")" --arg sha "$manifest_sha" --argjson sz "$manifest_size" '$current + [{fileName:$fn,sizeBytes:$sz,sha256:$sha}]')"
+
+          jq -nc \
+            --arg tag "${RELEASE_TAG}" \
+            --argjson entries "$entries_json" \
+            '{
+              documentType: "elegy-release-checksums",
+              schemaVersion: "elegy-release-checksums/v1",
+              tag: $tag,
+              algorithm: "sha256",
+              entries: $entries
+            }' > "$checksums_path"
 
       - name: Upload manifest + checksums to release
         shell: bash

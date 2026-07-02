@@ -5,31 +5,31 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
 Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent
-hosts. It keeps contracts and discovery metadata durable, exposes installable
-binaries through GitHub Releases, and uses CLI invocation templates as the
-default execution boundary.
+hosts. Governed artifacts stay in the repo. Dedicated `elegy-*` binaries expose
+the executable surfaces. CLI invocation is the default integration boundary.
+MCP is optional.
 
 Core model:
 
-- governed artifacts are the durable authority
-- Rust implements reusable executable behavior over those artifacts
-- skill definitions are the discovery authority for agent capabilities
-- CLI invocation templates are the default execution boundary
-- generated mirrors, wrapper roots, Codex plugin exports, and MCP tool
-  lists are derived adapter surfaces
-- MCP is an optional projection for MCP-native clients
+- governed artifacts stay co-located with owning plugins
+- Rust implements reusable behavior over those artifacts
+- `SKILL.md` files are the skill discovery authority
+- dedicated `elegy-*` binaries are the shipped surfaces
+- `elegy-run` is the MCP host adapter
 
 ## Repository Model
 
 | Area | Purpose |
 | --- | --- |
-| `contracts/` | Governed schemas, fixtures, manifests, package metadata, and discovery artifacts. |
-| `docs/governance/` | Operational policy (workflow/environment/branch enforcement modes). |
-| `rust/` | First-party Rust libraries and binaries that consume governed artifacts. |
-| `artifacts/` | Generated bundles, archives, and validation outputs. |
+| `docs/governance/` | Narrow policy assets used by workflows and tooling. |
+| `hosts/` | Thin host entrypoints. |
+| `plugins/` | Capability crates with co-located schemas, fixtures, skills, and plugin-local contracts. |
+| `shared/` | Cross-cutting crates and operator tooling. |
+| `plugins/<name>/skills/` | Plugin-owned skill definitions. |
+| `artifacts/` | CI-generated bundles, archives, and validation outputs. |
 
-When those surfaces disagree, prefer the governed artifact roots and the
-smallest relevant architecture or spec document under `docs/`.
+When those surfaces disagree, prefer the governed artifacts within their owning
+plugin and the smallest relevant architecture or spec document under `docs/`.
 
 ## Install
 
@@ -37,129 +37,74 @@ Latest stable release: [github.com/Sofreshx/Elegy/releases/latest](https://githu
 
 Rolling prerelease from `main`: [github.com/Sofreshx/Elegy/releases/tag/main-snapshot](https://github.com/Sofreshx/Elegy/releases/tag/main-snapshot)
 
-Per-binary install commands and asset family names live in each binary's
-per-feature distribution note. The top-level [docs/distribution.md](docs/distribution.md)
-is a thin index: release channels, published targets, asset family patterns,
-and a per-binary link list.
-
 Published targets:
 
-- Windows x64: `x86_64-pc-windows-msvc`
-- Linux x64: `x86_64-unknown-linux-gnu`
-- macOS ARM64: `aarch64-apple-darwin`
+- `x86_64-pc-windows-msvc`
+- `x86_64-unknown-linux-gnu`
+- `aarch64-apple-darwin`
 
-### Install
-
-Download `elegy-installer-<bundleVersion>.zip` from GitHub Releases, extract,
-and run the canonical installer. The `install-distribution.ps1` file in the
-archive is a thin shim that forwards all arguments to `install-distribution.sh`;
-the bash script is the single canonical implementation.
+Plugin-packaged surfaces ship as portable `.plugin.zip` archives. Use
+`elegy-plugin-packaging` to install or export them.
 
 ```bash
-# Canonical installer (recommended; works on any platform with bash)
-bash ./install-distribution.sh -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
+elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
+elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
 
-```powershell
-# Native-pwsh entry point: thin shim that forwards all args to bash (requires bash in PATH)
-pwsh ./install-distribution.ps1 -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
-```
-
-Pin a specific release:
-
-```bash
-bash ./install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli,elegy-memory,elegy-planning -Force
-```
-
-Track the rolling `main-snapshot` prerelease:
-
-```bash
-bash ./install-distribution.sh -Tag main-snapshot -Destination ./tools/elegy-main -CliSurfaces elegy-cli -Force
-```
-
-The same installer is also available at `scripts/install-distribution.{sh,ps1}` from
-a repo checkout.
-
-### Bash installer
-
-On Linux or macOS, use the Bash installer from a repo checkout:
-
-```bash
-bash ./scripts/install-distribution.sh -Tag vX.Y.Z -Destination ./tools/elegy -CliSurfaces elegy-cli -Force
-```
-
-### Installed layout
-
-- `contracts/` - extracted governed contracts bundle
-- `bin/<surface>/` - installed CLI binaries
-- `wrappers/<surface>/` - installed wrapper surfaces when requested
-- `install-receipt.json` - verification evidence and installed asset metadata
+Non-plugin surfaces ship as standalone binaries. See
+[docs/distribution.md](docs/distribution.md) for the release index and each
+binary's `DISTRIBUTION.md` for install details.
 
 ### From source
 
 ```bash
 git clone https://github.com/Sofreshx/Elegy.git
-cd Elegy/rust
-cargo build -p elegy-cli
-cargo run -p elegy-cli -- --version --json
+cd Elegy
+cargo build
+cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
+cargo run -p elegy-planning -- --version --json
 ```
 
 Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
 [docs/architecture/README.md](docs/architecture/README.md).
 
-## Quick Start
-
-After installing a release asset:
-
-```bash
-elegy agent check --json
-elegy agent discover --query "repo status" --json
-elegy repo status --json
-elegy docs check --json
-```
-
-From a repo checkout, use `cargo run -p elegy-cli -- ...` with the same
-arguments.
-
-## Per-binary surface
+## Shipped Binaries
 
 Each binary owns its own distribution note. Adding a new binary does not
 require editing this README.
 
 | Binary | Crate | Per-feature note |
 | --- | --- | --- |
-| `elegy` | `rust/bin/elegy-cli/` | [DISTRIBUTION.md](rust/bin/elegy-cli/DISTRIBUTION.md) |
-| `elegy-memory` | `rust/features/elegy-memory/` | [DISTRIBUTION.md](rust/features/elegy-memory/DISTRIBUTION.md) |
-| `elegy-mcp` | `rust/features/elegy-mcp/` | [DISTRIBUTION.md](rust/features/elegy-mcp/DISTRIBUTION.md) |
-| `elegy-planning` | `rust/features/elegy-planning/` | [DISTRIBUTION.md](rust/features/elegy-planning/DISTRIBUTION.md) |
-| `elegy-skills` | `rust/features/elegy-skills/` | [DISTRIBUTION.md](rust/features/elegy-skills/DISTRIBUTION.md) |
-| `elegy-configuration` | `rust/features/elegy-configuration/` | [DISTRIBUTION.md](rust/features/elegy-configuration/DISTRIBUTION.md) |
-| `elegy-documentation` | `rust/features/elegy-documentation/` | [DISTRIBUTION.md](rust/features/elegy-documentation/DISTRIBUTION.md) |
-| `elegy-memory-mcp-stdio` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
-| `elegy-memory-mcp-http` | `rust/features/elegy-memory-mcp/` | [DISTRIBUTION.md](rust/features/elegy-memory-mcp/DISTRIBUTION.md) |
-| `elegy-codegraph` | `rust/features/elegy-codegraph/` | [DISTRIBUTION.md](rust/features/elegy-codegraph/DISTRIBUTION.md) |
+| `elegy-run` | `hosts/host-mcp/` | [DISTRIBUTION.md](hosts/host-mcp/DISTRIBUTION.md) |
+| `elegy-contracts` | `shared/core/` | _No dedicated distribution note yet_ |
+| `elegy-plugin-packaging` | `shared/tooling/` | [docs/distribution.md](docs/distribution.md) |
+| `elegy-desktop` | `plugins/desktop/` | [DISTRIBUTION.md](plugins/desktop/DISTRIBUTION.md) |
+| `elegy-observe` | `plugins/observe/` | [DISTRIBUTION.md](plugins/observe/DISTRIBUTION.md) |
+| `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
+| `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
+| `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
+| `elegy-skills` | `plugins/skills/` | [DISTRIBUTION.md](plugins/skills/DISTRIBUTION.md) |
+| `elegy-configuration` | `plugins/configuration/` | [DISTRIBUTION.md](plugins/configuration/DISTRIBUTION.md) |
+| `elegy-documentation` | `plugins/documentation/` | [DISTRIBUTION.md](plugins/documentation/DISTRIBUTION.md) |
+| `elegy-memory-mcp-stdio` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
+| `elegy-memory-mcp-http` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
+| `elegy-codegraph` | `plugins/codegraph/` | [DISTRIBUTION.md](plugins/codegraph/DISTRIBUTION.md) |
 
-## Wrapper and Skill Surfaces
+## Skill Surfaces
 
-Elegy ships dedicated `elegy-*` Rust binaries for each capability surface. The
-`Elegy-obsidian` surface is different: it wraps the official Obsidian Desktop
-CLI and keeps Obsidian vault content non-authoritative. Durable planning state
-continues to live in `elegy-planning` and SQLite.
-
-The governed `contracts/fixtures/skill.*.json` files remain the skill authority.
-Skill delivery uses plugin packages and host export; repo-local
-`.agents/skills/**` and `.github/skills/**` mirror lanes are retired.
+Plugin-owned skills live under `plugins/<name>/skills/elegy-<name>/SKILL.md`.
+Standalone skill-only packages live at the repo root (`elegy-<name>/SKILL.md`).
+The `elegy-skills` CLI discovers skills from plugin manifests first, then standalone
+root packages, failing on duplicate skill IDs.
 
 ## Configuration Materialization
 
-The umbrella CLI and dedicated `elegy-configuration` binary support
-deterministic materialization and drift verification of agent-facing repo and
-home assets from governed templates and profiles.
+`elegy-configuration` materializes and verifies governed repo and home assets
+from plugin-owned templates and profiles.
 
 ```bash
-elegy configuration list --json
-elegy configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
-elegy-configuration apply --package ./contracts/fixtures/elegy-plugin-package.demo-config.json --profile-id demo-profile --target . --dry-run --json
+elegy-configuration list --json
+elegy-configuration apply --profile-id repo-opencode-minimal --target . --dry-run --json
 ```
 
 See [docs/architecture/README.md](docs/architecture/README.md) for built-in
@@ -167,72 +112,39 @@ templates and profile details.
 
 ## Skill Tools
 
-Elegy's skills product is registry-first. Governed skill definitions under
-`contracts/fixtures/skill.*.json` are the discovery authority. The `elegy-skills`
-CLI provides search, resolve, inspect, and validation. The umbrella `elegy skills ...`
-surface mirrors this for convenience.
+Elegy's skills product is registry-first. Plugin-owned skills under
+`plugins/<name>/skills/` and standalone root packages are the discovery authority.
+The `elegy-skills` CLI provides search, resolve, inspect, and validation.
 
-```bash
-elegy-skills list --json
-elegy-skills search --query "repo status" --json
-elegy-skills validate --file ./contracts/fixtures/skill.elegy-repo.json --json
-```
+`elegy-skills list/search/describe/resolve/validate --json`
 
-## Plugin Packages
+## Plugins
 
-> Note: the `elegy-codegraph` library crate is a separate portable codebase
-> graph extraction and query tool. It is **not** a plugin package and lives
-> under its own `contracts/schemas/elegy-codegraph.graph.v0.json` contract.
-
-`elegy-plugin-package/v1` is the portable package contract for bundling
-governed skill definitions, capability projections, tool requirements, and
-publishing metadata into a single host-facing surface. Plugin packages are the
-primary setup path for bringing governed capabilities to LLM hosts.
+`elegy-plugin/v1` is the minimal plugin manifest format for `.elegy-plugin/plugin.json`.
+Plugins declare identity and Agent Skills (SKILL.md) in a single filesystem directory.
+The `ElegyPluginV1` struct (a Rust type in the plugin infrastructure) defines the
+in-code contract; there is no standalone JSON schema file.
 
 Setup flow:
 
 ```bash
-elegy plugin new --template cli-tool --output ./my-plugin
-# edit ./my-plugin/elegy-plugin-package.json
-elegy plugin verify --package ./my-plugin/elegy-plugin-package.json --json
-elegy plugin install-check --package ./my-plugin/elegy-plugin-package.json --install-receipt ./tools/elegy/install-receipt.json --json
+elegy-plugin-packaging verify --plugin ./my-plugin
 ```
 
-`elegy plugin verify` checks package consistency against referenced skill
-definitions, capability projections, side-effect classes, and subset
-declarations. `elegy plugin install-check` checks declared tool requirements
-against an install receipt and optional binary probes. Both commands emit a
-readiness receipt (`ready` | `partial` | `blocked`) governed by
-`contracts/schemas/elegy-plugin-readiness-v1.schema.json`. The receipt is the
-machine-readable answer to "what can this package actually do on this host right
-now?"
+Release configuration uses `distribution/surfaces.json` as the central release catalog.
 
-Authority schemas:
-
-- `contracts/schemas/elegy-plugin-package.schema.json` — package contract
-- `contracts/schemas/elegy-plugin.lock.json` — pinned contract bundle version
-- `contracts/schemas/elegy-plugin-readiness-v1.schema.json` — readiness receipt
-
-Boundaries: the package is a portable contract bundle, not a runtime,
+Boundaries: the plugin manifest is a metadata envelope, not a runtime,
 marketplace, auth store, approval record, or secret/session container. Hosts own
 install, auth, approvals, runtime sessions, and execution policy.
-
-See the [Elegy Plugin Package Model](docs/architecture/elegy-plugin-package-model.md)
-for the full model, and the [Plugin Tool Availability spec](docs/specs/plugin-tool-availability.md)
-for the verify-only contract rules.
-
-Host export (`elegy plugin export codex` / `elegy plugin export host`) is one optional derived
-projection target, not the main plugin setup path.
 
 ## Optional MCP Projection
 
 ```bash
-elegy run --profile ./tools/elegy-profile.json
+elegy-run
 ```
 
 MCP is an adapter over governed skills and CLI behavior. Side-effecting tools
-stay blocked unless the host passes `--allow-side-effects`. Prefer `--dry-run`
-for one-off invocations.
+stay blocked unless the host is started with `--allow-side-effects`.
 
 ## Documentation
 
@@ -243,13 +155,12 @@ for one-off invocations.
 - [Ecosystem topology](docs/architecture/ecosystem-topology.md)
 - [Substrate governance](docs/architecture/substrate-governance.md)
 - [Contributing guide](CONTRIBUTING.md) | [Security policy](SECURITY.md)
-- [Code of conduct](CODE_OF_CONDUCT.md) | [Changelog](CHANGELOG.md)
+- [Code of conduct](CODE_OF_CONDUCT.md)
 
 ## Contributing From Source
 
 ```bash
-cd rust
-cargo build -p elegy-cli
+cargo build
 cargo test --workspace --all-targets --all-features
 ```
 
@@ -267,7 +178,6 @@ elegy-documentation check --project . --json
 Common Rust checks:
 
 ```bash
-cd rust
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-targets --all-features
@@ -276,7 +186,8 @@ cargo test --workspace --all-targets --all-features
 Repo-root validation for governed artifacts and packaging:
 
 ```bash
-cd rust && cargo run -p elegy-cli -- contracts validate --project .. && cargo test -p elegy-contracts --test conformance
+cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
+cargo run -p elegy-documentation -- check --project .
 ```
 
 ## License

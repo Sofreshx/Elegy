@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-mcp",
+  "version": "0.1.0",
+  "description": "Governed MCP descriptor authoring, analysis, and validation for MCP server tool surface projection.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1"
+    }
+  }
+}

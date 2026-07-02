@@ -1,102 +1,50 @@
 # Codex Plugin Projection
 
-> **This is a narrow optional projection target, not the main plugin setup
-> path.** The primary plugin package model is defined in
-> [elegy-plugin-package-model.md](elegy-plugin-package-model.md). Plugin
-> packages are the canonical portable contract surface; Codex plugin generation
-> is one derived adapter output among several possible host projections.
+Codex export is a derived host projection over the `elegy-plugin/v1` plugin manifest.
+The portable plugin archive (`.plugin.zip`) is the primary release contract; Codex
+export generates a `.codex-plugin/plugin.json` and `skills/` directory from the
+plugin manifest through `elegy-plugin-packaging export --host codex`.
 
-## Purpose
+Codex-specific metadata lives in the manifest's `extensions["codex.plugin/v1"]`
+namespace. The base `elegy-plugin/v1` manifest is not widened with host-specific fields.
 
-This document describes the current Codex projection slice implemented in Elegy.
+## Compatibility target
 
-The goal is to project governed portable package metadata into a conservative
-Codex plugin folder without promoting Codex files into authority roots.
+Current Codex plugin compatibility covers:
 
-## Authority chain
+| Codex surface | Elegy authority |
+|---|---|
+| `.codex-plugin/plugin.json` identity and display metadata | `elegy-plugin/v1` plus `extensions["codex.plugin/v1"]` |
+| `skills/` | base `skills` field |
+| `.app.json` connector references | `extensions["codex.plugin/v1"].apps` |
+| lifecycle hooks | `extensions["codex.plugin/v1"].hooks` or default `hooks/hooks.json` |
+| plugin-bundled MCP config | `extensions["codex.plugin/v1"].mcpServers` |
+| marketplace UI metadata | `extensions["codex.plugin/v1"].interface` |
 
-The authority chain is one-way:
+Codex app connector files are local connector references:
 
-1. `contracts/schemas/elegy-plugin-package.schema.json` and `contracts/schemas/elegy-plugin.lock.json` define the portable package contracts.
-2. `contracts/fixtures/elegy-plugin-package.minimal.json` and real package instances are the governed package inputs.
-3. Generated Codex plugin files are derived projections only.
-
-Codex plugin files do not become authored truth for Elegy behavior, package
-metadata, skill authority, connector ownership, or host policy.
-
-## Current implemented slice
-
-The current implementation adds `elegy plugin export codex` (Codex plugin
-export) on the umbrella CLI as lower-level contributor tooling.
-The legacy `elegy generate codex-plugin` command remains as a compatibility alias.
-
-It currently generates:
-
-- `.codex-plugin/plugin.json`
-- `skills/<projected-id>/SKILL.md`
-
-The generated `skills/` directory is built from:
-
-- embedded governed skill definitions in the portable package
-- skill definitions loaded from `definitionRef` when the package points at local files
-- instruction-skill files loaded from package-relative `instructionSkills[].path` when those files exist locally
-- fallback instruction-skill placeholders when the package only carries instruction-skill metadata and not the original markdown body
-
-Generated skill directory names are intentionally stable and non-lossy. They are
-derived from the fully qualified skill identity for governed skills and from the
-declared relative instruction-skill path for instruction skills, using a
-case-safe encoded form instead of a lossy basename.
-
-## What is intentionally not generated yet
-
-The current slice does not generate:
-
-- `.mcp.json`
-- `.app.json`
-- `hooks/hooks.json`
-- marketplace metadata such as `.agents/plugins/marketplace.json`
-
-Reason:
-
-- `elegy-plugin-package/v1` carries portable MCP projection metadata, but it does not yet carry enough Codex-runnable MCP launch information to emit a truthful `.mcp.json`.
-- Connector identity, auth, state, trust, and install/runtime UX remain host-owned and are therefore outside the first derived projection slice.
-- Hook packaging and execution policy are also host/runtime concerns and remain out of scope for this first projection pass.
-
-## Current command
-
-```text
-elegy plugin export codex --package <path> --output-dir <dir> [--force]
+```json
+{
+  "apps": {
+    "github": {
+      "id": "connector_...",
+      "required": true
+    }
+  }
+}
 ```
 
-The legacy alias is `elegy generate codex-plugin`.
+They are not an OAuth, token, provider-action, or approval-policy schema.
+Hosts own connector authentication, tool approvals, and runtime sessions.
 
-When `--force` is used, the generator replaces the existing plugin root for that
-projected plugin name before writing the fresh output so stale generated files
-do not survive across reruns.
+## SDK surface
 
-This is contributor tooling, not a claim that Elegy ships a Codex plugin runtime,
-plugin marketplace, or connector-management product surface.
+The Codex plugin projection is implemented in `shared/plugin-sdk/src/lib.rs`:
 
-## Generated manifest posture
-
-The generated `.codex-plugin/plugin.json` is intentionally conservative.
-
-It currently projects:
-
-- plugin identity from package identity
-- description, homepage, license, and tags when the portable package provides them
-- `skills: "./skills/"`
-- minimal Codex `interface` metadata when the portable package contains enough descriptive fields
-
-It does not currently claim bundled apps, MCP servers, or hooks.
-
-## Validation posture
-
-The current evidence for this slice is:
-
-- reusable generation logic in `rust/core/elegy-tooling`
-- umbrella CLI coverage in `rust/bin/elegy-cli`
-- focused tooling and CLI tests for Codex plugin export (tests cover both `elegy plugin export codex` and the legacy `elegy generate codex-plugin` alias)
-
-If future work adds `.mcp.json`, `.app.json`, or marketplace output, update the
-portable package contract, generator behavior, and docs together.
+- `CodexPluginManifest`
+- `CodexPluginExtensionV1`
+- `CodexPluginInterface`
+- `CodexAppsFile`
+- `CodexHooksConfig`
+- `import_codex_plugin_v1`
+- `export_plugin_v1`
