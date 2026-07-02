@@ -8,11 +8,11 @@ The repository is still in a **bootstrap and consolidation stage** after the leg
 
 At this stage:
 
-- `contracts/` (including `contracts/schemas/`) is the authority root for governed schemas, fixtures, manifests, support metadata, versioning, and policy
+- `plugins/<name>/schemas/` and `plugins/<name>/fixtures/` hold the authority root for governed schemas, fixtures, manifests, support metadata, versioning, and policy
 - `docs/governance/` holds the canonical operational policy assets (e.g. workflow/environment/branch enforcement mode selection)
 - exported bundles under `artifacts/contracts` are the supported machine-readable handoff surface for downstream consumers
-- the Rust workspace under `rust/` is the active home for CLI, tooling, host, runtime, and adapter behavior that consumes governed artifacts
-- the current contributor-facing self-authoring slice is the Rust CLI path for `author mcp`, `analyze mcp`, and `generate skills`, backed by `rust/core/elegy-tooling`
+- the first-party Rust workspace at the repo root (`hosts/`, `plugins/`, `shared/`) is the active home for CLI, tooling, host, runtime, and adapter behavior that consumes governed artifacts
+- the current contributor-facing self-authoring slice is the Rust CLI path for `author mcp`, `analyze mcp`, and `generate skills`, backed by `shared/tooling`
 - this policy describes the repository boundary and reporting process; it does not claim a finished hardening story or a built-in MCP-native or skill-driven self-authoring product surface
 
 ## Reporting a vulnerability
@@ -46,7 +46,7 @@ During bootstrap, response times are best-effort. Maintainers will try to:
 
 The current implemented posture includes repository and runtime safeguards such as:
 
-- canonical output and boundary validation through `elegy-cli contracts validate` and the conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`
+- canonical output and boundary validation through `elegy contracts validate` and the conformance tests in `shared/core/`
 - distribution bundle export and archive validation in `.github/workflows/distribution-artifacts.yml`
 - Rust workspace formatting, linting, and test validation in `.github/workflows/rust-ci.yml`
 - dependency review through `cargo-deny` and advisory review through `cargo-audit` in `.github/workflows/security.yml`

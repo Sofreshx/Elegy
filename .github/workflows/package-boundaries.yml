@@ -2,10 +2,8 @@
 
 # Validates that the contract bundle is internally consistent and that the
 # Rust workspace + docs surface still agree with the governed artifacts.
-# This replaces the legacy `scripts/validate-canonical-outputs.ps1` and
-# `scripts/export-contracts.ps1` flow; the new entry point is
-# `elegy-cli contracts validate`, which is itself backed by the
-# conformance tests in `rust/core/elegy-contracts/tests/conformance.rs`.
+# The `elegy-contracts contracts validate` step is backed by `shared/core/tests/bootstrap_slice.rs`
+# and per-plugin conformance tests under `plugins/*/tests/conformance.rs`.
 
 on:
   pull_request:
@@ -34,12 +32,12 @@ jobs:
       - name: Cache Rust build
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: Validate contracts (canonical)
-        working-directory: ./rust
-        run: cargo run -p elegy-cli -- contracts validate --project ..
+        working-directory: .
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 
       - name: Validate contracts (conformance)
-        working-directory: ./rust
-        run: cargo test -p elegy-contracts --test conformance -- --nocapture
+        working-directory: .
+        run: cargo test -p elegy-skills --test conformance -p elegy-mcp --test conformance -p elegy-configuration --test conformance -p elegy-memory --test conformance -- --nocapture

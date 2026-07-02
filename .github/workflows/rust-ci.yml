@@ -1,16 +1,28 @@
-﻿name: Rust CI
+name: Rust CI
 
 on:
   pull_request:
     paths:
-      - 'rust/**'
+      - 'plugins/**'
+      - 'shared/**'
+      - 'hosts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'rustfmt.toml'
+      - 'deny.toml'
+      - '.cargo/**'
       - '.github/workflows/rust-ci.yml'
       - 'scripts/**'
       - '.elegy/docs.yaml'
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/schemas/**'
+      - 'plugins/**/schemas/**'
+      - 'plugins/**/fixtures/**'
+      - 'plugins/**/templates/**'
+      - 'shared/core/fixtures/**'
+      - 'docs/schema-version.json'
       - 'docs/governance/**'
   push:
     branches:
@@ -30,15 +42,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo fmt --all --check
-        working-directory: ./rust
+        working-directory: .
         run: cargo fmt --all --check
 
   clippy:
@@ -46,16 +58,30 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: clippy
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
-      - name: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        working-directory: ./rust
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+          workspaces: . -> target
+      - name: cargo clippy --workspace --all-features -- -D warnings
+        working-directory: .
+        run: cargo clippy --workspace --all-features -- -D warnings
+
+  msrv:
+    name: msrv check (Rust 1.88)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: . -> target
+      - name: cargo build --workspace
+        working-directory: .
+        run: cargo build --workspace
 
   test:
     name: test (${{ matrix.os }})
@@ -64,30 +90,49 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.95.0
         with:
-          workspaces: rust -> rust/target
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: . -> target
       - name: cargo test --workspace --all-targets --all-features
-        working-directory: ./rust
-        run: cargo test --workspace --all-targets --all-features
+        working-directory: .
+        run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
+
+  packaging-smoke:
+    name: packaging smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: . -> target
+      - name: verify planning plugin packaging CLI
+        working-directory: .
+        run: cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
 
   docs-check-v2:
     name: docs check v2 (authoritative)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
-      - uses: dtolnay/rust-toolchain@1.96.0
-      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+      - uses: actions/checkout@v6.0.2
+      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo run -p elegy-documentation -- check
-        working-directory: ./rust
-        run: cargo run -p elegy-documentation -- check --project ..
+        working-directory: .
+        run: cargo run -p elegy-documentation -- check --project .

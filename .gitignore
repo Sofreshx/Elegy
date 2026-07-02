@@ -1,18 +1,7 @@
 # Build outputs
 **/[Bb]in/
 **/[Oo]bj/
-rust/target/
-!/rust/bin/
-
-# Standalone crate outputs under rust/{core,features,bin}/
-rust/core/**/target/
-rust/features/**/target/
-rust/bin/**/target/
-
-# Standalone crate lockfiles under rust/{core,features,bin}/
-rust/core/**/Cargo.lock
-rust/features/**/Cargo.lock
-rust/bin/**/Cargo.lock
+target/
 
 # Test artifacts
 TestResults/
@@ -60,4 +49,7 @@ signing-key
 clients.json
 refresh-tokens.json
 
-.cargo/config.toml
+# Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
+C*
+
+

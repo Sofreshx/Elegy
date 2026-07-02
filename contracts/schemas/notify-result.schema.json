@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elegy/contracts/schemas/notify-result.schema.json",
-  "title": "NotifyResult",
-  "description": "Notification result: ToastResult with delivery flag and platform; or WebhookResult with target URL, HTTP status, and success flag.",
-  "type": "object"
-}
