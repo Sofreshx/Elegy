@@ -23,7 +23,7 @@ this skill and configuring local paths and triggers through
 2. **Scaffold the artifact** — use `elegy docs new adr --title "..."` or
    `elegy docs new spec --title "..."` to get a file with required frontmatter.
 3. **Adopt locally** — copy the snippets in
-   `elegy-doc-practices/adoption/` into the consuming repo's
+   `plugins/doc-practices/adoption/` into the consuming repo's
    `.elegy/docs.yaml` and CI workflow.
 4. **Validate objectively** — run `elegy-documentation check --project . --json`
    to surface missing frontmatter, invalid statuses, broken links, unparseable
@@ -75,7 +75,7 @@ Downstream repos such as `holon` and `elegy-copilot` should:
    `.elegy/docs.yaml`.
 3. Keep product ADRs and specs local unless the decision is cross-repo.
 
-See `elegy-doc-practices/adoption/` for copy-paste snippets.
+See `plugins/doc-practices/adoption/` for copy-paste snippets.
 
 ## Validation
 
