@@ -8,10 +8,19 @@
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
-  "skills": "skills/",
+  "skills": "./skills/",
   "extensions": {
     "codex.plugin/v1": {
-      "schemaVersion": "codex.plugin/v1"
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Desktop",
+        "shortDescription": "Automate and inspect Windows desktop applications",
+        "longDescription": "Use governed desktop observation and automation commands for Windows applications.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Interactive", "Read", "Write"],
+        "defaultPrompt": ["Inspect and operate this desktop application."]
+      }
     }
   }
 }

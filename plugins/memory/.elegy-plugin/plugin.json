@@ -8,10 +8,19 @@
   },
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
-  "skills": "skills/",
+  "skills": "./skills/",
   "extensions": {
     "codex.plugin/v1": {
-      "schemaVersion": "codex.plugin/v1"
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Memory",
+        "shortDescription": "Store and retrieve governed local memory",
+        "longDescription": "Manage durable local memories with scoped retrieval, provenance, and consolidation.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Find the relevant project memories."]
+      }
     }
   }
 }

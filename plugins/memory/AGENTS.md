@@ -2,9 +2,9 @@
 
 ## Start Here
 
-- Read `docs/architecture/mvp-scope.md` before implementing memory behavior.
-- Read `docs/architecture/memory-model.md` when changing scopes, scoring, decay, confidence, provenance, or state transitions.
-- Read `docs/architecture/storage-schema.md` before changing persistence.
+- Read `plugins/memory/docs/architecture/mvp-scope.md` before implementing memory behavior.
+- Read `plugins/memory/docs/architecture/memory-model.md` when changing scopes, scoring, decay, confidence, provenance, or state transitions.
+- Read `plugins/memory/docs/architecture/storage-schema.md` before changing persistence.
 
 ## Boundaries
 

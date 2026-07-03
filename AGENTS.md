@@ -1,69 +1,42 @@
-# Elegy Codex Guidance
+# Elegy Guidance
 
 ## What Elegy Is
 
-Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.
-It keeps durable contracts and discovery metadata in repo-visible artifacts, exposes
-installable binaries through releases, and treats CLI invocation templates as the
-default execution boundary. MCP is supported as an optional adapter, not the primary
-authority surface.
+Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts.
+Durable contracts and discovery metadata live in repo-visible artifacts. CLI
+invocation templates are the default integration contract; MCP is an optional
+adapter.
 
-## Authority Centers
+## Authority Hierarchy
 
-- Governed schemas, fixtures, and contracts live co-located with their owning plugins under `plugins/<name>/schemas/`, `plugins/<name>/fixtures/`, and `plugins/<name>/contracts/`. Cross-cutting fixtures live in `shared/core/fixtures/`.
-- `plugins/<name>/` holds one tree per agent capability plugin — each is a lib+bin Rust crate.
-- `hosts/<name>/` holds thin binary entrypoints (`elegy-run` MCP host).
-- `shared/<name>/` holds library crates shared across plugins, including `shared/plugin-sdk/` — the publishable SDK for external plugin repos.
-- `docs/adr/` and `docs/specs/` hold current durable documentation decisions and implementation-facing specs, configured by `.elegy/docs.yaml`.
-
-## Start Here
-
-- Read `README.md`, then `docs/architecture/ecosystem-topology.md` or `docs/architecture/substrate-governance.md` when changing repo ownership, authority boundaries, or public positioning.
-- Read the smallest relevant doc under `docs/architecture/`, `docs/adr/`, or `docs/specs/` before changing behavior in that lane.
-- Use `docs/agent-integration.md` before changing host onboarding, discovery, invocation envelopes, profiles, MCP projection, side-effect posture, or other agent-facing JSON.
-- Use `docs/architecture/mcp-skill-tooling-placement.md` before changing MCP authoring, analysis, skill registry, or ownership boundaries.
-- Use `docs/architecture/documentation-practices.md` and `docs/specs/documentation-practices-skill-and-cli.md` before changing ADR/spec doctrine, docs config, or docs validation behavior.
-- Use `docs/specs/obsidian-skill-and-cli.md` before changing the Obsidian skill, result envelope, or vault-boundary guidance.
-- Use `docs/spec-baseline.md` before changing MCP protocol baseline language.
+| Priority | Source |
+|---|---|
+| 1 | Explicit user instruction |
+| 2 | `docs/architecture/README.md` — repo topology, governance, skill placement, terminology |
+| 3 | `docs/adr/` — durable architecture decisions |
+| 4 | `docs/specs/` — implementation-facing behavior and acceptance criteria |
+| 5 | `plugins/<name>/AGENTS.md` — plugin-local guidance (e.g. `plugins/memory/AGENTS.md`) |
+| 6 | Repeated implementation patterns in the workspace |
 
 ## Boundary Rules
 
-- Discovery indexes, generated bundles, `SKILL.md` mirrors, Codex plugin exports, and MCP projections are derived outputs or adapters, not independent authority.
-- Profiles are allowlists, not approvals. Side effects still require host policy, and side-effecting MCP tools stay blocked unless the call is an explicit dry run or the host is started with `--allow-side-effects`.
-- CLI invocation templates are the default integration contract. Use MCP only when the host specifically needs an MCP protocol boundary.
-- Obsidian is a non-authoritative vault bridge. Do not make it a source of truth for plans, roadmaps, goals, todos, or review state.
+- Discovery indexes, generated bundles, SKILL.md mirrors, and MCP projections are derived outputs, not independent authority.
+- Profiles are allowlists, not approvals. Side-effecting MCP tools stay blocked unless the host is started with `--allow-side-effects`.
+- CLI invocation templates are the default contract. Use MCP only when the host specifically needs an MCP protocol boundary.
+- Obsidian is a non-authoritative vault bridge. Not a source of truth for plans, roadmaps, or review state.
 
 ## Documentation Rules
 
-- Prefer updating an existing ADR or spec when extending the same decision or behavior slice.
-- Create or update specs for implementation-facing behavior, acceptance criteria, and validation evidence.
-- Use `elegy-documentation inspect/map/check --project . --json` for authority-aware documentation inspection and objective validation.
-- Objective docs validation does not prove prose quality or architecture correctness; still inspect reasoning and authority boundaries manually.
-- Keep harness files thin. Root `AGENTS.md` is the repo authority; other harness instruction files should mostly point back here.
+- Update an existing ADR or spec when extending the same decision slice.
+- Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation.
+- Keep harness files thin. Root `AGENTS.md` is the repo authority; other harness files should point back here.
 
 ## Validation
 
-- Prefer the narrowest validation that proves the changed boundary.
-- Run validation from the repo root for Rust behavior (`cargo test -p <crate>`, `cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .`) and use repo-root scripts for governed/export boundaries.
-- If docs or fixtures changed without code, inspect emitted JSON or generated contract output instead of only proofreading Markdown.
-- When capability behavior changes, verify both the Rust implementation and the governed fixture/projection that exposes it to agents.
+Run from repo root: `cargo test -p <crate>`, `cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .`. When capability behavior changes, verify both the Rust implementation and the governed fixture/projection.
 
 ## Rust Style
 
 - `snake_case` functions/variables, `PascalCase` types/traits, `SCREAMING_SNAKE_CASE` constants.
 - `thiserror` for library errors, `anyhow` for CLI errors.
-- No `unwrap()` in library code. Use `?` or explicit error handling.
-- Prefer returning `Result<T, E>` over panicking.
-- Group imports: std, external crates, internal modules, separated by blank lines.
-- Minimize dependencies, especially in crates that feed CLI, MCP, host, or contract surfaces.
-
-## elegy-memory Guardrails
-
-1. Trait-first. Define behavior as traits. Implementations are pluggable. Never hardcode concrete types in function signatures where a trait bound works.
-2. MVP discipline. If `mvp-scope.md` says a feature is v1 or v2, write the type/trait skeleton with `todo!()` or no-op. Do not implement it.
-3. No raw transcripts. Memories are distilled summaries, facts, decisions, procedures, or observations.
-4. Provenance is mandatory. Every memory has a `ProvenanceLevel`. No memory without provenance.
-5. Write-time gate. Every memory passes through the salience gate before storage. No bypass.
-6. Embeddings can fail. Handle gracefully, mark stale when needed, and never block writes on provider-backed embedding computation.
-7. Scopes are isolated. Session, workspace, user, and agent scopes must not cross-query implicitly.
-8. SQLite is the MVP storage authority. PostgreSQL and broader provider surfaces stay later-scope unless the current memory docs say otherwise.
+- No `unwrap()` in library code. Group imports: std, external crates, internal modules.

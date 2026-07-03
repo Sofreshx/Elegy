@@ -1,6 +1,6 @@
 ---
 created: 2026-05-13
-updated: 2026-05-13
+updated: 2026-06-30
 category: governance
 status: active
 doc_kind: roadmap

@@ -42,6 +42,8 @@ where
     pub data: Option<T>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warnings: Option<Vec<String>>,
 }
 
 impl<T: Serialize> MachineEnvelope<T> {
@@ -50,6 +52,7 @@ impl<T: Serialize> MachineEnvelope<T> {
         non_interactive: bool,
         command: Vec<String>,
         data: T,
+        warnings: Option<Vec<String>>,
     ) -> Self {
         Self {
             schema_version: RESULT_SCHEMA_VERSION,
@@ -59,6 +62,7 @@ impl<T: Serialize> MachineEnvelope<T> {
             status: MachineStatus::Ok.as_str(),
             data: Some(data),
             error: None,
+            warnings,
         }
     }
 
@@ -68,6 +72,7 @@ impl<T: Serialize> MachineEnvelope<T> {
         command: Vec<String>,
         status: MachineStatus,
         error_message: String,
+        warnings: Option<Vec<String>>,
     ) -> Self {
         Self {
             schema_version: RESULT_SCHEMA_VERSION,
@@ -77,6 +82,7 @@ impl<T: Serialize> MachineEnvelope<T> {
             status: status.as_str(),
             data: None,
             error: Some(error_message),
+            warnings,
         }
     }
 }

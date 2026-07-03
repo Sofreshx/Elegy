@@ -3,6 +3,7 @@ name = "elegy-observe"
 version.workspace = true
 publish = false
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "Desktop and OS observation for agentic workflows. Process snapshots, window tracking, clipboard, screen capture, and filesystem diffing."
 
