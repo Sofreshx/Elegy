@@ -1,4 +1,4 @@
-schemaVersion: elegy-docs/v1
+schemaVersion: elegy-documentation/v2
 authorityRoots:
   current:
     - docs/adr
@@ -23,4 +23,7 @@ freshnessWarnings:
   planningDays: 45
   researchDays: 90
 localExceptions:
+  - docs/architecture/codex-plugin-projection.md
+  - docs/specs/codex-plugin-compatibility.md
+  - docs/specs/documentation-practices-skill-and-cli.md
   - docs/specs/obsidian-skill-and-cli.md

@@ -1,5 +1,7 @@
 # Build outputs
 **/[Bb]in/
+!shared/plugin-sdk/src/bin/
+!shared/plugin-sdk/src/bin/*.rs
 **/[Oo]bj/
 target/
 
@@ -52,6 +54,4 @@ clients.json
 refresh-tokens.json
 
 # Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
-C*
-
-
+C*

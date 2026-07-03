@@ -22,6 +22,8 @@ time = { workspace = true, features = ["formatting", "parsing", "serde"] }
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 schemars = "1.2.1"
 serde_path_to_error = "0.1.20"
+sha2 = "0.10"
+hex = "0.4"
 
 [dev-dependencies]
 tempfile = "3.16.0"

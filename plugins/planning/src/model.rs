@@ -49,7 +49,10 @@ string_enum!(EntityType {
     Insight => "insight",
     ProjectRun => "project-run",
     GraphNode => "graph-node",
-    GraphEdge => "graph-edge"
+    GraphEdge => "graph-edge",
+    DiscoveryNode => "discovery-node",
+    DiscoveryRelationship => "discovery-relationship",
+    DiscoveryCheckpoint => "discovery-checkpoint",
 });
 
 string_enum!(GoalStatus {
@@ -191,6 +194,35 @@ string_enum!(WorkPointKind {
     ReviewFix => "review-fix",
     ValidationFix => "validation-fix",
     FollowUp => "follow-up"
+});
+
+string_enum!(DiscoveryClassification {
+    Defect => "defect",
+    DeferredWork => "deferred-work",
+    ReviewFinding => "review-finding",
+    Insight => "insight",
+    Observation => "observation",
+});
+
+string_enum!(VerificationState {
+    Unverified => "unverified",
+    Verified => "verified",
+    Rejected => "rejected",
+});
+
+string_enum!(DiscoveryStatus {
+    Candidate => "candidate",
+    Triaged => "triaged",
+    Promoted => "promoted",
+    Resolved => "resolved",
+    Reopened => "reopened",
+});
+
+string_enum!(DiscoveryRelationshipKind {
+    AppliesTo => "applies-to",
+    Found => "found",
+    EvidencedBy => "evidenced-by",
+    Supersedes => "supersedes",
 });
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -684,6 +716,7 @@ pub struct EntityContextBundle {
     pub insights: Vec<InsightRecord>,
     pub related_insights: Vec<InsightRecord>,
     pub tags: Vec<String>,
+    pub discoveries: Vec<DiscoveryRecord>,
     pub validation: ValidationReport,
     pub token_estimate: TokenEstimate,
 }
@@ -705,6 +738,7 @@ pub struct SessionContextBundle {
     pub open_blocking_review_points: Vec<ReviewPointRecord>,
     pub recommended_next_action: Option<String>,
     pub context_warnings: Vec<String>,
+    pub active_discoveries: Vec<DiscoveryRecord>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -827,6 +861,75 @@ pub struct PlanView {
 #[serde(rename_all = "camelCase")]
 pub struct IssueView {
     pub issue: IssueRecord,
+    pub validation: ValidationReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoverySourceEntry {
+    pub source_type: String,
+    pub source_id: String,
+    pub observed_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub correlation_id: String,
+    pub classification: DiscoveryClassification,
+    pub verification_state: VerificationState,
+    pub severity: Severity,
+    pub status: DiscoveryStatus,
+    pub claim: String,
+    pub impact: Option<String>,
+    pub next_action: Option<String>,
+    pub verification_step: Option<String>,
+    pub recurrence_key: Option<String>,
+    pub fingerprint: Option<String>,
+    pub observed_at: Vec<String>,
+    pub occurrence_count: i64,
+    pub source_lineage: Vec<DiscoverySourceEntry>,
+    pub review_date: Option<String>,
+    pub resolved_at: Option<String>,
+    pub resolution_rationale: Option<String>,
+    pub promoted_entity_type: Option<EntityType>,
+    pub promoted_entity_id: Option<String>,
+    pub tags: Vec<String>,
+    pub revision: i64,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryRelationshipRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub source_id: String,
+    pub target_id: String,
+    pub relationship_kind: DiscoveryRelationshipKind,
+    pub metadata: Option<serde_json::Value>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryCheckpointRecord {
+    pub id: String,
+    pub scope_key: String,
+    pub run_id: String,
+    pub event: String,
+    pub snapshot: Option<serde_json::Value>,
+    pub created_at: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct DiscoveryView {
+    pub discovery: DiscoveryRecord,
+    pub relationships: Vec<DiscoveryRelationshipRecord>,
     pub validation: ValidationReport,
 }
 
