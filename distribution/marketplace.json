@@ -1,48 +1,79 @@
 {
   "schemaVersion": "elegy-plugin-marketplace/v1",
-  "name": "Elegy Plugin Marketplace",
-  "description": "Bundled plugin marketplace for the Elegy monorepo. Indexes shipped plugins by name and relative source path. Authority for versions, capabilities, skills, executables, and interface metadata lives in each plugin's .elegy-plugin/plugin.json. Marketplace policy is installation metadata, never execution trust or approval. Local relative sources only in this slice.",
+  "name": "elegy-marketplace",
+  "interface": {
+    "displayName": "Elegy Plugin Marketplace"
+  },
+  "description": "Bundled plugin marketplace for the Elegy monorepo. Indexes shipped plugins by name and source. Authority for versions, capabilities, skills, executables, and interface metadata lives in each plugin's .elegy-plugin/plugin.json. Marketplace policy is installation metadata, never execution trust or approval.",
   "plugins": [
     {
       "name": "elegy-planning",
-      "source": "plugins/planning",
-      "policy": "default",
+      "source": { "source": "local", "path": "plugins/planning" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Productivity",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-memory",
-      "source": "plugins/memory",
-      "policy": "default",
+      "source": { "source": "local", "path": "plugins/memory" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Productivity",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-skills",
-      "source": "plugins/skills",
-      "policy": "available",
+      "source": { "source": "local", "path": "plugins/skills" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-mcp",
-      "source": "plugins/mcp",
-      "policy": "available",
+      "source": { "source": "local", "path": "plugins/mcp" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-desktop",
-      "source": "plugins/desktop",
-      "policy": "available",
+      "source": { "source": "local", "path": "plugins/desktop" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-documentation",
-      "source": "plugins/documentation",
-      "policy": "available",
+      "source": { "source": "local", "path": "plugins/documentation" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
       "manifest": ".elegy-plugin/plugin.json"
     },
     {
       "name": "elegy-observe",
-      "source": "plugins/observe",
-      "policy": "available",
+      "source": { "source": "local", "path": "plugins/observe" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-doc-practices",
+      "source": { "source": "local", "path": "plugins/doc-practices" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-obsidian",
+      "source": { "source": "local", "path": "plugins/obsidian" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Productivity",
+      "manifest": ".elegy-plugin/plugin.json"
+    },
+    {
+      "name": "elegy-skill-authoring",
+      "source": { "source": "local", "path": "plugins/skill-authoring" },
+      "policy": { "installation": "AVAILABLE", "authentication": "NONE" },
+      "category": "Developer Tools",
       "manifest": ".elegy-plugin/plugin.json"
     }
   ]
