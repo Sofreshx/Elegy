@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-opencode-workers",
+  "version": "0.1.0",
+  "description": "Launch supervised read-only OpenCode workers from Codex.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/Sofreshx/elegy-opencode-workers",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1",
+      "sourceRepository": "https://github.com/Sofreshx/elegy-opencode-workers"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "homepage": "https://github.com/Sofreshx/elegy-opencode-workers",
+      "keywords": [
+        "codex",
+        "opencode",
+        "workers",
+        "mcp",
+        "planning"
+      ],
+      "interface": {
+        "displayName": "OpenCode Workers",
+        "shortDescription": "Delegate read-only worker jobs to OpenCode.",
+        "longDescription": "Launch supervised OpenCode ACP workers for exploration, research, review, and validation while Codex keeps authority over edits and final evidence.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": [
+          "MCP",
+          "Read-only delegation",
+          "Planning evidence"
+        ],
+        "websiteURL": "https://github.com/Sofreshx/elegy-opencode-workers",
+        "defaultPrompt": [
+          "Spawn a read-only OpenCode review worker.",
+          "Check recent OpenCode worker results.",
+          "Cancel the active OpenCode worker."
+        ]
+      }
+    }
+  }
+}

@@ -42,6 +42,17 @@ To add a new release surface, add an entry to `distribution/surfaces.json` and e
 
 Each dedicated binary is listed in the catalog with kind `cli`. Most build from a package with the same name; surfaces with a different package declare `package` explicitly. Skill-only surfaces (those without a corresponding Rust binary) are listed with kind `skill-only`.
 
+External plugin wrappers use `kind: "external-plugin"`, `packaging: "plugin"`,
+`pluginRoot`, and `artifactBaseUrl`. The generated marketplace keeps
+`source.path` local for wrapper metadata and points artifact URLs at the external
+release repository.
+
+External plugin repositories own their release pipeline. They must publish
+`<name>-plugin-<target>.zip` plus `<name>-plugin-<target>.zip.sha256` for each
+marketplace target under the release tag used by the generated index.
+For the public Elegy marketplace, those assets live on the public Elegy release
+even when the producing source repository is private.
+
 ## Install
 
 Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
