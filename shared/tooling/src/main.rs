@@ -187,6 +187,8 @@ struct DistributionSurface {
     packaging: Option<String>,
     #[serde(default)]
     plugin_root: Option<String>,
+    #[serde(default)]
+    artifact_base_url: Option<String>,
     #[serde(default = "default_marketplace_category")]
     marketplace_category: String,
 }
@@ -607,11 +609,16 @@ fn generate_marketplace(
                 surface.name, manifest.name
             ));
         }
+        let artifact_base = surface
+            .artifact_base_url
+            .as_deref()
+            .unwrap_or(base)
+            .trim_end_matches('/');
         let artifacts = targets
             .iter()
             .map(|target| {
                 let file_name = format!("{}-plugin-{target}.zip", surface.name);
-                let url = format!("{base}/{release_tag}/{file_name}");
+                let url = format!("{artifact_base}/{release_tag}/{file_name}");
                 ElegyMarketplaceArtifact {
                     target: (*target).to_string(),
                     checksum_url: format!("{url}.sha256"),

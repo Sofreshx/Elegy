@@ -1,78 +1,76 @@
-# Closed-Source Plugin Wrapper Template
+# Plugin Wrapper Template
 
-Use this template to register an external or closed-source plugin in the Elegy marketplace. The wrapper provides discovery metadata only — the actual implementation lives in the external source.
+Use this template to register a plugin whose implementation ships outside this
+repository. The wrapper is public metadata. Runtime behavior lives in compiled
+artifacts or an external service.
 
 ## Usage
 
 1. Copy this directory to `plugins/<your-plugin-name>/`
-2. Edit `.elegy-plugin/plugin.json` with your plugin's metadata
-3. Set the `source` field to point to your external repository or registry
-4. Add an entry to `distribution/marketplace.json`
+2. Edit `.elegy-plugin/plugin.json`
+3. Add the plugin to `distribution/surfaces.json`
+4. Regenerate `.elegy/marketplace.json`
 
 ## Directory structure
 
 ```
 plugins/<your-plugin-name>/
   .elegy-plugin/
-    plugin.json       # discovery metadata + external source pointer
+    plugin.json       # discovery metadata
   README.md           # local docs about this wrapper (optional)
 ```
 
-No `skills/` or `src/` directory — those live in the external repository.
+No `src/` directory is required. Put implementation code in the external
+repository, compiled archive, or hosted service.
 
-## Source types
+## Manifest rules
 
-### Git repository
+- Use `license: "Proprietary"` when the implementation is closed source.
+- Omit `repository` when the source location is private.
+- Do not put secrets in manifests, skills, scripts, descriptors, or archives.
+- Keep host-specific display metadata under `extensions`.
 
 ```json
 {
-  "source": {
-    "source": "git",
-    "url": "https://github.com/org/private-plugin",
-    "tag": "v1.0.0"
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-my-plugin",
+  "version": "0.1.0",
+  "description": "Short user-facing capability summary.",
+  "author": {
+    "name": "Example Publisher"
+  },
+  "license": "Proprietary",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1",
+      "sourceRepository": "https://github.com/org/private-plugin"
+    }
   }
 }
 ```
 
-### Package registry
+## Marketplace entry source
 
-```json
-{
-  "source": {
-    "source": "registry",
-    "url": "https://registry.elegy.dev",
-    "package": "elegy-private-plugin",
-    "version": "^1.0.0"
-  }
-}
-```
-
-### Local (in-repo)
-
-```json
-{
-  "source": {
-    "source": "local",
-    "path": "plugins/my-plugin"
-  }
-}
-```
-
-## Marketplace entry
-
-Add to `distribution/marketplace.json`:
+Add one packaged surface to `distribution/surfaces.json`:
 
 ```json
 {
   "name": "elegy-my-plugin",
-  "source": { "source": "git", "url": "https://github.com/org/private-plugin", "tag": "v1.0.0" },
-  "policy": { "installation": "AVAILABLE", "authentication": "ON_INSTALL" },
-  "category": "Developer Tools"
+  "kind": "external-plugin",
+  "packaging": "plugin",
+  "pluginRoot": "plugins/my-plugin",
+  "artifactBaseUrl": "https://github.com/org/private-plugin/releases/download",
+  "marketplaceCategory": "Developer Tools",
+  "description": "Short user-facing capability summary."
 }
 ```
 
-## Authentication policy
+Then run:
 
-- `NONE` — no auth required
-- `ON_INSTALL` — auth needed when installing the plugin
-- `ON_USE` — auth needed when invoking the plugin
+```bash
+cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace generate --project .
+cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace validate --source .
+```
+
+The generated marketplace lives at `.elegy/marketplace.json`. Hosts own install
+state, authentication, approvals, and execution policy.

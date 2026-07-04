@@ -616,7 +616,7 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
         validate_uri("repository", repo, &mut issues);
     }
 
-    if plugin.skills.is_none() && plugin.mcp_servers.is_none() {
+    if plugin.skills.is_none() && plugin.mcp_servers.is_none() && !is_marketplace_wrapper(plugin) {
         issues.push("At least one of skills or mcpServers must be declared.".into());
     }
 
@@ -646,6 +646,17 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
     }
 
     ElegyPluginV1ValidationResult { issues }
+}
+
+fn is_marketplace_wrapper(plugin: &ElegyPluginV1) -> bool {
+    plugin
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.get("elegy.marketplace-wrapper/v1"))
+        .and_then(serde_json::Value::as_object)
+        .and_then(|extension| extension.get("schemaVersion"))
+        .and_then(serde_json::Value::as_str)
+        == Some("elegy.marketplace-wrapper/v1")
 }
 
 fn validate_codex_extension_v1(codex_ext: &CodexPluginExtensionV1, issues: &mut Vec<String>) {
@@ -4307,6 +4318,25 @@ mod tests {
             .issues
             .iter()
             .any(|issue| { issue.contains("schemaVersion must be 'codex.plugin/v1'") }));
+    }
+
+    #[test]
+    fn validate_plugin_v1_allows_explicit_marketplace_wrapper() {
+        let plugin = ElegyPluginV1 {
+            schema_version: ELEGY_PLUGIN_V1_SCHEMA_VERSION.to_string(),
+            name: "wrapped-plugin".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Marketplace wrapper for an external plugin.".to_string(),
+            extensions: Some(serde_json::Map::from_iter([(
+                "elegy.marketplace-wrapper/v1".to_string(),
+                json!({"schemaVersion": "elegy.marketplace-wrapper/v1"}),
+            )])),
+            ..ElegyPluginV1::default()
+        };
+
+        let validation = validate_elegy_plugin_v1(&plugin);
+
+        assert!(validation.is_valid(), "{:?}", validation.issues);
     }
 
     #[test]

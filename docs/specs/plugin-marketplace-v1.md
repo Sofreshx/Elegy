@@ -41,6 +41,8 @@ Rules:
 - Artifact selection prefers the exact host target, then `any`.
 - Remote installation requires an HTTPS artifact and SHA-256 sidecar.
 - The archive manifest name and version must match the public wrapper manifest.
+- A `distribution/surfaces.json` surface may set `artifactBaseUrl` to publish
+  plugin archives from an external release repository.
 - Installation normalizes legacy `skills/` and `mcpServers` paths to `./` form;
   authoring and generated manifests remain strict.
 - Extraction stages files before atomically publishing the install directory.
@@ -70,6 +72,34 @@ supported host target.
 Public wrappers may use `license: "Proprietary"` and omit `repository`. Put
 private behavior in compiled artifacts or a hosted service. Do not put secrets
 in manifests, skills, scripts, app descriptors, or archives.
+
+Discovery-only wrappers must declare:
+
+```json
+{
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1"
+    }
+  }
+}
+```
+
+This marker allows a wrapper manifest to omit `skills` and `mcpServers`. The
+published plugin archive still supplies runtime files.
+
+External/private plugin publish contract:
+
+| Owner | Contract |
+|---|---|
+| External plugin repo | Publishes `<plugin-name>-plugin-<target>.zip` and `.sha256` sidecars to the public marketplace release under the tag used by the marketplace. |
+| Public Elegy repo | Stores wrapper metadata and generates `.elegy/marketplace.json` with `artifactBaseUrl`. |
+| Installer/exporter | Downloads the artifact, verifies the sidecar checksum, and checks that the archive manifest matches the wrapper manifest. |
+
+Private implementation source can stay private. The archive URL must be
+reachable by the intended installer audience. For the public Elegy marketplace,
+publish closed-source plugin archives to the public `Sofreshx/Elegy` release
+referenced by `artifactBaseUrl`.
 
 ## Validation
 
