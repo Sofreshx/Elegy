@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-example-external",
+  "version": "1.0.0",
+  "description": "Example closed-source plugin wrapper. Replace with your plugin metadata.",
+  "author": {
+    "name": "Your Organization"
+  },
+  "license": "Proprietary",
+  "repository": "https://github.com/your-org/your-plugin",
+  "source": {
+    "source": "git",
+    "url": "https://github.com/your-org/your-plugin",
+    "tag": "v1.0.0"
+  },
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Example External Plugin",
+        "shortDescription": "Replace with your short description",
+        "longDescription": "Replace with your long description.",
+        "developerName": "Your Organization",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Replace with a default prompt for your plugin."]
+      }
+    }
+  }
+}

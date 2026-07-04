@@ -18,7 +18,7 @@ Elegy treats planning state as durable and authoritative in SQLite via the `eleg
 Today there is no first-party Elegy skill for that. The pablo-mano/Obsidian-CLI-skill demonstrates a viable shape (a thin skill wrapping the official Obsidian CLI), but Elegy needs a version that:
 
 - Sits inside the Elegy contracts and discovery surface (`skill`, `skill-discovery-index`).
-- Distributed as a standalone skill-only package at the repo root (`elegy-obsidian/SKILL.md`). No binary to install — skill is consumed by hosts directly.
+- Distributed as a skill-only package under `plugins/obsidian/SKILL.md`. No binary to install — skill is consumed by hosts directly.
 - Exposes a uniform `obsidian-result/v1` envelope so callers in any agent can reason about outcomes.
 - Leaves a clean extension point for future mirror commands without committing to them yet.
 
@@ -28,13 +28,13 @@ This document captures the foundation slice.
 
 In scope:
 
-- A governed skill definition: `elegy-obsidian/SKILL.md` (standalone root package).
-- Discovery projection: the `elegy-skills` registry discovers this standalone skill from the repo root.
+- A governed skill definition: `plugins/obsidian/SKILL.md` (plugin skill-only package).
+- Discovery projection: the `elegy-skills` registry discovers this skill from `plugins/obsidian/`.
 - Result envelope schema: defined in the shared `plugin-sdk` (`AgentSkillFrontmatter` struct).
-- A standalone root skill: `elegy-obsidian/SKILL.md` plus per-command reference and install guidance in the skill body.
+- A skill-only plugin: `plugins/obsidian/SKILL.md` plus per-command reference and install guidance in the skill body.
 - A foundation spec: this document.
 
-Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the skill package is a standalone root directory (`elegy-obsidian/`). Hosts discover it through the `elegy-skills` registry.):
+Out of scope (the `src/Elegy-*/` wrapper installer lanes are retired; the skill package is at `plugins/obsidian/`. Hosts discover it through the `elegy-skills` registry.):
 
 Out of scope (follow-up work):
 
@@ -48,19 +48,19 @@ Out of scope (follow-up work):
 The skill follows the standard Elegy one-way authority chain:
 
 ```
-elegy-obsidian/SKILL.md                           (standalone root package — governed source of truth)
+plugins/obsidian/SKILL.md                          (plugin package — governed source of truth)
         |
         v
 elegy-skills registry                              (discovery projection)
         |
         v
-elegy-obsidian/SKILL.md                                 (standalone root skill package)
+plugins/obsidian/SKILL.md                                (skill-only plugin package)
         |
         v
-elegy-obsidian/SKILL.md                                 (standalone root skill package)
+plugins/obsidian/SKILL.md                                (skill-only plugin package)
 ```
 
-`elegy-obsidian/` is the standalone root skill package, not a wrapper overlay. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
+`plugins/obsidian/` is the skill-only plugin package, not a wrapper overlay. The implementation does not live in this repo; the user's Obsidian Desktop installation provides the `obsidian` binary.
 
 The wrapper surface points to the external executable explicitly:
 
@@ -146,7 +146,7 @@ The foundation is complete when all of the following are true:
 - the SKILL.md frontmatter validates against the `AgentSkillFrontmatter` struct in `shared/plugin-sdk`. Registry discovery validates through the `SkillRegistry` in `plugins/skills`.
 - The result envelope schema validates against the JSON Schema 2020-12 grammar.
 - The `elegy-skills` registry resolves the surface metadata from the standalone root package.
-- Installation guidance lives in the skill body content of `elegy-obsidian/SKILL.md` that operators can follow to enable the official CLI.
+- Installation guidance lives in the skill body content of `plugins/obsidian/SKILL.md` that operators can follow to enable the official CLI.
 - The `elegy-obsidian` skill is registered in the `elegy-skills` registry with `lifecycleState: "draft"`, signaling that the foundation is ready for review but not yet promoted to active.
 - The `distribution/surfaces.json` entry for `elegy-obsidian` registers the surface for release and install.
 

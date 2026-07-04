@@ -19,7 +19,7 @@ owner: Elegy
 
 ## Decision
 
-- Keep the durable doctrine in the central `elegy-doc-practices/`
+- Keep the durable doctrine in the central `plugins/doc-practices/`
   package plus repo-visible architecture docs in `elegy`.
 - Add a narrow `elegy-documentation ...` CLI only for deterministic file creation,
   objective validation, and docs index generation.
