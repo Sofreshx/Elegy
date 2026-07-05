@@ -15,5 +15,6 @@ https://github.com/Sofreshx/elegy-opencode-workers
 ```
 
 This directory only provides public Elegy marketplace discovery metadata. Runtime
-files, skills, MCP descriptors, and binaries are supplied by the published plugin
-archive.
+files, skills, optional MCP descriptors, and binaries are supplied by the
+published plugin archive from the private implementation repo. The primary
+runtime contract is the bundled CLI.
