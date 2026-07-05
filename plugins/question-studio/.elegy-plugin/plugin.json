@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-question-studio",
+  "version": "0.1.0",
+  "description": "Structured quiz question generation and validation for Elegy.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Proprietary",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "keywords": [
+        "quiz",
+        "questions",
+        "validation",
+        "education"
+      ],
+      "interface": {
+        "displayName": "Question Studio",
+        "shortDescription": "Generate and validate structured quiz question sets.",
+        "longDescription": "Create, validate, and export structured question sets through a bundled CLI. The implementation ships as a proprietary plugin archive while this wrapper provides public Elegy marketplace metadata.",
+        "developerName": "Elegy Contributors",
+        "category": "Education & Research",
+        "capabilities": [
+          "CLI",
+          "Question generation",
+          "Validation",
+          "Export planning"
+        ],
+        "defaultPrompt": [
+          "Use Question Studio to validate a structured quiz question set.",
+          "Plan a question set schema with Question Studio."
+        ]
+      }
+    }
+  }
+}

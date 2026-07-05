@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-ai-radar",
+  "version": "0.1.0",
+  "description": "AI release, research, and tooling signal tracking for Elegy.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Proprietary",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "keywords": [
+        "ai",
+        "research",
+        "releases",
+        "signals"
+      ],
+      "interface": {
+        "displayName": "AI Radar",
+        "shortDescription": "Track AI releases, research, and tooling signals.",
+        "longDescription": "Monitor AI release, research, repository, and tooling signals through a bundled CLI. The implementation ships as a proprietary plugin archive while this wrapper provides public Elegy marketplace metadata.",
+        "developerName": "Elegy Contributors",
+        "category": "Education & Research",
+        "capabilities": [
+          "CLI",
+          "AI monitoring",
+          "Research tracking",
+          "Digest planning"
+        ],
+        "defaultPrompt": [
+          "Use AI Radar to inspect planned AI signal tracking capabilities.",
+          "Plan an AI release digest with AI Radar."
+        ]
+      }
+    }
+  }
+}
