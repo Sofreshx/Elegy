@@ -1,0 +1,49 @@
+{
+  "_note": "Best-effort JSON. GitHub ruleset import format is undocumented and may change. If import fails, follow the checklist in main-ruleset.md manually via the GitHub UI. Generated 2026-06-16 for Elegy repo.",
+  "name": "main-protection",
+  "enforcement": "active",
+  "target": "branch",
+  "conditions": {
+    "ref_name": {
+      "include": ["refs/heads/main"],
+      "exclude": []
+    }
+  },
+  "rules": [
+    { "type": "deletion" },
+    { "type": "non_fast_forward" },
+    { "type": "required_linear_history" },
+    {
+      "type": "pull_request",
+      "parameters": {
+        "dismiss_stale_reviews_on_push": true,
+        "require_code_owner_review": false,
+        "require_last_push_approval": false,
+        "required_approving_review_count": 0,
+        "required_review_thread_resolution": false
+      }
+    },
+    {
+      "type": "required_status_checks",
+      "parameters": {
+        "strict_required_status_checks_policy": true,
+        "required_status_checks": [
+          { "context": "Rust CI / fmt" },
+          { "context": "Rust CI / clippy" },
+          { "context": "Rust CI / test (ubuntu-latest)" },
+          { "context": "Rust CI / test (windows-latest)" },
+          { "context": "Rust CI / test (macos-latest)" },
+          { "context": "Rust CI / docs check v2 (authoritative)" },
+          { "context": "Security / cargo-deny" },
+          { "context": "Security / cargo-audit" },
+          { "context": "Security / gitleaks" },
+          { "context": "Security / codeql" },
+          { "context": "Repo Boundaries (package-boundaries compatibility name) / validate-package-boundaries" },
+          { "context": "WS3 Governance (formalization compatibility name) / ws3-governance" },
+          { "context": "Crate Verify / verify" }
+        ]
+      }
+    }
+  ],
+  "bypass_actors": []
+}
