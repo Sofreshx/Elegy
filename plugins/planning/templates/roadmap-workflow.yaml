@@ -1,0 +1,59 @@
+# Template: Roadmap Workflow Scaffold
+# Creates a v1 goal -> roadmap -> section -> work-point -> plan -> todo flow.
+# Use with: elegy-planning roadmap scaffold --file <file> --dry-run|--apply
+goal:
+  id: <GOAL_ID>
+  title: "<GOAL_TITLE>"
+  description: "<WHAT_THIS_GOAL_ACHIEVES>"
+  acceptanceCriteria:
+    - "<ACCEPTANCE_CRITERION>"
+  rejectionCriteria:
+    - "<REJECTION_CRITERION>"
+  tags: [planning]
+
+roadmap:
+  id: <ROADMAP_ID>
+  title: "<ROADMAP_TITLE>"
+  summary: "<ROADMAP_SUMMARY>"
+  tags: [planning]
+
+sections:
+  - id: <SECTION_ID>
+    slug: main
+    title: "<SECTION_TITLE>"
+    summary: "<SECTION_SUMMARY>"
+    ordering: 10
+
+workPoints:
+  - id: <WORK_POINT_ID>
+    sectionId: <SECTION_ID>
+    title: "<WORK_POINT_TITLE>"
+    summary: "<RUNNABLE_WORK_SUMMARY>"
+    validationExpectations:
+      - "<VALIDATION_COMMAND_OR_EXPECTATION>"
+    fileScopes:
+      - "glob:primary:<PATH_OR_GLOB>"
+    effortTier: balanced
+    priority: high
+
+plan:
+  id: <PLAN_ID>
+  title: "<PLAN_TITLE>"
+  summary: "<PLAN_SUMMARY>"
+  planScope: implementation
+  targetedWorkPointIds:
+    - <WORK_POINT_ID>
+  validationSteps:
+    - "<VALIDATION_COMMAND>"
+  stopConditions:
+    - "<STOP_CONDITION>"
+  effortTier: balanced
+
+todos:
+  - id: <TODO_ID>
+    planId: <PLAN_ID>
+    workPointId: <WORK_POINT_ID>
+    title: "<TODO_TITLE>"
+    summary: "<TODO_SUMMARY>"
+    priority: medium
+    effortTier: balanced

@@ -5719,6 +5719,7 @@ fn template_list_returns_all_templates() {
     );
     assert!(templates.contains(&Value::String("phase-gate".to_string())));
     assert!(templates.contains(&Value::String("implementation-slice".to_string())));
+    assert!(templates.contains(&Value::String("roadmap-workflow".to_string())));
 }
 
 #[test]
@@ -6109,4 +6110,292 @@ fn capabilities_compact_backward_compat() {
             "project-run.add-evidence.fenced.v1"
         ])
     );
+}
+
+#[test]
+fn v1_entity_fts_search_uses_shared_index() {
+    let temp_dir = unique_temp_dir("elegy-v1-fts-search");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-fts",
+        "goal",
+        "create",
+        "--id",
+        "goal-fts",
+        "--title",
+        "Needle Alpha Goal",
+        "--description",
+        "FTS lookup target",
+        "--acceptance",
+        "search finds goal",
+        "--rejection",
+        "search fails",
+    ]);
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-fts",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-fts",
+        "--goal-id",
+        "goal-fts",
+        "--title",
+        "Needle Beta Roadmap",
+        "--summary",
+        "roadmap search target",
+    ]);
+
+    let goal_search = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "search",
+        "--fts",
+        "Needle Alpha",
+    ]);
+    assert_eq!(goal_search["status"], "ok");
+    assert_eq!(goal_search["data"]["results"][0]["id"], "goal-fts");
+
+    let roadmap_search = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "search",
+        "--fts",
+        "Needle Beta",
+    ]);
+    assert_eq!(roadmap_search["status"], "ok");
+    assert_eq!(roadmap_search["data"]["results"][0]["id"], "roadmap-fts");
+
+    let top_search = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "search",
+        "--fts",
+        "Needle",
+    ]);
+    assert_eq!(top_search["status"], "ok");
+    assert!(top_search["data"]["results"]
+        .as_array()
+        .expect("results")
+        .iter()
+        .any(|item| item["id"] == "goal-fts"));
+
+    let health = command_json(&["--db", db, "--json", "--non-interactive", "health"]);
+    assert_eq!(health["status"], "ok");
+    assert_eq!(health["data"]["fts"]["tablesPresent"], true);
+    assert_eq!(health["data"]["fts"]["findings"], serde_json::json!([]));
+}
+
+#[test]
+fn show_accepts_id_alias_and_status_errors_suggest_next_command() {
+    let temp_dir = unique_temp_dir("elegy-show-id-status-hint");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-id-alias",
+        "goal",
+        "create",
+        "--id",
+        "goal-id-alias",
+        "--title",
+        "Alias Goal",
+        "--description",
+        "Show alias target",
+        "--acceptance",
+        "alias works",
+        "--rejection",
+        "alias fails",
+    ]);
+    let shown = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "goal-id-alias",
+    ]);
+    assert_eq!(shown["status"], "ok");
+    assert_eq!(shown["data"]["goal"]["id"], "goal-id-alias");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-status-hint",
+        "todo",
+        "create",
+        "--id",
+        "todo-status-hint",
+        "--title",
+        "Status hint todo",
+    ]);
+    let invalid = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-status-hint",
+        "todo",
+        "update-status",
+        "--todo-id",
+        "todo-status-hint",
+        "--status",
+        "completed",
+    ]);
+    assert_eq!(invalid["status"], "invalid");
+    let error = invalid["error"].as_str().expect("error should be a string");
+    assert!(error.contains("\"nextAllowedCommand\""), "{error}");
+    assert!(
+        error.contains(
+            "elegy-planning todo update-status --todo-id todo-status-hint --status in-progress"
+        ),
+        "{error}"
+    );
+}
+
+#[test]
+fn roadmap_scaffold_dry_run_and_apply_cover_v1_workflow() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+    let scaffold_path = temp_dir.join("roadmap.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: scaffold-goal
+  title: Scaffold Goal
+  description: Create a complete v1 planning flow.
+  acceptanceCriteria:
+    - validate all passes
+  rejectionCriteria:
+    - missing work point
+roadmap:
+  id: scaffold-roadmap
+  title: Scaffold Roadmap
+  summary: Batch-created roadmap.
+sections:
+  - id: scaffold-section
+    slug: main
+    title: Main
+workPoints:
+  - id: scaffold-wp
+    sectionId: scaffold-section
+    title: Scaffold Work
+    summary: Implement the first unit.
+    validationExpectations:
+      - cargo test -p elegy-planning
+plan:
+  id: scaffold-plan
+  title: Scaffold Plan
+  summary: Execute the scaffold work.
+  planScope: implementation
+  targetedWorkPointIds:
+    - scaffold-wp
+  validationSteps:
+    - cargo test -p elegy-planning
+todos:
+  - id: scaffold-todo
+    title: Run validation
+    workPointId: scaffold-wp
+"#,
+    )
+    .expect("write scaffold file");
+
+    let dry_run = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-scaffold",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--dry-run",
+    ]);
+    assert_eq!(dry_run["status"], "ok");
+    assert!(dry_run["data"]["created"]
+        .as_array()
+        .expect("created")
+        .iter()
+        .any(|item| item["entityId"] == "scaffold-wp"));
+
+    let missing_after_dry_run = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "scaffold-goal",
+    ]);
+    assert_eq!(missing_after_dry_run["status"], "invalid");
+
+    let applied = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-scaffold",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+    ]);
+    assert_eq!(applied["status"], "ok");
+    assert!(applied["data"]["created"]
+        .as_array()
+        .expect("created")
+        .iter()
+        .any(|item| item["entityId"] == "scaffold-plan"));
+
+    let validation = command_json(&["--db", db, "--json", "--non-interactive", "validate", "all"]);
+    assert_eq!(validation["status"], "ok");
+    let show = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "show",
+        "--id",
+        "scaffold-roadmap",
+    ]);
+    assert_eq!(show["status"], "ok");
+    assert_eq!(show["data"]["roadmap"]["id"], "scaffold-roadmap");
 }

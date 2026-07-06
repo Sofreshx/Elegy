@@ -971,6 +971,16 @@ pub struct PlanningHealthReport {
     pub project_run_count: i64,
     pub graph_node_count: i64,
     pub graph_edge_count: i64,
+    pub fts: FtsHealthReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FtsHealthReport {
+    pub tables_present: bool,
+    pub indexed_entity_count: i64,
+    pub source_entity_count: i64,
+    pub findings: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]

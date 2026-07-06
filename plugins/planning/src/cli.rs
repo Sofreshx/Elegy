@@ -1,7 +1,7 @@
 use std::{env, ffi::OsString, path::PathBuf, process::ExitCode, sync::OnceLock};
 
 use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand, ValueEnum};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use thiserror::Error;
 
@@ -205,6 +205,7 @@ enum RoadmapCommand {
     UpdateStatus(RoadmapUpdateStatusArgs),
     AddSection(RoadmapAddSectionArgs),
     AddWorkPoint(RoadmapAddWorkPointArgs),
+    Scaffold(RoadmapScaffoldArgs),
     List,
     Show(RoadmapShowArgs),
     Search(EntitySearchArgs),
@@ -486,7 +487,7 @@ struct InsightListArgs {
 
 #[derive(Args, Debug)]
 struct InsightShowArgs {
-    #[arg(long = "insight-id")]
+    #[arg(long = "insight-id", alias = "id")]
     insight_id: String,
 }
 
@@ -597,7 +598,7 @@ struct GoalUpdateStatusArgs {
 
 #[derive(Args, Debug)]
 struct GoalShowArgs {
-    #[arg(long = "goal-id")]
+    #[arg(long = "goal-id", alias = "id")]
     goal_id: String,
 }
 
@@ -675,8 +676,207 @@ struct RoadmapAddWorkPointArgs {
 
 #[derive(Args, Debug)]
 struct RoadmapShowArgs {
-    #[arg(long = "roadmap-id")]
+    #[arg(long = "roadmap-id", alias = "id")]
     roadmap_id: String,
+}
+
+#[derive(Args, Debug)]
+struct RoadmapScaffoldArgs {
+    #[arg(long)]
+    file: PathBuf,
+    #[arg(long)]
+    dry_run: bool,
+    #[arg(long)]
+    apply: bool,
+    #[arg(long = "if-exists", value_enum, default_value_t = ScaffoldIfExists::Fail)]
+    if_exists: ScaffoldIfExists,
+}
+
+#[derive(Clone, Copy, Debug, ValueEnum, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+enum ScaffoldIfExists {
+    Update,
+    Skip,
+    Fail,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldFile {
+    #[serde(default)]
+    scope_key: Option<String>,
+    goal: RoadmapScaffoldGoal,
+    roadmap: RoadmapScaffoldRoadmap,
+    #[serde(default)]
+    sections: Vec<RoadmapScaffoldSection>,
+    #[serde(default)]
+    work_points: Vec<RoadmapScaffoldWorkPoint>,
+    #[serde(default)]
+    plan: Option<RoadmapScaffoldPlan>,
+    #[serde(default)]
+    todos: Vec<RoadmapScaffoldTodo>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldGoal {
+    id: String,
+    title: String,
+    description: String,
+    #[serde(default)]
+    acceptance_criteria: Vec<String>,
+    #[serde(default)]
+    rejection_criteria: Vec<String>,
+    #[serde(default)]
+    status: Option<GoalStatus>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldRoadmap {
+    id: String,
+    title: String,
+    summary: String,
+    #[serde(default)]
+    status: Option<RoadmapStatus>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldSection {
+    id: String,
+    slug: String,
+    title: String,
+    #[serde(default)]
+    summary: Option<String>,
+    #[serde(default)]
+    ordering: Option<i64>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldWorkPoint {
+    id: String,
+    #[serde(default)]
+    section_id: Option<String>,
+    title: String,
+    summary: String,
+    #[serde(default)]
+    status: Option<WorkPointStatus>,
+    #[serde(default)]
+    ordering: Option<i64>,
+    #[serde(default)]
+    dependency_ids: Vec<String>,
+    #[serde(default)]
+    validation_expectations: Vec<String>,
+    #[serde(default)]
+    effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    file_scopes: Vec<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    kind: Option<WorkPointKind>,
+    #[serde(default)]
+    priority: Option<Priority>,
+    #[serde(default)]
+    repairs_work_point_ids: Vec<String>,
+    #[serde(default)]
+    supersedes_work_point_ids: Vec<String>,
+    #[serde(default)]
+    blocks_work_point_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldPlan {
+    id: String,
+    title: String,
+    summary: String,
+    #[serde(default = "default_plan_scope")]
+    plan_scope: String,
+    #[serde(default)]
+    assumptions: Vec<String>,
+    #[serde(default)]
+    stop_conditions: Vec<String>,
+    #[serde(default)]
+    validation_steps: Vec<String>,
+    #[serde(default)]
+    targeted_work_point_ids: Vec<String>,
+    #[serde(default)]
+    effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    routing_hint: Option<String>,
+    #[serde(default)]
+    allow_parallel_overlap: bool,
+    #[serde(default)]
+    file_scopes: Vec<String>,
+    #[serde(default)]
+    status: Option<PlanStatus>,
+    #[serde(default)]
+    tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldTodo {
+    id: String,
+    #[serde(default)]
+    plan_id: Option<String>,
+    #[serde(default)]
+    work_point_id: Option<String>,
+    title: String,
+    #[serde(default)]
+    summary: Option<String>,
+    #[serde(default)]
+    status: Option<TodoStatus>,
+    #[serde(default)]
+    priority: Option<Priority>,
+    #[serde(default)]
+    effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    file_scopes: Vec<String>,
+    #[serde(default)]
+    evidence_refs: Vec<String>,
+    #[serde(default)]
+    tags: Vec<String>,
+    #[serde(default)]
+    ordering: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RoadmapScaffoldResult {
+    created: Vec<ScaffoldEntityChange>,
+    updated: Vec<ScaffoldEntityChange>,
+    unchanged: Vec<ScaffoldEntityChange>,
+    skipped: Vec<ScaffoldEntityChange>,
+    rejected: Vec<ScaffoldEntityRejection>,
+    validation_findings: Vec<crate::ValidationFinding>,
+    next_runnable_work_points: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScaffoldEntityChange {
+    entity_type: String,
+    entity_id: String,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ScaffoldEntityRejection {
+    entity_type: String,
+    entity_id: String,
+    reason: String,
+}
+
+fn default_plan_scope() -> String {
+    "implementation".to_string()
 }
 
 #[derive(Args, Debug)]
@@ -731,7 +931,7 @@ struct PlanCreateArgs {
 
 #[derive(Args, Debug)]
 struct PlanShowArgs {
-    #[arg(long = "plan-id")]
+    #[arg(long = "plan-id", alias = "id")]
     plan_id: String,
 }
 
@@ -843,7 +1043,7 @@ struct IssueRecordArgs {
 
 #[derive(Args, Debug)]
 struct IssueShowArgs {
-    #[arg(long = "issue-id")]
+    #[arg(long = "issue-id", alias = "id")]
     issue_id: String,
 }
 
@@ -891,7 +1091,7 @@ struct ReviewPointUpdateStatusArgs {
 
 #[derive(Args, Debug)]
 struct WorkPointShowArgs {
-    #[arg(long = "work-point-id")]
+    #[arg(long = "work-point-id", alias = "id")]
     work_point_id: String,
 }
 
@@ -1164,7 +1364,7 @@ struct AcceptanceCreateArgs {
 
 #[derive(Args, Debug)]
 struct AcceptanceShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1216,7 +1416,7 @@ struct EvidenceCreateArgs {
 
 #[derive(Args, Debug)]
 struct EvidenceShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1266,7 +1466,7 @@ struct GraphNodeCreateArgs {
 
 #[derive(Args, Debug)]
 struct GraphNodeShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1300,7 +1500,7 @@ struct GraphEdgeCreateArgs {
 
 #[derive(Args, Debug)]
 struct GraphEdgeShowArgs {
-    #[arg(long = "edge-id")]
+    #[arg(long = "edge-id", alias = "id")]
     edge_id: String,
 }
 
@@ -1944,6 +2144,10 @@ fn execute_roadmap(
                 run_id: context.correlation_id.clone(),
             })?,
         ),
+        RoadmapCommand::Scaffold(args) => {
+            let result = execute_roadmap_scaffold(args, store, context)?;
+            emit_success(context, vec!["roadmap", "scaffold"], result)
+        }
         RoadmapCommand::List => emit_success(
             context,
             vec!["roadmap", "list"],
@@ -1966,6 +2170,469 @@ fn execute_roadmap(
         }
         RoadmapCommand::Search(args) => execute_entity_search(args, store, context, "roadmap"),
     }
+}
+
+fn execute_roadmap_scaffold(
+    args: RoadmapScaffoldArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<RoadmapScaffoldResult, CliError> {
+    if args.dry_run == args.apply {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "specify exactly one of --dry-run or --apply".to_string(),
+        )));
+    }
+
+    let scaffold = parse_roadmap_scaffold_file(&args.file)?;
+    let scope_key = scaffold
+        .scope_key
+        .clone()
+        .unwrap_or_else(|| context.scope_key.clone());
+    let correlation_id = context
+        .correlation_id
+        .clone()
+        .unwrap_or_else(|| "roadmap-scaffold".to_string());
+    let mut result = RoadmapScaffoldResult {
+        created: Vec::new(),
+        updated: Vec::new(),
+        unchanged: Vec::new(),
+        skipped: Vec::new(),
+        rejected: Vec::new(),
+        validation_findings: Vec::new(),
+        next_runnable_work_points: serde_json::Value::Null,
+    };
+
+    scaffold_scope(store, &mut result, args.dry_run, args.if_exists, &scope_key)?;
+    scaffold_goal(
+        store,
+        &mut result,
+        args.dry_run,
+        args.if_exists,
+        &scope_key,
+        &correlation_id,
+        &scaffold.goal,
+        context,
+    )?;
+    scaffold_roadmap(
+        store,
+        &mut result,
+        args.dry_run,
+        args.if_exists,
+        &scope_key,
+        &correlation_id,
+        &scaffold,
+        context,
+    )?;
+    for section in &scaffold.sections {
+        scaffold_section(
+            store,
+            &mut result,
+            args.dry_run,
+            args.if_exists,
+            &scope_key,
+            &scaffold.roadmap.id,
+            section,
+            context,
+        )?;
+    }
+    for work_point in &scaffold.work_points {
+        scaffold_work_point(
+            store,
+            &mut result,
+            args.dry_run,
+            args.if_exists,
+            &scope_key,
+            &scaffold.roadmap.id,
+            work_point,
+            context,
+        )?;
+    }
+    if let Some(plan) = &scaffold.plan {
+        scaffold_plan(
+            store,
+            &mut result,
+            args.dry_run,
+            args.if_exists,
+            &scope_key,
+            &scaffold.goal.id,
+            &scaffold.roadmap.id,
+            plan,
+            context,
+        )?;
+    }
+    for todo in &scaffold.todos {
+        scaffold_todo(
+            store,
+            &mut result,
+            args.dry_run,
+            args.if_exists,
+            &scope_key,
+            scaffold.plan.as_ref().map(|plan| plan.id.as_str()),
+            todo,
+            context,
+        )?;
+    }
+
+    if !args.dry_run {
+        let validation = store.validate_all_in_scope(&scope_key)?;
+        result.validation_findings = validation.findings;
+        result.next_runnable_work_points =
+            serde_json::to_value(store.find_runnable_work_points(&scaffold.roadmap.id)?)?;
+    } else if store.roadmap(&scaffold.roadmap.id).is_ok() {
+        result.next_runnable_work_points =
+            serde_json::to_value(store.find_runnable_work_points(&scaffold.roadmap.id)?)?;
+    }
+
+    Ok(result)
+}
+
+fn parse_roadmap_scaffold_file(path: &PathBuf) -> Result<RoadmapScaffoldFile, CliError> {
+    let content = std::fs::read_to_string(path).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to read scaffold file {}: {error}",
+            path.display()
+        )))
+    })?;
+    if path.extension().map(|ext| ext == "json").unwrap_or(false) {
+        Ok(serde_json::from_str(&content)?)
+    } else {
+        serde_yaml::from_str(&content).map_err(|error| {
+            CliError::Store(PlanningStoreError::InvalidInput(format!(
+                "invalid scaffold YAML {}: {error}",
+                path.display()
+            )))
+        })
+    }
+}
+
+fn scaffold_scope(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+) -> Result<(), CliError> {
+    if store.scope(scope_key).is_ok() {
+        let _ = if_exists;
+        push_change(&mut result.unchanged, "scope", scope_key);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "scope", scope_key);
+        return Ok(());
+    }
+    store.create_scope(CreateScopeInput {
+        scope_key: scope_key.to_string(),
+        scope_type: Some("roadmap-scaffold".to_string()),
+        parent_scope_key: None,
+        metadata: Some(serde_json::json!({})),
+        tags: Vec::new(),
+        run_id: None,
+    })?;
+    push_change(&mut result.created, "scope", scope_key);
+    Ok(())
+}
+
+fn scaffold_goal(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    correlation_id: &str,
+    goal: &RoadmapScaffoldGoal,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    if let Ok(existing) = store.goal(&goal.id) {
+        let unchanged = existing.goal.scope_key == scope_key
+            && existing.goal.title == goal.title
+            && existing.goal.description == goal.description
+            && existing.goal.acceptance_criteria == goal.acceptance_criteria
+            && existing.goal.rejection_criteria == goal.rejection_criteria;
+        record_existing(result, if_exists, "goal", &goal.id, unchanged);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "goal", &goal.id);
+        return Ok(());
+    }
+    store.create_goal(CreateGoalInput {
+        id: Some(goal.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        correlation_id: correlation_id.to_string(),
+        title: goal.title.clone(),
+        description: goal.description.clone(),
+        acceptance_criteria: goal.acceptance_criteria.clone(),
+        rejection_criteria: goal.rejection_criteria.clone(),
+        status: goal.status.unwrap_or(GoalStatus::Draft),
+        tags: goal.tags.clone(),
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "goal", &goal.id);
+    Ok(())
+}
+
+fn scaffold_roadmap(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    correlation_id: &str,
+    scaffold: &RoadmapScaffoldFile,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    let roadmap = &scaffold.roadmap;
+    if let Ok(existing) = store.roadmap(&roadmap.id) {
+        let unchanged = existing.roadmap.scope_key == scope_key
+            && existing.roadmap.goal_id == scaffold.goal.id
+            && existing.roadmap.title == roadmap.title
+            && existing.roadmap.summary == roadmap.summary;
+        record_existing(result, if_exists, "roadmap", &roadmap.id, unchanged);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "roadmap", &roadmap.id);
+        return Ok(());
+    }
+    store.create_roadmap(CreateRoadmapInput {
+        id: Some(roadmap.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        goal_id: scaffold.goal.id.clone(),
+        correlation_id: correlation_id.to_string(),
+        title: roadmap.title.clone(),
+        summary: roadmap.summary.clone(),
+        status: roadmap.status.unwrap_or(RoadmapStatus::Draft),
+        tags: roadmap.tags.clone(),
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "roadmap", &roadmap.id);
+    Ok(())
+}
+
+fn scaffold_section(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    roadmap_id: &str,
+    section: &RoadmapScaffoldSection,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    if let Ok(view) = store.roadmap(roadmap_id) {
+        if let Some(existing) = view.sections.iter().find(|item| item.id == section.id) {
+            let unchanged = existing.scope_key == scope_key
+                && existing.slug == section.slug
+                && existing.title == section.title
+                && existing.summary == section.summary.clone().unwrap_or_default();
+            record_existing(result, if_exists, "roadmap-section", &section.id, unchanged);
+            return Ok(());
+        }
+    }
+    if dry_run {
+        push_change(&mut result.created, "roadmap-section", &section.id);
+        return Ok(());
+    }
+    store.add_roadmap_section(AddRoadmapSectionInput {
+        id: Some(section.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        roadmap_id: roadmap_id.to_string(),
+        slug: section.slug.clone(),
+        title: section.title.clone(),
+        summary: section.summary.clone().unwrap_or_default(),
+        ordering: section.ordering,
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "roadmap-section", &section.id);
+    Ok(())
+}
+
+fn scaffold_work_point(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    roadmap_id: &str,
+    work_point: &RoadmapScaffoldWorkPoint,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    if let Ok(existing) = store.work_point(&work_point.id) {
+        let unchanged = existing.work_point.scope_key == scope_key
+            && existing.work_point.roadmap_id == roadmap_id
+            && existing.work_point.section_id == work_point.section_id
+            && existing.work_point.title == work_point.title
+            && existing.work_point.summary == work_point.summary
+            && existing.work_point.dependency_ids == work_point.dependency_ids;
+        record_existing(result, if_exists, "work-point", &work_point.id, unchanged);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "work-point", &work_point.id);
+        return Ok(());
+    }
+    store.add_work_point(AddWorkPointInput {
+        id: Some(work_point.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        roadmap_id: roadmap_id.to_string(),
+        section_id: work_point.section_id.clone(),
+        title: work_point.title.clone(),
+        summary: work_point.summary.clone(),
+        status: work_point.status.unwrap_or(WorkPointStatus::Draft),
+        ordering: work_point.ordering,
+        dependency_ids: work_point.dependency_ids.clone(),
+        validation_expectations: work_point.validation_expectations.clone(),
+        effort_tier: work_point.effort_tier.unwrap_or(EffortTier::Balanced),
+        file_scopes: parse_file_scopes(work_point.file_scopes.clone())?,
+        tags: work_point.tags.clone(),
+        kind: work_point.kind,
+        priority: work_point.priority,
+        repairs_work_point_ids: work_point.repairs_work_point_ids.clone(),
+        supersedes_work_point_ids: work_point.supersedes_work_point_ids.clone(),
+        blocks_work_point_ids: work_point.blocks_work_point_ids.clone(),
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "work-point", &work_point.id);
+    Ok(())
+}
+
+fn scaffold_plan(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    goal_id: &str,
+    roadmap_id: &str,
+    plan: &RoadmapScaffoldPlan,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    if let Ok(existing) = store.plan(&plan.id) {
+        let unchanged = existing.plan.scope_key == scope_key
+            && existing.plan.goal_id == goal_id
+            && existing.plan.roadmap_id == roadmap_id
+            && existing.plan.title == plan.title
+            && existing.plan.summary == plan.summary
+            && existing.plan.targeted_work_point_ids == plan.targeted_work_point_ids;
+        record_existing(result, if_exists, "plan", &plan.id, unchanged);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "plan", &plan.id);
+        return Ok(());
+    }
+    store.create_plan(CreatePlanInput {
+        id: Some(plan.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        goal_id: goal_id.to_string(),
+        roadmap_id: roadmap_id.to_string(),
+        correlation_id: context
+            .correlation_id
+            .clone()
+            .unwrap_or_else(|| "roadmap-scaffold".to_string()),
+        title: plan.title.clone(),
+        summary: plan.summary.clone(),
+        scope: plan.plan_scope.clone(),
+        assumptions: plan.assumptions.clone(),
+        stop_conditions: plan.stop_conditions.clone(),
+        validation_steps: plan.validation_steps.clone(),
+        targeted_work_point_ids: plan.targeted_work_point_ids.clone(),
+        effort_tier: plan.effort_tier.unwrap_or(EffortTier::Balanced),
+        routing_hint: plan.routing_hint.clone(),
+        allow_parallel_overlap: plan.allow_parallel_overlap,
+        file_scopes: parse_file_scopes(plan.file_scopes.clone())?,
+        status: plan.status.unwrap_or(PlanStatus::Draft),
+        tags: plan.tags.clone(),
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "plan", &plan.id);
+    Ok(())
+}
+
+fn scaffold_todo(
+    store: &PlanningStore,
+    result: &mut RoadmapScaffoldResult,
+    dry_run: bool,
+    if_exists: ScaffoldIfExists,
+    scope_key: &str,
+    default_plan_id: Option<&str>,
+    todo: &RoadmapScaffoldTodo,
+    context: &MachineContext,
+) -> Result<(), CliError> {
+    if let Some(existing) = store
+        .list_todos_in_scope(scope_key)?
+        .into_iter()
+        .find(|item| item.id == todo.id)
+    {
+        let plan_id = todo
+            .plan_id
+            .clone()
+            .or_else(|| default_plan_id.map(str::to_string));
+        let unchanged = existing.plan_id == plan_id
+            && existing.work_point_id == todo.work_point_id
+            && existing.title == todo.title
+            && existing.summary == todo.summary.clone().unwrap_or_default();
+        record_existing(result, if_exists, "todo", &todo.id, unchanged);
+        return Ok(());
+    }
+    if dry_run {
+        push_change(&mut result.created, "todo", &todo.id);
+        return Ok(());
+    }
+    store.create_todo(CreateTodoInput {
+        id: Some(todo.id.clone()),
+        scope_key: Some(scope_key.to_string()),
+        plan_id: todo
+            .plan_id
+            .clone()
+            .or_else(|| default_plan_id.map(str::to_string)),
+        work_point_id: todo.work_point_id.clone(),
+        title: todo.title.clone(),
+        summary: todo.summary.clone().unwrap_or_default(),
+        status: todo.status.unwrap_or(TodoStatus::Pending),
+        priority: todo.priority.unwrap_or(Priority::Medium),
+        effort_tier: todo.effort_tier.unwrap_or(EffortTier::Balanced),
+        file_scopes: parse_file_scopes(todo.file_scopes.clone())?,
+        evidence_refs: todo.evidence_refs.clone(),
+        tags: todo.tags.clone(),
+        ordering: todo.ordering,
+        run_id: context.correlation_id.clone(),
+    })?;
+    push_change(&mut result.created, "todo", &todo.id);
+    Ok(())
+}
+
+fn record_existing(
+    result: &mut RoadmapScaffoldResult,
+    if_exists: ScaffoldIfExists,
+    entity_type: &str,
+    entity_id: &str,
+    unchanged: bool,
+) {
+    match if_exists {
+        ScaffoldIfExists::Fail => result.rejected.push(ScaffoldEntityRejection {
+            entity_type: entity_type.to_string(),
+            entity_id: entity_id.to_string(),
+            reason: "entity already exists".to_string(),
+        }),
+        ScaffoldIfExists::Skip => push_change(&mut result.skipped, entity_type, entity_id),
+        ScaffoldIfExists::Update if unchanged => {
+            push_change(&mut result.unchanged, entity_type, entity_id)
+        }
+        ScaffoldIfExists::Update => result.rejected.push(ScaffoldEntityRejection {
+            entity_type: entity_type.to_string(),
+            entity_id: entity_id.to_string(),
+            reason: "entity exists with different fields; scaffold update is not supported for this field set yet".to_string(),
+        }),
+    }
+}
+
+fn push_change(changes: &mut Vec<ScaffoldEntityChange>, entity_type: &str, entity_id: &str) {
+    changes.push(ScaffoldEntityChange {
+        entity_type: entity_type.to_string(),
+        entity_id: entity_id.to_string(),
+    });
 }
 
 fn execute_work_point(
@@ -4034,6 +4701,7 @@ fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
         RoadmapCommand::UpdateStatus(_) => "update-status",
         RoadmapCommand::AddSection(_) => "add-section",
         RoadmapCommand::AddWorkPoint(_) => "add-work-point",
+        RoadmapCommand::Scaffold(_) => "scaffold",
         RoadmapCommand::List => "list",
         RoadmapCommand::Show(_) => "show",
         RoadmapCommand::Search(_) => "search",
@@ -4303,6 +4971,7 @@ fn is_command_mutation(command: &Command) -> bool {
                 | RoadmapCommand::UpdateStatus(_)
                 | RoadmapCommand::AddSection(_)
                 | RoadmapCommand::AddWorkPoint(_)
+                | RoadmapCommand::Scaffold(_)
         ),
         Command::WorkPoint { command } => matches!(
             command,

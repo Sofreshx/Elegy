@@ -56,6 +56,7 @@ elegy-plugin-packaging marketplace list --source . --json
 elegy-plugin-packaging marketplace search planning --source . --json
 elegy-plugin-packaging marketplace install elegy-planning --source .
 elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --output ./dist/codex
+elegy-plugin-packaging marketplace export-codex --source . --plugin elegy-opencode-workers --target x86_64-pc-windows-msvc --output ./dist/codex
 ```
 
 `--source` accepts a local root or an HTTPS base URL. Remote roots must serve
@@ -65,7 +66,8 @@ stable consumers can regenerate it with an explicit `--release-tag`.
 
 Codex export resolves the selected target artifact, verifies and stages it, and
 copies its binary into the derived plugin. Omit `--target` to use the current
-supported host target.
+supported host target. Use `--plugin <name>` to export one marketplace entry
+without materializing unrelated plugin artifacts.
 
 ## Closed-source wrappers
 
