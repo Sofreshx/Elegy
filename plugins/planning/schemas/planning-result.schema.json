@@ -44,7 +44,19 @@
         { "type": "object", "required": ["scopes"] },
         { "type": "object", "required": ["scope"] },
         { "type": "object", "required": ["entityType", "entityId", "format", "outputPath"] },
-        { "type": "object", "required": ["insights"] }
+        { "type": "object", "required": ["insights"] },
+        {
+          "type": "object",
+          "required": [
+            "created",
+            "updated",
+            "unchanged",
+            "skipped",
+            "rejected",
+            "validationFindings",
+            "nextRunnableWorkPoints"
+          ]
+        }
       ]
     },
     "error": {

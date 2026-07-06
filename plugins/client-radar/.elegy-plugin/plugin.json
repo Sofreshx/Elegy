@@ -1,0 +1,41 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-client-radar",
+  "version": "0.1.0",
+  "description": "Evidence-backed client discovery and opportunity intelligence for Elegy.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Proprietary",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "keywords": [
+        "clients",
+        "prospects",
+        "business",
+        "compliance"
+      ],
+      "interface": {
+        "displayName": "Client Radar",
+        "shortDescription": "Find evidence-backed client opportunity signals.",
+        "longDescription": "Research companies, explain opportunity signals, and surface compliance constraints through a bundled CLI. The implementation ships as a proprietary plugin archive while this wrapper provides public Elegy marketplace metadata.",
+        "developerName": "Elegy Contributors",
+        "category": "Business & Operations",
+        "capabilities": [
+          "CLI",
+          "Company research",
+          "Opportunity scoring",
+          "Compliance planning"
+        ],
+        "defaultPrompt": [
+          "Use Client Radar to inspect planned opportunity intelligence capabilities.",
+          "Plan compliant prospect scoring with Client Radar."
+        ]
+      }
+    }
+  }
+}
