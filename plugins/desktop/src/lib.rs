@@ -498,7 +498,6 @@ mod tests {
     fn parse_key_combo_single_key() {
         let keys = parse_key_combo("enter");
         assert!(keys.is_ok());
-        #[expect(clippy::unwrap_used)]
         let keys = keys.unwrap();
         assert_eq!(keys, vec![ParsedKey::Enter]);
     }
@@ -507,7 +506,6 @@ mod tests {
     fn parse_key_combo_ctrl_s() {
         let keys = parse_key_combo("ctrl+s");
         assert!(keys.is_ok());
-        #[expect(clippy::unwrap_used)]
         let keys = keys.unwrap();
         assert_eq!(keys, vec![ParsedKey::Ctrl, ParsedKey::Char('S')]);
     }
@@ -516,7 +514,6 @@ mod tests {
     fn parse_key_combo_ctrl_shift_f5() {
         let keys = parse_key_combo("ctrl+shift+f5");
         assert!(keys.is_ok());
-        #[expect(clippy::unwrap_used)]
         let keys = keys.unwrap();
         assert_eq!(
             keys,
@@ -528,7 +525,6 @@ mod tests {
     fn parse_key_combo_alt_tab() {
         let keys = parse_key_combo("alt+tab");
         assert!(keys.is_ok());
-        #[expect(clippy::unwrap_used)]
         let keys = keys.unwrap();
         assert_eq!(keys, vec![ParsedKey::Alt, ParsedKey::Tab]);
     }
@@ -589,7 +585,6 @@ mod tests {
     fn click_dry_run_succeeds() {
         let result = click(100, 200, "left", true);
         assert!(result.is_ok());
-        #[expect(clippy::unwrap_used)]
         let r = result.unwrap();
         assert!(r.dry_run);
         assert_eq!(r.action, "click");
@@ -599,7 +594,6 @@ mod tests {
     fn type_text_dry_run_succeeds() {
         let result = type_text("hello", true);
         assert!(result.is_ok());
-        #[expect(clippy::unwrap_used)]
         let r = result.unwrap();
         assert!(r.dry_run);
         assert_eq!(r.character_count, 5);
@@ -609,7 +603,6 @@ mod tests {
     fn send_key_dry_run_succeeds() {
         let result = send_key("ctrl+s", true);
         assert!(result.is_ok());
-        #[expect(clippy::unwrap_used)]
         let r = result.unwrap();
         assert!(r.dry_run);
         assert_eq!(r.combo, "ctrl+s");

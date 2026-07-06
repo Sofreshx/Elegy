@@ -1,0 +1,47 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-opencode-workers",
+  "version": "0.1.0",
+  "description": "CLI-first supervised read-only OpenCode workers for Codex.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "MIT",
+  "repository": "https://github.com/Sofreshx/elegy-opencode-workers",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1",
+      "sourceRepository": "https://github.com/Sofreshx/elegy-opencode-workers"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "homepage": "https://github.com/Sofreshx/elegy-opencode-workers",
+      "keywords": [
+        "codex",
+        "opencode",
+        "workers",
+        "cli",
+        "planning"
+      ],
+      "interface": {
+        "displayName": "OpenCode Workers",
+        "shortDescription": "Delegate read-only worker jobs to OpenCode through a bundled CLI.",
+        "longDescription": "Launch supervised OpenCode ACP workers for exploration, research, review, and validation through a bundled CLI while Codex keeps authority over edits and final evidence. MCP is available only as an optional projection.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": [
+          "CLI",
+          "Read-only delegation",
+          "Planning evidence",
+          "Optional MCP projection"
+        ],
+        "websiteURL": "https://github.com/Sofreshx/elegy-opencode-workers",
+        "defaultPrompt": [
+          "Run the bundled OpenCode Workers CLI for a read-only review.",
+          "Check recent OpenCode worker results through the CLI.",
+          "Review OpenCode worker usage and cost evidence."
+        ]
+      }
+    }
+  }
+}

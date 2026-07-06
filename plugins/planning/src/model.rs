@@ -971,6 +971,215 @@ pub struct PlanningHealthReport {
     pub project_run_count: i64,
     pub graph_node_count: i64,
     pub graph_edge_count: i64,
+    pub fts: FtsHealthReport,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FtsHealthReport {
+    pub tables_present: bool,
+    pub indexed_entity_count: i64,
+    pub source_entity_count: i64,
+    pub by_entity_type: Vec<FtsEntityHealth>,
+    pub findings: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct FtsEntityHealth {
+    pub entity_type: String,
+    pub source_count: i64,
+    pub indexed_count: i64,
+    pub findings: Vec<String>,
+}
+
+#[derive(
+    Clone, Copy, Debug, ValueEnum, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema,
+)]
+#[serde(rename_all = "kebab-case")]
+pub enum ScaffoldIfExists {
+    Update,
+    Skip,
+    Fail,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldFile {
+    #[serde(default)]
+    pub scope_key: Option<String>,
+    pub goal: RoadmapScaffoldGoal,
+    pub roadmap: RoadmapScaffoldRoadmap,
+    #[serde(default)]
+    pub sections: Vec<RoadmapScaffoldSection>,
+    #[serde(default)]
+    pub work_points: Vec<RoadmapScaffoldWorkPoint>,
+    #[serde(default)]
+    pub plan: Option<RoadmapScaffoldPlan>,
+    #[serde(default)]
+    pub todos: Vec<RoadmapScaffoldTodo>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldGoal {
+    pub id: String,
+    pub title: String,
+    pub description: String,
+    #[serde(default)]
+    pub acceptance_criteria: Vec<String>,
+    #[serde(default)]
+    pub rejection_criteria: Vec<String>,
+    #[serde(default)]
+    pub status: Option<GoalStatus>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldRoadmap {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    #[serde(default)]
+    pub status: Option<RoadmapStatus>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldSection {
+    pub id: String,
+    pub slug: String,
+    pub title: String,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub ordering: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldWorkPoint {
+    pub id: String,
+    #[serde(default)]
+    pub section_id: Option<String>,
+    pub title: String,
+    pub summary: String,
+    #[serde(default)]
+    pub status: Option<WorkPointStatus>,
+    #[serde(default)]
+    pub ordering: Option<i64>,
+    #[serde(default)]
+    pub dependency_ids: Vec<String>,
+    #[serde(default)]
+    pub validation_expectations: Vec<String>,
+    #[serde(default)]
+    pub effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    pub file_scopes: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub kind: Option<WorkPointKind>,
+    #[serde(default)]
+    pub priority: Option<Priority>,
+    #[serde(default)]
+    pub repairs_work_point_ids: Vec<String>,
+    #[serde(default)]
+    pub supersedes_work_point_ids: Vec<String>,
+    #[serde(default)]
+    pub blocks_work_point_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldPlan {
+    pub id: String,
+    pub title: String,
+    pub summary: String,
+    #[serde(default = "default_plan_scope")]
+    pub plan_scope: String,
+    #[serde(default)]
+    pub assumptions: Vec<String>,
+    #[serde(default)]
+    pub stop_conditions: Vec<String>,
+    #[serde(default)]
+    pub validation_steps: Vec<String>,
+    #[serde(default)]
+    pub targeted_work_point_ids: Vec<String>,
+    #[serde(default)]
+    pub effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    pub routing_hint: Option<String>,
+    #[serde(default)]
+    pub allow_parallel_overlap: bool,
+    #[serde(default)]
+    pub file_scopes: Vec<String>,
+    #[serde(default)]
+    pub status: Option<PlanStatus>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldTodo {
+    pub id: String,
+    #[serde(default)]
+    pub plan_id: Option<String>,
+    #[serde(default)]
+    pub work_point_id: Option<String>,
+    pub title: String,
+    #[serde(default)]
+    pub summary: Option<String>,
+    #[serde(default)]
+    pub status: Option<TodoStatus>,
+    #[serde(default)]
+    pub priority: Option<Priority>,
+    #[serde(default)]
+    pub effort_tier: Option<EffortTier>,
+    #[serde(default)]
+    pub file_scopes: Vec<String>,
+    #[serde(default)]
+    pub evidence_refs: Vec<String>,
+    #[serde(default)]
+    pub tags: Vec<String>,
+    #[serde(default)]
+    pub ordering: Option<i64>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RoadmapScaffoldResult {
+    pub created: Vec<ScaffoldEntityChange>,
+    pub updated: Vec<ScaffoldEntityChange>,
+    pub unchanged: Vec<ScaffoldEntityChange>,
+    pub skipped: Vec<ScaffoldEntityChange>,
+    pub rejected: Vec<ScaffoldEntityRejection>,
+    pub validation_findings: Vec<ValidationFinding>,
+    pub next_runnable_work_points: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScaffoldEntityChange {
+    pub entity_type: String,
+    pub entity_id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ScaffoldEntityRejection {
+    pub entity_type: String,
+    pub entity_id: String,
+    pub reason: String,
+}
+
+fn default_plan_scope() -> String {
+    "implementation".to_string()
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]

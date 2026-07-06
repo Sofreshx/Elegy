@@ -164,6 +164,9 @@ enum MarketplaceCommand {
     ExportCodex {
         #[arg(long, default_value = ".")]
         source: String,
+        /// Export only one marketplace plugin by name.
+        #[arg(long)]
+        plugin: Option<String>,
         #[arg(long)]
         output: PathBuf,
         #[arg(long)]
@@ -187,6 +190,8 @@ struct DistributionSurface {
     packaging: Option<String>,
     #[serde(default)]
     plugin_root: Option<String>,
+    #[serde(default)]
+    artifact_base_url: Option<String>,
     #[serde(default = "default_marketplace_category")]
     marketplace_category: String,
 }
@@ -530,11 +535,13 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
         ),
         MarketplaceCommand::ExportCodex {
             source,
+            plugin,
             output,
             target,
             overwrite,
         } => export_codex_marketplace(
             &source,
+            plugin.as_deref(),
             &output,
             target.as_deref().unwrap_or(current_release_target()),
             overwrite,
@@ -607,11 +614,16 @@ fn generate_marketplace(
                 surface.name, manifest.name
             ));
         }
+        let artifact_base = surface
+            .artifact_base_url
+            .as_deref()
+            .unwrap_or(base)
+            .trim_end_matches('/');
         let artifacts = targets
             .iter()
             .map(|target| {
                 let file_name = format!("{}-plugin-{target}.zip", surface.name);
-                let url = format!("{base}/{release_tag}/{file_name}");
+                let url = format!("{artifact_base}/{release_tag}/{file_name}");
                 ElegyMarketplaceArtifact {
                     target: (*target).to_string(),
                     checksum_url: format!("{url}.sha256"),
@@ -879,6 +891,7 @@ fn install_marketplace_plugin(
 
 fn export_codex_marketplace(
     source: &str,
+    plugin_name: Option<&str>,
     output: &Path,
     target: &str,
     overwrite: bool,
@@ -893,19 +906,41 @@ fn export_codex_marketplace(
     fs::create_dir_all(output).map_err(|error| format!("create {}: {error}", output.display()))?;
     let artifact_staging = tempfile::tempdir().map_err(|error| error.to_string())?;
     let mut codex_entries = Vec::new();
-    for (entry, manifest) in &loaded.plugins {
-        let plugin_root = local_root.join(entry.source.path.trim_start_matches("./"));
+    let selected_plugins = loaded
+        .plugins
+        .iter()
+        .filter(|(entry, _)| plugin_name.is_none_or(|plugin_name| entry.name == plugin_name))
+        .collect::<Vec<_>>();
+    if selected_plugins.is_empty() {
+        return Err(match plugin_name {
+            Some(plugin_name) => format!(
+                "plugin '{plugin_name}' is not in marketplace '{}'",
+                loaded.marketplace.name
+            ),
+            None => format!(
+                "marketplace '{}' contains no plugins",
+                loaded.marketplace.name
+            ),
+        });
+    }
+    for (entry, manifest) in selected_plugins {
+        let wrapper_root = local_root.join(entry.source.path.trim_start_matches("./"));
         let plugin_output = output.join("plugins").join(&entry.name);
-        let binary =
-            materialize_marketplace_binary(entry, manifest, target, artifact_staging.path())?;
-        let binary_spec = binary
+        let materialized =
+            materialize_marketplace_artifact(entry, manifest, target, artifact_staging.path())?;
+        let plugin_root = materialized
             .as_ref()
-            .map(|(path, archive_path)| PluginArchiveBinary {
-                source_path: path.as_path(),
-                archive_path: archive_path.clone(),
+            .map(|artifact| artifact.plugin_root.as_path())
+            .unwrap_or(wrapper_root.as_path());
+        let binary_spec = materialized
+            .as_ref()
+            .and_then(|artifact| artifact.binary.as_ref())
+            .map(|binary| PluginArchiveBinary {
+                source_path: binary.source_path.as_path(),
+                archive_path: binary.archive_path.clone(),
             });
         export_plugin_v1_with_codex_mode_and_binary(
-            &plugin_root,
+            plugin_root,
             "codex",
             &plugin_output,
             overwrite,
@@ -946,12 +981,22 @@ fn export_codex_marketplace(
     Ok(())
 }
 
-fn materialize_marketplace_binary(
+struct MaterializedMarketplaceArtifact {
+    plugin_root: PathBuf,
+    binary: Option<MaterializedMarketplaceBinary>,
+}
+
+struct MaterializedMarketplaceBinary {
+    source_path: PathBuf,
+    archive_path: String,
+}
+
+fn materialize_marketplace_artifact(
     entry: &ElegyMarketplacePlugin,
     manifest: &ElegyPluginV1,
     target: &str,
     staging_root: &Path,
-) -> Result<Option<(PathBuf, String)>, String> {
+) -> Result<Option<MaterializedMarketplaceArtifact>, String> {
     if entry.artifacts.is_empty() {
         return Ok(None);
     }
@@ -968,12 +1013,48 @@ fn materialize_marketplace_binary(
         Some(&entry.name),
         Some(&manifest.version),
     )
-    .map_err(|error| error.to_string())?;
+    .map_err(|error| {
+        let message = error.to_string();
+        if message.contains("checksum HTTP 404") {
+            format!(
+                "plugin '{}' is missing the public checksum artifact for target '{}': {}",
+                entry.name, artifact.target, artifact.checksum_url
+            )
+        } else if message.contains("checksum HTTP") {
+            format!(
+                "plugin '{}' checksum download failed for target '{}': {} ({message})",
+                entry.name, artifact.target, artifact.checksum_url
+            )
+        } else if message.contains("Download failed: HTTP 404") {
+            format!(
+                "plugin '{}' is missing the public plugin artifact for target '{}': {}",
+                entry.name, artifact.target, artifact.url
+            )
+        } else if message.contains("Download failed: HTTP") {
+            format!(
+                "plugin '{}' artifact download failed for target '{}': {} ({message})",
+                entry.name, artifact.target, artifact.url
+            )
+        } else if message.contains("Checksum mismatch") {
+            format!(
+                "plugin '{}' checksum verification failed for target '{}': {message}",
+                entry.name, artifact.target
+            )
+        } else {
+            format!(
+                "plugin '{}' artifact materialization failed for target '{}': {message}",
+                entry.name, artifact.target
+            )
+        }
+    })?;
     let installed_root = staging_root.join(&entry.name);
     let bin_root = installed_root.join("bin");
     if !bin_root.is_dir() {
         if artifact.target == "any" {
-            return Ok(None);
+            return Ok(Some(MaterializedMarketplaceArtifact {
+                plugin_root: installed_root,
+                binary: None,
+            }));
         }
         return Err(format!(
             "plugin '{}' artifact for target '{}' contains no bin directory",
@@ -996,7 +1077,13 @@ fn materialize_marketplace_binary(
         .map_err(|_| format!("plugin '{}' binary escaped its install root", entry.name))?
         .to_string_lossy()
         .replace('\\', "/");
-    Ok(Some((binary_path, archive_path)))
+    Ok(Some(MaterializedMarketplaceArtifact {
+        plugin_root: installed_root,
+        binary: Some(MaterializedMarketplaceBinary {
+            source_path: binary_path,
+            archive_path,
+        }),
+    }))
 }
 
 fn collect_regular_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {

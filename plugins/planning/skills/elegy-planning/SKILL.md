@@ -22,12 +22,15 @@ that silent default is a common source of agent mistakes — always pass
    Repeat `--acceptance` and `--rejection` for multiple criteria. Do
    not comma-join values.
 3. Add a work point to a roadmap:
-   `elegy-planning --scope <scope-key> --json --non-interactive roadmap add-section --roadmap-id <r> --section-id <s>` followed by
-   `roadmap add-work-point --roadmap-id <r> --work-point-id <wp> --effort-tier <fast|balanced|deep> --file-scope <type:intent:selector>`.
-4. Inspect context before deep work:
+   `elegy-planning --scope <scope-key> --json --non-interactive --correlation-id <id> roadmap add-section --roadmap-id <r> --id <s> --slug <slug> --title <t>` followed by
+   `roadmap add-work-point --roadmap-id <r> --id <wp> --title <t> --summary <s> --effort-tier <fast|balanced|deep> --file-scope <type:intent:selector>`.
+4. For batch roadmap authoring, render `roadmap-workflow` and apply it:
+   `elegy-planning template render --template roadmap-workflow --output roadmap.yaml`, then
+   `elegy-planning --scope <scope-key> --json --non-interactive --correlation-id <id> roadmap scaffold --file roadmap.yaml --dry-run`.
+5. Inspect context before deep work:
    `elegy-planning --scope <scope-key> --json context --entity-type goal --entity-id <id>` to load the goal plus related insights and
    token estimates.
-5. Run a full validation pass:
+6. Run a full validation pass:
    `elegy-planning --scope <scope-key> --json validate all` to surface
    referential integrity issues and stale references.
 
@@ -37,14 +40,16 @@ that silent default is a common source of agent mistakes — always pass
 show & list, scope, search-extended, tags-list, context, work-graph,
 next-runnable)
 
-- Argument shape: `<entity> show --<entity>-id <id> --json`. The
-  `--json` flag is required for machine-mode parsing; do not omit it
-  even on a "quick check".
+- Argument shape: `<entity> show --<entity>-id <id> --json`. `show --id <id>`
+  is also accepted for goal, roadmap, work-point, plan, issue, insight, graph
+  node, graph edge, acceptance, and evidence show commands.
+  The `--json` flag is required for machine-mode parsing; do not omit it even
+  on a "quick check".
 - For list commands, pass `--limit <n>` to cap the result set; the
   default limit is conservative but explicit is safer.
-- `search-extended` is the only search family that supports
-  `--title`, `--tag`, `--status`, and `--fts` together. Pass each
-  filter as a separate flag; do not stack them in `--query`.
+- `search` and entity-local `search` commands support `--title`, `--tag`,
+  `--status`, and `--fts`. Pass each filter as a separate flag; do not stack
+  them in `--query`.
 - `context --entity-type <type> --entity-id <id>` returns progressive
   disclosure bundles with token estimates. The estimate is
   informational; do not parse it.
@@ -98,6 +103,24 @@ next-runnable)
 - Side-effect class: `disk_write` against the SQLite database.
 - Approval posture: `advisory`. The host may require approval for
   specific transitions (e.g. `validated`, `invalidated`).
+- Run mutating commands and read-after-write checks sequentially. SQLite uses a
+  local file lock; parallel show/list calls during writes can still race on busy
+  workstations.
+
+### Roadmap scaffold family
+
+- Use `roadmap scaffold --file <yaml|json> --dry-run` before `--apply`.
+- The scaffold file creates v1 records: scope, goal, roadmap, sections,
+  work-points, plan, and todos. It is separate from graph `manifest`.
+- Dry-run and apply return `created`, `updated`, `unchanged`, `skipped`,
+  `rejected`, `validationFindings`, and `nextRunnableWorkPoints`.
+- `--if-exists fail` is the default for planning records. Use
+  `--if-exists skip` for idempotent create-only automation. `--if-exists update`
+  accepts matching existing records as unchanged and rejects unsupported field
+  drift instead of mutating SQLite outside the service layer.
+- Side-effect class: `disk_write` with `--apply`; read-only planning preview
+  with `--dry-run`.
+- Approval posture: `advisory`.
 
 ### Project-run family (claim / activate / release / add-evidence)
 
@@ -166,6 +189,7 @@ project-render)
 | `planning-roadmap-create` | disk_write | Create a roadmap under a goal |
 | `planning-roadmap-add-section` | disk_write | Add a section to a roadmap |
 | `planning-roadmap-add-work-point` | disk_write | Attach a work point with file scopes and effort tier |
+| `planning-roadmap-scaffold` | disk_write | Batch create a v1 goal, roadmap, sections, work-points, plan, and todos from YAML or JSON |
 | `planning-roadmap-show` | read-only | Show one roadmap with sections and work points |
 | `planning-roadmap-list` | read-only | List roadmaps in the active scope |
 | `planning-roadmap-update-status` | disk_write | Transition a roadmap |

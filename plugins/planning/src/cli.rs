@@ -21,9 +21,10 @@ use crate::{
     PlanningNodeKind, PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence,
     ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus,
     ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput, ReviseWorkPointInput,
-    RoadmapStatus, SatisfyAcceptanceInput, SearchInput, Severity, TodoStatus,
-    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput, VerificationState,
-    WorkPointKind, WorkPointStatus, WorktreeStatus,
+    RoadmapScaffoldFile, RoadmapScaffoldResult, RoadmapStatus, SatisfyAcceptanceInput,
+    ScaffoldIfExists, SearchInput, Severity, TodoStatus, UpdateGraphEdgeStatusInput,
+    UpdateGraphNodeStatusInput, UpdateStatusInput, VerificationState, WorkPointKind,
+    WorkPointStatus, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -205,6 +206,7 @@ enum RoadmapCommand {
     UpdateStatus(RoadmapUpdateStatusArgs),
     AddSection(RoadmapAddSectionArgs),
     AddWorkPoint(RoadmapAddWorkPointArgs),
+    Scaffold(RoadmapScaffoldArgs),
     List,
     Show(RoadmapShowArgs),
     Search(EntitySearchArgs),
@@ -486,7 +488,7 @@ struct InsightListArgs {
 
 #[derive(Args, Debug)]
 struct InsightShowArgs {
-    #[arg(long = "insight-id")]
+    #[arg(long = "insight-id", alias = "id")]
     insight_id: String,
 }
 
@@ -597,7 +599,7 @@ struct GoalUpdateStatusArgs {
 
 #[derive(Args, Debug)]
 struct GoalShowArgs {
-    #[arg(long = "goal-id")]
+    #[arg(long = "goal-id", alias = "id")]
     goal_id: String,
 }
 
@@ -675,8 +677,20 @@ struct RoadmapAddWorkPointArgs {
 
 #[derive(Args, Debug)]
 struct RoadmapShowArgs {
-    #[arg(long = "roadmap-id")]
+    #[arg(long = "roadmap-id", alias = "id")]
     roadmap_id: String,
+}
+
+#[derive(Args, Debug)]
+struct RoadmapScaffoldArgs {
+    #[arg(long)]
+    file: PathBuf,
+    #[arg(long)]
+    dry_run: bool,
+    #[arg(long)]
+    apply: bool,
+    #[arg(long = "if-exists", value_enum, default_value_t = ScaffoldIfExists::Fail)]
+    if_exists: ScaffoldIfExists,
 }
 
 #[derive(Args, Debug)]
@@ -731,7 +745,7 @@ struct PlanCreateArgs {
 
 #[derive(Args, Debug)]
 struct PlanShowArgs {
-    #[arg(long = "plan-id")]
+    #[arg(long = "plan-id", alias = "id")]
     plan_id: String,
 }
 
@@ -843,7 +857,7 @@ struct IssueRecordArgs {
 
 #[derive(Args, Debug)]
 struct IssueShowArgs {
-    #[arg(long = "issue-id")]
+    #[arg(long = "issue-id", alias = "id")]
     issue_id: String,
 }
 
@@ -891,7 +905,7 @@ struct ReviewPointUpdateStatusArgs {
 
 #[derive(Args, Debug)]
 struct WorkPointShowArgs {
-    #[arg(long = "work-point-id")]
+    #[arg(long = "work-point-id", alias = "id")]
     work_point_id: String,
 }
 
@@ -1164,7 +1178,7 @@ struct AcceptanceCreateArgs {
 
 #[derive(Args, Debug)]
 struct AcceptanceShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1216,7 +1230,7 @@ struct EvidenceCreateArgs {
 
 #[derive(Args, Debug)]
 struct EvidenceShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1266,7 +1280,7 @@ struct GraphNodeCreateArgs {
 
 #[derive(Args, Debug)]
 struct GraphNodeShowArgs {
-    #[arg(long = "node-id")]
+    #[arg(long = "node-id", alias = "id")]
     node_id: String,
 }
 
@@ -1300,7 +1314,7 @@ struct GraphEdgeCreateArgs {
 
 #[derive(Args, Debug)]
 struct GraphEdgeShowArgs {
-    #[arg(long = "edge-id")]
+    #[arg(long = "edge-id", alias = "id")]
     edge_id: String,
 }
 
@@ -1944,6 +1958,10 @@ fn execute_roadmap(
                 run_id: context.correlation_id.clone(),
             })?,
         ),
+        RoadmapCommand::Scaffold(args) => {
+            let result = execute_roadmap_scaffold(args, store, context)?;
+            emit_success(context, vec!["roadmap", "scaffold"], result)
+        }
         RoadmapCommand::List => emit_success(
             context,
             vec!["roadmap", "list"],
@@ -1965,6 +1983,46 @@ fn execute_roadmap(
             emit_success(context, vec!["roadmap", "show"], view)
         }
         RoadmapCommand::Search(args) => execute_entity_search(args, store, context, "roadmap"),
+    }
+}
+
+fn execute_roadmap_scaffold(
+    args: RoadmapScaffoldArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<RoadmapScaffoldResult, CliError> {
+    if args.dry_run == args.apply {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "specify exactly one of --dry-run or --apply".to_string(),
+        )));
+    }
+
+    let scaffold = parse_roadmap_scaffold_file(&args.file)?;
+    Ok(store.apply_roadmap_scaffold(
+        scaffold,
+        Some(context.scope_key.clone()),
+        context.correlation_id.clone(),
+        args.dry_run,
+        args.if_exists,
+    )?)
+}
+
+fn parse_roadmap_scaffold_file(path: &PathBuf) -> Result<RoadmapScaffoldFile, CliError> {
+    let content = std::fs::read_to_string(path).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to read scaffold file {}: {error}",
+            path.display()
+        )))
+    })?;
+    if path.extension().map(|ext| ext == "json").unwrap_or(false) {
+        Ok(serde_json::from_str(&content)?)
+    } else {
+        serde_yaml::from_str(&content).map_err(|error| {
+            CliError::Store(PlanningStoreError::InvalidInput(format!(
+                "invalid scaffold YAML {}: {error}",
+                path.display()
+            )))
+        })
     }
 }
 
@@ -4034,6 +4092,7 @@ fn roadmap_command_name(command: &RoadmapCommand) -> &'static str {
         RoadmapCommand::UpdateStatus(_) => "update-status",
         RoadmapCommand::AddSection(_) => "add-section",
         RoadmapCommand::AddWorkPoint(_) => "add-work-point",
+        RoadmapCommand::Scaffold(_) => "scaffold",
         RoadmapCommand::List => "list",
         RoadmapCommand::Show(_) => "show",
         RoadmapCommand::Search(_) => "search",
@@ -4303,6 +4362,7 @@ fn is_command_mutation(command: &Command) -> bool {
                 | RoadmapCommand::UpdateStatus(_)
                 | RoadmapCommand::AddSection(_)
                 | RoadmapCommand::AddWorkPoint(_)
+                | RoadmapCommand::Scaffold(_)
         ),
         Command::WorkPoint { command } => matches!(
             command,
