@@ -409,7 +409,7 @@ mod tests {
     use super::{
         install_from_archive, install_from_archive_with_identity, verify_sha256, InstallError,
     };
-    use elegy_plugin_sdk::{pack_plugin_v1, scaffold_plugin_v1_repository, verify_plugin_v1};
+    use elegy_plugin_sdk::{pack_plugin_v1, verify_plugin_v1};
     use std::fs;
     use std::io::Write;
 
@@ -425,6 +425,33 @@ mod tests {
         }
 
         zip.finish().expect("finish zip");
+    }
+
+    fn write_plugin_fixture(root: &std::path::Path, name: &str, description: &str) {
+        fs::create_dir_all(root.join(".elegy-plugin")).expect("create manifest dir");
+        fs::create_dir_all(root.join("skills").join(name)).expect("create skill dir");
+        fs::write(
+            root.join(".elegy-plugin").join("plugin.json"),
+            format!(
+                r#"{{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "{name}",
+  "version": "0.1.0",
+  "description": "{description}",
+  "author": {{"name": "Elegy"}},
+  "license": "Apache-2.0",
+  "skills": "./skills/"
+}}"#
+            ),
+        )
+        .expect("write manifest");
+        fs::write(
+            root.join("skills").join(name).join("SKILL.md"),
+            format!(
+                "---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n\nUse this test fixture skill.\n"
+            ),
+        )
+        .expect("write skill");
     }
 
     #[test]
@@ -478,16 +505,7 @@ mod tests {
     fn packed_plugin_installs_with_receipt() {
         let temp = tempfile::tempdir().expect("tempdir");
         let plugin_root = temp.path().join("source");
-        scaffold_plugin_v1_repository(
-            "roundtrip-plugin",
-            "Round-trip fixture",
-            "0.1.0",
-            &plugin_root,
-            "Elegy",
-            "Apache-2.0",
-            "",
-        )
-        .expect("scaffold");
+        write_plugin_fixture(&plugin_root, "roundtrip-plugin", "Round-trip fixture");
         let archive_path = temp.path().join("roundtrip.plugin.zip");
         pack_plugin_v1(&plugin_root, &archive_path).expect("pack");
         let install_root = temp.path().join("installed");

@@ -95,7 +95,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 - Pin an explicit Elegy semver release tag in downstream repositories and install into a repo-local tools directory.
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
-- Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, scaffolding, and export.
+- Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, packaging, and export.
 - Prefer `.plugin.zip` archives over flat binaries for plugin-packaged surfaces. The archive carries the manifest, skills, and built binary in a single verifiable artifact.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
 - Treat the rolling `main-snapshot` prerelease as an integration/debug lane, not a pinned downstream contract.

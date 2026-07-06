@@ -12,6 +12,34 @@ generated, derived outputs. Omitted scope defaults to `default` and
 that silent default is a common source of agent mistakes — always pass
 `--scope <scope-key>` explicitly.
 
+## Setup and authority
+
+- Run from the Elegy repo root during development:
+  `cargo run -p elegy-planning -- --help`.
+- Use `--db <path>` when the default repo-local SQLite database is not the
+  intended planning authority.
+- Use `--scope <scope-key>` on every call. Scope is part of the planning
+  identity, not display metadata.
+- Use `--json --non-interactive --correlation-id <id>` on every mutating call.
+- Do not edit SQLite directly. Use CLI commands so validation, FTS, tags, and
+  event history stay synchronized.
+- Serialize mutating calls. SQLite has a busy timeout, but agent workflows
+  should not launch parallel writes.
+
+## Ideology
+
+- `elegy-planning` is an agent contract, not a note-taking format.
+- SQLite is authority; projections, templates, and skill docs are routing
+  surfaces.
+- Durable writes should append events. Events are the review trail for later
+  agents.
+- Validation is advisory but persistent. Structural write invariants block bad
+  records; planning-quality findings guide follow-up work.
+- Stable explicit IDs are automation handles. Prefer them over generated IDs
+  in agent-authored workflows.
+- Batch authoring should be previewable. Use `roadmap scaffold --dry-run`,
+  inspect `rejected`, then apply.
+
 ## Quick start
 
 1. Resolve the scope key. Use
@@ -112,12 +140,20 @@ next-runnable)
 - Use `roadmap scaffold --file <yaml|json> --dry-run` before `--apply`.
 - The scaffold file creates v1 records: scope, goal, roadmap, sections,
   work-points, plan, and todos. It is separate from graph `manifest`.
+- Dry-run and apply use the same transaction path. Apply rolls back all
+  scaffold-created or scaffold-updated rows when any entity is rejected.
+- Work-point dependencies may reference work-points declared later in the same
+  scaffold file.
+- Omitted ordering on update preserves the existing order.
 - Dry-run and apply return `created`, `updated`, `unchanged`, `skipped`,
   `rejected`, `validationFindings`, and `nextRunnableWorkPoints`.
 - `--if-exists fail` is the default for planning records. Use
-  `--if-exists skip` for idempotent create-only automation. `--if-exists update`
-  accepts matching existing records as unchanged and rejects unsupported field
-  drift instead of mutating SQLite outside the service layer.
+  `--if-exists skip` for idempotent create-only automation.
+- `--if-exists update` updates supported content fields, reports `updated`
+  only when a persisted change occurred, and rejects parent-link drift such as
+  moving a roadmap to another goal.
+- Scaffold `validationFindings` are limited to touched scaffold entities and
+  directly affected parents. Run `validate all` for a full-scope audit.
 - Side-effect class: `disk_write` with `--apply`; read-only planning preview
   with `--dry-run`.
 - Approval posture: `advisory`.
@@ -145,6 +181,9 @@ project-render)
   `"all"`) and `scopeKey` to confirm which scope(s) were checked.
 - `health` is read-only but expensive on large databases. Schedule
   it, do not run it per-keystroke.
+- `health.data.fts` reports `tablesPresent`, aggregate counts, per-entity
+  `byEntityType` drift, and `findings`. Treat FTS drift as a search reliability
+  issue.
 - `project-export` and `project-render` write to disk under the path
   passed via `--output <path>`. Confirm the path with the user
   before invoking; the file is overwritten if it exists.

@@ -2546,6 +2546,24 @@ fn scaffold_change(entity_type: EntityType, entity_id: &str) -> ScaffoldEntityCh
     }
 }
 
+fn scaffold_touched_entities(result: &RoadmapScaffoldResult) -> Vec<(EntityType, String)> {
+    let mut seen = HashSet::<(String, String)>::new();
+    let mut entities = Vec::new();
+    for change in result
+        .created
+        .iter()
+        .chain(result.updated.iter())
+        .chain(result.unchanged.iter())
+    {
+        if seen.insert((change.entity_type.clone(), change.entity_id.clone())) {
+            if let Ok(entity_type) = change.entity_type.parse::<EntityType>() {
+                entities.push((entity_type, change.entity_id.clone()));
+            }
+        }
+    }
+    entities
+}
+
 fn scaffold_reject(
     result: &mut RoadmapScaffoldResult,
     entity_type: EntityType,
@@ -2972,10 +2990,11 @@ fn scaffold_apply_section(
         if !scaffold_existing_action(result, EntityType::RoadmapSection, &section.id, if_exists) {
             return Ok(());
         }
+        let desired_ordering = section.ordering.unwrap_or(existing.ordering);
         if existing.slug == section.slug.trim()
             && existing.title == section.title.trim()
             && existing.summary == summary
-            && existing.ordering == ordering
+            && existing.ordering == desired_ordering
         {
             result
                 .unchanged
@@ -2984,7 +3003,27 @@ fn scaffold_apply_section(
         }
         transaction.execute(
             "UPDATE roadmap_sections SET slug = ?1, title = ?2, summary = ?3, ordering_index = ?4, revision = revision + 1, updated_at = ?5 WHERE id = ?6",
-            params![section.slug.trim(), section.title.trim(), summary, ordering, now, section.id],
+            params![section.slug.trim(), section.title.trim(), summary, desired_ordering, now, section.id],
+        )?;
+        let record: RoadmapSectionRecord = transaction.query_row(
+            "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE id = ?1",
+            params![section.id],
+            row_to_section,
+        )?;
+        let correlation_id = roadmap_correlation_id(transaction, roadmap_id)?;
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::RoadmapSection,
+                &section.id,
+                EntityType::Roadmap,
+                roadmap_id,
+                &correlation_id,
+                None,
+                "roadmap.section-revised",
+                serde_json::to_value(&record)?,
+            )?,
         )?;
         let _ = refresh_validation_target(transaction, EntityType::RoadmapSection, &section.id)?;
         let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
@@ -2996,6 +3035,26 @@ fn scaffold_apply_section(
     transaction.execute(
         "INSERT INTO roadmap_sections (id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8)",
         params![section.id, scope_key, roadmap_id, section.slug.trim(), section.title.trim(), summary, ordering, now],
+    )?;
+    let record: RoadmapSectionRecord = transaction.query_row(
+        "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE id = ?1",
+        params![section.id],
+        row_to_section,
+    )?;
+    let correlation_id = roadmap_correlation_id(transaction, roadmap_id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::RoadmapSection,
+            &section.id,
+            EntityType::Roadmap,
+            roadmap_id,
+            &correlation_id,
+            None,
+            "roadmap.section-added",
+            serde_json::to_value(&record)?,
+        )?,
     )?;
     let _ = refresh_validation_target(transaction, EntityType::RoadmapSection, &section.id)?;
     let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
@@ -3011,9 +3070,13 @@ fn scaffold_validate_work_point_refs(
     entity_id: &str,
     roadmap_id: &str,
     refs: &[String],
+    planned_work_point_ids: &HashSet<String>,
     field_name: &str,
 ) -> bool {
     for reference in refs {
+        if planned_work_point_ids.contains(reference) {
+            continue;
+        }
         match load_work_point(transaction, reference) {
             Ok(record) if record.roadmap_id == roadmap_id => {}
             Ok(_) => {
@@ -3046,6 +3109,7 @@ fn scaffold_apply_work_point(
     scope_key: &str,
     roadmap_id: &str,
     work_point: &RoadmapScaffoldWorkPoint,
+    planned_work_point_ids: &HashSet<String>,
     if_exists: ScaffoldIfExists,
     now: &str,
 ) -> Result<(), PlanningStoreError> {
@@ -3096,6 +3160,7 @@ fn scaffold_apply_work_point(
         &work_point.id,
         roadmap_id,
         &dependencies,
+        planned_work_point_ids,
         "dependency",
     ) || !scaffold_validate_work_point_refs(
         transaction,
@@ -3103,6 +3168,7 @@ fn scaffold_apply_work_point(
         &work_point.id,
         roadmap_id,
         &repairs,
+        planned_work_point_ids,
         "repairsWorkPointId",
     ) || !scaffold_validate_work_point_refs(
         transaction,
@@ -3110,6 +3176,7 @@ fn scaffold_apply_work_point(
         &work_point.id,
         roadmap_id,
         &supersedes,
+        planned_work_point_ids,
         "supersedesWorkPointId",
     ) || !scaffold_validate_work_point_refs(
         transaction,
@@ -3117,6 +3184,7 @@ fn scaffold_apply_work_point(
         &work_point.id,
         roadmap_id,
         &blocks,
+        planned_work_point_ids,
         "blocksWorkPointId",
     ) {
         return Ok(());
@@ -3163,11 +3231,12 @@ fn scaffold_apply_work_point(
         if !scaffold_existing_action(result, EntityType::WorkPoint, &work_point.id, if_exists) {
             return Ok(());
         }
+        let desired_ordering = work_point.ordering.unwrap_or(existing.ordering);
         if existing.section_id == work_point.section_id
             && existing.title == work_point.title.trim()
             && existing.summary == work_point.summary.trim()
             && existing.status == status
-            && existing.ordering == ordering
+            && existing.ordering == desired_ordering
             && existing.dependency_ids == dependencies
             && existing.validation_expectations == expectations
             && existing.effort_tier == effort_tier
@@ -3186,7 +3255,7 @@ fn scaffold_apply_work_point(
         }
         transaction.execute(
             "UPDATE work_points SET section_id = ?1, title = ?2, summary = ?3, status = ?4, ordering_index = ?5, dependency_ids_json = ?6, validation_expectations_json = ?7, effort_tier = ?8, kind = ?9, priority = ?10, repairs_work_point_ids = ?11, supersedes_work_point_ids = ?12, blocks_work_point_ids = ?13, tags_json = ?14, revision = revision + 1, updated_at = ?15 WHERE id = ?16",
-            params![work_point.section_id, work_point.title.trim(), work_point.summary.trim(), status.as_str(), ordering, to_json_text(&dependencies)?, to_json_text(&expectations)?, effort_tier.as_str(), kind.as_str(), priority.as_str(), to_json_text(&repairs)?, to_json_text(&supersedes)?, to_json_text(&blocks)?, to_json_text(&tags)?, now, work_point.id],
+            params![work_point.section_id, work_point.title.trim(), work_point.summary.trim(), status.as_str(), desired_ordering, to_json_text(&dependencies)?, to_json_text(&expectations)?, effort_tier.as_str(), kind.as_str(), priority.as_str(), to_json_text(&repairs)?, to_json_text(&supersedes)?, to_json_text(&blocks)?, to_json_text(&tags)?, now, work_point.id],
         )?;
         replace_entity_file_scopes(
             transaction,
@@ -3281,6 +3350,7 @@ fn scaffold_apply_plan(
     goal_id: &str,
     roadmap_id: &str,
     plan: &RoadmapScaffoldPlan,
+    planned_work_point_ids: &HashSet<String>,
     if_exists: ScaffoldIfExists,
     correlation_id: &str,
     now: &str,
@@ -3311,6 +3381,7 @@ fn scaffold_apply_plan(
         &plan.id,
         roadmap_id,
         &targeted,
+        planned_work_point_ids,
         "targetedWorkPointId",
     ) {
         if let Some(rejection) = result.rejected.last_mut() {
@@ -3541,6 +3612,7 @@ fn scaffold_apply_todo(
         if !scaffold_existing_action(result, EntityType::Todo, &todo.id, if_exists) {
             return Ok(());
         }
+        let desired_ordering = todo.ordering.unwrap_or(existing.ordering);
         if existing.title == todo.title.trim()
             && existing.summary == summary
             && existing.status == status
@@ -3549,7 +3621,7 @@ fn scaffold_apply_todo(
             && existing.file_scopes == file_scopes
             && existing.evidence_refs == evidence_refs
             && existing.tags == tags
-            && existing.ordering == ordering
+            && existing.ordering == desired_ordering
         {
             result
                 .unchanged
@@ -3558,7 +3630,7 @@ fn scaffold_apply_todo(
         }
         transaction.execute(
             "UPDATE todos SET title = ?1, summary = ?2, status = ?3, priority = ?4, effort_tier = ?5, evidence_refs_json = ?6, tags_json = ?7, ordering_index = ?8, revision = revision + 1, updated_at = ?9 WHERE id = ?10",
-            params![todo.title.trim(), summary, status.as_str(), priority.as_str(), effort_tier.as_str(), to_json_text(&evidence_refs)?, to_json_text(&tags)?, ordering, now, todo.id],
+            params![todo.title.trim(), summary, status.as_str(), priority.as_str(), effort_tier.as_str(), to_json_text(&evidence_refs)?, to_json_text(&tags)?, desired_ordering, now, todo.id],
         )?;
         replace_entity_file_scopes(
             transaction,
@@ -8215,6 +8287,11 @@ impl PlanningStore {
             .unwrap_or_else(|| DEFAULT_SCOPE_KEY.to_string());
         let correlation_id = correlation_id.unwrap_or_else(|| "roadmap-scaffold".to_string());
         let now = now_string()?;
+        let planned_work_point_ids = scaffold
+            .work_points
+            .iter()
+            .map(|work_point| work_point.id.clone())
+            .collect::<HashSet<_>>();
         let mut result = RoadmapScaffoldResult {
             created: Vec::new(),
             updated: Vec::new(),
@@ -8262,6 +8339,7 @@ impl PlanningStore {
                 &scope_key,
                 &scaffold.roadmap.id,
                 work_point,
+                &planned_work_point_ids,
                 if_exists,
                 &now,
             )?;
@@ -8274,6 +8352,7 @@ impl PlanningStore {
                 &scaffold.goal.id,
                 &scaffold.roadmap.id,
                 plan,
+                &planned_work_point_ids,
                 if_exists,
                 &correlation_id,
                 &now,
@@ -8291,7 +8370,7 @@ impl PlanningStore {
             )?;
         }
 
-        let entities = collect_entities_in_scope(&transaction, &scope_key)?;
+        let entities = scaffold_touched_entities(&result);
         for (entity_type, entity_id) in entities {
             let findings = validate_entity(&transaction, entity_type, &entity_id)?;
             result.validation_findings.extend(findings);
