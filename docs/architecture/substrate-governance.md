@@ -61,6 +61,16 @@ The following rules are mandatory until a later architecture decision changes th
 6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
 7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists.
 
+## Post-legacy rule
+
+Elegy no longer has an active first-party `.NET` source-package family in-repo.
+
+That means:
+
+1. docs must not describe `src/` or `tests/` as active repo centers
+2. any downstream `.NET` consumer is now just that: a consumer of governed outputs, not a co-owned in-repo authority surface
+3. new shared responsibilities should be expressed either as governed artifacts or as Rust executable behavior, not by reintroducing legacy compatibility framing
+
 ## Public-surface graduation rule
 
 A concept should become a durable Elegy-owned surface only when all of the following are true:
@@ -115,3 +125,21 @@ Current enforcement lives in these surfaces:
 - `.github/workflows/distribution-artifacts.yml`
 - `.github/workflows/rust-ci.yml`
 - Rust workspace tests that exercise CLI and tooling behavior
+
+## Crate publishing policy
+
+All crates in the Rust workspace carry `publish = false`.  No crate can
+be published to crates.io without a conscious decision to remove that
+gate.  See `docs/adr/2026-06-15-block-crates-io-publishing.md` for the
+full decision record and the re-enablement procedure.
+
+## Completion standard
+
+The governance baseline is only complete when the repo is not just described but enforced.
+
+The minimum bar is:
+
+1. governed artifact roots are documented
+2. export and canonical-output validation are runnable from the repo root
+3. Rust executable surfaces are linted and tested from the Rust workspace
+4. contributor docs point to the real validation and export path rather than to removed solution-era flows

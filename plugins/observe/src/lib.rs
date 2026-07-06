@@ -764,7 +764,6 @@ mod tests {
         // Very short timeout — just verify the function works
         let result = observe_filesystem(&dir, Duration::from_millis(10));
         assert!(result.is_ok());
-        #[expect(clippy::unwrap_used)]
         let diff = result.unwrap();
         assert!(!diff.started_at_utc.is_empty());
         assert!(!diff.ended_at_utc.is_empty());
