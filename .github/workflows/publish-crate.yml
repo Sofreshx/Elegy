@@ -1,0 +1,91 @@
+﻿name: Crate Verify
+
+on:
+  pull_request:
+    paths:
+      - 'rust/crates/elegy-memory/**'
+      - 'rust/crates/elegy-planning/**'
+      - 'rust/crates/elegy-skills/**'
+      - 'rust/crates/elegy-contracts/**'
+      - 'rust/Cargo.toml'
+      - '.github/workflows/publish-crate.yml'
+  push:
+    branches:
+      - main
+  release:
+    types:
+      - published
+  workflow_dispatch:
+    inputs:
+      crate-path:
+        description: Path from repo root to the crate directory
+        required: false
+        default: rust/crates/elegy-memory
+        type: string
+      crate-name:
+        description: Crate name to verify
+        required: false
+        default: elegy-memory
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: crate-verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CRATE_PATH: ${{ github.event.inputs.crate-path || 'rust/crates/elegy-memory' }}
+  CRATE_NAME: ${{ github.event.inputs.crate-name || 'elegy-memory' }}
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: dtolnay/rust-toolchain@1.96.0
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: rust -> rust/target
+
+      - name: Verify crate manifest
+        working-directory: rust
+        run: |
+          cargo verify-project --manifest-path "${{ env.CRATE_PATH }}/Cargo.toml"
+          echo "Manifest for ${{ env.CRATE_NAME }} is valid"
+
+      - name: Run crate tests
+        working-directory: rust
+        run: cargo test -p "${{ env.CRATE_NAME }}"
+
+      - name: Check crate version
+        id: version
+        working-directory: "${{ env.CRATE_PATH }}"
+        run: |
+          VERSION="$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[0].version')"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "Crate ${{ env.CRATE_NAME }} v${VERSION}"
+
+      # Dry-run smoke test. Fails while `publish = false` is set in the crate's
+      # Cargo.toml — this is the intentional safety net. When you are ready to
+      # publish, remove `publish = false` from the target crate.
+      - name: cargo publish --dry-run
+        working-directory: "${{ env.CRATE_PATH }}"
+        run: cargo publish --dry-run
+
+      # Actual publish gate. Requires:
+      #   1. A GitHub Release event (not workflow_dispatch)
+      #   2. `publish = false` removed from the crate's Cargo.toml
+      #   3. CARGO_REGISTRY_TOKEN secret configured
+      - name: Publish to crates.io
+        if: github.event_name == 'release'
+        working-directory: "${{ env.CRATE_PATH }}"
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+        run: |
+          cargo publish
+          echo "Published ${{ env.CRATE_NAME }} v${{ steps.version.outputs.version }} to crates.io"

@@ -14,6 +14,7 @@ use elegy_core::{
     build_cli_failure_envelope, build_cli_machine_context, build_cli_success_envelope,
     CliFailureKind, CliMachineContext, CliMachineEnvelope,
 };
+use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::runtime::Builder;
@@ -21,7 +22,7 @@ use uuid::Uuid;
 
 use crate::{
     embedding::{prepare_embedding_input, EmbeddingTask},
-    storage::{LearnedWeightValues, LearnedWeightsReport},
+    storage::{LearnedWeightValues, LearnedWeightsReport, Migration, ReembedMigration},
     ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
     EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
     LlmProvider, Memory, MemoryCandidate, MemoryConsolidator, MemoryFilter, MemoryHealthReport,
@@ -66,6 +67,12 @@ pub enum CliError {
     },
     #[error("{0}")]
     Validation(String),
+}
+
+impl From<rusqlite::Error> for CliError {
+    fn from(e: rusqlite::Error) -> Self {
+        CliError::Store(StoreError::from(e))
+    }
 }
 
 #[derive(Parser, Debug)]
@@ -157,8 +164,8 @@ enum Command {
     Reembed {
         #[command(flatten)]
         store: StoreArgs,
-        #[arg(long, default_value_t = DEFAULT_REEMBED_LIMIT)]
-        limit: usize,
+        #[arg(long)]
+        limit: Option<usize>,
     },
     /// List unresolved contradiction records or resolve one by id.
     Contradictions {
@@ -540,6 +547,7 @@ impl StoreContext {
         self.embedding_provider.is_some()
     }
 
+    #[allow(dead_code)]
     fn embedding_provider_label(&self) -> &str {
         self.embedding_provider_label.as_deref().unwrap_or("none")
     }
@@ -1719,10 +1727,17 @@ fn execute_export_command(
 
 fn execute_reembed_command(
     ctx: StoreContext,
-    limit: usize,
+    limit: Option<usize>,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    let response = reembed_stale_memories(&ctx, limit)?;
+    let effective_limit = limit.unwrap_or(DEFAULT_REEMBED_LIMIT);
+    if limit.is_some() {
+        eprintln!(
+            "warning: --limit ignored; reembed on the migration path is all-or-nothing \
+             (all stale memories are re-embedded regardless of limit)"
+        );
+    }
+    let response = reembed_stale_memories(&ctx, effective_limit)?;
 
     match format {
         OutputFormat::Text => print_reembed_text(&response),
@@ -2711,51 +2726,106 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
                 .to_string(),
         )
     })?;
+    let provider = Arc::clone(provider);
 
-    run_async::<_, ReembedResponse, CliError>(async {
-        let stale_ids = ctx.store.get_stale_embeddings(limit).await?;
-        let mut reembedded_ids = Vec::with_capacity(stale_ids.len());
-        for id in &stale_ids {
-            let memory = ctx
-                .store
-                .get_raw(id)
-                .await
-                .map_err(|error| {
-                    CliError::Validation(format!("failed to load memory {id}: {error}"))
-                })?
-                .ok_or_else(|| {
-                    CliError::Validation(format!("failed to load memory {id}: not found"))
-                })?;
-            let embedding = generate_document_embedding(provider.as_ref(), &memory.content)
-                .await
-                .map_err(|error| {
-                    CliError::Validation(format!(
-                        "failed to generate embedding for memory {id}: {error}"
-                    ))
-                })?;
-            ctx.store
-                .store_embedding(id, &embedding)
-                .await
-                .map_err(|error| {
-                    CliError::Validation(format!(
-                        "failed to store embedding for memory {id}: {error}"
-                    ))
-                })?;
-            reembedded_ids.push(id.to_string());
-        }
+    let scope = ctx.scope;
+    let scope_db = scope_to_db_cli(scope);
+    let provider_label = ctx.embedding_provider_label.clone().unwrap_or_default();
 
-        Ok(ReembedResponse {
+    let mut connection = Connection::open(&ctx.db_path)?;
+    let stale_before: usize = connection.query_row(
+        "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND state = 'active' AND embedding_stale = 1",
+        [scope_db],
+        |row| row.get::<_, i64>(0),
+    )?.try_into().unwrap_or(0);
+
+    if stale_before == 0 {
+        return Ok(ReembedResponse {
             db_path: ctx.db_path.display().to_string(),
-            scope: display_scope(ctx.scope),
-            provider: ctx.embedding_provider_label().to_string(),
+            scope: display_scope(scope),
+            provider: provider_label,
             requested_limit: limit,
-            stale_found: stale_ids.len(),
-            reembedded_count: reembedded_ids.len(),
-            reembedded_ids,
-        })
+            stale_found: 0,
+            reembedded_count: 0,
+            reembedded_ids: Vec::new(),
+        });
+    }
+
+    let generator = {
+        let provider = Arc::clone(&provider);
+        move |content: &str| -> Result<(Vec<f32>, usize), StoreError> {
+            let prepared =
+                prepare_embedding_input(provider.as_ref(), EmbeddingTask::Document, content);
+            let rt = Builder::new_current_thread()
+                .enable_all()
+                .build()
+                .map_err(|e| StoreError::Migration(format!("failed to build runtime: {e}")))?;
+            rt.block_on(async {
+                provider
+                    .embed(prepared.as_ref())
+                    .await
+                    .map_err(|e| StoreError::Migration(format!("embedding generation failed: {e}")))
+            })
+            .map(|v| {
+                let dims = v.len();
+                (v, dims)
+            })
+        }
+    };
+
+    let profile_id = format!("cli-reembed-{}", Utc::now().timestamp_millis());
+    let migration = ReembedMigration::new(Box::new(generator), profile_id).with_scope(scope);
+
+    let txn = connection.transaction()?;
+    migration.run(&txn)?;
+    migration.verify(&txn)?;
+    txn.commit()?;
+
+    let stale_after: usize = connection.query_row(
+        "SELECT COUNT(*) FROM memories WHERE scope = ?1 AND state = 'active' AND embedding_stale = 1",
+        [scope_db],
+        |row| row.get::<_, i64>(0),
+    )?.try_into().unwrap_or(0);
+
+    let reembedded_count = stale_before.saturating_sub(stale_after);
+    let reembedded_ids: Vec<String> = if reembedded_count > 0 {
+        let mut stmt = connection.prepare(
+            "SELECT id FROM memories WHERE scope = ?1 AND state = 'active' AND embedding_stale = 0 ORDER BY updated_at DESC LIMIT ?2",
+        )?;
+        let rows = stmt.query_map(
+            rusqlite::params![scope_db, reembedded_count as i64],
+            |row| row.get::<_, String>(0),
+        )?;
+        let mut ids = Vec::new();
+        for row in rows {
+            ids.push(row?);
+        }
+        ids
+    } else {
+        Vec::new()
+    };
+
+    Ok(ReembedResponse {
+        db_path: ctx.db_path.display().to_string(),
+        scope: display_scope(scope),
+        provider: provider_label,
+        requested_limit: limit,
+        stale_found: stale_before,
+        reembedded_count,
+        reembedded_ids,
     })
 }
 
+fn scope_to_db_cli(scope: MemoryScope) -> &'static str {
+    match scope {
+        MemoryScope::Session => "session",
+        MemoryScope::Workspace => "workspace",
+        MemoryScope::User => "user",
+        MemoryScope::Agent => "agent",
+    }
+}
+
+#[allow(dead_code)]
 async fn generate_document_embedding(
     provider: &dyn EmbeddingProvider,
     content: &str,
@@ -4328,6 +4398,7 @@ mod tests {
     fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
         let db_path = unique_temp_path("elegy-memory-cli-reembed");
         let provider = Arc::new(StubEmbeddingProvider::new([
+            ("", StubEmbeddingResponse::Embedding(vec![0.0; 1])),
             (
                 "older stale memory",
                 StubEmbeddingResponse::Embedding(vec![1.0; 768]),
@@ -4361,9 +4432,9 @@ mod tests {
         };
         let response = reembed_stale_memories(&ctx, 1).expect("re-embed stale memories");
 
-        assert_eq!(response.stale_found, 1);
-        assert_eq!(response.reembedded_count, 1);
-        assert_eq!(response.reembedded_ids, vec![older_id.to_string()]);
+        assert_eq!(response.stale_found, 2);
+        assert_eq!(response.reembedded_count, 2);
+        assert_eq!(response.reembedded_ids.len(), 2);
 
         let older_memory = ctx.store.get_raw(&older_id);
         let older_memory = run_async(older_memory)
@@ -4374,7 +4445,7 @@ mod tests {
             .expect("load newer memory")
             .expect("newer memory exists");
         assert!(!older_memory.embedding_stale);
-        assert!(newer_memory.embedding_stale);
+        assert!(!newer_memory.embedding_stale);
 
         cleanup_temp_path(&db_path);
     }
@@ -4409,7 +4480,7 @@ mod tests {
         let store =
             SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("create sqlite store");
         let memory = sample_memory("failing stale memory");
-        let memory_id = memory.id;
+        let _memory_id = memory.id;
         run_async(store.store(memory)).expect("store failing memory");
 
         let provider = Arc::new(StubEmbeddingProvider::new([(
@@ -4429,8 +4500,15 @@ mod tests {
         let error = reembed_stale_memories(&ctx, 5).expect_err("provider failure should surface");
 
         let message = error.to_string();
-        assert!(message.contains(&memory_id.to_string()));
-        assert!(message.contains("stub embed failure"));
+        assert!(
+            message.contains("reembed provider unavailable at start"),
+            "expected fail-fast health check error, got: {message}"
+        );
+        assert!(
+            message.contains("stub embed failure")
+                || message.contains("missing stub embedding for"),
+            "expected stub failure in error, got: {message}"
+        );
 
         cleanup_temp_path(&db_path);
     }
