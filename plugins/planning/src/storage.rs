@@ -17,18 +17,21 @@ use crate::{
     validation::validate_entity, AcceptanceKind, AcceptanceView, AttachWorktreeInput,
     BlockedCandidate, DiscoveryCheckpointRecord, DiscoveryClassification, DiscoveryRecord,
     DiscoveryRelationshipKind, DiscoveryRelationshipRecord, DiscoverySourceEntry, DiscoveryStatus,
-    DiscoveryView, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeRecord,
-    FileScopeSelectorType, FtsHealthReport, GoalRecord, GoalStatus, GoalView, GraphEdgeView,
-    GraphNodeView, InsightRecord, InsightStatus, InsightType, InsightView, IssueRecord,
-    IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEdgeKind,
-    PlanningEvent, PlanningGraphEdge, PlanningGraphNode, PlanningHealthReport, PlanningNodeKind,
-    PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus,
-    ProjectRunView, ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus,
-    RoadmapRecord, RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
-    RunnableWorkPointCandidate, ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord,
-    TodoStatus, ValidationFinding, ValidationReport, ValidationRunReport, ValidationSeverity,
-    VerificationState, WorkGraph, WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord,
-    WorkPointStatus, WorkPointView, WorktreeRecord, WorktreeStatus,
+    DiscoveryView, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeIntent,
+    FileScopeRecord, FileScopeSelectorType, FtsEntityHealth, FtsHealthReport, GoalRecord,
+    GoalStatus, GoalView, GraphEdgeView, GraphNodeView, InsightRecord, InsightStatus, InsightType,
+    InsightView, IssueRecord, IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus,
+    PlanView, PlanningEdgeKind, PlanningEvent, PlanningGraphEdge, PlanningGraphNode,
+    PlanningHealthReport, PlanningNodeKind, PlanningStoreError, Priority, ProjectRunEvidence,
+    ProjectRunRecord, ProjectRunStatus, ProjectRunView, ProjectionFormat, RenderedProjection,
+    ReviewPointRecord, ReviewPointStatus, RoadmapRecord, RoadmapScaffoldFile, RoadmapScaffoldGoal,
+    RoadmapScaffoldPlan, RoadmapScaffoldResult, RoadmapScaffoldSection, RoadmapScaffoldTodo,
+    RoadmapScaffoldWorkPoint, RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
+    RunnableWorkPointCandidate, ScaffoldEntityChange, ScaffoldEntityRejection, ScaffoldIfExists,
+    ScopeRecord, SessionSummary, Severity, TagInfo, TodoRecord, TodoStatus, ValidationFinding,
+    ValidationReport, ValidationRunReport, ValidationSeverity, VerificationState, WorkGraph,
+    WorkGraphEdge, WorkGraphNode, WorkPointKind, WorkPointRecord, WorkPointStatus, WorkPointView,
+    WorktreeRecord, WorktreeStatus,
 };
 
 pub const CURRENT_SCHEMA_VERSION: &str = "11";
@@ -574,7 +577,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::Goal, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::Goal,
+            &record.scope_key,
             &id,
             &record.title,
             &record.description,
@@ -679,7 +683,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::Roadmap, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::Roadmap,
+            &record.scope_key,
             &id,
             &record.title,
             &record.summary,
@@ -1021,7 +1026,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::WorkPoint, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::WorkPoint,
+            &record.scope_key,
             &id,
             &record.title,
             &record.summary,
@@ -1395,7 +1401,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::Plan, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::Plan,
+            &record.scope_key,
             &id,
             &record.title,
             &record.summary,
@@ -1546,7 +1553,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::Todo, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::Todo,
+            &record.scope_key,
             &id,
             &record.title,
             &record.summary,
@@ -1648,7 +1656,8 @@ impl PlanningStore {
         rebuild_tag_index_for_entity(&transaction, EntityType::Issue, &id, &record.tags)?;
         upsert_fts_entry(
             &transaction,
-            "entities_fts",
+            EntityType::Issue,
+            &record.scope_key,
             &id,
             &record.title,
             &record.summary,
@@ -1822,13 +1831,7 @@ impl PlanningStore {
         )?;
 
         rebuild_tag_index_for_entity(&transaction, EntityType::Insight, &id, &record.tags)?;
-        upsert_fts_entry(
-            &transaction,
-            "insights_fts",
-            &id,
-            &record.title,
-            &record.content,
-        )?;
+        upsert_insights_fts_entry(&transaction, &id, &record.title, &record.content)?;
 
         let correlation_id = attached_entity_correlation_id(
             &transaction,
@@ -1945,7 +1948,7 @@ impl PlanningStore {
             param_index += 1;
         }
         if let Some(fts) = &input.fts {
-            if let Some(rowids) = search_entity_fts(&connection, "insights_fts", fts)? {
+            if let Some(rowids) = search_entity_fts(&connection, "insights_fts", fts, None, None)? {
                 if rowids.is_empty() {
                     return Ok(Vec::new());
                 }
@@ -2534,6 +2537,1290 @@ impl PlanningStore {
         let rows = statement.query_map([], row_to_scope)?;
         collect_rows(rows)
     }
+}
+
+fn scaffold_change(entity_type: EntityType, entity_id: &str) -> ScaffoldEntityChange {
+    ScaffoldEntityChange {
+        entity_type: entity_type.as_str().to_string(),
+        entity_id: entity_id.to_string(),
+    }
+}
+
+fn scaffold_reject(
+    result: &mut RoadmapScaffoldResult,
+    entity_type: EntityType,
+    entity_id: &str,
+    reason: impl Into<String>,
+) {
+    result.rejected.push(ScaffoldEntityRejection {
+        entity_type: entity_type.as_str().to_string(),
+        entity_id: entity_id.to_string(),
+        reason: reason.into(),
+    });
+}
+
+fn scaffold_parse_file_scopes(
+    result: &mut RoadmapScaffoldResult,
+    entity_type: EntityType,
+    entity_id: &str,
+    values: &[String],
+) -> Option<Vec<FileScopeRecord>> {
+    let mut scopes = Vec::new();
+    for value in values {
+        let parts = value.split(':').collect::<Vec<_>>();
+        if parts.len() != 3 || parts.iter().any(|part| part.trim().is_empty()) {
+            scaffold_reject(
+                result,
+                entity_type,
+                entity_id,
+                format!("invalid file-scope grammar: {value}"),
+            );
+            return None;
+        }
+        let selector_type = match parts[0].trim().parse::<FileScopeSelectorType>() {
+            Ok(value) => value,
+            Err(_) => {
+                scaffold_reject(
+                    result,
+                    entity_type,
+                    entity_id,
+                    format!("invalid file-scope selector type: {}", parts[0]),
+                );
+                return None;
+            }
+        };
+        let intent = match parts[2].trim().parse::<FileScopeIntent>() {
+            Ok(value) => value,
+            Err(_) => {
+                scaffold_reject(
+                    result,
+                    entity_type,
+                    entity_id,
+                    format!("invalid file-scope intent: {}", parts[2]),
+                );
+                return None;
+            }
+        };
+        scopes.push(FileScopeRecord {
+            selector_type,
+            selector: parts[1].trim().to_string(),
+            intent,
+        });
+    }
+    Some(normalize_file_scopes(scopes))
+}
+
+fn scaffold_apply_scope(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    _dry_run: bool,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    if load_scope(transaction, scope_key).is_ok() {
+        result
+            .unchanged
+            .push(scaffold_change(EntityType::Scope, scope_key));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO scopes (scope_key, scope_type, parent_scope_key, metadata_json, tags_json, revision, created_at, updated_at) VALUES (?1, NULL, NULL, '{}', '[]', 1, ?2, ?2)",
+        params![scope_key, now],
+    )?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::Scope,
+            scope_key,
+            EntityType::Scope,
+            scope_key,
+            &format!("corr-scope-{scope_key}"),
+            None,
+            "scope.created",
+            serde_json::json!({ "scopeKey": scope_key }),
+        )?,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::Scope, scope_key));
+    Ok(())
+}
+
+fn scaffold_existing_action(
+    result: &mut RoadmapScaffoldResult,
+    entity_type: EntityType,
+    entity_id: &str,
+    if_exists: ScaffoldIfExists,
+) -> bool {
+    match if_exists {
+        ScaffoldIfExists::Fail => {
+            scaffold_reject(result, entity_type, entity_id, "entity already exists");
+            false
+        }
+        ScaffoldIfExists::Skip => {
+            result.skipped.push(scaffold_change(entity_type, entity_id));
+            false
+        }
+        ScaffoldIfExists::Update => true,
+    }
+}
+
+fn scaffold_apply_goal(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    correlation_id: &str,
+    goal: &RoadmapScaffoldGoal,
+    if_exists: ScaffoldIfExists,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    require_non_empty("goal.id", &goal.id)?;
+    require_non_empty("goal.title", &goal.title)?;
+    require_non_empty("goal.description", &goal.description)?;
+    let status = goal.status.unwrap_or(GoalStatus::Draft);
+    let tags = normalize_string_list(goal.tags.clone());
+    let acceptance = normalize_string_list(goal.acceptance_criteria.clone());
+    let rejection = normalize_string_list(goal.rejection_criteria.clone());
+    if let Ok(existing) = load_goal(transaction, &goal.id) {
+        if existing.scope_key != scope_key {
+            scaffold_reject(result, EntityType::Goal, &goal.id, "scope mismatch");
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::Goal, &goal.id, if_exists) {
+            return Ok(());
+        }
+        if existing.title == goal.title.trim()
+            && existing.description == goal.description.trim()
+            && existing.acceptance_criteria == acceptance
+            && existing.rejection_criteria == rejection
+            && existing.status == status
+            && existing.tags == tags
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::Goal, &goal.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE goals SET title = ?1, description = ?2, acceptance_criteria_json = ?3, rejection_criteria_json = ?4, status = ?5, tags_json = ?6, revision = revision + 1, updated_at = ?7 WHERE id = ?8",
+            params![
+                goal.title.trim(),
+                goal.description.trim(),
+                to_json_text(&acceptance)?,
+                to_json_text(&rejection)?,
+                status.as_str(),
+                to_json_text(&tags)?,
+                now,
+                goal.id,
+            ],
+        )?;
+        let record = load_goal(transaction, &goal.id)?;
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::Goal,
+                &goal.id,
+                EntityType::Goal,
+                &goal.id,
+                correlation_id,
+                None,
+                "goal.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::Goal, &goal.id)?;
+        rebuild_tag_index_for_entity(transaction, EntityType::Goal, &goal.id, &tags)?;
+        upsert_fts_entry(
+            transaction,
+            EntityType::Goal,
+            scope_key,
+            &goal.id,
+            &record.title,
+            &record.description,
+        )?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::Goal, &goal.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO goals (id, scope_key, correlation_id, title, description, acceptance_criteria_json, rejection_criteria_json, status, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, 1, ?10, ?10)",
+        params![goal.id, scope_key, correlation_id, goal.title.trim(), goal.description.trim(), to_json_text(&acceptance)?, to_json_text(&rejection)?, status.as_str(), to_json_text(&tags)?, now],
+    )?;
+    let record = load_goal(transaction, &goal.id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::Goal,
+            &goal.id,
+            EntityType::Goal,
+            &goal.id,
+            correlation_id,
+            None,
+            "goal.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::Goal, &goal.id)?;
+    rebuild_tag_index_for_entity(transaction, EntityType::Goal, &goal.id, &tags)?;
+    upsert_fts_entry(
+        transaction,
+        EntityType::Goal,
+        scope_key,
+        &goal.id,
+        &record.title,
+        &record.description,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::Goal, &goal.id));
+    Ok(())
+}
+
+fn scaffold_apply_roadmap(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    correlation_id: &str,
+    scaffold: &RoadmapScaffoldFile,
+    if_exists: ScaffoldIfExists,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    let roadmap = &scaffold.roadmap;
+    require_non_empty("roadmap.id", &roadmap.id)?;
+    require_non_empty("roadmap.title", &roadmap.title)?;
+    require_non_empty("roadmap.summary", &roadmap.summary)?;
+    match load_goal(transaction, &scaffold.goal.id) {
+        Ok(goal) if goal.scope_key == scope_key => {}
+        Ok(_) => {
+            scaffold_reject(
+                result,
+                EntityType::Roadmap,
+                &roadmap.id,
+                "goal scope mismatch",
+            );
+            return Ok(());
+        }
+        Err(_) => {
+            scaffold_reject(result, EntityType::Roadmap, &roadmap.id, "unresolved goal");
+            return Ok(());
+        }
+    }
+    let status = roadmap.status.unwrap_or(RoadmapStatus::Draft);
+    let tags = normalize_string_list(roadmap.tags.clone());
+    if let Ok(existing) = load_roadmap(transaction, &roadmap.id) {
+        if existing.scope_key != scope_key {
+            scaffold_reject(result, EntityType::Roadmap, &roadmap.id, "scope mismatch");
+            return Ok(());
+        }
+        if existing.goal_id != scaffold.goal.id {
+            scaffold_reject(
+                result,
+                EntityType::Roadmap,
+                &roadmap.id,
+                "unsupported update field: goalId",
+            );
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::Roadmap, &roadmap.id, if_exists) {
+            return Ok(());
+        }
+        if existing.title == roadmap.title.trim()
+            && existing.summary == roadmap.summary.trim()
+            && existing.status == status
+            && existing.tags == tags
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::Roadmap, &roadmap.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE roadmaps SET title = ?1, summary = ?2, status = ?3, tags_json = ?4, revision = revision + 1, updated_at = ?5 WHERE id = ?6",
+            params![roadmap.title.trim(), roadmap.summary.trim(), status.as_str(), to_json_text(&tags)?, now, roadmap.id],
+        )?;
+        let record = load_roadmap(transaction, &roadmap.id)?;
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::Roadmap,
+                &roadmap.id,
+                EntityType::Goal,
+                &record.goal_id,
+                correlation_id,
+                None,
+                "roadmap.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::Roadmap, &roadmap.id)?;
+        let _ = refresh_validation_target(transaction, EntityType::Goal, &record.goal_id)?;
+        rebuild_tag_index_for_entity(transaction, EntityType::Roadmap, &roadmap.id, &tags)?;
+        upsert_fts_entry(
+            transaction,
+            EntityType::Roadmap,
+            scope_key,
+            &roadmap.id,
+            &record.title,
+            &record.summary,
+        )?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::Roadmap, &roadmap.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO roadmaps (id, scope_key, goal_id, correlation_id, title, summary, status, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, 1, ?9, ?9)",
+        params![roadmap.id, scope_key, scaffold.goal.id, correlation_id, roadmap.title.trim(), roadmap.summary.trim(), status.as_str(), to_json_text(&tags)?, now],
+    )?;
+    let record = load_roadmap(transaction, &roadmap.id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::Roadmap,
+            &roadmap.id,
+            EntityType::Goal,
+            &record.goal_id,
+            correlation_id,
+            None,
+            "roadmap.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::Roadmap, &roadmap.id)?;
+    let _ = refresh_validation_target(transaction, EntityType::Goal, &record.goal_id)?;
+    rebuild_tag_index_for_entity(transaction, EntityType::Roadmap, &roadmap.id, &tags)?;
+    upsert_fts_entry(
+        transaction,
+        EntityType::Roadmap,
+        scope_key,
+        &roadmap.id,
+        &record.title,
+        &record.summary,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::Roadmap, &roadmap.id));
+    Ok(())
+}
+
+fn scaffold_apply_section(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    roadmap_id: &str,
+    section: &RoadmapScaffoldSection,
+    if_exists: ScaffoldIfExists,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    require_non_empty("section.id", &section.id)?;
+    require_non_empty("section.slug", &section.slug)?;
+    require_non_empty("section.title", &section.title)?;
+    if load_roadmap(transaction, roadmap_id)
+        .map(|r| r.scope_key != scope_key)
+        .unwrap_or(true)
+    {
+        scaffold_reject(
+            result,
+            EntityType::RoadmapSection,
+            &section.id,
+            "unresolved roadmap",
+        );
+        return Ok(());
+    }
+    let summary = section.summary.as_deref().unwrap_or("").trim();
+    let ordering = section.ordering.unwrap_or_else(|| {
+        transaction
+            .query_row(
+                "SELECT COALESCE(MAX(ordering_index), 0) + 1 FROM roadmap_sections WHERE roadmap_id = ?1",
+                params![roadmap_id],
+                |row| row.get::<_, i64>(0),
+            )
+            .unwrap_or(1)
+    });
+    let existing: Option<RoadmapSectionRecord> = transaction
+        .query_row(
+            "SELECT id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at FROM roadmap_sections WHERE id = ?1",
+            params![section.id],
+            row_to_section,
+        )
+        .optional()?;
+    if let Some(existing) = existing {
+        if existing.scope_key != scope_key {
+            scaffold_reject(
+                result,
+                EntityType::RoadmapSection,
+                &section.id,
+                "scope mismatch",
+            );
+            return Ok(());
+        }
+        if existing.roadmap_id != roadmap_id {
+            scaffold_reject(
+                result,
+                EntityType::RoadmapSection,
+                &section.id,
+                "unsupported update field: roadmapId",
+            );
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::RoadmapSection, &section.id, if_exists) {
+            return Ok(());
+        }
+        if existing.slug == section.slug.trim()
+            && existing.title == section.title.trim()
+            && existing.summary == summary
+            && existing.ordering == ordering
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::RoadmapSection, &section.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE roadmap_sections SET slug = ?1, title = ?2, summary = ?3, ordering_index = ?4, revision = revision + 1, updated_at = ?5 WHERE id = ?6",
+            params![section.slug.trim(), section.title.trim(), summary, ordering, now, section.id],
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::RoadmapSection, &section.id)?;
+        let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::RoadmapSection, &section.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO roadmap_sections (id, scope_key, roadmap_id, slug, title, summary, ordering_index, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, 1, ?8, ?8)",
+        params![section.id, scope_key, roadmap_id, section.slug.trim(), section.title.trim(), summary, ordering, now],
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::RoadmapSection, &section.id)?;
+    let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
+    result
+        .created
+        .push(scaffold_change(EntityType::RoadmapSection, &section.id));
+    Ok(())
+}
+
+fn scaffold_validate_work_point_refs(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    entity_id: &str,
+    roadmap_id: &str,
+    refs: &[String],
+    field_name: &str,
+) -> bool {
+    for reference in refs {
+        match load_work_point(transaction, reference) {
+            Ok(record) if record.roadmap_id == roadmap_id => {}
+            Ok(_) => {
+                scaffold_reject(
+                    result,
+                    EntityType::WorkPoint,
+                    entity_id,
+                    format!("{field_name} scope/roadmap mismatch: {reference}"),
+                );
+                return false;
+            }
+            Err(_) => {
+                scaffold_reject(
+                    result,
+                    EntityType::WorkPoint,
+                    entity_id,
+                    format!("unresolved {field_name}: {reference}"),
+                );
+                return false;
+            }
+        }
+    }
+    true
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scaffold_apply_work_point(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    roadmap_id: &str,
+    work_point: &RoadmapScaffoldWorkPoint,
+    if_exists: ScaffoldIfExists,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    require_non_empty("workPoint.id", &work_point.id)?;
+    require_non_empty("workPoint.title", &work_point.title)?;
+    require_non_empty("workPoint.summary", &work_point.summary)?;
+    if load_roadmap(transaction, roadmap_id)
+        .map(|record| record.scope_key != scope_key)
+        .unwrap_or(true)
+    {
+        scaffold_reject(
+            result,
+            EntityType::WorkPoint,
+            &work_point.id,
+            "unresolved roadmap",
+        );
+        return Ok(());
+    }
+    if let Some(section_id) = &work_point.section_id {
+        let section_ok = transaction
+            .query_row(
+                "SELECT roadmap_id, scope_key FROM roadmap_sections WHERE id = ?1",
+                params![section_id],
+                |row| Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?)),
+            )
+            .optional()?
+            .map(|(section_roadmap_id, section_scope_key)| {
+                section_roadmap_id == roadmap_id && section_scope_key == scope_key
+            })
+            .unwrap_or(false);
+        if !section_ok {
+            scaffold_reject(
+                result,
+                EntityType::WorkPoint,
+                &work_point.id,
+                "unresolved section",
+            );
+            return Ok(());
+        }
+    }
+    let dependencies = normalize_string_list(work_point.dependency_ids.clone());
+    let repairs = normalize_string_list(work_point.repairs_work_point_ids.clone());
+    let supersedes = normalize_string_list(work_point.supersedes_work_point_ids.clone());
+    let blocks = normalize_string_list(work_point.blocks_work_point_ids.clone());
+    if !scaffold_validate_work_point_refs(
+        transaction,
+        result,
+        &work_point.id,
+        roadmap_id,
+        &dependencies,
+        "dependency",
+    ) || !scaffold_validate_work_point_refs(
+        transaction,
+        result,
+        &work_point.id,
+        roadmap_id,
+        &repairs,
+        "repairsWorkPointId",
+    ) || !scaffold_validate_work_point_refs(
+        transaction,
+        result,
+        &work_point.id,
+        roadmap_id,
+        &supersedes,
+        "supersedesWorkPointId",
+    ) || !scaffold_validate_work_point_refs(
+        transaction,
+        result,
+        &work_point.id,
+        roadmap_id,
+        &blocks,
+        "blocksWorkPointId",
+    ) {
+        return Ok(());
+    }
+    let Some(file_scopes) = scaffold_parse_file_scopes(
+        result,
+        EntityType::WorkPoint,
+        &work_point.id,
+        &work_point.file_scopes,
+    ) else {
+        return Ok(());
+    };
+    let status = work_point.status.unwrap_or(WorkPointStatus::Draft);
+    let ordering = work_point.ordering.unwrap_or(next_ordering(
+        transaction,
+        "work_points",
+        "roadmap_id",
+        roadmap_id,
+    )?);
+    let expectations = normalize_string_list(work_point.validation_expectations.clone());
+    let effort_tier = work_point.effort_tier.unwrap_or(EffortTier::Balanced);
+    let kind = work_point.kind.unwrap_or(WorkPointKind::Feature);
+    let priority = work_point.priority.unwrap_or(Priority::Medium);
+    let tags = normalize_string_list(work_point.tags.clone());
+    if let Ok(existing) = load_work_point(transaction, &work_point.id) {
+        if existing.scope_key != scope_key {
+            scaffold_reject(
+                result,
+                EntityType::WorkPoint,
+                &work_point.id,
+                "scope mismatch",
+            );
+            return Ok(());
+        }
+        if existing.roadmap_id != roadmap_id {
+            scaffold_reject(
+                result,
+                EntityType::WorkPoint,
+                &work_point.id,
+                "unsupported update field: roadmapId",
+            );
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::WorkPoint, &work_point.id, if_exists) {
+            return Ok(());
+        }
+        if existing.section_id == work_point.section_id
+            && existing.title == work_point.title.trim()
+            && existing.summary == work_point.summary.trim()
+            && existing.status == status
+            && existing.ordering == ordering
+            && existing.dependency_ids == dependencies
+            && existing.validation_expectations == expectations
+            && existing.effort_tier == effort_tier
+            && existing.kind == kind
+            && existing.priority == priority
+            && existing.repairs_work_point_ids == repairs
+            && existing.supersedes_work_point_ids == supersedes
+            && existing.blocks_work_point_ids == blocks
+            && existing.file_scopes == file_scopes
+            && existing.tags == tags
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::WorkPoint, &work_point.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE work_points SET section_id = ?1, title = ?2, summary = ?3, status = ?4, ordering_index = ?5, dependency_ids_json = ?6, validation_expectations_json = ?7, effort_tier = ?8, kind = ?9, priority = ?10, repairs_work_point_ids = ?11, supersedes_work_point_ids = ?12, blocks_work_point_ids = ?13, tags_json = ?14, revision = revision + 1, updated_at = ?15 WHERE id = ?16",
+            params![work_point.section_id, work_point.title.trim(), work_point.summary.trim(), status.as_str(), ordering, to_json_text(&dependencies)?, to_json_text(&expectations)?, effort_tier.as_str(), kind.as_str(), priority.as_str(), to_json_text(&repairs)?, to_json_text(&supersedes)?, to_json_text(&blocks)?, to_json_text(&tags)?, now, work_point.id],
+        )?;
+        replace_entity_file_scopes(
+            transaction,
+            scope_key,
+            EntityType::WorkPoint,
+            &work_point.id,
+            &file_scopes,
+            now,
+        )?;
+        let record = load_work_point(transaction, &work_point.id)?;
+        let correlation_id = roadmap_correlation_id(transaction, roadmap_id)?;
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::WorkPoint,
+                &work_point.id,
+                EntityType::Roadmap,
+                roadmap_id,
+                &correlation_id,
+                None,
+                "work-point.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::WorkPoint, &work_point.id)?;
+        let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
+        rebuild_tag_index_for_entity(transaction, EntityType::WorkPoint, &work_point.id, &tags)?;
+        upsert_fts_entry(
+            transaction,
+            EntityType::WorkPoint,
+            scope_key,
+            &work_point.id,
+            &record.title,
+            &record.summary,
+        )?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::WorkPoint, &work_point.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO work_points (id, scope_key, roadmap_id, section_id, title, summary, status, ordering_index, dependency_ids_json, validation_expectations_json, effort_tier, kind, priority, repairs_work_point_ids, supersedes_work_point_ids, blocks_work_point_ids, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?18)",
+        params![work_point.id, scope_key, roadmap_id, work_point.section_id, work_point.title.trim(), work_point.summary.trim(), status.as_str(), ordering, to_json_text(&dependencies)?, to_json_text(&expectations)?, effort_tier.as_str(), kind.as_str(), priority.as_str(), to_json_text(&repairs)?, to_json_text(&supersedes)?, to_json_text(&blocks)?, to_json_text(&tags)?, now],
+    )?;
+    replace_entity_file_scopes(
+        transaction,
+        scope_key,
+        EntityType::WorkPoint,
+        &work_point.id,
+        &file_scopes,
+        now,
+    )?;
+    let record = load_work_point(transaction, &work_point.id)?;
+    let correlation_id = roadmap_correlation_id(transaction, roadmap_id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::WorkPoint,
+            &work_point.id,
+            EntityType::Roadmap,
+            roadmap_id,
+            &correlation_id,
+            None,
+            "work-point.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::WorkPoint, &work_point.id)?;
+    let _ = refresh_validation_target(transaction, EntityType::Roadmap, roadmap_id)?;
+    rebuild_tag_index_for_entity(transaction, EntityType::WorkPoint, &work_point.id, &tags)?;
+    upsert_fts_entry(
+        transaction,
+        EntityType::WorkPoint,
+        scope_key,
+        &work_point.id,
+        &record.title,
+        &record.summary,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::WorkPoint, &work_point.id));
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+fn scaffold_apply_plan(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    goal_id: &str,
+    roadmap_id: &str,
+    plan: &RoadmapScaffoldPlan,
+    if_exists: ScaffoldIfExists,
+    correlation_id: &str,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    require_non_empty("plan.id", &plan.id)?;
+    require_non_empty("plan.title", &plan.title)?;
+    require_non_empty("plan.summary", &plan.summary)?;
+    match (
+        load_goal(transaction, goal_id),
+        load_roadmap(transaction, roadmap_id),
+    ) {
+        (Ok(goal), Ok(roadmap))
+            if goal.scope_key == scope_key && roadmap.scope_key == scope_key => {}
+        _ => {
+            scaffold_reject(
+                result,
+                EntityType::Plan,
+                &plan.id,
+                "unresolved goal or roadmap",
+            );
+            return Ok(());
+        }
+    }
+    let targeted = normalize_string_list(plan.targeted_work_point_ids.clone());
+    if !scaffold_validate_work_point_refs(
+        transaction,
+        result,
+        &plan.id,
+        roadmap_id,
+        &targeted,
+        "targetedWorkPointId",
+    ) {
+        if let Some(rejection) = result.rejected.last_mut() {
+            rejection.entity_type = EntityType::Plan.as_str().to_string();
+        }
+        return Ok(());
+    }
+    let Some(file_scopes) =
+        scaffold_parse_file_scopes(result, EntityType::Plan, &plan.id, &plan.file_scopes)
+    else {
+        return Ok(());
+    };
+    let assumptions = normalize_string_list(plan.assumptions.clone());
+    let stop_conditions = normalize_string_list(plan.stop_conditions.clone());
+    let validation_steps = normalize_string_list(plan.validation_steps.clone());
+    let effort_tier = plan.effort_tier.unwrap_or(EffortTier::Balanced);
+    let status = plan.status.unwrap_or(PlanStatus::Draft);
+    let tags = normalize_string_list(plan.tags.clone());
+    let routing_hint = plan
+        .routing_hint
+        .as_ref()
+        .map(|value| value.trim().to_string())
+        .filter(|value| !value.is_empty());
+    if let Ok(existing) = load_plan(transaction, &plan.id) {
+        if existing.scope_key != scope_key {
+            scaffold_reject(result, EntityType::Plan, &plan.id, "scope mismatch");
+            return Ok(());
+        }
+        if existing.goal_id != goal_id {
+            scaffold_reject(
+                result,
+                EntityType::Plan,
+                &plan.id,
+                "unsupported update field: goalId",
+            );
+            return Ok(());
+        }
+        if existing.roadmap_id != roadmap_id {
+            scaffold_reject(
+                result,
+                EntityType::Plan,
+                &plan.id,
+                "unsupported update field: roadmapId",
+            );
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::Plan, &plan.id, if_exists) {
+            return Ok(());
+        }
+        if existing.title == plan.title.trim()
+            && existing.summary == plan.summary.trim()
+            && existing.scope == plan.plan_scope.trim()
+            && existing.assumptions == assumptions
+            && existing.stop_conditions == stop_conditions
+            && existing.validation_steps == validation_steps
+            && existing.targeted_work_point_ids == targeted
+            && existing.effort_tier == effort_tier
+            && existing.routing_hint == routing_hint
+            && existing.allow_parallel_overlap == plan.allow_parallel_overlap
+            && existing.file_scopes == file_scopes
+            && existing.status == status
+            && existing.tags == tags
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::Plan, &plan.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE plans SET title = ?1, summary = ?2, scope = ?3, assumptions_json = ?4, stop_conditions_json = ?5, validation_steps_json = ?6, targeted_work_point_ids_json = ?7, effort_tier = ?8, routing_hint = ?9, allow_parallel_overlap = ?10, status = ?11, tags_json = ?12, revision = revision + 1, updated_at = ?13 WHERE id = ?14",
+            params![plan.title.trim(), plan.summary.trim(), plan.plan_scope.trim(), to_json_text(&assumptions)?, to_json_text(&stop_conditions)?, to_json_text(&validation_steps)?, to_json_text(&targeted)?, effort_tier.as_str(), routing_hint, if plan.allow_parallel_overlap { 1 } else { 0 }, status.as_str(), to_json_text(&tags)?, now, plan.id],
+        )?;
+        replace_entity_file_scopes(
+            transaction,
+            scope_key,
+            EntityType::Plan,
+            &plan.id,
+            &file_scopes,
+            now,
+        )?;
+        let record = load_plan(transaction, &plan.id)?;
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::Plan,
+                &plan.id,
+                EntityType::Plan,
+                &plan.id,
+                correlation_id,
+                None,
+                "plan.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::Plan, &plan.id)?;
+        rebuild_tag_index_for_entity(transaction, EntityType::Plan, &plan.id, &tags)?;
+        upsert_fts_entry(
+            transaction,
+            EntityType::Plan,
+            scope_key,
+            &plan.id,
+            &record.title,
+            &record.summary,
+        )?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::Plan, &plan.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO plans (id, scope_key, goal_id, roadmap_id, correlation_id, title, summary, scope, assumptions_json, stop_conditions_json, validation_steps_json, targeted_work_point_ids_json, effort_tier, routing_hint, allow_parallel_overlap, status, tags_json, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, 1, ?18, ?18)",
+        params![plan.id, scope_key, goal_id, roadmap_id, correlation_id, plan.title.trim(), plan.summary.trim(), plan.plan_scope.trim(), to_json_text(&assumptions)?, to_json_text(&stop_conditions)?, to_json_text(&validation_steps)?, to_json_text(&targeted)?, effort_tier.as_str(), routing_hint, if plan.allow_parallel_overlap { 1 } else { 0 }, status.as_str(), to_json_text(&tags)?, now],
+    )?;
+    replace_entity_file_scopes(
+        transaction,
+        scope_key,
+        EntityType::Plan,
+        &plan.id,
+        &file_scopes,
+        now,
+    )?;
+    let record = load_plan(transaction, &plan.id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::Plan,
+            &plan.id,
+            EntityType::Plan,
+            &plan.id,
+            correlation_id,
+            None,
+            "plan.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::Plan, &plan.id)?;
+    rebuild_tag_index_for_entity(transaction, EntityType::Plan, &plan.id, &tags)?;
+    upsert_fts_entry(
+        transaction,
+        EntityType::Plan,
+        scope_key,
+        &plan.id,
+        &record.title,
+        &record.summary,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::Plan, &plan.id));
+    Ok(())
+}
+
+fn scaffold_apply_todo(
+    transaction: &Transaction<'_>,
+    result: &mut RoadmapScaffoldResult,
+    scope_key: &str,
+    default_plan_id: Option<&str>,
+    todo: &RoadmapScaffoldTodo,
+    if_exists: ScaffoldIfExists,
+    now: &str,
+) -> Result<(), PlanningStoreError> {
+    require_non_empty("todo.id", &todo.id)?;
+    require_non_empty("todo.title", &todo.title)?;
+    let plan_id = todo
+        .plan_id
+        .clone()
+        .or_else(|| default_plan_id.map(ToString::to_string));
+    if let Some(plan_id) = &plan_id {
+        if load_plan(transaction, plan_id)
+            .map(|record| record.scope_key != scope_key)
+            .unwrap_or(true)
+        {
+            scaffold_reject(result, EntityType::Todo, &todo.id, "unresolved plan");
+            return Ok(());
+        }
+    }
+    if let Some(work_point_id) = &todo.work_point_id {
+        if load_work_point(transaction, work_point_id)
+            .map(|record| record.scope_key != scope_key)
+            .unwrap_or(true)
+        {
+            scaffold_reject(result, EntityType::Todo, &todo.id, "unresolved work point");
+            return Ok(());
+        }
+    }
+    let Some(file_scopes) =
+        scaffold_parse_file_scopes(result, EntityType::Todo, &todo.id, &todo.file_scopes)
+    else {
+        return Ok(());
+    };
+    let summary = todo.summary.as_deref().unwrap_or("").trim();
+    let status = todo.status.unwrap_or(TodoStatus::Pending);
+    let priority = todo.priority.unwrap_or(Priority::Medium);
+    let effort_tier = todo.effort_tier.unwrap_or(EffortTier::Balanced);
+    let evidence_refs = normalize_string_list(todo.evidence_refs.clone());
+    let tags = normalize_string_list(todo.tags.clone());
+    let ordering_group_key = plan_id
+        .as_deref()
+        .or(todo.work_point_id.as_deref())
+        .unwrap_or("__global__");
+    let ordering = todo
+        .ordering
+        .unwrap_or(next_todo_ordering(transaction, ordering_group_key)?);
+    if let Ok(existing) = load_todo(transaction, &todo.id) {
+        if existing.scope_key != scope_key {
+            scaffold_reject(result, EntityType::Todo, &todo.id, "scope mismatch");
+            return Ok(());
+        }
+        if existing.plan_id != plan_id {
+            scaffold_reject(
+                result,
+                EntityType::Todo,
+                &todo.id,
+                "unsupported update field: planId",
+            );
+            return Ok(());
+        }
+        if existing.work_point_id != todo.work_point_id {
+            scaffold_reject(
+                result,
+                EntityType::Todo,
+                &todo.id,
+                "unsupported update field: workPointId",
+            );
+            return Ok(());
+        }
+        if !scaffold_existing_action(result, EntityType::Todo, &todo.id, if_exists) {
+            return Ok(());
+        }
+        if existing.title == todo.title.trim()
+            && existing.summary == summary
+            && existing.status == status
+            && existing.priority == priority
+            && existing.effort_tier == effort_tier
+            && existing.file_scopes == file_scopes
+            && existing.evidence_refs == evidence_refs
+            && existing.tags == tags
+            && existing.ordering == ordering
+        {
+            result
+                .unchanged
+                .push(scaffold_change(EntityType::Todo, &todo.id));
+            return Ok(());
+        }
+        transaction.execute(
+            "UPDATE todos SET title = ?1, summary = ?2, status = ?3, priority = ?4, effort_tier = ?5, evidence_refs_json = ?6, tags_json = ?7, ordering_index = ?8, revision = revision + 1, updated_at = ?9 WHERE id = ?10",
+            params![todo.title.trim(), summary, status.as_str(), priority.as_str(), effort_tier.as_str(), to_json_text(&evidence_refs)?, to_json_text(&tags)?, ordering, now, todo.id],
+        )?;
+        replace_entity_file_scopes(
+            transaction,
+            scope_key,
+            EntityType::Todo,
+            &todo.id,
+            &file_scopes,
+            now,
+        )?;
+        let record = load_todo(transaction, &todo.id)?;
+        let correlation_id = if let Some(plan_id) = &record.plan_id {
+            plan_correlation_id(transaction, plan_id)?
+        } else if let Some(work_point_id) = &record.work_point_id {
+            work_point_correlation_id(transaction, work_point_id)?
+        } else {
+            format!("corr-{}", record.id)
+        };
+        append_event(
+            transaction,
+            build_event(
+                transaction,
+                EntityType::Todo,
+                &todo.id,
+                EntityType::Todo,
+                &todo.id,
+                &correlation_id,
+                None,
+                "todo.revised",
+                serde_json::to_value(&record)?,
+            )?,
+        )?;
+        let _ = refresh_validation_target(transaction, EntityType::Todo, &todo.id)?;
+        if let Some(plan_id) = &record.plan_id {
+            let _ = refresh_validation_target(transaction, EntityType::Plan, plan_id)?;
+        }
+        rebuild_tag_index_for_entity(transaction, EntityType::Todo, &todo.id, &tags)?;
+        upsert_fts_entry(
+            transaction,
+            EntityType::Todo,
+            scope_key,
+            &todo.id,
+            &record.title,
+            &record.summary,
+        )?;
+        result
+            .updated
+            .push(scaffold_change(EntityType::Todo, &todo.id));
+        return Ok(());
+    }
+    transaction.execute(
+        "INSERT INTO todos (id, scope_key, plan_id, work_point_id, title, summary, status, priority, effort_tier, evidence_refs_json, tags_json, ordering_index, revision, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, 1, ?13, ?13)",
+        params![todo.id, scope_key, plan_id, todo.work_point_id, todo.title.trim(), summary, status.as_str(), priority.as_str(), effort_tier.as_str(), to_json_text(&evidence_refs)?, to_json_text(&tags)?, ordering, now],
+    )?;
+    replace_entity_file_scopes(
+        transaction,
+        scope_key,
+        EntityType::Todo,
+        &todo.id,
+        &file_scopes,
+        now,
+    )?;
+    let record = load_todo(transaction, &todo.id)?;
+    let correlation_id = if let Some(plan_id) = &record.plan_id {
+        plan_correlation_id(transaction, plan_id)?
+    } else if let Some(work_point_id) = &record.work_point_id {
+        work_point_correlation_id(transaction, work_point_id)?
+    } else {
+        format!("corr-{}", record.id)
+    };
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::Todo,
+            &todo.id,
+            EntityType::Todo,
+            &todo.id,
+            &correlation_id,
+            None,
+            "todo.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    let _ = refresh_validation_target(transaction, EntityType::Todo, &todo.id)?;
+    if let Some(plan_id) = &record.plan_id {
+        let _ = refresh_validation_target(transaction, EntityType::Plan, plan_id)?;
+    }
+    rebuild_tag_index_for_entity(transaction, EntityType::Todo, &todo.id, &tags)?;
+    upsert_fts_entry(
+        transaction,
+        EntityType::Todo,
+        scope_key,
+        &todo.id,
+        &record.title,
+        &record.summary,
+    )?;
+    result
+        .created
+        .push(scaffold_change(EntityType::Todo, &todo.id));
+    Ok(())
+}
+
+fn find_runnable_work_points_in_connection(
+    connection: &Connection,
+    roadmap_id: &str,
+) -> Result<RunnableCandidates, PlanningStoreError> {
+    let now = now_string()?;
+    let roadmap = load_roadmap(connection, roadmap_id)?;
+    let all_work_points = list_work_points_for_roadmap(connection, roadmap_id)?;
+    let scope_key = &roadmap.scope_key;
+
+    let mut open_blocker_issues: HashMap<String, Vec<String>> = HashMap::new();
+    let mut stmt = connection.prepare(
+        "SELECT related_entity_id, id FROM issues WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical') AND related_entity_id IS NOT NULL",
+    )?;
+    let rows = stmt.query_map(params![scope_key], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (entity_id, issue_id) = row?;
+        open_blocker_issues
+            .entry(entity_id)
+            .or_default()
+            .push(issue_id);
+    }
+
+    let mut open_blocker_review_points: HashMap<String, Vec<String>> = HashMap::new();
+    let mut stmt = connection.prepare(
+        "SELECT attached_entity_id, id FROM review_points WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical')",
+    )?;
+    let rows = stmt.query_map(params![scope_key], |row| {
+        Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
+    })?;
+    for row in rows {
+        let (entity_id, review_point_id) = row?;
+        open_blocker_review_points
+            .entry(entity_id)
+            .or_default()
+            .push(review_point_id);
+    }
+
+    let mut blocked_set: HashMap<String, (String, String)> = HashMap::new();
+    for work_point in &all_work_points {
+        if work_point.kind != WorkPointKind::Feature
+            && !work_point.blocks_work_point_ids.is_empty()
+            && !matches!(
+                work_point.status,
+                WorkPointStatus::Completed
+                    | WorkPointStatus::Cancelled
+                    | WorkPointStatus::Invalidated
+            )
+        {
+            for blocked_id in &work_point.blocks_work_point_ids {
+                blocked_set.insert(
+                    blocked_id.clone(),
+                    (work_point.id.clone(), work_point.title.clone()),
+                );
+            }
+        }
+    }
+
+    let mut candidates = Vec::new();
+    let mut blocked = Vec::new();
+    for work_point in &all_work_points {
+        if matches!(
+            work_point.status,
+            WorkPointStatus::Completed
+                | WorkPointStatus::Cancelled
+                | WorkPointStatus::Invalidated
+                | WorkPointStatus::Blocked
+        ) {
+            continue;
+        }
+        if let Some((blocker_id, blocker_title)) = blocked_set.get(&work_point.id) {
+            blocked.push(BlockedCandidate {
+                work_point_id: work_point.id.clone(),
+                work_point_title: work_point.title.clone(),
+                blocker_id: blocker_id.clone(),
+                blocker_title: blocker_title.clone(),
+                reason: format!("blocked_by:{blocker_id}"),
+            });
+            continue;
+        }
+        let active_lease_count: i64 = connection.query_row(
+            "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+            params![work_point.id, now],
+            |row| row.get(0),
+        )?;
+        if active_lease_count > 0 {
+            continue;
+        }
+        let mut dependency_titles = Vec::new();
+        let mut dependencies_ready = true;
+        for dependency_id in &work_point.dependency_ids {
+            match load_work_point(connection, dependency_id) {
+                Ok(dependency) if dependency.status == WorkPointStatus::Completed => {
+                    dependency_titles.push(dependency.title);
+                }
+                Ok(dependency) => {
+                    dependency_titles.push(dependency.title);
+                    dependencies_ready = false;
+                }
+                Err(_) => {
+                    dependency_titles.push(format!("<missing: {dependency_id}>"));
+                    dependencies_ready = false;
+                }
+            }
+        }
+        if !dependencies_ready {
+            continue;
+        }
+        let mut reasons = Vec::new();
+        if work_point.status == WorkPointStatus::Draft
+            || work_point.status == WorkPointStatus::Proposed
+        {
+            reasons.push("status is ready for work".to_string());
+        }
+        if work_point.dependency_ids.is_empty() {
+            reasons.push("no dependencies".to_string());
+        } else {
+            reasons.push("all dependencies completed".to_string());
+        }
+        let required_reason = if work_point.kind != WorkPointKind::Feature
+            && (work_point.priority == Priority::Urgent || work_point.priority == Priority::High)
+        {
+            Some("urgent_fix".to_string())
+        } else if work_point.repairs_work_point_ids.iter().any(|id| {
+            open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
+        }) || work_point.supersedes_work_point_ids.iter().any(|id| {
+            open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
+        }) {
+            Some("resolves_blocker".to_string())
+        } else {
+            Some("ready".to_string())
+        };
+        candidates.push(RunnableWorkPointCandidate {
+            work_point: work_point.clone(),
+            roadmap_id: roadmap_id.to_string(),
+            roadmap_title: roadmap.title.clone(),
+            dependency_titles,
+            reasons,
+            required_reason,
+        });
+    }
+    fn tier_rank(reason: &Option<String>) -> u8 {
+        match reason.as_deref() {
+            Some("urgent_fix") => 0,
+            Some("resolves_blocker") => 1,
+            _ => 2,
+        }
+    }
+    candidates.sort_by(|left, right| {
+        tier_rank(&left.required_reason)
+            .cmp(&tier_rank(&right.required_reason))
+            .then_with(|| left.work_point.ordering.cmp(&right.work_point.ordering))
+            .then_with(|| left.work_point.id.cmp(&right.work_point.id))
+    });
+    Ok(RunnableCandidates {
+        roadmap_id: roadmap_id.to_string(),
+        candidates,
+        blocked,
+    })
 }
 
 fn allowed_transitions(
@@ -4771,197 +6058,8 @@ impl PlanningStore {
         roadmap_id: &str,
     ) -> Result<RunnableCandidates, PlanningStoreError> {
         require_non_empty("roadmapId", roadmap_id)?;
-
         let connection = self.open_connection()?;
-        let now = now_string()?;
-        let roadmap = load_roadmap(&connection, roadmap_id)?;
-        let all_work_points = list_work_points_for_roadmap(&connection, roadmap_id)?;
-        let scope_key = &roadmap.scope_key;
-
-        // Pre-load: all open high/critical issues for the scope
-        let mut open_blocker_issues: HashMap<String, Vec<String>> = HashMap::new();
-        {
-            let mut stmt = connection.prepare(
-                "SELECT related_entity_id, id FROM issues WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical') AND related_entity_id IS NOT NULL",
-            )?;
-            let rows = stmt.query_map(params![scope_key], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })?;
-            for row in rows {
-                let (entity_id, issue_id) = row?;
-                open_blocker_issues
-                    .entry(entity_id)
-                    .or_default()
-                    .push(issue_id);
-            }
-        }
-
-        // Pre-load: all open high/critical review points for the scope
-        let mut open_blocker_review_points: HashMap<String, Vec<String>> = HashMap::new();
-        {
-            let mut stmt = connection.prepare(
-                "SELECT attached_entity_id, id FROM review_points WHERE scope_key = ?1 AND status = 'open' AND severity IN ('high', 'critical')",
-            )?;
-            let rows = stmt.query_map(params![scope_key], |row| {
-                Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))
-            })?;
-            for row in rows {
-                let (entity_id, rp_id) = row?;
-                open_blocker_review_points
-                    .entry(entity_id)
-                    .or_default()
-                    .push(rp_id);
-            }
-        }
-
-        // Collect active corrective blockers for this scope
-        let mut active_blockers: Vec<(String, String, Vec<String>)> = Vec::new(); // (blocker_id, blocker_title, blocked_ids)
-        for wp in &all_work_points {
-            if wp.kind != WorkPointKind::Feature
-                && !wp.blocks_work_point_ids.is_empty()
-                && !matches!(
-                    wp.status,
-                    WorkPointStatus::Completed
-                        | WorkPointStatus::Cancelled
-                        | WorkPointStatus::Invalidated
-                )
-            {
-                active_blockers.push((
-                    wp.id.clone(),
-                    wp.title.clone(),
-                    wp.blocks_work_point_ids.clone(),
-                ));
-            }
-        }
-
-        // Build set of all blocked work point IDs
-        let mut blocked_set: HashMap<String, (String, String)> = HashMap::new(); // blocked_id -> (blocker_id, blocker_title)
-        for (blocker_id, blocker_title, blocked_ids) in &active_blockers {
-            for bid in blocked_ids {
-                blocked_set.insert(bid.clone(), (blocker_id.clone(), blocker_title.clone()));
-            }
-        }
-
-        let mut candidates = Vec::new();
-        let mut blocked_candidates = Vec::new();
-
-        for wp in &all_work_points {
-            // Skip terminal statuses
-            if matches!(
-                wp.status,
-                WorkPointStatus::Completed
-                    | WorkPointStatus::Cancelled
-                    | WorkPointStatus::Invalidated
-                    | WorkPointStatus::Blocked
-            ) {
-                continue;
-            }
-
-            // Check if blocked by active corrective work
-            if let Some((blocker_id, blocker_title)) = blocked_set.get(&wp.id) {
-                blocked_candidates.push(BlockedCandidate {
-                    work_point_id: wp.id.clone(),
-                    work_point_title: wp.title.clone(),
-                    blocker_id: blocker_id.clone(),
-                    blocker_title: blocker_title.clone(),
-                    reason: format!("blocked_by:{}", blocker_id),
-                });
-                continue;
-            }
-
-            // Check active leases
-            let active_lease_count: i64 = connection.query_row(
-                "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
-                params![wp.id, now],
-                |row| row.get(0),
-            )?;
-            if active_lease_count > 0 {
-                continue;
-            }
-
-            // Check dependencies exist and are completed
-            let mut all_deps_exist = true;
-            let mut all_deps_completed = true;
-            let mut dependency_titles = Vec::new();
-
-            for dep_id in &wp.dependency_ids {
-                match load_work_point(&connection, dep_id) {
-                    Ok(dep) => {
-                        dependency_titles.push(dep.title.clone());
-                        if dep.status != WorkPointStatus::Completed {
-                            all_deps_completed = false;
-                        }
-                    }
-                    Err(_) => {
-                        all_deps_exist = false;
-                        dependency_titles.push(format!("<missing: {dep_id}>"));
-                    }
-                }
-            }
-
-            if !all_deps_exist {
-                continue;
-            }
-            if !all_deps_completed {
-                continue;
-            }
-
-            let mut reasons = Vec::new();
-            if wp.status == WorkPointStatus::Draft || wp.status == WorkPointStatus::Proposed {
-                reasons.push("status is ready for work".to_string());
-            }
-            if wp.dependency_ids.is_empty() {
-                reasons.push("no dependencies".to_string());
-            } else {
-                reasons.push("all dependencies completed".to_string());
-            }
-
-            // Determine required_reason based on ranking tier
-            let required_reason = if wp.kind != WorkPointKind::Feature
-                && (wp.priority == Priority::Urgent || wp.priority == Priority::High)
-            {
-                Some("urgent_fix".to_string())
-            } else if wp.repairs_work_point_ids.iter().any(|id| {
-                open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
-            }) || wp.supersedes_work_point_ids.iter().any(|id| {
-                open_blocker_issues.contains_key(id) || open_blocker_review_points.contains_key(id)
-            }) {
-                Some("resolves_blocker".to_string())
-            } else {
-                Some("ready".to_string())
-            };
-
-            candidates.push(RunnableWorkPointCandidate {
-                work_point: wp.clone(),
-                roadmap_id: roadmap_id.to_string(),
-                roadmap_title: roadmap.title.clone(),
-                dependency_titles,
-                reasons,
-                required_reason,
-            });
-        }
-
-        // Sort by ranking tiers: urgent_fix > resolves_blocker > ready, then by ordering
-        fn tier_rank(reason: &Option<String>) -> u8 {
-            match reason.as_deref() {
-                Some("urgent_fix") => 0,
-                Some("resolves_blocker") => 1,
-                _ => 2,
-            }
-        }
-
-        candidates.sort_by(|a, b| {
-            tier_rank(&a.required_reason)
-                .cmp(&tier_rank(&b.required_reason))
-                .then_with(|| a.work_point.ordering.cmp(&b.work_point.ordering))
-                .then_with(|| a.work_point.id.cmp(&b.work_point.id))
-        });
-
-        Ok(RunnableCandidates {
-            roadmap_id: roadmap_id.to_string(),
-            candidates,
-            blocked: blocked_candidates,
-        })
+        find_runnable_work_points_in_connection(&connection, roadmap_id)
     }
 
     pub fn build_work_graph(&self, roadmap_id: &str) -> Result<WorkGraph, PlanningStoreError> {
@@ -7099,6 +8197,133 @@ impl PlanningStore {
         })
     }
 
+    pub fn apply_roadmap_scaffold(
+        &self,
+        scaffold: RoadmapScaffoldFile,
+        active_scope_key: Option<String>,
+        correlation_id: Option<String>,
+        dry_run: bool,
+        if_exists: ScaffoldIfExists,
+    ) -> Result<RoadmapScaffoldResult, PlanningStoreError> {
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let scope_key = scaffold
+            .scope_key
+            .clone()
+            .or(active_scope_key)
+            .map(|value| normalize_scope_key_value(&value))
+            .unwrap_or_else(|| DEFAULT_SCOPE_KEY.to_string());
+        let correlation_id = correlation_id.unwrap_or_else(|| "roadmap-scaffold".to_string());
+        let now = now_string()?;
+        let mut result = RoadmapScaffoldResult {
+            created: Vec::new(),
+            updated: Vec::new(),
+            unchanged: Vec::new(),
+            skipped: Vec::new(),
+            rejected: Vec::new(),
+            validation_findings: Vec::new(),
+            next_runnable_work_points: serde_json::Value::Null,
+        };
+
+        scaffold_apply_scope(&transaction, &mut result, &scope_key, dry_run, &now)?;
+        scaffold_apply_goal(
+            &transaction,
+            &mut result,
+            &scope_key,
+            &correlation_id,
+            &scaffold.goal,
+            if_exists,
+            &now,
+        )?;
+        scaffold_apply_roadmap(
+            &transaction,
+            &mut result,
+            &scope_key,
+            &correlation_id,
+            &scaffold,
+            if_exists,
+            &now,
+        )?;
+        for section in &scaffold.sections {
+            scaffold_apply_section(
+                &transaction,
+                &mut result,
+                &scope_key,
+                &scaffold.roadmap.id,
+                section,
+                if_exists,
+                &now,
+            )?;
+        }
+        for work_point in &scaffold.work_points {
+            scaffold_apply_work_point(
+                &transaction,
+                &mut result,
+                &scope_key,
+                &scaffold.roadmap.id,
+                work_point,
+                if_exists,
+                &now,
+            )?;
+        }
+        if let Some(plan) = &scaffold.plan {
+            scaffold_apply_plan(
+                &transaction,
+                &mut result,
+                &scope_key,
+                &scaffold.goal.id,
+                &scaffold.roadmap.id,
+                plan,
+                if_exists,
+                &correlation_id,
+                &now,
+            )?;
+        }
+        for todo in &scaffold.todos {
+            scaffold_apply_todo(
+                &transaction,
+                &mut result,
+                &scope_key,
+                scaffold.plan.as_ref().map(|plan| plan.id.as_str()),
+                todo,
+                if_exists,
+                &now,
+            )?;
+        }
+
+        let entities = collect_entities_in_scope(&transaction, &scope_key)?;
+        for (entity_type, entity_id) in entities {
+            let findings = validate_entity(&transaction, entity_type, &entity_id)?;
+            result.validation_findings.extend(findings);
+        }
+        if result.rejected.is_empty() {
+            result.next_runnable_work_points = serde_json::to_value(
+                find_runnable_work_points_in_connection(&transaction, &scaffold.roadmap.id)?,
+            )?;
+        }
+
+        if dry_run || !result.rejected.is_empty() {
+            transaction.rollback()?;
+        } else {
+            let mut findings_by_entity = HashMap::<(String, String), Vec<ValidationFinding>>::new();
+            for finding in &result.validation_findings {
+                findings_by_entity
+                    .entry((
+                        finding.entity_type.as_str().to_string(),
+                        finding.entity_id.clone(),
+                    ))
+                    .or_default()
+                    .push(finding.clone());
+            }
+            for ((entity_type, entity_id), findings) in findings_by_entity {
+                let entity_type = parse_entity_type(entity_type)?;
+                persist_validation_findings(&transaction, entity_type, &entity_id, &findings)?;
+            }
+            transaction.commit()?;
+        }
+        Ok(result)
+    }
+
     /// Internal: upsert a graph node within an existing transaction.
     fn upsert_graph_node_in_tx(
         &self,
@@ -7637,10 +8862,11 @@ fn create_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError>
 
     connection.execute_batch(
         r#"
-        CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(entity_id UNINDEXED, title, content, tokenize='porter');
+        CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(entity_id UNINDEXED, entity_type UNINDEXED, scope_key UNINDEXED, title, content, tokenize='porter');
         CREATE VIRTUAL TABLE IF NOT EXISTS insights_fts USING fts5(entity_id UNINDEXED, title, content, tokenize='porter');
         "#,
     )?;
+    ensure_entities_fts_schema(connection)?;
 
     connection.execute_batch(
         r#"
@@ -7964,36 +9190,44 @@ fn migrate_v4_to_v5(connection: &Transaction<'_>) -> Result<(), PlanningStoreErr
 
     connection.execute_batch(
         r#"
-        CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(entity_id UNINDEXED, title, content, tokenize='porter');
+        CREATE VIRTUAL TABLE IF NOT EXISTS entities_fts USING fts5(entity_id UNINDEXED, entity_type UNINDEXED, scope_key UNINDEXED, title, content, tokenize='porter');
         CREATE VIRTUAL TABLE IF NOT EXISTS insights_fts USING fts5(entity_id UNINDEXED, title, content, tokenize='porter');
         "#,
     )?;
+    ensure_entities_fts_schema(connection)?;
 
     rebuild_all_tag_indexes(connection)?;
 
-    for (table, id_column, title_column, content_column) in [
-        ("goals", "id", "title", "description"),
-        ("roadmaps", "id", "title", "summary"),
-        ("work_points", "id", "title", "summary"),
-        ("plans", "id", "title", "summary"),
-        ("todos", "id", "title", "summary"),
-        ("issues", "id", "title", "summary"),
+    for (table, entity_type, id_column, title_column, content_column) in [
+        ("goals", EntityType::Goal, "id", "title", "description"),
+        ("roadmaps", EntityType::Roadmap, "id", "title", "summary"),
+        (
+            "work_points",
+            EntityType::WorkPoint,
+            "id",
+            "title",
+            "summary",
+        ),
+        ("plans", EntityType::Plan, "id", "title", "summary"),
+        ("todos", EntityType::Todo, "id", "title", "summary"),
+        ("issues", EntityType::Issue, "id", "title", "summary"),
     ] {
         let mut statement = connection.prepare(&format!(
-            "SELECT {id_column}, {title_column}, {content_column} FROM {table}"
+            "SELECT {id_column}, scope_key, {title_column}, {content_column} FROM {table}"
         ))?;
         let rows = statement.query_map([], |row| {
             Ok((
                 row.get::<_, String>(0)?,
                 row.get::<_, String>(1)?,
                 row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
             ))
         })?;
         for row in rows {
-            let (id, title, content) = row?;
+            let (id, scope_key, title, content) = row?;
             connection.execute(
-                "INSERT INTO entities_fts (entity_id, title, content) VALUES (?1, ?2, ?3)",
-                params![id, title, content],
+                "INSERT INTO entities_fts (entity_id, entity_type, scope_key, title, content) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, entity_type.as_str(), scope_key, title, content],
             )?;
         }
     }
@@ -8299,6 +9533,56 @@ fn rebuild_all_tag_indexes(connection: &Transaction<'_>) -> Result<(), PlanningS
                     params![scope_key, entity_type.as_str(), id, tag],
                 )?;
             }
+        }
+    }
+    Ok(())
+}
+
+fn ensure_entities_fts_schema(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    let mut statement = connection.prepare("PRAGMA table_info(entities_fts)")?;
+    let rows = statement.query_map([], |row| row.get::<_, String>(1))?;
+    let columns = collect_rows(rows)?;
+    let has_typed_scope = columns.iter().any(|column| column == "entity_type")
+        && columns.iter().any(|column| column == "scope_key");
+    if has_typed_scope {
+        return Ok(());
+    }
+
+    connection.execute("DROP TABLE IF EXISTS entities_fts", [])?;
+    connection.execute(
+        "CREATE VIRTUAL TABLE entities_fts USING fts5(entity_id UNINDEXED, entity_type UNINDEXED, scope_key UNINDEXED, title, content, tokenize='porter')",
+        [],
+    )?;
+    rebuild_entities_fts(connection)
+}
+
+fn rebuild_entities_fts(connection: &Transaction<'_>) -> Result<(), PlanningStoreError> {
+    connection.execute("DELETE FROM entities_fts", [])?;
+    for (table, entity_type, content_column) in [
+        ("goals", EntityType::Goal, "description"),
+        ("roadmaps", EntityType::Roadmap, "summary"),
+        ("work_points", EntityType::WorkPoint, "summary"),
+        ("plans", EntityType::Plan, "summary"),
+        ("todos", EntityType::Todo, "summary"),
+        ("issues", EntityType::Issue, "summary"),
+    ] {
+        let mut statement = connection.prepare(&format!(
+            "SELECT id, scope_key, title, {content_column} FROM {table}"
+        ))?;
+        let rows = statement.query_map([], |row| {
+            Ok((
+                row.get::<_, String>(0)?,
+                row.get::<_, String>(1)?,
+                row.get::<_, String>(2)?,
+                row.get::<_, String>(3)?,
+            ))
+        })?;
+        for row in rows {
+            let (id, scope_key, title, content) = row?;
+            connection.execute(
+                "INSERT INTO entities_fts (entity_id, entity_type, scope_key, title, content) VALUES (?1, ?2, ?3, ?4, ?5)",
+                params![id, entity_type.as_str(), scope_key, title, content],
+            )?;
         }
     }
     Ok(())
@@ -9695,6 +10979,7 @@ fn fts_health(connection: &Connection) -> Result<FtsHealthReport, PlanningStoreE
         0
     };
     let source_entity_count = count_v1_fts_source_entities(connection)?;
+    let by_entity_type = fts_health_by_entity_type(connection, entities_present)?;
     let mut findings = Vec::new();
     if !entities_present {
         findings.push("missing entities_fts table".to_string());
@@ -9707,11 +10992,15 @@ fn fts_health(connection: &Connection) -> Result<FtsHealthReport, PlanningStoreE
             "entities_fts indexed {indexed_entity_count} rows but source entities contain {source_entity_count} rows"
         ));
     }
+    for entity in &by_entity_type {
+        findings.extend(entity.findings.iter().cloned());
+    }
 
     Ok(FtsHealthReport {
         tables_present,
         indexed_entity_count,
         source_entity_count,
+        by_entity_type,
         findings,
     })
 }
@@ -9729,6 +11018,46 @@ fn count_v1_fts_source_entities(connection: &Connection) -> Result<i64, Planning
         total += count_table(connection, table)?;
     }
     Ok(total)
+}
+
+fn fts_health_by_entity_type(
+    connection: &Connection,
+    entities_present: bool,
+) -> Result<Vec<FtsEntityHealth>, PlanningStoreError> {
+    let mut rows = Vec::new();
+    for (table, entity_type) in [
+        ("goals", EntityType::Goal),
+        ("roadmaps", EntityType::Roadmap),
+        ("work_points", EntityType::WorkPoint),
+        ("plans", EntityType::Plan),
+        ("todos", EntityType::Todo),
+        ("issues", EntityType::Issue),
+    ] {
+        let source_count = count_table(connection, table)?;
+        let indexed_count = if entities_present {
+            connection.query_row(
+                "SELECT COUNT(*) FROM entities_fts WHERE entity_type = ?1",
+                params![entity_type.as_str()],
+                |row| row.get(0),
+            )?
+        } else {
+            0
+        };
+        let mut findings = Vec::new();
+        if entities_present && indexed_count != source_count {
+            findings.push(format!(
+                "entities_fts indexed {indexed_count} {} rows but source table contains {source_count}",
+                entity_type.as_str()
+            ));
+        }
+        rows.push(FtsEntityHealth {
+            entity_type: entity_type.as_str().to_string(),
+            source_count,
+            indexed_count,
+            findings,
+        });
+    }
+    Ok(rows)
 }
 
 fn row_to_goal(row: &Row<'_>) -> Result<GoalRecord, rusqlite::Error> {
@@ -10848,17 +12177,35 @@ fn rebuild_tag_index_for_entity(
 
 fn upsert_fts_entry(
     connection: &Transaction<'_>,
-    fts_table: &str,
+    entity_type: EntityType,
+    scope_key: &str,
     row_id: &str,
     title: &str,
     content: &str,
 ) -> Result<(), PlanningStoreError> {
     connection.execute(
-        &format!("DELETE FROM {fts_table} WHERE entity_id = ?1"),
+        "DELETE FROM entities_fts WHERE entity_id = ?1 AND entity_type = ?2 AND scope_key = ?3",
+        params![row_id, entity_type.as_str(), scope_key],
+    )?;
+    connection.execute(
+        "INSERT INTO entities_fts (entity_id, entity_type, scope_key, title, content) VALUES (?1, ?2, ?3, ?4, ?5)",
+        params![row_id, entity_type.as_str(), scope_key, title, content],
+    )?;
+    Ok(())
+}
+
+fn upsert_insights_fts_entry(
+    connection: &Transaction<'_>,
+    row_id: &str,
+    title: &str,
+    content: &str,
+) -> Result<(), PlanningStoreError> {
+    connection.execute(
+        "DELETE FROM insights_fts WHERE entity_id = ?1",
         params![row_id],
     )?;
     connection.execute(
-        &format!("INSERT INTO {fts_table} (entity_id, title, content) VALUES (?1, ?2, ?3)"),
+        "INSERT INTO insights_fts (entity_id, title, content) VALUES (?1, ?2, ?3)",
         params![row_id, title, content],
     )?;
     Ok(())
@@ -10900,16 +12247,28 @@ fn search_entity_fts(
     connection: &Connection,
     fts_table: &str,
     query: &str,
+    entity_type: Option<EntityType>,
+    scope_key: Option<&str>,
 ) -> Result<Option<Vec<String>>, PlanningStoreError> {
     let fts_query = format!("\"{query}\"");
-    let mut statement = connection.prepare(&format!(
-        "SELECT entity_id FROM {fts_table} WHERE {fts_table} MATCH ?1"
-    ))?;
-    let rows = statement.query_map(params![fts_query], |row| row.get::<_, String>(0))?;
+    let rows = if let (Some(entity_type), Some(scope_key)) = (entity_type, scope_key) {
+        let mut statement = connection.prepare(&format!(
+            "SELECT entity_id FROM {fts_table} WHERE {fts_table} MATCH ?1 AND entity_type = ?2 AND scope_key = ?3"
+        ))?;
+        let rows = statement
+            .query_map(params![fts_query, entity_type.as_str(), scope_key], |row| {
+                row.get::<_, String>(0)
+            })?;
+        collect_rows(rows)?
+    } else {
+        let mut statement = connection.prepare(&format!(
+            "SELECT entity_id FROM {fts_table} WHERE {fts_table} MATCH ?1"
+        ))?;
+        let rows = statement.query_map(params![fts_query], |row| row.get::<_, String>(0))?;
+        collect_rows(rows)?
+    };
     let mut ids = Vec::new();
-    for row in rows {
-        ids.push(row?);
-    }
+    ids.extend(rows);
     Ok(Some(ids))
 }
 
@@ -10949,7 +12308,22 @@ fn search_entity(
         param_index += 1;
     }
     if let Some(fts) = &input.fts {
-        if let Some(rowids) = search_entity_fts(connection, "entities_fts", fts)? {
+        let entity_type = match entity_type_label {
+            "goal" => EntityType::Goal,
+            "roadmap" => EntityType::Roadmap,
+            "work-point" => EntityType::WorkPoint,
+            "plan" => EntityType::Plan,
+            "todo" => EntityType::Todo,
+            "issue" => EntityType::Issue,
+            _ => EntityType::Goal,
+        };
+        if let Some(rowids) = search_entity_fts(
+            connection,
+            "entities_fts",
+            fts,
+            Some(entity_type),
+            Some(&scope_key),
+        )? {
             if rowids.is_empty() {
                 return Ok(Vec::new());
             }

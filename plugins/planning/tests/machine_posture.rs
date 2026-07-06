@@ -6206,6 +6206,129 @@ fn v1_entity_fts_search_uses_shared_index() {
 }
 
 #[test]
+fn typed_scoped_fts_does_not_cross_contaminate_ids_or_scopes() {
+    let temp_dir = unique_temp_dir("elegy-typed-scoped-fts");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-fts-collision",
+        "goal",
+        "create",
+        "--id",
+        "shared-fts-id",
+        "--title",
+        "Plain Goal",
+        "--description",
+        "Goal text does not contain the unique roadmap token.",
+        "--acceptance",
+        "done",
+    ]);
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-fts-collision",
+        "roadmap",
+        "create",
+        "--id",
+        "shared-fts-id",
+        "--goal-id",
+        "shared-fts-id",
+        "--title",
+        "RoadmapOnlyNeedle",
+        "--summary",
+        "This row intentionally shares an id with the goal.",
+    ]);
+
+    let goal_search = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "search",
+        "--fts",
+        "RoadmapOnlyNeedle",
+    ]);
+    assert_eq!(goal_search["status"], "ok");
+    assert_eq!(
+        goal_search["data"]["results"]
+            .as_array()
+            .expect("results")
+            .len(),
+        0
+    );
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "scope",
+        "create",
+        "--scope-key",
+        "scope-b",
+    ]);
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-scope-b",
+        "--scope",
+        "scope-b",
+        "goal",
+        "create",
+        "--id",
+        "scope-b-goal",
+        "--title",
+        "Scope B Goal",
+        "--description",
+        "ScopeBNeedle target",
+        "--acceptance",
+        "done",
+    ]);
+
+    let default_scope_search = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "default",
+        "goal",
+        "search",
+        "--fts",
+        "ScopeBNeedle",
+    ]);
+    assert_eq!(default_scope_search["status"], "ok");
+    assert_eq!(
+        default_scope_search["data"]["results"]
+            .as_array()
+            .expect("results")
+            .len(),
+        0
+    );
+
+    let health = command_json(&["--db", db, "--json", "--non-interactive", "health"]);
+    let by_type = health["data"]["fts"]["byEntityType"]
+        .as_array()
+        .expect("byEntityType");
+    assert!(by_type
+        .iter()
+        .any(|entry| entry["entityType"] == "goal" && entry["sourceCount"] == 2));
+}
+
+#[test]
 fn show_accepts_id_alias_and_status_errors_suggest_next_command() {
     let temp_dir = unique_temp_dir("elegy-show-id-status-hint");
     let db_path = temp_dir.join("planning.db");
@@ -6398,4 +6521,278 @@ todos:
     ]);
     assert_eq!(show["status"], "ok");
     assert_eq!(show["data"]["roadmap"]["id"], "scaffold-roadmap");
+}
+
+#[test]
+fn roadmap_scaffold_rejected_apply_rolls_back_created_records() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-rollback");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+    let scaffold_path = temp_dir.join("invalid-roadmap.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: rollback-goal
+  title: Rollback Goal
+  description: Must not persist after rejected apply.
+roadmap:
+  id: rollback-roadmap
+  title: Rollback Roadmap
+  summary: Rejected workflow.
+workPoints:
+  - id: rollback-wp-1
+    title: First
+    summary: Valid first work point.
+  - id: rollback-wp-2
+    title: Second
+    summary: Invalid dependency.
+    dependencyIds:
+      - missing-work-point
+"#,
+    )
+    .expect("write scaffold file");
+
+    let applied = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+    ]);
+    assert_eq!(applied["status"], "ok");
+    assert!(applied["data"]["rejected"]
+        .as_array()
+        .expect("rejected")
+        .iter()
+        .any(|item| item["entityId"] == "rollback-wp-2"));
+
+    let show_goal = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "rollback-goal",
+    ]);
+    assert_eq!(show_goal["status"], "invalid");
+}
+
+#[test]
+fn roadmap_scaffold_invalid_todo_plan_reference_rolls_back() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-todo-rollback");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+    let scaffold_path = temp_dir.join("invalid-todo.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: todo-rollback-goal
+  title: Todo Rollback Goal
+  description: Must not persist after invalid todo.
+roadmap:
+  id: todo-rollback-roadmap
+  title: Todo Rollback Roadmap
+  summary: Invalid todo parent.
+todos:
+  - id: todo-rollback-item
+    planId: missing-plan
+    title: Invalid parent todo
+"#,
+    )
+    .expect("write scaffold file");
+
+    let dry_run = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--dry-run",
+    ]);
+    assert_eq!(dry_run["status"], "ok");
+    assert!(dry_run["data"]["rejected"]
+        .as_array()
+        .expect("rejected")
+        .iter()
+        .any(|item| item["entityId"] == "todo-rollback-item"));
+
+    let applied = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+    ]);
+    assert_eq!(applied["status"], "ok");
+    assert!(applied["data"]["rejected"]
+        .as_array()
+        .expect("rejected")
+        .iter()
+        .any(|item| item["reason"] == "unresolved plan"));
+
+    let show_goal = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "todo-rollback-goal",
+    ]);
+    assert_eq!(show_goal["status"], "invalid");
+}
+
+#[test]
+fn roadmap_scaffold_update_reports_supported_changes_and_rejects_parent_drift() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-update");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+    let scaffold_path = temp_dir.join("roadmap.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: update-goal
+  title: Original Goal
+  description: Original description.
+roadmap:
+  id: update-roadmap
+  title: Original Roadmap
+  summary: Original summary.
+plan:
+  id: update-plan
+  title: Original Plan
+  summary: Original plan summary.
+todos:
+  - id: update-todo
+    title: Original Todo
+"#,
+    )
+    .expect("write initial scaffold");
+    let first = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+    ]);
+    assert_eq!(first["status"], "ok");
+
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: update-goal
+  title: Revised Goal
+  description: Revised description.
+roadmap:
+  id: update-roadmap
+  title: Revised Roadmap
+  summary: Revised summary.
+plan:
+  id: update-plan
+  title: Revised Plan
+  summary: Revised plan summary.
+todos:
+  - id: update-todo
+    title: Revised Todo
+"#,
+    )
+    .expect("write updated scaffold");
+    let updated = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+        "--if-exists",
+        "update",
+    ]);
+    assert_eq!(updated["status"], "ok");
+    assert!(updated["data"]["updated"]
+        .as_array()
+        .expect("updated")
+        .iter()
+        .any(|item| item["entityId"] == "update-roadmap"));
+    let shown = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "update-goal",
+    ]);
+    assert_eq!(shown["data"]["goal"]["title"], "Revised Goal");
+
+    let drift_path = temp_dir.join("drift.yaml");
+    fs::write(
+        &drift_path,
+        r#"
+goal:
+  id: drift-goal
+  title: Drift Goal
+  description: Should roll back.
+roadmap:
+  id: update-roadmap
+  title: Illegal Parent Drift
+  summary: Existing roadmap cannot move goals.
+"#,
+    )
+    .expect("write drift scaffold");
+    let drift = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        drift_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+        "--if-exists",
+        "update",
+    ]);
+    assert_eq!(drift["status"], "ok");
+    assert!(drift["data"]["rejected"]
+        .as_array()
+        .expect("rejected")
+        .iter()
+        .any(|item| item["reason"] == "unsupported update field: goalId"));
+    let rolled_back_goal = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "goal",
+        "show",
+        "--id",
+        "drift-goal",
+    ]);
+    assert_eq!(rolled_back_goal["status"], "invalid");
 }
