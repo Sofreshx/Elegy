@@ -1,11 +1,11 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use elegy_plugin_sdk::{
     export_plugin_v1_with_codex_mode_and_binary, inspect_plugin_v1, pack_plugin_v1,
-    pack_plugin_v1_with_binary, resolve_plugin_root, scaffold_plugin_v1_repository_with_mode,
-    select_marketplace_artifact, validate_elegy_marketplace_v1, validate_elegy_plugin_v1,
-    verify_plugin_v1, CodexProjectionMode, ElegyMarketplaceArtifact, ElegyMarketplaceInterface,
-    ElegyMarketplacePlugin, ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1,
-    PluginArchiveBinary, PluginScaffoldMode, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
+    pack_plugin_v1_with_binary, resolve_plugin_root, select_marketplace_artifact,
+    validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, CodexProjectionMode,
+    ElegyMarketplaceArtifact, ElegyMarketplaceInterface, ElegyMarketplacePlugin,
+    ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, PluginArchiveBinary,
+    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -26,25 +26,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Scaffold a minimal Elegy plugin repository
-    Scaffold {
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        description: String,
-        #[arg(long, default_value = "0.1.0")]
-        version: String,
-        #[arg(long)]
-        output: PathBuf,
-        #[arg(long)]
-        author: String,
-        #[arg(long, default_value = "")]
-        license: String,
-        #[arg(long, default_value = "")]
-        repository: String,
-        #[arg(long, value_enum, default_value_t = ScaffoldMode::SkillOnly)]
-        mode: ScaffoldMode,
-    },
     /// Verify a plugin package (validates manifest and skills)
     Verify {
         /// Path to plugin directory, .elegy-plugin dir, or plugin.json
@@ -221,56 +202,9 @@ struct MarketplaceListOutput<'a> {
     plugins: Vec<MarketplacePluginSummary<'a>>,
 }
 
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
-enum ScaffoldMode {
-    #[default]
-    SkillOnly,
-    RustCli,
-    McpServer,
-}
-
-impl From<ScaffoldMode> for PluginScaffoldMode {
-    fn from(value: ScaffoldMode) -> Self {
-        match value {
-            ScaffoldMode::SkillOnly => Self::SkillOnly,
-            ScaffoldMode::RustCli => Self::RustCli,
-            ScaffoldMode::McpServer => Self::McpServer,
-        }
-    }
-}
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scaffold {
-            name,
-            description,
-            version,
-            output,
-            author,
-            license,
-            repository,
-            mode,
-        } => match scaffold_plugin_v1_repository_with_mode(
-            &name,
-            &description,
-            &version,
-            &output,
-            &author,
-            &license,
-            &repository,
-            mode.into(),
-        ) {
-            Ok(files) => {
-                println!("Plugin scaffolded successfully.");
-                println!("  mode: {mode:?}  files: {}", files.len());
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                eprintln!("Error: {error}");
-                ExitCode::from(2)
-            }
-        },
         Command::Verify { plugin } => {
             // verify_plugin_v1 expects the .elegy-plugin directory directly.
             let (repo_root, _manifest) = match resolve_plugin_root(&plugin) {

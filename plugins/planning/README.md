@@ -16,6 +16,29 @@ It is intentionally not an extension of `elegy-memory`.
 
 This crate uses SQLite as the MVP authority and keeps a structured event log plus current-state projection tables.
 
+## Setup
+
+Run from the repo root during development:
+
+```bash
+cargo run -p elegy-planning -- --help
+```
+
+Use a stable database path for durable local planning state:
+
+```bash
+cargo run -p elegy-planning -- --db .elegy/planning.db --scope <scope-key> --json --non-interactive health
+```
+
+Agent automation should always pass:
+
+- `--db <path>` when the default repo-local database is not intended
+- `--scope <scope-key>` instead of relying on `default`
+- `--json --non-interactive --correlation-id <id>` on mutating commands
+
+SQLite is opened with a bounded busy timeout. Agents should still serialize
+mutating calls instead of launching parallel writes.
+
 ## MVP Behavior
 
 The implemented MVP supports:
@@ -26,6 +49,8 @@ The implemented MVP supports:
 - non-blocking validation findings in `validation_findings`
 - machine-friendly CLI output with `--json`, `--non-interactive`, and `--correlation-id`
 - on-demand markdown or JSON projections for key entities
+- FTS5 search across v1 entities with typed and scoped index rows
+- transactional v1 roadmap scaffolding from YAML or JSON
 
 Machine-mode runtime failures emit structured JSON envelopes. Missing required parent references are rejected as invalid input before SQLite insert time so callers do not receive raw foreign-key failures.
 
@@ -38,6 +63,25 @@ The current MVP intentionally keeps validation advisory-first:
 When a write changes another entity's validation posture, dependent findings are refreshed as part of the same write flow so reads do not return stale validation state.
 
 This follows the current design choice to help an LLM or operator keep moving while surfacing what must be fixed next.
+
+## Operating Ideology
+
+`elegy-planning` is an agent contract, not a note-taking format.
+
+- SQLite is authority. Projections, templates, and skill docs route agents to
+  the authority; they do not replace it.
+- Scope is part of identity. Agents should pass scope explicitly and reject
+  surprising cross-scope references.
+- Authoring should be batch-safe. `roadmap scaffold` dry-run and apply use the
+  same transaction path so an agent can preview, inspect `rejected`, then apply
+  without changing semantics.
+- Validation is advisory but durable. Structural write invariants block bad
+  records; planning quality findings are stored and surfaced so the next agent
+  can continue from evidence.
+- Events matter. Durable writes should append events so later review can
+  reconstruct what happened and why.
+- IDs are automation handles. Prefer explicit stable IDs over generated IDs in
+  agent-authored workflows.
 
 ## Implemented Entity Rules
 
@@ -93,6 +137,9 @@ The SQLite schema currently includes:
 - `review_points`
 - `planning_events`
 - `validation_findings`
+- `tag_index`
+- `entities_fts`
+- `insights_fts`
 
 `planning_events` stores append-only event history with:
 
@@ -116,6 +163,10 @@ Event listing is scope-aware: `events` returns only events for the active scope.
 
 `sequence` is stream-local to `stream_id`. Flat event listing uses append order rather than treating `sequence` as a global ordering key.
 
+`entities_fts` stores typed and scoped rows: `entity_id`, `entity_type`,
+`scope_key`, `title`, and `content`. `health` reports aggregate and per-entity
+drift so index problems are visible to agents.
+
 ## CLI
 
 Global flags:
@@ -131,9 +182,10 @@ Implemented commands:
 - `scope create|list|show`
 - `goal create|list|show|update-status`
 - `roadmap create|add-section|add-work-point|list|show|update-status`
-- `work-point list|show|update-status`
+- `roadmap scaffold --file <yaml|json> --dry-run|--apply --if-exists fail|skip|update`
+- `work-point list|show|revise|update-status`
 - `plan create|list|show|revise|update-status`
-- `todo create|list|update-status`
+- `todo create|list|show|update-status`
 - `issue record|list|show|update-status`
 - `review-point record|update-status`
 - `validate all`
@@ -163,6 +215,44 @@ cargo run -p elegy-planning -- --json --non-interactive --correlation-id corr-pl
 ```bash
 cargo run -p elegy-planning -- --json validate all
 ```
+
+## Roadmap Scaffold
+
+`roadmap scaffold` is the v1 batch authoring surface for the common
+goal → roadmap → sections → work-points → plan → todos flow.
+
+```bash
+cargo run -p elegy-planning -- --scope <scope-key> --json --non-interactive \
+  --correlation-id corr-scaffold-1 roadmap scaffold \
+  --file roadmap.yaml --dry-run
+```
+
+```bash
+cargo run -p elegy-planning -- --scope <scope-key> --json --non-interactive \
+  --correlation-id corr-scaffold-1 roadmap scaffold \
+  --file roadmap.yaml --apply --if-exists update
+```
+
+Semantics:
+
+- dry-run and apply share the same transaction path
+- apply rolls back every scaffold-created or scaffold-updated row when any
+  entity is rejected
+- work-point dependencies may reference work-points declared later in the same
+  file
+- omitted ordering on update preserves existing ordering
+- `--if-exists fail` rejects existing records
+- `--if-exists skip` leaves existing records untouched
+- `--if-exists update` updates supported content fields and rejects parent-link
+  drift such as moving a roadmap to another goal
+- result fields are `created`, `updated`, `unchanged`, `skipped`, `rejected`,
+  `validationFindings`, and `nextRunnableWorkPoints`
+
+Scaffold validation output is limited to touched scaffold entities and directly
+affected parents. Use `validate all` for a full-scope audit.
+
+Use `template render --template roadmap-workflow --output roadmap.yaml` to start
+from the maintained scaffold template.
 
 ## Projection Rendering
 

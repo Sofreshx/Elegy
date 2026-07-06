@@ -256,6 +256,31 @@
       ]
     },
     {
+      "name": "elegy-plugin-authoring",
+      "source": {
+        "source": "local",
+        "path": "./plugins/plugin-authoring"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-plugin-authoring-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
       "name": "elegy-skills",
       "source": {
         "source": "local",

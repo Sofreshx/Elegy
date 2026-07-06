@@ -34,7 +34,7 @@ the portable contract.
 | `author` | `ElegyPluginV1Author` | validator, inspect, export/import | Keep portable publisher metadata. |
 | `license` | `ElegyPluginV1` | export/import | Keep portable package metadata. |
 | `repository` | `ElegyPluginV1` | validator, export/import | Keep portable package metadata. |
-| `skills` | `ElegyPluginV1` | verifier, inspect, export, pack, scaffold | Keep portable component path. |
+| `skills` | `ElegyPluginV1` | verifier, inspect, export, pack | Keep portable component path. |
 | `mcpServers` | `ElegyPluginV1` | verifier, inspect, Claude export, pack | Keep portable descriptor path. Do not reuse it for Codex runtime config. |
 | `extensions` | `ElegyPluginV1` | extension validator and host adapters | Keep optional. Omit empty maps and empty host extensions. |
 
