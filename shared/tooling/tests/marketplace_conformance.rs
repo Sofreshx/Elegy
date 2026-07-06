@@ -52,7 +52,8 @@ fn generated_marketplace_is_valid() {
     let marketplace = load_marketplace();
 
     assert_eq!(
-        marketplace.schema_version, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION
+        marketplace.schema_version,
+        ELEGY_MARKETPLACE_V1_SCHEMA_VERSION
     );
     let validation = validate_elegy_marketplace_v1(&marketplace);
     assert!(

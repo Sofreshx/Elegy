@@ -18,10 +18,10 @@ use crate::{
     BlockedCandidate, DiscoveryCheckpointRecord, DiscoveryClassification, DiscoveryRecord,
     DiscoveryRelationshipKind, DiscoveryRelationshipRecord, DiscoverySourceEntry, DiscoveryStatus,
     DiscoveryView, EffortTier, EntityType, EvidenceKind, EvidenceView, FileScopeRecord,
-    FileScopeSelectorType, GoalRecord, GoalStatus, GoalView, GraphEdgeView, GraphNodeView,
-    InsightRecord, InsightStatus, InsightType, InsightView, IssueRecord, IssueStatus, IssueView,
-    MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEdgeKind, PlanningEvent,
-    PlanningGraphEdge, PlanningGraphNode, PlanningHealthReport, PlanningNodeKind,
+    FileScopeSelectorType, FtsHealthReport, GoalRecord, GoalStatus, GoalView, GraphEdgeView,
+    GraphNodeView, InsightRecord, InsightStatus, InsightType, InsightView, IssueRecord,
+    IssueStatus, IssueView, MutationResult, PlanRecord, PlanStatus, PlanView, PlanningEdgeKind,
+    PlanningEvent, PlanningGraphEdge, PlanningGraphNode, PlanningHealthReport, PlanningNodeKind,
     PlanningStoreError, Priority, ProjectRunEvidence, ProjectRunRecord, ProjectRunStatus,
     ProjectRunView, ProjectionFormat, RenderedProjection, ReviewPointRecord, ReviewPointStatus,
     RoadmapRecord, RoadmapSectionRecord, RoadmapStatus, RoadmapView, RunnableCandidates,
@@ -2660,6 +2660,50 @@ fn allowed_transitions(
     Ok(allowed)
 }
 
+fn invalid_status_transition_error(
+    entity_type: EntityType,
+    entity_id: &str,
+    current_status: &str,
+    requested_status: &str,
+    allowed_transitions: &[&str],
+) -> PlanningStoreError {
+    let next_allowed_command = allowed_transitions.first().map(|next_status| {
+        format!(
+            "elegy-planning {} update-status --{} {} --status {}",
+            entity_type.as_str(),
+            status_id_flag(entity_type),
+            entity_id,
+            next_status
+        )
+    });
+    PlanningStoreError::InvalidInput(
+        serde_json::to_string_pretty(&serde_json::json!({
+            "code": "INVALID_STATUS_TRANSITION",
+            "entityType": entity_type.as_str(),
+            "entityId": entity_id,
+            "currentStatus": current_status,
+            "requestedStatus": requested_status,
+            "allowedTransitions": allowed_transitions,
+            "nextAllowedCommand": next_allowed_command,
+        }))
+        .unwrap_or_default(),
+    )
+}
+
+fn status_id_flag(entity_type: EntityType) -> &'static str {
+    match entity_type {
+        EntityType::Goal => "goal-id",
+        EntityType::Roadmap => "roadmap-id",
+        EntityType::WorkPoint => "work-point-id",
+        EntityType::Plan => "plan-id",
+        EntityType::Todo => "todo-id",
+        EntityType::Issue => "issue-id",
+        EntityType::ReviewPoint => "review-point-id",
+        EntityType::Insight => "insight-id",
+        _ => "id",
+    }
+}
+
 impl PlanningStore {
     pub fn update_status(
         &self,
@@ -2699,16 +2743,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Goal, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "goal",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Goal,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -2755,16 +2795,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Roadmap, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "roadmap",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Roadmap,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -2811,16 +2847,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::WorkPoint, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "work-point",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::WorkPoint,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -2873,16 +2905,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Plan, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "plan",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Plan,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -2929,16 +2957,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Todo, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "todo",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Todo,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -2999,16 +3023,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Issue, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "issue",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Issue,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -3064,16 +3084,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::ReviewPoint, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "review-point",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::ReviewPoint,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -3130,16 +3146,12 @@ impl PlanningStore {
                     let allowed =
                         allowed_transitions(EntityType::Insight, old_record.status.as_str())?;
                     if !allowed.contains(&status.as_str()) {
-                        return Err(PlanningStoreError::InvalidInput(
-                            serde_json::to_string_pretty(&serde_json::json!({
-                                "code": "INVALID_STATUS_TRANSITION",
-                                "entityType": "insight",
-                                "entityId": input.entity_id,
-                                "currentStatus": old_record.status.as_str(),
-                                "requestedStatus": status.as_str(),
-                                "allowedTransitions": allowed,
-                            }))
-                            .unwrap_or_default(),
+                        return Err(invalid_status_transition_error(
+                            EntityType::Insight,
+                            &input.entity_id,
+                            old_record.status.as_str(),
+                            status.as_str(),
+                            &allowed,
                         ));
                     }
                 }
@@ -5019,6 +5031,7 @@ impl PlanningStore {
 
     pub fn health(&self) -> Result<PlanningHealthReport, PlanningStoreError> {
         let connection = self.open_connection()?;
+        let fts = fts_health(&connection)?;
         Ok(PlanningHealthReport {
             db_path: self.db_path.display().to_string(),
             schema_version: CURRENT_SCHEMA_VERSION.to_string(),
@@ -5037,6 +5050,7 @@ impl PlanningStore {
             project_run_count: count_table(&connection, "project_runs")?,
             graph_node_count: count_table(&connection, "planning_nodes")?,
             graph_edge_count: count_table(&connection, "planning_edges")?,
+            fts,
         })
     }
 
@@ -9659,6 +9673,64 @@ fn count_table(connection: &Connection, table: &str) -> Result<i64, PlanningStor
     Ok(connection.query_row(&sql, [], |row| row.get(0))?)
 }
 
+fn table_exists(connection: &Connection, table: &str) -> Result<bool, PlanningStoreError> {
+    let exists = connection
+        .query_row(
+            "SELECT 1 FROM sqlite_master WHERE name = ?1 AND type IN ('table', 'virtual table')",
+            params![table],
+            |_| Ok(()),
+        )
+        .optional()?
+        .is_some();
+    Ok(exists)
+}
+
+fn fts_health(connection: &Connection) -> Result<FtsHealthReport, PlanningStoreError> {
+    let entities_present = table_exists(connection, "entities_fts")?;
+    let insights_present = table_exists(connection, "insights_fts")?;
+    let tables_present = entities_present && insights_present;
+    let indexed_entity_count = if entities_present {
+        count_table(connection, "entities_fts")?
+    } else {
+        0
+    };
+    let source_entity_count = count_v1_fts_source_entities(connection)?;
+    let mut findings = Vec::new();
+    if !entities_present {
+        findings.push("missing entities_fts table".to_string());
+    }
+    if !insights_present {
+        findings.push("missing insights_fts table".to_string());
+    }
+    if entities_present && indexed_entity_count != source_entity_count {
+        findings.push(format!(
+            "entities_fts indexed {indexed_entity_count} rows but source entities contain {source_entity_count} rows"
+        ));
+    }
+
+    Ok(FtsHealthReport {
+        tables_present,
+        indexed_entity_count,
+        source_entity_count,
+        findings,
+    })
+}
+
+fn count_v1_fts_source_entities(connection: &Connection) -> Result<i64, PlanningStoreError> {
+    let mut total = 0;
+    for table in [
+        "goals",
+        "roadmaps",
+        "work_points",
+        "plans",
+        "todos",
+        "issues",
+    ] {
+        total += count_table(connection, table)?;
+    }
+    Ok(total)
+}
+
 fn row_to_goal(row: &Row<'_>) -> Result<GoalRecord, rusqlite::Error> {
     Ok(GoalRecord {
         id: row.get(0)?,
@@ -10877,8 +10949,7 @@ fn search_entity(
         param_index += 1;
     }
     if let Some(fts) = &input.fts {
-        let fts_table = format!("{table}_fts");
-        if let Some(rowids) = search_entity_fts(connection, &fts_table, fts)? {
+        if let Some(rowids) = search_entity_fts(connection, "entities_fts", fts)? {
             if rowids.is_empty() {
                 return Ok(Vec::new());
             }

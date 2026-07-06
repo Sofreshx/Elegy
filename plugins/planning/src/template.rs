@@ -17,6 +17,10 @@ const TEMPLATES: &[(&str, &str)] = &[
         "production-readiness",
         include_str!("../templates/production-readiness.yaml"),
     ),
+    (
+        "roadmap-workflow",
+        include_str!("../templates/roadmap-workflow.yaml"),
+    ),
 ];
 
 /// List available template names.
