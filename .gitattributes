@@ -1,1 +1,29 @@
+# Normalize all text files to LF on checkin, respect OS default on checkout
+* text=auto eol=lf
 
+# Windows-specific scripts — keep CRLF on disk
+*.ps1 eol=crlf
+*.bat eol=crlf
+*.cmd eol=crlf
+
+# Binary files — never touch
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.gif binary
+*.svg binary
+*.webp binary
+*.woff2 binary
+*.icns binary
+*.pdf binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.wav binary
+*.mp3 binary
+*.mp4 binary
+*.zip binary
+*.tar.gz binary
+*.tgz binary
+*.wasm binary
