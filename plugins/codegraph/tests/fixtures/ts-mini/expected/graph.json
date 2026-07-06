@@ -1,0 +1,188 @@
+{
+  "schema": "elegy-codegraph.graph.v0",
+  "extractor": {
+    "name": "elegy-codegraph-ts",
+    "version": "0.1.0",
+    "lang": "ts"
+  },
+  "entities": [
+    {
+      "id": "TS-FILE-math",
+      "kind": "file",
+      "layer": "source",
+      "name": "src/math.ts",
+      "qualifiedName": "src/math.ts",
+      "file": "src/math.ts",
+      "span": { "start": [1, 1], "end": [1, 1] },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": [],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:1:1"]
+      }
+    },
+    {
+      "id": "TS-FUNC-add",
+      "kind": "function",
+      "layer": "source",
+      "name": "add",
+      "qualifiedName": "src/math::add",
+      "file": "src/math.ts",
+      "span": { "start": [7, 1], "end": [9, 2] },
+      "inputs": [
+        { "name": "a", "typeHint": "number" },
+        { "name": "b", "typeHint": "number" }
+      ],
+      "outputs": [{ "typeHint": "number" }],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": ["TS-TEST-add-positive"],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:7:1"]
+      }
+    },
+    {
+      "id": "TS-CLASS-counter",
+      "kind": "class",
+      "layer": "source",
+      "name": "Counter",
+      "qualifiedName": "src/math::Counter",
+      "file": "src/math.ts",
+      "span": { "start": [17, 1], "end": [28, 2] },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": ["TS-TEST-counter-inc"],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:17:1"]
+      }
+    },
+    {
+      "id": "TS-FUNC-formatSum",
+      "kind": "function",
+      "layer": "source",
+      "name": "formatSum",
+      "qualifiedName": "src/utils::formatSum",
+      "file": "src/utils.ts",
+      "span": { "start": [4, 1], "end": [7, 2] },
+      "inputs": [
+        { "name": "a", "typeHint": "number" },
+        { "name": "b", "typeHint": "number" }
+      ],
+      "outputs": [{ "typeHint": "string" }],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": [],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/utils.ts:4:1"]
+      }
+    },
+    {
+      "id": "TS-TEST-add-positive",
+      "kind": "test",
+      "layer": "test",
+      "name": "add two positive numbers",
+      "qualifiedName": "src/__tests__/math.test::add two positive numbers",
+      "file": "src/__tests__/math.test.ts",
+      "span": { "start": [3, 1], "end": [6, 2] },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": [],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": ["src/__tests__/math.test.ts:3:1"]
+      }
+    },
+    {
+      "id": "TS-TEST-counter-inc",
+      "kind": "test",
+      "layer": "test",
+      "name": "counter increments",
+      "qualifiedName": "src/__tests__/math.test::counter increments",
+      "file": "src/__tests__/math.test.ts",
+      "span": { "start": [8, 1], "end": [12, 2] },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": [],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": ["src/__tests__/math.test.ts:8:1"]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "src": "TS-FILE-math",
+      "dst": "TS-FUNC-add",
+      "kind": "exports",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": []
+      }
+    },
+    {
+      "src": "TS-FILE-math",
+      "dst": "TS-CLASS-counter",
+      "kind": "exports",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": []
+      }
+    },
+    {
+      "src": "TS-TEST-add-positive",
+      "dst": "TS-FUNC-add",
+      "kind": "calls",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": []
+      }
+    },
+    {
+      "src": "TS-TEST-add-positive",
+      "dst": "TS-FUNC-add",
+      "kind": "tests",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": []
+      }
+    },
+    {
+      "src": "TS-TEST-counter-inc",
+      "dst": "TS-CLASS-counter",
+      "kind": "tests",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": []
+      }
+    }
+  ]
+}

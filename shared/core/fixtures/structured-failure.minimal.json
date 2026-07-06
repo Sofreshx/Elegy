@@ -1,0 +1,12 @@
+{
+  "code": "capability.invalid-input",
+  "message": "The capability input payload did not pass validation.",
+  "category": "invalidInput",
+  "retryable": false,
+  "correlationId": "corr-example-1",
+  "details": {
+    "field": "message",
+    "reason": "required"
+  },
+  "cause": null
+}

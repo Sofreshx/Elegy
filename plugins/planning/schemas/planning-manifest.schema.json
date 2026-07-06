@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/planning-manifest.schema.json",
+  "title": "PlanningManifest",
+  "description": "Schema for a planning manifest file used with 'elegy-planning manifest apply'. Defines a complete typed graph (nodes + edges) for transactional application.",
+  "type": "object",
+  "required": ["scope", "nodes"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "planning-manifest/v1"
+    },
+    "scope": {
+      "type": "string",
+      "description": "Scope key all entities in this manifest belong to."
+    },
+    "nodes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/manifestNode" }
+    },
+    "edges": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/manifestEdge" }
+    }
+  },
+  "$defs": {
+    "manifestNode": {
+      "type": "object",
+      "required": ["kind", "title", "summary", "status"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable user-provided ID (slug). UUID generated if omitted."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["goal", "roadmap", "milestone", "work", "plan", "task", "run", "acceptance", "evidence", "issue", "review", "insight"]
+        },
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "status": { "type": "string" },
+        "payload": {
+          "type": "object",
+          "description": "Kind-specific payload JSON. For acceptance nodes, use acceptanceKind/description/verificationPolicy fields directly."
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "dependsOn": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates depends-on edges from this node to each listed node ID."
+        },
+        "blocks": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates blocks edges from this node to each listed node ID."
+        },
+        "decomposesTo": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates decomposes-to edges from this node to each listed node ID."
+        },
+        "plannedBy": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates planned-by edges from this node to each listed plan node ID."
+        },
+        "targetedWork": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand (on plan nodes): creates planned-by edges from each listed work node ID to this plan."
+        },
+        "repairs": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates repairs edges from this node to each listed node ID."
+        },
+        "supersedes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Shorthand: creates supersedes edges from this node to each listed node ID."
+        },
+        "acceptanceKind": {
+          "type": "string",
+          "enum": ["abstract", "concrete"]
+        },
+        "description": { "type": "string" },
+        "verificationPolicy": { "type": "string" },
+        "requiredEvidenceKinds": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "waiver": { "type": "string" },
+        "evidenceKind": {
+          "type": "string",
+          "enum": ["command-result", "test-result", "artifact-ref", "commit-ref", "pr-ref", "review", "trace-excerpt", "external-url"]
+        },
+        "reference": { "type": "string" },
+        "content": { "type": "string" },
+        "capturedAt": { "type": "string" }
+      }
+    },
+    "manifestEdge": {
+      "type": "object",
+      "required": ["kind", "sourceNodeId", "targetNodeId"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Stable user-provided ID (slug). UUID generated if omitted."
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["decomposes-to", "depends-on", "blocks", "parallel-safe-with", "planned-by", "executed-by", "contains", "requires", "satisfies", "evidenced-by", "found", "addressed-by", "repairs", "supersedes"]
+        },
+        "sourceNodeId": { "type": "string" },
+        "targetNodeId": { "type": "string" },
+        "status": {
+          "type": "string",
+          "default": "active"
+        },
+        "payload": { "type": "object" }
+      }
+    }
+  }
+}

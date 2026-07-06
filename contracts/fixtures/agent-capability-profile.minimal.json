@@ -1,8 +1,0 @@
-{
-  "schemaVersion": "agent-capability-profile/v1",
-  "profileId": "generic-agent-host",
-  "includeSkills": ["memory", "repo"],
-  "includeCapabilities": ["data-validate"],
-  "excludeCapabilities": ["memory-purge"],
-  "alwaysIncludeRouter": true
-}

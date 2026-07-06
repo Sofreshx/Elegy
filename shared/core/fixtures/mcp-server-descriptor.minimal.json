@@ -1,0 +1,13 @@
+{
+  "serverName": "weather-server",
+  "transport": "stdio",
+  "tools": [
+    {
+      "name": "get-weather",
+      "description": "Look up a weather report",
+      "inputSchema": {
+        "type": "object"
+      }
+    }
+  ]
+}

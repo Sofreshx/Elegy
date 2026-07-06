@@ -1,7 +1,0 @@
-{
-  "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://elegy/contracts/schemas/mermaid-result.schema.json",
-  "title": "MermaidResult",
-  "description": "Result of a mermaid capability: a flowchart projection, bounded workflow graph semantics, or a narrative explanation.",
-  "type": "object"
-}

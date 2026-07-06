@@ -1,75 +1,58 @@
 # Agent Integration
 
-Elegy is designed for AI-agent hosts that can run local subprocesses. The canonical integration path is skills plus CLI:
+Elegy is designed for AI-agent hosts that can run local subprocesses. The
+canonical path is skill discovery plus dedicated `elegy-*` binaries:
 
 1. validate the setup
-2. load the host manifest
-3. discover the minimum needed capability
-4. invoke the advertised CLI template
-5. let the host enforce policy for side effects
+2. discover the minimum needed capability
+3. invoke the advertised CLI template
+4. let the host enforce side-effect policy
 
 MCP is supported as an optional projection for MCP-native clients, but it is not the primary onboarding model.
 
-## Canonical Host Flow
+## Canonical Flow
 
-Validate the local setup:
-
-```bash
-elegy agent check --json
-```
-
-Load the integration manifest:
+Search and then invoke the dedicated binary:
 
 ```bash
-elegy agent manifest --json
-```
-
-Search with progressive disclosure:
-
-```bash
-elegy agent discover --query "repo status" --json
-elegy agent discover --query "repo status" --detail --json
-```
-
-Invoke the discovered command:
-
-```bash
-elegy <command> --json
+elegy-skills search --query "planning" --json
+elegy-planning --help
 ```
 
 ## Discovery Layers
 
-Use `elegy agent ...` for host onboarding and discovery.
-
-Use raw `elegy skills ...` when developing Elegy itself or inspecting the full built-in registry:
+Use `elegy-skills` when developing Elegy itself or when a host needs the full
+registry surface:
 
 ```bash
-elegy skills list --json
-elegy skills search --query "diagram" --json
-elegy skills describe --skill-id diagram --json
+elegy-skills list --json
+elegy-skills search --query "diagram" --json
+elegy-skills describe --skill-id diagram --json
 ```
 
-The skill definitions in `contracts/fixtures/skill.*.json` remain the discovery authority. The contract schemas under `contracts/schemas/` remain the durable authority.
+Skill definitions in `plugins/<name>/skills/<skill-id>/SKILL.md` and standalone root
+`<skill-id>/SKILL.md` packages are the discovery authority. Contract schemas live
+under `plugins/<name>/schemas/` and cross-cutting fixtures under `shared/core/fixtures/`.
 
 ## Optional MCP Adapter
 
 MCP-native clients can start the stdio host:
 
 ```bash
-elegy run
+elegy-run
 ```
 
 The same side-effect rule applies: tools with side effects are blocked unless the call is an explicit dry run or the host is started with side-effect execution enabled by a surrounding approval policy.
 
 ```bash
-elegy run --allow-side-effects
+elegy-run --allow-side-effects
 ```
 
 Use MCP only when it is the host's preferred protocol boundary. CLI invocation remains the default integration contract.
 
 ## Release Assets
 
-Tagged releases include dedicated CLI archives for each runtime surface:
+Tagged releases include dedicated binaries for each runtime surface.
 
 - `elegy-planning` binary
 - `elegy-skills` binary
@@ -78,7 +61,11 @@ Tagged releases include dedicated CLI archives for each runtime surface:
 - `elegy-configuration` binary
 - `elegy-documentation` binary
 
-See [Distribution](distribution.md) for the full list of asset families, targets, and install commands.
+Plugin-packaged surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`,
+`elegy-documentation`, `elegy-observe`, `elegy-desktop`) ship as `.plugin.zip` archives
+containing manifest, skills, and binary. Non-plugin surfaces ship as standalone binaries.
+
+See [Distribution](distribution.md) for the release index and install lanes.
 
 ## Example Profile
 

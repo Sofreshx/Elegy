@@ -139,13 +139,13 @@ Runtime concerns include lifecycle, invocation, transport, environment binding, 
 
 The set of implementation packages or crates that own behavior-heavy execution concerns such as transport, filesystem, HTTP, host integration, and CLI orchestration.
 
-In the current topology, the Rust subtree under `rust/` is the primary runtime family for MCP-oriented execution concerns.
+In the current topology, the crate trees under `hosts/`, `plugins/`, and `shared/` are the primary runtime family for MCP-oriented execution concerns.
 
 ### Authority surface
 
 The package family or artifact set that is allowed to define canonical truth for a concept.
 
-In Elegy, authority surfaces are the governed artifact roots under `contracts/`. Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth. Operational policy lives at `docs/governance/`.
+In Elegy, authority surfaces are the governed artifact roots co-located in each plugin's directory (e.g., `plugins/<name>/schemas/`, `plugins/<name>/fixtures/`). Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth. Operational policy lives at `docs/governance/`.
 
 ### Governance
 

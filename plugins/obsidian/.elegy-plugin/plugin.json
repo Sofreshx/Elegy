@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-obsidian",
+  "version": "0.1.0",
+  "description": "Obsidian vault bridge skill for read/write/search against local Obsidian vaults.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Obsidian",
+        "shortDescription": "Read, write, and search local Obsidian vaults",
+        "longDescription": "Thin skill wrapping the official Obsidian v1.12+ CLI for vault-aware file creation, search, navigation, task toggling, and tag inspection.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Search this Obsidian vault for recent notes."]
+      }
+    }
+  }
+}

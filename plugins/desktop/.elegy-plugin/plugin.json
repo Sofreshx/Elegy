@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-desktop",
+  "version": "0.1.0",
+  "description": "Safe desktop automation for agentic workflows. Mouse clicks, keyboard input, window management with dry-run and evidence capture.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Desktop",
+        "shortDescription": "Automate and inspect Windows desktop applications",
+        "longDescription": "Use governed desktop observation and automation commands for Windows applications.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Interactive", "Read", "Write"],
+        "defaultPrompt": ["Inspect and operate this desktop application."]
+      }
+    }
+  }
+}

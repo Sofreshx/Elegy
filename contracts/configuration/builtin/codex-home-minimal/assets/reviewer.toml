@@ -1,3 +1,0 @@
-name = "reviewer"
-description = "Bounded reviewer role installed by elegy-configuration."
-developer_instructions = "Review changes for bugs, regressions, and missing tests."

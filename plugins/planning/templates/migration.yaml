@@ -1,0 +1,60 @@
+# Template: Migration
+# Structured migration plan with preparation, execution, rollback, and verification.
+# Replace all <PLACEHOLDERS> with your specific values.
+scope: "<SCOPE>"
+nodes:
+  - id: <MIGRATION_GOAL_ID>
+    kind: goal
+    title: "Migrate: <WHAT_TO_WHAT>"
+    summary: "<WHY_WE_ARE_MIGRATING>"
+    status: active
+    decomposesTo: [<PREP_ID>, <EXEC_ID>, <VERIFY_ID>]
+
+  - id: <PREP_ID>
+    kind: work
+    title: "Preparation: <PREPARATION_STEPS>"
+    summary: "<WHAT_MUST_BE_DONE_BEFORE_MIGRATION>"
+    status: proposed
+
+  - id: <EXEC_ID>
+    kind: work
+    title: "Execution: <MIGRATION_STEPS>"
+    summary: "<THE_ACTUAL_MIGRATION_WORK>"
+    status: draft
+    dependsOn: [<PREP_ID>]
+
+  - id: <ROLLBACK_ID>
+    kind: work
+    title: "Rollback: <ROLLBACK_PLAN>"
+    summary: "<HOW_TO_UNDO_IF_MIGRATION_FAILS>"
+    status: draft
+
+  - id: <VERIFY_ID>
+    kind: work
+    title: "Verification: <POST_MIGRATION_CHECKS>"
+    summary: "<HOW_WE_CONFIRM_MIGRATION_SUCCEEDED>"
+    status: draft
+    dependsOn: [<EXEC_ID>]
+    blocks: [<ROLLBACK_ID>]
+
+  - id: <AC_MIGRATION_ID>
+    kind: acceptance
+    title: "Migration verified"
+    summary: "All post-migration checks pass"
+    status: active
+    acceptanceKind: concrete
+    description: "<SPECIFIC_VERIFICATION_CRITERIA>"
+    verificationPolicy: automated-ci
+    requiredEvidenceKinds: [test-result]
+
+edges:
+  - id: <ED_PREP_EXEC>
+    kind: depends-on
+    sourceNodeId: <EXEC_ID>
+    targetNodeId: <PREP_ID>
+    status: active
+  - id: <ED_VERIFY_REQ>
+    kind: requires
+    sourceNodeId: <VERIFY_ID>
+    targetNodeId: <AC_MIGRATION_ID>
+    status: active

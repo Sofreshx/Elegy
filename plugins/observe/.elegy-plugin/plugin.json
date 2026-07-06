@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-observe",
+  "version": "0.1.0",
+  "description": "Desktop and OS observation for agentic workflows. Process snapshots, window tracking, clipboard, screen capture, and filesystem diffing.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Observe",
+        "shortDescription": "Capture bounded system observations",
+        "longDescription": "Collect bounded, policy-aware system observations for agent workflows.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Capture the current system state."]
+      }
+    }
+  }
+}

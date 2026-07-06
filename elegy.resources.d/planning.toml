@@ -1,0 +1,10 @@
+version = 1
+name = "elegy-planning-host"
+
+[[resources]]
+kind = "static"
+id = "placeholder"
+uri = "elegy://planning-host/resource/placeholder"
+title = "Placeholder"
+mime_type = "text/plain"
+content = "Minimal descriptor for MCP host."

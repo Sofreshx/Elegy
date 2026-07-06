@@ -1,0 +1,284 @@
+{
+  "schemaVersion": "elegy-marketplace/v1",
+  "name": "elegy",
+  "interface": {
+    "displayName": "Elegy"
+  },
+  "plugins": [
+    {
+      "name": "elegy-desktop",
+      "source": {
+        "source": "local",
+        "path": "./plugins/desktop"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-desktop-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-documentation",
+      "source": {
+        "source": "local",
+        "path": "./plugins/documentation"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-documentation-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-mcp",
+      "source": {
+        "source": "local",
+        "path": "./plugins/mcp"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-mcp-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-memory",
+      "source": {
+        "source": "local",
+        "path": "./plugins/memory"
+      },
+      "category": "Productivity",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-memory-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-observe",
+      "source": {
+        "source": "local",
+        "path": "./plugins/observe"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-observe-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-question-studio",
+      "source": {
+        "source": "local",
+        "path": "./plugins/question-studio"
+      },
+      "category": "Education & Research",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-question-studio-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-ai-radar",
+      "source": {
+        "source": "local",
+        "path": "./plugins/ai-radar"
+      },
+      "category": "Education & Research",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-ai-radar-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-client-radar",
+      "source": {
+        "source": "local",
+        "path": "./plugins/client-radar"
+      },
+      "category": "Business & Operations",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-client-radar-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-opencode-workers",
+      "source": {
+        "source": "local",
+        "path": "./plugins/opencode-workers"
+      },
+      "category": "Productivity",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-opencode-workers-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-planning",
+      "source": {
+        "source": "local",
+        "path": "./plugins/planning"
+      },
+      "category": "Productivity",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-planning-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
+      "name": "elegy-skills",
+      "source": {
+        "source": "local",
+        "path": "./plugins/skills"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-skills-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-documentation",
+  "version": "0.1.0",
+  "description": "Authority-aware documentation inspection, mapping, objective checking, and export over repo-local docs roots.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Documentation",
+        "shortDescription": "Inspect and validate governed documentation",
+        "longDescription": "Map documentation authority, validate links and structure, and generate derived documentation views.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Validate this repository's documentation."]
+      }
+    }
+  }
+}

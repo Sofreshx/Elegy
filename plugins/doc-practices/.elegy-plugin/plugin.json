@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-doc-practices",
+  "version": "0.1.0",
+  "description": "Documentation practices skill for ADR/spec doctrine and docs config validation.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Documentation Practices",
+        "shortDescription": "Classify, scaffold, and validate documentation artifacts",
+        "longDescription": "Central doctrine for ADRs, specs, guides, notes, and roadmap material across Elegy and downstream repos.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Classify a documentation change for this project."]
+      }
+    }
+  }
+}

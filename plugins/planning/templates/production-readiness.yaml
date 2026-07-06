@@ -1,0 +1,72 @@
+# Template: Production Readiness
+# Acceptance criteria for production deployment: security, performance, observability, fallback.
+# Replace all <PLACEHOLDERS> with your specific values.
+scope: "<SCOPE>"
+nodes:
+  - id: <RELEASE_ID>
+    kind: milestone
+    title: "Release: <VERSION>"
+    summary: "<WHAT_IS_BEING_RELEASED>"
+    status: proposed
+
+  - id: <AC_SEC_ID>
+    kind: acceptance
+    title: "Security review passed"
+    summary: "No critical or high vulnerabilities found"
+    status: active
+    acceptanceKind: concrete
+    description: "<SECURITY_CHECKLIST>"
+    verificationPolicy: manual-review
+    requiredEvidenceKinds: [review]
+
+  - id: <AC_PERF_ID>
+    kind: acceptance
+    title: "Performance benchmarks met"
+    summary: "P95 latency under <X>ms, throughput above <Y> rps"
+    status: active
+    acceptanceKind: concrete
+    description: "<PERFORMANCE_TARGETS>"
+    verificationPolicy: automated-ci
+    requiredEvidenceKinds: [test-result]
+
+  - id: <AC_OBS_ID>
+    kind: acceptance
+    title: "Observability configured"
+    summary: "Metrics, logging, and alerting in place"
+    status: active
+    acceptanceKind: concrete
+    description: "<OBSERVABILITY_CHECKLIST>"
+    verificationPolicy: manual-review
+    requiredEvidenceKinds: [review, artifact-ref]
+
+  - id: <AC_FALLBACK_ID>
+    kind: acceptance
+    title: "Rollback plan tested"
+    summary: "Can roll back to previous version in under <X> minutes"
+    status: active
+    acceptanceKind: concrete
+    description: "<ROLLBACK_TEST_PLAN>"
+    verificationPolicy: manual-review
+    requiredEvidenceKinds: [test-result]
+
+edges:
+  - id: <ED_REQ_SEC>
+    kind: requires
+    sourceNodeId: <RELEASE_ID>
+    targetNodeId: <AC_SEC_ID>
+    status: active
+  - id: <ED_REQ_PERF>
+    kind: requires
+    sourceNodeId: <RELEASE_ID>
+    targetNodeId: <AC_PERF_ID>
+    status: active
+  - id: <ED_REQ_OBS>
+    kind: requires
+    sourceNodeId: <RELEASE_ID>
+    targetNodeId: <AC_OBS_ID>
+    status: active
+  - id: <ED_REQ_FALLBACK>
+    kind: requires
+    sourceNodeId: <RELEASE_ID>
+    targetNodeId: <AC_FALLBACK_ID>
+    status: active

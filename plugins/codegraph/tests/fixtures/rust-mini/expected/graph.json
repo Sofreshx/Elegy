@@ -1,0 +1,97 @@
+{
+  "schema": "elegy-codegraph.graph.v0",
+  "extractor": {
+    "name": "elegy-codegraph-rust",
+    "version": "0.1.0",
+    "lang": "rust"
+  },
+  "entities": [
+    {
+      "kind": "file",
+      "layer": "source",
+      "name": "src/lib.rs",
+      "file": "src/lib.rs"
+    },
+    {
+      "kind": "function",
+      "layer": "source",
+      "name": "add",
+      "file": "src/lib.rs"
+    },
+    {
+      "kind": "struct",
+      "layer": "source",
+      "name": "Counter",
+      "file": "src/lib.rs"
+    },
+    {
+      "kind": "impl",
+      "layer": "source",
+      "name": "Counter",
+      "file": "src/lib.rs"
+    },
+    {
+      "kind": "file",
+      "layer": "source",
+      "name": "src/helper.rs",
+      "file": "src/helper.rs"
+    },
+    {
+      "kind": "function",
+      "layer": "source",
+      "name": "validate_input",
+      "file": "src/helper.rs"
+    },
+    {
+      "kind": "module",
+      "layer": "source",
+      "name": "helper",
+      "file": "src/lib.rs"
+    },
+    {
+      "kind": "test",
+      "layer": "test",
+      "name": "test_add_positive",
+      "file": "tests/integration_test.rs"
+    },
+    {
+      "kind": "test",
+      "layer": "test",
+      "name": "test_add_zero",
+      "file": "tests/integration_test.rs"
+    },
+    {
+      "kind": "file",
+      "layer": "test",
+      "name": "tests/integration_test.rs",
+      "file": "tests/integration_test.rs"
+    }
+  ],
+  "edges": [
+    {
+      "src": "FILE-lib",
+      "dst": "FUNC-add",
+      "kind": "exports"
+    },
+    {
+      "src": "FILE-lib",
+      "dst": "STRUCT-counter",
+      "kind": "exports"
+    },
+    {
+      "src": "TEST-add-positive",
+      "dst": "FUNC-add",
+      "kind": "calls"
+    },
+    {
+      "src": "TEST-add-positive",
+      "dst": "FUNC-add",
+      "kind": "tests"
+    },
+    {
+      "src": "TEST-add-zero",
+      "dst": "FUNC-add",
+      "kind": "tests"
+    }
+  ]
+}

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-skill-authoring",
+  "version": "0.1.0",
+  "description": "Portable agent skill authoring skill for creating and refining SKILL.md files.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Skill Authoring",
+        "shortDescription": "Draft and audit agent skill definitions",
+        "longDescription": "Doctrine for drafting, auditing, and fixing Elegy skills — audit checklists, anti-pattern lookup, and template emission.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Audit this skill for anti-patterns."]
+      }
+    }
+  }
+}

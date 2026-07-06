@@ -22,12 +22,12 @@ jobs:
     outputs:
       matrix: ${{ steps.discover.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - id: discover
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_crate: .crate, archiveFamily: .archiveFamily}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
           matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
@@ -42,67 +42,90 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.discover.outputs.matrix) }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.96.1
         with:
           targets: ${{ matrix.target }}
 
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: cargo build --release
-        working-directory: ./rust
-        run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_crate }}
+        working-directory: .
+        run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_package }}
 
       - name: Stage archive
         id: stage
         shell: bash
         run: |
           set -euo pipefail
-          archive_name="${{ matrix.archiveFamily }}-${{ matrix.target }}-${{ github.sha }}"
-          staging="artifacts/distribution/${archive_name}"
-          mkdir -p "$staging"
-          binary_dir="rust/target/${{ matrix.target }}/release"
-          if [[ ! -d "$binary_dir" ]]; then
-            echo "Missing build output: $binary_dir" >&2
+          mkdir -p artifacts/distribution
+          ext=""
+          if [[ "${{ matrix.target }}" == *windows* ]]; then
+            ext=".exe"
+          fi
+          binary_name="${{ matrix.surface_name }}${ext}"
+          binary_path="target/${{ matrix.target }}/release/${binary_name}"
+          if [[ ! -f "$binary_path" ]]; then
+            echo "Missing build output: $binary_path" >&2
             exit 1
           fi
-          cp "$binary_dir"/* "$staging"/ 2>/dev/null || true
-          (cd "$staging" && tar -a -cf "../${archive_name}.zip" .)
-          echo "asset=${archive_name}.zip" >> "$GITHUB_OUTPUT"
+          if [[ "${{ matrix.surface_packaging }}" == "plugin" ]]; then
+            plugin_root="${{ matrix.plugin_root }}"
+            if [[ -z "$plugin_root" ]]; then
+              echo "Missing pluginRoot for plugin-packaged surface ${{ matrix.surface_name }}" >&2
+              exit 1
+            fi
+            asset_name="${{ matrix.surface_name }}-plugin-${{ matrix.target }}.zip"
+            asset_path="artifacts/distribution/${asset_name}"
+            cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
+              pack \
+              --plugin "$plugin_root" \
+              --output "$asset_path" \
+              --binary "$binary_path" \
+              --binary-name "bin/${binary_name}"
+          else
+            asset_name="${{ matrix.surface_name }}-${{ matrix.target }}${ext}"
+            asset_path="artifacts/distribution/${asset_name}"
+            cp "$binary_path" "$asset_path"
+          fi
+          sha256sum "$asset_path" | awk '{print $1}' > "${asset_path}.sha256"
+          echo "asset=${asset_name}" >> "$GITHUB_OUTPUT"
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: ${{ matrix.surface_name }}-${{ matrix.target }}-${{ github.sha }}
           if-no-files-found: error
-          path: artifacts/distribution/${{ steps.stage.outputs.asset }}
+          path: |
+            artifacts/distribution/${{ steps.stage.outputs.asset }}
+            artifacts/distribution/${{ steps.stage.outputs.asset }}.sha256
 
   export-contracts:
     name: export contracts bundle
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.96.1
 
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
 
       - name: Validate contracts (canonical)
-        working-directory: ./rust
-        run: cargo run -p elegy-cli -- contracts validate --project ..
+        working-directory: .
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 
       - name: Export contracts bundle
-        working-directory: ./rust
-        run: cargo run -p elegy-cli -- contracts export --output-path ../artifacts/contracts --create-archive --archive-output-path ../artifacts/distribution/elegy-contracts-bundle.zip
+        working-directory: .
+        run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts export --output-dir artifacts/contracts --archive --archive-output artifacts/distribution/elegy-contracts-bundle.zip
 
       - name: Upload contracts distribution archive
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: elegy-contracts-${{ github.sha }}
           if-no-files-found: error
@@ -113,13 +136,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Package installer archive
         shell: bash
         run: |
           set -euo pipefail
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           staging="$(mktemp -d)"
           mkdir -p "artifacts/distribution"
           cp scripts/install-distribution.sh "$staging/install.sh"
@@ -128,7 +151,7 @@ jobs:
           (cd "$staging" && zip -r "${GITHUB_WORKSPACE}/artifacts/distribution/elegy-installer-${bundle_version}.zip" .)
 
       - name: Upload installer distribution artifact
-        uses: actions/upload-artifact@v7.0.1
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: elegy-installer-${{ github.sha }}
           if-no-files-found: error
@@ -143,10 +166,10 @@ jobs:
     runs-on: ubuntu-latest
     if: ${{ github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v') }}
     steps:
-      - uses: actions/checkout@v6.0.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Download all assets
-        uses: actions/download-artifact@v8.0.1
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
           pattern: "*-${{ github.sha }}"
           path: artifacts/distribution
@@ -189,20 +212,25 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/distribution
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
           checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
 
-          mapfile -t zip_files < <(find artifacts/distribution -maxdepth 1 -type f -name '*.zip' | sort)
-          if [[ "${#zip_files[@]}" -eq 0 ]]; then
-            echo "No release archives were staged." >&2
+          mapfile -t asset_files < <(find artifacts/distribution -maxdepth 1 -type f | sort)
+          if [[ "${#asset_files[@]}" -eq 0 ]]; then
+            echo "No release assets were staged." >&2
             exit 1
           fi
 
           assets_json='[]'
           published_targets_json='[]'
-          for file in "${zip_files[@]}"; do
+          for file in "${asset_files[@]}"; do
             base="$(basename "$file")"
+            case "$base" in
+              *.sha256|elegy-release-manifest-*.json|elegy-release-checksums-*.json)
+                continue
+                ;;
+            esac
             size="$(stat -c%s "$file")"
             sha="$(sha256sum "$file" | awk '{print $1}')"
 
@@ -210,10 +238,20 @@ jobs:
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
-            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)-[0-9a-f]{40}\.zip$ ]]; then
+            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .archiveFamily == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve surface for archive family: $archive_family" >&2
                 exit 1
@@ -268,9 +306,22 @@ jobs:
         run: |
           set -euo pipefail
           release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
+          mapfile -t external_plugin_prefixes < <(
+            jq -r '.surfaces[] | select(.kind == "external-plugin") | .name + "-plugin-"' distribution/surfaces.json
+          )
           while IFS=$'\t' read -r asset_id asset_name; do
+            preserve_external=false
+            for prefix in "${external_plugin_prefixes[@]}"; do
+              if [[ "$asset_name" == "${prefix}"* ]]; then
+                preserve_external=true
+                break
+              fi
+            done
+            if [[ "$preserve_external" == "true" ]]; then
+              continue
+            fi
             case "$asset_name" in
-              *.zip|elegy-release-manifest-*.json|elegy-release-checksums-*.json)
+              *.zip|*.sha256|elegy-release-manifest-*.json|elegy-release-checksums-*.json|elegy-*-x86_64-unknown-linux-gnu|elegy-*-aarch64-apple-darwin|elegy-*-x86_64-pc-windows-msvc.exe)
                 gh api --method DELETE "repos/${GITHUB_REPOSITORY}/releases/assets/${asset_id}"
                 ;;
             esac
@@ -279,5 +330,5 @@ jobs:
               "repos/${GITHUB_REPOSITORY}/releases/${release_id}/assets?per_page=100" \
               --jq '.[] | [.id, .name] | @tsv'
           )
-          mapfile -t assets < <(find artifacts/distribution -maxdepth 1 -type f \( -name '*.zip' -o -name 'elegy-release-*.json' \) | sort)
+          mapfile -t assets < <(find artifacts/distribution -maxdepth 1 -type f \( -name '*.zip' -o -name '*.sha256' -o -name 'elegy-*-x86_64-unknown-linux-gnu' -o -name 'elegy-*-aarch64-apple-darwin' -o -name 'elegy-*-x86_64-pc-windows-msvc.exe' -o -name 'elegy-release-*.json' \) | sort)
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
