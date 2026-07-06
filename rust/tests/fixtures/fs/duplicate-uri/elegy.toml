@@ -1,7 +1,0 @@
-version = 1
-
-[project]
-name = "duplicate-uri"
-
-[descriptors]
-include = ["elegy.resources.d/*.toml"]

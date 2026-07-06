@@ -1,8 +1,0 @@
-# CI sets the build target via CARGO_BUILD_TARGET or --target.
-# Local builds use the default host target from rustup.
-
-[target.x86_64-unknown-linux-gnu]
-linker = "cc"
-
-[target.x86_64-pc-windows-msvc]
-# Uses the default MSVC linker bundled with Rust for Windows

@@ -43,7 +43,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p artifacts/distribution
-          gh release download "${RELEASE_TAG}" --dir artifacts/distribution --clobber --pattern '*.zip'
+          gh release download "${RELEASE_TAG}" --dir artifacts/distribution --clobber
 
       - name: Compose manifest + checksums
         shell: bash
@@ -51,20 +51,25 @@ jobs:
           RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
         run: |
           set -euo pipefail
-          bundle_version="$(jq -r '.schemaVersion' contracts/schemas/schema-version.json)"
+          bundle_version="$(jq -r '.schemaVersion' docs/schema-version.json)"
           manifest_path="artifacts/distribution/elegy-release-manifest-${RELEASE_TAG}.json"
           checksums_path="artifacts/distribution/elegy-release-checksums-${RELEASE_TAG}.json"
 
-          mapfile -t zip_files < <(find artifacts/distribution -maxdepth 1 -type f -name '*.zip' | sort)
-          if [[ "${#zip_files[@]}" -eq 0 ]]; then
-            echo "Release ${RELEASE_TAG} has no downloadable archives." >&2
+          mapfile -t asset_files < <(find artifacts/distribution -maxdepth 1 -type f | sort)
+          if [[ "${#asset_files[@]}" -eq 0 ]]; then
+            echo "Release ${RELEASE_TAG} has no downloadable assets." >&2
             exit 1
           fi
 
           assets_json='[]'
           published_targets_json='[]'
-          for file in "${zip_files[@]}"; do
+          for file in "${asset_files[@]}"; do
             base="$(basename "$file")"
+            case "$base" in
+              *.sha256|elegy-release-manifest-*.json|elegy-release-checksums-*.json)
+                continue
+                ;;
+            esac
             size="$(stat -c%s "$file")"
             sha="$(sha256sum "$file" | awk '{print $1}')"
 
@@ -72,10 +77,20 @@ jobs:
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
-            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)-[0-9a-f]{40}\.zip$ ]]; then
+            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .archiveFamily == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              if [[ -z "$surface_name" ]]; then
+                echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
+                exit 1
+              fi
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
+              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+            elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
+              archive_family="${BASH_REMATCH[1]}"
+              target="${BASH_REMATCH[2]}"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve surface for archive family: $archive_family" >&2
                 exit 1

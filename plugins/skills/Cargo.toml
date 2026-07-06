@@ -1,0 +1,24 @@
+[package]
+name = "elegy-skills"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "elegy-skills"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+elegy-core = { version = "0.1.0", path = "../../shared/core" }
+elegy-plugin-sdk = { version = "0.1.0", path = "../../shared/plugin-sdk" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

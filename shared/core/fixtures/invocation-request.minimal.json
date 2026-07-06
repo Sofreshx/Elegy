@@ -1,0 +1,21 @@
+{
+  "requestId": "invoke-req-1",
+  "capabilityId": "cap.example.echo",
+  "input": {
+    "message": "hello"
+  },
+  "context": {
+    "correlationId": "corr-example-1",
+    "executionId": "exec-example-1",
+    "requestedAt": "2026-03-31T17:00:00Z",
+    "timeoutSeconds": 30,
+    "callerRef": "agent:test",
+    "policyContext": {
+      "approvalMode": "none"
+    },
+    "traceRef": "trace-example-1",
+    "metadata": {
+      "surface": "elegy-cli"
+    }
+  }
+}

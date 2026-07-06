@@ -1,0 +1,10 @@
+title = "Elegy gitleaks config"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Known historical findings from deleted FLIGHT_RECORDER.md content"
+commits = [
+  "aecc63b4424b5284b593f4c1f09ac05f313cba90",
+]

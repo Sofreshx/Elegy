@@ -1,0 +1,56 @@
+# Template: Implementation Slice
+# A single work item with a plan, tasks, acceptance criteria, and evidence tracking.
+# Replace all <PLACEHOLDERS> with your specific values.
+scope: "<SCOPE>"
+nodes:
+  - id: <WORK_ID>
+    kind: work
+    title: "<IMPLEMENTATION_TITLE>"
+    summary: "<WHAT_THIS_WORK_ACCOMPLISHES>"
+    status: proposed
+
+  - id: <PLAN_ID>
+    kind: plan
+    title: "<PLAN_TITLE>"
+    summary: "<SESSION_PLAN_FOR_THIS_WORK>"
+    status: draft
+    targetedWork: [<WORK_ID>]
+
+  - id: <TASK_1_ID>
+    kind: task
+    title: "<TASK_1_TITLE>"
+    summary: "<FIRST_STEP>"
+    status: pending
+
+  - id: <TASK_2_ID>
+    kind: task
+    title: "<TASK_2_TITLE>"
+    summary: "<SECOND_STEP>"
+    status: pending
+
+  - id: <AC_ID>
+    kind: acceptance
+    title: "<ACCEPTANCE_CRITERIA>"
+    summary: "<HOW_WE_KNOW_IT_WORKS>"
+    status: active
+    acceptanceKind: concrete
+    description: "<DETAILED_VERIFICATION_STEPS>"
+    verificationPolicy: automated-ci
+    requiredEvidenceKinds: [test-result]
+
+edges:
+  - id: <ED_WORK_PLAN>
+    kind: decomposes-to
+    sourceNodeId: <WORK_ID>
+    targetNodeId: <TASK_1_ID>
+    status: active
+  - id: <ED_TASKS>
+    kind: depends-on
+    sourceNodeId: <TASK_2_ID>
+    targetNodeId: <TASK_1_ID>
+    status: active
+  - id: <ED_AC_REQ>
+    kind: requires
+    sourceNodeId: <WORK_ID>
+    targetNodeId: <AC_ID>
+    status: active

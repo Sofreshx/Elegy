@@ -1,0 +1,111 @@
+{
+  "$defs": {
+    "ElegyMarketplaceArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "checksumUrl": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "url",
+        "checksumUrl"
+      ],
+      "type": "object"
+    },
+    "ElegyMarketplaceInterface": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ElegyMarketplacePlugin": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ElegyMarketplaceArtifact"
+          },
+          "type": "array"
+        },
+        "category": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/ElegyMarketplaceSource"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "category"
+      ],
+      "type": "object"
+    },
+    "ElegyMarketplaceSource": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "path"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "interface": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyMarketplaceInterface"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "plugins": {
+      "items": {
+        "$ref": "#/$defs/ElegyMarketplacePlugin"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "plugins"
+  ],
+  "title": "ElegyMarketplaceV1",
+  "type": "object"
+}

@@ -1,0 +1,24 @@
+{
+  "requestId": "request-1",
+  "messages": [
+    {
+      "messageId": "message-1",
+      "role": "user",
+      "content": "Summarize this API surface"
+    }
+  ],
+  "context": {
+    "correlationId": "corr-1",
+    "sessionId": "session-1",
+    "conversationId": "conversation-1",
+    "requestedSkillId": "api-summary",
+    "capabilityHints": [
+      "summarization",
+      "analysis"
+    ],
+    "metadata": {
+      "channel": "cli"
+    }
+  },
+  "streamingRequested": true
+}

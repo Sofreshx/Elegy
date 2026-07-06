@@ -1,0 +1,26 @@
+[package]
+name = "elegy-configuration"
+version.workspace = true
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[[bin]]
+name = "elegy-configuration"
+path = "src/main.rs"
+
+[dependencies]
+clap.workspace = true
+elegy-core = { version = "0.1.0", path = "../../shared/core" }
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+tempfile = "3.16.0"
+
+[lints]
+workspace = true

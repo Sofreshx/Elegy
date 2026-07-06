@@ -3,14 +3,26 @@ name: Rust CI
 on:
   pull_request:
     paths:
-      - 'rust/**'
+      - 'plugins/**'
+      - 'shared/**'
+      - 'hosts/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - 'rustfmt.toml'
+      - 'deny.toml'
+      - '.cargo/**'
       - '.github/workflows/rust-ci.yml'
       - 'scripts/**'
       - '.elegy/docs.yaml'
       - 'docs/adr/**'
       - 'docs/specs/**'
       - 'docs/docs-index.md'
-      - 'contracts/schemas/**'
+      - 'plugins/**/schemas/**'
+      - 'plugins/**/fixtures/**'
+      - 'plugins/**/templates/**'
+      - 'shared/core/fixtures/**'
+      - 'docs/schema-version.json'
       - 'docs/governance/**'
   push:
     branches:
@@ -30,15 +42,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.1
         with:
           components: rustfmt
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo fmt --all --check
-        working-directory: ./rust
+        working-directory: .
         run: cargo fmt --all --check
 
   clippy:
@@ -46,15 +58,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.1
         with:
           components: clippy
       - uses: Swatinem/rust-cache@v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo clippy --workspace --all-features -- -D warnings
-        working-directory: ./rust
+        working-directory: .
         run: cargo clippy --workspace --all-features -- -D warnings
 
   msrv:
@@ -62,13 +74,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4.2.2
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
       - uses: dtolnay/rust-toolchain@1.88.0
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo build --workspace
-        working-directory: ./rust
+        working-directory: .
         run: cargo build --workspace
 
   test:
@@ -86,27 +98,47 @@ jobs:
           - os: macos-latest
             target: aarch64-apple-darwin
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.1
         with:
           targets: ${{ matrix.target }}
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo test --workspace --all-targets --all-features
-        working-directory: ./rust
+        working-directory: .
         run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
+
+  packaging-smoke:
+    name: packaging smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: . -> target
+      - name: verify planning plugin packaging CLI
+        working-directory: .
+        run: cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
+      - name: verify marketplace schemas and generated index
+        working-directory: .
+        run: |
+          cargo run -p elegy-plugin-sdk --bin elegy-plugin-schemas -- --check
+          cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace generate --project . --check
+          cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace validate --source .
 
   docs-check-v2:
     name: docs check v2 (authoritative)
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4.2.2
-      - uses: dtolnay/rust-toolchain@1.95.0
-      - uses: Swatinem/rust-cache@v2.9.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+      - uses: dtolnay/rust-toolchain@1.96.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
-          workspaces: rust -> rust/target
+          workspaces: . -> target
       - name: cargo run -p elegy-documentation -- check
-        working-directory: ./rust
-        run: cargo run -p elegy-documentation -- check --project ..
+        working-directory: .
+        run: cargo run -p elegy-documentation -- check --project .

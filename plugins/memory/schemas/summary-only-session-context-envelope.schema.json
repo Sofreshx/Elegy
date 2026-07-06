@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/formalization/1.0.0/summary-only-session-context-envelope.schema.json",
+  "title": "Summary-Only Session Context Envelope",
+  "description": "Dedicated durable session-context artifact for bounded memory handoff. This artifact explicitly forbids transcript messages and transcript bodies.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["artifactKind", "sessionContext"],
+  "properties": {
+    "artifactKind": {
+      "const": "summary-only-session-context-envelope"
+    },
+    "requestId": { "type": ["string", "null"], "minLength": 1 },
+    "runId": { "type": ["string", "null"], "minLength": 1 },
+    "capturedAtUtc": { "type": ["string", "null"], "format": "date-time" },
+    "messages": false,
+    "message": false,
+    "content": false,
+    "transcript": false,
+    "rawTranscript": false,
+    "sessionContext": {
+      "type": "object",
+      "description": "Bounded summary-only durable context. Raw transcript content is never part of this artifact.",
+      "additionalProperties": false,
+      "required": [
+        "scope",
+        "representation",
+        "summary",
+        "rawTranscriptPersisted"
+      ],
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": ["run", "session", "workspace"]
+        },
+        "representation": {
+          "type": "string",
+          "enum": ["summary-only"]
+        },
+        "summary": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "salientFacts": {
+          "type": "array",
+          "maxItems": 16,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "instructionContext": {
+          "type": "array",
+          "maxItems": 8,
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 280
+          }
+        },
+        "rawTranscriptPersisted": {
+          "const": false
+        }
+      }
+    }
+  }
+}

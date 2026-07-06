@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-memory",
+  "version": "0.1.0",
+  "description": "Bounded local non-authoritative memory operations for agent sessions — write, search, recall with provenance and scope isolation.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./skills/",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Memory",
+        "shortDescription": "Store and retrieve governed local memory",
+        "longDescription": "Manage durable local memories with scoped retrieval, provenance, and consolidation.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Find the relevant project memories."]
+      }
+    }
+  }
+}

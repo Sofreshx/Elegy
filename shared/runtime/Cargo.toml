@@ -1,0 +1,21 @@
+[package]
+name = "elegy-runtime"
+version.workspace = true
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+elegy-mcp = { version = "0.1.0", path = "../../plugins/mcp" }
+elegy-adapter-fs = { version = "0.1.0", path = "../adapter-fs" }
+elegy-adapter-http = { version = "0.1.0", path = "../adapter-http" }
+elegy-descriptor = { version = "0.1.0", path = "../descriptor" }
+elegy-policy = { version = "0.1.0", path = "../policy" }
+serde.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

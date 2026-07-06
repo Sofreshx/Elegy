@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "elegy-configuration-template/v1",
+  "templateId": "repo-opencode-agentic-minimal",
+  "displayName": "Repo OpenCode Agentic Minimal",
+  "description": "Patch AGENTS.md and merge a minimal VS Code MCP config for repo-local OpenCode setup.",
+  "harness": "opencode",
+  "scope": "repo",
+  "bindings": {
+    "target.instructions": {
+      "defaultValue": "AGENTS.md",
+      "required": true,
+      "description": "Repo instruction overlay file."
+    }
+  },
+  "operations": [
+    {
+      "operationType": "patchTextBlock",
+      "operationId": "patch-agents-block",
+      "family": "instruction",
+      "destination": {
+        "base": "target-root",
+        "path": "${target.instructions}"
+      },
+      "startMarker": "<!-- elegy-configuration:begin opencode-agentic -->",
+      "endMarker": "<!-- elegy-configuration:end opencode-agentic -->",
+      "contentPath": {
+        "base": "template-root",
+        "path": "assets/opencode-agentic-agents-block.md"
+      },
+      "createIfMissing": true
+    },
+    {
+      "operationType": "mergeJson",
+      "operationId": "merge-vscode-mcp",
+      "family": "mcp",
+      "destination": {
+        "base": "target-root",
+        "path": ".vscode/mcp.json"
+      },
+      "source": {
+        "base": "template-root",
+        "path": "assets/vscode-mcp.json"
+      }
+    }
+  ]
+}
