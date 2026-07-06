@@ -44,9 +44,13 @@ Thumbs.db
 elegy-memory-mvp-test-plan.md
 /FLIGHT_RECORDER_WU_C.md
 /action_shas.txt
+/SESSION_TRACKING.md
 
 # Local agent session artifacts
 /target/agent-artifacts/
+
+# Rust local cargo config (user-specific, not to be committed)
+.cargo/config.toml
 
 # elegy-memory-mcp local auth state
 signing-key
@@ -54,4 +58,6 @@ clients.json
 refresh-tokens.json
 
 # Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
-C*
+# (e.g. "C:\Users\...\Temp\*.db" or "\Users\...\AppData\..." mangled into filenames)
+CUsers*AppDataLocalTemp*
+Users*AppDataLocalTemp*
