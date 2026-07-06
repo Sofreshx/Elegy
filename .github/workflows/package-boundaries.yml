@@ -1,4 +1,4 @@
-﻿name: Repo Boundaries
+name: Repo Boundaries
 
 # Validates that the contract bundle is internally consistent and that the
 # Rust workspace + docs surface still agree with the governed artifacts.
@@ -27,7 +27,7 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - name: Setup Rust
-        uses: dtolnay/rust-toolchain@1.96.0
+        uses: dtolnay/rust-toolchain@1.100.0
 
       - name: Cache Rust build
         uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
