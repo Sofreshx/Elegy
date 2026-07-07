@@ -53,10 +53,22 @@ foreach ($file in $trackedFiles) {
     }
 }
 
-$localPathPattern = 'C:/Users|C:\\Users|AppData/Local|AppData\\Local|/Users/[^/\s]+|/home/[^/\s]+'
+$windowsUsersPathPattern = 'C:' + '[/\\]' + 'Users'
+$appDataPathPattern = 'AppData' + '[/\\]' + 'Local'
+$macUsersPathPattern = '/' + 'Users' + '/[^/\s]+'
+$linuxHomePathPattern = '/' + 'home' + '/[^/\s]+'
+$localPathPattern = @(
+    $windowsUsersPathPattern,
+    $appDataPathPattern,
+    $macUsersPathPattern,
+    $linuxHomePathPattern
+) -join '|'
 foreach ($file in $trackedFiles) {
     $fullPath = Join-Path $root $file
-    $item = Get-Item -LiteralPath $fullPath
+    $item = Get-Item -LiteralPath $fullPath -ErrorAction SilentlyContinue
+    if (-not $item -or $item.PSIsContainer) {
+        continue
+    }
     if ($item.Length -gt 1048576) {
         continue
     }

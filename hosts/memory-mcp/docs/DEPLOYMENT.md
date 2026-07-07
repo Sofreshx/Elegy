@@ -43,11 +43,11 @@ cloudflared tunnel route dns elegy-memory elegy-memory.holon.it.com
 
 Point the public hostname at the local HTTP MCP server on port `8765`.
 
-File: `C:\Users\<you>\.cloudflared\config.yml`
+File: `%USERPROFILE%\.cloudflared\config.yml`
 
 ```yaml
 tunnel: <TUNNEL_ID>
-credentials-file: C:\Users\<you>\.cloudflared\<TUNNEL_ID>.json
+credentials-file: %USERPROFILE%\.cloudflared\<TUNNEL_ID>.json
 
 ingress:
   - hostname: elegy-memory.holon.it.com
