@@ -11,7 +11,7 @@ MCP is optional.
 
 Core model:
 
-- governed artifacts stay co-located with owning plugins
+- governed plugin artifacts stay co-located with owning bundled plugins
 - Rust implements reusable behavior over those artifacts
 - `SKILL.md` files are the skill discovery authority
 - dedicated `elegy-*` binaries are the shipped surfaces
@@ -21,15 +21,19 @@ Core model:
 
 | Area | Purpose |
 | --- | --- |
-| `docs/governance/` | Narrow policy assets used by workflows and tooling. |
-| `hosts/` | Thin host entrypoints. |
-| `plugins/` | Capability crates with co-located schemas, fixtures, skills, and plugin-local contracts. |
-| `shared/` | Cross-cutting crates and operator tooling. |
-| `plugins/<name>/skills/` | Plugin-owned skill definitions. |
+| `plugins/` | Bundled installable plugin packages. |
+| `tools/` | Standalone CLI crates that are not plugin packages. |
+| `hosts/` | Host adapters and transport servers. |
+| `skills/` | Standalone skill-only packages. |
+| `marketplace-wrappers/` | Public metadata wrappers for external/private plugin archives. |
+| `shared/` | Reusable Rust libraries and platform tooling. |
+| `distribution/` | Canonical release and surface catalog. |
+| `docs/` | Architecture, ADRs, specs, governance, and operations docs. |
 | `artifacts/` | CI-generated bundles, archives, and validation outputs. |
 
-When those surfaces disagree, prefer the governed artifacts within their owning
-plugin and the smallest relevant architecture or spec document under `docs/`.
+When those surfaces disagree, prefer the smallest relevant architecture or spec
+document under `docs/`, then the owning package manifest and
+`distribution/surfaces.json`.
 
 ## Install
 
@@ -83,19 +87,20 @@ require editing this README.
 | `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
 | `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
 | `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
-| `elegy-skills` | `plugins/skills/` | [DISTRIBUTION.md](plugins/skills/DISTRIBUTION.md) |
-| `elegy-configuration` | `plugins/configuration/` | [DISTRIBUTION.md](plugins/configuration/DISTRIBUTION.md) |
+| `elegy-skills` | `tools/skills/` | [DISTRIBUTION.md](tools/skills/DISTRIBUTION.md) |
+| `elegy-configuration` | `tools/configuration/` | [DISTRIBUTION.md](tools/configuration/DISTRIBUTION.md) |
 | `elegy-documentation` | `plugins/documentation/` | [DISTRIBUTION.md](plugins/documentation/DISTRIBUTION.md) |
-| `elegy-memory-mcp-stdio` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
-| `elegy-memory-mcp-http` | `plugins/memory-mcp/` | [DISTRIBUTION.md](plugins/memory-mcp/DISTRIBUTION.md) |
-| `elegy-codegraph` | `plugins/codegraph/` | [DISTRIBUTION.md](plugins/codegraph/DISTRIBUTION.md) |
+| `elegy-memory-mcp-stdio` | `hosts/memory-mcp/` | [DISTRIBUTION.md](hosts/memory-mcp/DISTRIBUTION.md) |
+| `elegy-memory-mcp-http` | `hosts/memory-mcp/` | [DISTRIBUTION.md](hosts/memory-mcp/DISTRIBUTION.md) |
+| `elegy-codegraph` | `tools/codegraph/` | [DISTRIBUTION.md](tools/codegraph/DISTRIBUTION.md) |
 
 ## Skill Surfaces
 
-Plugin-owned skills live under `plugins/<name>/skills/elegy-<name>/SKILL.md`.
-Standalone skill-only packages live at the repo root (`elegy-<name>/SKILL.md`).
-The `elegy-skills` CLI discovers skills from plugin manifests first, then standalone
-root packages, failing on duplicate skill IDs.
+Plugin-owned skills live under
+`plugins/{plugin-name}/skills/elegy-{skill-id}/SKILL.md`. Standalone skill-only
+packages live under `skills/elegy-{skill-id}/SKILL.md`. The `elegy-skills` CLI
+discovers skills from plugin manifests and `skills/elegy-*` packages, failing
+on duplicate skill IDs.
 
 ## Configuration Materialization
 
@@ -113,8 +118,9 @@ templates and profile details.
 ## Skill Tools
 
 Elegy's skills product is registry-first. Plugin-owned skills under
-`plugins/<name>/skills/` and standalone root packages are the discovery authority.
-The `elegy-skills` CLI provides search, resolve, inspect, and validation.
+`plugins/{plugin-name}/skills/` and standalone packages under `skills/elegy-*`
+are the discovery authority. The `elegy-skills` CLI provides search, resolve,
+inspect, and validation.
 
 `elegy-skills list/search/describe/resolve/validate --json`
 

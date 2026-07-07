@@ -1,3 +1,10 @@
+---
+title: Elegy Terminology
+status: active
+owner: elegy-core
+doc_kind: reference
+---
+
 # Elegy Terminology
 
 ## Purpose

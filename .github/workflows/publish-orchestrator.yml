@@ -27,7 +27,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli") | {surface_name: .name, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter") | {surface_name: .name, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
           matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
@@ -241,7 +241,7 @@ jobs:
             elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin") and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
                 exit 1
@@ -251,7 +251,7 @@ jobs:
             elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.kind == "cli" and .name == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "host-adapter") and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve surface for archive family: $archive_family" >&2
                 exit 1
@@ -307,7 +307,7 @@ jobs:
           set -euo pipefail
           release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
           mapfile -t external_plugin_prefixes < <(
-            jq -r '.surfaces[] | select(.kind == "external-plugin") | .name + "-plugin-"' distribution/surfaces.json
+            jq -r '.surfaces[] | select(.kind == "external-plugin-wrapper") | .name + "-plugin-"' distribution/surfaces.json
           )
           while IFS=$'\t' read -r asset_id asset_name; do
             preserve_external=false

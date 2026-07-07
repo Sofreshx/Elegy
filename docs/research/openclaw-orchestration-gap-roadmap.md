@@ -1,3 +1,10 @@
+---
+title: Research OpenClaw orchestration gap roadmap
+status: exploratory
+owner: elegy-core
+doc_kind: research
+---
+
 # Research: OpenClaw orchestration gap roadmap
 
 Updated: 2026-03-25

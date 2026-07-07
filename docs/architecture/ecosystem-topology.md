@@ -1,3 +1,10 @@
+---
+title: Elegy Ecosystem Topology
+status: active
+owner: elegy-core
+doc_kind: system
+---
+
 # Elegy Ecosystem Topology
 
 ## Purpose
@@ -17,8 +24,12 @@ The main goal is to keep Elegy reusable across Holon and non-Holon projects whil
 
 Its active design centers are:
 
-- governed schemas, fixtures, manifests, and policy co-located with their owning plugins under `plugins/<name>/schemas/`, `plugins/<name>/fixtures/`, and `plugins/<name>/contracts/`; cross-cutting fixtures live in `shared/core/fixtures/`
-- the first-party Rust workspace at the repo root, organized into `hosts/`, `plugins/`, and `shared/`
+- bundled plugin packages under `plugins/`
+- standalone CLI crates under `tools/`
+- host adapters and transport servers under `hosts/`
+- standalone skill packages under `skills/`
+- marketplace metadata wrappers under `marketplace-wrappers/`
+- shared Rust libraries under `shared/`
 
 Legacy `src/`, `tests/`, solution files, and `.NET` package-family narratives are not active repo centers and should not be described as such in current docs.
 
@@ -35,9 +46,10 @@ flowchart TD
         config["plugins/&lt;name&gt;/contracts/\nconfiguration artifacts"]
     end
 
-    subgraph exec["hosts/ + plugins/ + shared/ — Rust workspace (21 crates)"]
-        hosts["hosts/\n1 binary crate\n(elegy-run MCP host)"]
-        plugins["plugins/\n10 capability crates\n(mcp, skills, planning, ...)"]
+    subgraph exec["hosts/ + plugins/ + tools/ + shared/ — Rust workspace"]
+        hosts["hosts/\nhost adapters\n(elegy-run, memory MCP)"]
+        plugins["plugins/\nbundled plugin packages\n(mcp, planning, memory, ...)"]
+        tools["tools/\nstandalone CLIs\n(skills, configuration, codegraph)"]
         shared["shared/\n10 crates\n(libraries + operator tooling:\ncore, runtime, tooling,\nplugin-sdk, ...)"]
     end
 
@@ -58,6 +70,7 @@ flowchart TD
     end
 
     governed -->|"consumed by"| exec
+    tools -->|"uses"| shared
     exec -->|"generates"| derived
     docs -->|"governs"| governed
     docs -->|"governs"| exec
@@ -82,10 +95,13 @@ These assets are the source of truth for downstream consumers. They should be pr
 
 ### Rust executable family
 
-The first-party executable and runtime layer is organized as a Cargo workspace at the repo root with three top-level subtrees:
+The first-party executable and runtime layer is organized as a Cargo workspace at the repo root with role-specific top-level subtrees:
 
-- **`hosts/`** — thin binary entrypoints (elegy-run MCP host)
-- **`plugins/`** — capability crates, each owning its schemas, fixtures, and tests
+- **`plugins/`** — bundled installable plugin packages, each owning its schemas, fixtures, and tests
+- **`tools/`** — standalone CLI crates that are not plugin packages
+- **`hosts/`** — host adapters and transport servers
+- **`skills/`** — standalone skill-only packages
+- **`marketplace-wrappers/`** — public metadata wrappers for external/private plugin archives
 - **`shared/`** — library crates reused across hosts and plugins
 
 The key current crates are:
@@ -97,11 +113,11 @@ The key current crates are:
 - `elegy-tooling` (`shared/tooling`) as the binary-only home of `elegy-plugin-packaging` for plugin verify/pack/export/install
 - `elegy-plugin-sdk` (`shared/plugin-sdk`) for the publishable external plugin SDK
 - `elegy-mcp` (`plugins/mcp`) for MCP analysis and related runtime behavior over governed descriptors
-- `elegy-skills` (`plugins/skills`) for governed skill-registry access and validation
+- `elegy-skills` (`tools/skills`) for governed skill-registry access and validation
 - `elegy-planning` (`plugins/planning`) for durable planning authority
 - `elegy-memory` (`plugins/memory`) for bounded local memory surfaces
 - `elegy-documentation` (`plugins/documentation`) for documentation inspection, mapping, and export
-- `elegy-configuration` (`plugins/configuration`) for governed template and profile flows
+- `elegy-configuration` (`tools/configuration`) for governed template and profile flows
 - `elegy-run` (`hosts/host-mcp`) for the thin stdio MCP host
 
 ### Current shipped operator slice
@@ -110,11 +126,10 @@ The current shipped operator path is intentionally narrow.
 
 The current shipped operator surfaces are each shipped as dedicated binaries: `elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`, `elegy-documentation`, `elegy-configuration`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`.
 
-Seven surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`,
-`elegy-documentation`, `elegy-observe`, `elegy-desktop`) are packaged as
-`elegy-plugin/v1` plugin archives. The portable plugin archive (`.plugin.zip`)
-is the primary release contract; per-host Codex exports are derived host projections.
-The remaining surfaces ship as standalone CLI binaries.
+Bundled plugins and skill packages are packaged as `elegy-plugin/v1` plugin
+archives. External/private plugin wrappers publish marketplace metadata under
+`marketplace-wrappers/`. The remaining executable surfaces ship as standalone
+CLI binaries.
 
 What the repo proves today:
 

@@ -6,7 +6,7 @@ artifacts or an external service.
 
 ## Usage
 
-1. Copy this directory to `plugins/<your-plugin-name>/`
+1. Copy this directory to `marketplace-wrappers/<your-plugin-name>/`
 2. Edit `.elegy-plugin/plugin.json`
 3. Add the plugin to `distribution/surfaces.json`
 4. Regenerate `.elegy/marketplace.json`
@@ -14,7 +14,7 @@ artifacts or an external service.
 ## Directory structure
 
 ```
-plugins/<your-plugin-name>/
+marketplace-wrappers/<your-plugin-name>/
   .elegy-plugin/
     plugin.json       # discovery metadata
   README.md           # local docs about this wrapper (optional)
@@ -56,9 +56,9 @@ Add one packaged surface to `distribution/surfaces.json`:
 ```json
 {
   "name": "elegy-my-plugin",
-  "kind": "external-plugin",
+  "kind": "external-plugin-wrapper",
   "packaging": "plugin",
-  "pluginRoot": "plugins/my-plugin",
+  "pluginRoot": "marketplace-wrappers/my-plugin",
   "artifactBaseUrl": "https://github.com/org/private-plugin/releases/download",
   "marketplaceCategory": "Developer Tools",
   "description": "Short user-facing capability summary."

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-configuration-profile/v1",
+  "profileId": "repo-codex-minimal",
+  "displayName": "Repo Codex Minimal",
+  "description": "Minimal repo-local Codex-facing setup with Codex home installation.",
+  "bindings": {},
+  "templates": [
+    {
+      "templateId": "codex-home-minimal",
+      "bindings": {}
+    }
+  ]
+}

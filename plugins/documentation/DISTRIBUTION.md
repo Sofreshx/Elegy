@@ -44,7 +44,7 @@ cargo run -p elegy-documentation -- check --project . --json
 ## Validation
 
 - `cargo test -p elegy-documentation`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/documentation`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/documentation`
 
 ## Where to read more
 
