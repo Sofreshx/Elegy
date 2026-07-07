@@ -3175,7 +3175,12 @@ mod tests {
             let path = schema_dir.join(file_name);
             let actual = fs::read_to_string(&path)
                 .unwrap_or_else(|error| panic!("read {}: {error}", path.display()));
-            assert_eq!(actual, expected, "schema drift: {}", path.display());
+            assert_eq!(
+                actual.replace("\r\n", "\n"),
+                expected.replace("\r\n", "\n"),
+                "schema drift: {}",
+                path.display()
+            );
         }
     }
 
