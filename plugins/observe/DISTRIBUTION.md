@@ -42,7 +42,7 @@ cargo run -p elegy-observe -- --help
 ## Validation
 
 - `cargo test -p elegy-observe`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/observe`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/observe`
 
 ## Where to read more
 

@@ -3,6 +3,8 @@ created: 2026-03-19
 updated: 2026-06-30
 category: architecture
 status: active
+title: MCP Spec Baseline
+owner: elegy-core
 doc_kind: reference
 ---
 

@@ -34,6 +34,14 @@ packages/
 .DS_Store
 Thumbs.db
 
+# Local databases / agent state
+*.db
+*.sqlite
+*.sqlite3
+*.db-wal
+*.db-shm
+*.db-journal
+
 # LLM temporary directories
 .tmp/llm-input/
 .tmp/llm-output/
@@ -41,8 +49,8 @@ Thumbs.db
 
 # Repo-local prompt/session scratch files
 /prompt.md
+/FLIGHT_RECORDER*.md
 elegy-memory-mvp-test-plan.md
-/FLIGHT_RECORDER_WU_C.md
 /action_shas.txt
 
 # Local agent session artifacts
@@ -54,4 +62,5 @@ clients.json
 refresh-tokens.json
 
 # Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
-C*
+/C*
+/Users*AppData*Temp*

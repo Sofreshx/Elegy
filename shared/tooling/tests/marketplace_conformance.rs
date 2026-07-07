@@ -11,6 +11,8 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct DistributionCatalog {
+    #[serde(rename = "schemaVersion")]
+    schema_version: String,
     surfaces: Vec<DistributionSurface>,
 }
 
@@ -18,6 +20,7 @@ struct DistributionCatalog {
 #[serde(rename_all = "camelCase")]
 struct DistributionSurface {
     name: String,
+    kind: String,
     #[serde(default)]
     packaging: Option<String>,
     #[serde(default)]
@@ -61,6 +64,28 @@ fn generated_marketplace_is_valid() {
         "invalid marketplace: {}",
         validation.issues.join("; ")
     );
+}
+
+#[test]
+fn distribution_catalog_uses_explicit_surface_roles() {
+    let surfaces = load_surfaces();
+
+    assert_eq!(surfaces.schema_version, "elegy-surfaces/v2");
+    for surface in surfaces.surfaces {
+        assert!(
+            matches!(
+                surface.kind.as_str(),
+                "bundled-plugin"
+                    | "cli"
+                    | "host-adapter"
+                    | "skill-package"
+                    | "external-plugin-wrapper"
+            ),
+            "{} uses unsupported surface kind {}",
+            surface.name,
+            surface.kind
+        );
+    }
 }
 
 #[test]

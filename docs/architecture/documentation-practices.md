@@ -1,3 +1,10 @@
+---
+title: Documentation Practices
+status: active
+owner: elegy-core
+doc_kind: guide
+---
+
 # Documentation Practices
 
 ## Purpose

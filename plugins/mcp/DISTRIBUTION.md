@@ -45,7 +45,7 @@ cargo run -p elegy-mcp -- --help
 ## Validation
 
 - `cargo test -p elegy-mcp`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/mcp`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/mcp`
 
 ## Where to read more
 

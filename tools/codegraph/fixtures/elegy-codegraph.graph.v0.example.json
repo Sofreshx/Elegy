@@ -1,0 +1,126 @@
+{
+  "schema": "elegy-codegraph.graph.v0",
+  "extractor": {
+    "name": "elegy-codegraph-ts",
+    "version": "0.1.0",
+    "lang": "ts"
+  },
+  "entities": [
+    {
+      "id": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+      "kind": "module",
+      "layer": "source",
+      "name": "math",
+      "qualifiedName": "src/math",
+      "file": "src/math.ts",
+      "span": {
+        "start": [1, 1],
+        "end": [42, 1]
+      },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": ["c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2"],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:1:1"]
+      }
+    },
+    {
+      "id": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+      "kind": "function",
+      "layer": "source",
+      "name": "add",
+      "qualifiedName": "src/math::add",
+      "file": "src/math.ts",
+      "span": {
+        "start": [3, 1],
+        "end": [5, 2]
+      },
+      "inputs": [
+        {"name": "a", "typeHint": "number"},
+        {"name": "b", "typeHint": "number"}
+      ],
+      "outputs": [
+        {"typeHint": "number"}
+      ],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": ["c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2"],
+      "docs": ["d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3"],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:3:1"]
+      }
+    },
+    {
+      "id": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+      "kind": "test",
+      "layer": "test",
+      "name": "test_add_positive",
+      "qualifiedName": "src/math.test::test_add_positive",
+      "file": "src/math.test.ts",
+      "span": {
+        "start": [1, 1],
+        "end": [10, 2]
+      },
+      "inputs": [],
+      "outputs": [],
+      "sideEffects": [],
+      "dependencies": [],
+      "tests": [],
+      "docs": [],
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": ["src/math.test.ts:1:1"]
+      }
+    }
+  ],
+  "edges": [
+    {
+      "src": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+      "dst": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+      "kind": "exports",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.ts:3:1"]
+      }
+    },
+    {
+      "src": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+      "dst": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+      "kind": "calls",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "exact",
+        "evidenceRefs": ["src/math.test.ts:5:10"]
+      }
+    },
+    {
+      "src": "c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2",
+      "dst": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+      "kind": "tests",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "inferred",
+        "evidenceRefs": ["src/math.test.ts:1:1"]
+      }
+    },
+    {
+      "src": "b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1",
+      "dst": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+      "kind": "documents",
+      "provenance": {
+        "extractor": "elegy-codegraph-ts",
+        "confidence": "heuristic",
+        "evidenceRefs": ["src/math.ts:2:5"]
+      }
+    }
+  ]
+}

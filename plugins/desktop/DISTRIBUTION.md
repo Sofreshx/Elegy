@@ -42,7 +42,7 @@ cargo run -p elegy-desktop -- --help
 ## Validation
 
 - `cargo test -p elegy-desktop`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/desktop`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/desktop`
 
 ## Where to read more
 

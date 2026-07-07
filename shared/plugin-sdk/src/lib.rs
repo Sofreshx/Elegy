@@ -1809,7 +1809,31 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
         };
         if skills_dir.exists() && skills_dir.is_dir() {
             let mut count = 0;
-            if let Ok(entries) = fs::read_dir(&skills_dir) {
+            let direct_skill_md = skills_dir.join("SKILL.md");
+            if direct_skill_md.is_file() {
+                count += 1;
+                let skill_name = skills_dir
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("<root>");
+                match fs::read_to_string(&direct_skill_md) {
+                    Ok(content) => match parse_agent_skill_frontmatter(&content) {
+                        Ok((frontmatter, _)) => {
+                            for issue in validate_agent_skill_frontmatter(&frontmatter) {
+                                issues.push(format!("skills.{skill_name}: {issue}"));
+                            }
+                        }
+                        Err(issue) => {
+                            issues.push(format!("skills.{skill_name}: {issue}"));
+                        }
+                    },
+                    Err(error) => {
+                        issues.push(format!(
+                            "skills.{skill_name}: unable to read SKILL.md: {error}."
+                        ));
+                    }
+                }
+            } else if let Ok(entries) = fs::read_dir(&skills_dir) {
                 for entry in entries.flatten() {
                     let skill_dir = entry.path();
                     if skill_dir.is_dir() {

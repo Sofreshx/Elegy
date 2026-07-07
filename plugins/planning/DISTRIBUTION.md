@@ -47,7 +47,7 @@ cargo run -p elegy-planning -- --help
 ## Validation
 
 - `cargo test -p elegy-planning`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/planning`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning`
 
 ## Where to read more
 

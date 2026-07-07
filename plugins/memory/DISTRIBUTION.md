@@ -46,11 +46,11 @@ cargo run -p elegy-memory -- --help
 ## Validation
 
 - `cargo test -p elegy-memory`
-- Plugin verify: `cargo run -p elegy-tooling -- verify --plugin plugins/memory`
+- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/memory`
 
 ## Where to read more
 
 - Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
 - Crate boundaries: [`AGENTS.md`](./AGENTS.md)
 - Memory MCP transport adapter (separate binary):
-  [`../memory-mcp/DISTRIBUTION.md`](../memory-mcp/DISTRIBUTION.md)
+  [`../../hosts/memory-mcp/DISTRIBUTION.md`](../../hosts/memory-mcp/DISTRIBUTION.md)

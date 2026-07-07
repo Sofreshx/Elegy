@@ -1,16 +1,13 @@
 [workspace]
 members = [
     "hosts/host-mcp",
-    "plugins/codegraph",
-    "plugins/configuration",
     "plugins/desktop",
     "plugins/documentation",
     "plugins/mcp",
     "plugins/memory",
-    "plugins/memory-mcp",
     "plugins/observe",
     "plugins/planning",
-    "plugins/skills",
+    "hosts/memory-mcp",
     "shared/adapter-fs",
     "shared/adapter-http",
     "shared/core",
@@ -21,6 +18,9 @@ members = [
     "shared/policy",
     "shared/runtime",
     "shared/tooling",
+    "tools/codegraph",
+    "tools/configuration",
+    "tools/skills",
 ]
 resolver = "2"
 
