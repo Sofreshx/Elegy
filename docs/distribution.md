@@ -1,3 +1,10 @@
+---
+title: Distribution and downstream consumption
+status: active
+owner: elegy-core
+doc_kind: guide
+---
+
 # Distribution and downstream consumption
 
 Elegy ships release assets through GitHub Releases, not package feeds or
@@ -36,16 +43,28 @@ stability promise.
 
 ## Surface Catalog
 
-Release configuration uses `distribution/surfaces.json` as the central catalog. It maps workspace crates and surfaces to their release identities, build targets, and description. The publish orchestrator reads this catalog to discover which surfaces to build and release.
+Release configuration uses `distribution/surfaces.json` as the central catalog.
+It declares `schemaVersion: "elegy-surfaces/v2"` and maps workspace crates and
+surfaces to their release identities, build targets, and description. The
+publish orchestrator reads this catalog to discover which surfaces to build and
+release.
 
 To add a new release surface, add an entry to `distribution/surfaces.json` and ensure the crate builds. No per-feature workflow files are needed.
 
-Each dedicated binary is listed in the catalog with kind `cli`. Most build from a package with the same name; surfaces with a different package declare `package` explicitly. Skill-only surfaces (those without a corresponding Rust binary) are listed with kind `skill-only`.
+Each surface uses one explicit repository role:
 
-External plugin wrappers use `kind: "external-plugin"`, `packaging: "plugin"`,
-`pluginRoot`, and `artifactBaseUrl`. The generated marketplace keeps
-`source.path` local for wrapper metadata and points artifact URLs at the external
-release repository.
+| Kind | Contract |
+| --- | --- |
+| `bundled-plugin` | Installable plugin package under `plugins/`, usually with a Rust crate and skill surface. |
+| `cli` | Standalone CLI under `tools/` or `shared/`, not a host adapter. |
+| `host-adapter` | Host or transport surface under `hosts/`. |
+| `skill-package` | Standalone skill package under `skills/elegy-*`, with no dedicated Rust binary. |
+| `external-plugin-wrapper` | Public marketplace metadata under `marketplace-wrappers/` for an external/private implementation. |
+
+External plugin wrappers use `kind: "external-plugin-wrapper"`,
+`packaging: "plugin"`, `pluginRoot`, and `artifactBaseUrl`. The generated
+marketplace keeps `source.path` local for wrapper metadata and points artifact
+URLs at the external release repository.
 
 External plugin repositories own their release pipeline. They must publish
 `<name>-plugin-<target>.zip` plus `<name>-plugin-<target>.zip.sha256` for each
@@ -95,7 +114,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 - Pin an explicit Elegy semver release tag in downstream repositories and install into a repo-local tools directory.
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
-- Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, scaffolding, and export.
+- Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, packaging, and export.
 - Prefer `.plugin.zip` archives over flat binaries for plugin-packaged surfaces. The archive carries the manifest, skills, and built binary in a single verifiable artifact.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
 - Treat the rolling `main-snapshot` prerelease as an integration/debug lane, not a pinned downstream contract.

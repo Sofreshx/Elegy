@@ -34,7 +34,7 @@ the portable contract.
 | `author` | `ElegyPluginV1Author` | validator, inspect, export/import | Keep portable publisher metadata. |
 | `license` | `ElegyPluginV1` | export/import | Keep portable package metadata. |
 | `repository` | `ElegyPluginV1` | validator, export/import | Keep portable package metadata. |
-| `skills` | `ElegyPluginV1` | verifier, inspect, export, pack, scaffold | Keep portable component path. |
+| `skills` | `ElegyPluginV1` | verifier, inspect, export, pack | Keep portable component path. |
 | `mcpServers` | `ElegyPluginV1` | verifier, inspect, Claude export, pack | Keep portable descriptor path. Do not reuse it for Codex runtime config. |
 | `extensions` | `ElegyPluginV1` | extension validator and host adapters | Keep optional. Omit empty maps and empty host extensions. |
 
@@ -70,7 +70,7 @@ from default export until validator evidence changes.
 |---|---|---|
 | `skills` | `./skills/` | Require `./`-prefixed portable paths. |
 | `.app.json` | connector references with `id` and optional `category` | Remove Elegy's unsupported `required` field. Do not add OAuth, token, action, or approval policy. |
-| `.mcp.json` | `mcpServers` object | Validate the companion file. v1 stores its path and does not model inline objects. |
+| `.mcp.json` | `mcpServers` object | Validate the companion file. v1 stores its path and does not model inline objects. Target-specific archives may use target-specific command paths. Windows `bin/` commands must reference a Windows-runnable file such as `.exe`, `.cmd`, `.bat`, or `.ps1`. |
 | hooks | command handlers in `hooks/hooks.json` | Treat manifest `hooks` as experimental while retaining default-file discovery. |
 | interface assets | files under the plugin archive | Validate `composerIcon`, `logo`, `logoDark`, and PNG screenshots. |
 
@@ -100,7 +100,9 @@ to `ElegyPluginV1`, and preserves Codex-only fields under
 wrapper under `plugins/<name>/`, preserves entry order and category, defaults
 Codex policy to `AVAILABLE` and `ON_INSTALL`, resolves the selected target's
 verified binary, and omits Elegy artifact fields from the generated index. The
-Codex index is derived output.
+Codex index is derived output. For Windows targets, export rejects `.mcp.json`
+commands under `bin/` when they omit a Windows-runnable extension or point at a
+missing file.
 
 ## Non-goals
 

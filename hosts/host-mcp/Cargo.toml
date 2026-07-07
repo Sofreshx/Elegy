@@ -12,7 +12,7 @@ repository.workspace = true
 base64.workspace = true
 clap.workspace = true
 elegy-core = { version = "0.1.0", path = "../../shared/core" }
-elegy-skills = { version = "0.1.0", path = "../../plugins/skills" }
+elegy-skills = { version = "0.1.0", path = "../../tools/skills" }
 rmcp.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true

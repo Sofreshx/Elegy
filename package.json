@@ -1,7 +1,0 @@
-{
-  "name": "elegy",
-  "version": "0.1.0",
-  "private": true,
-  "description": "Elegy — Rust toolkit for shipping governed local CLI capabilities to AI-agent hosts",
-  "license": "Apache-2.0"
-}

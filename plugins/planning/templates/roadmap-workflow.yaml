@@ -1,6 +1,11 @@
 # Template: Roadmap Workflow Scaffold
 # Creates a v1 goal -> roadmap -> section -> work-point -> plan -> todo flow.
-# Use with: elegy-planning roadmap scaffold --file <file> --dry-run|--apply
+# Use with:
+#   elegy-planning --scope <scope> --json --non-interactive --correlation-id <id> roadmap scaffold --file <file> --dry-run
+#   elegy-planning --scope <scope> --json --non-interactive --correlation-id <id> roadmap scaffold --file <file> --apply --if-exists update
+# Dry-run and apply share one transaction path. Apply rolls back all scaffold
+# writes when any entity is rejected.
+# Work-point dependencies may reference work-points declared later in this file.
 goal:
   id: <GOAL_ID>
   title: "<GOAL_TITLE>"

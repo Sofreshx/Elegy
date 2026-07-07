@@ -9,7 +9,7 @@ use elegy_mcp::{
     McpServerDescriptor,
 };
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn repo_root() -> PathBuf {
@@ -148,10 +148,7 @@ fn duplicate_resource_uris_are_rejected() {
     assert!(codes.contains(&"RUNTIME-DUPLICATE-URI-001"));
 }
 
-fn load_mcp_fixture<T: serde::de::DeserializeOwned>(
-    dir: &PathBuf,
-    name: &str,
-) -> Result<T, String> {
+fn load_mcp_fixture<T: serde::de::DeserializeOwned>(dir: &Path, name: &str) -> Result<T, String> {
     let path = dir.join("fixtures").join(name);
     let content =
         fs::read_to_string(&path).map_err(|e| format!("failed to read {}: {e}", path.display()))?;

@@ -38,6 +38,11 @@ jobs:
         working-directory: .
         run: cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate
 
+      - name: Validate repo shape
+        shell: pwsh
+        working-directory: .
+        run: ./scripts/check-repo-shape.ps1 -Project . -FailOnIssues
+
       - name: Validate contracts (conformance)
         working-directory: .
         run: cargo test -p elegy-skills --test conformance -p elegy-mcp --test conformance -p elegy-configuration --test conformance -p elegy-memory --test conformance -- --nocapture

@@ -1,3 +1,10 @@
+---
+title: main-protection Branch Ruleset
+status: draft
+owner: elegy-core
+doc_kind: reference
+---
+
 # main-protection — Branch Ruleset for `main`
 
 Status: **artifact**. Not yet applied. Apply after `reconcile/main-roro` merges CI-green.
