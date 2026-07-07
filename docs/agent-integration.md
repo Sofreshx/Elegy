@@ -1,3 +1,10 @@
+---
+title: Agent Integration
+status: active
+owner: elegy-core
+doc_kind: guide
+---
+
 # Agent Integration
 
 Elegy is designed for AI-agent hosts that can run local subprocesses. The

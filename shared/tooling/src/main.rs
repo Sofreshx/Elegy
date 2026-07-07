@@ -1,11 +1,11 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, Subcommand};
 use elegy_plugin_sdk::{
     export_plugin_v1_with_codex_mode_and_binary, inspect_plugin_v1, pack_plugin_v1,
-    pack_plugin_v1_with_binary, resolve_plugin_root, scaffold_plugin_v1_repository_with_mode,
-    select_marketplace_artifact, validate_elegy_marketplace_v1, validate_elegy_plugin_v1,
-    verify_plugin_v1, CodexProjectionMode, ElegyMarketplaceArtifact, ElegyMarketplaceInterface,
-    ElegyMarketplacePlugin, ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1,
-    PluginArchiveBinary, PluginScaffoldMode, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
+    pack_plugin_v1_with_binary, resolve_plugin_root, select_marketplace_artifact,
+    validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, CodexProjectionMode,
+    ElegyMarketplaceArtifact, ElegyMarketplaceInterface, ElegyMarketplacePlugin,
+    ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, PluginArchiveBinary,
+    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -26,25 +26,6 @@ struct Cli {
 
 #[derive(Subcommand)]
 enum Command {
-    /// Scaffold a minimal Elegy plugin repository
-    Scaffold {
-        #[arg(long)]
-        name: String,
-        #[arg(long)]
-        description: String,
-        #[arg(long, default_value = "0.1.0")]
-        version: String,
-        #[arg(long)]
-        output: PathBuf,
-        #[arg(long)]
-        author: String,
-        #[arg(long, default_value = "")]
-        license: String,
-        #[arg(long, default_value = "")]
-        repository: String,
-        #[arg(long, value_enum, default_value_t = ScaffoldMode::SkillOnly)]
-        mode: ScaffoldMode,
-    },
     /// Verify a plugin package (validates manifest and skills)
     Verify {
         /// Path to plugin directory, .elegy-plugin dir, or plugin.json
@@ -186,6 +167,7 @@ struct DistributionCatalog {
 #[serde(rename_all = "camelCase")]
 struct DistributionSurface {
     name: String,
+    kind: String,
     #[serde(default)]
     packaging: Option<String>,
     #[serde(default)]
@@ -221,56 +203,9 @@ struct MarketplaceListOutput<'a> {
     plugins: Vec<MarketplacePluginSummary<'a>>,
 }
 
-#[derive(Clone, Copy, Debug, Default, ValueEnum)]
-enum ScaffoldMode {
-    #[default]
-    SkillOnly,
-    RustCli,
-    McpServer,
-}
-
-impl From<ScaffoldMode> for PluginScaffoldMode {
-    fn from(value: ScaffoldMode) -> Self {
-        match value {
-            ScaffoldMode::SkillOnly => Self::SkillOnly,
-            ScaffoldMode::RustCli => Self::RustCli,
-            ScaffoldMode::McpServer => Self::McpServer,
-        }
-    }
-}
-
 fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
-        Command::Scaffold {
-            name,
-            description,
-            version,
-            output,
-            author,
-            license,
-            repository,
-            mode,
-        } => match scaffold_plugin_v1_repository_with_mode(
-            &name,
-            &description,
-            &version,
-            &output,
-            &author,
-            &license,
-            &repository,
-            mode.into(),
-        ) {
-            Ok(files) => {
-                println!("Plugin scaffolded successfully.");
-                println!("  mode: {mode:?}  files: {}", files.len());
-                ExitCode::SUCCESS
-            }
-            Err(error) => {
-                eprintln!("Error: {error}");
-                ExitCode::from(2)
-            }
-        },
         Command::Verify { plugin } => {
             // verify_plugin_v1 expects the .elegy-plugin directory directly.
             let (repo_root, _manifest) = match resolve_plugin_root(&plugin) {
@@ -587,7 +522,7 @@ fn generate_marketplace(
     for surface in catalog
         .surfaces
         .into_iter()
-        .filter(|surface| surface.packaging.as_deref() == Some("plugin"))
+        .filter(is_plugin_packaged_surface)
     {
         let plugin_root = surface
             .plugin_root
@@ -682,6 +617,17 @@ fn generate_marketplace(
         .map_err(|error| format!("write {}: {error}", output_path.display()))?;
     println!("Generated {}", output_path.display());
     Ok(())
+}
+
+fn is_plugin_packaged_surface(surface: &DistributionSurface) -> bool {
+    if surface.packaging.as_deref() != Some("plugin") {
+        return false;
+    }
+
+    matches!(
+        surface.kind.as_str(),
+        "bundled-plugin" | "skill-package" | "external-plugin-wrapper" | "cli"
+    )
 }
 
 fn load_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
@@ -1048,6 +994,7 @@ fn materialize_marketplace_artifact(
         }
     })?;
     let installed_root = staging_root.join(&entry.name);
+    validate_target_mcp_commands(&installed_root, target)?;
     let bin_root = installed_root.join("bin");
     if !bin_root.is_dir() {
         if artifact.target == "any" {
@@ -1084,6 +1031,76 @@ fn materialize_marketplace_artifact(
             archive_path,
         }),
     }))
+}
+
+fn validate_target_mcp_commands(plugin_root: &Path, target: &str) -> Result<(), String> {
+    let mcp_path = plugin_root.join(".mcp.json");
+    if !mcp_path.is_file() {
+        return Ok(());
+    }
+
+    let raw = fs::read_to_string(&mcp_path)
+        .map_err(|error| format!("read {}: {error}", mcp_path.display()))?;
+    let value: Value = serde_json::from_str(&raw)
+        .map_err(|error| format!("parse {}: {error}", mcp_path.display()))?;
+    let Some(servers_value) = value.get("mcpServers") else {
+        return Ok(());
+    };
+    let servers = servers_value
+        .as_object()
+        .ok_or_else(|| format!("{} mcpServers must be an object", mcp_path.display()))?;
+
+    for (server_name, config) in servers {
+        let Some(command) = config.get("command").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(relative_command) = command
+            .strip_prefix("./")
+            .or_else(|| command.strip_prefix(".\\"))
+        else {
+            continue;
+        };
+        let normalized_command = relative_command.replace('\\', "/");
+        if !normalized_command.starts_with("bin/") {
+            continue;
+        }
+
+        if target.contains("windows") {
+            let lowercase = normalized_command.to_ascii_lowercase();
+            let runnable = [".exe", ".cmd", ".bat", ".ps1"]
+                .iter()
+                .any(|extension| lowercase.ends_with(extension));
+            if !runnable {
+                return Err(format!(
+                    "{} MCP server '{}' command '{}' is not Windows-runnable; use a .exe/.cmd/.bat/.ps1 launcher or a host executable",
+                    mcp_path.display(),
+                    server_name,
+                    command
+                ));
+            }
+        }
+
+        let resolved_command = package_path(plugin_root, &normalized_command);
+        if !resolved_command.is_file() {
+            return Err(format!(
+                "{} MCP server '{}' command '{}' points to missing file {}",
+                mcp_path.display(),
+                server_name,
+                command,
+                resolved_command.display()
+            ));
+        }
+    }
+
+    Ok(())
+}
+
+fn package_path(root: &Path, path: &str) -> PathBuf {
+    let mut resolved = root.to_path_buf();
+    for part in path.split('/') {
+        resolved.push(part);
+    }
+    resolved
 }
 
 fn collect_regular_files(directory: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -1140,4 +1157,58 @@ fn plugin_requires_binary(plugin: &Path) -> bool {
         manifest.get("name").and_then(Value::as_str),
         Some(name) if name.starts_with("elegy-")
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_dir(name: &str) -> PathBuf {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("system time")
+            .as_nanos();
+        std::env::temp_dir().join(format!("elegy-tooling-{name}-{nonce}"))
+    }
+
+    #[test]
+    fn target_mcp_commands_reject_extensionless_windows_bin_command() {
+        let root = temp_dir("windows-extensionless-mcp");
+        fs::create_dir_all(root.join("bin")).expect("create bin dir");
+        fs::write(
+            root.join("bin").join("elegy-opencode-workers.exe"),
+            b"binary",
+        )
+        .expect("write binary");
+        fs::write(
+            root.join(".mcp.json"),
+            r#"{"mcpServers":{"elegy-opencode-workers":{"command":"./bin/elegy-opencode-workers","args":["mcp","serve"]}}}"#,
+        )
+        .expect("write mcp config");
+
+        let err = validate_target_mcp_commands(&root, "x86_64-pc-windows-msvc").unwrap_err();
+
+        assert!(err.contains("Windows-runnable"), "unexpected error: {err}");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn target_mcp_commands_accept_windows_exe_command() {
+        let root = temp_dir("windows-exe-mcp");
+        fs::create_dir_all(root.join("bin")).expect("create bin dir");
+        fs::write(
+            root.join("bin").join("elegy-opencode-workers.exe"),
+            b"binary",
+        )
+        .expect("write binary");
+        fs::write(
+            root.join(".mcp.json"),
+            r#"{"mcpServers":{"elegy-opencode-workers":{"command":"./bin/elegy-opencode-workers.exe","args":["mcp","serve"]}}}"#,
+        )
+        .expect("write mcp config");
+
+        validate_target_mcp_commands(&root, "x86_64-pc-windows-msvc").expect("valid mcp config");
+        let _ = fs::remove_dir_all(root);
+    }
 }

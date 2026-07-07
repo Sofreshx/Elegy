@@ -575,16 +575,19 @@ pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1Validati
         issues.push("description must not be only whitespace.".into());
     }
 
-    for (field_name, path) in &[
-        ("skills", &plugin.skills),
-        ("mcpServers", &plugin.mcp_servers),
-    ] {
-        if let Some(p) = path {
-            if !is_safe_package_relative_path(p) {
-                issues.push(format!(
-                    "{field_name} path '{p}' is not a safe package-relative path.",
-                ));
-            }
+    if let Some(path) = &plugin.skills {
+        if !is_safe_skill_package_path(path) {
+            issues.push(format!(
+                "skills path '{path}' is not a safe package-relative path.",
+            ));
+        }
+    }
+
+    if let Some(path) = &plugin.mcp_servers {
+        if !is_safe_package_relative_path(path) {
+            issues.push(format!(
+                "mcpServers path '{path}' is not a safe package-relative path.",
+            ));
         }
     }
 
@@ -875,6 +878,10 @@ pub fn is_safe_package_relative_path(path: &str) -> bool {
     relative
         .split('/')
         .all(|segment| !segment.is_empty() && segment != "." && segment != "..")
+}
+
+fn is_safe_skill_package_path(path: &str) -> bool {
+    path == "./" || is_safe_package_relative_path(path)
 }
 
 pub fn validate_kebab_case_name(name: &str) -> bool {
@@ -1743,553 +1750,6 @@ Generated from MCP server `{server}`.
     })
 }
 
-// ── Scaffold ──────────────────────────────────────────────────────────────
-
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub enum PluginScaffoldMode {
-    #[default]
-    SkillOnly,
-    RustCli,
-    McpServer,
-}
-
-fn scaffold_server_type_name(name: &str) -> String {
-    let mut result = String::new();
-    for segment in name.split('-').filter(|segment| !segment.is_empty()) {
-        let mut chars = segment.chars();
-        if let Some(first) = chars.next() {
-            result.extend(first.to_uppercase());
-            result.extend(chars);
-        }
-    }
-    result.push_str("Server");
-    result
-}
-
-/// Scaffold a minimal skill-only v1-format Elegy plugin repository.
-///
-/// Generates a standalone repository with the elegy-plugin/v1 layout:
-/// `.elegy-plugin/plugin.json`, `skills/<name>/SKILL.md`,
-/// `Cargo.toml`, `src/main.rs`, CI workflows, README, etc.
-/// # Arguments
-///
-/// * `name` - Plugin name (lowercase kebab-case)
-/// * `description` - Plugin description (non-empty)
-/// * `version` - Plugin version (valid SemVer)
-/// * `output_dir` - Output directory for generated repository
-/// * `author_name` - Author name
-/// * `license` - SPDX license identifier (empty string to omit)
-/// * `repository_url` - Repository URL (empty string to omit)
-pub fn scaffold_plugin_v1_repository(
-    name: &str,
-    description: &str,
-    version: &str,
-    output_dir: &Path,
-    author_name: &str,
-    license: &str,
-    repository_url: &str,
-) -> Result<Vec<String>, ToolingError> {
-    scaffold_plugin_v1_repository_with_mode(
-        name,
-        description,
-        version,
-        output_dir,
-        author_name,
-        license,
-        repository_url,
-        PluginScaffoldMode::SkillOnly,
-    )
-}
-
-#[allow(clippy::too_many_arguments)]
-pub fn scaffold_plugin_v1_repository_with_mode(
-    name: &str,
-    description: &str,
-    version: &str,
-    output_dir: &Path,
-    author_name: &str,
-    license: &str,
-    repository_url: &str,
-    mode: PluginScaffoldMode,
-) -> Result<Vec<String>, ToolingError> {
-    // ── 0. Validate inputs before writing ──
-    if !validate_kebab_case_name(name) {
-        return Err(ToolingError::InvalidPluginPackage {
-            path: output_dir.to_path_buf(),
-            issues: vec![format!(
-                "name '{}' is not valid lowercase kebab-case (must start with a letter, contain only a-z, 0-9, hyphens).",
-                name
-            )],
-        });
-    }
-    if !validate_semver(version) {
-        return Err(ToolingError::InvalidPluginPackage {
-            path: output_dir.to_path_buf(),
-            issues: vec![format!("version '{}' is not valid SemVer.", version)],
-        });
-    }
-    if description.trim().is_empty() {
-        return Err(ToolingError::InvalidPluginPackage {
-            path: output_dir.to_path_buf(),
-            issues: vec!["description must not be empty.".into()],
-        });
-    }
-
-    // Reject existing non-empty destination
-    if output_dir.exists() {
-        let mut has_files = false;
-        if let Ok(entries) = fs::read_dir(output_dir) {
-            for entry in entries.flatten() {
-                let name = entry.file_name();
-                let name_str = name.to_string_lossy();
-                // Skip common empty markers
-                if name_str == ".git" || name_str == ".gitkeep" || name_str == ".gitignore" {
-                    continue;
-                }
-                has_files = true;
-                break;
-            }
-        }
-        if has_files {
-            return Err(ToolingError::OutputExists {
-                path: output_dir.to_path_buf(),
-            });
-        }
-    }
-
-    let mut written = Vec::new();
-    let description = description.trim();
-
-    // Create output directory
-    fs::create_dir_all(output_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: output_dir.to_path_buf(),
-        source: e,
-    })?;
-
-    // 1. Create .elegy-plugin/plugin.json
-    let plugin_dir = output_dir.join(".elegy-plugin");
-    fs::create_dir_all(&plugin_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: plugin_dir.clone(),
-        source: e,
-    })?;
-
-    let mut plugin_map = serde_json::Map::new();
-    plugin_map.insert(
-        "schemaVersion".into(),
-        serde_json::Value::String("elegy-plugin/v1".into()),
-    );
-    plugin_map.insert("name".into(), serde_json::Value::String(name.into()));
-    plugin_map.insert("version".into(), serde_json::Value::String(version.into()));
-    plugin_map.insert(
-        "description".into(),
-        serde_json::Value::String(description.into()),
-    );
-    plugin_map.insert("author".into(), serde_json::json!({"name": author_name}));
-    // Omit license if empty
-    if !license.is_empty() {
-        plugin_map.insert("license".into(), serde_json::Value::String(license.into()));
-    }
-    // Omit repository if empty
-    if !repository_url.is_empty() {
-        plugin_map.insert(
-            "repository".into(),
-            serde_json::Value::String(repository_url.into()),
-        );
-    }
-    plugin_map.insert(
-        "skills".into(),
-        serde_json::Value::String("./skills/".into()),
-    );
-    if mode == PluginScaffoldMode::McpServer {
-        plugin_map.insert(
-            "extensions".into(),
-            serde_json::json!({
-                "codex.plugin/v1": {
-                    "schemaVersion": "codex.plugin/v1",
-                    "mcpServers": "./.mcp.json"
-                }
-            }),
-        );
-    }
-    let plugin_json = serde_json::Value::Object(plugin_map);
-
-    let plugin_path = plugin_dir.join("plugin.json");
-    let content = serde_json::to_string_pretty(&plugin_json).map_err(|e| ToolingError::Json {
-        path: plugin_path.clone(),
-        source: e,
-    })?;
-    fs::write(&plugin_path, &content).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: plugin_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&plugin_path));
-
-    // 2. Create skills/<name>/SKILL.md (Agent Skills standard)
-    let skills_dir = output_dir.join("skills").join(name);
-    fs::create_dir_all(&skills_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: skills_dir.clone(),
-        source: e,
-    })?;
-
-    let display_name = name.replace('-', " ");
-    let skill_md = format!(
-        r#"---
-name: {name}
-description: {description}
----
-
-# {display_name}
-
-{description}
-
-## Usage
-
-This skill provides agent instructions for {name}.
-
-## Capabilities
-
-Describe what this skill enables agents to do.
-"#,
-        name = name,
-        display_name = display_name,
-        description = description,
-    );
-    let skill_path = skills_dir.join("SKILL.md");
-    fs::write(&skill_path, &skill_md).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: skill_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&skill_path));
-
-    if mode == PluginScaffoldMode::SkillOnly {
-        return Ok(written);
-    }
-
-    if mode == PluginScaffoldMode::McpServer {
-        let mcp_path = output_dir.join(".mcp.json");
-        let mcp = serde_json::json!({
-            "mcpServers": {
-                (name): {
-                    "command": format!("./bin/{name}")
-                }
-            }
-        });
-        let content = serde_json::to_string_pretty(&mcp).map_err(|source| ToolingError::Json {
-            path: mcp_path.clone(),
-            source,
-        })?;
-        fs::write(&mcp_path, content).map_err(|source| ToolingError::Io {
-            operation: "write",
-            path: mcp_path.clone(),
-            source,
-        })?;
-        written.push(display_path(&mcp_path));
-    }
-
-    // 3. Create Cargo.toml (Rust binary)
-    let mut cargo_toml = format!(
-        r#"[package]
-name = "{name}"
-version = "{version}"
-edition = "2021"
-description = "{description}"
-"#,
-        name = name,
-        version = version,
-        description = description,
-    );
-    if !license.is_empty() {
-        cargo_toml.push_str(&format!("license = \"{license}\"\n", license = license));
-    }
-    if !repository_url.is_empty() {
-        cargo_toml.push_str(&format!(
-            "repository = \"{repository_url}\"\n",
-            repository_url = repository_url
-        ));
-    }
-    cargo_toml.push_str(match mode {
-        PluginScaffoldMode::RustCli => {
-            r#"
-[[bin]]
-name = "{name}"
-path = "src/main.rs"
-
-[dependencies]
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-serde_json = "1"
-"#
-        }
-        PluginScaffoldMode::McpServer => {
-            r#"
-[[bin]]
-name = "{name}"
-path = "src/main.rs"
-
-[dependencies]
-rmcp = { version = "1.2", features = ["server", "transport-io"] }
-tokio = { version = "1", features = ["macros", "rt-multi-thread", "io-std"] }
-"#
-        }
-        PluginScaffoldMode::SkillOnly => unreachable!("skill-only returns before runtime files"),
-    });
-    let cargo_toml = cargo_toml.replace("{name}", name);
-    let cargo_path = output_dir.join("Cargo.toml");
-    fs::write(&cargo_path, &cargo_toml).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: cargo_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&cargo_path));
-
-    // 5. Create src/main.rs
-    let src_dir = output_dir.join("src");
-    fs::create_dir_all(&src_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: src_dir.clone(),
-        source: e,
-    })?;
-
-    let main_rs = match mode {
-        PluginScaffoldMode::RustCli => format!(
-            r#"use clap::{{Parser, Subcommand}};
-use serde::Serialize;
-
-#[derive(Parser)]
-#[command(name = "{name}", version = "{version}")]
-struct Cli {{
-    #[command(subcommand)]
-    command: Command,
-}}
-
-#[derive(Subcommand)]
-enum Command {{
-    /// Print plugin status as JSON
-    Status,
-}}
-
-#[derive(Serialize)]
-struct StatusOutput {{
-    status: String,
-    version: String,
-}}
-
-fn main() -> Result<(), Box<dyn std::error::Error>> {{
-    let cli = Cli::parse();
-    match cli.command {{
-        Command::Status => {{
-            let output = StatusOutput {{
-                status: "ok".to_string(),
-                version: "{version}".to_string(),
-            }};
-            println!("{{}}", serde_json::to_string_pretty(&output)?);
-        }}
-    }}
-    Ok(())
-}}
-"#,
-            name = name,
-            version = version,
-        ),
-        PluginScaffoldMode::McpServer => format!(
-            r#"use rmcp::{{
-    model::{{Implementation, ServerCapabilities, ServerInfo}},
-    transport::stdio,
-    ServerHandler,
-    ServiceExt,
-}};
-
-#[derive(Clone, Default)]
-struct {server_type};
-
-impl ServerHandler for {server_type} {{
-    fn get_info(&self) -> ServerInfo {{
-        ServerInfo::new(ServerCapabilities::default())
-            .with_server_info(Implementation::from_build_env())
-            .with_instructions("{description}".to_string())
-    }}
-}}
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {{
-    let service = {server_type}.serve(stdio()).await?;
-    service.waiting().await?;
-    Ok(())
-}}
-"#,
-            server_type = scaffold_server_type_name(name),
-            description = description.replace('"', "\\\""),
-        ),
-        PluginScaffoldMode::SkillOnly => unreachable!("skill-only returns before runtime files"),
-    };
-    let main_path = src_dir.join("main.rs");
-    fs::write(&main_path, &main_rs).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: main_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&main_path));
-
-    // 5b. Create rust-toolchain.toml (pinned Rust toolchain)
-    let toolchain_toml = "[toolchain]\nchannel = \"stable\"\n";
-    let toolchain_path = output_dir.join("rust-toolchain.toml");
-    fs::write(&toolchain_path, toolchain_toml).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: toolchain_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&toolchain_path));
-
-    // 5c. Create tests/ directory with integration test
-    let tests_dir = output_dir.join("tests");
-    fs::create_dir_all(&tests_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: tests_dir.clone(),
-        source: e,
-    })?;
-    let test_rs = format!(
-        r#"// Integration test for {name} plugin.
-// Replace with actual tests as needed.
-#[test]
-fn test_plugin_compiles() {{
-    assert!(true);
-}}
-"#,
-        name = name,
-    );
-    let test_path = tests_dir.join("integration_test.rs");
-    fs::write(&test_path, &test_rs).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: test_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&test_path));
-
-    // 6. Create README.md
-    let readme = format!(
-        r#"# {display_name}
-
-{description}
-
-## Plugin Layout
-
-```
-.elegy-plugin/plugin.json   — Plugin manifest (elegy-plugin/v1)
-skills/{name}/SKILL.md      — Agent skill instructions
-src/main.rs                 — Tool implementations
-```
-
-## Verify
-
-```bash
-cargo build
-```
-
-## Build
-
-```bash
-cargo build --release
-```
-"#,
-        display_name = display_name,
-        name = name,
-        description = description,
-    );
-    let readme_path = output_dir.join("README.md");
-    fs::write(&readme_path, &readme).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: readme_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&readme_path));
-
-    // 7. Create AGENTS.md
-    let agents_md = format!(
-        r#"# {display_name}
-
-This repository is an Elegy plugin.
-
-## Layout
-
-- `.elegy-plugin/plugin.json` — Plugin manifest (elegy-plugin/v1)
-- `skills/{name}/SKILL.md` — Agent skill instructions
-- `src/main.rs` — CLI implementation
-- `Cargo.toml` — Rust project
-
-## Commands
-
-- `cargo build` — Build the plugin
-- `cargo test` — Run tests
-"#,
-        display_name = display_name,
-        name = name,
-    );
-    let agents_path = output_dir.join("AGENTS.md");
-    fs::write(&agents_path, &agents_md).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: agents_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&agents_path));
-
-    // 8. Create .gitignore
-    let gitignore = "target/\n**/*.rs.bk\n.DS_Store\n";
-    let gitignore_path = output_dir.join(".gitignore");
-    fs::write(&gitignore_path, gitignore).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: gitignore_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&gitignore_path));
-
-    // 9. Create .github/workflows/ci.yml
-    let ci_dir = output_dir.join(".github").join("workflows");
-    fs::create_dir_all(&ci_dir).map_err(|e| ToolingError::Io {
-        operation: "create directory",
-        path: ci_dir.clone(),
-        source: e,
-    })?;
-
-    let ci_yml = r#"name: CI
-on: [push, pull_request]
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
-      - run: cargo fmt --check
-      - run: cargo clippy -- -D warnings
-      - run: cargo test
-      - name: Build plugin
-        run: cargo build
-"#
-    .to_string();
-    let ci_path = ci_dir.join("ci.yml");
-    fs::write(&ci_path, ci_yml).map_err(|e| ToolingError::Io {
-        operation: "write",
-        path: ci_path.clone(),
-        source: e,
-    })?;
-    written.push(display_path(&ci_path));
-
-    // 10. Verify the generated plugin
-    let verify_result = verify_plugin_v1(&plugin_dir)?;
-    if !verify_result.valid {
-        return Err(ToolingError::InvalidPluginPackage {
-            path: output_dir.to_path_buf(),
-            issues: verify_result.issues,
-        });
-    }
-
-    Ok(written)
-}
-
 // ── V1 plugin verification, inspection, and export ────────────────────────
 
 /// Simple verification result for a v1 plugin.
@@ -2349,7 +1809,31 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
         };
         if skills_dir.exists() && skills_dir.is_dir() {
             let mut count = 0;
-            if let Ok(entries) = fs::read_dir(&skills_dir) {
+            let direct_skill_md = skills_dir.join("SKILL.md");
+            if direct_skill_md.is_file() {
+                count += 1;
+                let skill_name = skills_dir
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .unwrap_or("<root>");
+                match fs::read_to_string(&direct_skill_md) {
+                    Ok(content) => match parse_agent_skill_frontmatter(&content) {
+                        Ok((frontmatter, _)) => {
+                            for issue in validate_agent_skill_frontmatter(&frontmatter) {
+                                issues.push(format!("skills.{skill_name}: {issue}"));
+                            }
+                        }
+                        Err(issue) => {
+                            issues.push(format!("skills.{skill_name}: {issue}"));
+                        }
+                    },
+                    Err(error) => {
+                        issues.push(format!(
+                            "skills.{skill_name}: unable to read SKILL.md: {error}."
+                        ));
+                    }
+                }
+            } else if let Ok(entries) = fs::read_dir(&skills_dir) {
                 for entry in entries.flatten() {
                     let skill_dir = entry.path();
                     if skill_dir.is_dir() {
@@ -3627,18 +3111,17 @@ mod tests {
         export_plugin_v1_with_codex_mode, export_plugin_v1_with_codex_mode_and_binary,
         generate_plugin_schema_artifacts, generate_skills_from_descriptor_file,
         import_codex_plugin_v1, inspect_plugin_v1, is_safe_package_relative_path, pack_plugin_v1,
-        pack_plugin_v1_with_binary, scaffold_plugin_v1_repository,
-        scaffold_plugin_v1_repository_with_mode, select_marketplace_artifact,
-        validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, walk_dir_files,
-        AuthorMcpDescriptorRequest, AuthorMcpToolRequest, CodexPluginExtensionV1,
-        CodexProjectionMode, ElegyMarketplaceArtifact, ElegyMarketplacePlugin,
-        ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, McpServerDescriptor,
-        McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary, PluginScaffoldMode, ToolingError,
-        ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_V1_SCHEMA_VERSION,
+        pack_plugin_v1_with_binary, select_marketplace_artifact, validate_elegy_marketplace_v1,
+        validate_elegy_plugin_v1, verify_plugin_v1, AuthorMcpDescriptorRequest,
+        AuthorMcpToolRequest, CodexPluginExtensionV1, CodexProjectionMode,
+        ElegyMarketplaceArtifact, ElegyMarketplacePlugin, ElegyMarketplaceSource,
+        ElegyMarketplaceV1, ElegyPluginV1, McpServerDescriptor, McpToolAnalyzer, McpToolDefinition,
+        PluginArchiveBinary, ToolingError, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
+        ELEGY_PLUGIN_V1_SCHEMA_VERSION,
     };
     use serde_json::{json, Value};
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -3649,6 +3132,38 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
         fs::create_dir_all(&dir).expect("create temp directory");
         dir
+    }
+
+    fn write_plugin_fixture(root: &Path, name: &str, description: &str, repository: Option<&str>) {
+        fs::create_dir_all(root.join(".elegy-plugin")).expect("create manifest dir");
+        fs::create_dir_all(root.join("skills").join(name)).expect("create skill dir");
+
+        let mut manifest = json!({
+            "schemaVersion": "elegy-plugin/v1",
+            "name": name,
+            "version": "0.1.0",
+            "description": description,
+            "author": {"name": "Test Author"},
+            "license": "MIT",
+            "skills": "./skills/"
+        });
+        if let Some(repository) = repository {
+            manifest["repository"] = json!(repository);
+        }
+
+        fs::write(
+            root.join(".elegy-plugin").join("plugin.json"),
+            serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        fs::write(
+            root.join("skills").join(name).join("SKILL.md"),
+            format!(
+                "---\nname: {name}\ndescription: {description}\n---\n\n# {name}\n\nUse this test fixture skill.\n"
+            ),
+        )
+        .expect("write skill");
     }
 
     #[test]
@@ -3685,6 +3200,22 @@ mod tests {
         ] {
             assert!(!is_safe_package_relative_path(invalid), "{invalid}");
         }
+    }
+
+    #[test]
+    fn plugin_validation_allows_root_skill_only_path() {
+        let plugin = ElegyPluginV1 {
+            schema_version: ELEGY_PLUGIN_V1_SCHEMA_VERSION.to_string(),
+            name: "skill-only-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Skill-only fixture.".to_string(),
+            skills: Some("./".to_string()),
+            ..ElegyPluginV1::default()
+        };
+
+        let validation = validate_elegy_plugin_v1(&plugin);
+
+        assert!(validation.is_valid(), "{:?}", validation.issues);
     }
 
     #[test]
@@ -3955,22 +3486,16 @@ mod tests {
     }
 
     #[test]
-    fn scaffold_verify_inspect_plugin_v1() {
+    fn verify_inspect_plugin_v1_fixture() {
         let temp_dir = unique_temp_dir("elegy-plugin-v1");
         let output_dir = temp_dir.join("my-plugin");
 
-        let written = scaffold_plugin_v1_repository(
+        write_plugin_fixture(
+            &output_dir,
             "my-plugin",
             "Test plugin for verification",
-            "0.1.0",
-            &output_dir,
-            "Test Author",
-            "MIT",
-            "https://github.com/example/my-plugin",
-        )
-        .expect("scaffold should succeed");
-
-        assert!(!written.is_empty(), "scaffold should write files");
+            Some("https://github.com/example/my-plugin"),
+        );
 
         let verify_result = verify_plugin_v1(&output_dir.join(".elegy-plugin"))
             .expect("verification should succeed");
@@ -3994,81 +3519,11 @@ mod tests {
     }
 
     #[test]
-    fn scaffold_modes_are_minimal_and_deterministic() {
-        for mode in [
-            PluginScaffoldMode::SkillOnly,
-            PluginScaffoldMode::RustCli,
-            PluginScaffoldMode::McpServer,
-        ] {
-            let first = unique_temp_dir("elegy-scaffold-first").join("plugin");
-            let second = unique_temp_dir("elegy-scaffold-second").join("plugin");
-            for output in [&first, &second] {
-                scaffold_plugin_v1_repository_with_mode(
-                    "mode-plugin",
-                    "Mode fixture",
-                    "0.1.0",
-                    output,
-                    "Test Author",
-                    "MIT",
-                    "",
-                    mode,
-                )
-                .expect("scaffold mode");
-            }
-
-            let first_files = walk_dir_files(&first).expect("walk first scaffold");
-            let second_files = walk_dir_files(&second).expect("walk second scaffold");
-            let first_relative = first_files
-                .iter()
-                .map(|path| path.strip_prefix(&first).expect("first relative"))
-                .collect::<Vec<_>>();
-            let second_relative = second_files
-                .iter()
-                .map(|path| path.strip_prefix(&second).expect("second relative"))
-                .collect::<Vec<_>>();
-            assert_eq!(first_relative, second_relative);
-            for (first_path, second_path) in first_files.iter().zip(second_files.iter()) {
-                assert_eq!(
-                    fs::read(first_path).expect("read first file"),
-                    fs::read(second_path).expect("read second file")
-                );
-            }
-
-            match mode {
-                PluginScaffoldMode::SkillOnly => {
-                    assert!(!first.join("Cargo.toml").exists());
-                    assert!(!first.join("src").exists());
-                    assert!(!first.join(".mcp.json").exists());
-                }
-                PluginScaffoldMode::RustCli => {
-                    assert!(first.join("Cargo.toml").is_file());
-                    assert!(first.join("src").join("main.rs").is_file());
-                    assert!(!first.join(".mcp.json").exists());
-                }
-                PluginScaffoldMode::McpServer => {
-                    assert!(first.join("Cargo.toml").is_file());
-                    assert!(first.join("src").join("main.rs").is_file());
-                    assert!(first.join(".mcp.json").is_file());
-                }
-            }
-        }
-    }
-
-    #[test]
     fn export_plugin_v1_opencode() {
         let temp_dir = unique_temp_dir("elegy-export-opencode");
         let plugin_dir = temp_dir.join("my-plugin");
 
-        scaffold_plugin_v1_repository(
-            "my-plugin",
-            "Test plugin for export",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "",
-        )
-        .expect("scaffold should succeed");
+        write_plugin_fixture(&plugin_dir, "my-plugin", "Test plugin for export", None);
 
         let export_dir = temp_dir.join("exported");
         let result = export_plugin_v1(&plugin_dir, "opencode", &export_dir, false)
@@ -4088,16 +3543,12 @@ mod tests {
     fn export_plugin_v1_includes_explicit_binary() {
         let temp_dir = unique_temp_dir("elegy-export-binary");
         let plugin_dir = temp_dir.join("my-plugin");
-        scaffold_plugin_v1_repository(
+        write_plugin_fixture(
+            &plugin_dir,
             "my-plugin",
             "Test plugin for binary export",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "",
-        )
-        .expect("scaffold should succeed");
+            None,
+        );
         let binary = temp_dir.join("my-plugin.exe");
         fs::write(&binary, b"binary").expect("write binary");
 
@@ -4127,16 +3578,12 @@ mod tests {
         let temp_dir = unique_temp_dir("elegy-export-codex");
         let plugin_dir = temp_dir.join("github-plugin");
 
-        scaffold_plugin_v1_repository(
+        write_plugin_fixture(
+            &plugin_dir,
             "github-plugin",
             "Test plugin for Codex export",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "https://github.com/example/github-plugin",
-        )
-        .expect("scaffold should succeed");
+            Some("https://github.com/example/github-plugin"),
+        );
 
         fs::create_dir_all(plugin_dir.join("assets")).expect("create assets");
         fs::write(plugin_dir.join("assets").join("logo.png"), b"logo").expect("write logo");
@@ -4344,16 +3791,12 @@ mod tests {
         let temp_dir = unique_temp_dir("elegy-invalid-codex");
         let plugin_dir = temp_dir.join("bad-plugin");
 
-        scaffold_plugin_v1_repository(
+        write_plugin_fixture(
+            &plugin_dir,
             "bad-plugin",
             "Test plugin for invalid Codex components",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "",
-        )
-        .expect("scaffold should succeed");
+            None,
+        );
 
         fs::write(
             plugin_dir.join(".app.json"),
@@ -4412,16 +3855,7 @@ mod tests {
     fn verify_plugin_v1_rejects_malformed_declared_surfaces() {
         let temp_dir = unique_temp_dir("elegy-invalid-surfaces");
         let plugin_dir = temp_dir.join("bad-plugin");
-        scaffold_plugin_v1_repository(
-            "bad-plugin",
-            "Invalid surface fixture",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "",
-        )
-        .expect("scaffold");
+        write_plugin_fixture(&plugin_dir, "bad-plugin", "Invalid surface fixture", None);
 
         fs::write(
             plugin_dir
@@ -4478,16 +3912,7 @@ mod tests {
         let temp_dir = unique_temp_dir("elegy-pack-plugin-binary");
         let plugin_dir = temp_dir.join("my-plugin");
 
-        scaffold_plugin_v1_repository(
-            "my-plugin",
-            "Test plugin for packing",
-            "0.1.0",
-            &plugin_dir,
-            "Test Author",
-            "MIT",
-            "",
-        )
-        .expect("scaffold should succeed");
+        write_plugin_fixture(&plugin_dir, "my-plugin", "Test plugin for packing", None);
 
         let binary_path = temp_dir.join("my-plugin.exe");
         fs::write(&binary_path, b"binary-bytes").expect("write fake binary");
@@ -4527,16 +3952,7 @@ mod tests {
     fn pack_plugin_v1_rejects_duplicate_archive_targets() {
         let temp_dir = unique_temp_dir("elegy-pack-duplicate");
         let plugin_dir = temp_dir.join("plugin");
-        scaffold_plugin_v1_repository(
-            "duplicate-plugin",
-            "Duplicate fixture",
-            "0.1.0",
-            &plugin_dir,
-            "Elegy",
-            "MIT",
-            "",
-        )
-        .expect("scaffold");
+        write_plugin_fixture(&plugin_dir, "duplicate-plugin", "Duplicate fixture", None);
         fs::create_dir_all(plugin_dir.join("assets")).expect("create assets");
         fs::write(plugin_dir.join("assets").join("logo.png"), b"logo").expect("write asset");
         let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");

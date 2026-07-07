@@ -4,8 +4,12 @@ on:
   pull_request:
     paths:
       - 'plugins/**'
+      - 'tools/**'
+      - 'skills/**'
       - 'shared/**'
       - 'hosts/**'
+      - 'marketplace-wrappers/**'
+      - 'distribution/**'
       - 'Cargo.toml'
       - 'Cargo.lock'
       - 'rust-toolchain.toml'
@@ -119,9 +123,22 @@ jobs:
       - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
         with:
           workspaces: . -> target
-      - name: verify planning plugin packaging CLI
+      - name: verify repo shape
+        shell: pwsh
         working-directory: .
-        run: cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
+        run: ./scripts/check-repo-shape.ps1 -Project . -FailOnIssues
+      - name: verify declared plugin packages
+        shell: pwsh
+        working-directory: .
+        run: |
+          $surfaces = (Get-Content distribution/surfaces.json -Raw | ConvertFrom-Json).surfaces
+          $pluginRoots = @($surfaces | Where-Object { $_.packaging -eq "plugin" -and $_.pluginRoot } | ForEach-Object { $_.pluginRoot })
+          foreach ($pluginRoot in $pluginRoots) {
+            cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin $pluginRoot
+            if ($LASTEXITCODE -ne 0) {
+              throw "Plugin package verification failed for $pluginRoot"
+            }
+          }
       - name: verify marketplace schemas and generated index
         working-directory: .
         run: |

@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-plugin-authoring",
+  "version": "0.1.0",
+  "description": "Agent-guided Elegy plugin authoring for skill-only plugins, Rust CLI-backed plugins, marketplace wrappers, and downstream plugin repositories.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./",
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Elegy Plugin Authoring",
+        "shortDescription": "Bootstrap Elegy plugins with repo-aware patterns",
+        "longDescription": "Author new Elegy plugins by reading the target repository, selecting the correct plugin lane, and applying manifest, skill, runtime, wrapper, and marketplace patterns without rigid generated scaffolds.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read", "Write"],
+        "defaultPrompt": ["Bootstrap a new Elegy plugin for this repository."]
+      }
+    }
+  }
+}

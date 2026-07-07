@@ -6521,6 +6521,79 @@ todos:
     ]);
     assert_eq!(show["status"], "ok");
     assert_eq!(show["data"]["roadmap"]["id"], "scaffold-roadmap");
+
+    let events = command_json(&["--db", db, "--json", "--non-interactive", "events"]);
+    assert!(events["data"]["events"]
+        .as_array()
+        .expect("events")
+        .iter()
+        .any(|event| event["eventType"] == "roadmap.section-added"
+            && event["entityId"] == "scaffold-section"));
+}
+
+#[test]
+fn roadmap_scaffold_accepts_out_of_order_work_point_dependencies() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-out-of-order");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+    let scaffold_path = temp_dir.join("out-of-order.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: order-goal
+  title: Order Goal
+  description: Work points may reference later IDs.
+roadmap:
+  id: order-roadmap
+  title: Order Roadmap
+  summary: Dependency appears before dependency target.
+workPoints:
+  - id: order-dependent
+    title: Dependent
+    summary: Depends on a later work point.
+    dependencyIds:
+      - order-foundation
+  - id: order-foundation
+    title: Foundation
+    summary: Referenced by the first work point.
+"#,
+    )
+    .expect("write scaffold file");
+
+    let applied = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+    ]);
+    assert_eq!(applied["status"], "ok");
+    assert_eq!(
+        applied["data"]["rejected"]
+            .as_array()
+            .expect("rejected")
+            .len(),
+        0
+    );
+    let work_point = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "work-point",
+        "show",
+        "--id",
+        "order-dependent",
+    ]);
+    assert_eq!(
+        work_point["data"]["workPoint"]["dependencyIds"][0],
+        "order-foundation"
+    );
 }
 
 #[test]
@@ -6659,6 +6732,66 @@ todos:
 }
 
 #[test]
+fn roadmap_scaffold_validation_findings_are_limited_to_touched_entities() {
+    let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-validation-scope");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-unrelated",
+        "todo",
+        "create",
+        "--id",
+        "unrelated-standalone-todo",
+        "--title",
+        "Unrelated standalone todo",
+    ]);
+
+    let scaffold_path = temp_dir.join("valid-scaffold.yaml");
+    fs::write(
+        &scaffold_path,
+        r#"
+goal:
+  id: validation-scope-goal
+  title: Validation Scope Goal
+  description: Scaffold result should report only touched entities.
+roadmap:
+  id: validation-scope-roadmap
+  title: Validation Scope Roadmap
+  summary: Minimal roadmap.
+workPoints:
+  - id: validation-scope-wp
+    title: Validation Scope Work
+    summary: Touched entity.
+"#,
+    )
+    .expect("write scaffold");
+
+    let dry_run = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--dry-run",
+    ]);
+    assert_eq!(dry_run["status"], "ok");
+    assert!(!dry_run["data"]["validationFindings"]
+        .as_array()
+        .expect("validation findings")
+        .iter()
+        .any(|finding| finding["entityId"] == "unrelated-standalone-todo"));
+}
+
+#[test]
 fn roadmap_scaffold_update_reports_supported_changes_and_rejects_parent_drift() {
     let temp_dir = unique_temp_dir("elegy-roadmap-scaffold-update");
     let db_path = temp_dir.join("planning.db");
@@ -6749,6 +6882,28 @@ todos:
         "update-goal",
     ]);
     assert_eq!(shown["data"]["goal"]["title"], "Revised Goal");
+
+    let idempotent = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "roadmap",
+        "scaffold",
+        "--file",
+        scaffold_path.to_str().expect("utf-8 scaffold path"),
+        "--apply",
+        "--if-exists",
+        "update",
+    ]);
+    assert_eq!(idempotent["status"], "ok");
+    assert_eq!(
+        idempotent["data"]["updated"]
+            .as_array()
+            .expect("updated")
+            .len(),
+        0
+    );
 
     let drift_path = temp_dir.join("drift.yaml");
     fs::write(

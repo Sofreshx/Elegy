@@ -57,7 +57,6 @@ signing-key
 clients.json
 refresh-tokens.json
 
-# Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
-# (e.g. "C:\Users\...\Temp\*.db" or "\Users\...\AppData\..." mangled into filenames)
+# Prevent accidental commit of extracted release payloads and malformed local temp path artifacts.
 CUsers*AppDataLocalTemp*
 Users*AppDataLocalTemp*

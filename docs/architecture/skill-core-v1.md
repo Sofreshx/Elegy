@@ -1,3 +1,10 @@
+---
+title: Skill Core
+status: active
+owner: elegy-core
+doc_kind: reference
+---
+
 # Skill Core
 
 Agent Skills are standard SKILL.md files. Plugin-owned skills live under
