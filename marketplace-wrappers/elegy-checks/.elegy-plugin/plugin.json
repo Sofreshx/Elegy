@@ -1,0 +1,42 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-checks",
+  "version": "0.1.0",
+  "description": "Local-first check registry, runner, and evidence store for Elegy.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Proprietary",
+  "extensions": {
+    "elegy.marketplace-wrapper/v1": {
+      "schemaVersion": "elegy.marketplace-wrapper/v1"
+    },
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "keywords": [
+        "checks",
+        "ci",
+        "validation",
+        "evidence"
+      ],
+      "interface": {
+        "displayName": "Elegy Checks",
+        "shortDescription": "Run and inspect local repository checks.",
+        "longDescription": "Rust-first local check registry, runner, SQLite evidence store, and CI-parity mapper for agents and Elegy Copilot. Ships local-only check packs for repo hygiene, Node/TS, React/Vite, Rust, Tauri, docs, specs, agent instruction surfaces, GitHub Actions, and dependency basics.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": [
+          "CLI",
+          "Validation",
+          "Evidence",
+          "CI Parity"
+        ],
+        "defaultPrompt": [
+          "Audit this repo's checks.",
+          "Run the local check profile.",
+          "Inspect the latest check failure."
+        ]
+      }
+    }
+  }
+}
