@@ -256,6 +256,31 @@
       ]
     },
     {
+      "name": "elegy-checks",
+      "source": {
+        "source": "local",
+        "path": "./marketplace-wrappers/elegy-checks"
+      },
+      "category": "Developer Tools",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        },
+        {
+          "target": "x86_64-unknown-linux-gnu",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-x86_64-unknown-linux-gnu.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-x86_64-unknown-linux-gnu.zip.sha256"
+        },
+        {
+          "target": "aarch64-apple-darwin",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-aarch64-apple-darwin.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-checks-plugin-aarch64-apple-darwin.zip.sha256"
+        }
+      ]
+    },
+    {
       "name": "elegy-obsidian",
       "source": {
         "source": "local",
