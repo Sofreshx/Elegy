@@ -1,0 +1,178 @@
+{
+  "schemaVersion": 2,
+  "configVersion": 2,
+  "generated": "2026-07-08T12:35:39.398625300+00:00",
+  "defaultProfile": "commit",
+  "profiles": {
+    "ci-local": {
+      "label": "CI Local",
+      "description": "Local CI parity gate",
+      "cost": "medium",
+      "opensWindow": false
+    },
+    "commit": {
+      "label": "Commit",
+      "description": "Fast mandatory local gate",
+      "cost": "fast",
+      "opensWindow": false
+    }
+  },
+  "groups": {},
+  "ciRemoteOnly": [],
+  "checks": {
+    "ci-map-pr": {
+      "enabled": true,
+      "group": "ci",
+      "description": "Map local checks to PR workflow jobs and report gaps",
+      "cwd": ".",
+      "timeoutMs": 30000,
+      "blocking": false,
+      "required": false,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "elegy-checks ci-map --repo . --scope pr --json"
+      ],
+      "gateStrength": "advisory",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "github-actions",
+      "tags": [
+        "github-actions",
+        "ci"
+      ],
+      "severity": "warning",
+      "promotionState": "advisory",
+      "owner": null
+    },
+    "npm-audit-advisory": {
+      "enabled": true,
+      "group": "security",
+      "description": "Run npm audit as advisory dependency hygiene",
+      "cwd": ".",
+      "timeoutMs": 120000,
+      "blocking": false,
+      "required": false,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "npm audit --audit-level=high"
+      ],
+      "gateStrength": "advisory",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "security-basics",
+      "tags": [
+        "security",
+        "dependencies"
+      ],
+      "severity": "warning",
+      "promotionState": "advisory",
+      "owner": null
+    },
+    "rust-clippy": {
+      "enabled": true,
+      "group": "commit",
+      "description": "Run Rust clippy with warnings denied",
+      "cwd": ".",
+      "timeoutMs": 120000,
+      "blocking": true,
+      "required": true,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [
+        "commit"
+      ],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "cargo clippy -- -D warnings"
+      ],
+      "gateStrength": "blocking",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "rust",
+      "tags": [
+        "rust",
+        "lint"
+      ],
+      "severity": "error",
+      "promotionState": "enforced",
+      "owner": null
+    },
+    "rust-format": {
+      "enabled": true,
+      "group": "commit",
+      "description": "Check Rust formatting",
+      "cwd": ".",
+      "timeoutMs": 60000,
+      "blocking": true,
+      "required": true,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [
+        "commit"
+      ],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "cargo fmt -- --check"
+      ],
+      "gateStrength": "blocking",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "rust",
+      "tags": [
+        "rust",
+        "format"
+      ],
+      "severity": "error",
+      "promotionState": "enforced",
+      "owner": null
+    },
+    "rust-test": {
+      "enabled": true,
+      "group": "push",
+      "description": "Run Rust tests",
+      "cwd": ".",
+      "timeoutMs": 120000,
+      "blocking": true,
+      "required": true,
+      "skippable": false,
+      "requiresReasonOnSkip": false,
+      "defaultProfiles": [],
+      "cost": "medium",
+      "opensWindow": false,
+      "ciWorkflow": null,
+      "ciJob": null,
+      "ciRequired": false,
+      "commands": [
+        "cargo test"
+      ],
+      "gateStrength": "blocking",
+      "determinism": "deterministic-runnable",
+      "sourcePack": "rust",
+      "tags": [
+        "rust",
+        "test"
+      ],
+      "severity": "error",
+      "promotionState": "enforced",
+      "owner": null
+    }
+  }
+}
