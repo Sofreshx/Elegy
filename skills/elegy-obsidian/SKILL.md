@@ -57,8 +57,7 @@ this resolution order:
    ```bash
    cmd.exe /c "where obsidian"
    ```
-   This returns the full Windows path (e.g.,
-   `C:\Users\<user>\AppData\Local\Programs\Obsidian\Obsidian.com`).
+   This returns the full Windows path.
    Convert to a WSL path and use it for all subsequent invocations.
 3. **Known install root**: if `where` fails, check the default
    Obsidian Desktop install location (typically under the user's
