@@ -47,9 +47,18 @@ For Rust-backed plugins, also run the relevant package tests, for example:
 cargo test -p <plugin-crate>
 ```
 
+## Release pipeline (private/external plugins)
+
+When authoring a private or external plugin that ships archives to the Elegy
+marketplace, read `references/private-plugin-release-pipeline.md` for the
+full setup: fine-grained PAT creation, `ELEGY_RELEASE_TOKEN` secret setup,
+token-based CI upload (preferred), local build + manual upload (fallback),
+and the new-private-plugin checklist.
+
 ## References
 
 - Snippets: `references/snippets.md`
+- Release pipeline: `references/private-plugin-release-pipeline.md`
 - Architecture entrypoint: `docs/architecture/README.md`
 - Skill authority: `docs/architecture/skill-core-v1.md`
 - Codex projection: `docs/architecture/codex-plugin-projection.md`
