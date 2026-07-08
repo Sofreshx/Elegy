@@ -59,11 +59,10 @@ this resolution order:
    ```
    This returns the full Windows path (e.g.,
    `C:\Users\<user>\AppData\Local\Programs\Obsidian\Obsidian.com`).
-   Convert to a WSL path (`/mnt/c/Users/<user>/AppData/Local/Programs/Obsidian/Obsidian.com`)
-   and use it for all subsequent invocations.
-3. **Known install root**: if `where` fails, check
-   `C:\Users\<user>\AppData\Local\Programs\Obsidian\Obsidian.com`
-   (the default Obsidian Desktop 1.12.7+ install location on Windows).
+   Convert to a WSL path and use it for all subsequent invocations.
+3. **Known install root**: if `where` fails, check the default
+   Obsidian Desktop install location (typically under the user's
+   local AppData Programs directory).
 
 Once resolved, use the full binary path for every `obsidian` call in
 the session. Do not re-resolve unless the first attempt fails.
@@ -78,7 +77,7 @@ Before invoking any vault command, load the vault context:
 
 1. **Read config**: `~/.elegy/obsidian-vault.json` contains
    `vaultPath` (the vault root). Derive the vault name from the
-   folder basename (e.g., `C:/Users/lolzi/Documents/Dev` → vault
+   folder basename (e.g., a vault at `~/Documents/Dev` → vault
    name `Dev`).
 2. **Fallback**: if config is absent, run `obsidian vault list` to
    discover registered vaults. Use the first (or prompt the user

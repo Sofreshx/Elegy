@@ -6,9 +6,9 @@ The official `obsidian` CLI ships with Obsidian Desktop 1.12.7+.
 
 - **Windows (native shell)**: `obsidian` is on PATH via app-execution alias.
 - **WSL / non-PATH shells**: resolve via `cmd.exe /c "where obsidian"`,
-  convert the Windows path to `/mnt/c/.../Obsidian.com`, and use the
-  full path. Known install root:
-  `C:\Users\<user>\AppData\Local\Programs\Obsidian\Obsidian.com`.
+  convert the Windows path to a WSL path, and use the full path.
+  Known install root: the default Obsidian Desktop install location
+  (typically under the user's local AppData Programs directory).
 - **Vault targeting**: pass `vault=<name>` on every command when more
   than one vault is registered. The active-vault default is
   platform-specific and unreliable.
