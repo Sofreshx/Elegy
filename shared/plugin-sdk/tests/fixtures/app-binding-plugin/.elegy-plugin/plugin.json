@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "test-app-binding",
+  "version": "0.1.0",
+  "description": "Test plugin for app-binding export path.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "skills": "./skills/",
+  "capabilityCatalog": {
+    "path": "./capability-catalog.json",
+    "schemaVersion": "elegy-capability-catalog/v1"
+  },
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "interface": {
+        "displayName": "Test App Binding",
+        "shortDescription": "Test plugin for app-binding export.",
+        "longDescription": "Proves that app-binding capabilities generate .app.json correctly.",
+        "developerName": "Elegy Contributors",
+        "category": "Developer Tools",
+        "capabilities": ["Read"],
+        "defaultPrompt": ["Triage pull requests."]
+      }
+    }
+  }
+}

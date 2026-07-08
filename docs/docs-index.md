@@ -106,6 +106,16 @@
     },
     {
       "authorityClass": "current",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Accepted.",
+      "title": "Adopt Capability-Kind Taxonomy"
+    },
+    {
+      "authorityClass": "current",
       "created": "2026-05-29",
       "docKind": "adr",
       "freshness": "unknown",
@@ -124,6 +134,14 @@
       "status": "active",
       "summary": "Elegy is designed for AI-agent hosts that can run local subprocesses. The",
       "title": "Agent Integration"
+    },
+    {
+      "authorityClass": "other",
+      "freshness": "unknown",
+      "path": "docs/ai/checks-demo-report.md",
+      "sourceOfTruth": "unclassified",
+      "summary": "**Generated:** 2026-07-08",
+      "title": "Agent-Ready Repo Pack Demo — Elegy Repo"
     },
     {
       "authorityClass": "other",
@@ -283,6 +301,26 @@
       "authorityClass": "current",
       "docKind": "spec",
       "freshness": "unknown",
+      "path": "docs/specs/capability-catalog-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "`elegy-capability-catalog/v1` is the shared governed contract for plugin",
+      "title": "Capability Catalog V1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/monetization-infrastructure.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "Define the create → distribute → sell → self-use infrastructure for monetizable",
+      "title": "Monetization infrastructure"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
       "path": "docs/specs/plugin-marketplace-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
@@ -307,8 +345,11 @@
     "docs/adr/2026-06-15-block-crates-io-publishing.md",
     "docs/adr/2026-07-01-adopt-static-plugin-marketplace.md",
     "docs/adr/2026-07-07-adopt-repo-surface-taxonomy.md",
+    "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
+    "docs/specs/capability-catalog-v1.md",
+    "docs/specs/monetization-infrastructure.md",
     "docs/specs/plugin-marketplace-v1.md",
     "docs/architecture/ecosystem-topology.md",
     "docs/architecture/substrate-governance.md",
@@ -324,6 +365,7 @@
     "docs/spec-baseline.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",
+    "docs/ai/checks-demo-report.md",
     "docs/architecture/README.md"
   ],
   "schemaVersion": "documentation-bundle/v1"

@@ -1,0 +1,53 @@
+{
+  "schemaVersion": "elegy-capability-catalog/v1",
+  "plugin": "test-app-binding",
+  "pluginVersion": "0.1.0",
+  "generatedAt": "2026-07-08T00:00:00Z",
+  "capabilities": [
+    {
+      "id": "github.pr-triage",
+      "kind": "app-binding",
+      "sideEffectClass": "query",
+      "contractVersion": "v1",
+      "description": "Triage GitHub pull requests.",
+      "appBinding": {
+        "connector": "github",
+        "category": "Developer Tools"
+      },
+      "fallback": {
+        "kind": "cli",
+        "invocation": {
+          "executable": "gh",
+          "command": ["pr", "list"]
+        }
+      },
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "repo": { "type": "string", "description": "Repository name" },
+          "state": { "type": "string", "description": "PR state filter" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "pullRequests": {
+            "type": "array",
+            "items": { "type": "object" }
+          }
+        }
+      }
+    },
+    {
+      "id": "local.scan",
+      "kind": "cli",
+      "sideEffectClass": "query",
+      "contractVersion": "v1",
+      "description": "Scan local repository for analysis.",
+      "invocation": {
+        "executable": "elegy-test",
+        "command": ["scan", "--json"]
+      }
+    }
+  ]
+}

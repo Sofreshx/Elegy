@@ -1,0 +1,231 @@
+{
+  "$defs": {
+    "ElegyAppBinding": {
+      "additionalProperties": false,
+      "description": "App-binding metadata for a capability.\n\nDeclares the portable external-service identity. The Codex exporter\nemits `connector` as the `id` in `.app.json` and `category` as the `category`.",
+      "properties": {
+        "category": {
+          "description": "Display category for the connector (e.g. `Developer Tools`).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "connector": {
+          "description": "External-service identity (e.g. `github`, `gmail`, `slack`). Portable and host-neutral.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "connector"
+      ],
+      "type": "object"
+    },
+    "ElegyCapability": {
+      "additionalProperties": false,
+      "description": "A single capability entry in the catalog.",
+      "properties": {
+        "appBinding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyAppBinding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "App-binding metadata. Required for `app-binding` kind."
+        },
+        "contractVersion": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "fallback": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyCapabilityFallback"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Fallback surface for hosts that do not support the primary kind."
+        },
+        "id": {
+          "type": "string"
+        },
+        "inputSchema": true,
+        "invocation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyCapabilityInvocation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Invocation metadata. Required for `cli` and `mcp` kinds."
+        },
+        "kind": {
+          "$ref": "#/$defs/ElegyCapabilityKind",
+          "default": "cli",
+          "description": "Capability kind. Defaults to `cli` on read when absent (backward compat)."
+        },
+        "outputSchema": true,
+        "sideEffectClass": {
+          "$ref": "#/$defs/ElegySideEffectClass"
+        }
+      },
+      "required": [
+        "id",
+        "sideEffectClass",
+        "contractVersion",
+        "description"
+      ],
+      "type": "object"
+    },
+    "ElegyCapabilityFallback": {
+      "additionalProperties": false,
+      "description": "Fallback surface for a capability.",
+      "properties": {
+        "invocation": {
+          "$ref": "#/$defs/ElegyCapabilityInvocation"
+        },
+        "kind": {
+          "$ref": "#/$defs/ElegyCapabilityKind"
+        }
+      },
+      "required": [
+        "kind",
+        "invocation"
+      ],
+      "type": "object"
+    },
+    "ElegyCapabilityInvocation": {
+      "additionalProperties": false,
+      "description": "Invocation metadata for a capability.",
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "optionalArgs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requiredArgs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "toolName": {
+          "description": "MCP tool name (for `mcp` kind).",
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "executable",
+        "command"
+      ],
+      "type": "object"
+    },
+    "ElegyCapabilityKind": {
+      "description": "Capability kind taxonomy discriminator.\n\nDetermines which Codex export surface a capability maps to.",
+      "oneOf": [
+        {
+          "const": "cli",
+          "description": "Executable deterministic or controlled commands. Invoked via `elegy-*` binaries.",
+          "type": "string"
+        },
+        {
+          "const": "mcp",
+          "description": "Typed agent-facing tool server.",
+          "type": "string"
+        },
+        {
+          "const": "app-binding",
+          "description": "Host-authenticated external-service connector (GitHub, Gmail, Slack, etc.).",
+          "type": "string"
+        }
+      ]
+    },
+    "ElegySideEffectClass": {
+      "description": "Side-effect classification for a capability.",
+      "oneOf": [
+        {
+          "const": "pure",
+          "description": "No side effects, pure computation.",
+          "type": "string"
+        },
+        {
+          "const": "query",
+          "description": "Read-only query.",
+          "type": "string"
+        },
+        {
+          "const": "mutation",
+          "description": "State-changing mutation.",
+          "type": "string"
+        },
+        {
+          "const": "fenced-mutation",
+          "description": "Mutation with fencing token for concurrency control.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Shared governed `elegy-capability-catalog/v1` contract.\n\nReferenced by the portable `elegy-plugin/v1` manifest via `capabilityCatalog.path`.\nThe catalog is a portable, host-neutral artifact. Codex-specific projection\n(such as `.app.json` connector files) is derived by the host exporter.",
+  "properties": {
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/ElegyCapability"
+      },
+      "type": "array"
+    },
+    "digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generatedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plugin": {
+      "type": "string"
+    },
+    "pluginVersion": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "plugin",
+    "pluginVersion",
+    "capabilities"
+  ],
+  "title": "ElegyCapabilityCatalogV1",
+  "type": "object"
+}

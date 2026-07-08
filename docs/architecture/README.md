@@ -22,6 +22,8 @@ plugin metadata wrappers, and `shared/` for reusable libraries.
 - [Codex plugin projection](codex-plugin-projection.md) — optional Codex projection slice (derived adapter surface, not the primary plugin path)
 - [Static plugin marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — host-neutral marketplace authority and closed-source binary boundary
 - [Plugin marketplace v1](../specs/plugin-marketplace-v1.md) — index, artifact, install, and projection contract
+- [Capability catalog v1](../specs/capability-catalog-v1.md) — shared governed catalog contract with capability-kind taxonomy
+- [Capability-kind taxonomy ADR](../adr/2026-07-08-adopt-capability-kind-taxonomy.md) — decision record for `cli`/`mcp`/`app-binding` kinds and catalog-driven `.app.json`
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) — placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Shared crate boundaries](shared-crate-boundaries.md) — keep/merge criteria for shared Rust crates
 - [Documentation practices](documentation-practices.md) — central ADR/spec doctrine, placement rules, and the lean `elegy docs` validation posture
