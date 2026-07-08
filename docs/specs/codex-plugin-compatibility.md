@@ -49,7 +49,7 @@ from default export until validator evidence changes.
 | `schemaVersion` | none | Elegy contract | Require exact `codex.plugin/v1`; never emit the extension version. |
 | `homepage`, `keywords` | same field | Current-compatible | Typed import/export; accepted by the installed validator. |
 | `interface` | `interface` | Current-compatible | Current export requires validator-required fields and supports `logoDark`. |
-| `apps` | `apps` path plus `.app.json` | Current-compatible | Installed validator accepts connector `id` plus optional `category`. |
+| `apps` | `apps` path plus `.app.json` | Current-compatible | Installed validator accepts connector `id` plus optional `category`. Generated from catalog `app-binding` capabilities when present; falls back to hand-authored file for backward compat. |
 | `hooks` | default `hooks/hooks.json` | Current-compatible file discovery | Current export copies the file without a manifest field. |
 | `hooks` | `hooks` manifest field | Experimental | Emitted only with explicit experimental mode; installed validator rejects it. |
 | `mcpServers` | `mcpServers` | Current-compatible | Companion file is parsed and statically validated before export. |
@@ -69,10 +69,33 @@ from default export until validator evidence changes.
 | Surface | Current contract | Known correction |
 |---|---|---|
 | `skills` | `./skills/` | Require `./`-prefixed portable paths. |
-| `.app.json` | connector references with `id` and optional `category` | Remove Elegy's unsupported `required` field. Do not add OAuth, token, action, or approval policy. |
+| `.app.json` | connector references with `id` and optional `category` | Generated from catalog `app-binding` capabilities (`appBinding.connector` → `id`, `appBinding.category` → `category`). Hand-authored file used only when catalog has no `app-binding` capabilities. Do not add OAuth, token, action, or approval policy. |
 | `.mcp.json` | `mcpServers` object | Validate the companion file. v1 stores its path and does not model inline objects. Target-specific archives may use target-specific command paths. Windows `bin/` commands must reference a Windows-runnable file such as `.exe`, `.cmd`, `.bat`, or `.ps1`. |
 | hooks | command handlers in `hooks/hooks.json` | Treat manifest `hooks` as experimental while retaining default-file discovery. |
 | interface assets | files under the plugin archive | Validate `composerIcon`, `logo`, `logoDark`, and PNG screenshots. |
+
+## Capability-kind mapping
+
+The `elegy-capability-catalog/v1` catalog declares each capability's `kind`.
+The Codex exporter maps kinds to export surfaces:
+
+| Catalog `kind` | Codex export | Authority |
+|---|---|---|
+| `cli` | Invoked by skills or MCP server. No dedicated Codex file. | Catalog `invocation` field. |
+| `mcp` | `.mcp.json` | Catalog `invocation` field with `toolName`. |
+| `app-binding` | `.app.json` (generated) | Catalog `appBinding.connector` → Codex `id`; `appBinding.category` → Codex `category`. |
+
+When the catalog contains `app-binding` capabilities, the exporter generates
+`.app.json` from them. When the catalog has no `app-binding` capabilities but
+`codex.plugin/v1.apps` points to a hand-authored file, the exporter copies
+that file (backward compat). If both exist, catalog wins.
+
+A capability may declare a `fallback` surface (typically `cli`) for hosts that
+do not support the primary kind. The Codex exporter does not emit fallback into
+the Codex plugin — it is host-neutral guidance.
+
+See [capability-catalog-v1 spec](capability-catalog-v1.md) for the full
+capability shape.
 
 ## Audit findings
 

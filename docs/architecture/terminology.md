@@ -63,6 +63,33 @@ A formalized capability definition with identity, metadata, and execution-orient
 
 In Elegy, a skill is a governed capability contract. It is a portable package/contract bundle — not inherently tied to a specific LLM vendor, prompt engine, runtime host, or MCP transport. A skill declares capabilities and their constraints; it does not own host-side execution decisions.
 
+### Capability kind
+
+A taxonomy discriminator for capabilities in the `elegy-capability-catalog/v1`
+catalog. Current kinds: `cli` (executable deterministic commands), `mcp`
+(typed agent-facing tool server), `app-binding` (host-authenticated
+external-service connector). The kind determines which Codex export surface the
+capability maps to. `provider-adapter` is deferred until a real AI-provider
+consumer exists.
+
+### App binding
+
+A capability kind that maps to a host-authenticated external-service connector
+(e.g. GitHub, Gmail, Slack). Declared in the capability catalog with a portable
+`connector` identity (the external-service name) and optional `category`. The
+Codex exporter generates `.app.json` from app-binding capabilities. App bindings
+are the distinction between a plugin that is streamlined packaging (skills +
+CLI/MCP) and one that crosses into host-authenticated external-service
+integration.
+
+### Fallback
+
+An alternative surface declared on a capability for hosts that do not support
+the primary kind. For example, an `app-binding` capability may declare a `cli`
+fallback so non-Codex hosts can invoke it via a command-line tool. Fallback is
+host-neutral guidance — the Codex exporter does not emit it into the Codex
+plugin.
+
 ### Dynamic skill
 
 A skill representation or activation path that is derived or materialized at runtime rather than declared only as a static artifact.

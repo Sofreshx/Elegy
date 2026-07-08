@@ -55,13 +55,20 @@ elegy-plugin-packaging export --host codex \
 The manifest does not infer a build artifact. The caller selects the target
 binary and its host-relative path.
 
-Codex app connector files are local connector references:
+Codex app connector files are generated from `app-binding` capabilities in the
+`elegy-capability-catalog/v1` catalog. The exporter collects app-binding
+capabilities and emits `.app.json` with `id` (from `appBinding.connector`) and
+optional `category` (from `appBinding.category`).
+
+When the catalog has no `app-binding` capabilities but
+`codex.plugin/v1.apps` points to a hand-authored file, the exporter copies
+that file for backward compat. If both exist, catalog wins.
 
 ```json
 {
   "apps": {
     "github": {
-      "id": "connector_...",
+      "id": "github",
       "category": "Developer Tools"
     }
   }
