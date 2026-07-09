@@ -9,7 +9,8 @@
   "license": "Proprietary",
   "extensions": {
     "elegy.marketplace-wrapper/v1": {
-      "schemaVersion": "elegy.marketplace-wrapper/v1"
+      "schemaVersion": "elegy.marketplace-wrapper/v1",
+      "windowsBinaryName": "elegy-checks.exe"
     },
     "codex.plugin/v1": {
       "schemaVersion": "codex.plugin/v1",

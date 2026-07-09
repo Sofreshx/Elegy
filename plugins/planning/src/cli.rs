@@ -43,6 +43,7 @@ pub enum CliError {
 
 #[derive(Parser, Debug)]
 #[command(name = "elegy-planning")]
+#[command(version = env!("CARGO_PKG_VERSION"))]
 #[command(
     about = "Dedicated planning authority CLI for durable goals, roadmaps, plans, todos, and issues"
 )]
@@ -122,6 +123,8 @@ enum Command {
     Events,
     #[command(about = "Check planning database health")]
     Health,
+    #[command(about = "Report CLI and plugin version metadata")]
+    Version,
     #[command(about = "Report machine-readable CLI compatibility metadata")]
     Capabilities {
         #[arg(long)]
@@ -1519,6 +1522,9 @@ where
         compact: cli.compact,
     };
     let _ = CLI_MACHINE_CONTEXT.set(context.clone());
+    if let Command::Version = &cli.command {
+        return execute_version(&context);
+    }
     if let Command::Capabilities { detail } = &cli.command {
         return execute_capabilities(&context, *detail);
     }
@@ -1563,6 +1569,7 @@ where
         Command::Validate { command } => execute_validate(command, &store, &context),
         Command::Events => execute_events(&store, &context),
         Command::Health => execute_health(&store, &context),
+        Command::Version => unreachable!("version returns before database initialization"),
         Command::Capabilities { .. } => {
             unreachable!("capabilities returns before database initialization")
         }
@@ -2535,6 +2542,31 @@ fn execute_events(store: &PlanningStore, context: &MachineContext) -> Result<Exi
 
 fn execute_health(store: &PlanningStore, context: &MachineContext) -> Result<ExitCode, CliError> {
     emit_success(context, vec!["health"], store.health()?)
+}
+
+fn execute_version(context: &MachineContext) -> Result<ExitCode, CliError> {
+    let catalog: serde_json::Value =
+        serde_json::from_str(include_str!("../capability-catalog.json")).map_err(CliError::Json)?;
+    let capability_digest = catalog
+        .get("digest")
+        .and_then(serde_json::Value::as_str)
+        .map(str::to_string);
+    let plugin_version = catalog
+        .get("pluginVersion")
+        .and_then(serde_json::Value::as_str)
+        .unwrap_or(env!("CARGO_PKG_VERSION"));
+    emit_success(
+        context,
+        vec!["version"],
+        json!({
+            "plugin": "elegy-planning",
+            "cliVersion": env!("CARGO_PKG_VERSION"),
+            "pluginVersion": plugin_version,
+            "capabilityDigest": capability_digest,
+            "resultSchemaVersion": RESULT_SCHEMA_VERSION,
+            "planningSchemaVersion": CURRENT_SCHEMA_VERSION
+        }),
+    )
 }
 
 fn execute_capabilities(context: &MachineContext, detail: bool) -> Result<ExitCode, CliError> {
@@ -4004,6 +4036,7 @@ fn command_path(command: &Command) -> Vec<String> {
         ],
         Command::Events => vec!["events".to_string(), "list".to_string()],
         Command::Health => vec!["health".to_string()],
+        Command::Version => vec!["version".to_string()],
         Command::Capabilities { .. } => vec!["capabilities".to_string()],
         Command::Project { command } => vec![
             "project".to_string(),
@@ -4436,6 +4469,7 @@ fn is_command_mutation(command: &Command) -> bool {
         Command::Validate { .. }
         | Command::Events
         | Command::Health
+        | Command::Version
         | Command::Capabilities { .. }
         | Command::Project { .. }
         | Command::Search(_)

@@ -104,7 +104,10 @@ jobs:
             size="$(stat -c%s "$file")"
             sha="$(sha256sum "$file" | awk '{print $1}')"
 
-            if [[ "$base" == "elegy-contracts-bundle.zip" ]]; then
+            if [[ "$base" =~ ^elegy-codex-marketplace-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
+              target="${BASH_REMATCH[1]}"
+              asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg tg "$target" '{assetKind:"codex-marketplace",surface:null,target:$tg,fileName:$fn,requiredEntries:[".agents/plugins/marketplace.json"],sizeBytes:$sz,sha256:$sha}')"
+            elif [[ "$base" == "elegy-contracts-bundle.zip" ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"

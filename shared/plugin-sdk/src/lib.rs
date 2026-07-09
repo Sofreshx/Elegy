@@ -11,6 +11,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest, Sha256};
 use thiserror::Error;
 
 // ── Structured Failure ────────────────────────────────────────────────────
@@ -2364,6 +2365,17 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
 
     // Compute catalog-derived Codex apps once; reused for file write and manifest path.
     let catalog_apps = catalog.as_ref().and_then(build_codex_apps_from_catalog);
+    let codex_projection_digest = if host == "codex" {
+        Some(compute_codex_projection_digest(
+            &package_root,
+            &raw,
+            &plugin,
+            codex_ext.as_ref(),
+            binary.as_ref(),
+        )?)
+    } else {
+        None
+    };
 
     let mut written_files = Vec::new();
     let mut skills_count = 0usize;
@@ -2557,7 +2569,7 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
         })?;
         let mut codex_manifest = serde_json::json!({
             "name": plugin.name,
-            "version": plugin.version,
+            "version": codex_projection_version(&plugin.version, codex_projection_digest.as_deref()),
             "description": plugin.description,
             "author": plugin.author.as_ref().map(|a| serde_json::json!({"name": a.name})),
             "license": plugin.license,
@@ -2671,6 +2683,135 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
         },
         written_files,
     })
+}
+
+fn codex_projection_version(base_version: &str, digest: Option<&str>) -> String {
+    let base = base_version
+        .split_once('+')
+        .map_or(base_version, |(base, _)| base);
+    match digest {
+        Some(digest) => format!("{base}+codex.{}", &digest[..digest.len().min(12)]),
+        None => base.to_string(),
+    }
+}
+
+fn compute_codex_projection_digest(
+    package_root: &Path,
+    manifest_raw: &str,
+    plugin: &ElegyPluginV1,
+    codex_ext: Option<&CodexPluginExtensionV1>,
+    binary: Option<&PluginArchiveBinary<'_>>,
+) -> Result<String, ToolingError> {
+    let mut hasher = Sha256::new();
+    hash_named_bytes(
+        &mut hasher,
+        ".elegy-plugin/plugin.json",
+        manifest_raw.as_bytes(),
+    );
+
+    if let Some(skills_path) = &plugin.skills {
+        hash_package_component(&mut hasher, package_root, skills_path)?;
+    }
+    if let Some(catalog) = &plugin.capability_catalog {
+        hash_package_component(&mut hasher, package_root, &catalog.path)?;
+    }
+    if let Some(mcp_servers) = &plugin.mcp_servers {
+        hash_package_component(&mut hasher, package_root, mcp_servers)?;
+    }
+    if let Some(ext) = codex_ext {
+        if let Some(apps) = &ext.apps {
+            hash_package_component(&mut hasher, package_root, apps)?;
+        }
+        if let Some(hooks) = &ext.hooks {
+            hash_package_component(&mut hasher, package_root, hooks)?;
+        } else {
+            let default_hooks = package_root.join("hooks").join("hooks.json");
+            if default_hooks.exists() {
+                hash_path_component(&mut hasher, package_root, &default_hooks)?;
+            }
+        }
+        if let Some(mcp_servers) = &ext.mcp_servers {
+            hash_package_component(&mut hasher, package_root, mcp_servers)?;
+        }
+        if let Some(assets) = &ext.assets {
+            for asset in assets {
+                hash_package_component(&mut hasher, package_root, asset)?;
+            }
+        }
+    }
+    if let Some(binary) = binary {
+        let bytes = fs::read(binary.source_path).map_err(|source| ToolingError::Io {
+            operation: "read",
+            path: binary.source_path.to_path_buf(),
+            source,
+        })?;
+        hash_named_bytes(
+            &mut hasher,
+            &format!("binary/{}", binary.archive_path),
+            &bytes,
+        );
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn hash_package_component(
+    hasher: &mut Sha256,
+    package_root: &Path,
+    relative_path: &str,
+) -> Result<(), ToolingError> {
+    let path = resolve_package_path(package_root, relative_path);
+    if path.exists() {
+        hash_path_component(hasher, package_root, &path)?;
+    }
+    Ok(())
+}
+
+fn hash_path_component(
+    hasher: &mut Sha256,
+    package_root: &Path,
+    path: &Path,
+) -> Result<(), ToolingError> {
+    if path.is_file() {
+        let relative = path
+            .strip_prefix(package_root)
+            .map(|relative| relative.to_string_lossy().replace('\\', "/"))
+            .unwrap_or_else(|_| path.to_string_lossy().replace('\\', "/"));
+        if should_skip_projection_digest_path(&relative) {
+            return Ok(());
+        }
+        let bytes = fs::read(path).map_err(|source| ToolingError::Io {
+            operation: "read",
+            path: path.to_path_buf(),
+            source,
+        })?;
+        hash_named_bytes(hasher, &relative, &bytes);
+        return Ok(());
+    }
+    if path.is_dir() {
+        let mut files = walk_dir_files(path)?;
+        files.sort();
+        for file in files {
+            hash_path_component(hasher, package_root, &file)?;
+        }
+    }
+    Ok(())
+}
+
+fn should_skip_projection_digest_path(relative: &str) -> bool {
+    relative == "install-receipt.json"
+        || relative == ".elegy-plugin/plugin.json"
+        || relative == "plugin.json"
+        || relative.starts_with(".codex-plugin/")
+        || relative.starts_with(".claude-plugin/")
+}
+
+fn hash_named_bytes(hasher: &mut Sha256, name: &str, bytes: &[u8]) {
+    hasher.update(name.as_bytes());
+    hasher.update([0]);
+    hasher.update((bytes.len() as u64).to_le_bytes());
+    hasher.update([0]);
+    hasher.update(bytes);
+    hasher.update([0xff]);
 }
 
 /// Recursively copy a directory.
@@ -3978,6 +4119,93 @@ mod tests {
             .written_files
             .iter()
             .any(|path| path.ends_with("my-plugin.exe")));
+    }
+
+    #[test]
+    fn export_plugin_v1_codex_version_digest_changes_when_projection_changes() {
+        let temp_dir = unique_temp_dir("elegy-export-codex-digest");
+        let plugin_dir = temp_dir.join("my-plugin");
+        write_plugin_fixture(
+            &plugin_dir,
+            "my-plugin",
+            "Test plugin for Codex digest",
+            Some("https://example.com/my-plugin"),
+        );
+        let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
+        let mut manifest: Value =
+            serde_json::from_str(&fs::read_to_string(&manifest_path).expect("read manifest"))
+                .expect("parse manifest");
+        manifest["extensions"] = json!({
+            "codex.plugin/v1": {
+                "schemaVersion": "codex.plugin/v1",
+                "interface": {
+                    "displayName": "My Plugin",
+                    "shortDescription": "Test digest",
+                    "longDescription": "Test digest changes.",
+                    "developerName": "Test Author",
+                    "category": "Developer Tools",
+                    "capabilities": ["Read"],
+                    "defaultPrompt": ["Use My Plugin."]
+                }
+            }
+        });
+        fs::write(
+            &manifest_path,
+            serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        let binary_path = temp_dir.join("my-plugin.exe");
+        fs::write(&binary_path, b"first").expect("write binary");
+        let first_output = temp_dir.join("codex-first");
+        export_plugin_v1_with_codex_mode_and_binary(
+            &plugin_dir,
+            "codex",
+            &first_output,
+            false,
+            CodexProjectionMode::Current,
+            Some(PluginArchiveBinary {
+                source_path: &binary_path,
+                archive_path: "bin/my-plugin.exe".to_string(),
+            }),
+        )
+        .expect("first export");
+        let first_manifest: Value = serde_json::from_str(
+            &fs::read_to_string(first_output.join(".codex-plugin").join("plugin.json"))
+                .expect("read first manifest"),
+        )
+        .expect("parse first manifest");
+
+        fs::write(
+            plugin_dir.join("skills").join("my-plugin").join("SKILL.md"),
+            "---\nname: my-plugin\ndescription: changed\n---\n\n# Changed\n",
+        )
+        .expect("change skill");
+        fs::write(&binary_path, b"second").expect("change binary");
+        let second_output = temp_dir.join("codex-second");
+        export_plugin_v1_with_codex_mode_and_binary(
+            &plugin_dir,
+            "codex",
+            &second_output,
+            false,
+            CodexProjectionMode::Current,
+            Some(PluginArchiveBinary {
+                source_path: &binary_path,
+                archive_path: "bin/my-plugin.exe".to_string(),
+            }),
+        )
+        .expect("second export");
+        let second_manifest: Value = serde_json::from_str(
+            &fs::read_to_string(second_output.join(".codex-plugin").join("plugin.json"))
+                .expect("read second manifest"),
+        )
+        .expect("parse second manifest");
+
+        let first_version = first_manifest["version"].as_str().expect("first version");
+        let second_version = second_manifest["version"].as_str().expect("second version");
+        assert!(first_version.starts_with("0.1.0+codex."));
+        assert!(second_version.starts_with("0.1.0+codex."));
+        assert_ne!(first_version, second_version);
     }
 
     #[test]

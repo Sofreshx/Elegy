@@ -145,6 +145,25 @@ jobs:
           cargo run -p elegy-plugin-sdk --bin elegy-plugin-schemas -- --check
           cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace generate --project . --check
           cargo run -p elegy-tooling --bin elegy-plugin-packaging -- marketplace validate --source .
+      - name: verify Codex marketplace projections
+        shell: bash
+        working-directory: .
+        run: |
+          set -euo pipefail
+          for target in x86_64-pc-windows-msvc x86_64-unknown-linux-gnu aarch64-apple-darwin; do
+            output="$(mktemp -d)"
+            cargo run -p elegy-tooling --bin elegy-plugin-packaging -- \
+              marketplace export-codex \
+              --source . \
+              --target "$target" \
+              --output "$output"
+            cargo run -p elegy-tooling --bin elegy-plugin-packaging -- \
+              marketplace export-codex \
+              --source . \
+              --target "$target" \
+              --output "$output" \
+              --check
+          done
 
   docs-check-v2:
     name: docs check v2 (authoritative)

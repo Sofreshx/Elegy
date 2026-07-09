@@ -33,7 +33,7 @@ adapter.
 
 ## Validation
 
-Run from repo root: `cargo test -p <crate>`, `cargo run -p elegy-core --bin elegy-contracts -- contracts validate --project .`. When capability behavior changes, verify both the Rust implementation and the governed fixture/projection.
+Run from repo root: `cargo test -p <crate>`, `cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate`. When capability behavior changes, verify both the Rust implementation and the governed fixture/projection.
 
 ## Rust Style
 

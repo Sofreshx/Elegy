@@ -18,3 +18,10 @@ This directory only provides public Elegy marketplace discovery metadata. Runtim
 files, skills, optional MCP descriptors, and binaries are supplied by the
 published plugin archive from the private implementation repo. The primary
 runtime contract is the bundled CLI.
+
+Windows Codex projection:
+
+```text
+bin/elegy-opencode-workers.exe
+.mcp.json command -> ./bin/elegy-opencode-workers.exe
+```

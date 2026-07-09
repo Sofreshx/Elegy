@@ -57,6 +57,15 @@ elegy-plugin-packaging install --archive elegy-planning-plugin-x86_64-pc-windows
 elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
 
+Codex-native consumers should use the generated marketplace projection asset
+named `elegy-codex-marketplace-<target>.zip`. Extract it to a Codex marketplace
+directory, register that marketplace, then install the selected plugin:
+
+```bash
+codex plugin marketplace add <CODEX_HOME>/marketplaces/elegy --json
+codex plugin add elegy-planning@elegy --json
+```
+
 Non-plugin surfaces ship as standalone binaries. See
 [docs/distribution.md](docs/distribution.md) for the release index and each
 binary's `DISTRIBUTION.md` for install details.
@@ -68,7 +77,7 @@ git clone https://github.com/Sofreshx/Elegy.git
 cd Elegy
 cargo build
 cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
-cargo run -p elegy-planning -- --version --json
+cargo run -p elegy-planning -- --json version
 ```
 
 Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
@@ -146,6 +155,8 @@ The generated marketplace lives at `.elegy/marketplace.json`:
 ```bash
 elegy-plugin-packaging marketplace list --source . --json
 elegy-plugin-packaging marketplace search planning --source . --json
+elegy-plugin-packaging marketplace status --source . --plugin elegy-planning --json
+elegy-plugin-packaging marketplace update elegy-planning --source . --json
 ```
 
 Boundaries: the plugin manifest is a metadata envelope, not a runtime,

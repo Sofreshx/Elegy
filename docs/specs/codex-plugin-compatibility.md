@@ -48,6 +48,7 @@ from default export until validator evidence changes.
 |---|---|---|---|
 | `schemaVersion` | none | Elegy contract | Require exact `codex.plugin/v1`; never emit the extension version. |
 | `homepage`, `keywords` | same field | Current-compatible | Typed import/export; accepted by the installed validator. |
+| base `version` | `version` with `+codex.<projectionDigest12>` | Current-compatible | Export keeps the Elegy SemVer prefix and adds deterministic build metadata so Codex can pick up fast-moving projection changes. |
 | `interface` | `interface` | Current-compatible | Current export requires validator-required fields and supports `logoDark`. |
 | `apps` | `apps` path plus `.app.json` | Current-compatible | Installed validator accepts connector `id` plus optional `category`. Generated from catalog `app-binding` capabilities when present; falls back to hand-authored file for backward compat. |
 | `hooks` | default `hooks/hooks.json` | Current-compatible file discovery | Current export copies the file without a manifest field. |
@@ -132,6 +133,31 @@ for skill-only packages, and omits Elegy artifact fields from the generated
 index. The Codex index is derived output. For Windows targets, export rejects `.mcp.json`
 commands under `bin/` when they omit a Windows-runnable extension or point at a
 missing file.
+
+Use `marketplace export-codex --check` to compare an existing generated tree
+against current projection output without rewriting it.
+
+Generated Codex plugin versions use:
+
+```text
+<elegy-version>+codex.<projectionDigest12>
+```
+
+`projectionDigest12` must change when exported manifest content, skills,
+catalog metadata, companion files, or bundled binary checksums change. Generated
+control files are excluded from digest inputs to avoid self-referential churn,
+including install receipts and generated `.elegy-plugin/`, `.codex-plugin/`,
+and `.claude-plugin/` manifest copies inside staged projection trees.
+
+Release CI publishes one Codex marketplace projection per supported target:
+
+```text
+elegy-codex-marketplace-<target>.zip
+elegy-codex-marketplace-<target>.zip.sha256
+```
+
+Each archive contains `.agents/plugins/marketplace.json`, generated
+`.codex-plugin/plugin.json` files, skills, companion files, and target binaries.
 
 ## Non-goals
 

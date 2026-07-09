@@ -39,6 +39,7 @@ stability promise.
 | Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
 | Plugin archive | `<surface>-plugin-<target>.zip` | Primary release for binary-backed plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
 | Skill-only plugin archive | `<surface>-plugin-any.zip` | Primary release for skill-only plugin packages. Contains plugin.json and skills/, with no `bin/`. |
+| Codex marketplace projection | `elegy-codex-marketplace-<target>.zip` | Generated Codex-native marketplace tree containing `.agents/plugins/marketplace.json`, plugin projections, skills, companion files, and target binaries. |
 | Local pack default | `<plugin-name>-v<version>.plugin.zip` | Ad hoc output from `elegy-plugin-packaging pack` when `--output` is omitted. Not the GitHub release naming contract. |
 | CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in plugin archives. |
 | CLI asset checksum | `<name>-<target>[.exe].sha256` | Sidecar checksum used by the installer. |
@@ -107,6 +108,19 @@ The same `--source` contract accepts an HTTPS base URL, so Holon and other
 consumers are not tied to this repository. Remote archives require SHA-256
 sidecars and are checked against the public wrapper manifest before install.
 
+Codex consumers use the generated Codex marketplace projection:
+
+```bash
+codex plugin marketplace add <CODEX_HOME>/marketplaces/elegy --json
+codex plugin add elegy-planning@elegy --json
+codex plugin list --marketplace elegy --available --json
+```
+
+Downstream Codex apps should consume `elegy-codex-marketplace-<target>.zip`
+and install through Codex plugin commands. Do not copy shared skills as the
+primary Codex route for Elegy plugins. Shared skills are compatibility fallback
+assets when plugin installation is unavailable or disabled.
+
 Private-source plugins may publish public proprietary binaries. Their wrapper
 metadata, skills, scripts, and descriptors are public. Keep private behavior in
 the compiled binary or behind a hosted service; hosts own all credentials and
@@ -118,6 +132,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 
 - Prefer GitHub release assets for downstream consumption. Workflow artifacts are a maintainer/CI convenience, not the primary handoff lane.
 - Pin an explicit Elegy semver release tag in downstream repositories and install into a repo-local tools directory.
+- Use `main-snapshot` only for latest-branch integration, validation, and debugging.
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
 - Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, packaging, and export.
