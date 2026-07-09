@@ -151,7 +151,7 @@ jobs:
         run: |
           set -euo pipefail
           for target in x86_64-pc-windows-msvc x86_64-unknown-linux-gnu aarch64-apple-darwin; do
-            output="$(mktemp -d)"
+            output="$(mktemp -u)"
             cargo run -p elegy-tooling --bin elegy-plugin-packaging -- \
               marketplace export-codex \
               --source . \
@@ -163,6 +163,7 @@ jobs:
               --target "$target" \
               --output "$output" \
               --check
+            rm -rf "$output"
           done
 
   docs-check-v2:
