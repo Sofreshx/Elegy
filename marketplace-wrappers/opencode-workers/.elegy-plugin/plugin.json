@@ -11,7 +11,11 @@
   "extensions": {
     "elegy.marketplace-wrapper/v1": {
       "schemaVersion": "elegy.marketplace-wrapper/v1",
-      "sourceRepository": "https://github.com/Sofreshx/elegy-opencode-workers"
+      "sourceRepository": "https://github.com/Sofreshx/elegy-opencode-workers",
+      "windowsBinaryName": "elegy-opencode-workers.exe",
+      "windowsMcpCommandRewrites": {
+        "./bin/elegy-opencode-workers": "./bin/elegy-opencode-workers.exe"
+      }
     },
     "codex.plugin/v1": {
       "schemaVersion": "codex.plugin/v1",

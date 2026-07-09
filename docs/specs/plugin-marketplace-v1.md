@@ -59,7 +59,12 @@ elegy-plugin-packaging marketplace validate --source .
 elegy-plugin-packaging marketplace list --source . --json
 elegy-plugin-packaging marketplace search planning --source . --json
 elegy-plugin-packaging marketplace install elegy-planning --source .
+elegy-plugin-packaging marketplace status --source . --plugin elegy-planning --json
+elegy-plugin-packaging marketplace update elegy-planning --source . --json
+elegy-plugin-packaging marketplace monitor --source . --plugin elegy-planning --jsonl
 elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --output ./dist/codex
+elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --output ./dist/codex --check
+elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --artifact-dir ./artifacts/distribution --output ./dist/codex
 elegy-plugin-packaging marketplace export-codex --source . --plugin elegy-opencode-workers --target x86_64-pc-windows-msvc --output ./dist/codex
 ```
 
@@ -71,7 +76,32 @@ stable consumers can regenerate it with an explicit `--release-tag`.
 Codex export resolves the selected target artifact, verifies and stages it, and
 copies its binary into the derived plugin. Omit `--target` to use the current
 supported host target. Use `--plugin <name>` to export one marketplace entry
-without materializing unrelated plugin artifacts.
+without materializing unrelated plugin artifacts. Use `--artifact-dir <path>`
+when release assets have already been downloaded by CI; exporter validation
+stays strict and does not silently repair invalid artifacts.
+
+Freshness status compares the selected marketplace artifact sidecar with the
+installed plugin receipt and manifest. Agents should call it only for explicit
+operator checks, monitors, or capability-preflight failures. Normal skill use
+must not poll freshness every turn.
+
+Freshness statuses:
+
+| Status | Meaning | Action |
+|---|---|---|
+| `current` | Installed receipt, manifest, and selected artifact checksum match. | No repair. |
+| `notInstalled` | Marketplace entry exists, but no installed receipt or manifest exists. | Install selected plugin. |
+| `stale` | Installed plugin identity matches, but version, artifact checksum, or capability digest differs. | Update selected plugin. |
+| `missingArtifact` | Marketplace entry points at an artifact or projection file that is unavailable. | Repair release/projection source, then rerun install/export. |
+| `checksumUnavailable` | Artifact exists, but the required SHA-256 sidecar is missing or unreadable. | Publish or repair checksum sidecar before install/update. |
+| `identityMismatch` | Artifact manifest name/version does not match the marketplace wrapper. | Refuse install/update until the release artifact is corrected. |
+| `unsupportedTarget` | No exact target artifact and no `any` fallback exists for the requested target. | Publish a supported target artifact or choose a supported target. |
+| `unknown` | Status could not be determined, usually because installed state or host listing failed. | Surface error to operator; retry explicit check/update after cause is fixed. |
+
+Apps and operators may surface any non-`current` status as actionable. Strict
+validation fails closed on missing artifacts, checksum failures, identity
+mismatches, unsupported targets, or stale generated projections. Agents should
+not poll freshness during normal turns.
 
 ## Closed-source wrappers
 
@@ -93,6 +123,13 @@ Discovery-only wrappers must declare:
 
 This marker allows a wrapper manifest to omit `skills` and `mcpServers`. The
 published plugin archive still supplies runtime files.
+
+Wrapper fixups are explicit metadata, not exporter guesses:
+
+| Field | Use |
+|---|---|
+| `windowsBinaryName` | Rename staged `bin/<name>` to `bin/<name>.exe` for Windows Codex projection. |
+| `windowsMcpCommandRewrites` | Rewrite known `.mcp.json` command strings for Windows projection. |
 
 External/private plugin publish contract:
 

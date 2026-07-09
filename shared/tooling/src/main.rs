@@ -9,12 +9,19 @@ use elegy_plugin_sdk::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
+use sha2::{Digest, Sha256};
 use std::fs;
+use std::io::Read;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
+use std::thread;
+use std::time::Duration;
 
 mod installer;
-use installer::{install_from_archive, install_from_url};
+use installer::{
+    install_from_archive, install_from_archive_with_identity, install_from_url,
+    install_from_url_with_metadata, InstallReceipt, InstallReceiptMetadata,
+};
 
 #[derive(Parser)]
 #[command(name = "elegy-plugin-packaging")]
@@ -141,6 +148,46 @@ enum MarketplaceCommand {
         #[arg(long)]
         install_root: Option<PathBuf>,
     },
+    /// Report whether installed plugins match the selected marketplace artifacts
+    Status {
+        #[arg(long, default_value = ".")]
+        source: String,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        plugin: Option<String>,
+        #[arg(long)]
+        install_root: Option<PathBuf>,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    /// Update one marketplace plugin after checksum and identity verification
+    Update {
+        plugin: String,
+        #[arg(long, default_value = ".")]
+        source: String,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        install_root: Option<PathBuf>,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    /// Poll marketplace freshness and emit JSON lines
+    Monitor {
+        #[arg(long, default_value = ".")]
+        source: String,
+        #[arg(long)]
+        target: Option<String>,
+        #[arg(long)]
+        plugin: Option<String>,
+        #[arg(long)]
+        install_root: Option<PathBuf>,
+        #[arg(long, default_value_t = 300)]
+        interval_seconds: u64,
+        #[arg(long, default_value_t = false)]
+        jsonl: bool,
+    },
     /// Export a local marketplace as a Codex marketplace tree
     ExportCodex {
         #[arg(long, default_value = ".")]
@@ -154,6 +201,11 @@ enum MarketplaceCommand {
         target: Option<String>,
         #[arg(long, default_value_t = false)]
         overwrite: bool,
+        #[arg(long, default_value_t = false)]
+        check: bool,
+        /// Resolve marketplace artifacts from this local release asset directory
+        #[arg(long)]
+        artifact_dir: Option<PathBuf>,
     },
 }
 
@@ -203,6 +255,43 @@ struct MarketplaceListOutput<'a> {
     schema_version: &'static str,
     marketplace: &'a str,
     plugins: Vec<MarketplacePluginSummary<'a>>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+enum MarketplaceFreshnessStatus {
+    NotInstalled,
+    Current,
+    Stale,
+    MissingArtifact,
+    ChecksumUnavailable,
+    IdentityMismatch,
+    UnsupportedTarget,
+    Unknown,
+}
+
+#[derive(Debug, Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct MarketplaceStatusRecord {
+    plugin: String,
+    target: String,
+    marketplace_version: String,
+    installed_version: Option<String>,
+    status: MarketplaceFreshnessStatus,
+    artifact_sha256: Option<String>,
+    installed_sha256: Option<String>,
+    capability_digest: Option<String>,
+    source: String,
+    install_dir: String,
+    recommended_command: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct MarketplaceStatusOutput {
+    schema_version: &'static str,
+    marketplace: String,
+    records: Vec<MarketplaceStatusRecord>,
 }
 
 fn main() -> ExitCode {
@@ -470,18 +559,63 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
             target.as_deref().unwrap_or(current_release_target()),
             install_root.as_deref(),
         ),
+        MarketplaceCommand::Status {
+            source,
+            target,
+            plugin,
+            install_root,
+            json,
+        } => print_marketplace_status(
+            &source,
+            plugin.as_deref(),
+            target.as_deref().unwrap_or(current_release_target()),
+            install_root.as_deref(),
+            json,
+        ),
+        MarketplaceCommand::Update {
+            plugin,
+            source,
+            target,
+            install_root,
+            json,
+        } => update_marketplace_plugin(
+            &source,
+            &plugin,
+            target.as_deref().unwrap_or(current_release_target()),
+            install_root.as_deref(),
+            json,
+        ),
+        MarketplaceCommand::Monitor {
+            source,
+            target,
+            plugin,
+            install_root,
+            interval_seconds,
+            jsonl,
+        } => monitor_marketplace_status(
+            &source,
+            plugin.as_deref(),
+            target.as_deref().unwrap_or(current_release_target()),
+            install_root.as_deref(),
+            interval_seconds,
+            jsonl,
+        ),
         MarketplaceCommand::ExportCodex {
             source,
             plugin,
             output,
             target,
             overwrite,
+            check,
+            artifact_dir,
         } => export_codex_marketplace(
             &source,
             plugin.as_deref(),
             &output,
             target.as_deref().unwrap_or(current_release_target()),
             overwrite,
+            check,
+            artifact_dir.as_deref(),
         ),
     };
 
@@ -800,6 +934,443 @@ fn print_marketplace_plugins(
     Ok(())
 }
 
+fn print_marketplace_status(
+    source: &str,
+    plugin_name: Option<&str>,
+    target: &str,
+    install_root: Option<&Path>,
+    as_json: bool,
+) -> Result<(), String> {
+    let loaded = load_marketplace(source)?;
+    let root = install_root
+        .map(Path::to_path_buf)
+        .unwrap_or_else(default_plugin_install_root);
+    let records =
+        build_marketplace_status_records(&loaded, source, plugin_name, target, &root, &|url| {
+            get_text(url)
+        })?;
+    if as_json {
+        let output = MarketplaceStatusOutput {
+            schema_version: "elegy-marketplace-status/v1",
+            marketplace: loaded.marketplace.name,
+            records,
+        };
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&output).map_err(|error| error.to_string())?
+        );
+    } else {
+        for record in records {
+            println!(
+                "{} {:?} installed={:?} marketplace={} target={}",
+                record.plugin,
+                record.status,
+                record.installed_version,
+                record.marketplace_version,
+                record.target
+            );
+            if let Some(command) = record.recommended_command {
+                println!("  fix: {command}");
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_marketplace_status_records(
+    loaded: &LoadedMarketplace,
+    source: &str,
+    plugin_name: Option<&str>,
+    target: &str,
+    install_root: &Path,
+    checksum_reader: &dyn Fn(&str) -> Result<String, String>,
+) -> Result<Vec<MarketplaceStatusRecord>, String> {
+    let selected = loaded
+        .plugins
+        .iter()
+        .filter(|(entry, _)| plugin_name.is_none_or(|plugin_name| entry.name == plugin_name))
+        .collect::<Vec<_>>();
+    if selected.is_empty() {
+        return Err(match plugin_name {
+            Some(plugin_name) => format!(
+                "plugin '{plugin_name}' is not in marketplace '{}'",
+                loaded.marketplace.name
+            ),
+            None => format!(
+                "marketplace '{}' contains no plugins",
+                loaded.marketplace.name
+            ),
+        });
+    }
+
+    let mut records = Vec::new();
+    for (entry, manifest) in selected {
+        records.push(build_marketplace_status_record(
+            source,
+            entry,
+            manifest,
+            target,
+            install_root,
+            checksum_reader,
+        )?);
+    }
+    Ok(records)
+}
+
+fn build_marketplace_status_record(
+    source: &str,
+    entry: &ElegyMarketplacePlugin,
+    manifest: &ElegyPluginV1,
+    target: &str,
+    install_root: &Path,
+    checksum_reader: &dyn Fn(&str) -> Result<String, String>,
+) -> Result<MarketplaceStatusRecord, String> {
+    let install_dir = install_root.join(&entry.name);
+    let recommended_command = Some(format!(
+        "elegy-plugin-packaging marketplace update {} --source {} --target {} --install-root {} --json",
+        entry.name,
+        source,
+        target,
+        install_root.display()
+    ));
+
+    if !is_supported_marketplace_target(target) {
+        return Ok(MarketplaceStatusRecord {
+            plugin: entry.name.clone(),
+            target: target.to_string(),
+            marketplace_version: manifest.version.clone(),
+            installed_version: None,
+            status: MarketplaceFreshnessStatus::UnsupportedTarget,
+            artifact_sha256: None,
+            installed_sha256: None,
+            capability_digest: None,
+            source: source.to_string(),
+            install_dir: install_dir.display().to_string(),
+            recommended_command,
+        });
+    }
+
+    let Some(artifact) = select_marketplace_artifact(entry, target) else {
+        return Ok(MarketplaceStatusRecord {
+            plugin: entry.name.clone(),
+            target: target.to_string(),
+            marketplace_version: manifest.version.clone(),
+            installed_version: installed_plugin_version(&install_dir),
+            status: MarketplaceFreshnessStatus::MissingArtifact,
+            artifact_sha256: None,
+            installed_sha256: installed_receipt(&install_dir)
+                .and_then(|receipt| receipt.artifact_sha256),
+            capability_digest: installed_capability_digest(&install_dir),
+            source: source.to_string(),
+            install_dir: install_dir.display().to_string(),
+            recommended_command,
+        });
+    };
+
+    let artifact_sha256 = match checksum_reader(&artifact.checksum_url) {
+        Ok(raw) => parse_checksum_text(&raw),
+        Err(_) => None,
+    };
+    if artifact_sha256.is_none() {
+        return Ok(MarketplaceStatusRecord {
+            plugin: entry.name.clone(),
+            target: artifact.target.clone(),
+            marketplace_version: manifest.version.clone(),
+            installed_version: installed_plugin_version(&install_dir),
+            status: MarketplaceFreshnessStatus::ChecksumUnavailable,
+            artifact_sha256: None,
+            installed_sha256: installed_receipt(&install_dir)
+                .and_then(|receipt| receipt.artifact_sha256),
+            capability_digest: installed_capability_digest(&install_dir),
+            source: source.to_string(),
+            install_dir: install_dir.display().to_string(),
+            recommended_command,
+        });
+    }
+    let artifact_sha256 = artifact_sha256.expect("checked above");
+
+    let installed_manifest_path = install_dir.join(".elegy-plugin").join("plugin.json");
+    if !installed_manifest_path.is_file() {
+        return Ok(MarketplaceStatusRecord {
+            plugin: entry.name.clone(),
+            target: artifact.target.clone(),
+            marketplace_version: manifest.version.clone(),
+            installed_version: None,
+            status: MarketplaceFreshnessStatus::NotInstalled,
+            artifact_sha256: Some(artifact_sha256),
+            installed_sha256: installed_receipt(&install_dir)
+                .and_then(|receipt| receipt.artifact_sha256),
+            capability_digest: installed_capability_digest(&install_dir),
+            source: source.to_string(),
+            install_dir: install_dir.display().to_string(),
+            recommended_command,
+        });
+    }
+
+    let installed_raw = fs::read_to_string(&installed_manifest_path)
+        .map_err(|error| format!("read {}: {error}", installed_manifest_path.display()))?;
+    let installed_manifest: ElegyPluginV1 = serde_json::from_str(&installed_raw)
+        .map_err(|error| format!("parse {}: {error}", installed_manifest_path.display()))?;
+    if installed_manifest.name != entry.name {
+        return Ok(MarketplaceStatusRecord {
+            plugin: entry.name.clone(),
+            target: artifact.target.clone(),
+            marketplace_version: manifest.version.clone(),
+            installed_version: Some(installed_manifest.version),
+            status: MarketplaceFreshnessStatus::IdentityMismatch,
+            artifact_sha256: Some(artifact_sha256),
+            installed_sha256: installed_receipt(&install_dir)
+                .and_then(|receipt| receipt.artifact_sha256),
+            capability_digest: installed_capability_digest(&install_dir),
+            source: source.to_string(),
+            install_dir: install_dir.display().to_string(),
+            recommended_command,
+        });
+    }
+
+    let receipt = installed_receipt(&install_dir);
+    let installed_sha256 = receipt
+        .as_ref()
+        .and_then(|receipt| receipt.artifact_sha256.clone());
+    let status = if installed_manifest.version == manifest.version
+        && installed_sha256.as_deref() == Some(artifact_sha256.as_str())
+    {
+        MarketplaceFreshnessStatus::Current
+    } else {
+        MarketplaceFreshnessStatus::Stale
+    };
+
+    Ok(MarketplaceStatusRecord {
+        plugin: entry.name.clone(),
+        target: artifact.target.clone(),
+        marketplace_version: manifest.version.clone(),
+        installed_version: Some(installed_manifest.version),
+        status,
+        artifact_sha256: Some(artifact_sha256),
+        installed_sha256,
+        capability_digest: receipt
+            .and_then(|receipt| receipt.capability_digest)
+            .or_else(|| installed_capability_digest(&install_dir)),
+        source: source.to_string(),
+        install_dir: install_dir.display().to_string(),
+        recommended_command,
+    })
+}
+
+fn update_marketplace_plugin(
+    source: &str,
+    plugin_name: &str,
+    target: &str,
+    install_root: Option<&Path>,
+    as_json: bool,
+) -> Result<(), String> {
+    let loaded = load_marketplace(source)?;
+    let (entry, manifest) = loaded
+        .plugins
+        .iter()
+        .find(|(entry, _)| entry.name == plugin_name)
+        .ok_or_else(|| {
+            format!(
+                "plugin '{plugin_name}' is not in marketplace '{}'",
+                loaded.marketplace.name
+            )
+        })?;
+    if !is_supported_marketplace_target(target) {
+        return Err(format!("unsupported marketplace target '{target}'"));
+    }
+    let artifact = select_marketplace_artifact(entry, target).ok_or_else(|| {
+        format!(
+            "plugin '{}' has no artifact for target '{}'",
+            entry.name, target
+        )
+    })?;
+    let root = install_root
+        .map(Path::to_path_buf)
+        .unwrap_or_else(default_plugin_install_root);
+    let staging = tempfile::tempdir().map_err(|error| error.to_string())?;
+    let metadata = InstallReceiptMetadata {
+        target: Some(artifact.target.clone()),
+        marketplace_name: Some(loaded.marketplace.name.clone()),
+        marketplace_source: Some(source.to_string()),
+        artifact_url: Some(artifact.url.clone()),
+        checksum_url: Some(artifact.checksum_url.clone()),
+        manifest_version: Some(manifest.version.clone()),
+        capability_digest: manifest_capability_digest(&loaded, entry, manifest),
+        ..Default::default()
+    };
+    let mut receipt = install_from_url_with_metadata(
+        &artifact.url,
+        &artifact.checksum_url,
+        staging.path(),
+        Some(&entry.name),
+        Some(&manifest.version),
+        metadata,
+    )
+    .map_err(|error| error.to_string())?;
+    let staged_dir = staging.path().join(&entry.name);
+    let final_dir = root.join(&entry.name);
+    receipt.install_dir = final_dir.display().to_string();
+    write_install_receipt(&staged_dir, &receipt)?;
+    publish_staged_plugin(&staged_dir, &final_dir)?;
+
+    if as_json {
+        println!(
+            "{}",
+            serde_json::to_string_pretty(&receipt).map_err(|error| error.to_string())?
+        );
+    } else {
+        println!(
+            "Updated {} v{} at {}",
+            receipt.name, receipt.version, receipt.install_dir
+        );
+    }
+    Ok(())
+}
+
+fn monitor_marketplace_status(
+    source: &str,
+    plugin_name: Option<&str>,
+    target: &str,
+    install_root: Option<&Path>,
+    interval_seconds: u64,
+    jsonl: bool,
+) -> Result<(), String> {
+    let interval = Duration::from_secs(interval_seconds.max(1));
+    loop {
+        let loaded = load_marketplace(source)?;
+        let root = install_root
+            .map(Path::to_path_buf)
+            .unwrap_or_else(default_plugin_install_root);
+        let records = build_marketplace_status_records(
+            &loaded,
+            source,
+            plugin_name,
+            target,
+            &root,
+            &|url| get_text(url),
+        )?;
+        if jsonl {
+            for record in records {
+                println!(
+                    "{}",
+                    serde_json::to_string(&record).map_err(|error| error.to_string())?
+                );
+            }
+        } else {
+            for record in records {
+                println!("{} {:?}", record.plugin, record.status);
+            }
+        }
+        thread::sleep(interval);
+    }
+}
+
+fn is_supported_marketplace_target(target: &str) -> bool {
+    matches!(
+        target,
+        "any" | "x86_64-pc-windows-msvc" | "x86_64-unknown-linux-gnu" | "aarch64-apple-darwin"
+    )
+}
+
+fn parse_checksum_text(raw: &str) -> Option<String> {
+    raw.split_whitespace()
+        .next()
+        .filter(|value| value.len() == 64 && value.chars().all(|c| c.is_ascii_hexdigit()))
+        .map(str::to_ascii_lowercase)
+}
+
+fn installed_receipt(install_dir: &Path) -> Option<InstallReceipt> {
+    let raw = fs::read_to_string(install_dir.join("install-receipt.json")).ok()?;
+    serde_json::from_str(&raw).ok()
+}
+
+fn installed_plugin_version(install_dir: &Path) -> Option<String> {
+    installed_receipt(install_dir)
+        .map(|receipt| receipt.version)
+        .or_else(|| {
+            let raw =
+                fs::read_to_string(install_dir.join(".elegy-plugin").join("plugin.json")).ok()?;
+            serde_json::from_str::<ElegyPluginV1>(&raw)
+                .ok()
+                .map(|manifest| manifest.version)
+        })
+}
+
+fn installed_capability_digest(install_dir: &Path) -> Option<String> {
+    let raw = fs::read_to_string(install_dir.join(".elegy-plugin").join("plugin.json")).ok()?;
+    let manifest: ElegyPluginV1 = serde_json::from_str(&raw).ok()?;
+    let catalog_path = manifest
+        .capability_catalog
+        .as_ref()?
+        .path
+        .trim_start_matches("./");
+    let catalog_raw = fs::read_to_string(install_dir.join(catalog_path)).ok()?;
+    serde_json::from_str::<Value>(&catalog_raw)
+        .ok()?
+        .get("digest")?
+        .as_str()
+        .map(str::to_string)
+}
+
+fn manifest_capability_digest(
+    loaded: &LoadedMarketplace,
+    entry: &ElegyMarketplacePlugin,
+    manifest: &ElegyPluginV1,
+) -> Option<String> {
+    let catalog = manifest.capability_catalog.as_ref()?;
+    let local_root = loaded.local_root.as_ref()?;
+    let plugin_root = local_root.join(entry.source.path.trim_start_matches("./"));
+    let catalog_raw =
+        fs::read_to_string(plugin_root.join(catalog.path.trim_start_matches("./"))).ok()?;
+    serde_json::from_str::<Value>(&catalog_raw)
+        .ok()?
+        .get("digest")?
+        .as_str()
+        .map(str::to_string)
+}
+
+fn write_install_receipt(install_dir: &Path, receipt: &InstallReceipt) -> Result<(), String> {
+    let receipt_path = install_dir.join("install-receipt.json");
+    let content = serde_json::to_string_pretty(receipt).map_err(|error| error.to_string())?;
+    fs::write(&receipt_path, format!("{content}\n"))
+        .map_err(|error| format!("write {}: {error}", receipt_path.display()))
+}
+
+fn publish_staged_plugin(staged_dir: &Path, final_dir: &Path) -> Result<(), String> {
+    if let Some(parent) = final_dir.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("create {}: {error}", parent.display()))?;
+    }
+    let backup_dir = final_dir.with_extension("elegy-update-backup");
+    if backup_dir.exists() {
+        fs::remove_dir_all(&backup_dir)
+            .map_err(|error| format!("remove stale backup {}: {error}", backup_dir.display()))?;
+    }
+    if final_dir.exists() {
+        fs::rename(final_dir, &backup_dir).map_err(|error| {
+            format!(
+                "move existing install {} to backup {}: {error}",
+                final_dir.display(),
+                backup_dir.display()
+            )
+        })?;
+    }
+    if let Err(error) = fs::rename(staged_dir, final_dir) {
+        if backup_dir.exists() {
+            let _ = fs::rename(&backup_dir, final_dir);
+        }
+        return Err(format!(
+            "publish staged install {}: {error}",
+            final_dir.display()
+        ));
+    }
+    if backup_dir.exists() {
+        fs::remove_dir_all(&backup_dir)
+            .map_err(|error| format!("remove backup {}: {error}", backup_dir.display()))?;
+    }
+    Ok(())
+}
+
 fn install_marketplace_plugin(
     source: &str,
     plugin_name: &str,
@@ -822,12 +1393,23 @@ fn install_marketplace_plugin(
         .unwrap_or_else(|| dirs_or_manual_home().join(".elegy").join("plugins"));
 
     let receipt = if let Some(artifact) = select_marketplace_artifact(entry, target) {
-        install_from_url(
+        let metadata = InstallReceiptMetadata {
+            target: Some(artifact.target.clone()),
+            marketplace_name: Some(loaded.marketplace.name.clone()),
+            marketplace_source: Some(source.to_string()),
+            artifact_url: Some(artifact.url.clone()),
+            checksum_url: Some(artifact.checksum_url.clone()),
+            manifest_version: Some(manifest.version.clone()),
+            capability_digest: manifest_capability_digest(&loaded, entry, manifest),
+            ..Default::default()
+        };
+        install_from_url_with_metadata(
             &artifact.url,
             &artifact.checksum_url,
             &root,
             Some(&entry.name),
             Some(&manifest.version),
+            metadata,
         )
         .map_err(|error| error.to_string())?
     } else if !entry.artifacts.is_empty() {
@@ -859,15 +1441,27 @@ fn export_codex_marketplace(
     output: &Path,
     target: &str,
     overwrite: bool,
+    check: bool,
+    artifact_dir: Option<&Path>,
 ) -> Result<(), String> {
     let loaded = load_marketplace(source)?;
     let local_root = loaded
         .local_root
         .ok_or_else(|| "Codex export requires a local marketplace source".to_string())?;
-    if output.exists() && !overwrite {
+    if output.exists() && !overwrite && !check {
         return Err(format!("output already exists: {}", output.display()));
     }
-    fs::create_dir_all(output).map_err(|error| format!("create {}: {error}", output.display()))?;
+    let check_staging = if check {
+        Some(tempfile::tempdir().map_err(|error| error.to_string())?)
+    } else {
+        None
+    };
+    let generation_output = check_staging
+        .as_ref()
+        .map(|temp| temp.path())
+        .unwrap_or(output);
+    fs::create_dir_all(generation_output)
+        .map_err(|error| format!("create {}: {error}", generation_output.display()))?;
     let artifact_staging = tempfile::tempdir().map_err(|error| error.to_string())?;
     let mut codex_entries = Vec::new();
     let selected_plugins = loaded
@@ -889,9 +1483,14 @@ fn export_codex_marketplace(
     }
     for (entry, manifest) in selected_plugins {
         let wrapper_root = local_root.join(entry.source.path.trim_start_matches("./"));
-        let plugin_output = output.join("plugins").join(&entry.name);
-        let materialized =
-            materialize_marketplace_artifact(entry, manifest, target, artifact_staging.path())?;
+        let plugin_output = generation_output.join("plugins").join(&entry.name);
+        let materialized = materialize_marketplace_artifact(
+            entry,
+            manifest,
+            target,
+            artifact_staging.path(),
+            artifact_dir,
+        )?;
         let plugin_root = materialized
             .as_ref()
             .map(|artifact| artifact.plugin_root.as_path())
@@ -928,7 +1527,7 @@ fn export_codex_marketplace(
         },
         "plugins": codex_entries
     });
-    let index_path = output
+    let index_path = generation_output
         .join(".agents")
         .join("plugins")
         .join("marketplace.json");
@@ -941,7 +1540,77 @@ fn export_codex_marketplace(
     content.push('\n');
     fs::write(&index_path, content)
         .map_err(|error| format!("write {}: {error}", index_path.display()))?;
-    println!("Exported Codex marketplace to {}", output.display());
+    if check {
+        compare_directory_trees(generation_output, output)?;
+        println!("Codex marketplace projection is current.");
+    } else {
+        println!("Exported Codex marketplace to {}", output.display());
+    }
+    Ok(())
+}
+
+fn compare_directory_trees(expected_root: &Path, actual_root: &Path) -> Result<(), String> {
+    if !actual_root.is_dir() {
+        return Err(format!(
+            "{} is missing; run marketplace export-codex",
+            actual_root.display()
+        ));
+    }
+    let expected = collect_tree_files(expected_root)?;
+    let actual = collect_tree_files(actual_root)?;
+    if expected != actual {
+        return Err(format!(
+            "{} is stale; run marketplace export-codex",
+            actual_root.display()
+        ));
+    }
+    for relative in expected {
+        let expected_bytes = fs::read(expected_root.join(&relative)).map_err(|error| {
+            format!("read {}: {error}", expected_root.join(&relative).display())
+        })?;
+        let actual_bytes = fs::read(actual_root.join(&relative))
+            .map_err(|error| format!("read {}: {error}", actual_root.join(&relative).display()))?;
+        if expected_bytes != actual_bytes {
+            return Err(format!(
+                "{} differs; run marketplace export-codex",
+                actual_root.join(&relative).display()
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn collect_tree_files(root: &Path) -> Result<Vec<PathBuf>, String> {
+    let mut files = Vec::new();
+    collect_tree_files_recursive(root, root, &mut files)?;
+    files.sort();
+    Ok(files)
+}
+
+fn collect_tree_files_recursive(
+    root: &Path,
+    directory: &Path,
+    files: &mut Vec<PathBuf>,
+) -> Result<(), String> {
+    for entry in
+        fs::read_dir(directory).map_err(|error| format!("read {}: {error}", directory.display()))?
+    {
+        let entry =
+            entry.map_err(|error| format!("read entry in {}: {error}", directory.display()))?;
+        let path = entry.path();
+        let file_type = entry
+            .file_type()
+            .map_err(|error| format!("inspect {}: {error}", path.display()))?;
+        if file_type.is_dir() {
+            collect_tree_files_recursive(root, &path, files)?;
+        } else if file_type.is_file() {
+            files.push(
+                path.strip_prefix(root)
+                    .map_err(|_| format!("{} escaped {}", path.display(), root.display()))?
+                    .to_path_buf(),
+            );
+        }
+    }
     Ok(())
 }
 
@@ -955,11 +1624,221 @@ struct MaterializedMarketplaceBinary {
     archive_path: String,
 }
 
+fn install_from_local_marketplace_artifact(
+    entry: &ElegyMarketplacePlugin,
+    manifest: &ElegyPluginV1,
+    artifact: &ElegyMarketplaceArtifact,
+    artifact_dir: &Path,
+    staging_root: &Path,
+) -> Result<(), String> {
+    let artifact_name = artifact_url_file_name(&artifact.url).ok_or_else(|| {
+        format!(
+            "plugin '{}' artifact URL has no file name: {}",
+            entry.name, artifact.url
+        )
+    })?;
+    let checksum_name = artifact_url_file_name(&artifact.checksum_url).ok_or_else(|| {
+        format!(
+            "plugin '{}' checksum URL has no file name: {}",
+            entry.name, artifact.checksum_url
+        )
+    })?;
+    let artifact_path = artifact_dir.join(artifact_name);
+    let checksum_path = artifact_dir.join(checksum_name);
+    let expected_sha = fs::read_to_string(&checksum_path)
+        .map_err(|error| format!("read {}: {error}", checksum_path.display()))
+        .and_then(|raw| {
+            parse_checksum_text(&raw).ok_or_else(|| {
+                format!(
+                    "{} does not contain a SHA-256 digest",
+                    checksum_path.display()
+                )
+            })
+        })?;
+    let actual_sha = file_sha256_hex(&artifact_path)?;
+    if actual_sha != expected_sha {
+        return Err(format!(
+            "plugin '{}' local artifact checksum mismatch for target '{}': expected {}, found {}",
+            entry.name, artifact.target, expected_sha, actual_sha
+        ));
+    }
+    install_from_archive_with_identity(
+        &artifact_path,
+        staging_root,
+        Some(&entry.name),
+        Some(&manifest.version),
+    )
+    .map_err(|error| {
+        format!(
+            "plugin '{}' local artifact materialization failed for target '{}': {error}",
+            entry.name, artifact.target
+        )
+    })?;
+    Ok(())
+}
+
+fn artifact_url_file_name(url: &str) -> Option<&str> {
+    url.rsplit('/').next().filter(|name| !name.is_empty())
+}
+
+fn file_sha256_hex(path: &Path) -> Result<String, String> {
+    let mut file =
+        fs::File::open(path).map_err(|error| format!("open {}: {error}", path.display()))?;
+    let mut hasher = Sha256::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let read = file
+            .read(&mut buffer)
+            .map_err(|error| format!("read {}: {error}", path.display()))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
+fn apply_external_wrapper_codex_projection(
+    manifest: &ElegyPluginV1,
+    installed_root: &Path,
+    target: &str,
+) -> Result<(), String> {
+    let Some(wrapper) = manifest
+        .extensions
+        .as_ref()
+        .and_then(|extensions| extensions.get("elegy.marketplace-wrapper/v1"))
+        .and_then(Value::as_object)
+    else {
+        return Ok(());
+    };
+    apply_external_wrapper_manifest_metadata(manifest, installed_root)?;
+    if !target.contains("windows") {
+        return Ok(());
+    }
+    let Some(windows_binary_name) = wrapper
+        .get("windowsBinaryName")
+        .and_then(Value::as_str)
+        .filter(|name| name.ends_with(".exe") && !name.contains('/') && !name.contains('\\'))
+    else {
+        return Ok(());
+    };
+
+    let bin_root = installed_root.join("bin");
+    let target_binary = bin_root.join(windows_binary_name);
+    if !target_binary.exists() {
+        let source_binary_name = windows_binary_name.trim_end_matches(".exe");
+        let source_binary = bin_root.join(source_binary_name);
+        if !source_binary.is_file() {
+            return Err(format!(
+                "plugin '{}' wrapper declares windowsBinaryName '{}', but {} is missing",
+                manifest.name,
+                windows_binary_name,
+                source_binary.display()
+            ));
+        }
+        fs::rename(&source_binary, &target_binary).map_err(|error| {
+            format!(
+                "rename {} to {}: {error}",
+                source_binary.display(),
+                target_binary.display()
+            )
+        })?;
+    }
+
+    let Some(rewrites) = wrapper
+        .get("windowsMcpCommandRewrites")
+        .and_then(Value::as_object)
+    else {
+        return Ok(());
+    };
+    let mcp_path = installed_root.join(".mcp.json");
+    if !mcp_path.is_file() {
+        return Ok(());
+    }
+    let raw = fs::read_to_string(&mcp_path)
+        .map_err(|error| format!("read {}: {error}", mcp_path.display()))?;
+    let mut value: Value = serde_json::from_str(&raw)
+        .map_err(|error| format!("parse {}: {error}", mcp_path.display()))?;
+    if let Some(servers) = value.get_mut("mcpServers").and_then(Value::as_object_mut) {
+        for config in servers.values_mut() {
+            let Some(command) = config.get("command").and_then(Value::as_str) else {
+                continue;
+            };
+            let Some(next) = rewrites.get(command).and_then(Value::as_str) else {
+                continue;
+            };
+            config["command"] = Value::String(next.to_string());
+        }
+    }
+    let mut rewritten = serde_json::to_string_pretty(&value).map_err(|error| error.to_string())?;
+    rewritten.push('\n');
+    fs::write(&mcp_path, rewritten)
+        .map_err(|error| format!("write {}: {error}", mcp_path.display()))?;
+    Ok(())
+}
+
+fn apply_external_wrapper_manifest_metadata(
+    wrapper_manifest: &ElegyPluginV1,
+    installed_root: &Path,
+) -> Result<(), String> {
+    let manifest_path = installed_root.join(".elegy-plugin").join("plugin.json");
+    let raw = fs::read_to_string(&manifest_path)
+        .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
+    let mut installed: Value = serde_json::from_str(&raw)
+        .map_err(|error| format!("parse {}: {error}", manifest_path.display()))?;
+    let wrapper_value =
+        serde_json::to_value(wrapper_manifest).map_err(|error| error.to_string())?;
+
+    for key in ["description", "author", "license", "repository"] {
+        if let Some(value) = wrapper_value.get(key) {
+            installed[key] = value.clone();
+        }
+    }
+    if let Some(wrapper_extensions) = wrapper_value.get("extensions").and_then(Value::as_object) {
+        let installed_extensions = installed
+            .as_object_mut()
+            .ok_or_else(|| format!("{} must contain a JSON object", manifest_path.display()))?
+            .entry("extensions")
+            .or_insert_with(|| json!({}));
+        let installed_extensions = installed_extensions
+            .as_object_mut()
+            .ok_or_else(|| format!("{} extensions must be an object", manifest_path.display()))?;
+        for (extension_name, wrapper_extension) in wrapper_extensions {
+            if extension_name == "codex.plugin/v1" {
+                let target_extension = installed_extensions
+                    .entry(extension_name.clone())
+                    .or_insert_with(|| json!({}));
+                let target_extension = target_extension.as_object_mut().ok_or_else(|| {
+                    format!(
+                        "{} extension '{}' must be an object",
+                        manifest_path.display(),
+                        extension_name
+                    )
+                })?;
+                if let Some(wrapper_object) = wrapper_extension.as_object() {
+                    for (key, value) in wrapper_object {
+                        target_extension.insert(key.clone(), value.clone());
+                    }
+                }
+            } else {
+                installed_extensions.insert(extension_name.clone(), wrapper_extension.clone());
+            }
+        }
+    }
+    let mut serialized =
+        serde_json::to_string_pretty(&installed).map_err(|error| error.to_string())?;
+    serialized.push('\n');
+    fs::write(&manifest_path, serialized)
+        .map_err(|error| format!("write {}: {error}", manifest_path.display()))?;
+    Ok(())
+}
+
 fn materialize_marketplace_artifact(
     entry: &ElegyMarketplacePlugin,
     manifest: &ElegyPluginV1,
     target: &str,
     staging_root: &Path,
+    artifact_dir: Option<&Path>,
 ) -> Result<Option<MaterializedMarketplaceArtifact>, String> {
     if entry.artifacts.is_empty() {
         return Ok(None);
@@ -970,48 +1849,59 @@ fn materialize_marketplace_artifact(
             entry.name, target
         )
     })?;
-    install_from_url(
-        &artifact.url,
-        &artifact.checksum_url,
-        staging_root,
-        Some(&entry.name),
-        Some(&manifest.version),
-    )
-    .map_err(|error| {
-        let message = error.to_string();
-        if message.contains("checksum HTTP 404") {
-            format!(
-                "plugin '{}' is missing the public checksum artifact for target '{}': {}",
-                entry.name, artifact.target, artifact.checksum_url
-            )
-        } else if message.contains("checksum HTTP") {
-            format!(
-                "plugin '{}' checksum download failed for target '{}': {} ({message})",
-                entry.name, artifact.target, artifact.checksum_url
-            )
-        } else if message.contains("Download failed: HTTP 404") {
-            format!(
-                "plugin '{}' is missing the public plugin artifact for target '{}': {}",
-                entry.name, artifact.target, artifact.url
-            )
-        } else if message.contains("Download failed: HTTP") {
-            format!(
-                "plugin '{}' artifact download failed for target '{}': {} ({message})",
-                entry.name, artifact.target, artifact.url
-            )
-        } else if message.contains("Checksum mismatch") {
-            format!(
-                "plugin '{}' checksum verification failed for target '{}': {message}",
-                entry.name, artifact.target
-            )
-        } else {
-            format!(
-                "plugin '{}' artifact materialization failed for target '{}': {message}",
-                entry.name, artifact.target
-            )
-        }
-    })?;
+    if let Some(artifact_dir) = artifact_dir {
+        install_from_local_marketplace_artifact(
+            entry,
+            manifest,
+            artifact,
+            artifact_dir,
+            staging_root,
+        )?;
+    } else {
+        install_from_url(
+            &artifact.url,
+            &artifact.checksum_url,
+            staging_root,
+            Some(&entry.name),
+            Some(&manifest.version),
+        )
+        .map_err(|error| {
+            let message = error.to_string();
+            if message.contains("checksum HTTP 404") {
+                format!(
+                    "plugin '{}' is missing the public checksum artifact for target '{}': {}",
+                    entry.name, artifact.target, artifact.checksum_url
+                )
+            } else if message.contains("checksum HTTP") {
+                format!(
+                    "plugin '{}' checksum download failed for target '{}': {} ({message})",
+                    entry.name, artifact.target, artifact.checksum_url
+                )
+            } else if message.contains("Download failed: HTTP 404") {
+                format!(
+                    "plugin '{}' is missing the public plugin artifact for target '{}': {}",
+                    entry.name, artifact.target, artifact.url
+                )
+            } else if message.contains("Download failed: HTTP") {
+                format!(
+                    "plugin '{}' artifact download failed for target '{}': {} ({message})",
+                    entry.name, artifact.target, artifact.url
+                )
+            } else if message.contains("Checksum mismatch") {
+                format!(
+                    "plugin '{}' checksum verification failed for target '{}': {message}",
+                    entry.name, artifact.target
+                )
+            } else {
+                format!(
+                    "plugin '{}' artifact materialization failed for target '{}': {message}",
+                    entry.name, artifact.target
+                )
+            }
+        })?;
+    }
     let installed_root = staging_root.join(&entry.name);
+    apply_external_wrapper_codex_projection(manifest, &installed_root, target)?;
     validate_target_mcp_commands(&installed_root, target)?;
     let bin_root = installed_root.join("bin");
     if !bin_root.is_dir() {
@@ -1156,6 +2046,10 @@ fn dirs_or_manual_home() -> PathBuf {
         .unwrap_or_else(|_| PathBuf::from("."))
 }
 
+fn default_plugin_install_root() -> PathBuf {
+    dirs_or_manual_home().join(".elegy").join("plugins")
+}
+
 fn plugin_requires_binary(plugin: &Path) -> bool {
     let Ok((repo_root, manifest_path)) = resolve_plugin_root(plugin) else {
         return false;
@@ -1188,6 +2082,142 @@ mod tests {
             .expect("system time")
             .as_nanos();
         std::env::temp_dir().join(format!("elegy-tooling-{name}-{nonce}"))
+    }
+
+    fn marketplace_fixture(version: &str) -> LoadedMarketplace {
+        let entry = ElegyMarketplacePlugin {
+            name: "demo-plugin".to_string(),
+            source: ElegyMarketplaceSource {
+                source: "local".to_string(),
+                path: "./plugins/demo-plugin".to_string(),
+            },
+            category: "Developer Tools".to_string(),
+            artifacts: vec![ElegyMarketplaceArtifact {
+                target: "x86_64-pc-windows-msvc".to_string(),
+                url: "https://example.com/demo-plugin.zip".to_string(),
+                checksum_url: "https://example.com/demo-plugin.zip.sha256".to_string(),
+            }],
+        };
+        let manifest = ElegyPluginV1 {
+            schema_version: "elegy-plugin/v1".to_string(),
+            name: "demo-plugin".to_string(),
+            version: version.to_string(),
+            description: "Demo plugin".to_string(),
+            ..Default::default()
+        };
+        LoadedMarketplace {
+            marketplace: ElegyMarketplaceV1 {
+                schema_version: ELEGY_MARKETPLACE_V1_SCHEMA_VERSION.to_string(),
+                name: "test-market".to_string(),
+                interface: None,
+                plugins: vec![entry.clone()],
+            },
+            plugins: vec![(entry, manifest)],
+            local_root: None,
+        }
+    }
+
+    fn write_installed_plugin(root: &Path, version: &str, artifact_sha256: &str) {
+        let install_dir = root.join("demo-plugin");
+        fs::create_dir_all(install_dir.join(".elegy-plugin"))
+            .expect("create installed manifest dir");
+        fs::write(
+            install_dir.join(".elegy-plugin").join("plugin.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "elegy-plugin/v1",
+                "name": "demo-plugin",
+                "version": version,
+                "description": "Demo plugin"
+            }))
+            .expect("serialize manifest"),
+        )
+        .expect("write installed manifest");
+        fs::write(
+            install_dir.join("install-receipt.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "elegy-installer/v1",
+                "name": "demo-plugin",
+                "version": version,
+                "installedAt": "2026-07-09T00:00:00Z",
+                "source": "https://example.com/demo-plugin.zip",
+                "installDir": install_dir.display().to_string(),
+                "artifactSha256": artifact_sha256,
+                "files": [".elegy-plugin/plugin.json"]
+            }))
+            .expect("serialize receipt"),
+        )
+        .expect("write receipt");
+    }
+
+    #[test]
+    fn old_install_receipts_parse_without_new_metadata() {
+        let raw = r#"{
+            "schemaVersion": "elegy-installer/v1",
+            "name": "legacy-plugin",
+            "version": "0.1.0",
+            "installedAt": "2026-07-09T00:00:00Z",
+            "source": "legacy.zip",
+            "installDir": "/tmp/legacy-plugin",
+            "files": [".elegy-plugin/plugin.json"]
+        }"#;
+        let receipt: InstallReceipt = serde_json::from_str(raw).expect("parse old receipt");
+        assert_eq!(receipt.name, "legacy-plugin");
+        assert_eq!(receipt.target, None);
+        assert_eq!(receipt.artifact_sha256, None);
+    }
+
+    #[test]
+    fn marketplace_status_reports_not_installed_current_and_stale() {
+        let checksum = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+        let loaded = marketplace_fixture("0.1.0");
+        let missing_root = temp_dir("status-not-installed");
+        fs::create_dir_all(&missing_root).expect("create root");
+        let records = build_marketplace_status_records(
+            &loaded,
+            ".",
+            Some("demo-plugin"),
+            "x86_64-pc-windows-msvc",
+            &missing_root,
+            &|_| Ok(checksum.to_string()),
+        )
+        .expect("status records");
+        assert_eq!(records[0].status, MarketplaceFreshnessStatus::NotInstalled);
+
+        let current_root = temp_dir("status-current");
+        fs::create_dir_all(&current_root).expect("create current root");
+        write_installed_plugin(&current_root, "0.1.0", checksum);
+        let records = build_marketplace_status_records(
+            &loaded,
+            ".",
+            Some("demo-plugin"),
+            "x86_64-pc-windows-msvc",
+            &current_root,
+            &|_| Ok(checksum.to_string()),
+        )
+        .expect("current status records");
+        assert_eq!(records[0].status, MarketplaceFreshnessStatus::Current);
+
+        let stale_root = temp_dir("status-stale");
+        fs::create_dir_all(&stale_root).expect("create stale root");
+        write_installed_plugin(
+            &stale_root,
+            "0.1.0",
+            "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        );
+        let records = build_marketplace_status_records(
+            &loaded,
+            ".",
+            Some("demo-plugin"),
+            "x86_64-pc-windows-msvc",
+            &stale_root,
+            &|_| Ok(checksum.to_string()),
+        )
+        .expect("stale status records");
+        assert_eq!(records[0].status, MarketplaceFreshnessStatus::Stale);
+
+        let _ = fs::remove_dir_all(missing_root);
+        let _ = fs::remove_dir_all(current_root);
+        let _ = fs::remove_dir_all(stale_root);
     }
 
     #[test]
@@ -1227,6 +2257,81 @@ mod tests {
         .expect("write mcp config");
 
         validate_target_mcp_commands(&root, "x86_64-pc-windows-msvc").expect("valid mcp config");
+        let _ = fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn external_wrapper_projection_declares_windows_binary_and_mcp_rewrite() {
+        let root = temp_dir("wrapper-windows-projection");
+        fs::create_dir_all(root.join(".elegy-plugin")).expect("create manifest dir");
+        fs::create_dir_all(root.join("bin")).expect("create bin dir");
+        fs::write(root.join("bin").join("demo-plugin"), b"binary").expect("write binary");
+        fs::write(
+            root.join(".mcp.json"),
+            r#"{"mcpServers":{"demo-plugin":{"command":"./bin/demo-plugin","args":["mcp","serve"]}}}"#,
+        )
+        .expect("write mcp config");
+        fs::write(
+            root.join(".elegy-plugin").join("plugin.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "elegy-plugin/v1",
+                "name": "demo-plugin",
+                "version": "0.1.0",
+                "description": "Runtime manifest",
+                "extensions": {
+                    "codex.plugin/v1": {
+                        "schemaVersion": "codex.plugin/v1",
+                        "mcpServers": "./.mcp.json"
+                    }
+                }
+            }))
+            .expect("serialize runtime manifest"),
+        )
+        .expect("write runtime manifest");
+        let mut wrapper = ElegyPluginV1 {
+            schema_version: "elegy-plugin/v1".to_string(),
+            name: "demo-plugin".to_string(),
+            version: "0.1.0".to_string(),
+            description: "Wrapper manifest".to_string(),
+            ..Default::default()
+        };
+        wrapper.extensions = Some(
+            serde_json::from_value(json!({
+                "elegy.marketplace-wrapper/v1": {
+                    "schemaVersion": "elegy.marketplace-wrapper/v1",
+                    "windowsBinaryName": "demo-plugin.exe",
+                    "windowsMcpCommandRewrites": {
+                        "./bin/demo-plugin": "./bin/demo-plugin.exe"
+                    }
+                },
+                "codex.plugin/v1": {
+                    "schemaVersion": "codex.plugin/v1",
+                    "interface": {
+                        "displayName": "Demo",
+                        "shortDescription": "Demo",
+                        "longDescription": "Demo plugin",
+                        "developerName": "Elegy Contributors",
+                        "category": "Developer Tools",
+                        "capabilities": ["Read"],
+                        "defaultPrompt": ["Use demo."]
+                    }
+                }
+            }))
+            .expect("extensions value"),
+        );
+
+        apply_external_wrapper_codex_projection(&wrapper, &root, "x86_64-pc-windows-msvc")
+            .expect("apply projection");
+        validate_target_mcp_commands(&root, "x86_64-pc-windows-msvc")
+            .expect("rewritten mcp config is valid");
+
+        assert!(root.join("bin").join("demo-plugin.exe").is_file());
+        let mcp_raw = fs::read_to_string(root.join(".mcp.json")).expect("read mcp");
+        assert!(mcp_raw.contains("./bin/demo-plugin.exe"));
+        let manifest_raw = fs::read_to_string(root.join(".elegy-plugin").join("plugin.json"))
+            .expect("read manifest");
+        assert!(manifest_raw.contains("Wrapper manifest"));
+        assert!(manifest_raw.contains("mcpServers"));
         let _ = fs::remove_dir_all(root);
     }
 }

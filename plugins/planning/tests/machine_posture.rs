@@ -82,6 +82,40 @@ fn capabilities_reports_lease_contract_without_initializing_a_database() {
 }
 
 #[test]
+fn version_reports_plugin_metadata_without_initializing_a_database() {
+    let temp_dir = unique_temp_dir("elegy-planning-version");
+    let db_path = temp_dir.join("missing-parent").join("planning.db");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db_path.to_str().expect("utf-8 db path"),
+            "--json",
+            "version",
+        ])
+        .output()
+        .expect("run elegy-planning version");
+
+    assert!(
+        output.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(!db_path.exists(), "version must not initialize storage");
+
+    let envelope: Value =
+        serde_json::from_slice(&output.stdout).expect("stdout should be valid json");
+    assert_eq!(envelope["schemaVersion"], "planning-result/v1");
+    assert_eq!(envelope["command"], serde_json::json!(["version"]));
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["data"]["plugin"], "elegy-planning");
+    assert!(envelope["data"]["capabilityDigest"]
+        .as_str()
+        .expect("capability digest")
+        .starts_with("sha256:"));
+}
+
+#[test]
 fn goal_create_supports_machine_flags_and_correlation_id() {
     let temp_dir = unique_temp_dir("elegy-planning-machine-goal");
     let db_path = temp_dir.join("planning.db");

@@ -16,7 +16,35 @@ pub struct InstallReceipt {
     pub installed_at: String,
     pub source: String,
     pub install_dir: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketplace_name: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub marketplace_source: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub checksum_url: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub artifact_sha256: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub manifest_version: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_digest: Option<String>,
     pub files: Vec<String>,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct InstallReceiptMetadata {
+    pub target: Option<String>,
+    pub marketplace_name: Option<String>,
+    pub marketplace_source: Option<String>,
+    pub artifact_url: Option<String>,
+    pub checksum_url: Option<String>,
+    pub artifact_sha256: Option<String>,
+    pub manifest_version: Option<String>,
+    pub capability_digest: Option<String>,
 }
 
 /// Error type for installation failures.
@@ -97,6 +125,7 @@ pub fn install_from_archive_with_identity(
         expected_name,
         expected_version,
         None,
+        InstallReceiptMetadata::default(),
     )
 }
 
@@ -106,6 +135,7 @@ fn install_from_archive_with_identity_and_source(
     expected_name: Option<&str>,
     expected_version: Option<&str>,
     source_override: Option<&str>,
+    metadata: InstallReceiptMetadata,
 ) -> Result<InstallReceipt, InstallError> {
     let file = fs::File::open(archive_path)?;
     let mut archive = zip::ZipArchive::new(file)?;
@@ -227,6 +257,16 @@ fn install_from_archive_with_identity_and_source(
             .map(str::to_string)
             .unwrap_or_else(|| archive_path.display().to_string()),
         install_dir: install_dir.display().to_string(),
+        target: metadata.target,
+        marketplace_name: metadata.marketplace_name,
+        marketplace_source: metadata.marketplace_source,
+        artifact_url: metadata.artifact_url,
+        checksum_url: metadata.checksum_url,
+        artifact_sha256: metadata.artifact_sha256,
+        manifest_version: metadata
+            .manifest_version
+            .or_else(|| Some(manifest.version.clone())),
+        capability_digest: metadata.capability_digest,
         files: installed_files,
     };
 
@@ -247,6 +287,24 @@ pub fn install_from_url(
     expected_name: Option<&str>,
     expected_version: Option<&str>,
 ) -> Result<InstallReceipt, InstallError> {
+    install_from_url_with_metadata(
+        url,
+        checksum_url,
+        install_root,
+        expected_name,
+        expected_version,
+        InstallReceiptMetadata::default(),
+    )
+}
+
+pub fn install_from_url_with_metadata(
+    url: &str,
+    checksum_url: &str,
+    install_root: &Path,
+    expected_name: Option<&str>,
+    expected_version: Option<&str>,
+    mut metadata: InstallReceiptMetadata,
+) -> Result<InstallReceipt, InstallError> {
     let checksum_response = reqwest::blocking::get(checksum_url)
         .map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
     if !checksum_response.status().is_success() {
@@ -266,6 +324,15 @@ pub fn install_from_url(
             InstallError::DownloadFailed("checksum response is not a SHA-256 digest".to_string())
         })?
         .to_ascii_lowercase();
+    if metadata.artifact_sha256.is_none() {
+        metadata.artifact_sha256 = Some(expected_checksum.clone());
+    }
+    if metadata.artifact_url.is_none() {
+        metadata.artifact_url = Some(url.to_string());
+    }
+    if metadata.checksum_url.is_none() {
+        metadata.checksum_url = Some(checksum_url.to_string());
+    }
 
     let response =
         reqwest::blocking::get(url).map_err(|e| InstallError::DownloadFailed(e.to_string()))?;
@@ -289,6 +356,7 @@ pub fn install_from_url(
         expected_name,
         expected_version,
         Some(url),
+        metadata,
     )
 }
 

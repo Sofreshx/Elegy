@@ -34,6 +34,10 @@ This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is
 # Install as a plugin package (primary lane)
 elegy-plugin-packaging install --archive elegy-planning-plugin-<target>.zip
 
+# Check or update the installed marketplace plugin
+elegy-plugin-packaging marketplace status --source . --plugin elegy-planning --json
+elegy-plugin-packaging marketplace update elegy-planning --source . --json
+
 # Export for Codex host (derived lane)
 elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
@@ -43,6 +47,7 @@ elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./
 ```bash
 cargo build -p elegy-planning
 cargo run -p elegy-planning -- --help
+cargo run -p elegy-planning -- --json version
 ```
 
 ## Validation
