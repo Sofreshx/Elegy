@@ -193,6 +193,33 @@ jobs:
           path: artifacts/distribution
           merge-multiple: true
 
+      - name: Download published external wrapper assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF:-}" == refs/tags/v* ]]; then
+            release_tag="${GITHUB_REF_NAME}"
+          else
+            release_tag="main-snapshot"
+          fi
+
+          mapfile -t wrapper_prefixes < <(
+            jq -r '.surfaces[]
+              | select(.kind == "external-plugin-wrapper" and (.marketplacePublished // true))
+              | .name + "-plugin-"' distribution/surfaces.json
+          )
+
+          for prefix in "${wrapper_prefixes[@]}"; do
+            gh release download "${release_tag}" \
+              --repo "${GITHUB_REPOSITORY}" \
+              --pattern "${prefix}*.zip" \
+              --pattern "${prefix}*.zip.sha256" \
+              --dir artifacts/distribution \
+              --clobber
+          done
+
       - name: Generate Codex marketplace projections
         shell: bash
         run: |
