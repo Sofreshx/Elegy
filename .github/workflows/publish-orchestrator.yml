@@ -211,13 +211,20 @@ jobs:
               | .name + "-plugin-"' distribution/surfaces.json
           )
 
+          asset_names="$(gh release view "${release_tag}" --repo "${GITHUB_REPOSITORY}" --json assets --jq '.assets[].name')"
           for prefix in "${wrapper_prefixes[@]}"; do
-            gh release download "${release_tag}" \
-              --repo "${GITHUB_REPOSITORY}" \
-              --pattern "${prefix}*.zip" \
-              --pattern "${prefix}*.zip.sha256" \
-              --dir artifacts/distribution \
-              --clobber
+            mapfile -t matches < <(printf '%s\n' "${asset_names}" | grep -E "^${prefix}.*\.zip(\.sha256)?$" || true)
+            if [[ "${#matches[@]}" -eq 0 ]]; then
+              echo "No published assets found for external wrapper prefix '${prefix}' in release '${release_tag}'." >&2
+              exit 1
+            fi
+            for asset_name in "${matches[@]}"; do
+              gh release download "${release_tag}" \
+                --repo "${GITHUB_REPOSITORY}" \
+                --pattern "${asset_name}" \
+                --dir artifacts/distribution \
+                --clobber
+            done
           done
 
       - name: Generate Codex marketplace projections
