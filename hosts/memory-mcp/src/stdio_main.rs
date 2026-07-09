@@ -3,7 +3,7 @@ use std::{env, path::PathBuf, sync::Arc, time::Duration};
 use anyhow::{bail, Context};
 use elegy_memory::{EmbeddingProvider, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
 use elegy_memory_mcp::{
-    memory_tools::{MemoryBinding, MemoryRepository, DEFAULT_NAMESPACE},
+    memory_tools::{MemoryBinding, MemoryRepository},
     server::{ElegyMemoryMcpServer, NoopWriteAuditor, WriteAuditor},
 };
 use reqwest::Client;
@@ -122,7 +122,7 @@ fn build_stdio_runtime_with_bootstrap(
     config: &StdioConfig,
     embedding_bootstrap: StdioEmbeddingBootstrap,
 ) -> anyhow::Result<StdioServerRuntime> {
-    let binding = MemoryBinding::new(DEFAULT_NAMESPACE, &config.agent_id)
+    let binding = MemoryBinding::new(&config.agent_id, &config.agent_id)
         .context("configuring stdio memory binding")?;
     let memory_repository = Arc::new(match embedding_bootstrap {
         StdioEmbeddingBootstrap::ProviderBacked(embedding_provider) => {
@@ -383,7 +383,7 @@ mod tests {
         )
         .expect("stdio runtime should build");
 
-        assert_eq!(runtime.memory_repository.namespace(), DEFAULT_NAMESPACE);
+        assert_eq!(runtime.memory_repository.namespace(), "stdio-test-agent");
         assert_eq!(runtime.memory_repository.agent_id(), "stdio-test-agent");
 
         let (server_transport, client_transport) = tokio::io::duplex(4096);
@@ -415,6 +415,54 @@ mod tests {
 
         assert_eq!(tool_names.len(), EXPECTED_TOOL_NAMES.len());
         assert_eq!(tool_names, expected_tool_names);
+
+        client_service.cancel().await.expect("client should cancel");
+        server_task.await.expect("server task should join");
+    }
+
+    #[tokio::test]
+    async fn stdio_fallback_namespace_is_default_agent_when_elegy_mcp_agent_id_is_unset() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        std::fs::write(&db_path, b"").expect("db placeholder should write");
+        let config = StdioConfig {
+            db_path,
+            agent_id: DEFAULT_AGENT_ID.to_string(),
+            ollama_url: DEFAULT_OLLAMA_URL.to_string(),
+            embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
+            allow_no_embeddings: true,
+        };
+        let runtime = build_stdio_runtime_with_bootstrap(
+            &config,
+            StdioEmbeddingBootstrap::DisabledNoProvider,
+        )
+        .expect("stdio runtime should build with degraded mode");
+
+        assert_eq!(runtime.memory_repository.namespace(), DEFAULT_AGENT_ID);
+        assert_eq!(runtime.memory_repository.agent_id(), DEFAULT_AGENT_ID);
+
+        let (server_transport, client_transport) = tokio::io::duplex(4096);
+        let server_task = tokio::spawn(async move {
+            let service = runtime
+                .server
+                .serve(server_transport)
+                .await
+                .expect("server should initialize");
+            service.waiting().await.expect("server should run cleanly");
+        });
+
+        let client_service = TestClient
+            .serve(client_transport)
+            .await
+            .expect("client should initialize");
+        let tool_names = client_service
+            .list_all_tools()
+            .await
+            .expect("client should list tools")
+            .into_iter()
+            .map(|tool| tool.name)
+            .collect::<Vec<_>>();
+        assert_eq!(tool_names.len(), EXPECTED_TOOL_NAMES.len());
 
         client_service.cancel().await.expect("client should cancel");
         server_task.await.expect("server task should join");
