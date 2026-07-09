@@ -1,8 +1,15 @@
-# Agent-Ready Repo Pack Demo — Elegy Repo
+---
+title: Agent-Ready Repo Pack Demo
+status: active
+owner: Elegy
+doc_kind: generated
+---
+
+# Agent-Ready Repo Pack Demo - Elegy Repo
 
 **Generated:** 2026-07-08
 **Tool:** elegy-checks v0.1.0
-**Repo:** C:\Users\lolzi\Documents\GitHub\Elegy
+**Repo:** Sofreshx/Elegy
 
 ## Before
 

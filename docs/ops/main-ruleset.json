@@ -39,8 +39,7 @@
           { "context": "Security / gitleaks" },
           { "context": "Security / codeql" },
           { "context": "Repo Boundaries (package-boundaries compatibility name) / validate-package-boundaries" },
-          { "context": "WS3 Governance (formalization compatibility name) / ws3-governance" },
-          { "context": "Crate Verify / verify" }
+          { "context": "WS3 Governance (formalization compatibility name) / ws3-governance" }
         ]
       }
     }

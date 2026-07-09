@@ -55,14 +55,16 @@ Add each of these exact `context` names:
 | `Security / codeql` | security.yml |
 | `Repo Boundaries (package-boundaries compatibility name) / validate-package-boundaries` | package-boundaries.yml |
 | `WS3 Governance (formalization compatibility name) / ws3-governance` | ws3-formalization-governance.yml |
-| `Crate Verify / verify` | publish-crate.yml |
 
 Note: the context names include historical compatibility suffixes (e.g. `(package-boundaries compatibility name)`, `(formalization compatibility name)`). These match the `name:` field in the workflow YAML.
 
 Distribution Artifacts jobs are intentionally NOT listed as required — they are heavyweight (matrix × 21) and not release-critical. They run and log but do not gate PR merge.
+`Crate Verify` is also not listed as required while the crates.io gate is
+disabled or advisory. Keep it as a manual smoke test unless crates.io publishing
+is reactivated.
 
 ### Effect after application
 
-- All PRs into `main` must pass the 13 listed checks before the merge button enables.
+- All PRs into `main` must pass the 12 listed checks before the merge button enables.
 - No direct push to `main` — only reviewed, CI-green PRs.
 - Force pushes to `main` are impossible.

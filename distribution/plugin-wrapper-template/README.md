@@ -11,6 +11,10 @@ artifacts or an external service.
 3. Add the plugin to `distribution/surfaces.json`
 4. Regenerate `.elegy/marketplace.json`
 
+Set `"marketplacePublished": false` until public archives and `.sha256`
+sidecars exist. Draft wrappers stay in source, but they are omitted from the
+generated installable marketplace.
+
 ## Directory structure
 
 ```
@@ -60,6 +64,7 @@ Add one packaged surface to `distribution/surfaces.json`:
   "packaging": "plugin",
   "pluginRoot": "marketplace-wrappers/my-plugin",
   "artifactBaseUrl": "https://github.com/org/private-plugin/releases/download",
+  "marketplacePublished": false,
   "marketplaceCategory": "Developer Tools",
   "description": "Short user-facing capability summary."
 }

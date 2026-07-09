@@ -37,8 +37,10 @@ stability promise.
 | --- | --- | --- |
 | Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
 | Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
-| Plugin archive | `<name>-v<version>.plugin.zip` | Primary release for plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
-| CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in .plugin.zip. |
+| Plugin archive | `<surface>-plugin-<target>.zip` | Primary release for binary-backed plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
+| Skill-only plugin archive | `<surface>-plugin-any.zip` | Primary release for skill-only plugin packages. Contains plugin.json and skills/, with no `bin/`. |
+| Local pack default | `<plugin-name>-v<version>.plugin.zip` | Ad hoc output from `elegy-plugin-packaging pack` when `--output` is omitted. Not the GitHub release naming contract. |
+| CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in plugin archives. |
 | CLI asset checksum | `<name>-<target>[.exe].sha256` | Sidecar checksum used by the installer. |
 
 ## Surface Catalog
@@ -72,12 +74,16 @@ marketplace target under the release tag used by the generated index.
 For the public Elegy marketplace, those assets live on the public Elegy release
 even when the producing source repository is private.
 
+External wrapper surfaces may set `marketplacePublished: false` while archives
+are not yet public. Draft wrappers stay in source, but the generated
+marketplace omits them until the public archives exist.
+
 ## Install
 
 Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
 
 ```bash
-elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
+elegy-plugin-packaging install --archive elegy-planning-plugin-x86_64-pc-windows-msvc.zip
 ```
 
 Non-plugin surfaces install via `scripts/install-distribution.sh`:
@@ -115,7 +121,7 @@ To install a surface, the surface must exist in the release assets and have a pu
 - Do not hard-code sibling checkout paths or assume a shared parent workspace layout.
 - Keep any host-specific runtime/bootstrap behavior in the consuming repository. Elegy owns the contracts, the binaries, and the generic installer; the consuming repo owns product wiring.
 - Use `cargo add elegy-plugin-sdk` for external plugin repos that need plugin types, validation, packaging, and export.
-- Prefer `.plugin.zip` archives over flat binaries for plugin-packaged surfaces. The archive carries the manifest, skills, and built binary in a single verifiable artifact.
+- Prefer plugin archives over flat binaries for plugin-packaged surfaces. Binary-backed archives carry the manifest, skills, and built binary in a single verifiable artifact. Skill-only archives use `target: "any"` and omit `bin/`.
 - Do not reintroduce NuGet or GitHub Packages as the primary downstream lane.
 - Treat the rolling `main-snapshot` prerelease as an integration/debug lane, not a pinned downstream contract.
 

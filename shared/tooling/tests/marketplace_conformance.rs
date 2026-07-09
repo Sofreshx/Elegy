@@ -25,6 +25,12 @@ struct DistributionSurface {
     packaging: Option<String>,
     #[serde(default)]
     plugin_root: Option<String>,
+    #[serde(default = "default_marketplace_published")]
+    marketplace_published: bool,
+}
+
+fn default_marketplace_published() -> bool {
+    true
 }
 
 fn repo_root() -> PathBuf {
@@ -96,7 +102,9 @@ fn generated_marketplace_matches_packaged_surfaces() {
     let expected: BTreeMap<String, String> = surfaces
         .surfaces
         .into_iter()
-        .filter(|surface| surface.packaging.as_deref() == Some("plugin"))
+        .filter(|surface| {
+            surface.packaging.as_deref() == Some("plugin") && surface.marketplace_published
+        })
         .map(|surface| {
             let plugin_root = surface
                 .plugin_root

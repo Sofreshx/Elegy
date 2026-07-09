@@ -20,7 +20,8 @@ This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is
 
 ## Distribution shape
 
-- **Plugin archive:** `elegy-documentation-v<version>.plugin.zip` (primary release contract)
+- **Release plugin archive:** `elegy-documentation-plugin-<target>.zip` (primary GitHub release and marketplace contract)
+- **Local pack default:** `elegy-documentation-v<version>.plugin.zip` (ad hoc output when `pack --output` is omitted)
 - **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
 - **Versioning:** follows workspace `version`.
 
@@ -28,7 +29,7 @@ This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is
 
 ```bash
 # Install as a plugin package (primary lane)
-elegy-plugin-packaging install --archive elegy-documentation-v<version>.plugin.zip
+elegy-plugin-packaging install --archive elegy-documentation-plugin-<target>.zip
 
 # Export for Codex host (derived lane)
 elegy-plugin-packaging export --plugin plugins/documentation --host codex --output ./export

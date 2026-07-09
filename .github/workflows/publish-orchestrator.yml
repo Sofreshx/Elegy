@@ -27,9 +27,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter") | {surface_name: .name, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter" or .kind == "skill-package") | {surface_name: .name, surface_kind: .kind, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // "")}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
-          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $targets[] as $target | $surfaces[] | . + $target ]')"
+          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $surfaces[] as $surface | if $surface.surface_kind == "skill-package" then $surface + {runner:"ubuntu-24.04",target:"any"} else ($targets[] as $target | $surface + $target) end ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   build:
@@ -53,6 +53,7 @@ jobs:
           workspaces: . -> target
 
       - name: cargo build --release
+        if: ${{ matrix.surface_kind != 'skill-package' }}
         working-directory: .
         run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_package }}
 
@@ -68,7 +69,7 @@ jobs:
           fi
           binary_name="${{ matrix.surface_name }}${ext}"
           binary_path="target/${{ matrix.target }}/release/${binary_name}"
-          if [[ ! -f "$binary_path" ]]; then
+          if [[ "${{ matrix.surface_kind }}" != "skill-package" && ! -f "$binary_path" ]]; then
             echo "Missing build output: $binary_path" >&2
             exit 1
           fi
@@ -80,12 +81,19 @@ jobs:
             fi
             asset_name="${{ matrix.surface_name }}-plugin-${{ matrix.target }}.zip"
             asset_path="artifacts/distribution/${asset_name}"
-            cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
-              pack \
-              --plugin "$plugin_root" \
-              --output "$asset_path" \
-              --binary "$binary_path" \
-              --binary-name "bin/${binary_name}"
+            if [[ "${{ matrix.surface_kind }}" == "skill-package" ]]; then
+              cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
+                pack \
+                --plugin "$plugin_root" \
+                --output "$asset_path"
+            else
+              cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
+                pack \
+                --plugin "$plugin_root" \
+                --output "$asset_path" \
+                --binary "$binary_path" \
+                --binary-name "bin/${binary_name}"
+            fi
           else
             asset_name="${{ matrix.surface_name }}-${{ matrix.target }}${ext}"
             asset_path="artifacts/distribution/${asset_name}"
@@ -238,16 +246,18 @@ jobs:
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
-            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
+            elif [[ "$base" =~ ^(.+)-plugin-(any|x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin") and .name == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin" or .kind == "skill-package" or (.kind == "external-plugin-wrapper" and (.marketplacePublished // true))) and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
                 exit 1
               fi
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
-              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+              if [[ "$target" != "any" ]]; then
+                published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+              fi
             elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
@@ -307,7 +317,7 @@ jobs:
           set -euo pipefail
           release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
           mapfile -t external_plugin_prefixes < <(
-            jq -r '.surfaces[] | select(.kind == "external-plugin-wrapper") | .name + "-plugin-"' distribution/surfaces.json
+            jq -r '.surfaces[] | select(.kind == "external-plugin-wrapper" and (.marketplacePublished // true)) | .name + "-plugin-"' distribution/surfaces.json
           )
           while IFS=$'\t' read -r asset_id asset_name; do
             preserve_external=false
@@ -332,3 +342,32 @@ jobs:
           )
           mapfile -t assets < <(find artifacts/distribution -maxdepth 1 -type f \( -name '*.zip' -o -name '*.sha256' -o -name 'elegy-*-x86_64-unknown-linux-gnu' -o -name 'elegy-*-aarch64-apple-darwin' -o -name 'elegy-*-x86_64-pc-windows-msvc.exe' -o -name 'elegy-release-*.json' \) | sort)
           gh release upload "${RELEASE_TAG}" "${assets[@]}" --clobber
+
+      - name: Validate marketplace release assets
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mapfile -t expected < <(
+            jq -r --arg tag "$RELEASE_TAG" '
+              .plugins[].artifacts[]
+              | select((.url | contains("/" + $tag + "/")) and (.checksumUrl | contains("/" + $tag + "/")))
+              | (.url | split("/")[-1]), (.checksumUrl | split("/")[-1])
+            ' .elegy/marketplace.json | sort -u
+          )
+          mapfile -t actual < <(
+            gh release view "$RELEASE_TAG" --json assets --jq '.assets[].name' | sort -u
+          )
+          missing=()
+          for name in "${expected[@]}"; do
+            if ! printf '%s\n' "${actual[@]}" | grep -Fxq "$name"; then
+              missing+=("$name")
+            fi
+          done
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            printf 'Missing marketplace release assets for %s:\n' "$RELEASE_TAG" >&2
+            printf '  %s\n' "${missing[@]}" >&2
+            exit 1
+          fi

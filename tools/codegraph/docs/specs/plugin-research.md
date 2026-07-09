@@ -253,7 +253,7 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 
 1. The spec documents a concrete TypeScript extractor strategy (Compiler API) with known gaps.
 2. The spec documents a concrete Rust extractor strategy (tree-sitter + cargo metadata + SCIP) with known gaps.
-3. A prototype can index at least one TypeScript fixture repo and one Rust fixture repo for files, modules, symbols, imports/exports, and test/doc links (validated by `rust/tests/fixtures/ts-mini/` and `rust/tests/fixtures/rust-mini/`).
+3. A prototype can index at least one TypeScript fixture repo and one Rust fixture repo for files, modules, symbols, imports/exports, and test/doc links (validated by `tools/codegraph/tests/fixtures/ts-mini/` and `tools/codegraph/tests/fixtures/rust-mini/`).
 4. Query results include `provenance` and `confidence` on every record; absent fields are a validation failure.
 5. The plugin boundary stays host-neutral: no host imports in the `elegy-codegraph` crate; CLI emits JSON only.
 6. A governed contract artifact exists at `tools/codegraph/src/ir.rs` with a validating example fixture at `tools/codegraph/fixtures/elegy-codegraph.graph.v0.example.json`.
@@ -270,7 +270,7 @@ Non-zero exit code + JSON error on not-found. Agents consume via the standard CL
 ## Validation Evidence
 
 - **Extractor strategies:** Concrete TS and Rust strategies documented above with known gaps explicitly listed. ✅
-- **Fixture repos:** `rust/tests/fixtures/ts-mini/` and `rust/tests/fixtures/rust-mini/` committed in-tree with expected graph snapshots. ✅
+- **Fixture repos:** `tools/codegraph/tests/fixtures/ts-mini/` and `tools/codegraph/tests/fixtures/rust-mini/` committed in-tree with expected graph snapshots. ✅
 - **Integration tests:** `cargo test -p elegy-codegraph` — **46 tests pass** (32 unit + 14 integration). Exercises extract + query against both fixtures through both the library API and the CLI binary (`CARGO_BIN_EXE_elegy-codegraph`); asserts entity counts, expected kinds, tests edges, provenance presence, error envelopes, snapshot idempotency, and TS --use-scip warning. ✅
 - **Contract validation:** `tools/codegraph/fixtures/elegy-codegraph.graph.v0.example.json` validates against `tools/codegraph/src/ir.rs` via the `ir::tests::round_trip_contract_fixture` test. ✅
 - **Design decisions:** All architectural choices (redb over sled, SCIP over LSP, locked enums) documented in the Design Decisions section with rationale and alternatives considered. ✅

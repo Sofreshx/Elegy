@@ -174,6 +174,8 @@ struct DistributionSurface {
     plugin_root: Option<String>,
     #[serde(default)]
     artifact_base_url: Option<String>,
+    #[serde(default = "default_marketplace_published")]
+    marketplace_published: bool,
     #[serde(default = "default_marketplace_category")]
     marketplace_category: String,
 }
@@ -496,6 +498,10 @@ fn default_marketplace_category() -> String {
     "Developer Tools".to_string()
 }
 
+fn default_marketplace_published() -> bool {
+    true
+}
+
 fn generate_marketplace(
     project: &Path,
     output: &Path,
@@ -524,6 +530,9 @@ fn generate_marketplace(
         .into_iter()
         .filter(is_plugin_packaged_surface)
     {
+        if !surface.marketplace_published {
+            continue;
+        }
         let plugin_root = surface
             .plugin_root
             .ok_or_else(|| format!("surface '{}' is missing pluginRoot", surface.name))?;
@@ -554,13 +563,18 @@ fn generate_marketplace(
             .as_deref()
             .unwrap_or(base)
             .trim_end_matches('/');
-        let artifacts = targets
-            .iter()
+        let artifact_targets = if surface.kind == "skill-package" {
+            vec!["any"]
+        } else {
+            targets.to_vec()
+        };
+        let artifacts = artifact_targets
+            .into_iter()
             .map(|target| {
                 let file_name = format!("{}-plugin-{target}.zip", surface.name);
                 let url = format!("{artifact_base}/{release_tag}/{file_name}");
                 ElegyMarketplaceArtifact {
-                    target: (*target).to_string(),
+                    target: target.to_string(),
                     checksum_url: format!("{url}.sha256"),
                     url,
                 }
@@ -600,7 +614,7 @@ fn generate_marketplace(
     if check {
         let actual = fs::read_to_string(&output_path)
             .map_err(|error| format!("read {}: {error}", output_path.display()))?;
-        if actual != expected {
+        if !generated_content_matches(&actual, &expected) {
             return Err(format!(
                 "{} is stale; run marketplace generate",
                 output_path.display()
@@ -628,6 +642,10 @@ fn is_plugin_packaged_surface(surface: &DistributionSurface) -> bool {
         surface.kind.as_str(),
         "bundled-plugin" | "skill-package" | "external-plugin-wrapper" | "cli"
     )
+}
+
+fn generated_content_matches(actual: &str, expected: &str) -> bool {
+    actual.replace("\r\n", "\n") == expected
 }
 
 fn load_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
