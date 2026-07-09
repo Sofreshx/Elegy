@@ -47,11 +47,13 @@ Published targets:
 - `x86_64-unknown-linux-gnu`
 - `aarch64-apple-darwin`
 
-Plugin-packaged surfaces ship as portable `.plugin.zip` archives. Use
-`elegy-plugin-packaging` to install or export them.
+Plugin-packaged surfaces ship as portable release archives named
+`<surface>-plugin-<target>.zip`. Skill-only packages use
+`<surface>-plugin-any.zip`. Use `elegy-plugin-packaging` to install or export
+them.
 
 ```bash
-elegy-plugin-packaging install --archive elegy-planning-v0.1.0.plugin.zip
+elegy-plugin-packaging install --archive elegy-planning-plugin-x86_64-pc-windows-msvc.zip
 elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
 ```
 

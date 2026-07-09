@@ -1,7 +1,7 @@
 # Migration Framework
 
-- **Source of truth:** `rust/crates/elegy-memory/src/storage/schema.rs`,
-  `rust/crates/elegy-memory/src/storage/sqlite_store.rs`,
+- **Source of truth:** `plugins/memory/src/storage/schema.rs`,
+  `plugins/memory/src/storage/sqlite_store.rs`,
   `FLIGHT_RECORDER.md` (WU15, WU16, WU17)
 - **Last reviewed:** 2026-06-15
 

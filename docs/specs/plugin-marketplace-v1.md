@@ -43,6 +43,10 @@ Rules:
 - The archive manifest name and version must match the public wrapper manifest.
 - A `distribution/surfaces.json` surface may set `artifactBaseUrl` to publish
   plugin archives from an external release repository.
+- Skill-only plugin packages publish one `target: "any"` artifact named
+  `<plugin-name>-plugin-any.zip`; the archive has no `bin/` directory.
+- External wrapper surfaces with `marketplacePublished: false` are drafts. The
+  generated marketplace omits them until the public archives exist.
 - Installation normalizes legacy `skills/` and `mcpServers` paths to `./` form;
   authoring and generated manifests remain strict.
 - Extraction stages files before atomically publishing the install directory.

@@ -7,6 +7,11 @@ on:
         description: "Release tag to finalize"
         type: string
         required: true
+      validate_marketplace_assets:
+        description: "Validate marketplace artifact URLs for this tag"
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: write
@@ -45,6 +50,32 @@ jobs:
           mkdir -p artifacts/distribution
           gh release download "${RELEASE_TAG}" --dir artifacts/distribution --clobber
 
+      - name: Validate marketplace release assets
+        if: ${{ inputs.validate_marketplace_assets }}
+        shell: bash
+        env:
+          RELEASE_TAG: ${{ steps.release_meta.outputs.tag_name }}
+        run: |
+          set -euo pipefail
+          mapfile -t expected < <(
+            jq -r --arg tag "$RELEASE_TAG" '
+              .plugins[].artifacts[]
+              | select((.url | contains("/" + $tag + "/")) and (.checksumUrl | contains("/" + $tag + "/")))
+              | (.url | split("/")[-1]), (.checksumUrl | split("/")[-1])
+            ' .elegy/marketplace.json | sort -u
+          )
+          missing=()
+          for name in "${expected[@]}"; do
+            if [[ ! -f "artifacts/distribution/$name" ]]; then
+              missing+=("$name")
+            fi
+          done
+          if [[ "${#missing[@]}" -gt 0 ]]; then
+            printf 'Missing marketplace release assets for %s:\n' "$RELEASE_TAG" >&2
+            printf '  %s\n' "${missing[@]}" >&2
+            exit 1
+          fi
+
       - name: Compose manifest + checksums
         shell: bash
         env:
@@ -77,16 +108,18 @@ jobs:
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"contracts-bundle",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
             elif [[ "$base" == elegy-installer-*.zip ]]; then
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" '{assetKind:"installer",surface:null,target:null,fileName:$fn,requiredEntries:[],sizeBytes:$sz,sha256:$sha}')"
-            elif [[ "$base" =~ ^(.+)-plugin-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
+            elif [[ "$base" =~ ^(.+)-plugin-(any|x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin") and .name == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin" or .kind == "skill-package" or (.kind == "external-plugin-wrapper" and (.marketplacePublished // true))) and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
                 exit 1
               fi
               asset_entry="$(jq -nc --arg fn "$base" --arg sha "$sha" --argjson sz "$size" --arg sf "$surface_name" --arg tg "$target" '{assetKind:"plugin-package",surface:$sf,target:$tg,fileName:$fn,requiredEntries:["plugin.json"],sizeBytes:$sz,sha256:$sha}')"
-              published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+              if [[ "$target" != "any" ]]; then
+                published_targets_json="$(jq -nc --argjson current "$published_targets_json" --arg target "$target" '$current + [$target] | unique')"
+              fi
             elif [[ "$base" =~ ^(.+)-(x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)(\.exe)?$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"

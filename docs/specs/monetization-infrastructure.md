@@ -25,10 +25,10 @@ installable products second.
   release archive URLs.
 - `marketplace-wrappers/client-radar/`: thin metadata wrapper pattern
   (`.elegy-plugin/plugin.json` + README, Proprietary license).
-- `C:\Users\lolzi\Documents\GitHub\instruction-engine\elegy-checks\`: functional
+- `instruction-engine/elegy-checks`: functional
   Rust crate (registry, runner, SQLite evidence, CI-parity map, check packs,
   4 skills) currently vendored inside instruction-engine.
-- `C:\Users\lolzi\Documents\GitHub\elegy-client-radar\`: mature private plugin
+- `Sofreshx/elegy-client-radar`: mature private plugin
   (prospect ranking, ICP, account history, compliance, French public data
   sources, packaging pipeline).
 - Monetizing research docs (Obsidian vault): demand discovery system, opportunity
@@ -124,7 +124,7 @@ CREATE                          DISTRIBUTE                        SELL          
 ## Implementation links
 
 - elegy-checks extraction: `Sofreshx/elegy-checks` (private, to be created)
-- elegy-client-radar continuation: `C:\Users\lolzi\Documents\GitHub\elegy-client-radar\docs\next-steps.md`
+- elegy-client-radar continuation: `Sofreshx/elegy-client-radar/docs/next-steps.md`
 - Planning state: scope `elegy-tools-monetization` in `~/.elegy/planning.db`
 - Marketplace wrapper pattern: `marketplace-wrappers/client-radar/`
 - Release workflow pattern: `elegy-client-radar/.github/workflows/release-plugin.yml`

@@ -99,15 +99,20 @@ capability shape.
 
 ## Audit findings
 
-- `validate_plugin_mcp_tool_references` is a public no-op with no consumers.
-- All seven bundled Elegy manifests declare an otherwise empty
-  `codex.plugin/v1` extension.
-- Scaffolding always emits an empty `extensions` map and a null `mcpServers`.
-- MCP verification counts JSON files but does not parse descriptors.
-- Default Codex export re-emits unknown fields and fields rejected by current
-  validation.
-- Archive and host-export binary inclusion use explicit CLI arguments, not the
-  extension's `binary` field.
+- Live bundled and skill package manifests keep Codex-only data under
+  `extensions["codex.plugin/v1"]`; empty extension maps are omitted.
+- Capability catalogs are selective. They are required only for
+  machine-discovered capabilities or host projections such as `.app.json`.
+- `.app.json` is catalog-driven when live `app-binding` capabilities exist.
+  Current live package catalogs are CLI/MCP-focused; the SDK fixture covers the
+  app-binding path.
+- MCP companion files are parsed and validated during export/verify.
+- Default Codex export omits validator-rejected manifest hooks and unknown
+  fields unless explicit experimental export is requested.
+- Marketplace Codex export accepts target-specific binary archives and
+  `target: "any"` skill-only archives with no `bin/`.
+- Archive and host-export binary inclusion use explicit CLI arguments, not an
+  extension `binary` field.
 
 ## Import behavior
 
@@ -122,8 +127,9 @@ to `ElegyPluginV1`, and preserves Codex-only fields under
 `elegy-marketplace/v1` root into a Codex marketplace tree. It exports each local
 wrapper under `plugins/<name>/`, preserves entry order and category, defaults
 Codex policy to `AVAILABLE` and `ON_INSTALL`, resolves the selected target's
-verified binary, and omits Elegy artifact fields from the generated index. The
-Codex index is derived output. For Windows targets, export rejects `.mcp.json`
+verified binary when an archive contains one, accepts `target: "any"` archives
+for skill-only packages, and omits Elegy artifact fields from the generated
+index. The Codex index is derived output. For Windows targets, export rejects `.mcp.json`
 commands under `bin/` when they omit a Windows-runnable extension or point at a
 missing file.
 

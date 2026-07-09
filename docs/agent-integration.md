@@ -68,9 +68,11 @@ Tagged releases include dedicated binaries for each runtime surface.
 - `elegy-configuration` binary
 - `elegy-documentation` binary
 
-Plugin-packaged surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`,
-`elegy-documentation`, `elegy-observe`, `elegy-desktop`) ship as `.plugin.zip` archives
-containing manifest, skills, and binary. Non-plugin surfaces ship as standalone binaries.
+Plugin-packaged binary surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`,
+`elegy-mcp`, `elegy-documentation`, `elegy-observe`, `elegy-desktop`) ship as
+`<surface>-plugin-<target>.zip` archives containing manifest, skills, and
+binary. Skill-only plugin packages ship as `<surface>-plugin-any.zip` archives.
+Non-plugin surfaces ship as standalone binaries.
 
 See [Distribution](distribution.md) for the release index and install lanes.
 

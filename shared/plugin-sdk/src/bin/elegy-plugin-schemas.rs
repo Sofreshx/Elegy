@@ -32,7 +32,7 @@ fn run() -> Result<(), String> {
             continue;
         }
         match fs::read_to_string(&path) {
-            Ok(actual) if actual == expected => {}
+            Ok(actual) if generated_content_matches(&actual, &expected) => {}
             _ => drifted.push(path),
         }
     }
@@ -57,4 +57,8 @@ fn write_schema(path: &Path, content: &str) -> Result<(), String> {
         .ok_or_else(|| format!("schema path has no parent: {}", path.display()))?;
     fs::create_dir_all(parent).map_err(|error| format!("create {}: {error}", parent.display()))?;
     fs::write(path, content).map_err(|error| format!("write {}: {error}", path.display()))
+}
+
+fn generated_content_matches(actual: &str, expected: &str) -> bool {
+    actual.replace("\r\n", "\n") == expected
 }

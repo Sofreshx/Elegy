@@ -81,7 +81,7 @@
       "sourceOfTruth": "current-canon",
       "status": "accepted",
       "summary": "Elegy distributes through GitHub Releases, binary artifacts, wrapper",
-      "title": "Block all crates.io publishing; keep dry-run smoke test"
+      "title": "Block all crates.io publishing; keep advisory crate smoke test"
     },
     {
       "authorityClass": "current",
@@ -137,11 +137,13 @@
     },
     {
       "authorityClass": "other",
+      "docKind": "generated",
       "freshness": "unknown",
       "path": "docs/ai/checks-demo-report.md",
       "sourceOfTruth": "unclassified",
+      "status": "active",
       "summary": "**Generated:** 2026-07-08",
-      "title": "Agent-Ready Repo Pack Demo — Elegy Repo"
+      "title": "Agent-Ready Repo Pack Demo"
     },
     {
       "authorityClass": "other",

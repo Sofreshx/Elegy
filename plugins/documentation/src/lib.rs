@@ -1685,12 +1685,16 @@ fn surface_states_for_kind(
         let exists = absolute_path.exists();
         let drift_status = match surface_kind {
             "llms" if exists => match fs::read_to_string(&absolute_path) {
-                Ok(content) if content == render_llms_export(map) => "current".to_string(),
+                Ok(content) if generated_content_matches(&content, &render_llms_export(map)) => {
+                    "current".to_string()
+                }
                 Ok(_) => "drifted".to_string(),
                 Err(_) => "unreadable".to_string(),
             },
             "bundle" if exists => match fs::read_to_string(&absolute_path) {
-                Ok(content) if content == render_bundle_export(map)? => "current".to_string(),
+                Ok(content) if generated_content_matches(&content, &render_bundle_export(map)?) => {
+                    "current".to_string()
+                }
                 Ok(_) => "drifted".to_string(),
                 Err(_) => "unreadable".to_string(),
             },
@@ -2126,6 +2130,10 @@ fn parse_dateish(value: &str) -> Option<Date> {
             .ok()
             .map(|value| value.date())
     })
+}
+
+fn generated_content_matches(actual: &str, expected: &str) -> bool {
+    actual.replace("\r\n", "\n") == expected
 }
 
 fn parse_iso_date(value: &str) -> Option<Date> {
