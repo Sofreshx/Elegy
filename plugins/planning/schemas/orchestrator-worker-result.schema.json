@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/orchestrator-worker-result.schema.json",
+  "title": "OrchestratorWorkerResult",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "dispatchId",
+    "projectRunId",
+    "nodeId",
+    "sourceRevision",
+    "fencingToken",
+    "idempotencyKey",
+    "status",
+    "summary",
+    "evidenceKind"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "orchestrator-worker-result/v1" },
+    "dispatchId": { "type": "string", "minLength": 1 },
+    "projectRunId": { "type": "string", "minLength": 1 },
+    "nodeId": { "type": "string", "minLength": 1 },
+    "sourceRevision": { "type": "integer", "minimum": 1 },
+    "fencingToken": { "type": "integer", "minimum": 1 },
+    "idempotencyKey": { "type": "string", "minLength": 1 },
+    "status": { "enum": ["completed", "failed", "cancelled", "timed-out", "malformed"] },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 16384 },
+    "reference": { "type": ["string", "null"] },
+    "content": { "type": ["string", "null"], "maxLength": 1048576 },
+    "evidenceKind": { "type": "string", "minLength": 1 },
+    "capturedAt": { "type": ["string", "null"] },
+    "statusUpdate": { "type": ["string", "null"] }
+  }
+}

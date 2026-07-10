@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://elegy/contracts/schemas/orchestrator-dispatch.schema.json",
+  "title": "OrchestratorDispatch",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "dispatchId",
+    "scopeKey",
+    "adapterId",
+    "requiredCapabilities",
+    "source",
+    "nodeId",
+    "sourceRevision",
+    "projectRun",
+    "fencingToken",
+    "idempotencyKey",
+    "phaseId",
+    "role",
+    "workerProfile",
+    "recommendedSubagent",
+    "complexity",
+    "reasoningClass",
+    "fileScopes",
+    "allowedActions",
+    "requiredEvidenceKinds",
+    "handoff",
+    "budget"
+  ],
+  "properties": {
+    "schemaVersion": { "const": "orchestrator-dispatch/v1" },
+    "dispatchId": { "type": "string", "minLength": 1 },
+    "scopeKey": { "type": "string", "minLength": 1 },
+    "adapterId": { "type": "string", "minLength": 1 },
+    "requiredCapabilities": { "type": "array", "items": { "type": "string" } },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["entityType", "entityId"],
+      "properties": {
+        "entityType": { "type": "string", "minLength": 1 },
+        "entityId": { "type": "string", "minLength": 1 }
+      }
+    },
+    "nodeId": { "type": "string", "minLength": 1 },
+    "sourceRevision": { "type": "integer", "minimum": 1 },
+    "projectRun": { "type": "object" },
+    "fencingToken": { "type": "integer", "minimum": 1 },
+    "idempotencyKey": { "type": "string", "minLength": 1 },
+    "phaseId": { "type": "string", "minLength": 1 },
+    "role": { "type": "string", "minLength": 1 },
+    "workerProfile": { "type": "string", "minLength": 1 },
+    "recommendedSubagent": { "type": "string", "minLength": 1 },
+    "complexity": { "enum": ["light", "standard", "heavy"] },
+    "reasoningClass": { "enum": ["low", "medium", "high"] },
+    "fileScopes": { "type": "array" },
+    "allowedActions": { "type": "array", "items": { "type": "string" } },
+    "requiredEvidenceKinds": { "type": "array", "items": { "type": "string" } },
+    "handoff": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title", "summary", "acceptance", "stopConditions"],
+      "properties": {
+        "title": { "type": "string" },
+        "summary": { "type": "string" },
+        "acceptance": { "type": "array", "items": { "type": "string" } },
+        "stopConditions": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "budget": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["maxContextTokensEstimate", "maxOutputBytes", "wallTimeMinutesEstimate", "maxAttempts"],
+      "properties": {
+        "maxContextTokensEstimate": { "type": "integer", "minimum": 1 },
+        "maxOutputBytes": { "type": "integer", "minimum": 1, "maximum": 1048576 },
+        "wallTimeMinutesEstimate": { "type": "integer", "minimum": 1 },
+        "maxAttempts": { "type": "integer", "minimum": 1 }
+      }
+    }
+  }
+}

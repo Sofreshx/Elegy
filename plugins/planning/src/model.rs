@@ -185,7 +185,17 @@ string_enum!(ProjectRunStatus {
     Active => "active",
     Interrupted => "interrupted",
     Completed => "completed",
+    Failed => "failed",
+    Cancelled => "cancelled",
     Released => "released"
+});
+
+string_enum!(WorkflowResultStatus {
+    Completed => "completed",
+    Failed => "failed",
+    Cancelled => "cancelled",
+    TimedOut => "timed-out",
+    Malformed => "malformed"
 });
 
 string_enum!(WorkPointKind {
@@ -242,6 +252,8 @@ pub struct ProjectRunEvidence {
     pub commit_sha: Option<String>,
     pub pr_url: Option<String>,
     pub linked_spec_ids: Vec<String>,
+    #[serde(default)]
+    pub workflow_result_keys: Vec<String>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
@@ -1498,6 +1510,249 @@ pub struct BlockedGraphCandidate {
 pub struct GraphRunnableResult {
     pub candidates: Vec<GraphRunnableCandidate>,
     pub blocked: Vec<BlockedGraphCandidate>,
+}
+
+// ─── Workflow View Types ──────────────────────────────────────────────────
+
+/// Host-neutral workflow projection derived from planning graph and run state.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowView {
+    pub schema_version: String,
+    pub scope_key: String,
+    pub source: WorkflowViewSource,
+    pub nodes: Vec<WorkflowViewNode>,
+    pub edges: Vec<WorkflowViewEdge>,
+    pub runnable: GraphRunnableResult,
+    pub adapter_policy: WorkflowAdapterPolicy,
+    pub execution_plan: WorkflowExecutionPlan,
+    pub delegation_hints: Vec<WorkflowDelegationHint>,
+    pub evidence_policy: WorkflowEvidencePolicy,
+    pub budgets: WorkflowBudgets,
+    pub metrics: WorkflowMetrics,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowViewSource {
+    pub entity_type: EntityType,
+    pub entity_id: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowViewNode {
+    pub id: String,
+    pub kind: PlanningNodeKind,
+    pub title: String,
+    pub status: String,
+    pub tags: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowViewEdge {
+    pub id: String,
+    pub kind: PlanningEdgeKind,
+    pub source_node_id: String,
+    pub target_node_id: String,
+    pub status: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowDelegationHint {
+    pub node_id: String,
+    pub role: String,
+    pub worker_profile: String,
+    pub recommended_subagent: String,
+    pub model_tier: String,
+    pub effort_tier: EffortTier,
+    pub file_scopes: Vec<FileScopeRecord>,
+    pub allowed_actions: Vec<String>,
+    pub max_concurrency: usize,
+    pub max_context_tokens_estimate: usize,
+    pub wall_time_minutes_estimate: usize,
+    pub retry_policy: WorkflowRetryPolicy,
+    pub rationale: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowEvidencePolicy {
+    pub required_evidence_kinds: Vec<EvidenceKind>,
+    pub validation_gates: Vec<String>,
+    pub stop_conditions: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowBudgets {
+    pub max_workers: usize,
+    pub max_retries_per_node: usize,
+    pub max_context_tokens_estimate: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowAdapterPolicy {
+    pub orchestration_owner: String,
+    pub execution_owner: String,
+    pub max_delegate_depth: usize,
+    pub default_orchestrator_model_tier: String,
+    pub worker_model_tiers: Vec<String>,
+    pub degradation_rules: Vec<String>,
+    pub required_writebacks: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowExecutionPlan {
+    pub strategy: String,
+    pub phases: Vec<WorkflowExecutionPhase>,
+    pub blocked_node_ids: Vec<String>,
+    pub rationale: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowExecutionPhase {
+    pub id: String,
+    pub index: usize,
+    pub mode: String,
+    pub node_ids: Vec<String>,
+    pub max_concurrency: usize,
+    pub worker_profiles: Vec<String>,
+    pub rationale: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowRetryPolicy {
+    pub max_attempts: usize,
+    pub retryable_stop_conditions: Vec<String>,
+    pub escalation: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowMetrics {
+    pub total_nodes: usize,
+    pub total_edges: usize,
+    pub runnable_count: usize,
+    pub blocked_count: usize,
+    pub delegation_hint_count: usize,
+    pub parallel_safe_candidate_count: usize,
+    pub estimated_context_tokens: usize,
+    pub project_run_status_counts: ProjectRunStatusCounts,
+}
+
+/// Portable dispatch contract emitted by `workflow prepare`.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowDispatch {
+    pub schema_version: String,
+    pub dispatch_id: String,
+    pub scope_key: String,
+    pub adapter_id: String,
+    pub required_capabilities: Vec<String>,
+    pub source: WorkflowViewSource,
+    pub node_id: String,
+    pub source_revision: i64,
+    pub project_run: ProjectRunRecord,
+    pub fencing_token: i64,
+    pub idempotency_key: String,
+    pub phase_id: String,
+    pub role: String,
+    pub worker_profile: String,
+    pub recommended_subagent: String,
+    pub complexity: String,
+    pub reasoning_class: String,
+    pub file_scopes: Vec<FileScopeRecord>,
+    pub allowed_actions: Vec<String>,
+    pub required_evidence_kinds: Vec<EvidenceKind>,
+    pub handoff: WorkflowHandoff,
+    pub budget: WorkflowWorkerBudget,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowHandoff {
+    pub title: String,
+    pub summary: String,
+    pub acceptance: Vec<String>,
+    pub stop_conditions: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowWorkerBudget {
+    pub max_context_tokens_estimate: usize,
+    pub max_output_bytes: usize,
+    pub wall_time_minutes_estimate: usize,
+    pub max_attempts: usize,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowPrepareResult {
+    pub schema_version: String,
+    pub source: WorkflowViewSource,
+    pub strategy: String,
+    pub max_workers: usize,
+    pub dispatches: Vec<WorkflowDispatch>,
+    pub skipped: Vec<WorkflowPrepareSkip>,
+    pub blocked_node_ids: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowPrepareSkip {
+    pub node_id: String,
+    pub reason: String,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct WorkflowWorkerResult {
+    pub schema_version: String,
+    pub dispatch_id: String,
+    pub project_run_id: String,
+    pub node_id: String,
+    pub source_revision: i64,
+    pub fencing_token: i64,
+    pub idempotency_key: String,
+    pub status: WorkflowResultStatus,
+    pub summary: String,
+    pub reference: Option<String>,
+    pub content: Option<String>,
+    pub evidence_kind: EvidenceKind,
+    pub captured_at: Option<String>,
+    pub status_update: Option<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct WorkflowResultWriteback {
+    pub project_run: ProjectRunRecord,
+    pub evidence: Option<PlanningGraphNode>,
+    pub attachment: Option<PlanningGraphEdge>,
+    pub status_update: Option<PlanningGraphNode>,
+    pub replayed: bool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, Default, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ProjectRunStatusCounts {
+    pub suggested: usize,
+    pub claimed: usize,
+    pub active: usize,
+    pub interrupted: usize,
+    pub completed: usize,
+    pub failed: usize,
+    pub cancelled: usize,
+    pub released: usize,
 }
 
 // ─── Bulk Transition Types ─────────────────────────────────────────────────

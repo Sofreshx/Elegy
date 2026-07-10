@@ -144,6 +144,7 @@ What the repo proves today:
 - `elegy-contracts` provides contract export, validation, and project inspection
 - `elegy-codegraph` provides code graph analysis
 - `elegy-run` provides the stdio MCP host
+- `elegy-planning workflow prepare|record-result` provides the portable workflow lifecycle; Codex and Holon own native worker execution
 - those commands are backed by shared Rust crates led by `shared/core`, the `elegy-plugin-packaging` operator package under `shared/tooling`, and the `plugins/` tree
 - contract exports can be produced and consumed independently of the Rust workspace via `elegy-contracts`
 

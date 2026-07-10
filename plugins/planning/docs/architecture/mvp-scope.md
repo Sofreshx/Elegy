@@ -84,7 +84,7 @@
 | Feature | Milestone | Notes |
 | --- | --- | --- |
 | Internal planning authority independent from memory | **MVP** | Implemented by separate crate |
-| Import from instruction-engine workflow artifacts | **v1** | Not yet implemented |
+| Import/export instruction-engine workflow artifacts | **v1** | Implemented for roadmap workflow markdown artifacts through `workflow import-artifact` and `workflow export-artifact` |
 | Export to repo-backed planning docs | **v1** | Not yet implemented |
 | Skill and capability registry wiring | **MVP** | Governed skill fixture is exposed through the built-in registry and packaged wrapper bridge surfaces |
 

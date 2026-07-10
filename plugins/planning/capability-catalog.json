@@ -3,7 +3,7 @@
   "plugin": "elegy-planning",
   "pluginVersion": "0.1.0",
   "generatedAt": "2026-07-08T00:00:00Z",
-  "digest": "sha256:88a85a5f0592cc6b6c32a3a226fe06a64581e691509c16b681b9690bf8e6770d",
+  "digest": "sha256:7b5c37b16bdd0f185359174fdf546f132e49bd1747cea6c6f994060de7d84e3f",
   "capabilities": [
     {
       "id": "project-run.claim.v2",
@@ -119,7 +119,7 @@
         "required": ["projectRunId", "status"],
         "properties": {
           "projectRunId": { "type": "string", "description": "The project run ID to release" },
-          "status": { "type": "string", "enum": ["completed", "failed", "cancelled"], "description": "Final run status" },
+          "status": { "type": "string", "enum": ["completed", "failed", "cancelled", "released"], "description": "Final run status" },
           "evidenceJson": { "type": "string", "description": "JSON-encoded evidence payload" },
           "fencingToken": { "type": "integer", "description": "Fencing token for concurrency control" }
         }
@@ -158,6 +158,384 @@
         "properties": {
           "projectRunId": { "type": "string", "description": "The project run ID" },
           "evidenceCount": { "type": "integer", "description": "Total evidence entries after addition" }
+        }
+      }
+    },
+    {
+      "id": "workflow.view.v1",
+      "kind": "cli",
+      "sideEffectClass": "query",
+      "contractVersion": "v1",
+      "description": "Return a host-neutral workflow-view/v1 projection for a scoped planning entity.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "view"],
+        "requiredArgs": ["entity-type", "entity-id"],
+        "optionalArgs": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["entityType", "entityId"],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Planning entity type to use as the workflow source"
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Planning entity ID to use as the workflow source"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowView": {
+            "type": "object",
+            "required": [
+              "schemaVersion",
+              "scopeKey",
+              "source",
+              "nodes",
+              "edges",
+              "runnable",
+              "adapterPolicy",
+              "executionPlan",
+              "delegationHints",
+              "evidencePolicy",
+              "budgets",
+              "metrics"
+            ],
+            "properties": {
+              "schemaVersion": { "type": "string", "const": "workflow-view/v1" },
+              "scopeKey": { "type": "string" },
+              "source": { "type": "object" },
+              "nodes": { "type": "array" },
+              "edges": { "type": "array" },
+              "runnable": {
+                "type": "object",
+                "required": ["candidates", "blocked"],
+                "properties": {
+                  "candidates": { "type": "array" },
+                  "blocked": { "type": "array" }
+                }
+              },
+              "adapterPolicy": {
+                "type": "object",
+                "required": [
+                  "orchestrationOwner",
+                  "executionOwner",
+                  "maxDelegateDepth",
+                  "defaultOrchestratorModelTier",
+                  "workerModelTiers",
+                  "degradationRules",
+                  "requiredWritebacks"
+                ]
+              },
+              "executionPlan": {
+                "type": "object",
+                "required": ["strategy", "phases", "blockedNodeIds", "rationale"],
+                "properties": {
+                  "strategy": { "type": "string" },
+                  "phases": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "required": [
+                        "id",
+                        "index",
+                        "mode",
+                        "nodeIds",
+                        "maxConcurrency",
+                        "workerProfiles",
+                        "rationale"
+                      ]
+                    }
+                  },
+                  "blockedNodeIds": { "type": "array" },
+                  "rationale": { "type": "string" }
+                }
+              },
+              "delegationHints": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": [
+                    "nodeId",
+                    "role",
+                    "workerProfile",
+                    "recommendedSubagent",
+                    "modelTier",
+                    "effortTier",
+                    "fileScopes",
+                    "allowedActions",
+                    "maxConcurrency",
+                    "maxContextTokensEstimate",
+                    "wallTimeMinutesEstimate",
+                    "retryPolicy",
+                    "rationale"
+                  ]
+                }
+              },
+              "evidencePolicy": {
+                "type": "object",
+                "required": ["requiredEvidenceKinds", "validationGates", "stopConditions"]
+              },
+              "budgets": {
+                "type": "object",
+                "required": ["maxWorkers", "maxRetriesPerNode", "maxContextTokensEstimate"]
+              },
+              "metrics": {
+                "type": "object",
+                "required": [
+                  "totalNodes",
+                  "totalEdges",
+                  "runnableCount",
+                  "blockedCount",
+                  "delegationHintCount",
+                  "parallelSafeCandidateCount",
+                  "estimatedContextTokens",
+                  "projectRunStatusCounts"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "workflow.bundle.v1",
+      "kind": "cli",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Write a host-facing workflow execution bundle with dispatch, runbook, worker handoffs, and writeback command templates.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "bundle"],
+        "requiredArgs": ["entity-type", "entity-id", "output"],
+        "optionalArgs": ["host"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["entityType", "entityId", "output"],
+        "properties": {
+          "entityType": {
+            "type": "string",
+            "description": "Planning entity type to use as the workflow source"
+          },
+          "entityId": {
+            "type": "string",
+            "description": "Planning entity ID to use as the workflow source"
+          },
+          "output": {
+            "type": "string",
+            "description": "Directory where the workflow bundle should be written"
+          },
+          "host": {
+            "type": "string",
+            "description": "Host adapter label for generated runbook and dispatch metadata",
+            "default": "generic"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "bundle": {
+            "type": "object",
+            "required": [
+              "schemaVersion",
+              "host",
+              "scopeKey",
+              "source",
+              "outputPath",
+              "files",
+              "phaseCount",
+              "workerCount",
+              "blockedNodeIds"
+            ],
+            "properties": {
+              "schemaVersion": { "type": "string", "const": "workflow-bundle/v1" },
+              "host": { "type": "string" },
+              "scopeKey": { "type": "string" },
+              "source": { "type": "object" },
+              "outputPath": { "type": "string" },
+              "files": {
+                "type": "object",
+                "required": ["workflowView", "dispatch", "runbook", "writebackCommands", "workers"]
+              },
+              "phaseCount": { "type": "integer" },
+              "workerCount": { "type": "integer" },
+              "blockedNodeIds": { "type": "array" }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "workflow.prepare.v1",
+      "kind": "cli",
+      "sideEffectClass": "fenced-mutation",
+      "contractVersion": "v1",
+      "description": "Compile a bounded host-neutral workflow batch and claim/activate its project runs with fencing tokens.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "prepare"],
+        "requiredArgs": ["entity-type", "entity-id"],
+        "optionalArgs": ["adapter-id", "capability", "max-workers", "lease-seconds", "owner-id", "session-id", "repo-id", "branch", "worktree-id"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["entityType", "entityId"],
+        "properties": {
+          "entityType": { "type": "string" },
+          "entityId": { "type": "string" },
+          "adapterId": { "type": "string", "default": "native" },
+          "capabilities": { "type": "array", "items": { "type": "string" } },
+          "maxWorkers": { "type": "integer", "minimum": 1, "maximum": 3, "default": 3 },
+          "leaseSeconds": { "type": "integer", "minimum": 1, "maximum": 86400, "default": 900 },
+          "ownerId": { "type": "string" },
+          "sessionId": { "type": "string" },
+          "repoId": { "type": "string" },
+          "branch": { "type": "string" },
+          "worktreeId": { "type": "string" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["workflowPrepare"],
+        "properties": {
+          "workflowPrepare": {
+            "type": "object",
+            "required": ["schemaVersion", "source", "strategy", "maxWorkers", "dispatches", "skipped", "blockedNodeIds"]
+          }
+        }
+      }
+    },
+    {
+      "id": "workflow.record-result.v1",
+      "kind": "cli",
+      "sideEffectClass": "fenced-mutation",
+      "contractVersion": "v1",
+      "description": "Validate and atomically write back one native worker result, evidence edge, graph status, and fenced project-run terminal state.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "record-result"],
+        "requiredArgs": ["file"],
+        "optionalArgs": []
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["file"],
+        "properties": {
+          "file": { "type": "string", "description": "orchestrator-worker-result/v1 JSON file" }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "required": ["workflowResult"],
+        "properties": {
+          "workflowResult": {
+            "type": "object",
+            "required": ["projectRun", "replayed"]
+          }
+        }
+      }
+    },
+    {
+      "id": "workflow.import-artifact.v1",
+      "kind": "cli",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Import an instruction-engine roadmap workflow artifact into elegy-planning by deriving a roadmap scaffold and dry-running or applying it.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "import-artifact"],
+        "requiredArgs": ["file"],
+        "optionalArgs": ["dry-run", "apply", "if-exists"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["file"],
+        "properties": {
+          "file": {
+            "type": "string",
+            "description": "Markdown or JSON roadmap workflow artifact path"
+          },
+          "dryRun": {
+            "type": "boolean",
+            "description": "Preview scaffold changes without writing"
+          },
+          "apply": {
+            "type": "boolean",
+            "description": "Apply scaffold changes transactionally"
+          },
+          "ifExists": {
+            "type": "string",
+            "enum": ["fail", "skip", "update"],
+            "default": "fail"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowArtifactImport": {
+            "type": "object",
+            "required": ["schemaVersion", "mode", "sourcePath", "artifact", "scaffold", "result"]
+          }
+        }
+      }
+    },
+    {
+      "id": "workflow.export-artifact.v1",
+      "kind": "cli",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Export a roadmap or work point as an instruction-engine roadmap workflow markdown artifact.",
+      "invocation": {
+        "executable": "elegy-planning",
+        "command": ["workflow", "export-artifact"],
+        "requiredArgs": ["roadmap-id", "output"],
+        "optionalArgs": ["slice-id", "kind", "phase", "status", "repo-id", "session-id"]
+      },
+      "inputSchema": {
+        "type": "object",
+        "required": ["roadmapId", "output"],
+        "properties": {
+          "roadmapId": {
+            "type": "string",
+            "description": "Roadmap to export"
+          },
+          "sliceId": {
+            "type": "string",
+            "description": "Optional work point to export as the artifact slice"
+          },
+          "output": {
+            "type": "string",
+            "description": "Markdown artifact output path"
+          },
+          "kind": {
+            "type": "string",
+            "default": "roadmap.definition"
+          },
+          "phase": {
+            "type": "string",
+            "default": "definition"
+          },
+          "status": {
+            "type": "string",
+            "default": "proposed"
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "properties": {
+          "workflowArtifactExport": {
+            "type": "object",
+            "required": ["schemaVersion", "outputPath", "artifact"]
+          }
         }
       }
     }
