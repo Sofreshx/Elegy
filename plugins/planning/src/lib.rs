@@ -9,6 +9,7 @@ pub mod session;
 mod storage;
 pub mod template;
 mod validation;
+mod workflow;
 
 pub use envelope::*;
 pub use error::PlanningStoreError;
@@ -21,7 +22,8 @@ pub use storage::{
     CreateEvidenceInput, CreateGoalInput, CreateGraphEdgeInput, CreateGraphNodeInput,
     CreateInsightInput, CreateIssueInput, CreatePlanInput, CreateReviewPointInput,
     CreateRoadmapInput, CreateScopeInput, CreateTodoInput, FinalizeGraphNodeInput,
-    HeartbeatProjectRunInput, PlanningStore, ReleaseProjectRunInput, ReviseGraphEdgeInput,
-    ReviseGraphNodeInput, RevisePlanInput, ReviseWorkPointInput, SatisfyAcceptanceInput,
-    SearchInput, UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput,
+    HeartbeatProjectRunInput, PlanningStore, PrepareWorkflowInput, RecordWorkflowResultInput,
+    ReleaseProjectRunInput, ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput,
+    ReviseWorkPointInput, SatisfyAcceptanceInput, SearchInput, UpdateGraphEdgeStatusInput,
+    UpdateGraphNodeStatusInput, UpdateStatusInput,
 };

@@ -9,6 +9,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use serde_json::Value;
 use sha2::{Digest as Sha2Digest, Sha256};
 
+use elegy_planning::ProjectRunStatus;
+
 static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -76,7 +78,13 @@ fn capabilities_reports_lease_contract_without_initializing_a_database() {
             "project-run.activate.fenced.v1",
             "project-run.heartbeat.v1",
             "project-run.release.fenced.v1",
-            "project-run.add-evidence.fenced.v1"
+            "project-run.add-evidence.fenced.v1",
+            "workflow.view.v1",
+            "workflow.bundle.v1",
+            "workflow.prepare.v1",
+            "workflow.record-result.v1",
+            "workflow.import-artifact.v1",
+            "workflow.export-artifact.v1"
         ])
     );
 }
@@ -280,6 +288,977 @@ fn project_render_uses_projection_format_without_colliding_with_global_format() 
 
     let rendered = fs::read_to_string(output_path).expect("rendered roadmap markdown");
     assert!(rendered.contains("# Planning renderer roadmap"));
+}
+
+#[test]
+fn workflow_render_uses_projection_renderer() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-render");
+    let db_path = temp_dir.join("planning.db");
+    let output_path = temp_dir.join("workflow-roadmap.json");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-workflow-goal",
+        "goal",
+        "create",
+        "--id",
+        "goal-workflow",
+        "--title",
+        "Workflow projection goal",
+        "--description",
+        "Render workflow-oriented projections.",
+        "--acceptance",
+        "workflow render succeeds",
+        "--rejection",
+        "workflow command missing",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-workflow-roadmap",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-workflow",
+        "--goal-id",
+        "goal-workflow",
+        "--title",
+        "Workflow projection roadmap",
+        "--summary",
+        "Thin workflow projection command.",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-workflow-node",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "work-workflow",
+        "--kind",
+        "work",
+        "--title",
+        "Workflow implementation slice",
+        "--summary",
+        "Runnable work for workflow view.",
+        "--status",
+        "active",
+        "--payload-json",
+        r#"{"effortTier":"deep","modelTier":"medium","fileScopes":[{"selectorType":"glob","selector":"plugins/planning/**","intent":"primary"}]}"#,
+        "--tag",
+        "deep",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-workflow-acceptance",
+        "graph",
+        "acceptance",
+        "create",
+        "--id",
+        "acc-workflow-review",
+        "--acceptance-kind",
+        "concrete",
+        "--title",
+        "Workflow review evidence",
+        "--summary",
+        "Workflow mode should surface review evidence requirements.",
+        "--status",
+        "active",
+        "--description",
+        "The workflow projection must include acceptance-driven evidence.",
+        "--required-evidence-kind",
+        "review",
+    ]);
+
+    let render = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-render",
+            "workflow",
+            "render",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "roadmap-workflow",
+            "--projection-format",
+            "json",
+            "--output",
+            output_path.to_str().expect("utf-8 output path"),
+        ])
+        .output()
+        .expect("render workflow projection");
+
+    assert!(
+        render.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&render.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&render.stdout).expect("valid json");
+    assert_eq!(
+        envelope["command"],
+        serde_json::json!(["workflow", "render"])
+    );
+    assert_eq!(envelope["status"], "ok");
+    assert_eq!(envelope["data"]["format"], "json");
+
+    let rendered: Value =
+        serde_json::from_str(&fs::read_to_string(output_path).expect("rendered workflow json"))
+            .expect("projection json");
+    assert_eq!(rendered["roadmap"]["id"], "roadmap-workflow");
+
+    let view = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-view",
+            "workflow",
+            "view",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "roadmap-workflow",
+        ])
+        .output()
+        .expect("render workflow view");
+    assert!(
+        view.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&view.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&view.stdout).expect("valid json");
+    let workflow_view = &envelope["data"]["workflowView"];
+    assert_eq!(workflow_view["schemaVersion"], "workflow-view/v1");
+    assert_eq!(workflow_view["source"]["entityId"], "roadmap-workflow");
+    assert_eq!(
+        workflow_view["adapterPolicy"]["orchestrationOwner"],
+        "host-main-thread"
+    );
+    assert_eq!(
+        workflow_view["adapterPolicy"]["defaultOrchestratorModelTier"],
+        "xhigh"
+    );
+    assert_eq!(
+        workflow_view["executionPlan"]["strategy"],
+        "next-runnable-batch"
+    );
+    assert_eq!(
+        workflow_view["executionPlan"]["phases"][0]["mode"],
+        "sequential"
+    );
+    assert_eq!(
+        workflow_view["executionPlan"]["phases"][0]["nodeIds"][0],
+        "work-workflow"
+    );
+    assert_eq!(
+        workflow_view["executionPlan"]["phases"][0]["workerProfiles"][0],
+        "implementation-heavy"
+    );
+    assert_eq!(workflow_view["metrics"]["totalNodes"], 2);
+    assert_eq!(workflow_view["metrics"]["runnableCount"], 1);
+    assert_eq!(workflow_view["metrics"]["delegationHintCount"], 1);
+    assert_eq!(workflow_view["metrics"]["parallelSafeCandidateCount"], 1);
+    assert_eq!(workflow_view["metrics"]["estimatedContextTokens"], 24000);
+    assert_eq!(
+        workflow_view["delegationHints"][0]["nodeId"],
+        "work-workflow"
+    );
+    assert_eq!(workflow_view["delegationHints"][0]["effortTier"], "deep");
+    assert_eq!(workflow_view["delegationHints"][0]["modelTier"], "medium");
+    assert_eq!(
+        workflow_view["delegationHints"][0]["workerProfile"],
+        "implementation-heavy"
+    );
+    assert_eq!(
+        workflow_view["delegationHints"][0]["recommendedSubagent"],
+        "impl-heavy"
+    );
+    assert_eq!(
+        workflow_view["delegationHints"][0]["fileScopes"][0]["selector"],
+        "plugins/planning/**"
+    );
+    assert_eq!(
+        workflow_view["delegationHints"][0]["retryPolicy"]["maxAttempts"],
+        2
+    );
+    assert!(workflow_view["evidencePolicy"]["requiredEvidenceKinds"]
+        .as_array()
+        .expect("required evidence kinds")
+        .iter()
+        .any(|kind| kind == "review"));
+
+    let bundle_dir = temp_dir.join("workflow-bundle");
+    let bundle = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-bundle",
+            "workflow",
+            "bundle",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "roadmap-workflow",
+            "--output",
+            bundle_dir.to_str().expect("utf-8 bundle dir"),
+            "--host",
+            "codex",
+        ])
+        .output()
+        .expect("write workflow bundle");
+    assert!(
+        bundle.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&bundle.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&bundle.stdout).expect("valid json");
+    assert_eq!(
+        envelope["command"],
+        serde_json::json!(["workflow", "bundle"])
+    );
+    assert_eq!(
+        envelope["data"]["bundle"]["schemaVersion"],
+        "workflow-bundle/v1"
+    );
+    assert_eq!(envelope["data"]["bundle"]["workerCount"], 1);
+    let dispatch_path = PathBuf::from(
+        envelope["data"]["bundle"]["files"]["dispatch"]
+            .as_str()
+            .expect("dispatch path"),
+    );
+    let worker_path = PathBuf::from(
+        envelope["data"]["bundle"]["files"]["workers"][0]
+            .as_str()
+            .expect("worker path"),
+    );
+    let writeback_path = PathBuf::from(
+        envelope["data"]["bundle"]["files"]["writebackCommands"]
+            .as_str()
+            .expect("writeback path"),
+    );
+    assert!(dispatch_path.exists(), "dispatch file should exist");
+    assert!(worker_path.exists(), "worker handoff should exist");
+    assert!(writeback_path.exists(), "writeback file should exist");
+    let dispatch: Value =
+        serde_json::from_str(&fs::read_to_string(dispatch_path).expect("dispatch json"))
+            .expect("dispatch should be json");
+    assert_eq!(dispatch["schemaVersion"], "workflow-bundle-preview/v1");
+    assert_eq!(dispatch["workers"][0]["recommendedSubagent"], "impl-heavy");
+    assert_eq!(
+        dispatch["workers"][0]["handoffPath"],
+        "workers/phase-1-work-workflow.md"
+    );
+    let worker_handoff = fs::read_to_string(worker_path).expect("worker handoff");
+    assert!(worker_handoff.contains("Recommended subagent: `impl-heavy`"));
+    assert!(worker_handoff.contains("workflow record-result"));
+    let writeback = fs::read_to_string(writeback_path).expect("writeback commands");
+    assert!(writeback.contains("workflow record-result"));
+
+    let artifact_path = temp_dir.join("instruction-engine-artifact.md");
+    fs::write(
+        &artifact_path,
+        r#"# Review
+
+## Structured State
+
+```json
+{
+  "schemaVersion": "1",
+  "kind": "roadmap.review.result",
+  "roadmapId": "RM-core",
+  "sliceId": "RM-core-001",
+  "phase": "review",
+  "status": "pass",
+  "repoId": "elegy-copilot",
+  "followUps": [],
+  "requiresUserDecision": false,
+  "acceptance": {
+    "allPassed": true,
+    "failedChecks": [],
+    "passedChecks": ["node copilot-ui/routes/planning.test.js"]
+  }
+}
+
+```
+"#,
+    )
+    .expect("write instruction-engine artifact");
+    let import_dry_run = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-import-dry-run",
+            "workflow",
+            "import-artifact",
+            "--file",
+            artifact_path.to_str().expect("artifact path"),
+            "--dry-run",
+            "--if-exists",
+            "update",
+        ])
+        .output()
+        .expect("dry-run workflow artifact import");
+    assert!(
+        import_dry_run.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&import_dry_run.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&import_dry_run.stdout).expect("valid json");
+    assert_eq!(
+        envelope["command"],
+        serde_json::json!(["workflow", "import-artifact"])
+    );
+    assert_eq!(
+        envelope["data"]["workflowArtifactImport"]["schemaVersion"],
+        "instruction-engine-roadmap-workflow-import/v1"
+    );
+    assert_eq!(
+        envelope["data"]["workflowArtifactImport"]["artifact"]["roadmapId"],
+        "RM-core"
+    );
+    assert_eq!(
+        envelope["data"]["workflowArtifactImport"]["scaffold"]["goal"]["id"],
+        "ie-goal-RM-core"
+    );
+    assert_eq!(
+        envelope["data"]["workflowArtifactImport"]["result"]["created"][0]["entityType"],
+        "goal"
+    );
+
+    let import_apply = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-import-apply",
+            "workflow",
+            "import-artifact",
+            "--file",
+            artifact_path.to_str().expect("artifact path"),
+            "--apply",
+            "--if-exists",
+            "update",
+        ])
+        .output()
+        .expect("apply workflow artifact import");
+    assert!(
+        import_apply.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&import_apply.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&import_apply.stdout).expect("valid json");
+    assert_eq!(envelope["data"]["workflowArtifactImport"]["mode"], "apply");
+    assert!(
+        envelope["data"]["workflowArtifactImport"]["result"]["created"]
+            .as_array()
+            .expect("created")
+            .iter()
+            .any(|entry| entry["entityId"] == "RM-core-001")
+    );
+
+    let exported_artifact_path = temp_dir.join("exported-instruction-engine-artifact.md");
+    let export_artifact = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-export-artifact",
+            "workflow",
+            "export-artifact",
+            "--roadmap-id",
+            "RM-core",
+            "--slice-id",
+            "RM-core-001",
+            "--output",
+            exported_artifact_path.to_str().expect("export path"),
+            "--kind",
+            "roadmap.review.result",
+            "--phase",
+            "review",
+            "--status",
+            "pass",
+            "--repo-id",
+            "elegy-copilot",
+        ])
+        .output()
+        .expect("export workflow artifact");
+    assert!(
+        export_artifact.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&export_artifact.stderr)
+    );
+    let envelope: Value = serde_json::from_slice(&export_artifact.stdout).expect("valid json");
+    assert_eq!(
+        envelope["command"],
+        serde_json::json!(["workflow", "export-artifact"])
+    );
+    assert_eq!(
+        envelope["data"]["workflowArtifactExport"]["schemaVersion"],
+        "instruction-engine-roadmap-workflow-export/v1"
+    );
+    let exported = fs::read_to_string(exported_artifact_path).expect("exported artifact");
+    assert!(exported.contains("## Structured State"));
+    assert!(exported.contains("\"schemaVersion\": \"1\""));
+    assert!(exported.contains("\"roadmapId\": \"RM-core\""));
+}
+
+fn create_workflow_roadmap(db: &str, roadmap_id: &str, goal_id: &str) {
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        goal_id,
+        "goal",
+        "create",
+        "--id",
+        goal_id,
+        "--title",
+        goal_id,
+        "--description",
+        "Workflow test goal.",
+        "--acceptance",
+        "Workflow completes.",
+    ]);
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        roadmap_id,
+        "roadmap",
+        "create",
+        "--id",
+        roadmap_id,
+        "--goal-id",
+        goal_id,
+        "--title",
+        roadmap_id,
+        "--summary",
+        "Workflow test roadmap.",
+    ]);
+}
+
+fn create_workflow_graph_node(db: &str, node_id: &str, payload: &str) {
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        node_id,
+        "graph",
+        "node",
+        "create",
+        "--id",
+        node_id,
+        "--kind",
+        "work",
+        "--title",
+        node_id,
+        "--summary",
+        "Workflow test node.",
+        "--status",
+        "active",
+        "--payload-json",
+        payload,
+    ]);
+}
+
+#[test]
+fn workflow_view_is_rooted_to_the_requested_roadmap() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-root");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    create_workflow_roadmap(db, "root-roadmap", "root-goal");
+    create_workflow_roadmap(db, "other-roadmap", "other-goal");
+    create_workflow_graph_node(
+        db,
+        "root-work",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"root-roadmap"}}"#,
+    );
+    create_workflow_graph_node(
+        db,
+        "other-work",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"other-roadmap"}}"#,
+    );
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "view",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "root-roadmap",
+        ])
+        .output()
+        .expect("workflow view should run");
+    assert!(output.status.success(), "workflow view failed");
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    let node_ids = envelope["data"]["workflowView"]["nodes"]
+        .as_array()
+        .expect("workflow nodes")
+        .iter()
+        .filter_map(|node| node["id"].as_str())
+        .collect::<Vec<_>>();
+    assert_eq!(node_ids, vec!["root-work"]);
+}
+
+#[test]
+fn workflow_view_does_not_parallelize_overlapping_write_scopes() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-overlap");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    create_workflow_roadmap(db, "overlap-roadmap", "overlap-goal");
+    for node_id in ["overlap-work-a", "overlap-work-b"] {
+        create_workflow_graph_node(
+            db,
+            node_id,
+            r#"{"planningRef":{"entityType":"roadmap","entityId":"overlap-roadmap"},"fileScopes":[{"selectorType":"glob","selector":"src/shared/**","intent":"primary"}]}"#,
+        );
+    }
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "view",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "overlap-roadmap",
+        ])
+        .output()
+        .expect("workflow view should run");
+    assert!(output.status.success(), "workflow view failed");
+    let envelope: Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    let workflow_view = &envelope["data"]["workflowView"];
+    assert_eq!(
+        workflow_view["executionPlan"]["phases"][0]["mode"],
+        "sequential"
+    );
+    assert_eq!(workflow_view["metrics"]["parallelSafeCandidateCount"], 0);
+}
+
+#[test]
+fn workflow_view_requires_explicit_parallel_safety_for_disjoint_scopes() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-parallel-edge");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    create_workflow_roadmap(db, "parallel-roadmap", "parallel-goal");
+    create_workflow_graph_node(
+        db,
+        "parallel-work-a",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"parallel-roadmap"},"fileScopes":[{"selectorType":"glob","selector":"src/a/**","intent":"primary"}]}"#,
+    );
+    create_workflow_graph_node(
+        db,
+        "parallel-work-b",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"parallel-roadmap"},"fileScopes":[{"selectorType":"glob","selector":"src/b/**","intent":"primary"}]}"#,
+    );
+
+    let view_args = [
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "default",
+        "workflow",
+        "view",
+        "--entity-type",
+        "roadmap",
+        "--entity-id",
+        "parallel-roadmap",
+    ];
+    let without_edge = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(view_args)
+        .output()
+        .expect("workflow view without parallel edge");
+    assert!(without_edge.status.success());
+    let without_edge_json: Value = serde_json::from_slice(&without_edge.stdout).expect("json");
+    assert_eq!(
+        without_edge_json["data"]["workflowView"]["executionPlan"]["phases"][0]["mode"],
+        "sequential"
+    );
+    assert_eq!(
+        without_edge_json["data"]["workflowView"]["metrics"]["parallelSafeCandidateCount"],
+        0
+    );
+
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--scope",
+        "default",
+        "--correlation-id",
+        "parallel-edge",
+        "graph",
+        "edge",
+        "create",
+        "--id",
+        "parallel-edge",
+        "--kind",
+        "parallel-safe-with",
+        "--source-node-id",
+        "parallel-work-a",
+        "--target-node-id",
+        "parallel-work-b",
+        "--status",
+        "active",
+    ]);
+    let with_edge = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(view_args)
+        .output()
+        .expect("workflow view with parallel edge");
+    assert!(with_edge.status.success());
+    let with_edge_json: Value = serde_json::from_slice(&with_edge.stdout).expect("json");
+    assert_eq!(
+        with_edge_json["data"]["workflowView"]["executionPlan"]["phases"][0]["mode"],
+        "bounded-parallel"
+    );
+    assert_eq!(
+        with_edge_json["data"]["workflowView"]["metrics"]["parallelSafeCandidateCount"],
+        2
+    );
+}
+
+#[test]
+fn workflow_prepare_and_record_result_are_fenced_and_idempotent() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-prepare");
+    let db_path = temp_dir.join("planning.db");
+    let result_path = temp_dir.join("worker-result.json");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    create_workflow_roadmap(db, "prepare-roadmap", "prepare-goal");
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "prepare-work-point",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "prepare-roadmap",
+        "--id",
+        "prepare-work-point",
+        "--title",
+        "Prepare workflow point",
+        "--summary",
+        "Claimable workflow point.",
+        "--validation",
+        "cargo test -p elegy-planning",
+    ]);
+    create_workflow_graph_node(
+        db,
+        "prepare-work",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"prepare-roadmap"},"workPointId":"prepare-work-point","fileScopes":[{"selectorType":"glob","selector":"plugins/planning/**","intent":"primary"}]}"#,
+    );
+
+    let prepare = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-workflow-prepare",
+            "workflow",
+            "prepare",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "prepare-roadmap",
+            "--adapter-id",
+            "codex-native",
+            "--capability",
+            "browser",
+            "--capability",
+            "container",
+            "--max-workers",
+            "1",
+        ])
+        .output()
+        .expect("prepare workflow");
+    assert!(
+        prepare.status.success(),
+        "stderr: {}; stdout: {}",
+        String::from_utf8_lossy(&prepare.stderr),
+        String::from_utf8_lossy(&prepare.stdout)
+    );
+    let prepare_envelope: Value = serde_json::from_slice(&prepare.stdout).expect("valid json");
+    assert_eq!(
+        prepare_envelope["command"],
+        serde_json::json!(["workflow", "prepare"])
+    );
+    let dispatch = &prepare_envelope["data"]["workflowPrepare"]["dispatches"][0];
+    assert_eq!(dispatch["schemaVersion"], "orchestrator-dispatch/v1");
+    assert_eq!(dispatch["nodeId"], "prepare-work");
+    assert_eq!(dispatch["adapterId"], "codex-native");
+    assert_eq!(
+        dispatch["requiredCapabilities"],
+        serde_json::json!(["browser", "container"])
+    );
+    assert_eq!(dispatch["projectRun"]["status"], "active");
+    assert!(dispatch["fencingToken"].is_number());
+    assert!(dispatch["idempotencyKey"].is_string());
+
+    fs::write(
+        &result_path,
+        serde_json::to_string_pretty(&serde_json::json!({
+            "schemaVersion": "orchestrator-worker-result/v1",
+            "dispatchId": dispatch["dispatchId"],
+            "projectRunId": dispatch["projectRun"]["id"],
+            "nodeId": dispatch["nodeId"],
+            "sourceRevision": dispatch["sourceRevision"],
+            "fencingToken": dispatch["fencingToken"],
+            "idempotencyKey": dispatch["idempotencyKey"],
+            "status": "completed",
+            "summary": "Worker completed the prepared workflow point.",
+            "reference": "cargo test -p elegy-planning",
+            "content": "The focused and repository tests passed.",
+            "evidenceKind": "test-result",
+            "statusUpdate": "completed"
+        }))
+        .expect("serialize worker result"),
+    )
+    .expect("write worker result");
+
+    let record_args = [
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-workflow-result",
+        "workflow",
+        "record-result",
+        "--file",
+        result_path.to_str().expect("utf-8 result path"),
+    ];
+    let record = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(record_args)
+        .output()
+        .expect("record workflow result");
+    assert!(
+        record.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&record.stderr)
+    );
+    let record_envelope: Value = serde_json::from_slice(&record.stdout).expect("valid json");
+    assert_eq!(record_envelope["data"]["workflowResult"]["replayed"], false);
+    assert_eq!(
+        record_envelope["data"]["workflowResult"]["projectRun"]["status"],
+        "completed"
+    );
+
+    let replay = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args(record_args)
+        .output()
+        .expect("replay workflow result");
+    assert!(
+        replay.status.success(),
+        "stderr: {}",
+        String::from_utf8_lossy(&replay.stderr)
+    );
+    let replay_envelope: Value = serde_json::from_slice(&replay.stdout).expect("valid json");
+    assert_eq!(replay_envelope["data"]["workflowResult"]["replayed"], true);
+    assert_eq!(
+        replay_envelope["data"]["workflowResult"]["projectRun"]["status"],
+        "completed"
+    );
+}
+
+#[test]
+fn workflow_record_result_rejects_stale_fencing_token_without_writeback() {
+    let temp_dir = unique_temp_dir("elegy-planning-workflow-stale-result");
+    let db_path = temp_dir.join("planning.db");
+    let result_path = temp_dir.join("stale-worker-result.json");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    create_workflow_roadmap(db, "stale-roadmap", "stale-goal");
+    let _ = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "stale-work-point",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "stale-roadmap",
+        "--id",
+        "stale-work-point",
+        "--title",
+        "Stale workflow point",
+        "--summary",
+        "Fencing regression point.",
+    ]);
+    create_workflow_graph_node(
+        db,
+        "stale-work",
+        r#"{"planningRef":{"entityType":"roadmap","entityId":"stale-roadmap"},"workPointId":"stale-work-point"}"#,
+    );
+
+    let prepare = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-stale-prepare",
+            "workflow",
+            "prepare",
+            "--entity-type",
+            "roadmap",
+            "--entity-id",
+            "stale-roadmap",
+            "--max-workers",
+            "1",
+        ])
+        .output()
+        .expect("prepare stale workflow");
+    assert!(
+        prepare.status.success(),
+        "stderr: {}; stdout: {}",
+        String::from_utf8_lossy(&prepare.stderr),
+        String::from_utf8_lossy(&prepare.stdout)
+    );
+    let prepare_envelope: Value = serde_json::from_slice(&prepare.stdout).expect("valid json");
+    let dispatch = &prepare_envelope["data"]["workflowPrepare"]["dispatches"][0];
+    let stale_result = serde_json::json!({
+        "schemaVersion": "orchestrator-worker-result/v1",
+        "dispatchId": dispatch["dispatchId"],
+        "projectRunId": dispatch["projectRun"]["id"],
+        "nodeId": dispatch["nodeId"],
+        "sourceRevision": dispatch["sourceRevision"],
+        "fencingToken": dispatch["fencingToken"].as_i64().expect("fence") + 1,
+        "idempotencyKey": dispatch["idempotencyKey"],
+        "status": "completed",
+        "summary": "This result must be rejected.",
+        "evidenceKind": "test-result"
+    });
+    fs::write(
+        &result_path,
+        serde_json::to_string(&stale_result).expect("serialize stale result"),
+    )
+    .expect("write stale result");
+
+    let record = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-stale-result",
+            "workflow",
+            "record-result",
+            "--file",
+            result_path.to_str().expect("utf-8 result path"),
+        ])
+        .output()
+        .expect("record stale workflow result");
+    assert!(!record.status.success());
+    let envelope: Value = serde_json::from_slice(&record.stdout).expect("valid error json");
+    assert_eq!(envelope["status"], "invalid");
+    assert!(envelope["error"]
+        .as_str()
+        .unwrap_or_default()
+        .contains("STALE"));
+
+    let show = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-stale-show",
+            "project-run",
+            "show",
+            "--project-run-id",
+            dispatch["projectRun"]["id"].as_str().expect("run id"),
+        ])
+        .output()
+        .expect("show stale project run");
+    assert!(show.status.success());
+    let show_envelope: Value = serde_json::from_slice(&show.stdout).expect("valid show json");
+    assert_eq!(show_envelope["data"]["projectRun"]["status"], "active");
+}
+
+#[test]
+fn capability_catalog_uses_governed_side_effect_classes() {
+    let catalog: Value = serde_json::from_str(include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/capability-catalog.json"
+    )))
+    .expect("capability catalog JSON");
+    let allowed = ["pure", "query", "mutation", "fenced-mutation"];
+    for capability in catalog["capabilities"].as_array().expect("capabilities") {
+        let class = capability["sideEffectClass"]
+            .as_str()
+            .expect("sideEffectClass string");
+        assert!(
+            allowed.contains(&class),
+            "unsupported sideEffectClass: {class}"
+        );
+    }
 }
 
 #[test]
@@ -1658,6 +2637,29 @@ fn machine_output_conforms_to_planning_result_schema() {
         eprintln!("Schema validation error: {}", error);
         panic!("output does not conform to planning-result schema");
     }
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c2-graph",
+        "--scope",
+        "default",
+        "graph",
+        "node",
+        "create",
+        "--id",
+        "work-schema",
+        "--kind",
+        "work",
+        "--title",
+        "Schema work",
+        "--summary",
+        "Schema worker target.",
+        "--status",
+        "active",
+    ]);
 
     // Test 2: validate all output with new fields
     let validate_output = command_json(&[
@@ -1675,6 +2677,243 @@ fn machine_output_conforms_to_planning_result_schema() {
     if let Err(error) = schema.validate(&validate_output) {
         eprintln!("Schema validation error on validate output: {}", error);
         panic!("validate output does not conform to schema");
+    }
+
+    for args in [
+        vec!["--json", "--non-interactive", "version"],
+        vec!["--json", "--non-interactive", "capabilities"],
+        vec!["--json", "--non-interactive", "capabilities", "--detail"],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "graph",
+            "runnable",
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "view",
+            "--entity-type",
+            "goal",
+            "--entity-id",
+            "goal-schema",
+        ],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args(args)
+            .output()
+            .expect("run schema sample command");
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let instance: Value = serde_json::from_slice(&output.stdout).expect("parse output");
+        if let Err(error) = schema.validate(&instance) {
+            eprintln!("Schema validation error on newer command output: {}", error);
+            panic!("newer command output does not conform to schema");
+        }
+    }
+
+    let manifest_path = temp_dir.join("schema-manifest.yaml");
+    let workflow_output_path = temp_dir.join("schema-workflow.json");
+    let workflow_bundle_path = temp_dir.join("schema-workflow-bundle");
+    let workflow_artifact_path = temp_dir.join("schema-workflow-artifact.md");
+    let workflow_artifact_export_path = temp_dir.join("schema-workflow-artifact-export.md");
+    fs::write(
+        &manifest_path,
+        "schemaVersion: planning-manifest/v1\nscope: default\nnodes: []\nedges: []\n",
+    )
+    .expect("write manifest");
+    fs::write(
+        &workflow_artifact_path,
+        r#"# Schema Artifact
+
+## Structured State
+
+```json
+{
+  "schemaVersion": "1",
+  "kind": "roadmap.review.result",
+  "roadmapId": "RM-schema",
+  "sliceId": "RM-schema-001",
+  "phase": "review",
+  "status": "pass",
+  "followUps": [],
+  "requiresUserDecision": false,
+  "acceptance": {
+    "allPassed": true,
+    "failedChecks": [],
+    "passedChecks": ["cargo test -p elegy-planning"]
+  }
+}
+```
+"#,
+    )
+    .expect("write workflow artifact");
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c-schema-roadmap",
+        "--scope",
+        "default",
+        "roadmap",
+        "create",
+        "--id",
+        "schema-roadmap",
+        "--goal-id",
+        "goal-schema",
+        "--title",
+        "Schema roadmap",
+        "--summary",
+        "Schema export roadmap.",
+    ]);
+    command_json(&[
+        "--db",
+        db_arg,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "c-schema-workpoint",
+        "--scope",
+        "default",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "schema-roadmap",
+        "--id",
+        "schema-work-point",
+        "--title",
+        "Schema work point",
+        "--summary",
+        "Schema export work point.",
+        "--validation",
+        "cargo test -p elegy-planning",
+    ]);
+    for args in [
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "manifest",
+            "--file",
+            manifest_path.to_str().expect("utf-8 manifest"),
+            "--dry-run",
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "diff",
+            "--manifest",
+            manifest_path.to_str().expect("utf-8 manifest"),
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "render",
+            "--entity-type",
+            "goal",
+            "--entity-id",
+            "goal-schema",
+            "--projection-format",
+            "json",
+            "--output",
+            workflow_output_path
+                .to_str()
+                .expect("utf-8 workflow output"),
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "bundle",
+            "--entity-type",
+            "goal",
+            "--entity-id",
+            "goal-schema",
+            "--output",
+            workflow_bundle_path
+                .to_str()
+                .expect("utf-8 workflow bundle output"),
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "import-artifact",
+            "--file",
+            workflow_artifact_path
+                .to_str()
+                .expect("utf-8 workflow artifact"),
+            "--dry-run",
+            "--if-exists",
+            "update",
+        ],
+        vec![
+            "--db",
+            db_arg,
+            "--json",
+            "--non-interactive",
+            "--scope",
+            "default",
+            "workflow",
+            "export-artifact",
+            "--roadmap-id",
+            "schema-roadmap",
+            "--slice-id",
+            "schema-work-point",
+            "--output",
+            workflow_artifact_export_path
+                .to_str()
+                .expect("utf-8 workflow artifact export"),
+        ],
+    ] {
+        let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+            .args(args)
+            .output()
+            .expect("run manifest schema sample command");
+        assert!(
+            output.status.success(),
+            "stderr: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        let instance: Value = serde_json::from_slice(&output.stdout).expect("parse output");
+        if let Err(error) = schema.validate(&instance) {
+            eprintln!("Schema validation error on manifest output: {}", error);
+            panic!("manifest output does not conform to schema");
+        }
     }
 
     // Test 3: error output (invalid command)
@@ -5894,6 +7133,10 @@ fn template_help_shows_new_commands() {
         "help should show template command"
     );
     assert!(help.contains("intent"), "help should show intent command");
+    assert!(
+        help.contains("workflow"),
+        "help should show workflow command"
+    );
 
     // Check graph subcommand help
     let graph_help = Command::new(bin)
@@ -5903,6 +7146,29 @@ fn template_help_shows_new_commands() {
     let gh = String::from_utf8(graph_help.stdout).expect("utf-8");
     assert!(gh.contains("runnable"), "graph help should show runnable");
     assert!(gh.contains("bulk"), "graph help should show bulk");
+
+    let workflow_help = Command::new(bin)
+        .args(["workflow", "--help"])
+        .output()
+        .expect("run workflow help");
+    let wh = String::from_utf8(workflow_help.stdout).expect("utf-8");
+    assert!(wh.contains("render"), "workflow help should show render");
+    assert!(wh.contains("export"), "workflow help should show export");
+    assert!(wh.contains("view"), "workflow help should show view");
+    assert!(wh.contains("bundle"), "workflow help should show bundle");
+    assert!(wh.contains("prepare"), "workflow help should show prepare");
+    assert!(
+        wh.contains("record-result"),
+        "workflow help should show record-result"
+    );
+    assert!(
+        wh.contains("import-artifact"),
+        "workflow help should show import-artifact"
+    );
+    assert!(
+        wh.contains("export-artifact"),
+        "workflow help should show export-artifact"
+    );
 }
 
 #[test]
@@ -5942,6 +7208,43 @@ fn graph_runnable_empty_scope() {
     let result: Value = serde_json::from_slice(&output.stdout).expect("valid JSON");
     assert!(result["data"]["candidates"].as_array().unwrap().is_empty());
     assert!(result["data"]["blocked"].as_array().unwrap().is_empty());
+}
+
+#[test]
+fn skill_references_existing_contract_files() {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let skill = fs::read_to_string(manifest_dir.join("skills/elegy-planning/SKILL.md"))
+        .expect("read planning skill");
+
+    for stale_reference in [
+        "fixtures/skill.elegy-planning.json",
+        "fixtures/skill-discovery-index.elegy-planning.json",
+        "docs/architecture/v1.md",
+    ] {
+        assert!(
+            !skill.contains(stale_reference),
+            "skill should not reference stale path `{stale_reference}`"
+        );
+    }
+
+    for relative in [
+        ".elegy-plugin/plugin.json",
+        "capability-catalog.json",
+        "docs/architecture/ARCHITECTURE.md",
+        "docs/architecture/mvp-scope.md",
+        "docs/specs/index.md",
+        "docs/specs/workflow-view.md",
+        "schemas/planning-result.schema.json",
+    ] {
+        assert!(
+            skill.contains(relative),
+            "skill should reference `{relative}`"
+        );
+        assert!(
+            manifest_dir.join(relative).exists(),
+            "skill reference `{relative}` should exist"
+        );
+    }
 }
 
 // ===================================================================
@@ -6068,6 +7371,189 @@ fn capabilities_catalog_digest_valid() {
 }
 
 #[test]
+fn capability_release_statuses_match_project_run_status_enum() {
+    let catalog = load_catalog();
+    let release = catalog["capabilities"]
+        .as_array()
+        .expect("catalog capabilities array")
+        .iter()
+        .find(|capability| capability["id"] == "project-run.release.fenced.v1")
+        .expect("release capability present");
+    let statuses = release["inputSchema"]["properties"]["status"]["enum"]
+        .as_array()
+        .expect("release status enum");
+
+    for status in statuses {
+        let status = status.as_str().expect("status should be string");
+        status
+            .parse::<ProjectRunStatus>()
+            .unwrap_or_else(|_| panic!("catalog release status `{status}` must parse"));
+    }
+}
+
+#[test]
+fn project_run_release_rejects_non_terminal_status() {
+    let temp_dir = unique_temp_dir("elegy-planning-release-status");
+    let db_path = temp_dir.join("planning.db");
+    let db = db_path.to_str().expect("utf-8 db path");
+
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-scope-release",
+        "--scope",
+        "repo:test",
+        "scope",
+        "create",
+        "--scope-key",
+        "repo:test",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-goal-release",
+        "--scope",
+        "repo:test",
+        "goal",
+        "create",
+        "--id",
+        "goal-release",
+        "--title",
+        "Release status goal",
+        "--description",
+        "Verify release terminal status handling.",
+        "--acceptance",
+        "terminal statuses enforced",
+        "--rejection",
+        "active can be used as final status",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-roadmap-release",
+        "--scope",
+        "repo:test",
+        "roadmap",
+        "create",
+        "--id",
+        "roadmap-release",
+        "--goal-id",
+        "goal-release",
+        "--title",
+        "Release status roadmap",
+        "--summary",
+        "Create one work point.",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-section-release",
+        "--scope",
+        "repo:test",
+        "roadmap",
+        "add-section",
+        "--roadmap-id",
+        "roadmap-release",
+        "--id",
+        "section-release",
+        "--slug",
+        "release",
+        "--title",
+        "Release",
+    ]);
+    command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-wp-release",
+        "--scope",
+        "repo:test",
+        "roadmap",
+        "add-work-point",
+        "--roadmap-id",
+        "roadmap-release",
+        "--section-id",
+        "section-release",
+        "--id",
+        "wp-release",
+        "--title",
+        "Release status work",
+        "--summary",
+        "Claim and release.",
+    ]);
+    let claimed = command_json(&[
+        "--db",
+        db,
+        "--json",
+        "--non-interactive",
+        "--correlation-id",
+        "corr-claim-release",
+        "--scope",
+        "repo:test",
+        "project-run",
+        "claim",
+        "--id",
+        "run-release",
+        "--goal-id",
+        "goal-release",
+        "--roadmap-id",
+        "roadmap-release",
+        "--work-point-id",
+        "wp-release",
+    ]);
+    let fencing_token = claimed["data"]["record"]["fencingToken"]
+        .as_i64()
+        .expect("fencing token");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_elegy-planning"))
+        .args([
+            "--db",
+            db,
+            "--json",
+            "--non-interactive",
+            "--correlation-id",
+            "corr-release-active",
+            "--scope",
+            "repo:test",
+            "project-run",
+            "release",
+            "--project-run-id",
+            "run-release",
+            "--status",
+            "active",
+            "--fencing-token",
+            &fencing_token.to_string(),
+        ])
+        .output()
+        .expect("run project-run release");
+
+    assert!(
+        !output.status.success(),
+        "release with active status should fail"
+    );
+    let result: Value = serde_json::from_slice(&output.stdout).expect("valid json");
+    assert_eq!(result["status"], "invalid");
+    assert!(result["error"]
+        .as_str()
+        .expect("error")
+        .contains("release status must be completed, failed, cancelled, or released"));
+}
+
+#[test]
 fn capabilities_detail_does_not_initialize_database() {
     let temp_dir = unique_temp_dir("elegy-planning-capabilities-detail-no-db");
     let db_path = temp_dir.join("missing-parent").join("planning.db");
@@ -6141,7 +7627,13 @@ fn capabilities_compact_backward_compat() {
             "project-run.activate.fenced.v1",
             "project-run.heartbeat.v1",
             "project-run.release.fenced.v1",
-            "project-run.add-evidence.fenced.v1"
+            "project-run.add-evidence.fenced.v1",
+            "workflow.view.v1",
+            "workflow.bundle.v1",
+            "workflow.prepare.v1",
+            "workflow.record-result.v1",
+            "workflow.import-artifact.v1",
+            "workflow.export-artifact.v1"
         ])
     );
 }

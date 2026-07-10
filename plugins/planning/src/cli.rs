@@ -1,4 +1,11 @@
-use std::{env, ffi::OsString, path::PathBuf, process::ExitCode, sync::OnceLock};
+use std::{
+    env,
+    ffi::OsString,
+    fs,
+    path::{Path, PathBuf},
+    process::ExitCode,
+    sync::OnceLock,
+};
 
 use clap::{error::ErrorKind, Args, CommandFactory, Parser, Subcommand, ValueEnum};
 use serde::Serialize;
@@ -18,13 +25,14 @@ use crate::{
     EvidenceKind, FieldDiff, FileScopeIntent, FileScopeRecord, FileScopeSelectorType,
     FinalizeGraphNodeInput, GoalStatus, InsightStatus, InsightType, IssueStatus, ManifestDiffEntry,
     ManifestDiffResult, PlanStatus, PlanningEdgeKind, PlanningGraphEdge, PlanningGraphNode,
-    PlanningNodeKind, PlanningStore, PlanningStoreError, Priority, ProjectRunEvidence,
-    ProjectRunStatus, ProjectionFormat, ReleaseProjectRunInput, ReviewPointStatus,
-    ReviseGraphEdgeInput, ReviseGraphNodeInput, RevisePlanInput, ReviseWorkPointInput,
-    RoadmapScaffoldFile, RoadmapScaffoldResult, RoadmapStatus, SatisfyAcceptanceInput,
-    ScaffoldIfExists, SearchInput, Severity, TodoStatus, UpdateGraphEdgeStatusInput,
-    UpdateGraphNodeStatusInput, UpdateStatusInput, VerificationState, WorkPointKind,
-    WorkPointStatus, WorktreeStatus,
+    PlanningNodeKind, PlanningStore, PlanningStoreError, PrepareWorkflowInput, Priority,
+    ProjectRunEvidence, ProjectRunStatus, ProjectionFormat, RecordWorkflowResultInput,
+    ReleaseProjectRunInput, ReviewPointStatus, ReviseGraphEdgeInput, ReviseGraphNodeInput,
+    RevisePlanInput, ReviseWorkPointInput, RoadmapScaffoldFile, RoadmapScaffoldGoal,
+    RoadmapScaffoldResult, RoadmapScaffoldRoadmap, RoadmapScaffoldWorkPoint, RoadmapStatus,
+    SatisfyAcceptanceInput, ScaffoldIfExists, SearchInput, Severity, TodoStatus,
+    UpdateGraphEdgeStatusInput, UpdateGraphNodeStatusInput, UpdateStatusInput, VerificationState,
+    WorkPointKind, WorkPointStatus, WorkflowWorkerResult, WorktreeStatus,
 };
 
 const EXIT_CODE_INVALID_INPUT: u8 = 1;
@@ -134,6 +142,11 @@ enum Command {
     Project {
         #[command(subcommand)]
         command: ProjectCommand,
+    },
+    #[command(about = "Render workflow-oriented planning projections")]
+    Workflow {
+        #[command(subcommand)]
+        command: WorkflowCommand,
     },
     #[command(about = "Manage operational sessions")]
     Session {
@@ -381,6 +394,102 @@ struct ValidateAllArgs {
 enum ProjectCommand {
     Export(ProjectRenderArgs),
     Render(ProjectRenderArgs),
+}
+
+#[derive(Subcommand, Debug)]
+enum WorkflowCommand {
+    Export(ProjectRenderArgs),
+    Render(ProjectRenderArgs),
+    View(WorkflowViewArgs),
+    Bundle(WorkflowBundleArgs),
+    Prepare(WorkflowPrepareArgs),
+    RecordResult(WorkflowRecordResultArgs),
+    ImportArtifact(WorkflowImportArtifactArgs),
+    ExportArtifact(WorkflowExportArtifactArgs),
+}
+
+#[derive(Args, Debug)]
+struct WorkflowViewArgs {
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: EntityType,
+    #[arg(long = "entity-id")]
+    entity_id: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkflowBundleArgs {
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: EntityType,
+    #[arg(long = "entity-id")]
+    entity_id: String,
+    #[arg(long)]
+    output: PathBuf,
+    #[arg(long, default_value = "generic")]
+    host: String,
+}
+
+#[derive(Args, Debug)]
+struct WorkflowPrepareArgs {
+    #[arg(long = "entity-type", value_enum)]
+    entity_type: EntityType,
+    #[arg(long = "entity-id")]
+    entity_id: String,
+    #[arg(long = "adapter-id", default_value = "native")]
+    adapter_id: String,
+    #[arg(long = "capability")]
+    capabilities: Vec<String>,
+    #[arg(long = "max-workers", default_value_t = 3)]
+    max_workers: usize,
+    #[arg(long = "lease-seconds", default_value_t = 900)]
+    lease_seconds: i64,
+    #[arg(long = "owner-id")]
+    owner_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
+    #[arg(long = "repo-id")]
+    repo_id: Option<String>,
+    #[arg(long)]
+    branch: Option<String>,
+    #[arg(long = "worktree-id")]
+    worktree_id: Option<String>,
+}
+
+#[derive(Args, Debug)]
+struct WorkflowRecordResultArgs {
+    #[arg(long)]
+    file: PathBuf,
+}
+
+#[derive(Args, Debug)]
+struct WorkflowImportArtifactArgs {
+    #[arg(long)]
+    file: PathBuf,
+    #[arg(long)]
+    dry_run: bool,
+    #[arg(long)]
+    apply: bool,
+    #[arg(long = "if-exists", value_enum, default_value_t = ScaffoldIfExists::Fail)]
+    if_exists: ScaffoldIfExists,
+}
+
+#[derive(Args, Debug)]
+struct WorkflowExportArtifactArgs {
+    #[arg(long = "roadmap-id")]
+    roadmap_id: String,
+    #[arg(long = "slice-id")]
+    slice_id: Option<String>,
+    #[arg(long)]
+    output: PathBuf,
+    #[arg(long, default_value = "roadmap.definition")]
+    kind: String,
+    #[arg(long, default_value = "definition")]
+    phase: String,
+    #[arg(long, default_value = "proposed")]
+    status: String,
+    #[arg(long = "repo-id")]
+    repo_id: Option<String>,
+    #[arg(long = "session-id")]
+    session_id: Option<String>,
 }
 
 #[derive(Subcommand, Debug)]
@@ -1574,6 +1683,7 @@ where
             unreachable!("capabilities returns before database initialization")
         }
         Command::Project { command } => execute_project(command, &store, &context),
+        Command::Workflow { command } => execute_workflow(command, &store, &context),
         Command::Session { command } => execute_session(command, &store, &context),
         Command::Search(args) => execute_search(args, &store, &context),
         Command::Insight { command } => execute_insight(command, &store, &context),
@@ -2570,12 +2680,23 @@ fn execute_version(context: &MachineContext) -> Result<ExitCode, CliError> {
 }
 
 fn execute_capabilities(context: &MachineContext, detail: bool) -> Result<ExitCode, CliError> {
+    let catalog: serde_json::Value =
+        serde_json::from_str(include_str!("../capability-catalog.json")).map_err(CliError::Json)?;
     if detail {
-        let catalog: serde_json::Value =
-            serde_json::from_str(include_str!("../capability-catalog.json"))
-                .map_err(CliError::Json)?;
         emit_success(context, vec!["capabilities"], catalog)
     } else {
+        let capability_ids: Vec<String> = catalog
+            .get("capabilities")
+            .and_then(serde_json::Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|capability| {
+                capability
+                    .get("id")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_string)
+            })
+            .collect();
         emit_success(
             context,
             vec!["capabilities"],
@@ -2583,13 +2704,7 @@ fn execute_capabilities(context: &MachineContext, detail: bool) -> Result<ExitCo
                 "cliVersion": env!("CARGO_PKG_VERSION"),
                 "resultSchemaVersion": RESULT_SCHEMA_VERSION,
                 "planningSchemaVersion": CURRENT_SCHEMA_VERSION,
-                "capabilities": [
-                    "project-run.claim.v2",
-                    "project-run.activate.fenced.v1",
-                    "project-run.heartbeat.v1",
-                    "project-run.release.fenced.v1",
-                    "project-run.add-evidence.fenced.v1"
-                ]
+                "capabilities": capability_ids
             }),
         )
     }
@@ -2623,6 +2738,923 @@ fn execute_project(
                 &args.output,
             )?,
         ),
+    }
+}
+
+fn execute_workflow(
+    command: WorkflowCommand,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    match command {
+        WorkflowCommand::Export(args) => emit_success(
+            context,
+            vec!["workflow", "export"],
+            store.render_projection_in_scope(
+                &context.scope_key,
+                args.entity_type,
+                &args.entity_id,
+                args.projection_format,
+                &args.output,
+            )?,
+        ),
+        WorkflowCommand::Render(args) => emit_success(
+            context,
+            vec!["workflow", "render"],
+            store.render_projection_in_scope(
+                &context.scope_key,
+                args.entity_type,
+                &args.entity_id,
+                args.projection_format,
+                &args.output,
+            )?,
+        ),
+        WorkflowCommand::View(args) => emit_success(
+            context,
+            vec!["workflow", "view"],
+            json!({
+                "workflowView": store.workflow_view_in_scope(
+                    &context.scope_key,
+                    args.entity_type,
+                    &args.entity_id,
+                )?
+            }),
+        ),
+        WorkflowCommand::Bundle(args) => {
+            let workflow_view = store.workflow_view_in_scope(
+                &context.scope_key,
+                args.entity_type,
+                &args.entity_id,
+            )?;
+            let bundle = write_workflow_bundle(context, &workflow_view, &args.output, &args.host)?;
+            emit_success(
+                context,
+                vec!["workflow", "bundle"],
+                json!({ "bundle": bundle }),
+            )
+        }
+        WorkflowCommand::Prepare(args) => execute_workflow_prepare(args, store, context),
+        WorkflowCommand::RecordResult(args) => execute_workflow_record_result(args, store, context),
+        WorkflowCommand::ImportArtifact(args) => {
+            execute_workflow_import_artifact(args, store, context)
+        }
+        WorkflowCommand::ExportArtifact(args) => {
+            execute_workflow_export_artifact(args, store, context)
+        }
+    }
+}
+
+fn execute_workflow_prepare(
+    args: WorkflowPrepareArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let correlation_id = match resolve_correlation_id(None, context) {
+        Ok(value) => value,
+        Err(message) => return emit_error(context, vec!["workflow", "prepare"], message, true),
+    };
+    let result = store.prepare_workflow(PrepareWorkflowInput {
+        scope_key: context.scope_key.clone(),
+        entity_type: args.entity_type,
+        entity_id: args.entity_id,
+        correlation_id: correlation_id.clone(),
+        adapter_id: args.adapter_id,
+        capabilities: args.capabilities,
+        owner_id: args.owner_id,
+        session_id: args.session_id,
+        repo_id: args.repo_id,
+        branch: args.branch,
+        worktree_id: args.worktree_id,
+        run_id: context.correlation_id.clone(),
+        max_workers: args.max_workers,
+        lease_seconds: args.lease_seconds,
+    })?;
+    emit_success(
+        context,
+        vec!["workflow", "prepare"],
+        json!({ "workflowPrepare": result }),
+    )
+}
+
+fn execute_workflow_record_result(
+    args: WorkflowRecordResultArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let correlation_id = match resolve_correlation_id(None, context) {
+        Ok(value) => value,
+        Err(message) => {
+            return emit_error(context, vec!["workflow", "record-result"], message, true)
+        }
+    };
+    let result = read_workflow_result(&args.file)?;
+    let writeback = store.record_workflow_result(RecordWorkflowResultInput {
+        result,
+        active_scope_key: Some(context.scope_key.clone()),
+        correlation_id,
+        run_id: context.correlation_id.clone(),
+    })?;
+    emit_success(
+        context,
+        vec!["workflow", "record-result"],
+        json!({ "workflowResult": writeback }),
+    )
+}
+
+fn read_workflow_result(path: &Path) -> Result<WorkflowWorkerResult, CliError> {
+    let metadata = fs::metadata(path).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to stat workflow result `{}`: {error}",
+            path.display()
+        )))
+    })?;
+    if metadata.len() > 1_048_576 {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "workflow result file exceeds 1048576 bytes".to_string(),
+        )));
+    }
+    let content = fs::read_to_string(path).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to read workflow result `{}`: {error}",
+            path.display()
+        )))
+    })?;
+    serde_json::from_str(&content).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "workflow result is not valid orchestrator-worker-result/v1 JSON: {error}"
+        )))
+    })
+}
+
+fn execute_workflow_import_artifact(
+    args: WorkflowImportArtifactArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    if args.dry_run == args.apply {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "specify exactly one of --dry-run or --apply".to_string(),
+        )));
+    }
+
+    let parsed = parse_instruction_engine_workflow_artifact(&args.file)?;
+    let scaffold = workflow_artifact_scaffold(&parsed, &context.scope_key)?;
+    let result = store.apply_roadmap_scaffold(
+        scaffold.clone(),
+        Some(context.scope_key.clone()),
+        context.correlation_id.clone(),
+        args.dry_run,
+        args.if_exists,
+    )?;
+
+    emit_success(
+        context,
+        vec!["workflow", "import-artifact"],
+        json!({
+            "workflowArtifactImport": {
+                "schemaVersion": "instruction-engine-roadmap-workflow-import/v1",
+                "mode": if args.dry_run { "dry-run" } else { "apply" },
+                "sourcePath": args.file.display().to_string(),
+                "artifact": parsed.summary,
+                "scaffold": scaffold,
+                "result": result
+            }
+        }),
+    )
+}
+
+fn execute_workflow_export_artifact(
+    args: WorkflowExportArtifactArgs,
+    store: &PlanningStore,
+    context: &MachineContext,
+) -> Result<ExitCode, CliError> {
+    let roadmap = store.roadmap(&args.roadmap_id)?;
+    if roadmap.roadmap.scope_key != context.scope_key {
+        return emit_error(
+            context,
+            vec!["workflow", "export-artifact"],
+            format!(
+                "roadmap `{}` is in scope `{}`, not `{}`",
+                args.roadmap_id, roadmap.roadmap.scope_key, context.scope_key
+            ),
+            true,
+        );
+    }
+    let work_point = args.slice_id.as_ref().and_then(|slice_id| {
+        roadmap
+            .work_points
+            .iter()
+            .find(|candidate| &candidate.id == slice_id)
+    });
+    if args.slice_id.is_some() && work_point.is_none() {
+        return emit_error(
+            context,
+            vec!["workflow", "export-artifact"],
+            format!(
+                "work point `{}` was not found on roadmap `{}`",
+                args.slice_id.as_deref().unwrap_or_default(),
+                args.roadmap_id
+            ),
+            true,
+        );
+    }
+
+    let structured_state = instruction_engine_structured_state(
+        &roadmap,
+        work_point,
+        &args.kind,
+        &args.phase,
+        &args.status,
+        args.repo_id.as_deref(),
+        args.session_id.as_deref(),
+    );
+    let body = instruction_engine_artifact_markdown(&structured_state)?;
+    if let Some(parent) = args
+        .output
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+    {
+        fs::create_dir_all(parent).map_err(|error| {
+            CliError::Store(PlanningStoreError::InvalidInput(format!(
+                "failed to create artifact output directory `{}`: {error}",
+                parent.display()
+            )))
+        })?;
+    }
+    write_text_file(&args.output, &body)?;
+
+    emit_success(
+        context,
+        vec!["workflow", "export-artifact"],
+        json!({
+            "workflowArtifactExport": {
+                "schemaVersion": "instruction-engine-roadmap-workflow-export/v1",
+                "outputPath": args.output.display().to_string(),
+                "artifact": {
+                    "kind": args.kind,
+                    "roadmapId": roadmap.roadmap.id,
+                    "sliceId": work_point.map(|record| record.id.clone()),
+                    "phase": args.phase,
+                    "status": args.status,
+                    "structuredState": structured_state
+                }
+            }
+        }),
+    )
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ParsedWorkflowArtifact {
+    summary: WorkflowArtifactSummary,
+    structured_state: serde_json::Value,
+}
+
+#[derive(Clone, Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct WorkflowArtifactSummary {
+    schema_version: String,
+    kind: String,
+    roadmap_id: String,
+    slice_id: Option<String>,
+    phase: String,
+    status: String,
+    repo_id: Option<String>,
+    session_id: Option<String>,
+}
+
+fn parse_instruction_engine_workflow_artifact(
+    path: &Path,
+) -> Result<ParsedWorkflowArtifact, CliError> {
+    let content = fs::read_to_string(path).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to read workflow artifact `{}`: {error}",
+            path.display()
+        )))
+    })?;
+    let root: serde_json::Value = if path.extension().map(|ext| ext == "json").unwrap_or(false) {
+        serde_json::from_str(&content)?
+    } else {
+        json!({ "body": content })
+    };
+    let structured_state = if let Some(state) = root.get("structuredState").and_then(json_object) {
+        serde_json::Value::Object(state.clone())
+    } else if let Some(body) = root.get("body").and_then(serde_json::Value::as_str) {
+        extract_structured_state_json(body)?
+    } else if root.get("schemaVersion").is_some() && root.get("roadmapId").is_some() {
+        root.clone()
+    } else {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(
+            "workflow artifact must be markdown with a Structured State JSON block, a JSON wrapper with structuredState/body, or raw structured-state JSON".to_string(),
+        )));
+    };
+
+    let summary = WorkflowArtifactSummary {
+        schema_version: json_string(&structured_state, "schemaVersion").unwrap_or_default(),
+        kind: json_string(&structured_state, "kind")
+            .or_else(|| json_string(&root, "kind"))
+            .unwrap_or_else(|| "roadmap.definition".to_string()),
+        roadmap_id: json_string(&structured_state, "roadmapId")
+            .or_else(|| json_string(&root, "roadmapId"))
+            .ok_or_else(|| {
+                CliError::Store(PlanningStoreError::InvalidInput(
+                    "workflow artifact is missing roadmapId".to_string(),
+                ))
+            })?,
+        slice_id: json_string(&structured_state, "sliceId")
+            .or_else(|| json_string(&root, "sliceId")),
+        phase: json_string(&structured_state, "phase")
+            .or_else(|| json_string(&root, "phase"))
+            .unwrap_or_else(|| "definition".to_string()),
+        status: json_string(&structured_state, "status")
+            .or_else(|| json_string(&root, "status"))
+            .unwrap_or_else(|| "proposed".to_string()),
+        repo_id: json_string(&structured_state, "repoId").or_else(|| json_string(&root, "repoId")),
+        session_id: json_string(&structured_state, "sessionId")
+            .or_else(|| json_string(&root, "sessionId")),
+    };
+    if summary.schema_version != "1" {
+        return Err(CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "unsupported workflow artifact schemaVersion `{}`; expected `1`",
+            summary.schema_version
+        ))));
+    }
+
+    Ok(ParsedWorkflowArtifact {
+        summary,
+        structured_state,
+    })
+}
+
+fn workflow_artifact_scaffold(
+    artifact: &ParsedWorkflowArtifact,
+    scope_key: &str,
+) -> Result<RoadmapScaffoldFile, CliError> {
+    let metadata = artifact
+        .structured_state
+        .get("metadata")
+        .and_then(|value| value.get("elegyPlanning"));
+    let roadmap_id = metadata_string(metadata, "roadmapId")
+        .unwrap_or_else(|| artifact.summary.roadmap_id.clone());
+    let roadmap_title = metadata_string(metadata, "roadmapTitle")
+        .unwrap_or_else(|| roadmap_id_to_title(&roadmap_id));
+    let goal_id =
+        metadata_string(metadata, "goalId").unwrap_or_else(|| format!("ie-goal-{roadmap_id}"));
+    let shared_tags = workflow_artifact_tags(artifact);
+    let work_point_id =
+        metadata_string(metadata, "workPointId").or_else(|| artifact.summary.slice_id.clone());
+    let goal_status = workflow_goal_status(&artifact.summary.status);
+    let roadmap_status = workflow_roadmap_status(&artifact.summary.status);
+    let work_point = work_point_id.map(|id| RoadmapScaffoldWorkPoint {
+        title: metadata_string(metadata, "workPointTitle")
+            .unwrap_or_else(|| format!("Workflow Item {id}")),
+        summary: metadata_string(metadata, "workPointSummary").unwrap_or_else(|| {
+            format!(
+                "Seeded from {} in {} phase.",
+                artifact.summary.kind, artifact.summary.phase
+            )
+        }),
+        ordering: derive_work_point_ordering(&id),
+        validation_expectations: workflow_validation_expectations(&artifact.structured_state),
+        status: Some(workflow_work_point_status(&artifact.summary.status)),
+        effort_tier: Some(EffortTier::Balanced),
+        tags: shared_tags.clone(),
+        id,
+        section_id: None,
+        dependency_ids: Vec::new(),
+        file_scopes: Vec::new(),
+        kind: Some(WorkPointKind::FollowUp),
+        priority: Some(Priority::Medium),
+        repairs_work_point_ids: Vec::new(),
+        supersedes_work_point_ids: Vec::new(),
+        blocks_work_point_ids: Vec::new(),
+    });
+
+    Ok(RoadmapScaffoldFile {
+        scope_key: Some(scope_key.to_string()),
+        goal: RoadmapScaffoldGoal {
+            id: goal_id,
+            title: metadata_string(metadata, "goalTitle")
+                .unwrap_or_else(|| format!("Workflow Goal for {roadmap_title}")),
+            description: metadata_string(metadata, "goalDescription").unwrap_or_else(|| {
+                format!(
+                    "Compatibility goal seeded from instruction-engine workflow artifacts for roadmap {roadmap_id}."
+                )
+            }),
+            acceptance_criteria: vec![metadata_string(metadata, "goalAcceptance")
+                .unwrap_or_else(|| format!("Durable roadmap {roadmap_id} exists in elegy-planning."))],
+            rejection_criteria: vec![metadata_string(metadata, "goalRejection")
+                .unwrap_or_else(|| format!("Roadmap {roadmap_id} remains only in instruction-engine workflow artifacts."))],
+            status: Some(goal_status),
+            tags: shared_tags.clone(),
+        },
+        roadmap: RoadmapScaffoldRoadmap {
+            id: roadmap_id,
+            title: roadmap_title,
+            summary: metadata_string(metadata, "roadmapSummary").unwrap_or_else(|| {
+                format!(
+                    "Compatibility roadmap seeded from instruction-engine workflow artifact {}.",
+                    artifact.summary.kind
+                )
+            }),
+            status: Some(roadmap_status),
+            tags: shared_tags,
+        },
+        sections: Vec::new(),
+        work_points: work_point.into_iter().collect(),
+        plan: None,
+        todos: Vec::new(),
+    })
+}
+
+fn extract_structured_state_json(markdown: &str) -> Result<serde_json::Value, CliError> {
+    let mut in_structured_state = false;
+    let mut in_fence = false;
+    let mut json_lines = Vec::new();
+    for line in markdown.lines() {
+        let trimmed = line.trim();
+        if !in_structured_state {
+            if trimmed.eq_ignore_ascii_case("## Structured State") {
+                in_structured_state = true;
+            }
+            continue;
+        }
+        if !in_fence {
+            if trimmed.starts_with("```") {
+                in_fence = true;
+            }
+            continue;
+        }
+        if trimmed.starts_with("```") {
+            let json_text = json_lines.join("\n");
+            return serde_json::from_str(&json_text).map_err(CliError::Json);
+        }
+        json_lines.push(line);
+    }
+    Err(CliError::Store(PlanningStoreError::InvalidInput(
+        "workflow artifact markdown is missing a fenced JSON block after `## Structured State`"
+            .to_string(),
+    )))
+}
+
+fn instruction_engine_structured_state(
+    roadmap: &crate::RoadmapView,
+    work_point: Option<&crate::WorkPointRecord>,
+    kind: &str,
+    phase: &str,
+    status: &str,
+    repo_id: Option<&str>,
+    session_id: Option<&str>,
+) -> serde_json::Value {
+    let mut metadata = json!({
+        "elegyPlanning": {
+            "goalId": roadmap.roadmap.goal_id,
+            "roadmapId": roadmap.roadmap.id,
+            "roadmapTitle": roadmap.roadmap.title,
+            "roadmapSummary": roadmap.roadmap.summary
+        }
+    });
+    if let Some(work_point) = work_point {
+        metadata["elegyPlanning"]["workPointId"] = json!(work_point.id);
+        metadata["elegyPlanning"]["workPointTitle"] = json!(work_point.title);
+        metadata["elegyPlanning"]["workPointSummary"] = json!(work_point.summary);
+    }
+    json!({
+        "schemaVersion": "1",
+        "kind": kind,
+        "roadmapId": roadmap.roadmap.id,
+        "sliceId": work_point.map(|record| record.id.clone()),
+        "phase": phase,
+        "status": status,
+        "followUps": [],
+        "requiresUserDecision": false,
+        "repoId": repo_id,
+        "sessionId": session_id,
+        "acceptance": {
+            "allPassed": false,
+            "failedChecks": [],
+            "passedChecks": work_point
+                .map(|record| record.validation_expectations.clone())
+                .unwrap_or_default()
+        },
+        "metadata": metadata
+    })
+}
+
+fn instruction_engine_artifact_markdown(
+    structured_state: &serde_json::Value,
+) -> Result<String, CliError> {
+    let state = serde_json::to_string_pretty(structured_state)?;
+    Ok(format!(
+        "# Roadmap Workflow Artifact\n\n## Structured State\n\n```json\n{state}\n```\n"
+    ))
+}
+
+fn json_object(value: &serde_json::Value) -> Option<&serde_json::Map<String, serde_json::Value>> {
+    value.as_object()
+}
+
+fn json_string(value: &serde_json::Value, field: &str) -> Option<String> {
+    value
+        .get(field)
+        .and_then(serde_json::Value::as_str)
+        .map(str::trim)
+        .filter(|value| !value.is_empty())
+        .map(str::to_string)
+}
+
+fn metadata_string(metadata: Option<&serde_json::Value>, field: &str) -> Option<String> {
+    metadata.and_then(|value| json_string(value, field))
+}
+
+fn roadmap_id_to_title(roadmap_id: &str) -> String {
+    let trimmed = roadmap_id.strip_prefix("RM-").unwrap_or(roadmap_id);
+    let title = trimmed
+        .split(['-', '_'])
+        .filter(|part| !part.is_empty())
+        .map(|part| {
+            let mut chars = part.chars();
+            match chars.next() {
+                Some(first) => format!("{}{}", first.to_ascii_uppercase(), chars.as_str()),
+                None => String::new(),
+            }
+        })
+        .collect::<Vec<_>>()
+        .join(" ");
+    if title.is_empty() {
+        roadmap_id.to_string()
+    } else {
+        title
+    }
+}
+
+fn workflow_artifact_tags(artifact: &ParsedWorkflowArtifact) -> Vec<String> {
+    let mut tags = vec![
+        "instruction-engine".to_string(),
+        "roadmap-workflow".to_string(),
+    ];
+    if let Some(repo_id) = &artifact.summary.repo_id {
+        tags.push(format!("repo:{repo_id}"));
+    }
+    if !artifact.summary.phase.is_empty() {
+        tags.push(format!("phase:{}", artifact.summary.phase));
+    }
+    tags
+}
+
+fn workflow_validation_expectations(structured_state: &serde_json::Value) -> Vec<String> {
+    let mut values = Vec::new();
+    let Some(acceptance) = structured_state.get("acceptance") else {
+        return values;
+    };
+    for field in ["failedChecks", "passedChecks"] {
+        if let Some(items) = acceptance.get(field).and_then(serde_json::Value::as_array) {
+            for item in items {
+                if let Some(value) = item
+                    .as_str()
+                    .map(str::trim)
+                    .filter(|value| !value.is_empty())
+                {
+                    values.push(value.to_string());
+                }
+            }
+        }
+    }
+    values.sort();
+    values.dedup();
+    values
+}
+
+fn workflow_goal_status(status: &str) -> GoalStatus {
+    if status.eq_ignore_ascii_case("draft") {
+        GoalStatus::Draft
+    } else {
+        GoalStatus::Proposed
+    }
+}
+
+fn workflow_roadmap_status(status: &str) -> RoadmapStatus {
+    if status.eq_ignore_ascii_case("draft") {
+        RoadmapStatus::Draft
+    } else {
+        RoadmapStatus::Proposed
+    }
+}
+
+fn workflow_work_point_status(status: &str) -> WorkPointStatus {
+    match status.trim().to_ascii_lowercase().as_str() {
+        "draft" => WorkPointStatus::Draft,
+        "in_progress" | "in-progress" => WorkPointStatus::Active,
+        "blocked" | "fail" => WorkPointStatus::Blocked,
+        "pass" | "done" | "completed" => WorkPointStatus::Completed,
+        "cancelled" => WorkPointStatus::Cancelled,
+        _ => WorkPointStatus::Proposed,
+    }
+}
+
+fn derive_work_point_ordering(work_point_id: &str) -> Option<i64> {
+    let (_, suffix) = work_point_id.rsplit_once('-')?;
+    suffix.parse::<i64>().ok()
+}
+
+fn write_workflow_bundle(
+    context: &MachineContext,
+    workflow_view: &crate::WorkflowView,
+    output: &Path,
+    host: &str,
+) -> Result<serde_json::Value, CliError> {
+    fs::create_dir_all(output).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to create workflow bundle directory `{}`: {error}",
+            output.display()
+        )))
+    })?;
+    let workers_dir = output.join("workers");
+    fs::create_dir_all(&workers_dir).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to create workflow workers directory `{}`: {error}",
+            workers_dir.display()
+        )))
+    })?;
+
+    let workflow_view_path = output.join("workflow-view.json");
+    write_pretty_json(&workflow_view_path, workflow_view)?;
+
+    let mut worker_files = Vec::new();
+    let mut dispatch_workers = Vec::new();
+    for phase in &workflow_view.execution_plan.phases {
+        for node_id in &phase.node_ids {
+            let Some(hint) = workflow_view
+                .delegation_hints
+                .iter()
+                .find(|hint| &hint.node_id == node_id)
+            else {
+                continue;
+            };
+            let filename = format!(
+                "{}-{}.md",
+                sanitize_workflow_filename(&phase.id),
+                sanitize_workflow_filename(node_id)
+            );
+            let path = workers_dir.join(&filename);
+            let handoff_path = format!("workers/{filename}");
+            write_text_file(
+                &path,
+                &workflow_worker_handoff_markdown(context, workflow_view, phase, hint, host),
+            )?;
+            worker_files.push(path.display().to_string());
+            dispatch_workers.push(json!({
+                "phaseId": phase.id,
+                "nodeId": node_id,
+                "workerProfile": hint.worker_profile,
+                "recommendedSubagent": hint.recommended_subagent,
+                "modelTier": hint.model_tier,
+                "allowedActions": hint.allowed_actions,
+                "fileScopes": hint.file_scopes,
+                "handoffPath": handoff_path,
+                "writebackCommands": workflow_writeback_commands(context)
+            }));
+        }
+    }
+
+    let dispatch = json!({
+        "schemaVersion": "workflow-bundle-preview/v1",
+        "scopeKey": workflow_view.scope_key,
+        "host": host,
+        "source": workflow_view.source,
+        "strategy": workflow_view.execution_plan.strategy,
+        "phases": workflow_view.execution_plan.phases,
+        "workers": dispatch_workers,
+        "blockedNodeIds": workflow_view.execution_plan.blocked_node_ids,
+        "adapterPolicy": workflow_view.adapter_policy,
+        "evidencePolicy": workflow_view.evidence_policy,
+        "refreshCommand": [
+            "elegy-planning",
+            "--scope",
+            context.scope_key,
+            "--json",
+            "--non-interactive",
+            "workflow",
+            "view",
+            "--entity-type",
+            workflow_view.source.entity_type.as_str(),
+            "--entity-id",
+            workflow_view.source.entity_id
+        ]
+    });
+    let dispatch_path = output.join("dispatch.json");
+    write_pretty_json(&dispatch_path, &dispatch)?;
+
+    let runbook_path = output.join("runbook.md");
+    write_text_file(
+        &runbook_path,
+        &workflow_runbook_markdown(workflow_view, host),
+    )?;
+
+    let writeback_path = output.join("writeback-commands.md");
+    write_text_file(
+        &writeback_path,
+        &workflow_writeback_markdown(context, workflow_view, host),
+    )?;
+
+    Ok(json!({
+        "schemaVersion": "workflow-bundle/v1",
+        "host": host,
+        "scopeKey": workflow_view.scope_key,
+        "source": workflow_view.source,
+        "outputPath": output.display().to_string(),
+        "files": {
+            "workflowView": workflow_view_path.display().to_string(),
+            "dispatch": dispatch_path.display().to_string(),
+            "runbook": runbook_path.display().to_string(),
+            "writebackCommands": writeback_path.display().to_string(),
+            "workers": worker_files
+        },
+        "phaseCount": workflow_view.execution_plan.phases.len(),
+        "workerCount": dispatch_workers.len(),
+        "blockedNodeIds": workflow_view.execution_plan.blocked_node_ids
+    }))
+}
+
+fn write_pretty_json<T: Serialize>(path: &Path, value: &T) -> Result<(), CliError> {
+    let content = serde_json::to_string_pretty(value).map_err(CliError::Json)?;
+    write_text_file(path, &format!("{content}\n"))
+}
+
+fn write_text_file(path: &Path, content: &str) -> Result<(), CliError> {
+    fs::write(path, content).map_err(|error| {
+        CliError::Store(PlanningStoreError::InvalidInput(format!(
+            "failed to write workflow bundle file `{}`: {error}",
+            path.display()
+        )))
+    })
+}
+
+fn workflow_runbook_markdown(workflow_view: &crate::WorkflowView, host: &str) -> String {
+    let mut markdown = String::new();
+    markdown.push_str("# Workflow Runbook\n\n");
+    markdown.push_str(&format!("- Host: `{host}`\n"));
+    markdown.push_str(&format!("- Scope: `{}`\n", workflow_view.scope_key));
+    markdown.push_str(&format!(
+        "- Source: `{}` `{}`\n",
+        workflow_view.source.entity_type.as_str(),
+        workflow_view.source.entity_id
+    ));
+    markdown.push_str(&format!(
+        "- Strategy: `{}`\n",
+        workflow_view.execution_plan.strategy
+    ));
+    markdown.push_str(&format!(
+        "- Orchestrator model tier: `{}`\n\n",
+        workflow_view.adapter_policy.default_orchestrator_model_tier
+    ));
+    markdown.push_str("## Phases\n\n");
+    if workflow_view.execution_plan.phases.is_empty() {
+        markdown.push_str("No runnable phase is currently available. Refresh `workflow view` after resolving blockers.\n");
+    }
+    for phase in &workflow_view.execution_plan.phases {
+        markdown.push_str(&format!(
+            "### {}: `{}`\n\n- Mode: `{}`\n- Max concurrency: `{}`\n- Nodes: `{}`\n- Worker profiles: `{}`\n- Rationale: {}\n\n",
+            phase.index,
+            phase.id,
+            phase.mode,
+            phase.max_concurrency,
+            phase.node_ids.join(", "),
+            phase.worker_profiles.join(", "),
+            phase.rationale
+        ));
+    }
+    if !workflow_view.execution_plan.blocked_node_ids.is_empty() {
+        markdown.push_str("## Blocked Nodes\n\n");
+        for node_id in &workflow_view.execution_plan.blocked_node_ids {
+            markdown.push_str(&format!("- `{node_id}`\n"));
+        }
+    }
+    markdown
+}
+
+fn workflow_worker_handoff_markdown(
+    context: &MachineContext,
+    workflow_view: &crate::WorkflowView,
+    phase: &crate::WorkflowExecutionPhase,
+    hint: &crate::WorkflowDelegationHint,
+    host: &str,
+) -> String {
+    let title = workflow_view
+        .nodes
+        .iter()
+        .find(|node| node.id == hint.node_id)
+        .map(|node| node.title.as_str())
+        .unwrap_or(hint.node_id.as_str());
+    let mut markdown = String::new();
+    markdown.push_str("# Worker Handoff\n\n");
+    markdown.push_str(&format!("- Host: `{host}`\n"));
+    markdown.push_str(&format!("- Scope: `{}`\n", workflow_view.scope_key));
+    markdown.push_str(&format!("- Phase: `{}`\n", phase.id));
+    markdown.push_str(&format!("- Node: `{}`\n", hint.node_id));
+    markdown.push_str(&format!("- Title: {title}\n"));
+    markdown.push_str(&format!("- Worker profile: `{}`\n", hint.worker_profile));
+    markdown.push_str(&format!(
+        "- Recommended subagent: `{}`\n",
+        hint.recommended_subagent
+    ));
+    markdown.push_str(&format!("- Model tier: `{}`\n", hint.model_tier));
+    markdown.push_str(&format!("- Effort tier: `{}`\n", hint.effort_tier));
+    markdown.push_str(&format!(
+        "- Max context tokens: `{}`\n",
+        hint.max_context_tokens_estimate
+    ));
+    markdown.push_str(&format!(
+        "- Wall-time estimate minutes: `{}`\n",
+        hint.wall_time_minutes_estimate
+    ));
+    markdown.push_str("\n## Allowed Actions\n\n");
+    for action in &hint.allowed_actions {
+        markdown.push_str(&format!("- `{action}`\n"));
+    }
+    markdown.push_str("\n## File Scopes\n\n");
+    if hint.file_scopes.is_empty() {
+        markdown.push_str("- No file scopes declared. Treat as sequential/conservative work.\n");
+    } else {
+        for scope in &hint.file_scopes {
+            markdown.push_str(&format!(
+                "- `{}` `{}` `{}`\n",
+                scope.intent, scope.selector_type, scope.selector
+            ));
+        }
+    }
+    markdown.push_str("\n## Evidence Requirements\n\n");
+    for kind in &workflow_view.evidence_policy.required_evidence_kinds {
+        markdown.push_str(&format!("- `{}`\n", kind.as_str()));
+    }
+    markdown.push_str("\n## Writeback Templates\n\n");
+    for command in workflow_writeback_commands(context) {
+        markdown.push_str("```bash\n");
+        markdown.push_str(command.as_str().unwrap_or_default());
+        markdown.push_str("\n```\n\n");
+    }
+    markdown
+}
+
+fn workflow_writeback_markdown(
+    context: &MachineContext,
+    workflow_view: &crate::WorkflowView,
+    host: &str,
+) -> String {
+    let mut markdown = String::new();
+    markdown.push_str("# Workflow Writeback Commands\n\n");
+    markdown.push_str(&format!("- Host: `{host}`\n\n"));
+    for hint in &workflow_view.delegation_hints {
+        markdown.push_str(&format!("## `{}`\n\n", hint.node_id));
+        for command in workflow_writeback_commands(context) {
+            markdown.push_str("```bash\n");
+            markdown.push_str(command.as_str().unwrap_or_default());
+            markdown.push_str("\n```\n\n");
+        }
+    }
+    markdown
+}
+
+fn workflow_writeback_commands(context: &MachineContext) -> Vec<serde_json::Value> {
+    vec![
+        json!(format!(
+            "elegy-planning --scope {} --json --non-interactive workflow record-result --file <worker-result.json>",
+            shell_word(&context.scope_key),
+        )),
+        json!(format!(
+            "elegy-planning --scope {} --json --non-interactive workflow view --entity-type <source-type> --entity-id <source-id>",
+            shell_word(&context.scope_key)
+        )),
+    ]
+}
+
+fn sanitize_workflow_filename(value: &str) -> String {
+    let sanitized = value
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || ch == '-' || ch == '_' {
+                ch
+            } else {
+                '-'
+            }
+        })
+        .collect::<String>();
+    let trimmed = sanitized.trim_matches('-');
+    if trimmed.is_empty() {
+        "workflow-item".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+fn shell_word(value: &str) -> String {
+    if value
+        .chars()
+        .all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_' | '/' | '.' | ':'))
+    {
+        value.to_string()
+    } else {
+        format!("'{}'", value.replace('\'', "'\"'\"'"))
     }
 }
 
@@ -4042,6 +5074,10 @@ fn command_path(command: &Command) -> Vec<String> {
             "project".to_string(),
             project_command_name(command).to_string(),
         ],
+        Command::Workflow { command } => vec![
+            "workflow".to_string(),
+            workflow_command_name(command).to_string(),
+        ],
         Command::Session { command } => vec![
             "session".to_string(),
             session_command_name(command).to_string(),
@@ -4279,6 +5315,19 @@ fn project_command_name(command: &ProjectCommand) -> &'static str {
     }
 }
 
+fn workflow_command_name(command: &WorkflowCommand) -> &'static str {
+    match command {
+        WorkflowCommand::Export(_) => "export",
+        WorkflowCommand::Render(_) => "render",
+        WorkflowCommand::View(_) => "view",
+        WorkflowCommand::Bundle(_) => "bundle",
+        WorkflowCommand::Prepare(_) => "prepare",
+        WorkflowCommand::RecordResult(_) => "record-result",
+        WorkflowCommand::ImportArtifact(_) => "import-artifact",
+        WorkflowCommand::ExportArtifact(_) => "export-artifact",
+    }
+}
+
 fn session_command_name(command: &SessionCommand) -> &'static str {
     match command {
         SessionCommand::Init(_) => "init",
@@ -4462,6 +5511,16 @@ fn is_command_mutation(command: &Command) -> bool {
                 | DiscoveryCommand::Resolve(_)
                 | DiscoveryCommand::Reopen(_)
                 | DiscoveryCommand::Checkpoint(_)
+        ),
+        Command::Workflow { command } => matches!(
+            command,
+            WorkflowCommand::Bundle(_)
+                | WorkflowCommand::Prepare(_)
+                | WorkflowCommand::RecordResult(_)
+                | WorkflowCommand::ImportArtifact(_)
+                | WorkflowCommand::ExportArtifact(_)
+                | WorkflowCommand::Export(_)
+                | WorkflowCommand::Render(_)
         ),
         Command::Template { .. } => false,
         Command::Intent(_) => false,

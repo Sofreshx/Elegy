@@ -13,6 +13,14 @@ use serde_json::Value;
 use time::{format_description::well_known::Rfc3339, OffsetDateTime};
 use uuid::Uuid;
 
+use crate::workflow::{
+    normalize_file_scopes, project_run_status_counts, workflow_delegation_hint_for_node,
+    workflow_dispatch_from_parts, workflow_execution_plan, workflow_idempotency_key,
+    workflow_nodes_for_source, workflow_parallel_safe_candidate_count,
+    workflow_project_run_matches_source, workflow_required_evidence_kinds,
+    workflow_result_graph_status, workflow_result_project_run_status,
+    workflow_work_point_id_for_node, WorkflowDispatchInput,
+};
 use crate::{
     validation::validate_entity, AcceptanceKind, AcceptanceView, AttachWorktreeInput,
     BlockedCandidate, DiscoveryCheckpointRecord, DiscoveryClassification, DiscoveryRecord,
@@ -307,6 +315,32 @@ pub struct AddEvidenceInput {
     pub active_scope_key: Option<String>,
     pub run_id: Option<String>,
     pub fencing_token: Option<i64>,
+}
+
+#[derive(Clone, Debug)]
+pub struct PrepareWorkflowInput {
+    pub scope_key: String,
+    pub entity_type: EntityType,
+    pub entity_id: String,
+    pub correlation_id: String,
+    pub adapter_id: String,
+    pub capabilities: Vec<String>,
+    pub owner_id: Option<String>,
+    pub session_id: Option<String>,
+    pub repo_id: Option<String>,
+    pub branch: Option<String>,
+    pub worktree_id: Option<String>,
+    pub run_id: Option<String>,
+    pub max_workers: usize,
+    pub lease_seconds: i64,
+}
+
+#[derive(Clone, Debug)]
+pub struct RecordWorkflowResultInput {
+    pub result: crate::WorkflowWorkerResult,
+    pub active_scope_key: Option<String>,
+    pub correlation_id: String,
+    pub run_id: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -5664,6 +5698,18 @@ impl PlanningStore {
         input: ReleaseProjectRunInput,
     ) -> Result<MutationResult<ProjectRunRecord>, PlanningStoreError> {
         require_non_empty("projectRunId", &input.project_run_id)?;
+        if !matches!(
+            input.status,
+            ProjectRunStatus::Completed
+                | ProjectRunStatus::Failed
+                | ProjectRunStatus::Cancelled
+                | ProjectRunStatus::Released
+        ) {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "project-run release status must be completed, failed, cancelled, or released; got {}",
+                input.status.as_str()
+            )));
+        }
 
         let mut connection = self.open_connection()?;
         let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
@@ -5764,9 +5810,13 @@ impl PlanningStore {
         let existing = load_project_run(&transaction, &input.project_run_id)?;
         let now = now_string()?;
         require_current_lease(&existing, input.fencing_token, &now)?;
-        if existing.status == ProjectRunStatus::Completed
-            || existing.status == ProjectRunStatus::Released
-        {
+        if matches!(
+            existing.status,
+            ProjectRunStatus::Completed
+                | ProjectRunStatus::Failed
+                | ProjectRunStatus::Cancelled
+                | ProjectRunStatus::Released
+        ) {
             return Err(PlanningStoreError::ProjectRunStatusMismatch {
                 expected: "claimed or active".to_string(),
                 actual: existing.status.to_string(),
@@ -5820,6 +5870,611 @@ impl PlanningStore {
             },
         });
         Ok(MutationResult { record, validation })
+    }
+
+    /// Compile one bounded workflow batch and claim/activate its project runs
+    /// in a single SQLite transaction.
+    pub fn prepare_workflow(
+        &self,
+        input: PrepareWorkflowInput,
+    ) -> Result<crate::WorkflowPrepareResult, PlanningStoreError> {
+        require_non_empty("entityId", &input.entity_id)?;
+        require_non_empty("correlationId", &input.correlation_id)?;
+        require_non_empty("adapterId", &input.adapter_id)?;
+        if !(1..=3).contains(&input.max_workers) {
+            return Err(PlanningStoreError::InvalidInput(
+                "maxWorkers must be between 1 and 3".to_string(),
+            ));
+        }
+        let lease_seconds = normalize_lease_seconds(Some(input.lease_seconds))?;
+        let normalized_scope = normalize_scope_key_value(&input.scope_key);
+        let view =
+            self.workflow_view_in_scope(&normalized_scope, input.entity_type, &input.entity_id)?;
+        let source = view.source.clone();
+        let (phase_id, phase_mode, candidate_ids) = view
+            .execution_plan
+            .phases
+            .first()
+            .map(|phase| (phase.id.clone(), phase.mode.clone(), phase.node_ids.clone()))
+            .unwrap_or_else(|| ("phase-1".to_string(), "sequential".to_string(), Vec::new()));
+        let effective_max_workers = if phase_mode == "bounded-parallel" {
+            input.max_workers
+        } else {
+            1
+        };
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let now = now_string()?;
+        let owner_id = input
+            .owner_id
+            .clone()
+            .or_else(|| input.session_id.clone())
+            .or_else(|| input.run_id.clone())
+            .unwrap_or_else(|| input.correlation_id.clone());
+        let mut prepared = Vec::new();
+        let mut skipped = Vec::new();
+
+        for node_id in candidate_ids {
+            if prepared.len() >= effective_max_workers {
+                break;
+            }
+            let node = match load_graph_node(&transaction, &node_id) {
+                Ok(node) => node,
+                Err(PlanningStoreError::NotFound { .. }) => {
+                    skipped.push(crate::WorkflowPrepareSkip {
+                        node_id,
+                        reason: "graph node disappeared while preparing workflow".to_string(),
+                    });
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            if !matches!(node.status.as_str(), "draft" | "proposed" | "active") {
+                skipped.push(crate::WorkflowPrepareSkip {
+                    node_id: node.id,
+                    reason: "graph node is no longer runnable".to_string(),
+                });
+                continue;
+            }
+            let Some(hint) = view
+                .delegation_hints
+                .iter()
+                .find(|hint| hint.node_id == node.id)
+                .cloned()
+            else {
+                skipped.push(crate::WorkflowPrepareSkip {
+                    node_id: node.id,
+                    reason: "runnable node has no delegation policy".to_string(),
+                });
+                continue;
+            };
+            let Some(work_point_id) = workflow_work_point_id_for_node(&node) else {
+                skipped.push(crate::WorkflowPrepareSkip {
+                    node_id: node.id,
+                    reason: "graph work node is missing payload.workPointId".to_string(),
+                });
+                continue;
+            };
+            let work_point = match load_work_point(&transaction, &work_point_id) {
+                Ok(work_point) => work_point,
+                Err(PlanningStoreError::NotFound { .. }) => {
+                    skipped.push(crate::WorkflowPrepareSkip {
+                        node_id: node.id,
+                        reason: format!("work point `{work_point_id}` was not found"),
+                    });
+                    continue;
+                }
+                Err(error) => return Err(error),
+            };
+            if matches!(
+                work_point.status,
+                WorkPointStatus::Completed
+                    | WorkPointStatus::Cancelled
+                    | WorkPointStatus::Invalidated
+            ) {
+                skipped.push(crate::WorkflowPrepareSkip {
+                    node_id: node.id,
+                    reason: "work point is terminal".to_string(),
+                });
+                continue;
+            }
+            ensure_referenced_entity_in_scope(
+                &transaction,
+                EntityType::WorkPoint,
+                &work_point.id,
+                "workPointId",
+                &normalized_scope,
+            )?;
+            let roadmap = load_roadmap(&transaction, &work_point.roadmap_id)?;
+            let goal_id = roadmap.goal_id.clone();
+            ensure_referenced_entity_in_scope(
+                &transaction,
+                EntityType::Roadmap,
+                &roadmap.id,
+                "roadmapId",
+                &normalized_scope,
+            )?;
+            ensure_referenced_entity_in_scope(
+                &transaction,
+                EntityType::Goal,
+                &goal_id,
+                "goalId",
+                &normalized_scope,
+            )?;
+
+            let idempotency_key = workflow_idempotency_key(
+                input.entity_type,
+                &input.entity_id,
+                &node.id,
+                node.revision,
+                &input.correlation_id,
+            );
+            let existing_id: Option<String> = transaction
+                .query_row(
+                    "SELECT id FROM project_runs WHERE scope_key = ?1 AND idempotency_key = ?2",
+                    params![normalized_scope, idempotency_key],
+                    |row| row.get(0),
+                )
+                .optional()?;
+            if let Some(existing_id) = existing_id {
+                let existing = load_project_run(&transaction, &existing_id)?;
+                if existing.work_point_id != work_point.id
+                    || existing.roadmap_id != roadmap.id
+                    || existing.goal_id != goal_id
+                {
+                    return Err(PlanningStoreError::InvalidInput(
+                        serde_json::json!({
+                            "code": "WORKFLOW-IDEMPOTENCY-CONFLICT",
+                            "message": "workflow idempotency key resolves to a different planning target",
+                            "idempotencyKey": idempotency_key,
+                            "projectRunId": existing.id,
+                        })
+                        .to_string(),
+                    ));
+                }
+                if matches!(
+                    existing.status,
+                    ProjectRunStatus::Completed
+                        | ProjectRunStatus::Failed
+                        | ProjectRunStatus::Cancelled
+                        | ProjectRunStatus::Released
+                ) {
+                    skipped.push(crate::WorkflowPrepareSkip {
+                        node_id: node.id,
+                        reason: format!("project run `{}` is already terminal", existing.id),
+                    });
+                    continue;
+                }
+                if require_current_lease(&existing, Some(existing.fencing_token), &now).is_err() {
+                    skipped.push(crate::WorkflowPrepareSkip {
+                        node_id: node.id,
+                        reason: format!("project run `{}` lease is expired", existing.id),
+                    });
+                    continue;
+                }
+                let record = if existing.status == ProjectRunStatus::Claimed {
+                    transaction.execute(
+                        "UPDATE project_runs SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3 AND fencing_token = ?4",
+                        params![
+                            ProjectRunStatus::Active.as_str(),
+                            now,
+                            existing.id,
+                            existing.fencing_token,
+                        ],
+                    )?;
+                    let record = load_project_run(&transaction, &existing.id)?;
+                    append_event(
+                        &transaction,
+                        build_event(
+                            &transaction,
+                            EntityType::ProjectRun,
+                            &record.id,
+                            EntityType::Roadmap,
+                            &record.roadmap_id,
+                            &input.correlation_id,
+                            input.run_id.clone(),
+                            "project-run.activated",
+                            serde_json::to_value(&record)?,
+                        )?,
+                    )?;
+                    record
+                } else {
+                    existing
+                };
+                prepared.push((node, hint, record));
+                continue;
+            }
+
+            let active_count: i64 = transaction.query_row(
+                "SELECT COUNT(*) FROM project_runs WHERE work_point_id = ?1 AND status IN ('claimed', 'active', 'interrupted') AND julianday(lease_expires_at) > julianday(?2)",
+                params![work_point.id, now],
+                |row| row.get(0),
+            )?;
+            if active_count > 0 {
+                skipped.push(crate::WorkflowPrepareSkip {
+                    node_id: node.id,
+                    reason: format!("work point `{}` already has an active lease", work_point.id),
+                });
+                continue;
+            }
+
+            let id = new_id();
+            let fencing_token: i64 = transaction.query_row(
+                "SELECT COALESCE(MAX(fencing_token), 0) + 1 FROM project_runs WHERE work_point_id = ?1",
+                params![work_point.id],
+                |row| row.get(0),
+            )?;
+            let lease_expires_at = lease_deadline(&now, lease_seconds)?;
+            let record = ProjectRunRecord {
+                id: id.clone(),
+                scope_key: normalized_scope.clone(),
+                goal_id,
+                roadmap_id: roadmap.id.clone(),
+                work_point_id: work_point.id.clone(),
+                repo_id: input.repo_id.clone(),
+                branch: input.branch.clone(),
+                worktree_id: input.worktree_id.clone(),
+                session_id: input.session_id.clone(),
+                run_id: input.run_id.clone(),
+                profile_id: Some(hint.worker_profile.clone()),
+                owner_id: owner_id.clone(),
+                idempotency_key: Some(idempotency_key.clone()),
+                fencing_token,
+                lease_expires_at,
+                heartbeat_at: now.clone(),
+                status: ProjectRunStatus::Claimed,
+                evidence: ProjectRunEvidence::default(),
+                revision: 1,
+                claimed_at: Some(now.clone()),
+                completed_at: None,
+                created_at: now.clone(),
+                updated_at: now.clone(),
+            };
+            transaction.execute(
+                r#"
+                INSERT INTO project_runs (
+                    id, scope_key, goal_id, roadmap_id, work_point_id, repo_id, branch,
+                    worktree_id, session_id, run_id, profile_id, owner_id, idempotency_key,
+                    fencing_token, lease_expires_at, heartbeat_at, status, evidence_json,
+                    revision, claimed_at, completed_at, created_at, updated_at
+                ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23)
+                "#,
+                params![
+                    record.id,
+                    record.scope_key,
+                    record.goal_id,
+                    record.roadmap_id,
+                    record.work_point_id,
+                    record.repo_id,
+                    record.branch,
+                    record.worktree_id,
+                    record.session_id,
+                    record.run_id,
+                    record.profile_id,
+                    record.owner_id,
+                    record.idempotency_key,
+                    record.fencing_token,
+                    record.lease_expires_at,
+                    record.heartbeat_at,
+                    record.status.as_str(),
+                    to_json_text(&record.evidence)?,
+                    record.revision,
+                    record.claimed_at,
+                    record.completed_at,
+                    record.created_at,
+                    record.updated_at,
+                ],
+            )?;
+            append_event(
+                &transaction,
+                build_event(
+                    &transaction,
+                    EntityType::ProjectRun,
+                    &record.id,
+                    EntityType::Roadmap,
+                    &record.roadmap_id,
+                    &input.correlation_id,
+                    input.run_id.clone(),
+                    "project-run.claimed",
+                    serde_json::to_value(&record)?,
+                )?,
+            )?;
+            transaction.execute(
+                "UPDATE project_runs SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3 AND fencing_token = ?4",
+                params![
+                    ProjectRunStatus::Active.as_str(),
+                    now,
+                    record.id,
+                    record.fencing_token,
+                ],
+            )?;
+            let active_record = load_project_run(&transaction, &record.id)?;
+            append_event(
+                &transaction,
+                build_event(
+                    &transaction,
+                    EntityType::ProjectRun,
+                    &active_record.id,
+                    EntityType::Roadmap,
+                    &active_record.roadmap_id,
+                    &input.correlation_id,
+                    input.run_id.clone(),
+                    "project-run.activated",
+                    serde_json::to_value(&active_record)?,
+                )?,
+            )?;
+            let _ = validate_and_store(&transaction, EntityType::ProjectRun, &active_record.id)?;
+            let _ = refresh_validation_target(
+                &transaction,
+                EntityType::WorkPoint,
+                &active_record.work_point_id,
+            )?;
+            prepared.push((node, hint, active_record));
+        }
+
+        transaction.commit()?;
+
+        let dispatches = prepared
+            .into_iter()
+            .map(|(node, hint, project_run)| {
+                workflow_dispatch_from_parts(WorkflowDispatchInput {
+                    scope_key: &normalized_scope,
+                    source: &source,
+                    phase_id: &phase_id,
+                    node: &node,
+                    hint: &hint,
+                    adapter_id: &input.adapter_id,
+                    requested_capabilities: &input.capabilities,
+                    project_run,
+                    evidence_policy: &view.evidence_policy,
+                })
+            })
+            .collect();
+        Ok(crate::WorkflowPrepareResult {
+            schema_version: "workflow-prepare/v1".to_string(),
+            source,
+            strategy: view.execution_plan.strategy,
+            max_workers: effective_max_workers,
+            dispatches,
+            skipped,
+            blocked_node_ids: view.execution_plan.blocked_node_ids,
+        })
+    }
+
+    /// Validate and persist one native worker result as one fenced transaction.
+    pub fn record_workflow_result(
+        &self,
+        input: RecordWorkflowResultInput,
+    ) -> Result<crate::WorkflowResultWriteback, PlanningStoreError> {
+        let result = input.result;
+        require_non_empty("dispatchId", &result.dispatch_id)?;
+        require_non_empty("projectRunId", &result.project_run_id)?;
+        require_non_empty("nodeId", &result.node_id)?;
+        require_non_empty("idempotencyKey", &result.idempotency_key)?;
+        require_non_empty("summary", &result.summary)?;
+        if result.schema_version != "orchestrator-worker-result/v1" {
+            return Err(PlanningStoreError::InvalidInput(format!(
+                "unsupported workflow worker result schema `{}`",
+                result.schema_version
+            )));
+        }
+        if result.summary.len() > 16_384 {
+            return Err(PlanningStoreError::InvalidInput(
+                "workflow result summary exceeds 16384 bytes".to_string(),
+            ));
+        }
+        if result
+            .content
+            .as_ref()
+            .is_some_and(|content| content.len() > 1_048_576)
+        {
+            return Err(PlanningStoreError::InvalidInput(
+                "workflow result content exceeds 1048576 bytes".to_string(),
+            ));
+        }
+
+        let mut connection = self.open_connection()?;
+        let transaction = connection.transaction_with_behavior(TransactionBehavior::Immediate)?;
+        let scope_key = normalized_scope_key(input.active_scope_key);
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::ProjectRun,
+            &result.project_run_id,
+            &scope_key,
+        )?;
+        ensure_entity_in_scope(
+            &transaction,
+            EntityType::GraphNode,
+            &result.node_id,
+            &scope_key,
+        )?;
+        let existing = load_project_run(&transaction, &result.project_run_id)?;
+        let expected_dispatch_id = format!("dispatch-{}", existing.id);
+        if result.dispatch_id != expected_dispatch_id {
+            return Err(PlanningStoreError::InvalidInput(
+                serde_json::json!({
+                    "code": "WORKFLOW-RESULT-DISPATCH-MISMATCH",
+                    "message": "worker result dispatch ID does not match the prepared project run",
+                    "projectRunId": existing.id,
+                    "expectedDispatchId": expected_dispatch_id,
+                    "actualDispatchId": result.dispatch_id,
+                })
+                .to_string(),
+            ));
+        }
+        if existing.idempotency_key.as_deref() != Some(result.idempotency_key.as_str()) {
+            return Err(PlanningStoreError::InvalidInput(
+                serde_json::json!({
+                    "code": "WORKFLOW-RESULT-IDEMPOTENCY-MISMATCH",
+                    "message": "worker result idempotency key does not match the prepared project run",
+                    "projectRunId": existing.id,
+                })
+                .to_string(),
+            ));
+        }
+        if result.fencing_token != existing.fencing_token {
+            return Err(PlanningStoreError::InvalidInput(
+                serde_json::json!({
+                    "code": "PROJECT-RUN-STALE-FENCING-TOKEN",
+                    "message": "the project run fencing token is stale",
+                    "projectRunId": existing.id,
+                    "expectedFencingToken": existing.fencing_token,
+                    "actualFencingToken": result.fencing_token,
+                })
+                .to_string(),
+            ));
+        }
+        if existing
+            .evidence
+            .workflow_result_keys
+            .contains(&result.idempotency_key)
+        {
+            transaction.commit()?;
+            return Ok(crate::WorkflowResultWriteback {
+                project_run: existing,
+                evidence: None,
+                attachment: None,
+                status_update: None,
+                replayed: true,
+            });
+        }
+
+        let now = now_string()?;
+        require_current_lease(&existing, Some(result.fencing_token), &now)?;
+        if matches!(
+            existing.status,
+            ProjectRunStatus::Completed
+                | ProjectRunStatus::Failed
+                | ProjectRunStatus::Cancelled
+                | ProjectRunStatus::Released
+        ) {
+            return Err(PlanningStoreError::ProjectRunStatusMismatch {
+                expected: "claimed or active".to_string(),
+                actual: existing.status.to_string(),
+            });
+        }
+        let node = load_graph_node(&transaction, &result.node_id)?;
+        if node.kind != PlanningNodeKind::Work {
+            return Err(PlanningStoreError::InvalidInput(
+                "workflow result node must be a work graph node".to_string(),
+            ));
+        }
+        if workflow_work_point_id_for_node(&node).as_deref()
+            != Some(existing.work_point_id.as_str())
+        {
+            return Err(PlanningStoreError::InvalidInput(
+                "workflow result node is not bound to the project run work point".to_string(),
+            ));
+        }
+        if node.revision != result.source_revision {
+            return Err(PlanningStoreError::InvalidInput(
+                serde_json::json!({
+                    "code": "WORKFLOW-RESULT-SOURCE-REVISION-STALE",
+                    "message": "the graph node changed after the worker was dispatched",
+                    "nodeId": node.id,
+                    "expectedRevision": result.source_revision,
+                    "actualRevision": node.revision,
+                })
+                .to_string(),
+            ));
+        }
+
+        let evidence = insert_workflow_result_evidence(
+            &transaction,
+            &scope_key,
+            &node,
+            &result,
+            &input.correlation_id,
+            input.run_id.clone(),
+            &now,
+        )?;
+        let attachment = insert_workflow_result_attachment(
+            &transaction,
+            &node,
+            &evidence,
+            &result,
+            &input.correlation_id,
+            input.run_id.clone(),
+            &now,
+        )?;
+        let status_value = result
+            .status_update
+            .clone()
+            .unwrap_or_else(|| workflow_result_graph_status(result.status));
+        if status_value != workflow_result_graph_status(result.status) {
+            return Err(PlanningStoreError::InvalidInput(
+                "statusUpdate must match the worker result status".to_string(),
+            ));
+        }
+        require_kebab_token("statusUpdate", &status_value)?;
+        let status_update = update_workflow_node_status_in_transaction(
+            &transaction,
+            node,
+            &status_value,
+            &input.correlation_id,
+            input.run_id.clone(),
+            &now,
+        )?;
+
+        let mut project_evidence = existing.evidence.clone();
+        project_evidence
+            .implementation_run_refs
+            .push(evidence.id.clone());
+        project_evidence
+            .workflow_result_keys
+            .push(result.idempotency_key.clone());
+        let project_run_status = workflow_result_project_run_status(result.status);
+        let completed_at = if project_run_status == ProjectRunStatus::Completed {
+            Some(now.clone())
+        } else {
+            None
+        };
+        let changed = transaction.execute(
+            "UPDATE project_runs SET status = ?1, evidence_json = ?2, completed_at = ?3, revision = revision + 1, updated_at = ?4 WHERE id = ?5 AND fencing_token = ?6",
+            params![
+                project_run_status.as_str(),
+                to_json_text(&project_evidence)?,
+                completed_at,
+                now,
+                existing.id,
+                result.fencing_token,
+            ],
+        )?;
+        if changed != 1 {
+            return Err(PlanningStoreError::InvalidInput(
+                "project run changed while recording workflow result".to_string(),
+            ));
+        }
+        let project_run = load_project_run(&transaction, &result.project_run_id)?;
+        append_event(
+            &transaction,
+            build_event(
+                &transaction,
+                EntityType::ProjectRun,
+                &project_run.id,
+                EntityType::Roadmap,
+                &project_run.roadmap_id,
+                &input.correlation_id,
+                input.run_id,
+                "project-run.released",
+                serde_json::to_value(&project_run)?,
+            )?,
+        )?;
+        let _ = validate_and_store(&transaction, EntityType::ProjectRun, &project_run.id)?;
+        let _ = refresh_validation_target(
+            &transaction,
+            EntityType::WorkPoint,
+            &project_run.work_point_id,
+        )?;
+        transaction.commit()?;
+        let _ = crate::session::clear_active_project_run(Some(project_run.work_point_id.clone()));
+        Ok(crate::WorkflowResultWriteback {
+            project_run,
+            evidence: Some(evidence),
+            attachment: Some(attachment),
+            status_update: Some(status_update),
+            replayed: false,
+        })
     }
 
     pub fn count_active_runs_for_session(
@@ -6369,6 +7024,151 @@ impl PlanningStore {
         let normalized_scope_key = normalize_scope_key_value(scope_key);
         ensure_entity_in_scope(&connection, entity_type, entity_id, &normalized_scope_key)?;
         self.render_projection(entity_type, entity_id, format, output_path)
+    }
+
+    pub fn workflow_view_in_scope(
+        &self,
+        scope_key: &str,
+        entity_type: EntityType,
+        entity_id: &str,
+    ) -> Result<crate::WorkflowView, PlanningStoreError> {
+        let connection = self.open_connection()?;
+        let normalized_scope_key = normalize_scope_key_value(scope_key);
+        ensure_entity_in_scope(&connection, entity_type, entity_id, &normalized_scope_key)?;
+        drop(connection);
+
+        let all_nodes = self.load_all_graph_nodes(&normalized_scope_key)?;
+        let nodes = workflow_nodes_for_source(all_nodes, entity_type, entity_id);
+        let node_ids = nodes
+            .iter()
+            .map(|node| node.id.as_str())
+            .collect::<HashSet<_>>();
+        let edges = self
+            .load_all_graph_edges(&normalized_scope_key)?
+            .into_iter()
+            .filter(|edge| {
+                node_ids.contains(edge.source_node_id.as_str())
+                    && node_ids.contains(edge.target_node_id.as_str())
+            })
+            .collect::<Vec<_>>();
+        let all_runnable = self.find_runnable_graph_work(&normalized_scope_key)?;
+        let runnable = crate::GraphRunnableResult {
+            candidates: all_runnable
+                .candidates
+                .into_iter()
+                .filter(|candidate| node_ids.contains(candidate.node_id.as_str()))
+                .collect(),
+            blocked: all_runnable
+                .blocked
+                .into_iter()
+                .filter(|candidate| node_ids.contains(candidate.node_id.as_str()))
+                .collect(),
+        };
+        let project_runs = self
+            .list_project_runs_in_scope(&normalized_scope_key)?
+            .into_iter()
+            .filter(|run| workflow_project_run_matches_source(run, entity_type, entity_id))
+            .collect::<Vec<_>>();
+
+        let delegation_hints = nodes
+            .iter()
+            .filter(|node| node.kind == crate::PlanningNodeKind::Work)
+            .map(workflow_delegation_hint_for_node)
+            .collect::<Vec<_>>();
+        let delegation_hint_count = delegation_hints.len();
+        let estimated_context_tokens = delegation_hints
+            .iter()
+            .map(|hint| hint.max_context_tokens_estimate)
+            .sum();
+        let parallel_safe_candidate_count =
+            workflow_parallel_safe_candidate_count(&runnable, &delegation_hints, &edges);
+        let required_evidence_kinds = workflow_required_evidence_kinds(&nodes);
+        let execution_plan = workflow_execution_plan(&runnable, &delegation_hints, &edges);
+        let project_run_status_counts = project_run_status_counts(&project_runs);
+        let total_nodes = nodes.len();
+        let total_edges = edges.len();
+
+        Ok(crate::WorkflowView {
+            schema_version: "workflow-view/v1".to_string(),
+            scope_key: normalized_scope_key,
+            source: crate::WorkflowViewSource {
+                entity_type,
+                entity_id: entity_id.to_string(),
+            },
+            nodes: nodes
+                .into_iter()
+                .map(|node| crate::WorkflowViewNode {
+                    id: node.id,
+                    kind: node.kind,
+                    title: node.title,
+                    status: node.status,
+                    tags: node.tags,
+                })
+                .collect(),
+            edges: edges
+                .into_iter()
+                .map(|edge| crate::WorkflowViewEdge {
+                    id: edge.id,
+                    kind: edge.kind,
+                    source_node_id: edge.source_node_id,
+                    target_node_id: edge.target_node_id,
+                    status: edge.status,
+                })
+                .collect(),
+            adapter_policy: crate::WorkflowAdapterPolicy {
+                orchestration_owner: "host-main-thread".to_string(),
+                execution_owner: "host-adapter".to_string(),
+                max_delegate_depth: 1,
+                default_orchestrator_model_tier: "xhigh".to_string(),
+                worker_model_tiers: vec![
+                    "low".to_string(),
+                    "medium".to_string(),
+                    "high".to_string(),
+                ],
+                degradation_rules: vec![
+                    "use fewer workers before dropping evidence requirements".to_string(),
+                    "prefer read-only exploration when file scopes are unknown".to_string(),
+                    "record host capability gaps as evidence".to_string(),
+                ],
+                required_writebacks: vec![
+                    "project-run claim/activate/release".to_string(),
+                    "project-run evidence for worker outputs".to_string(),
+                    "graph evidence or discovery records for durable findings".to_string(),
+                ],
+            },
+            execution_plan,
+            metrics: crate::WorkflowMetrics {
+                total_nodes,
+                total_edges,
+                runnable_count: runnable.candidates.len(),
+                blocked_count: runnable.blocked.len(),
+                delegation_hint_count,
+                parallel_safe_candidate_count,
+                estimated_context_tokens,
+                project_run_status_counts,
+            },
+            runnable,
+            delegation_hints,
+            evidence_policy: crate::WorkflowEvidencePolicy {
+                required_evidence_kinds,
+                validation_gates: vec![
+                    "record worker claims as evidence".to_string(),
+                    "run narrowest relevant validation before completion".to_string(),
+                    "record failed, cancelled, and refuted work as evidence".to_string(),
+                ],
+                stop_conditions: vec![
+                    "missing source entity".to_string(),
+                    "cross-scope dependency".to_string(),
+                    "active lease conflict".to_string(),
+                    "validation gate failed".to_string(),
+                ],
+            },
+            budgets: crate::WorkflowBudgets {
+                max_workers: 3,
+                max_retries_per_node: 1,
+                max_context_tokens_estimate: 24_000,
+            },
+        })
     }
 
     fn open_connection(&self) -> Result<Connection, PlanningStoreError> {
@@ -9969,6 +10769,186 @@ fn ensure_entity_in_scope(
     Ok(scope_key)
 }
 
+fn insert_workflow_result_evidence(
+    transaction: &Transaction<'_>,
+    scope_key: &str,
+    node: &PlanningGraphNode,
+    result: &crate::WorkflowWorkerResult,
+    correlation_id: &str,
+    run_id: Option<String>,
+    now: &str,
+) -> Result<PlanningGraphNode, PlanningStoreError> {
+    let id = new_id();
+    let reference = result
+        .reference
+        .clone()
+        .unwrap_or_else(|| result.dispatch_id.clone());
+    let payload = serde_json::json!({
+        "evidenceKind": result.evidence_kind.as_str(),
+        "summary": result.summary,
+        "reference": reference,
+        "content": result.content,
+        "capturedAt": result.captured_at.clone().unwrap_or_else(|| now.to_string()),
+        "workflow": {
+            "dispatchId": result.dispatch_id,
+            "projectRunId": result.project_run_id,
+            "status": result.status,
+            "sourceRevision": result.source_revision,
+        }
+    });
+    let record = PlanningGraphNode {
+        id: id.clone(),
+        scope_key: scope_key.to_string(),
+        kind: PlanningNodeKind::Evidence,
+        title: format!("Workflow result for {}", node.id),
+        summary: result.summary.clone(),
+        status: "active".to_string(),
+        payload,
+        tags: vec![
+            "workflow-result".to_string(),
+            format!("workflow-status:{}", result.status.as_str()),
+        ],
+        revision: 1,
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+    };
+    transaction.execute(
+        r#"
+        INSERT INTO planning_nodes (
+            id, scope_key, kind, title, summary, status,
+            payload_json, tags_json, revision, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)
+        "#,
+        params![
+            record.id,
+            record.scope_key,
+            record.kind.as_str(),
+            record.title,
+            record.summary,
+            record.status,
+            to_json_text(&record.payload)?,
+            to_json_text(&record.tags)?,
+            record.revision,
+            record.created_at,
+            record.updated_at,
+        ],
+    )?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::GraphNode,
+            &id,
+            EntityType::GraphNode,
+            &node.id,
+            correlation_id,
+            run_id,
+            "graph-node.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    rebuild_tag_index_for_entity(transaction, EntityType::GraphNode, &id, &record.tags)?;
+    Ok(record)
+}
+
+fn insert_workflow_result_attachment(
+    transaction: &Transaction<'_>,
+    node: &PlanningGraphNode,
+    evidence: &PlanningGraphNode,
+    result: &crate::WorkflowWorkerResult,
+    correlation_id: &str,
+    run_id: Option<String>,
+    now: &str,
+) -> Result<PlanningGraphEdge, PlanningStoreError> {
+    let id = new_id();
+    let record = PlanningGraphEdge {
+        id: id.clone(),
+        scope_key: node.scope_key.clone(),
+        kind: PlanningEdgeKind::EvidencedBy,
+        source_node_id: node.id.clone(),
+        target_node_id: evidence.id.clone(),
+        status: "active".to_string(),
+        payload: serde_json::json!({
+            "rationale": "native workflow worker result",
+            "dispatchId": result.dispatch_id,
+        }),
+        revision: 1,
+        created_at: now.to_string(),
+        updated_at: now.to_string(),
+    };
+    transaction.execute(
+        r#"
+        INSERT INTO planning_edges (
+            id, scope_key, kind, source_node_id, target_node_id,
+            status, payload_json, revision, created_at, updated_at
+        ) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)
+        "#,
+        params![
+            record.id,
+            record.scope_key,
+            record.kind.as_str(),
+            record.source_node_id,
+            record.target_node_id,
+            record.status,
+            to_json_text(&record.payload)?,
+            record.revision,
+            record.created_at,
+            record.updated_at,
+        ],
+    )?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::GraphEdge,
+            &id,
+            EntityType::GraphNode,
+            &node.id,
+            correlation_id,
+            run_id,
+            "graph-edge.created",
+            serde_json::to_value(&record)?,
+        )?,
+    )?;
+    Ok(record)
+}
+
+fn update_workflow_node_status_in_transaction(
+    transaction: &Transaction<'_>,
+    node: PlanningGraphNode,
+    status: &str,
+    correlation_id: &str,
+    run_id: Option<String>,
+    now: &str,
+) -> Result<PlanningGraphNode, PlanningStoreError> {
+    transaction.execute(
+        "UPDATE planning_nodes SET status = ?1, revision = revision + 1, updated_at = ?2 WHERE id = ?3",
+        params![status, now, node.id],
+    )?;
+    let record = load_graph_node(transaction, &node.id)?;
+    append_event(
+        transaction,
+        build_event(
+            transaction,
+            EntityType::GraphNode,
+            &record.id,
+            EntityType::GraphNode,
+            &record.id,
+            correlation_id,
+            run_id,
+            "graph-node.status-updated",
+            serde_json::json!({
+                "status": record.status,
+                "previousStatus": node.status,
+                "revision": record.revision,
+            }),
+        )?,
+    )?;
+    let findings = validate_entity(transaction, EntityType::GraphNode, &record.id)?;
+    persist_validation_findings(transaction, EntityType::GraphNode, &record.id, &findings)?;
+    Ok(record)
+}
+
 fn scope_reference_mismatch_error(
     field_name: &str,
     entity_type: EntityType,
@@ -10821,31 +11801,6 @@ fn next_todo_ordering(
         params![grouping_key],
         |row| row.get(0),
     )?)
-}
-
-fn normalize_file_scopes(file_scopes: Vec<FileScopeRecord>) -> Vec<FileScopeRecord> {
-    let mut scopes: Vec<FileScopeRecord> = file_scopes
-        .into_iter()
-        .map(|scope| FileScopeRecord {
-            selector_type: scope.selector_type,
-            selector: scope.selector.trim().to_string(),
-            intent: scope.intent,
-        })
-        .filter(|scope| !scope.selector.is_empty())
-        .collect();
-    scopes.sort_by(|left, right| {
-        left.selector_type
-            .as_str()
-            .cmp(right.selector_type.as_str())
-            .then_with(|| left.intent.as_str().cmp(right.intent.as_str()))
-            .then_with(|| left.selector.cmp(&right.selector))
-    });
-    scopes.dedup_by(|left, right| {
-        left.selector_type == right.selector_type
-            && left.intent == right.intent
-            && left.selector == right.selector
-    });
-    scopes
 }
 
 fn replace_entity_file_scopes(

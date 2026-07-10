@@ -135,7 +135,8 @@ The validation engine runs automatically after every mutation. See [Validation E
 - Source crate: `plugins/planning/`
 - Spec: This document
 - Agent-Safe Planning Core spec: [agent-safe-planning-core](agent-safe-planning-core/spec.md)
-- Architecture: [elegy-planning-v1](../architecture/v1.md)
+- Workflow View Projection spec: [workflow-view](workflow-view.md)
+- Architecture: [elegy-planning architecture](../architecture/ARCHITECTURE.md)
 
 ---
 
@@ -367,6 +368,7 @@ via the session ID without needing `--correlation-id` on every call.
 | Compatibility metadata | `capabilities` |
 | Events | `events` |
 | Project | `render`, `export` |
+| Workflow | `render`, `export`, `view`, `bundle`, `prepare`, `record-result`, `import-artifact`, `export-artifact` |
 | Project run | `claim`, `activate`, `heartbeat`, `release`, `add-evidence`, `list`, `show` |
 
 ---
@@ -542,14 +544,15 @@ The risks are concentrated in three areas:
    land, the event infrastructure is paying storage cost for no operational benefit.
    This is a natural MVP tradeoff but shouldn't stay this way past v1.
 
-3. **No state machine enforcement** — this is the biggest practical risk. Without
-   transition rules, `update-status` is semantically equivalent to setting a free-text
-   tag. It works for display but not for workflow logic. The sooner transition
-   enforcement lands, the more confidence consumers can have in the status field.
+3. **Contract drift across CLI, schemas, and agent-facing docs** — state machine
+   enforcement has landed, along with graph, manifest, discovery, worktree, and
+   project-run surfaces. The practical risk has moved to machine consumers reading
+   an incomplete schema, stale skill reference, or partial capability catalog and
+   making invalid orchestration decisions.
 
-The top priority after MVP stabilization should be state machine enforcement for
-lifecycle transitions (v1), followed by event replay (v1), then the cross-entity
-modeling flexibility (v2).
+The top priority after MVP stabilization should be keeping the machine contract
+surfaces synchronized (CLI help, result schema, capability catalog, skill docs),
+followed by event replay (v1), then the cross-entity modeling flexibility (v2).
 
 ---
 

@@ -44,7 +44,7 @@ These crates consume governed artifacts and provide reusable executable behavior
 | `shared/descriptor` | Descriptor loading and normalization |
 | `shared/adapter-fs` and `shared/adapter-http` | Bounded adapter behavior |
 | `shared/runtime` and `shared/core` | Reusable runtime composition |
-| `hosts/host-mcp` | Thin MCP host entrypoint (`elegy-run`) |
+| `hosts/host-mcp` | Thin MCP host entrypoint (`elegy-run`); workflow execution remains host-owned |
 
 ### Layer 3: export and validation surfaces
 

@@ -140,17 +140,24 @@ This makes the planning subsystem suitable for automation and skills.
 
 Not yet implemented:
 
-- compatibility import from `instruction-engine` roadmap workflow artifacts
+- broader compatibility coverage beyond the implemented `instruction-engine`
+  roadmap workflow artifact import/export bridge
 - automatic export/projection into shared repo planning docs
-- richer evidence aggregates
+- host-specific adapters that map `orchestrator-dispatch/v1` workers to native
+  Codex, Holon, or OpenCode subagent APIs
+  ([spec](../specs/workflow-view.md))
+- cross-run evidence aggregates and persisted efficiency summaries beyond the
+  current workflow view metrics
 - replay-based rebuild from events alone
 - dedicated wrapper projection for repo-local skill bridge surfaces
 - FTS5 rebuild on entity update (currently only on create)
 
 ## Intended Next Steps
 
-1. Add update and transition commands for statuses and revisions.
-2. Add compatibility bridges to current `instruction-engine` planning artifacts.
-3. Add explicit evidence records.
-4. Add projection/import commands for shared repo planning surfaces.
-5. Add governed capability exposure on the umbrella Elegy surfaces when the command model stabilizes.
+1. Expand compatibility bridges to additional `instruction-engine` planning
+   artifact families if downstream consumers still depend on them.
+2. Add Codex and Holon-specific native adapters around the
+   `orchestrator-dispatch/v1` and `orchestrator-worker-result/v1` contracts.
+3. Add projection/import commands for shared repo planning surfaces.
+4. Add richer cross-run evidence and efficiency summaries.
+5. Expand governed capability exposure after the workflow command model stabilizes.

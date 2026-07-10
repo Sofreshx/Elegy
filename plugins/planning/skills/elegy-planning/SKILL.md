@@ -172,6 +172,54 @@ next-runnable)
 - Approval posture: `required`. The host must explicitly approve
   lease creation or release.
 
+### Workflow mode family (view / prepare / record-result)
+
+- Use workflow mode for multi-step, multi-session, or delegation-heavy work.
+  Keep trivial single-thread edits in the current harness with a small local
+  plan.
+- Start with `workflow view` to inspect `workflow-view/v1` before delegating:
+  `elegy-planning --scope <scope-key> --json --non-interactive workflow view --entity-type roadmap --entity-id <roadmap-id>`.
+  Treat `adapterPolicy`, `executionPlan`, `delegationHints`, `budgets`, and
+  `metrics` as advisory host input, not as a second source of truth.
+- Use `workflow prepare` for the native path. It claims and activates a
+  bounded batch transactionally and returns `orchestrator-dispatch/v1`:
+  `elegy-planning --scope <scope-key> --json --non-interactive --correlation-id <id> workflow prepare --entity-type roadmap --entity-id <roadmap-id> --max-workers 3`.
+- Pass `--adapter-id <host-adapter>` and repeated `--capability <name>` flags
+  when the host needs browser, container, E2E, or other validation support.
+- Keep the portable cap at three workers. Use one worker unless the phase has
+  explicit `parallel-safe-with` edges and disjoint declared file scopes.
+  Unknown or overlapping scopes remain sequential.
+- The main Codex thread remains orchestrator. It owns requirements,
+  architecture, integration, final judgment, and release decisions. Worker
+  agents only receive bounded worker handoffs.
+- Use one worker hop. Do not let worker output create a second delegation tree.
+  If a worker finds new scope, write evidence and refresh `workflow view`
+  instead of improvising nested work.
+- Codex should pass the compact dispatch handoff to a native child agent and
+  keep worker reasoning low or medium by default. The portable dispatch never
+  assigns `xhigh` to a worker.
+- Each worker writes `orchestrator-worker-result/v1` JSON. Submit it with
+  `workflow record-result --file <worker-result.json>`. The result must carry
+  the dispatch ID, project-run ID, source revision, fencing token, and
+  idempotency key. Replays are safe; stale fences fail closed.
+- `workflow bundle` remains an inspection/compatibility projection only. Its
+  worker paths are relative to the bundle root; it does not execute workers.
+- Use `workflow import-artifact --file <artifact.md> --dry-run` for
+  `instruction-engine` roadmap workflow artifacts before applying them. Apply
+  only through `--apply --if-exists update` after inspecting the scaffold.
+- Refresh `workflow view` after writeback. Never continue from a stale
+  execution plan after a worker reports blockers, degraded mode, failed tests,
+  or changed file scopes.
+- Efficiency signals to watch: `estimatedContextTokens`,
+  `parallelSafeCandidateCount`, worker wall time, worker count, result bytes,
+  validation outcome, and duplicate or superseded evidence. Prefer smaller
+  handoffs and bounded worker count before raising reasoning class.
+- Side-effect class: `query` for `workflow view`; `mutation` for bundle files;
+  `fenced-mutation` for `workflow prepare` and `workflow record-result`.
+- Approval posture: advisory for view and bundle inspection; required for
+  prepare/result execution when the host can mutate the repo, install
+  dependencies, call browsers, create containers, or spend external resources.
+
 ### Validation / health / export (validate all, health, project-export,
 project-render)
 
@@ -264,6 +312,14 @@ project-render)
 | `planning-health` | read-only | Surface database health, FTS5 index drift, lease state |
 | `planning-project-export` | disk_write | Export a scope to JSON |
 | `planning-project-render` | disk_write | Render a scope to Markdown |
+| `planning-workflow-export` | disk_write | Export a workflow-oriented projection |
+| `planning-workflow-render` | disk_write | Render a workflow-oriented projection |
+| `planning-workflow-view` | read-only | Return a host-neutral workflow-view/v1 projection with adapter policy, execution plan, delegation hints, budgets, and metrics |
+| `planning-workflow-bundle` | disk_write | Write dispatch, runbook, worker handoff, and writeback-template files for a host adapter |
+| `planning-workflow-prepare` | fenced-mutation | Compile a bounded native dispatch batch and claim/activate fenced project runs |
+| `planning-workflow-record-result` | fenced-mutation | Atomically validate and write back a native worker result, evidence, graph status, and project-run terminal state |
+| `planning-workflow-import-artifact` | disk_write | Import an instruction-engine roadmap workflow artifact through the roadmap scaffold transaction path |
+| `planning-workflow-export-artifact` | disk_write | Export a roadmap/work point as an instruction-engine roadmap workflow markdown artifact |
 | `planning-project-run-claim` | disk_write | Claim a durable execution lease on a work point |
 | `planning-project-run-activate` | disk_write | Activate a claimed run |
 | `planning-project-run-release` | disk_write | Release a lease |
@@ -425,11 +481,12 @@ Expected: `status: "ok"`, `data.scopeMode = "all"`, `data.scopeKey = "all"`, fin
 
 ## References
 
-- Governed source: `plugins/planning/fixtures/skill.elegy-planning.json`.
-- Discovery projection:
-  `plugins/planning/fixtures/skill-discovery-index.elegy-planning.json`.
-- Architecture: `plugins/planning/docs/architecture/v1.md`.
+- Governed plugin manifest: `plugins/planning/.elegy-plugin/plugin.json`.
+- Capability catalog: `plugins/planning/capability-catalog.json`.
+- Architecture: `plugins/planning/docs/architecture/ARCHITECTURE.md`.
+- MVP boundary: `plugins/planning/docs/architecture/mvp-scope.md`.
 - Spec: `plugins/planning/docs/specs/index.md`.
+- Workflow projection spec: `plugins/planning/docs/specs/workflow-view.md`.
 - Result envelope schema:
   `plugins/planning/schemas/planning-result.schema.json`.
 - Companion: `elegy-doc-practices` for cross-repo documentation
