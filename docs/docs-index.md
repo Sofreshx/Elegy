@@ -247,6 +247,16 @@
     },
     {
       "authorityClass": "other",
+      "docKind": "planning",
+      "freshness": "unknown",
+      "path": "docs/plans/automation-portability-handoff.md",
+      "sourceOfTruth": "unclassified",
+      "status": "planned",
+      "summary": "Clarify the boundary between portable Elegy capability plugins and separately",
+      "title": "Automation Portability Handoff"
+    },
+    {
+      "authorityClass": "other",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/repo-layout.md",
@@ -365,6 +375,7 @@
     "docs/ops/main-ruleset.md",
     "docs/repo-layout.md",
     "docs/spec-baseline.md",
+    "docs/plans/automation-portability-handoff.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",
     "docs/ai/checks-demo-report.md",
