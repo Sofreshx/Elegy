@@ -27,6 +27,9 @@ adapter.
 
 ## Documentation Rules
 
+- Read `docs/plans/automation-portability-handoff.md` before changing plugin,
+  host-projection, or automation-pack terminology.
+
 - Update an existing ADR or spec when extending the same decision slice.
 - Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation.
 - Keep harness files thin. Root `AGENTS.md` is the repo authority; other harness files should point back here.
