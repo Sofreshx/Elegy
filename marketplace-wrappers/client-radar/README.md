@@ -13,9 +13,9 @@ files, skills, schemas, and binaries are supplied by the published plugin
 archive from the private implementation repo. The primary runtime contract is
 the bundled CLI.
 
-Status: draft. `distribution/surfaces.json` sets `marketplacePublished: false`,
-so this wrapper is not emitted in the installable marketplace until public
-archives exist.
+Status: private-source marketplace entry. The implementation repository remains
+private; the installable marketplace consumes the target archive and checksum
+published to the Elegy release namespace.
 
 Release assets are published to the public `Sofreshx/Elegy` GitHub release
 namespace using the canonical external plugin names:
