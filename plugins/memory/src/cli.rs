@@ -4398,7 +4398,7 @@ mod tests {
     fn reembed_stale_memories_updates_embeddings_and_respects_limit() {
         let db_path = unique_temp_path("elegy-memory-cli-reembed");
         let provider = Arc::new(StubEmbeddingProvider::new([
-            ("", StubEmbeddingResponse::Embedding(vec![0.0; 1])),
+            ("test", StubEmbeddingResponse::Embedding(vec![0.0; 1])),
             (
                 "older stale memory",
                 StubEmbeddingResponse::Embedding(vec![1.0; 768]),
