@@ -819,7 +819,7 @@ impl ReembedMigration {
     /// unreachable.  A single test embedding is attempted; on failure the
     /// whole migration aborts without writing any staging rows.
     fn check_provider_health(&self) -> Result<(), StoreError> {
-        match (self.generator)("") {
+        match (self.generator)("test") {
             Ok(_) => Ok(()),
             Err(e) => Err(StoreError::Migration(format!(
                 "reembed provider unavailable at start: {e}"
@@ -2722,6 +2722,63 @@ mod tests {
     }
 
     #[test]
+    fn reembed_health_check_succeeds_with_non_empty_probe() {
+        // Regression test: The health probe used to pass an empty string "",
+        // which fails with real embedding providers (OpenAI/Ollama) that
+        // reject empty input. The probe must use a non-empty string so that
+        // the health check passes for a working provider.
+        let database_path =
+            env::temp_dir().join(format!("elegy-memory-ree-ne-{}.sqlite3", Uuid::new_v4()));
+        let mut connection = must(init_database(&database_path), "create ne test database");
+        must(
+            connection.execute_batch(
+                "INSERT INTO memories(id, content, scope, provenance, embedding_stale, created_at, updated_at) VALUES \
+                 ('ne1', 'non empty content', 'session', 'user', 1, '2024-01-01T00:00:00Z', '2024-01-01T00:00:00Z');",
+            ),
+            "insert stale memory",
+        );
+
+        // Mock provider that rejects empty input (like real OpenAI/Ollama)
+        // but works with non-empty input.
+        let migration = ReembedMigration::new(
+            Box::new(|content: &str| {
+                if content.trim().is_empty() {
+                    Err(StoreError::Migration(
+                        "embedding input must not be empty".into(),
+                    ))
+                } else {
+                    Ok((vec![1.0f32; 4], 4))
+                }
+            }),
+            "ne-profile",
+        );
+
+        // Should succeed: health probe is "test" (non-empty), not ""
+        let txn = must(connection.transaction(), "begin ne txn");
+        must(
+            migration.run(&txn),
+            "reembed with non-empty-probe-aware provider must succeed",
+        );
+        must(txn.commit(), "commit ne");
+
+        // Verify the memory was re-embedded
+        let stale: i64 = must(
+            connection.query_row(
+                "SELECT embedding_stale FROM memories WHERE id = 'ne1'",
+                [],
+                |row| row.get(0),
+            ),
+            "ne1 stale",
+        );
+        assert_eq!(stale, 0, "memory must be re-embedded");
+
+        drop(connection);
+        if let Err(error) = fs::remove_file(&database_path) {
+            assert_eq!(error.kind(), std::io::ErrorKind::NotFound);
+        }
+    }
+
+    #[test]
     fn reembed_cleans_orphan_staging_at_start_of_run() {
         let database_path = env::temp_dir().join(format!(
             "elegy-memory-ree-orphan2-{}.sqlite3",
@@ -2909,7 +2966,7 @@ mod tests {
             "mid-profile",
         );
 
-        // run() calls check_provider_health first ("" → succeeds)
+        // run() calls check_provider_health first ("test" → succeeds)
         // staging: mid1 succeeds (staged), mid2 fails (pending_retry)
         // verify: staged(1) + retry(1) == active(2) → passes
         // cutover: mid1 gets promoted (embedding_stale=0), mid2 stays stale
