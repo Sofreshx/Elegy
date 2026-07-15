@@ -27,7 +27,7 @@ plugin metadata wrappers, and `shared/` for reusable libraries.
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) — placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Shared crate boundaries](shared-crate-boundaries.md) — keep/merge criteria for shared Rust crates
 - [Documentation practices](documentation-practices.md) — central ADR/spec doctrine, placement rules, and the lean `elegy docs` validation posture
-- [Terminology](terminology.md) — neutral vocabulary for artifact authority, projections, and runtime ownership
+- [Terminology](terminology.md) — canonical vocabulary for plugins, Automation Packs, projections, bindings, deployments, and runtime ownership
 - [Repository layout](../repo-layout.md) — surface taxonomy, directory contracts, and repo-shape validation
 - [Repo surface taxonomy ADR](../adr/2026-07-07-adopt-repo-surface-taxonomy.md) — decision record for separating plugins, tools, hosts, skills, wrappers, and shared crates
 

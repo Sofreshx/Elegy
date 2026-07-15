@@ -1,11 +1,16 @@
 schemaVersion: elegy-documentation/v2
 authorityRoots:
   current:
+    - docs/architecture
     - docs/adr
     - docs/specs
-  planning: []
-  research: []
-  generated: []
+  planning:
+    - docs/plans
+    - docs/roadmaps
+  research:
+    - docs/research
+  generated:
+    - docs/ai
 entrypoints:
   - README.md
 derivedSurfaces:

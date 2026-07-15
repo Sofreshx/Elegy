@@ -3,12 +3,20 @@
   "config": {
     "authorityRoots": {
       "current": [
+        "docs/architecture",
         "docs/adr",
         "docs/specs"
       ],
-      "generated": [],
-      "planning": [],
-      "research": []
+      "generated": [
+        "docs/ai"
+      ],
+      "planning": [
+        "docs/plans",
+        "docs/roadmaps"
+      ],
+      "research": [
+        "docs/research"
+      ]
     },
     "compatibilityMode": "v2",
     "derivedSurfaces": {
@@ -136,93 +144,93 @@
       "title": "Agent Integration"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "generated",
       "docKind": "generated",
       "freshness": "unknown",
       "path": "docs/ai/checks-demo-report.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "generated-derived",
       "status": "active",
       "summary": "**Generated:** 2026-07-08",
       "title": "Agent-Ready Repo Pack Demo"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "index",
       "freshness": "unknown",
       "path": "docs/architecture/README.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "This directory contains the current architectural guidance for the Elegy repo.",
       "title": "Architecture Docs"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "guide",
       "freshness": "unknown",
       "path": "docs/architecture/documentation-practices.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "This document defines the current documentation doctrine for Elegy.",
       "title": "Documentation Practices"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "system",
       "freshness": "unknown",
       "path": "docs/architecture/ecosystem-topology.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "This document defines the current high-level organization of the Elegy ecosystem so docs, exports, and implementation ownership stay aligned with the repo that actually exists.",
       "title": "Elegy Ecosystem Topology"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/architecture/mcp-skill-tooling-placement.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "Simplified. MCP authoring and descriptor validation remain in `elegy-mcp`. The skill registry (`elegy-skills`) serves list/search/resolve/get/validate against Agent Skills (SKILL.md). MCP-to-skill generation has been removed. Package-backed configuration has been removed.",
       "title": "MCP, Skill, and Tooling Placement"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/architecture/shared-crate-boundaries.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "Shared crates stay separate only when they own a real boundary: cross-surface",
       "title": "Shared Crate Boundaries"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/architecture/skill-core-v1.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "Agent Skills are standard SKILL.md files. Plugin-owned skills live under",
       "title": "Skill Core"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "system",
       "freshness": "unknown",
       "path": "docs/architecture/substrate-governance.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
       "summary": "This document defines the active dependency and ownership rules for the current",
       "title": "Elegy Substrate Governance"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "current",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/architecture/terminology.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "This glossary defines the terms that Phase 1 treats as canonical across the Elegy umbrella repo.",
+      "summary": "This glossary defines the canonical terms used across the Elegy umbrella repo.",
       "title": "Elegy Terminology"
     },
     {
@@ -246,13 +254,13 @@
       "title": "main-protection Branch Ruleset"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "planning",
       "docKind": "planning",
       "freshness": "unknown",
       "path": "docs/plans/automation-portability-handoff.md",
-      "sourceOfTruth": "unclassified",
-      "status": "planned",
-      "summary": "Clarify the boundary between portable Elegy capability plugins and separately",
+      "sourceOfTruth": "planning-non-canon",
+      "status": "active",
+      "summary": "The canonical terminology boundary landed on 2026-07-15. Automation Pack",
       "title": "Automation Portability Handoff"
     },
     {
@@ -266,22 +274,22 @@
       "title": "Repository Layout"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "research",
       "docKind": "research",
       "freshness": "unknown",
       "path": "docs/research/openclaw-orchestration-gap-roadmap.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "research-non-canon",
       "status": "exploratory",
       "summary": "Updated: 2026-03-25",
       "title": "Research OpenClaw orchestration gap roadmap"
     },
     {
-      "authorityClass": "other",
+      "authorityClass": "planning",
       "created": "2026-05-13",
       "docKind": "planning",
-      "freshness": "n/a",
+      "freshness": "fresh",
       "path": "docs/roadmaps/observation-substrate-roadmap.md",
-      "sourceOfTruth": "unclassified",
+      "sourceOfTruth": "planning-non-canon",
       "status": "active",
       "summary": "Define the reusable observation and recording substrate that Elegy should own for downstream hosts such as Holon without absorbing host-local consent, policy, evidence, or product UX.",
       "title": "Observation Substrate Roadmap",
@@ -352,6 +360,13 @@
   "projectRoot": ".",
   "recommendedReadingOrder": [
     "README.md",
+    "docs/architecture/ecosystem-topology.md",
+    "docs/architecture/substrate-governance.md",
+    "docs/architecture/documentation-practices.md",
+    "docs/architecture/mcp-skill-tooling-placement.md",
+    "docs/architecture/shared-crate-boundaries.md",
+    "docs/architecture/skill-core-v1.md",
+    "docs/architecture/terminology.md",
     "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
     "docs/adr/2026-06-15-adopt-elegy-planning-graph-core.md",
     "docs/adr/2026-06-15-block-crates-io-publishing.md",
@@ -363,23 +378,15 @@
     "docs/specs/capability-catalog-v1.md",
     "docs/specs/monetization-infrastructure.md",
     "docs/specs/plugin-marketplace-v1.md",
-    "docs/architecture/ecosystem-topology.md",
-    "docs/architecture/substrate-governance.md",
-    "docs/agent-integration.md",
-    "docs/architecture/documentation-practices.md",
-    "docs/distribution.md",
-    "docs/architecture/mcp-skill-tooling-placement.md",
-    "docs/architecture/shared-crate-boundaries.md",
-    "docs/architecture/skill-core-v1.md",
-    "docs/architecture/terminology.md",
-    "docs/ops/main-ruleset.md",
-    "docs/repo-layout.md",
-    "docs/spec-baseline.md",
+    "docs/architecture/README.md",
     "docs/plans/automation-portability-handoff.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",
-    "docs/ai/checks-demo-report.md",
-    "docs/architecture/README.md"
+    "docs/agent-integration.md",
+    "docs/distribution.md",
+    "docs/ops/main-ruleset.md",
+    "docs/repo-layout.md",
+    "docs/spec-baseline.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

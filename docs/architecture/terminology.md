@@ -9,7 +9,7 @@ doc_kind: reference
 
 ## Purpose
 
-This glossary defines the terms that Phase 1 treats as canonical across the Elegy umbrella repo.
+This glossary defines the canonical terms used across the Elegy umbrella repo.
 
 These definitions exist to prevent later phases from overloading the same words in incompatible ways.
 
@@ -62,6 +62,74 @@ A capability is what a host invokes — it includes an identity, input/output co
 A formalized capability definition with identity, metadata, and execution-oriented semantics.
 
 In Elegy, a skill is a governed capability contract. It is a portable package/contract bundle — not inherently tied to a specific LLM vendor, prompt engine, runtime host, or MCP transport. A skill declares capabilities and their constraints; it does not own host-side execution decisions.
+
+### Portable plugin core
+
+The host-neutral plugin package and capability catalog from which host-specific
+install surfaces are derived.
+
+The portable plugin core owns capability identity, invocation contracts,
+dependencies, and distribution metadata. It does not contain a Codex plugin
+directory, a Holon package manifest, a native workflow graph, client
+credentials, or deployment state.
+
+### Host projection
+
+A derived installation or discovery surface for one supported agent host.
+
+For example, the Codex `.codex-plugin` tree is a host projection of a portable
+Elegy plugin core. A host projection may adapt layout and host metadata, but it
+must not become a second authority for capability behavior.
+
+### Capability binding
+
+A reference from a higher-level system to a governed Elegy capability it may
+invoke.
+
+An Automation Pack can use capability bindings for assisted or agent-runner
+steps without becoming an Elegy plugin. The binding identifies a capability
+and its required contract; the executing host still owns selection, policy,
+approval, credentials, and runtime evidence.
+
+### Automation Pack
+
+An independently versioned and signed distribution for a reusable business
+automation outcome.
+
+An Automation Pack can contain native target workflows, data policy,
+configuration slots, target projections, Care metadata, and optional Elegy
+capability bindings. It is not an Elegy plugin and it does not make a native
+target workflow part of the Elegy substrate. The incubating Pack and delivery
+contracts are owned by Automation Forge until promotion criteria are met.
+
+### Target adapter
+
+A target-specific implementation that materializes, inspects, or controls an
+Automation Pack projection in an automation runtime such as n8n.
+
+The adapter consumes Pack and delivery contracts. It does not own the portable
+Pack, client approval, credentials, or deployment state, and successful support
+for one target does not imply support for another.
+
+### Agent-runner binding
+
+A Pack-declared binding from an assisted automation step to a governed Elegy
+capability or host tool projection.
+
+The binding describes the required capability boundary. The selected agent
+host remains responsible for compatible projection, invocation policy,
+approval, and evidence. An agent-runner binding does not grant an Automation
+Pack ambient agent or tool access.
+
+### Automation deployment
+
+A client-specific installed instance of a verified Automation Pack projection
+on a selected target.
+
+Deployment state binds Pack and target identity with local configuration,
+opaque credential references, approvals, receipts, and operational status.
+Those client-local facts belong to the operating host or control plane, not to
+the portable Elegy plugin core or the Pack distribution.
 
 ### Capability kind
 
@@ -192,6 +260,16 @@ Governance is broader than security policy. It includes compatibility, conforman
 The generation and materialization layer responsible for deterministic derived outputs.
 
 Forge is not the same thing as the human-facing CLI. It is the subsystem that emits or materializes governed artifacts or derived projections from them.
+
+### Automation Forge
+
+The separately owned delivery toolchain that authors, validates, packages,
+signs, materializes, and controls Automation Pack projections through public
+delivery and adapter contracts.
+
+Automation Forge is not the generic Elegy forge subsystem, an automation
+runtime, or a client control plane. Its Pack contracts remain outside Elegy
+while they incubate.
 
 ### CLI
 
