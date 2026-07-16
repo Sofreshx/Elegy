@@ -1,0 +1,31 @@
+[package]
+name = "elegy-accounts"
+version.workspace = true
+edition = "2024"
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+publish = false
+
+[[bin]]
+name = "elegy-accounts"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = "1.0.98"
+axum = "0.8.4"
+chrono.workspace = true
+elegy-accountd = { version = "0.1.0", path = "../elegy-accountd" }
+rmcp = { version = "1.4.0", features = ["server", "client", "transport-io", "transport-child-process", "macros", "schemars"] }
+reqwest = { version = "0.12.22", default-features = false, features = ["json", "rustls-tls"] }
+schemars = "1.0.4"
+serde.workspace = true
+serde_json.workspace = true
+tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "io-std", "sync", "process", "net", "time"] }
+tower-http = { version = "0.6.6", features = ["fs", "set-header"] }
+url = "2.5.4"
+uuid.workspace = true
+zeroize.workspace = true
+
+[dev-dependencies]
+tempfile = "3.20.0"

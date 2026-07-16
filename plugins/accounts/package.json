@@ -1,0 +1,16 @@
+{
+  "name": "elegy-accounts-workspace",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/account-center",
+    "extensions/brave"
+  ],
+  "scripts": {
+    "test": "npm run test --workspaces --if-present",
+    "check": "npm run check --workspaces --if-present && node scripts/sync-assets.mjs",
+    "test:e2e": "npm run test:e2e --workspace @elegy/account-center",
+    "proof:github": "cargo run -p elegy-accounts -- proof-github artifacts/live/github-proof.json",
+    "acceptance": "node scripts/acceptance.mjs"
+  }
+}

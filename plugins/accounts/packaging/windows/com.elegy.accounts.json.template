@@ -1,0 +1,7 @@
+{
+  "name": "com.elegy.accounts",
+  "description": "Elegy Accounts local Brave bridge",
+  "path": "@@NATIVE_HOST_EXE@@",
+  "type": "stdio",
+  "allowed_origins": ["chrome-extension://@@EXTENSION_ID@@/"]
+}

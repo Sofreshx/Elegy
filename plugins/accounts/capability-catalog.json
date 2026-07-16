@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "elegy-capability-catalog/v1",
+  "plugin": "elegy-accounts",
+  "pluginVersion": "0.1.0",
+  "capabilities": [
+    {
+      "id": "accounts.mcp",
+      "kind": "mcp",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Request, inspect, and revoke credential-backed account access without revealing credentials.",
+      "invocation": {
+        "executable": "elegy-accounts",
+        "command": ["mcp"],
+        "toolName": "account_list"
+      }
+    },
+    {
+      "id": "accounts.center",
+      "kind": "cli",
+      "sideEffectClass": "mutation",
+      "contractVersion": "v1",
+      "description": "Open the local human authorization and account-management surface.",
+      "invocation": {
+        "executable": "elegy-accounts",
+        "command": ["open"]
+      }
+    }
+  ]
+}
