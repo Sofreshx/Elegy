@@ -69,6 +69,10 @@ External plugin wrappers use `kind: "external-plugin-wrapper"`,
 marketplace keeps `source.path` local for wrapper metadata and points artifact
 URLs at the external release repository.
 
+Binary surfaces may declare a `targets` array of supported Rust target triples.
+When omitted, the publisher uses the default Windows, Linux, and macOS matrix;
+skill-only surfaces continue to publish for the target-independent `any` target.
+
 External plugin repositories own their release pipeline. They must publish
 `<name>-plugin-<target>.zip` plus `<name>-plugin-<target>.zip.sha256` for each
 marketplace target under the release tag used by the generated index.
