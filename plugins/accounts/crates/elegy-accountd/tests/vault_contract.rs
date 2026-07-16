@@ -6,6 +6,7 @@ use tempfile::tempdir;
 const CANARY: &str = "ELEGY_CANARY_never-plaintext-in-vault";
 
 #[test]
+#[cfg(windows)]
 fn vault_persists_identity_but_never_plaintext_secret() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("accounts.sqlite");
@@ -33,6 +34,7 @@ fn vault_persists_identity_but_never_plaintext_secret() {
 }
 
 #[test]
+#[cfg(windows)]
 fn authenticated_encryption_fails_closed_after_ciphertext_tampering() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("accounts.sqlite");
@@ -62,6 +64,7 @@ fn authenticated_encryption_fails_closed_after_ciphertext_tampering() {
 }
 
 #[test]
+#[cfg(windows)]
 fn encrypted_backup_contains_no_plaintext_and_restores_for_same_user() {
     let dir = tempdir().unwrap();
     let source = dir.path().join("accounts.sqlite");
@@ -86,6 +89,7 @@ fn encrypted_backup_contains_no_plaintext_and_restores_for_same_user() {
 }
 
 #[test]
+#[cfg(windows)]
 fn dpapi_protection_is_nondeterministic_and_round_trips_for_current_user() {
     let protector = DpapiProtector;
     let first = protector
@@ -102,6 +106,7 @@ fn dpapi_protection_is_nondeterministic_and_round_trips_for_current_user() {
 }
 
 #[test]
+#[cfg(windows)]
 fn pending_authorization_survives_restart_without_plaintext_device_secret() {
     let dir = tempdir().unwrap();
     let path = dir.path().join("accounts.sqlite");
@@ -138,4 +143,11 @@ fn pending_authorization_survives_restart_without_plaintext_device_secret() {
             .as_slice(),
         CANARY.as_bytes()
     );
+}
+
+#[test]
+#[cfg(not(windows))]
+fn dpapi_fails_closed_on_unsupported_platforms() {
+    let error = DpapiProtector.protect(b"secret").unwrap_err();
+    assert!(matches!(error, VaultError::Protection(_)));
 }

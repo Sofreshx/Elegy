@@ -2,6 +2,7 @@ use elegy_accountd::{BrokerStore, DpapiProtector, NewAccessRequest, Vault};
 use std::sync::Arc;
 
 #[test]
+#[cfg(windows)]
 fn requests_grants_audit_and_revocation_survive_restart() {
     let directory = tempfile::tempdir().unwrap();
     let database = directory.path().join("accounts.sqlite");
