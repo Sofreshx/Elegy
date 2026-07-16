@@ -1486,6 +1486,15 @@ fn export_codex_marketplace(
         });
     }
     for (entry, manifest) in selected_plugins {
+        if !entry.artifacts.is_empty() && select_marketplace_artifact(entry, target).is_none() {
+            if plugin_name.is_some() {
+                return Err(format!(
+                    "plugin '{}' has no artifact for Codex export target '{}'",
+                    entry.name, target
+                ));
+            }
+            continue;
+        }
         let wrapper_root = local_root.join(entry.source.path.trim_start_matches("./"));
         let plugin_output = generation_output.join("plugins").join(&entry.name);
         let materialized = materialize_marketplace_artifact(
@@ -2222,6 +2231,14 @@ mod tests {
         let _ = fs::remove_dir_all(missing_root);
         let _ = fs::remove_dir_all(current_root);
         let _ = fs::remove_dir_all(stale_root);
+    }
+
+    #[test]
+    fn marketplace_target_selection_rejects_unsupported_platform() {
+        let loaded = marketplace_fixture("0.1.0");
+        let entry = &loaded.plugins[0].0;
+        assert!(select_marketplace_artifact(entry, "x86_64-pc-windows-msvc").is_some());
+        assert!(select_marketplace_artifact(entry, "x86_64-unknown-linux-gnu").is_none());
     }
 
     #[test]
