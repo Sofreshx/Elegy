@@ -7,6 +7,8 @@ use sha2::{Digest, Sha256};
 use thiserror::Error;
 use uuid::Uuid;
 
+type LeaseAuthorizationRecord = (String, String, String, String, String, i64, i64, i64);
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct NewAccessRequest {
     pub account_id: String,
@@ -290,7 +292,7 @@ impl BrokerStore {
     ) -> Result<(), BrokerError> {
         let connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;
         let hash = token_hash(token);
-        let record: Option<(String,String,String,String,String,i64,i64,i64)> = connection.query_row(
+        let record: Option<LeaseAuthorizationRecord> = connection.query_row(
             "SELECT l.expires_at,g.expires_at,g.client_id,g.purpose,g.operations_json,l.generation,g.generation,l.remaining_uses FROM leases l JOIN grants g ON g.id=l.grant_id WHERE l.token_hash=?1 AND g.provider=?2 AND g.revoked_at IS NULL",
             params![hash, audience], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?,row.get(7)?)),
         ).optional()?;
