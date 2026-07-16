@@ -122,6 +122,29 @@ fn generated_marketplace_matches_packaged_surfaces() {
 }
 
 #[test]
+fn client_radar_remains_quarantined_until_publication_is_reapproved() {
+    let marketplace = load_marketplace();
+    let surfaces = load_surfaces();
+    let client_radar = surfaces
+        .surfaces
+        .iter()
+        .find(|surface| surface.name == "elegy-client-radar")
+        .expect("Client Radar wrapper must remain registered while quarantined");
+
+    assert!(
+        !client_radar.marketplace_published,
+        "Client Radar must not be marketplace-published before its owning pilot and publication gates are explicitly reapproved"
+    );
+    assert!(
+        marketplace
+            .plugins
+            .iter()
+            .all(|plugin| plugin.name != "elegy-client-radar"),
+        "the generated marketplace must omit quarantined Client Radar"
+    );
+}
+
+#[test]
 fn generated_marketplace_points_to_matching_plugin_manifests() {
     let root = repo_root();
     let marketplace = load_marketplace();
