@@ -230,6 +230,8 @@ struct DistributionSurface {
     marketplace_published: bool,
     #[serde(default = "default_marketplace_category")]
     marketplace_category: String,
+    #[serde(default)]
+    targets: Vec<String>,
 }
 
 #[derive(Debug)]
@@ -699,6 +701,8 @@ fn generate_marketplace(
             .trim_end_matches('/');
         let artifact_targets = if surface.kind == "skill-package" {
             vec!["any"]
+        } else if !surface.targets.is_empty() {
+            surface.targets.iter().map(String::as_str).collect()
         } else {
             targets.to_vec()
         };
