@@ -29,7 +29,7 @@ jobs:
           set -euo pipefail
           surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter" or .kind == "skill-package") | {surface_name: .name, surface_kind: .kind, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // ""), surface_targets: (.targets // [])}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
-          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $surfaces[] as $surface | if $surface.surface_kind == "skill-package" then $surface + {runner:"ubuntu-24.04",target:"any"} else ($targets[] as $target | select(($surface.surface_targets | length) == 0 or (.target as $candidate | $surface.surface_targets | index($candidate))) | $surface + $target) end | del(.surface_targets) ]')"
+          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $surfaces[] as $surface | if $surface.surface_kind == "skill-package" then $surface + {runner:"ubuntu-24.04",target:"any"} else ($targets[] as $target | select(($surface.surface_targets | length) == 0 or any($surface.surface_targets[]; . == $target.target)) | $surface + $target) end | del(.surface_targets) ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   build:
