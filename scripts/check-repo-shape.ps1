@@ -173,10 +173,19 @@ if (Test-Path -LiteralPath $surfacesPath) {
             $relativePackageDir = [System.IO.Path]::GetRelativePath($root, $packageDir).Replace("\", "/")
             if ($relativePackageDir -match '^(plugins|tools|hosts)/') {
                 $packageName = [string]$package.name
-                if (-not $surfacePackages.Contains($packageName)) {
+                $coveredByPluginRoot = $false
+                foreach ($surface in $surfaces) {
+                    if ($surface.kind -ne "bundled-plugin" -or -not $surface.pluginRoot) { continue }
+                    $pluginRoot = ([string]$surface.pluginRoot).Replace("\", "/").TrimEnd("/")
+                    if ($relativePackageDir -eq $pluginRoot -or $relativePackageDir.StartsWith("$pluginRoot/")) {
+                        $coveredByPluginRoot = $true
+                        break
+                    }
+                }
+                if (-not $surfacePackages.Contains($packageName) -and -not $coveredByPluginRoot) {
                     Add-Issue "surfaces.missing_package" $relativePackageDir "Rust package '$packageName' under plugins/, tools/, or hosts/ is missing from distribution/surfaces.json."
                 }
-                if (-not $surfaceRoots.Contains($relativePackageDir)) {
+                if (-not $surfaceRoots.Contains($relativePackageDir) -and -not $coveredByPluginRoot) {
                     Add-Issue "surfaces.missing_crate_root_entry" $relativePackageDir "Rust package '$packageName' should be represented by crateRoot or pluginRoot in distribution/surfaces.json."
                 }
             }

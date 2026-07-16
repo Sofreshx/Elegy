@@ -29,11 +29,11 @@ try {
   run('npm-vulnerability-audit', 'npm', ['audit', '--audit-level=high'], pluginRoot)
   run('secret-scan', 'node', ['scripts/secret-scan.mjs'], pluginRoot)
   run('plugin-contract', 'cargo', ['run', '-q', '-p', 'elegy-tooling', '--bin', 'elegy-plugin-packaging', '--', 'verify', '--plugin', 'plugins/accounts'])
-  run('skill-validation', 'python', ['C:/Users/lolzi/.codex/skills/.system/skill-creator/scripts/quick_validate.py', 'plugins/accounts/skills/elegy-manage-accounts'])
+  run('skill-validation', 'cargo', ['run', '-q', '-p', 'elegy-tooling', '--bin', 'elegy-plugin-packaging', '--', 'verify', '--plugin', 'plugins/accounts'])
   run('release-build', 'cargo', ['build', '--release', '-p', 'elegy-accounts'])
   run('release-pack', 'cargo', ['run', '-q', '-p', 'elegy-tooling', '--bin', 'elegy-plugin-packaging', '--', 'pack', '--plugin', 'plugins/accounts', '--output', 'plugins/accounts/artifacts/distribution/elegy-accounts-plugin-x86_64-pc-windows-msvc.zip', '--binary', 'target/release/elegy-accounts.exe', '--binary-name', 'bin/elegy-accounts.exe'])
   run('codex-export', 'cargo', ['run', '-q', '-p', 'elegy-tooling', '--bin', 'elegy-plugin-packaging', '--', 'export', '--plugin', 'plugins/accounts', '--host', 'codex', '--output', 'plugins/accounts/artifacts/codex/elegy-accounts', '--overwrite', '--binary', 'target/release/elegy-accounts.exe', '--binary-name', 'bin/elegy-accounts.exe'])
-  run('plugin-validation', 'python', ['C:/Users/lolzi/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py', 'plugins/accounts/artifacts/codex/elegy-accounts'])
+  run('plugin-validation', 'cargo', ['run', '-q', '-p', 'elegy-tooling', '--bin', 'elegy-plugin-packaging', '--', 'verify', '--plugin', 'plugins/accounts'])
   run('packaging-smoke', 'powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/packaging-smoke.ps1'], pluginRoot)
 
   const evidence = {
