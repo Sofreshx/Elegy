@@ -236,6 +236,21 @@
       ]
     },
     {
+      "name": "elegy-accounts",
+      "source": {
+        "source": "local",
+        "path": "./plugins/accounts"
+      },
+      "category": "Productivity",
+      "artifacts": [
+        {
+          "target": "x86_64-pc-windows-msvc",
+          "url": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-accounts-plugin-x86_64-pc-windows-msvc.zip",
+          "checksumUrl": "https://github.com/Sofreshx/Elegy/releases/download/main-snapshot/elegy-accounts-plugin-x86_64-pc-windows-msvc.zip.sha256"
+        }
+      ]
+    },
+    {
       "name": "elegy-plugin-authoring",
       "source": {
         "source": "local",
