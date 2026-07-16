@@ -75,6 +75,14 @@ marketplace target under the release tag used by the generated index.
 For the public Elegy marketplace, those assets live on the public Elegy release
 even when the producing source repository is private.
 
+Clean external repositories call the pinned reusable
+`.github/workflows/publish-external-plugin.yml` workflow. Main-branch builds may
+refresh only the rolling `main-snapshot` integration channel. Stable upload is
+accepted only from an exact matching semver tag, with explicit marketplace
+eligibility, a matching plugin manifest version, an existing Elegy release,
+and non-clobbering asset publication. Publication credentials are checked
+before any release mutation.
+
 External wrapper surfaces may set `marketplacePublished: false` while archives
 are not yet public. Draft wrappers stay in source, but the generated
 marketplace omits them until the public archives exist.
