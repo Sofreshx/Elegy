@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "elegy-accounts": {
+      "command": "./bin/elegy-accounts.exe",
+      "args": ["mcp"]
+    }
+  }
+}

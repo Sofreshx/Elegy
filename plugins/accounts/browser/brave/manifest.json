@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Elegy Accounts",
+  "version": "0.1.0",
+  "description": "Continue safe provider account connections with your local Elegy Accounts broker.",
+  "permissions": ["activeTab", "nativeMessaging"],
+  "host_permissions": [],
+  "optional_host_permissions": [
+    "https://dash.cloudflare.com/*",
+    "https://github.com/*"
+  ],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Elegy Accounts", "default_popup": "popup.html" }
+}

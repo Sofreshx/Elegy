@@ -1,0 +1,37 @@
+{
+  "schemaVersion": "elegy-plugin/v1",
+  "name": "elegy-accounts",
+  "version": "0.1.0",
+  "description": "Local account authentication, encrypted credential storage, grants, and revocation for people and agents.",
+  "author": {
+    "name": "Elegy Contributors"
+  },
+  "license": "Apache-2.0",
+  "repository": "https://github.com/Sofreshx/Elegy",
+  "skills": "./skills/",
+  "capabilityCatalog": {
+    "path": "./capability-catalog.json",
+    "schemaVersion": "elegy-capability-catalog/v1",
+    "readinessCommand": "elegy-accounts status --json"
+  },
+  "extensions": {
+    "codex.plugin/v1": {
+      "schemaVersion": "codex.plugin/v1",
+      "mcpServers": "./.mcp.json",
+      "assets": ["./ui/", "./browser/"],
+      "interface": {
+        "displayName": "Elegy Accounts",
+        "shortDescription": "Connect accounts without exposing credentials",
+        "longDescription": "Discover, connect, select, review, and revoke local accounts while agents receive only scoped, auditable access grants.",
+        "developerName": "Elegy Contributors",
+        "category": "Productivity",
+        "capabilities": ["Read", "Write", "Interactive"],
+        "defaultPrompt": [
+          "Connect the account I need with minimum access.",
+          "Show my connected accounts and agent access.",
+          "Revoke account access I no longer need."
+        ]
+      }
+    }
+  }
+}

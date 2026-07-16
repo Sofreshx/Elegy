@@ -1,0 +1,12 @@
+interface:
+  display_name: "Manage Accounts"
+  short_description: "Connect accounts and request safe agent access"
+  default_prompt: "Use $manage-accounts to connect the account I need and request the minimum safe access."
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "elegy-accounts"
+      description: "Local encrypted account broker and grant workflow"
+      transport: "stdio"
+policy:
+  allow_implicit_invocation: true

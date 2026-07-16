@@ -7,6 +7,8 @@ members = [
     "plugins/memory",
     "plugins/observe",
     "plugins/planning",
+    "plugins/accounts/crates/elegy-accountd",
+    "plugins/accounts/crates/elegy-account-cli",
     "hosts/memory-mcp",
     "shared/adapter-fs",
     "shared/adapter-http",
@@ -54,6 +56,13 @@ zip = { version = "2.4.2", default-features = false, features = ["deflate"] }
 arboard = "3.4"
 png = "0.17"
 sysinfo = "0.33"
+aes-gcm = "0.10.3"
+chrono = { version = "0.4.41", features = ["serde"] }
+rand = "0.9.2"
+rusqlite = { version = "0.32.1", features = ["bundled"] }
+sha2 = "0.10.9"
+uuid = { version = "1.17.0", features = ["v4", "serde"] }
+zeroize = { version = "1.8.1", features = ["derive"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"
