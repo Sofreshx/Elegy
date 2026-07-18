@@ -1,6 +1,6 @@
 [package]
 name = "elegy-accounts"
-version.workspace = true
+version = "0.2.0"
 edition = "2024"
 license.workspace = true
 authors.workspace = true
@@ -15,7 +15,7 @@ path = "src/main.rs"
 anyhow = "1.0.98"
 axum = "0.8.4"
 chrono.workspace = true
-elegy-accountd = { version = "0.1.0", path = "../elegy-accountd" }
+elegy-accountd = { version = "0.2.0", path = "../elegy-accountd" }
 rmcp = { version = "1.4.0", features = ["server", "client", "transport-io", "transport-child-process", "macros", "schemars"] }
 reqwest = { version = "0.12.22", default-features = false, features = ["json", "rustls-tls"] }
 schemars = "1.0.4"
