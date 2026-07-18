@@ -1,0 +1,37 @@
+{
+  "schema_version": "elegy-account-provider/v1",
+  "id": "cloudflare",
+  "display_name": "Cloudflare",
+  "version": "1.0.0",
+  "publisher": "elegy",
+  "browser_origins": ["https://dash.cloudflare.com"],
+  "auth_profiles": [
+    {
+      "id": "scoped-token",
+      "method": "api_token",
+      "issuer": "https://dash.cloudflare.com",
+      "audience": "https://api.cloudflare.com",
+      "identity": {
+        "url": "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        "selectors": ["/result/id"],
+        "required": {
+          "/success": true,
+          "/result/status": "active"
+        }
+      },
+      "client": { "mode": "user_provided" },
+      "scopes": ["user:read", "zone:read", "dns:read"],
+      "credential_header": "authorization",
+      "credential_fields": [
+        { "id": "token", "label": "Scoped API token", "secret": true, "autocomplete": "off" }
+      ],
+      "creation_url": "https://dash.cloudflare.com/profile/api-tokens"
+    }
+  ],
+  "operations": {
+    "account.profile.read": ["user:read"],
+    "zones.read": ["zone:read"],
+    "dns.records.read": ["dns:read"],
+    "dns.records.write": ["dns:write"]
+  }
+}

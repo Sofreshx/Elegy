@@ -1,8 +1,8 @@
 {
   "schemaVersion": "elegy-plugin/v1",
   "name": "elegy-accounts",
-  "version": "0.1.0",
-  "description": "Local account authentication, encrypted credential storage, grants, and revocation for people and agents.",
+  "version": "0.2.0",
+  "description": "Generic local account authentication, encrypted credential storage, scoped broker execution, grants, and revocation for people and agents.",
   "author": {
     "name": "Elegy Contributors"
   },
@@ -18,7 +18,7 @@
     "codex.plugin/v1": {
       "schemaVersion": "codex.plugin/v1",
       "mcpServers": "./.mcp.json",
-      "assets": ["./ui/", "./browser/"],
+      "assets": ["./ui/", "./browser/", "./providers/"],
       "interface": {
         "displayName": "Elegy Accounts",
         "shortDescription": "Connect accounts without exposing credentials",

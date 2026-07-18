@@ -1,15 +1,12 @@
 // src/security.ts
-var providerByOrigin = /* @__PURE__ */ new Map([
-  ["https://dash.cloudflare.com", "cloudflare"],
-  ["https://github.com", "github"]
-]);
-function discoveryHintForUrl(rawUrl) {
+function discoveryHintForUrl(rawUrl, providers) {
   let url;
   try {
     url = new URL(rawUrl);
   } catch {
     return null;
   }
+  const providerByOrigin = new Map(providers.flatMap((provider) => provider.browserOrigins.map((origin) => [origin, provider.id])));
   const providerId = providerByOrigin.get(url.origin);
   return providerId ? { providerId, origin: url.origin, verified: false } : null;
 }
@@ -20,15 +17,22 @@ var detail = document.querySelector("[data-detail]");
 var allow = document.querySelector("[data-allow]");
 void initialize();
 async function initialize() {
-  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const hint = tab?.url ? discoveryHintForUrl(tab.url) : null;
-  if (!hint) {
-    title.textContent = "No supported account found";
-    detail.textContent = "Open Cloudflare or GitHub, then try again.";
+  const registry = await chrome.runtime.sendMessage({ type: "provider-registry" });
+  if (!registry?.ok || !registry.providers) {
+    title.textContent = "Account broker unavailable";
+    detail.textContent = registry?.error ?? "Start Elegy Account Center and try again.";
     allow.disabled = true;
     return;
   }
-  title.textContent = `Continue with ${providerName(hint.providerId)}`;
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  const hint = tab?.url ? discoveryHintForUrl(tab.url, registry.providers) : null;
+  if (!hint) {
+    title.textContent = "No supported account found";
+    detail.textContent = "Open a page for one of your installed provider packs, then try again.";
+    allow.disabled = true;
+    return;
+  }
+  title.textContent = `Continue with ${registry.providers.find((provider) => provider.id === hint.providerId)?.displayName ?? hint.providerId}`;
   detail.textContent = "Elegy will open a provider-approved connection flow. Passwords and cookies are never imported.";
   allow.addEventListener("click", async () => {
     allow.disabled = true;
@@ -44,7 +48,4 @@ async function initialize() {
     detail.textContent = "The local broker is ready to verify this account.";
     allow.hidden = true;
   });
-}
-function providerName(id) {
-  return { cloudflare: "Cloudflare", github: "GitHub" }[id] ?? id;
 }

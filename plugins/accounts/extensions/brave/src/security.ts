@@ -1,18 +1,15 @@
 export type DiscoveryHint = { providerId: string; origin: string; verified: false }
-
-const providerByOrigin = new Map([
-  ['https://dash.cloudflare.com', 'cloudflare'],
-  ['https://github.com', 'github'],
-])
+export type ProviderDescriptor = { id: string; displayName: string; browserOrigins: string[] }
 
 const secretKeys = new Set([
   'authorization', 'password', 'cookie', 'set-cookie', 'access_token',
   'refresh_token', 'api_key', 'client_secret', 'secret', 'token',
 ])
 
-export function discoveryHintForUrl(rawUrl: string): DiscoveryHint | null {
+export function discoveryHintForUrl(rawUrl: string, providers: ProviderDescriptor[]): DiscoveryHint | null {
   let url: URL
   try { url = new URL(rawUrl) } catch { return null }
+  const providerByOrigin = new Map(providers.flatMap(provider => provider.browserOrigins.map(origin => [origin, provider.id] as const)))
   const providerId = providerByOrigin.get(url.origin)
   return providerId ? { providerId, origin: url.origin, verified: false } : null
 }

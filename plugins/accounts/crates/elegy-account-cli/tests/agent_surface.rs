@@ -16,6 +16,10 @@ fn agent_surface_has_account_tools_but_no_secret_or_raw_execution_tool() {
         "account_request_access",
         "account_request_creation",
         "account_request_status",
+        "account_attention_list",
+        "account_present",
+        "account_cancel_request",
+        "account_resume_request",
         "account_open_center",
         "account_revoke_grant",
         "account_audit_list",
@@ -70,14 +74,18 @@ async fn mcp_server_advertises_only_the_bounded_account_tools() {
     assert_eq!(
         names,
         [
+            "account_attention_list",
             "account_audit_list",
+            "account_cancel_request",
             "account_discover",
             "account_list",
             "account_open_center",
+            "account_present",
             "account_request_access",
             "account_request_creation",
             "account_request_status",
             "account_require",
+            "account_resume_request",
             "account_revoke_grant",
         ]
     );
@@ -132,4 +140,26 @@ fn open_can_return_the_local_center_url_without_launching() {
         String::from_utf8_lossy(&output.stdout).trim(),
         "http://127.0.0.1:43119/"
     );
+}
+
+#[test]
+fn open_can_target_a_durable_request_without_putting_secrets_in_the_url() {
+    let local_data = tempfile::tempdir().expect("temp data directory");
+    let output = StdCommand::new(env!("CARGO_BIN_EXE_elegy-accounts"))
+        .args(["open", "--print-url", "--request", "auth_fixture-1"])
+        .env("LOCALAPPDATA", local_data.path())
+        .output()
+        .expect("open command should run");
+    assert!(output.status.success());
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout).trim(),
+        "http://127.0.0.1:43119/?request=auth_fixture-1"
+    );
+
+    let rejected = StdCommand::new(env!("CARGO_BIN_EXE_elegy-accounts"))
+        .args(["open", "--print-url", "--request", "unsafe&token=secret"])
+        .env("LOCALAPPDATA", local_data.path())
+        .output()
+        .expect("open command should run");
+    assert!(!rejected.status.success());
 }

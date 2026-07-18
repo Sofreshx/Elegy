@@ -7,15 +7,15 @@ The MVP is complete only when every `MUST` item passes and evidence is saved by 
 | ID | Requirement | Level | Evidence |
 |---|---|---:|---|
 | AC-01 | Account Center launches locally and shows connected, needs-attention, and revoked accounts without exposing secret values. | MUST | E2E + screenshot |
-| AC-02 | On a simulated signed-in Cloudflare page, the Brave extension offers **Allow**, obtains optional permission, starts the provider flow, and the verified account appears in Account Center. | MUST | extension integration test + E2E |
+| AC-02 | On an arbitrary pack-declared provider origin, the Brave extension offers **Allow**, starts the provider flow without host/cookie/password permission, and the verified account appears in Account Center. | MUST | extension integration test + E2E |
 | AC-03 | The same connected account is visible through Codex tools and the Holon/Elegy embedded surface without reconnecting. | MUST | contract + embed E2E |
-| AC-04 | An agent can request read-only Cloudflare DNS access; the user can approve it; the agent receives an opaque lease and sanitized DNS results, never a token. | MUST | broker integration test |
+| AC-04 | An agent can request a pack-declared read operation; the user can approve it; the broker injects auth for the allowlisted audience and returns sanitized results, never a credential. | MUST | broker proxy integration test |
 | AC-05 | A write operation not included in a read-only grant is denied and audited. | MUST | policy integration test |
 | AC-06 | Multiple accounts for one provider are distinguishable by verified identity and can be selected explicitly. | MUST | broker + UI test |
 | AC-07 | Revoking a grant immediately invalidates derived leases and updates all surfaces. | MUST | broker + E2E |
 | AC-08 | Restarting the broker preserves encrypted accounts, grants, audit history, resumable signup state, and unexpired authorization sessions; provider polling does not depend on an open UI. | MUST | restart integration test + authorization-session vault test |
 | AC-09 | Encrypted backup and same-user restore recover metadata and usable credentials without plaintext in the archive. | MUST | backup integration test + canary scan |
-| AC-10 | GitHub device authorization and Cloudflare scoped-token adapters connect against deterministic provider fakes and return verified identities. | MUST | adapter conformance suite |
+| AC-10 | Arbitrary provider packs exercise OAuth PKCE, device authorization, scoped tokens, Basic/app passwords, and client credentials against deterministic fakes and return verified identities. | MUST | pack + adapter conformance suites |
 
 ## Autonomous creation scenarios
 

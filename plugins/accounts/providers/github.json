@@ -1,0 +1,33 @@
+{
+  "schema_version": "elegy-account-provider/v1",
+  "id": "github",
+  "display_name": "GitHub",
+  "version": "1.0.0",
+  "publisher": "elegy",
+  "browser_origins": ["https://github.com"],
+  "auth_profiles": [
+    {
+      "id": "device",
+      "method": "device_authorization",
+      "issuer": "https://github.com",
+      "audience": "https://api.github.com",
+      "token_url": "https://github.com/login/oauth/access_token",
+      "device_authorization_url": "https://github.com/login/device/code",
+      "identity": {
+        "url": "https://api.github.com/user",
+        "selectors": ["/login", "/id"]
+      },
+      "client": {
+        "mode": "environment",
+        "client_id_env": "ELEGY_GITHUB_CLIENT_ID"
+      },
+      "scopes": ["read:user"],
+      "creation_url": "https://github.com/signup"
+    }
+  ],
+  "operations": {
+    "profile.read": ["read:user"],
+    "repositories.read": ["repo:status"],
+    "pull_requests.write": ["repo"]
+  }
+}

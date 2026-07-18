@@ -12,8 +12,9 @@ pub use vault::{
 };
 mod provider;
 pub use provider::{
-    AuthMethod, OAuthCallback, OAuthError, OAuthTransaction, PkceVerifier, ProviderCatalog,
-    ProviderSpec,
+    AuthMethod, AuthProfile, ClientRegistration, ClientRegistrationMode, CredentialField,
+    IdentitySpec, OAuthCallback, OAuthError, OAuthTransaction, PkceVerifier, ProviderCatalog,
+    ProviderError, ProviderSpec,
 };
 mod broker;
 pub use broker::{
@@ -21,9 +22,11 @@ pub use broker::{
 };
 mod adapter;
 pub use adapter::{
-    AdapterError, OAuthAdapterConfig, VerifiedCredential, exchange_and_verify,
-    verify_cloudflare_token,
+    AdapterError, OAuthAdapterConfig, TokenAdapterConfig, VerifiedCredential, exchange_and_verify,
+    verify_credentials, verify_token,
 };
+mod proxy;
+pub use proxy::{AuthenticatedRequest, AuthenticatedResponse, ProxyError};
 
 #[derive(Clone, Debug)]
 pub struct GrantRequest {

@@ -18,16 +18,19 @@ if (-not (Test-Path -LiteralPath $sourceExe)) {
 }
 $extensionSource = Join-Path $pluginRoot 'browser\brave'
 $accountCenterSource = Join-Path $pluginRoot 'ui\account-center'
+$providerSource = Join-Path $pluginRoot 'providers'
 $binDir = Join-Path $InstallRoot 'bin'
 $extensionDir = Join-Path $InstallRoot 'brave-extension'
 $uiDir = Join-Path $InstallRoot 'account-center'
+$providerDir = Join-Path $InstallRoot 'providers'
 $hostManifest = Join-Path $InstallRoot 'com.elegy.accounts.json'
 
-New-Item -ItemType Directory -Force -Path $binDir, $extensionDir, $uiDir | Out-Null
+New-Item -ItemType Directory -Force -Path $binDir, $extensionDir, $uiDir, $providerDir | Out-Null
 Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $binDir 'elegy-accounts.exe') -Force
 Copy-Item -LiteralPath $sourceExe -Destination (Join-Path $binDir 'elegy-accounts-native-host.exe') -Force
 Copy-Item -Path (Join-Path $extensionSource '*') -Destination $extensionDir -Recurse -Force
 Copy-Item -Path (Join-Path $accountCenterSource '*') -Destination $uiDir -Recurse -Force
+Copy-Item -Path (Join-Path $providerSource '*.json') -Destination $providerDir -Force
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'start-account-center.ps1'), (Join-Path $PSScriptRoot 'stop-account-center.ps1'), (Join-Path $PSScriptRoot 'backup.ps1'), (Join-Path $PSScriptRoot 'restore.ps1') -Destination $InstallRoot -Force
 
 $template = Get-Content -LiteralPath (Join-Path $PSScriptRoot 'com.elegy.accounts.json.template') -Raw

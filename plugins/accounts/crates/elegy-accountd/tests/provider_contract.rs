@@ -1,34 +1,77 @@
 use elegy_accountd::{AuthMethod, OAuthCallback, OAuthError, OAuthTransaction, ProviderCatalog};
+use std::path::Path;
 
 #[test]
-fn mvp_provider_catalog_declares_safe_connection_and_validation_modes() {
-    let catalog = ProviderCatalog::mvp();
-    let cloudflare = catalog.get("cloudflare").unwrap();
-    assert!(
-        cloudflare
-            .auth_methods
-            .contains(&AuthMethod::GuidedApiToken)
+fn bundled_provider_packs_are_data_driven_conformance_examples() {
+    let directory = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../providers");
+    let catalog = ProviderCatalog::load_directory(directory).expect("bundled provider packs");
+    assert_eq!(catalog.list().len(), 3);
+    assert_eq!(
+        catalog.get("github").expect("github pack").auth_profiles[0].method,
+        AuthMethod::DeviceAuthorization
     );
     assert_eq!(
-        cloudflare.identity_endpoint,
-        "https://api.cloudflare.com/client/v4/user/tokens/verify"
+        catalog
+            .get("cloudflare")
+            .expect("cloudflare pack")
+            .auth_profiles[0]
+            .method,
+        AuthMethod::ApiToken
     );
-    assert!(cloudflare.operations.contains_key("dns.records.read"));
-    assert!(
-        cloudflare
-            .browser_origins
-            .contains(&"https://dash.cloudflare.com".into())
+    assert_eq!(
+        catalog.get("google").expect("google pack").auth_profiles[0].method,
+        AuthMethod::OAuthPkce
     );
+}
 
-    let github = catalog.get("github").unwrap();
-    assert_eq!(github.auth_methods, vec![AuthMethod::DeviceCode]);
-    assert_eq!(catalog.list().len(), 2);
-    for id in ["google", "vercel", "generic"] {
-        assert!(
-            catalog.get(id).is_none(),
-            "{id} must not be advertised as MVP-ready"
-        );
-    }
+#[test]
+fn provider_catalog_loads_generic_manifest_without_compiled_provider_knowledge() {
+    let manifest = r#"{
+      "schema_version":"elegy-account-provider/v1",
+      "id":"synthetic-mail",
+      "display_name":"Synthetic Mail",
+      "version":"1.0.0",
+      "publisher":"test-suite",
+      "browser_origins":["https://accounts.example.test"],
+      "auth_profiles":[{
+        "id":"desktop-oauth",
+        "method":"oauth_pkce",
+        "issuer":"https://accounts.example.test",
+        "audience":"https://api.example.test",
+        "authorization_url":"https://accounts.example.test/authorize",
+        "token_url":"https://accounts.example.test/token",
+        "identity":{"url":"https://api.example.test/me","selectors":["/email","/id"]},
+        "client":{"mode":"environment","client_id_env":"SYNTHETIC_CLIENT_ID"},
+        "scopes":["profile.read"]
+      }],
+      "operations":{"mail.read":["profile.read"]}
+    }"#;
+
+    let catalog = ProviderCatalog::from_json_documents([manifest]).expect("valid provider pack");
+    let provider = catalog.get("synthetic-mail").expect("provider loaded");
+    assert_eq!(provider.auth_profiles[0].method, AuthMethod::OAuthPkce);
+    assert_eq!(
+        provider.auth_profiles[0].identity.selectors,
+        ["/email", "/id"]
+    );
+    assert_eq!(catalog.list().len(), 1);
+}
+
+#[test]
+fn provider_catalog_rejects_non_loopback_plain_http_endpoints() {
+    let manifest = r#"{
+      "schema_version":"elegy-account-provider/v1",
+      "id":"unsafe",
+      "display_name":"Unsafe",
+      "version":"1.0.0",
+      "publisher":"test-suite",
+      "browser_origins":["http://accounts.example.test"],
+      "auth_profiles":[],
+      "operations":{}
+    }"#;
+
+    let error = ProviderCatalog::from_json_documents([manifest]).expect_err("unsafe origin");
+    assert!(error.to_string().contains("HTTPS"));
 }
 
 #[test]

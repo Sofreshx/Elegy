@@ -1,8 +1,4 @@
 // src/security.ts
-var providerByOrigin = /* @__PURE__ */ new Map([
-  ["https://dash.cloudflare.com", "cloudflare"],
-  ["https://github.com", "github"]
-]);
 var secretKeys = /* @__PURE__ */ new Set([
   "authorization",
   "password",
@@ -15,13 +11,14 @@ var secretKeys = /* @__PURE__ */ new Set([
   "secret",
   "token"
 ]);
-function discoveryHintForUrl(rawUrl) {
+function discoveryHintForUrl(rawUrl, providers) {
   let url;
   try {
     url = new URL(rawUrl);
   } catch {
     return null;
   }
+  const providerByOrigin = new Map(providers.flatMap((provider) => provider.browserOrigins.map((origin) => [origin, provider.id])));
   const providerId = providerByOrigin.get(url.origin);
   return providerId ? { providerId, origin: url.origin, verified: false } : null;
 }
@@ -40,16 +37,16 @@ function assertNoSecretFields(value, path) {
 // src/background.ts
 var nativeHost = "com.elegy.accounts";
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  if (request?.type !== "connect-current-tab") return false;
-  void connectCurrentTab().then(sendResponse, (error) => sendResponse({ ok: false, error: safeError(error) }));
+  if (!["connect-current-tab", "provider-registry"].includes(request?.type)) return false;
+  const action = request.type === "provider-registry" ? loadRegistry() : connectCurrentTab();
+  void action.then(sendResponse, (error) => sendResponse({ ok: false, error: safeError(error) }));
   return true;
 });
 async function connectCurrentTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-  const hint = tab.url ? discoveryHintForUrl(tab.url) : null;
+  const registry = await loadRegistry();
+  const hint = tab.url ? discoveryHintForUrl(tab.url, registry.providers) : null;
   if (!hint) return { ok: false, error: "Open a supported provider account page first." };
-  const granted = await chrome.permissions.request({ origins: [`${hint.origin}/*`] });
-  if (!granted) return { ok: false, error: "Provider access was not allowed." };
   const message = sanitizeNativeMessage({ type: "account.discovery", version: 1, hint, interaction: "explicit-user-allow" });
   const response = await chrome.runtime.sendNativeMessage(nativeHost, message);
   const safeResponse = sanitizeNativeMessage(response);
@@ -60,6 +57,11 @@ async function connectCurrentTab() {
     await chrome.tabs.create({ url: center.toString() });
   }
   return safeResponse;
+}
+async function loadRegistry() {
+  const response = sanitizeNativeMessage(await chrome.runtime.sendNativeMessage(nativeHost, { type: "account.providers", version: 1 }));
+  if (!response.ok || !Array.isArray(response.providers)) throw new Error(response.error ?? "Could not load trusted provider packs.");
+  return { ok: true, providers: response.providers };
 }
 function safeError(error) {
   return error instanceof Error ? error.message.replace(/(Bearer|token|secret)\s+\S+/gi, "[REDACTED]") : "Connection failed.";

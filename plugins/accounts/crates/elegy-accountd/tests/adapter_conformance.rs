@@ -3,8 +3,12 @@ use axum::{
     http::{HeaderMap, StatusCode},
     routing::{get, post},
 };
-use elegy_accountd::{OAuthAdapterConfig, exchange_and_verify, verify_cloudflare_token};
+use elegy_accountd::{
+    AuthMethod, AuthProfile, ClientRegistration, ClientRegistrationMode, IdentitySpec,
+    OAuthAdapterConfig, TokenAdapterConfig, exchange_and_verify, verify_credentials, verify_token,
+};
 use serde_json::{Value, json};
+use std::collections::BTreeMap;
 
 #[tokio::test]
 async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
@@ -37,7 +41,11 @@ async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
             provider: provider.into(),
             client_id: "local-test-client".into(),
             token_url: format!("http://{address}/token"),
-            identity_url: format!("http://{address}/identity"),
+            identity: IdentitySpec {
+                url: format!("http://{address}/identity"),
+                selectors: vec!["/email".into()],
+                required: BTreeMap::new(),
+            },
         };
         let verified = exchange_and_verify(
             &client,
@@ -55,7 +63,7 @@ async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
 }
 
 #[tokio::test]
-async fn cloudflare_scoped_token_must_be_active_before_storage() {
+async fn declarative_token_profile_must_satisfy_identity_assertions_before_storage() {
     let app = Router::new().route(
         "/verify",
         get(|headers: HeaderMap| async move {
@@ -70,15 +78,27 @@ async fn cloudflare_scoped_token_must_be_active_before_storage() {
     let address = listener.local_addr().unwrap();
     tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
 
-    let verified = verify_cloudflare_token(
+    let verified = verify_token(
         &reqwest::Client::new(),
-        &format!("http://{address}/verify"),
+        &TokenAdapterConfig {
+            provider: "synthetic-edge".into(),
+            identity: IdentitySpec {
+                url: format!("http://{address}/verify"),
+                selectors: vec!["/result/id".into()],
+                required: BTreeMap::from([
+                    ("/success".into(), json!(true)),
+                    ("/result/status".into(), json!("active")),
+                ]),
+            },
+            header: "authorization".into(),
+            prefix: "Bearer ".into(),
+        },
         "scoped-canary",
     )
     .await
     .unwrap();
-    assert_eq!(verified.provider, "cloudflare");
-    assert_eq!(verified.identity, "token:verified-token-id");
+    assert_eq!(verified.provider, "synthetic-edge");
+    assert_eq!(verified.identity, "verified-token-id");
     assert_eq!(verified.secret.as_str(), "scoped-canary");
 }
 
@@ -100,7 +120,11 @@ async fn adapter_fails_closed_on_provider_rejection() {
         provider: "generic".into(),
         client_id: "test".into(),
         token_url: format!("http://{address}/token"),
-        identity_url: format!("http://{address}/identity"),
+        identity: IdentitySpec {
+            url: format!("http://{address}/identity"),
+            selectors: vec!["/id".into()],
+            required: BTreeMap::new(),
+        },
     };
     assert!(
         exchange_and_verify(
@@ -113,4 +137,115 @@ async fn adapter_fails_closed_on_provider_rejection() {
         .await
         .is_err()
     );
+}
+
+#[tokio::test]
+async fn common_basic_credentials_are_verified_and_serialized_as_an_encrypted_envelope_payload() {
+    let app = Router::new().route(
+        "/identity",
+        get(|headers: HeaderMap| async move {
+            assert_eq!(
+                headers.get("authorization").unwrap(),
+                "Basic dXNlcjphcHAtcGFzcw=="
+            );
+            Json(json!({"username":"verified-user"}))
+        }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let profile = AuthProfile {
+        id: "app-password".into(),
+        method: AuthMethod::HttpBasic,
+        audience: format!("http://{address}"),
+        issuer: None,
+        authorization_url: None,
+        token_url: None,
+        device_authorization_url: None,
+        identity: IdentitySpec {
+            url: format!("http://{address}/identity"),
+            selectors: vec!["/username".into()],
+            required: BTreeMap::new(),
+        },
+        client: ClientRegistration {
+            mode: ClientRegistrationMode::UserProvided,
+            client_id: None,
+            client_id_env: None,
+        },
+        scopes: vec![],
+        credential_header: None,
+        creation_url: None,
+        credential_fields: vec![],
+    };
+    let fields = BTreeMap::from([
+        ("username".into(), "user".into()),
+        ("password".into(), "app-pass".into()),
+    ]);
+    let verified = verify_credentials(&reqwest::Client::new(), "synthetic-basic", &profile, fields)
+        .await
+        .unwrap();
+    assert_eq!(verified.identity, "verified-user");
+    let envelope: Value = serde_json::from_str(verified.secret.as_str()).unwrap();
+    assert_eq!(envelope["version"], "elegy-credential/v1");
+    assert_eq!(envelope["fields"]["username"], "user");
+    assert_eq!(envelope["fields"]["password"], "app-pass");
+}
+
+#[tokio::test]
+async fn client_credentials_are_verified_but_only_the_long_lived_inputs_are_stored() {
+    let app = Router::new()
+        .route(
+            "/token",
+            post(|body: String| async move {
+                assert!(body.contains("client_id=fixture-client"));
+                assert!(body.contains("client_secret=fixture-secret"));
+                Json(json!({"access_token":"short-lived-token"}))
+            }),
+        )
+        .route(
+            "/identity",
+            get(|headers: HeaderMap| async move {
+                assert_eq!(
+                    headers.get("authorization").unwrap(),
+                    "Bearer short-lived-token"
+                );
+                Json(json!({"client":"fixture-client"}))
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let profile = AuthProfile {
+        id: "client".into(),
+        method: AuthMethod::ClientCredentials,
+        audience: format!("http://{address}"),
+        issuer: None,
+        authorization_url: None,
+        token_url: Some(format!("http://{address}/token")),
+        device_authorization_url: None,
+        identity: IdentitySpec {
+            url: format!("http://{address}/identity"),
+            selectors: vec!["/client".into()],
+            required: BTreeMap::new(),
+        },
+        client: ClientRegistration {
+            mode: ClientRegistrationMode::UserProvided,
+            client_id: None,
+            client_id_env: None,
+        },
+        scopes: vec!["resource.read".into()],
+        credential_header: None,
+        creation_url: None,
+        credential_fields: vec![],
+    };
+    let fields = BTreeMap::from([
+        ("client_id".into(), "fixture-client".into()),
+        ("client_secret".into(), "fixture-secret".into()),
+    ]);
+    let verified = verify_credentials(&reqwest::Client::new(), "machine-api", &profile, fields)
+        .await
+        .unwrap();
+    assert_eq!(verified.identity, "fixture-client");
+    assert!(!verified.secret.contains("short-lived-token"));
+    assert!(verified.secret.contains("fixture-secret"));
 }

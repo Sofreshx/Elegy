@@ -1,0 +1,37 @@
+{
+  "schema_version": "elegy-account-provider/v1",
+  "id": "google",
+  "display_name": "Google",
+  "version": "1.0.0",
+  "publisher": "elegy",
+  "browser_origins": ["https://accounts.google.com", "https://mail.google.com"],
+  "auth_profiles": [
+    {
+      "id": "desktop-oauth",
+      "method": "oauth_pkce",
+      "issuer": "https://accounts.google.com",
+      "audience": "https://openidconnect.googleapis.com",
+      "authorization_url": "https://accounts.google.com/o/oauth2/v2/auth",
+      "token_url": "https://oauth2.googleapis.com/token",
+      "identity": {
+        "url": "https://openidconnect.googleapis.com/v1/userinfo",
+        "selectors": ["/email", "/sub"]
+      },
+      "client": {
+        "mode": "environment",
+        "client_id_env": "ELEGY_GOOGLE_CLIENT_ID"
+      },
+      "scopes": [
+        "openid",
+        "email",
+        "profile",
+        "https://www.googleapis.com/auth/gmail.readonly"
+      ],
+      "creation_url": "https://accounts.google.com/signup"
+    }
+  ],
+  "operations": {
+    "profile.read": ["openid", "email", "profile"],
+    "gmail.messages.read": ["https://www.googleapis.com/auth/gmail.readonly"]
+  }
+}

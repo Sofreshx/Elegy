@@ -2,6 +2,8 @@
 
 Live checks complement the deterministic fake-provider suite. They are intentionally optional: CI and acceptance never require a personal account.
 
+Live proofs validate runtime packs; they never justify provider-name branches in the broker or UI. Before marking any pack ready, pass provider parsing, endpoint-policy, identity assertion, auth-adapter, proxy audience, lease, and redaction tests against a deterministic loopback fake. Then install the real pack, connect through Account Center, verify close/reopen recovery, approve one narrow read through the broker, restart, revoke, prove the old lease fails, scan artifacts for plaintext, and clean up.
+
 ## Safety contract
 
 - Obtain explicit user approval before creating an OAuth application or authorizing an account.
@@ -12,6 +14,8 @@ Live checks complement the deterministic fake-provider suite. They are intention
 - Evidence may contain provider name, public account identity, timestamps, boolean checks, and mutation counts only.
 
 ## GitHub proof lanes
+
+GitHub is the device-authorization proof pack, not a compiled special case.
 
 ### Ephemeral broker proof
 
@@ -38,5 +42,8 @@ The July 16, 2026 live run verified `Sofreshx`, UI close/reopen recovery, broker
 | Deterministic fake providers | OAuth PKCE and GitHub Device Flow | exact request shape, pending/slow/deny/success, identity validation, secret redaction | 0 | required in CI |
 | GitHub live | OAuth Device Flow, `read:user` | connect, identity, persistence, lease, read, revoke, plaintext scan | 0 | first live release gate |
 | Cloudflare live | user-created scoped token | verify active token; list account/zones only; no DNS edits | 0 | next proof target |
+| Google live | OAuth PKCE/OIDC | verify userinfo; optional Gmail read-only metadata; no mailbox mutation | 0 | OAuth PKCE proof target |
+
+For Google, create a dedicated desktop OAuth client, set `ELEGY_GOOGLE_CLIENT_ID`, and authorize only the bundled pack's declared scopes. CAPTCHA, MFA, account selection, consent, and recovery remain user checkpoints. Do not send mail, modify labels, or retain a broader credential for the proof.
 
 CAPTCHA, MFA, passkeys, consent, email verification, and provider risk challenges are always human checkpoints. The system can open the correct page and resume afterward; it does not bypass them.

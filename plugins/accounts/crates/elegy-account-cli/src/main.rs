@@ -7,9 +7,9 @@ use axum::{
     routing::{get, post},
 };
 use elegy_accountd::{
-    AuthorizationSession, BrokerStore, DpapiProtector, NewAccessRequest, OAuthAdapterConfig,
-    OAuthTransaction, ProviderCatalog, Vault, VerifiedCredential, exchange_and_verify,
-    verify_cloudflare_token,
+    AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, IdentitySpec,
+    NewAccessRequest, OAuthAdapterConfig, OAuthTransaction, ProviderCatalog, TokenAdapterConfig,
+    Vault, VerifiedCredential, exchange_and_verify, verify_credentials, verify_token,
 };
 use rmcp::{
     ServerHandler, ServiceExt,
@@ -25,7 +25,7 @@ use serde_json::json;
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::{
-    collections::HashMap,
+    collections::{BTreeMap, HashMap},
     path::PathBuf,
     sync::{Arc, Mutex},
     time::{Duration, Instant},
@@ -35,6 +35,7 @@ use zeroize::Zeroizing;
 #[derive(Clone)]
 struct AccountsMcp {
     broker: Arc<BrokerStore>,
+    catalog: Arc<ProviderCatalog>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
 }
@@ -78,6 +79,16 @@ struct StatusParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+struct AttentionParams {
+    limit: Option<u32>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct PresentParams {
+    request_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
 struct RevokeParams {
     grant_id: String,
     reason: Option<String>,
@@ -98,6 +109,7 @@ impl AccountsMcp {
         let broker = BrokerStore::new(Vault::open(database, Arc::new(DpapiProtector))?);
         Ok(Self {
             broker: Arc::new(broker),
+            catalog: Arc::new(load_provider_catalog()?),
             tool_router: Self::tool_router(),
         })
     }
@@ -132,8 +144,8 @@ impl AccountsMcp {
         description = "Discover safe connection methods and supported browser origins for a provider. Discovery hints are unverified until credential validation."
     )]
     fn account_discover(&self, Parameters(params): Parameters<DiscoverParams>) -> String {
-        let catalog = ProviderCatalog::mvp();
-        let providers: Vec<_> = catalog
+        let providers: Vec<_> = self
+            .catalog
             .list()
             .into_iter()
             .filter(|provider| params.provider.as_ref().is_none_or(|id| id == &provider.id))
@@ -203,6 +215,130 @@ impl AccountsMcp {
     }
 
     #[tool(
+        description = "List durable requests that need user interaction. Results are sanitized and contain a resumable local URL."
+    )]
+    fn account_attention_list(&self, Parameters(params): Parameters<AttentionParams>) -> String {
+        let limit = params.limit.unwrap_or(50).min(200) as usize;
+        let requests = self
+            .broker
+            .list_requests()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|request| {
+                matches!(
+                    request.status.as_str(),
+                    "awaiting_user" | "waiting_human" | "interaction_required"
+                )
+            })
+            .map(|request| {
+                json!({
+                    "request_id": request.id,
+                    "kind": request.kind,
+                    "provider": request.provider,
+                    "purpose": request.purpose,
+                    "status": request.status,
+                    "url": format!("{ACCOUNT_CENTER_URL}?request={}", request.id),
+                })
+            });
+        let authorizations = self
+            .broker
+            .vault()
+            .list_authorization_sessions()
+            .unwrap_or_default()
+            .into_iter()
+            .filter(|session| {
+                matches!(
+                    session.status.as_str(),
+                    "waiting_for_user" | "interaction_required"
+                )
+            })
+            .map(|session| {
+                json!({
+                    "request_id": session.id,
+                    "kind": "authorization",
+                    "provider": session.provider,
+                    "status": session.status,
+                    "expires_at": session.expires_at,
+                    "reason": session.last_error,
+                    "url": format!("{ACCOUNT_CENTER_URL}?request={}", session.id),
+                })
+            });
+        json!({"attention": requests.chain(authorizations).take(limit).collect::<Vec<_>>()})
+            .to_string()
+    }
+
+    #[tool(
+        description = "Present Account Center for a pending request. This opens only the local loopback UI and never puts credentials in the URL."
+    )]
+    fn account_present(&self, Parameters(params): Parameters<PresentParams>) -> String {
+        let Ok(url) = request_url(params.request_id.as_deref()) else {
+            return json!({"status":"invalid_request_id"}).to_string();
+        };
+        let launched = std::env::current_exe()
+            .ok()
+            .and_then(|executable| {
+                let mut command = Command::new(executable);
+                command.arg("open");
+                if let Some(request_id) = &params.request_id {
+                    command.args(["--request", request_id]);
+                }
+                command.spawn().ok()
+            })
+            .is_some();
+        json!({"status":if launched {"presented"} else {"presentation_required"},"url":url,"local_only":true}).to_string()
+    }
+
+    #[tool(
+        description = "Cancel a pending access, creation, or authorization request and delete any temporary authorization secret."
+    )]
+    fn account_cancel_request(&self, Parameters(params): Parameters<StatusParams>) -> String {
+        if self.broker.cancel_request(&params.request_id).is_ok() {
+            return json!({"request_id":params.request_id,"status":"cancelled"}).to_string();
+        }
+        let sessions = self
+            .broker
+            .vault()
+            .list_authorization_sessions()
+            .unwrap_or_default();
+        let Some(mut session) = sessions
+            .into_iter()
+            .find(|session| session.id == params.request_id)
+        else {
+            return json!({"request_id":params.request_id,"status":"not_found"}).to_string();
+        };
+        session.status = "cancelled".into();
+        session.user_code.clear();
+        session.updated_at = chrono::Utc::now().to_rfc3339();
+        let _ = self.broker.vault().update_authorization_session(&session);
+        let _ = self.broker.vault().delete_authorization_secret(&session.id);
+        json!({"request_id":params.request_id,"status":"cancelled"}).to_string()
+    }
+
+    #[tool(
+        description = "Return the safe user-present resume action for a durable request. Expired authorization is restarted only from Account Center."
+    )]
+    fn account_resume_request(&self, Parameters(params): Parameters<StatusParams>) -> String {
+        let request_exists = self.broker.get_request(&params.request_id).is_ok()
+            || self
+                .broker
+                .vault()
+                .list_authorization_sessions()
+                .unwrap_or_default()
+                .iter()
+                .any(|session| session.id == params.request_id);
+        if !request_exists {
+            return json!({"request_id":params.request_id,"status":"not_found"}).to_string();
+        }
+        json!({
+            "request_id": params.request_id,
+            "status":"interaction_required",
+            "action":"open_account_center",
+            "url":format!("{ACCOUNT_CENTER_URL}?request={}", params.request_id)
+        })
+        .to_string()
+    }
+
+    #[tool(
         description = "Return the local Account Center URL for user review. No credential is included in the URL."
     )]
     fn account_open_center(&self) -> String {
@@ -253,6 +389,24 @@ fn local_data_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(base).join("Elegy").join("Accounts"))
 }
 
+fn provider_directory() -> PathBuf {
+    if let Some(configured) = std::env::var_os("ELEGY_ACCOUNTS_PROVIDER_DIR") {
+        return PathBuf::from(configured);
+    }
+    let installed = std::env::current_exe().ok().and_then(|path| {
+        path.parent()
+            .and_then(|bin| bin.parent())
+            .map(|root| root.join("providers"))
+    });
+    installed
+        .filter(|path| path.is_dir())
+        .unwrap_or_else(|| PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../providers"))
+}
+
+fn load_provider_catalog() -> Result<ProviderCatalog> {
+    ProviderCatalog::load_directory(provider_directory()).context("load account provider packs")
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let args: Vec<String> = std::env::args().skip(1).collect();
@@ -273,7 +427,14 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some("serve" | "broker") => run_account_center().await,
-        Some("open") => run_open(args.iter().any(|arg| arg == "--print-url")).await,
+        Some("open") => {
+            let request_id = args
+                .iter()
+                .position(|arg| arg == "--request")
+                .and_then(|index| args.get(index + 1))
+                .map(String::as_str);
+            run_open(args.iter().any(|arg| arg == "--print-url"), request_id).await
+        }
         Some("status") => run_status(),
         Some("backup") => {
             let destination = args
@@ -313,9 +474,25 @@ async fn main() -> Result<()> {
 
 const ACCOUNT_CENTER_URL: &str = "http://127.0.0.1:43119/";
 
-async fn run_open(print_only: bool) -> Result<()> {
+fn request_url(request_id: Option<&str>) -> Result<String> {
+    let Some(request_id) = request_id else {
+        return Ok(ACCOUNT_CENTER_URL.into());
+    };
+    if request_id.is_empty()
+        || request_id.len() > 128
+        || !request_id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+    {
+        anyhow::bail!("request identifier is invalid");
+    }
+    Ok(format!("{ACCOUNT_CENTER_URL}?request={request_id}"))
+}
+
+async fn run_open(print_only: bool, request_id: Option<&str>) -> Result<()> {
+    let open_url = request_url(request_id)?;
     if print_only {
-        println!("{ACCOUNT_CENTER_URL}");
+        println!("{open_url}");
         return Ok(());
     }
 
@@ -367,11 +544,11 @@ async fn run_open(print_only: bool) -> Result<()> {
 
     #[cfg(windows)]
     Command::new("explorer.exe")
-        .arg(ACCOUNT_CENTER_URL)
+        .arg(&open_url)
         .spawn()
         .context("failed to open Account Center")?;
     #[cfg(not(windows))]
-    println!("{ACCOUNT_CENTER_URL}");
+    println!("{open_url}");
     Ok(())
 }
 
@@ -400,6 +577,7 @@ fn run_status() -> Result<()> {
     let vault = Vault::open(data_dir.join("accounts.sqlite"), Arc::new(DpapiProtector))?;
     let accounts = vault.list_accounts()?;
     let sessions = vault.list_authorization_sessions()?;
+    let catalog = load_provider_catalog()?;
     let attention = sessions
         .iter()
         .filter(|session| {
@@ -419,7 +597,7 @@ fn run_status() -> Result<()> {
             "authorizationSessions": sessions.len(),
             "attentionRequired": attention,
             "dataDirectory": data_dir,
-            "providers": ["github", "cloudflare"],
+            "providers": catalog.list().into_iter().map(|provider| provider.id.as_str()).collect::<Vec<_>>(),
         })
     );
     Ok(())
@@ -593,6 +771,7 @@ impl Drop for ProofDirectory {
 #[derive(Clone)]
 struct WebState {
     broker: Arc<BrokerStore>,
+    catalog: Arc<ProviderCatalog>,
     oauth: Arc<Mutex<HashMap<String, PendingOAuth>>>,
     devices: Arc<Mutex<HashMap<String, PendingDevice>>>,
     http: reqwest::Client,
@@ -617,7 +796,7 @@ struct OAuthConfig {
     client_id: String,
     authorize_url: String,
     token_url: String,
-    identity_url: String,
+    identity: IdentitySpec,
     scopes: String,
 }
 
@@ -628,7 +807,7 @@ struct DeviceFlowConfig {
     scope: String,
     device_url: String,
     token_url: String,
-    identity_url: String,
+    identity: IdentitySpec,
 }
 
 struct DeviceAuthorization {
@@ -759,7 +938,7 @@ async fn poll_device_flow(
             .to_owned(),
     );
     let identity_response = client
-        .get(&config.identity_url)
+        .get(&config.identity.url)
         .bearer_auth(secret.as_str())
         .header(reqwest::header::ACCEPT, "application/json")
         .send()
@@ -772,10 +951,12 @@ async fn poll_device_flow(
         .json()
         .await
         .context("invalid identity response")?;
-    let identity = ["login", "email", "username", "id"]
+    let identity = config
+        .identity
+        .selectors
         .iter()
-        .find_map(|key| {
-            let value = identity_json.get(key)?;
+        .find_map(|pointer| identity_json.pointer(pointer))
+        .and_then(|value| {
             value
                 .as_str()
                 .map(str::to_owned)
@@ -797,8 +978,14 @@ struct OAuthCallbackQuery {
 }
 
 #[derive(Deserialize)]
-struct CloudflareTokenRequest {
+struct TokenRequest {
     token: String,
+}
+
+#[derive(Deserialize)]
+struct CredentialRequest {
+    profile: String,
+    fields: BTreeMap<String, String>,
 }
 
 async fn run_account_center() -> Result<()> {
@@ -811,6 +998,7 @@ async fn run_account_center() -> Result<()> {
             database,
             Arc::new(DpapiProtector),
         )?)),
+        catalog: Arc::new(load_provider_catalog()?),
         oauth: Arc::new(Mutex::new(HashMap::new())),
         devices: Arc::new(Mutex::new(HashMap::new())),
         http: reqwest::Client::builder()
@@ -835,15 +1023,21 @@ async fn run_account_center() -> Result<()> {
         .route("/api/grants/{id}/revoke", post(web_revoke))
         .route("/api/accounts/{id}/disconnect", post(web_disconnect))
         .route("/api/connections/{provider}/start", post(web_start_connection))
-        .route("/api/connections/cloudflare/token", post(web_connect_cloudflare_token))
+        .route("/api/connections/{provider}/token", post(web_connect_token))
+        .route("/api/connections/{provider}/credential", post(web_connect_credential))
         .route("/api/connections/device/{id}/poll", post(web_poll_device))
         .route("/oauth/callback", get(web_oauth_callback))
         .fallback_service(tower_http::services::ServeDir::new(ui_dir).append_index_html_on_directories(true))
         .layer(tower_http::set_header::SetResponseHeaderLayer::if_not_present(header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
         .layer(tower_http::set_header::SetResponseHeaderLayer::if_not_present(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' http://127.0.0.1:*")))
         .with_state(state);
-    let listener = tokio::net::TcpListener::bind("127.0.0.1:43119").await?;
-    eprintln!("Elegy Account Center: http://127.0.0.1:43119/");
+    let port = std::env::var("ELEGY_ACCOUNT_CENTER_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(43119);
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
+    eprintln!("Elegy Account Center: http://127.0.0.1:{port}/");
     axum::serve(listener, app).await?;
     Ok(())
 }
@@ -852,6 +1046,7 @@ async fn web_state(State(state): State<WebState>) -> impl IntoResponse {
     let result = (|| -> Result<serde_json::Value> {
         Ok(json!({
             "accounts": state.broker.vault().list_accounts()?,
+            "providers": state.catalog.list(),
             "requests": state.broker.list_requests().map_err(anyhow::Error::from)?,
             "grants": state.broker.list_grants().map_err(anyhow::Error::from)?,
             "audit": state.broker.list_audit(100).map_err(anyhow::Error::from)?,
@@ -975,27 +1170,54 @@ async fn web_start_connection(
         )
             .into_response();
     }
-    if provider == "github" {
-        return web_start_github_device(state).await;
+    let Some(pack) = state.catalog.get(&provider) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"provider_not_found"})),
+        )
+            .into_response();
+    };
+    let Some(profile) = pack.auth_profiles.first().cloned() else {
+        return (
+            StatusCode::PRECONDITION_REQUIRED,
+            Json(json!({"error":"provider_has_no_auth_profile"})),
+        )
+            .into_response();
+    };
+    if profile.method == AuthMethod::DeviceAuthorization {
+        let Some(config) = device_config(&provider, &profile) else {
+            return provider_configuration_required(&provider);
+        };
+        return web_start_device(state, config).await;
     }
-    if provider == "cloudflare" {
+    if matches!(
+        profile.method,
+        AuthMethod::ApiToken
+            | AuthMethod::HttpBasic
+            | AuthMethod::ClientCredentials
+            | AuthMethod::ServiceCredential
+    ) {
         return (
             StatusCode::OK,
             Json(json!({
-                "mode":"manual_token",
-                "creation_url":"https://dash.cloudflare.com/profile/api-tokens"
+                "mode":"manual_credential",
+                "provider": provider,
+                "profile": profile.id,
+                "method": profile.method,
+                "creation_url": profile.creation_url,
+                "credential_fields": credential_fields(&profile)
             })),
         )
             .into_response();
     }
-    let Some(config) = oauth_config(&provider) else {
-        return (StatusCode::PRECONDITION_REQUIRED, Json(json!({"error":"provider_configuration_required","message":format!("Set the local {} OAuth client ID before connecting.", provider)}))).into_response();
+    let Some(config) = oauth_config(&provider, &profile) else {
+        return provider_configuration_required(&provider);
     };
     let redirect_uri = "http://127.0.0.1:43119/oauth/callback";
     let transaction = OAuthTransaction::new(
         &provider,
-        &config.authorize_url,
-        &config.identity_url,
+        profile.issuer.as_deref().unwrap_or(&config.authorize_url),
+        &profile.audience,
         redirect_uri,
     );
     let mut authorization = match url::Url::parse(&config.authorize_url) {
@@ -1035,10 +1257,34 @@ async fn web_start_connection(
         .into_response()
 }
 
-async fn web_connect_cloudflare_token(
+fn credential_fields(profile: &AuthProfile) -> serde_json::Value {
+    if !profile.credential_fields.is_empty() {
+        return json!(profile.credential_fields);
+    }
+    match profile.method {
+        AuthMethod::ApiToken => {
+            json!([{"id":"token","label":"Scoped token","secret":true,"autocomplete":"off"}])
+        }
+        AuthMethod::HttpBasic => json!([
+            {"id":"username","label":"Username","secret":false,"autocomplete":"username"},
+            {"id":"password","label":"Password or app password","secret":true,"autocomplete":"current-password"}
+        ]),
+        AuthMethod::ClientCredentials => json!([
+            {"id":"client_id","label":"Client ID","secret":false,"autocomplete":"off"},
+            {"id":"client_secret","label":"Client secret","secret":true,"autocomplete":"off"}
+        ]),
+        AuthMethod::ServiceCredential => {
+            json!([{"id":"credential","label":"Service credential","secret":true,"autocomplete":"off"}])
+        }
+        _ => json!([]),
+    }
+}
+
+async fn web_connect_credential(
     State(state): State<WebState>,
+    Path(provider): Path<String>,
     headers: HeaderMap,
-    Json(request): Json<CloudflareTokenRequest>,
+    Json(request): Json<CredentialRequest>,
 ) -> impl IntoResponse {
     if !valid_user_intent(&headers) {
         return (
@@ -1047,10 +1293,96 @@ async fn web_connect_cloudflare_token(
         )
             .into_response();
     }
+    let Some(profile) = state.catalog.profile(&provider, &request.profile) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"credential_profile_not_found"})),
+        )
+            .into_response();
+    };
+    let verified = if profile.method == AuthMethod::ApiToken {
+        let Some(token) = request.fields.get("token") else {
+            return (
+                StatusCode::BAD_REQUEST,
+                Json(json!({"error":"credential_fields_missing"})),
+            )
+                .into_response();
+        };
+        verify_token(
+            &state.http,
+            &TokenAdapterConfig {
+                provider: provider.clone(),
+                identity: profile.identity.clone(),
+                header: profile
+                    .credential_header
+                    .clone()
+                    .unwrap_or_else(|| "authorization".into()),
+                prefix: "Bearer ".into(),
+            },
+            token,
+        )
+        .await
+    } else {
+        verify_credentials(&state.http, &provider, profile, request.fields).await
+    };
+    let Ok(verified) = verified else {
+        return (StatusCode::UNAUTHORIZED, Json(json!({"error":"credential_verification_failed","message":format!("{} did not verify this credential.", provider)}))).into_response();
+    };
+    match state.broker.vault().store_account(
+        &verified.provider,
+        &verified.identity,
+        &format!("{:?}", profile.method).to_ascii_lowercase(),
+        verified.secret.as_bytes(),
+    ) {
+        Ok(account) => (
+            StatusCode::OK,
+            Json(json!({"status":"connected","account":account})),
+        )
+            .into_response(),
+        Err(_) => (
+            StatusCode::INTERNAL_SERVER_ERROR,
+            Json(json!({"error":"vault_store_failed"})),
+        )
+            .into_response(),
+    }
+}
+
+async fn web_connect_token(
+    State(state): State<WebState>,
+    Path(provider): Path<String>,
+    headers: HeaderMap,
+    Json(request): Json<TokenRequest>,
+) -> impl IntoResponse {
+    if !valid_user_intent(&headers) {
+        return (
+            StatusCode::FORBIDDEN,
+            Json(json!({"error":"user_intent_required"})),
+        )
+            .into_response();
+    }
+    let Some(profile) = state.catalog.get(&provider).and_then(|pack| {
+        pack.auth_profiles
+            .iter()
+            .find(|profile| profile.method == AuthMethod::ApiToken)
+    }) else {
+        return (
+            StatusCode::NOT_FOUND,
+            Json(json!({"error":"token_profile_not_found"})),
+        )
+            .into_response();
+    };
     let token = Zeroizing::new(request.token);
-    let verified = verify_cloudflare_token(
+    let verified = verify_token(
         &state.http,
-        "https://api.cloudflare.com/client/v4/user/tokens/verify",
+        &TokenAdapterConfig {
+            provider: provider.clone(),
+            identity: profile.identity.clone(),
+            header: profile
+                .credential_header
+                .clone()
+                .unwrap_or_else(|| "authorization".into()),
+            prefix: "Bearer ".into(),
+        },
         token.as_str(),
     )
     .await;
@@ -1059,7 +1391,7 @@ async fn web_connect_cloudflare_token(
             StatusCode::UNAUTHORIZED,
             Json(json!({
                 "error":"token_verification_failed",
-                "message":"Cloudflare did not verify this token as active. Check its scope and try again."
+                "message":format!("{} did not verify this credential. Check its scope and try again.", provider)
             })),
         )
             .into_response();
@@ -1067,7 +1399,7 @@ async fn web_connect_cloudflare_token(
     match state.broker.vault().store_account(
         &verified.provider,
         &verified.identity,
-        "guided_api_token",
+        "api_token",
         verified.secret.as_bytes(),
     ) {
         Ok(account) => (StatusCode::OK, Json(json!({"status":"connected","account":account}))).into_response(),
@@ -1079,17 +1411,7 @@ async fn web_connect_cloudflare_token(
     }
 }
 
-async fn web_start_github_device(state: WebState) -> axum::response::Response {
-    let Some(config) = github_device_config() else {
-        return (
-            StatusCode::PRECONDITION_REQUIRED,
-            Json(json!({
-                "error":"provider_configuration_required",
-                "message":"Set the local GitHub OAuth client ID before connecting."
-            })),
-        )
-            .into_response();
-    };
+async fn web_start_device(state: WebState, config: DeviceFlowConfig) -> axum::response::Response {
     let authorization = match start_device_flow(&state.http, &config).await {
         Ok(value) => value,
         Err(error) => {
@@ -1111,7 +1433,7 @@ async fn web_start_github_device(state: WebState) -> axum::response::Response {
     let now = chrono::Utc::now();
     if let Ok(existing) = state.broker.vault().list_authorization_sessions() {
         for mut session in existing.into_iter().filter(|item| {
-            item.provider == "github"
+            item.provider == config.provider
                 && matches!(
                     item.status.as_str(),
                     "waiting_for_user" | "interaction_required"
@@ -1135,6 +1457,7 @@ async fn web_start_github_device(state: WebState) -> axum::response::Response {
         expires_at: (now + chrono::Duration::seconds(expires_in as i64)).to_rfc3339(),
         interval_seconds: interval,
         next_poll_at: (now + chrono::Duration::seconds(interval as i64)).to_rfc3339(),
+        attempts: 0,
         last_error: None,
         created_at: now.to_rfc3339(),
         updated_at: now.to_rfc3339(),
@@ -1195,9 +1518,15 @@ fn spawn_device_worker(state: WebState, session_id: String) {
                     .await;
                 continue;
             }
-            let Some(config) = (session.provider == "github")
-                .then(github_device_config)
-                .flatten()
+            let Some(config) = state
+                .catalog
+                .get(&session.provider)
+                .and_then(|pack| {
+                    pack.auth_profiles
+                        .iter()
+                        .find(|profile| profile.method == AuthMethod::DeviceAuthorization)
+                })
+                .and_then(|profile| device_config(&session.provider, profile))
             else {
                 session.status = "interaction_required".into();
                 session.last_error = Some("provider_configuration_required".into());
@@ -1209,6 +1538,7 @@ fn spawn_device_worker(state: WebState, session_id: String) {
                 return;
             };
             let secret_text = String::from_utf8_lossy(secret.as_slice());
+            session.attempts = session.attempts.saturating_add(1);
             match poll_device_flow(&state.http, &config, &secret_text).await {
                 Ok(DevicePoll::Complete(verified)) => {
                     if state
@@ -1394,7 +1724,7 @@ async fn web_oauth_callback(
         provider: pending.config.provider.clone(),
         client_id: pending.config.client_id.clone(),
         token_url: pending.config.token_url.clone(),
-        identity_url: pending.config.identity_url.clone(),
+        identity: pending.config.identity.clone(),
     };
     let verified = exchange_and_verify(
         &state.http,
@@ -1438,22 +1768,48 @@ fn oauth_redirect(status: &str) -> axum::response::Response {
         .into_response()
 }
 
-fn oauth_config(_provider: &str) -> Option<OAuthConfig> {
-    None
+fn configured_client_id(profile: &AuthProfile) -> Option<String> {
+    profile.client.client_id.clone().or_else(|| {
+        profile
+            .client
+            .client_id_env
+            .as_deref()
+            .and_then(|name| std::env::var(name).ok())
+            .filter(|value| !value.trim().is_empty())
+    })
 }
 
-fn github_device_config() -> Option<DeviceFlowConfig> {
-    let client_id = std::env::var("ELEGY_GITHUB_CLIENT_ID")
-        .ok()
-        .filter(|value| !value.trim().is_empty())?;
-    Some(DeviceFlowConfig {
-        provider: "github".into(),
-        client_id,
-        scope: "read:user".into(),
-        device_url: "https://github.com/login/device/code".into(),
-        token_url: "https://github.com/login/oauth/access_token".into(),
-        identity_url: "https://api.github.com/user".into(),
+fn oauth_config(provider: &str, profile: &AuthProfile) -> Option<OAuthConfig> {
+    Some(OAuthConfig {
+        provider: provider.into(),
+        client_id: configured_client_id(profile)?,
+        authorize_url: profile.authorization_url.clone()?,
+        token_url: profile.token_url.clone()?,
+        identity: profile.identity.clone(),
+        scopes: profile.scopes.join(" "),
     })
+}
+
+fn device_config(provider: &str, profile: &AuthProfile) -> Option<DeviceFlowConfig> {
+    Some(DeviceFlowConfig {
+        provider: provider.into(),
+        client_id: configured_client_id(profile)?,
+        scope: profile.scopes.join(" "),
+        device_url: profile.device_authorization_url.clone()?,
+        token_url: profile.token_url.clone()?,
+        identity: profile.identity.clone(),
+    })
+}
+
+fn provider_configuration_required(provider: &str) -> axum::response::Response {
+    (
+        StatusCode::PRECONDITION_REQUIRED,
+        Json(json!({
+            "error":"provider_configuration_required",
+            "message":format!("Configure the local OAuth client registration declared by the {provider} provider pack.")
+        })),
+    )
+        .into_response()
 }
 
 fn run_native_host() -> Result<()> {
@@ -1482,6 +1838,22 @@ fn run_native_host() -> Result<()> {
 }
 
 fn handle_native_message(message: serde_json::Value) -> serde_json::Value {
+    let provider_request = message.get("type").and_then(|value| value.as_str())
+        == Some("account.providers")
+        && !contains_secret_key(&message);
+    if provider_request {
+        return match load_provider_catalog() {
+            Ok(catalog) => json!({
+                "ok": true,
+                "providers": catalog.list().into_iter().map(|provider| json!({
+                    "id": provider.id,
+                    "displayName": provider.display_name,
+                    "browserOrigins": provider.browser_origins,
+                })).collect::<Vec<_>>()
+            }),
+            Err(_) => json!({"ok":false,"error":"Provider registry is unavailable"}),
+        };
+    }
     let safe_discovery = message.get("type").and_then(|value| value.as_str())
         == Some("account.discovery")
         && message
@@ -1537,7 +1909,9 @@ mod native_host_tests {
         http::{HeaderMap, HeaderValue, StatusCode},
         routing::{get, post},
     };
+    use elegy_accountd::IdentitySpec;
     use serde_json::json;
+    use std::collections::BTreeMap;
     use std::sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
@@ -1659,7 +2033,11 @@ mod native_host_tests {
             scope: "read:user".into(),
             device_url: format!("{base}/device/code"),
             token_url: format!("{base}/oauth/access_token"),
-            identity_url: format!("{base}/user"),
+            identity: IdentitySpec {
+                url: format!("{base}/user"),
+                selectors: vec!["/login".into(), "/id".into()],
+                required: BTreeMap::new(),
+            },
         };
         let client = reqwest::Client::new();
         let start = start_device_flow(&client, &config).await.unwrap();

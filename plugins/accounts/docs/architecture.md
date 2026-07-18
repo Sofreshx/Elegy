@@ -28,11 +28,11 @@ flowchart LR
   B --> P["Policy engine\ngrants + approvals + leases"]
   B --> V["Vault\nDPAPI-encrypted secret envelopes"]
   B --> AS["Authorization sessions\npersisted state + broker worker"]
-  B --> PR["Provider adapters\nOAuth, PAT/API key, CLI, browser handoff"]
+  B --> PR["Runtime provider packs\nOAuth, token, Basic, client credentials"]
   B --> S["Provisioning saga\nidempotent signup state machine"]
   B --> A["Append-only audit log"]
 
-  PR --> API["Cloudflare / GitHub APIs"]
+  PR --> API["Any pack-declared provider API"]
   S --> BX
   P --> HX["Host-only executors\nHTTP / process / browser"]
   HX --> API
@@ -117,13 +117,13 @@ The broker is the sole authority for account metadata, secret envelopes, grants,
 
 Secrets use envelope encryption. The database stores ciphertext, nonce, algorithm version, and a DPAPI-protected data key. Decryption is allowed only inside broker execution paths. Backups contain encrypted envelopes plus metadata and can be restored only by the same Windows user unless explicitly exported through a future recovery flow.
 
-### Provider adapters
+### Provider packs and adapters
 
-Adapters declare supported auth methods, authorization metadata, safe discovery signals, allowed operations, credential validation, token refresh/revocation behavior, sanitized identity fields, and executor behavior. The MVP advertises only Cloudflare guided scoped tokens and GitHub device authorization. Additional adapters remain out of the ready catalog until their provider-specific flows pass the same acceptance contract.
+Runtime JSON packs declare auth methods, authorization metadata, safe discovery origins, allowed operations, credential fields, identity verification, and sanitized identity selectors. The broker and UIs contain no provider-name branches. OAuth PKCE, device authorization, scoped tokens, HTTP Basic/app passwords, and client credentials use built-in audited adapters. A service credential requires a separately reviewed code adapter. GitHub, Cloudflare, and Google are conformance and live-proof packs, not product limits. See [provider packs](provider-packs.md).
 
 ### Brave extension
 
-The MV3 extension uses optional host permissions and Native Messaging. It detects known provider origins, reads only the minimum non-secret page state required to suggest an account, and opens a provider-approved OAuth or token-creation flow after explicit user action. It never reads Chrome/Brave password storage, never exports cookies, and never places tokens in extension storage.
+The MV3 extension uses `activeTab` and exact-origin Native Messaging. It compares the active tab origin with the broker's sanitized runtime provider registry, then opens Account Center after explicit user action. It requests no host permissions and never reads Chrome/Brave password storage, exports cookies, or places tokens in extension storage.
 
 ### Provisioning saga
 
@@ -135,7 +135,7 @@ One React component system powers a standalone local app and an embeddable route
 
 ## Agent-facing contract
 
-Agent tools expose `account_list`, `account_discover`, `account_require`, `account_request_access`, `account_request_creation`, `account_request_status`, `account_open_center`, `account_revoke_grant`, and `account_audit_list`. Execution primitives are host-only and are not declared as general agent tools.
+Agent tools expose account discovery, selection, access/creation requests, durable attention listing, request-specific presentation/resume/cancel, revocation, and sanitized audit reads. `account_present` opens the exact loopback checkpoint and remains the deterministic fallback when a host cannot elicit a URL inline. Authenticated execution primitives are host-only and are not declared as raw secret or general execute tools.
 
 ## Compatibility contract
 
