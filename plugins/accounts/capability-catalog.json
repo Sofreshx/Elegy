@@ -1,7 +1,7 @@
 {
   "schemaVersion": "elegy-capability-catalog/v1",
   "plugin": "elegy-accounts",
-  "pluginVersion": "0.2.0",
+  "pluginVersion": "0.1.0",
   "capabilities": [
     {
       "id": "accounts.mcp",

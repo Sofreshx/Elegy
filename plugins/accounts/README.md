@@ -2,7 +2,7 @@
 
 Elegy Accounts is a strictly local authentication broker for people and AI agents. It consolidates account discovery, provider authorization, encrypted credential storage, explicit consent, scoped leases, broker-side authenticated execution, retryable human checkpoints, and revocation without revealing credentials to the agent.
 
-Version 0.2 is provider-generic. Runtime JSON packs describe OAuth PKCE, device authorization, scoped API tokens, HTTP Basic/app passwords, and client credentials. GitHub, Cloudflare, and Google are bundled proof packs—not compiled limits. See [provider packs](docs/provider-packs.md) to add another provider.
+The current release is provider-generic. Runtime JSON packs describe OAuth PKCE, device authorization, scoped API tokens, HTTP Basic/app passwords, and client credentials. GitHub, Cloudflare, and Google are bundled proof packs—not compiled limits. See [provider packs](docs/provider-packs.md) to add another provider.
 
 ## Surfaces
 

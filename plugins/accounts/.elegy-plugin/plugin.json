@@ -1,7 +1,7 @@
 {
   "schemaVersion": "elegy-plugin/v1",
   "name": "elegy-accounts",
-  "version": "0.2.0",
+  "version": "0.1.0",
   "description": "Generic local account authentication, encrypted credential storage, scoped broker execution, grants, and revocation for people and agents.",
   "author": {
     "name": "Elegy Contributors"
