@@ -4,7 +4,7 @@ Provider packs are the extension boundary for Elegy Accounts. The broker, Accoun
 
 ## When to add a pack
 
-Add a pack when a downstream tool needs an account-backed operation and the provider uses one of the supported declarative methods: OAuth 2.0 authorization code with PKCE, OAuth device authorization, scoped API token, HTTP Basic/app password, or OAuth client credentials. `service_credential` is reserved for a reviewed code adapter and is not executable in v0.2.
+Add a pack when a downstream tool needs an account-backed operation and the provider uses one of the supported declarative methods: OAuth 2.0 authorization code with PKCE, OAuth device authorization, scoped API token, HTTP Basic/app password, or OAuth client credentials. `service_credential` is reserved for a reviewed code adapter and is not executable in the current release.
 
 Put local packs in the installed `providers` directory or set `ELEGY_ACCOUNTS_PROVIDER_DIR` to a directory containing JSON packs. Restart the local broker after changing packs.
 

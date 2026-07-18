@@ -9,7 +9,7 @@ Choose from the runtime provider pack returned by `account_discover`; never infe
 | Scoped API token | The provider offers narrow, revocable tokens | user creates/pastes it only in Account Center |
 | HTTP Basic/app password | A legacy API supports a dedicated app password | user enters username and app password only in Account Center |
 | Client credentials | A machine identity is appropriate | user supplies client registration; broker exchanges tokens per use |
-| Service credential | A reviewed code adapter exists | unsupported by the v0.2 declarative executor |
+| Service credential | A reviewed code adapter exists | unsupported by the current declarative executor |
 
 GitHub, Cloudflare, and Google are bundled proof packs. They demonstrate device authorization, scoped tokens, and OAuth PKCE; they are not compiled special cases or the boundary of supported providers.
 

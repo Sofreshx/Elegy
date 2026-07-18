@@ -669,7 +669,7 @@ checksum = "91622ff5e7162018101f2fea40d6ebf4a78bbe5a49736a2020649edf9693679e"
 
 [[package]]
 name = "elegy-accountd"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "aes-gcm",
  "axum",
@@ -692,7 +692,7 @@ dependencies = [
 
 [[package]]
 name = "elegy-accounts"
-version = "0.2.0"
+version = "0.1.0"
 dependencies = [
  "anyhow",
  "axum",
