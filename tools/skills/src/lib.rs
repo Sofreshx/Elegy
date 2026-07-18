@@ -2,12 +2,64 @@ use elegy_core::{
     parse_agent_skill_frontmatter, validate_agent_skill_frontmatter, AgentSkillFrontmatter,
     ContractsError,
 };
+#[cfg(test)]
 use elegy_plugin_sdk::{validate_elegy_plugin_v1, ElegyPluginV1};
 use serde::Serialize;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use thiserror::Error;
+
+const EMBEDDED_SKILLS: &[(&str, &str)] = &[
+    (
+        "tools/skills/skills/elegy-skills",
+        include_str!("../skills/elegy-skills/SKILL.md"),
+    ),
+    (
+        "plugins/accounts/skills/elegy-manage-accounts",
+        include_str!("../../../plugins/accounts/skills/elegy-manage-accounts/SKILL.md"),
+    ),
+    (
+        "plugins/desktop/skills/elegy-desktop",
+        include_str!("../../../plugins/desktop/skills/elegy-desktop/SKILL.md"),
+    ),
+    (
+        "plugins/documentation/skills/elegy-documentation",
+        include_str!("../../../plugins/documentation/skills/elegy-documentation/SKILL.md"),
+    ),
+    (
+        "plugins/mcp/skills/elegy-mcp",
+        include_str!("../../../plugins/mcp/skills/elegy-mcp/SKILL.md"),
+    ),
+    (
+        "plugins/memory/skills/elegy-memory",
+        include_str!("../../../plugins/memory/skills/elegy-memory/SKILL.md"),
+    ),
+    (
+        "plugins/observe/skills/elegy-observe",
+        include_str!("../../../plugins/observe/skills/elegy-observe/SKILL.md"),
+    ),
+    (
+        "plugins/planning/skills/elegy-planning",
+        include_str!("../../../plugins/planning/skills/elegy-planning/SKILL.md"),
+    ),
+    (
+        "skills/elegy-doc-practices",
+        include_str!("../../../skills/elegy-doc-practices/SKILL.md"),
+    ),
+    (
+        "skills/elegy-obsidian",
+        include_str!("../../../skills/elegy-obsidian/SKILL.md"),
+    ),
+    (
+        "skills/elegy-plugin-authoring",
+        include_str!("../../../skills/elegy-plugin-authoring/SKILL.md"),
+    ),
+    (
+        "skills/elegy-skill-authoring",
+        include_str!("../../../skills/elegy-skill-authoring/SKILL.md"),
+    ),
+];
 
 #[derive(Debug, Error)]
 pub enum SkillsSurfaceError {
@@ -80,6 +132,9 @@ struct LoadedSkill {
 #[derive(Clone, Debug)]
 #[allow(dead_code)]
 enum SkillProvenance {
+    Embedded {
+        source_path: PathBuf,
+    },
     Plugin {
         plugin_name: String,
         manifest_path: PathBuf,
@@ -133,52 +188,19 @@ impl SkillRegistry {
     /// Build registry by discovering skills from plugin manifests, standalone
     /// skill packages.
     pub fn builtin() -> Result<Self, SkillsSurfaceError> {
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        let repo_root = manifest_dir
-            .parent()
-            .and_then(|p| p.parent())
-            .map(|p| p.to_path_buf())
-            .unwrap_or_else(|| PathBuf::from("../.."));
+        let skills = EMBEDDED_SKILLS
+            .iter()
+            .map(|(source_path, content)| {
+                let source_path = PathBuf::from(source_path);
+                load_skill_content(
+                    content,
+                    &source_path.join("SKILL.md"),
+                    source_path.clone(),
+                    SkillProvenance::Embedded { source_path },
+                )
+            })
+            .collect::<Result<Vec<_>, _>>()?;
 
-        let mut skills: Vec<LoadedSkill> = Vec::new();
-
-        // ── Phase 1: Plugin manifest discovery ──────────────────────────
-        skills.extend(discover_plugin_skills(&manifest_dir)?);
-
-        let plugins_dir = repo_root.join("plugins");
-        if plugins_dir.exists() && plugins_dir.is_dir() {
-            let plugin_entries =
-                fs::read_dir(&plugins_dir).map_err(|e| SkillsSurfaceError::Io {
-                    path: plugins_dir.clone(),
-                    source: e,
-                })?;
-
-            for entry in plugin_entries.flatten() {
-                let plugin_dir = entry.path();
-                if !plugin_dir.is_dir() {
-                    continue;
-                }
-                let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
-                if !manifest_path.exists() {
-                    continue;
-                }
-
-                skills.extend(discover_plugin_skills(&plugin_dir)?);
-            }
-        }
-
-        // ── Phase 2: Standalone skills/elegy-* package discovery ────────
-        let standalone_skills_dir = repo_root.join("skills");
-        if standalone_skills_dir.exists() && standalone_skills_dir.is_dir() {
-            skills.extend(scan_skills_dir(
-                &standalone_skills_dir,
-                SkillProvenance::Standalone {
-                    root_dir: standalone_skills_dir.clone(),
-                },
-            )?);
-        }
-
-        // ── Phase 3: Duplicate detection ────────────────────────────────
         let mut seen: HashMap<String, PathBuf> = HashMap::new();
         for skill in &skills {
             if let Some(first_path) = seen.get(&skill.summary.id) {
@@ -370,6 +392,7 @@ fn scan_skills_dir(
     Ok(skills)
 }
 
+#[cfg(test)]
 fn discover_plugin_skills(plugin_dir: &Path) -> Result<Vec<LoadedSkill>, SkillsSurfaceError> {
     let manifest_path = plugin_dir.join(".elegy-plugin").join("plugin.json");
     if !manifest_path.exists() {
@@ -417,8 +440,17 @@ fn load_skill_file(
         source: e,
     })?;
 
+    load_skill_content(&content, skill_md, dir, provenance)
+}
+
+fn load_skill_content(
+    content: &str,
+    skill_md: &Path,
+    dir: PathBuf,
+    provenance: SkillProvenance,
+) -> Result<LoadedSkill, SkillsSurfaceError> {
     let (frontmatter, _body) =
-        parse_agent_skill_frontmatter(&content).map_err(|e| SkillsSurfaceError::Yaml {
+        parse_agent_skill_frontmatter(content).map_err(|e| SkillsSurfaceError::Yaml {
             path: skill_md.to_path_buf(),
             details: e,
         })?;
@@ -578,6 +610,62 @@ mod tests {
             .skill("elegy-obsidian")
             .expect("standalone elegy-obsidian skill should be discovered");
         assert_eq!(skill.summary.id, "elegy-obsidian");
+    }
+
+    #[test]
+    fn builtin_registry_uses_portable_embedded_paths() {
+        let registry = SkillRegistry::builtin().expect("builtin registry should load");
+        assert!(!registry.skills.is_empty());
+        assert!(registry
+            .skills
+            .iter()
+            .all(|skill| !skill.path.is_absolute()));
+    }
+
+    #[test]
+    fn embedded_registry_matches_checkout_discovery() {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let repo_root = manifest_dir
+            .parent()
+            .and_then(|path| path.parent())
+            .expect("skills crate should be nested under the repo root");
+        let mut checkout_skills =
+            discover_plugin_skills(&manifest_dir).expect("discover dedicated skills plugin");
+        for entry in fs::read_dir(repo_root.join("plugins")).expect("read plugin roots") {
+            let plugin_dir = entry.expect("read plugin entry").path();
+            if plugin_dir
+                .join(".elegy-plugin")
+                .join("plugin.json")
+                .is_file()
+            {
+                checkout_skills.extend(
+                    discover_plugin_skills(&plugin_dir).expect("discover plugin-owned skills"),
+                );
+            }
+        }
+        checkout_skills.extend(
+            scan_skills_dir(
+                &repo_root.join("skills"),
+                SkillProvenance::Standalone {
+                    root_dir: repo_root.join("skills"),
+                },
+            )
+            .expect("discover standalone skills"),
+        );
+
+        let mut embedded_ids = SkillRegistry::builtin()
+            .expect("load embedded registry")
+            .skills
+            .into_iter()
+            .map(|skill| skill.summary.id)
+            .collect::<Vec<_>>();
+        let mut checkout_ids = checkout_skills
+            .into_iter()
+            .map(|skill| skill.summary.id)
+            .collect::<Vec<_>>();
+        embedded_ids.sort();
+        checkout_ids.sort();
+        assert_eq!(embedded_ids, checkout_ids);
     }
 
     #[test]
