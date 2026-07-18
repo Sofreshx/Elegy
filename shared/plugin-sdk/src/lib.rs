@@ -2423,7 +2423,15 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
                 })?;
                 if let Ok(entries) = fs::read_dir(&skills_src) {
                     for entry in entries.flatten() {
-                        if entry.file_name() == ".elegy-plugin" {
+                        if matches!(
+                            entry.file_name().to_str(),
+                            Some(
+                                ".elegy-plugin"
+                                    | ".codex-plugin"
+                                    | ".claude-plugin"
+                                    | "install-receipt.json"
+                            )
+                        ) {
                             continue;
                         }
                         let source = entry.path();
@@ -4198,6 +4206,11 @@ mod tests {
         .expect("write skill");
         fs::write(plugin_dir.join("references").join("guide.md"), "# Guide\n")
             .expect("write reference");
+        fs::write(
+            plugin_dir.join("install-receipt.json"),
+            r#"{"installedAt":"volatile"}"#,
+        )
+        .expect("write generated install receipt");
 
         let export_dir = temp_dir.join("exported");
         let result = export_plugin_v1(&plugin_dir, "codex", &export_dir, false)
@@ -4220,6 +4233,11 @@ mod tests {
             .join("skills")
             .join("root-skill-plugin")
             .join(".elegy-plugin")
+            .exists());
+        assert!(!export_dir
+            .join("skills")
+            .join("root-skill-plugin")
+            .join("install-receipt.json")
             .exists());
         let exported_skill = fs::read_to_string(
             export_dir
