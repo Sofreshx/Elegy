@@ -11,20 +11,18 @@ describe('Brave bridge security boundary', () => {
     expect(manifest.permissions).not.toContain('cookies')
     expect(manifest.permissions).not.toContain('passwordsPrivate')
     expect(manifest.host_permissions ?? []).toEqual([])
-    expect(manifest.optional_host_permissions).toEqual([
-      'https://dash.cloudflare.com/*',
-      'https://github.com/*',
-    ])
+    expect(manifest.optional_host_permissions ?? []).toEqual([])
     expect(manifest.optional_host_permissions).not.toContain('<all_urls>')
   })
 
   it('discovers only allowlisted provider origins and marks hints unverified', () => {
-    expect(discoveryHintForUrl('https://dash.cloudflare.com/profile/api-tokens')).toEqual({
-      providerId: 'cloudflare',
-      origin: 'https://dash.cloudflare.com',
+    const providers = [{ id: 'synthetic-edge', displayName: 'Synthetic Edge', browserOrigins: ['https://edge.example.test'] }]
+    expect(discoveryHintForUrl('https://edge.example.test/profile/tokens', providers)).toEqual({
+      providerId: 'synthetic-edge',
+      origin: 'https://edge.example.test',
       verified: false,
     })
-    expect(discoveryHintForUrl('https://malicious.example/cloudflare')).toBeNull()
+    expect(discoveryHintForUrl('https://malicious.example/synthetic-edge', providers)).toBeNull()
   })
 
   it('rejects secret-bearing fields before native messaging', () => {

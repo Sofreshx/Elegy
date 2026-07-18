@@ -33,6 +33,7 @@ pub struct AuthorizationSession {
     pub expires_at: String,
     pub interval_seconds: u64,
     pub next_poll_at: String,
+    pub attempts: u64,
     pub last_error: Option<String>,
     pub created_at: String,
     pub updated_at: String,
@@ -237,6 +238,7 @@ impl Vault {
                 expires_at TEXT NOT NULL,
                 interval_seconds INTEGER NOT NULL,
                 next_poll_at TEXT NOT NULL,
+                attempts INTEGER NOT NULL DEFAULT 0,
                 last_error TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
@@ -251,6 +253,10 @@ impl Vault {
         )?;
         let _ = connection.execute(
             "ALTER TABLE leases ADD COLUMN remaining_uses INTEGER NOT NULL DEFAULT -1",
+            [],
+        );
+        let _ = connection.execute(
+            "ALTER TABLE authorization_sessions ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
             [],
         );
         Ok(Self {
@@ -401,8 +407,8 @@ impl Vault {
         let mut connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
         let transaction = connection.transaction()?;
         transaction.execute(
-            "INSERT INTO authorization_sessions (id, provider, status, user_code, verification_uri, expires_at, interval_seconds, next_poll_at, last_error, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11)",
-            params![session.id, session.provider, session.status, session.user_code, session.verification_uri, session.expires_at, session.interval_seconds, session.next_poll_at, session.last_error, session.created_at, session.updated_at],
+            "INSERT INTO authorization_sessions (id, provider, status, user_code, verification_uri, expires_at, interval_seconds, next_poll_at, attempts, last_error, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
+            params![session.id, session.provider, session.status, session.user_code, session.verification_uri, session.expires_at, session.interval_seconds, session.next_poll_at, session.attempts, session.last_error, session.created_at, session.updated_at],
         )?;
         transaction.execute(
             "INSERT INTO authorization_secrets (session_id, algorithm, nonce, ciphertext, protected_key) VALUES (?1, 'AES-256-GCM+DPAPI-v1', ?2, ?3, ?4)",
@@ -415,7 +421,7 @@ impl Vault {
     pub fn list_authorization_sessions(&self) -> Result<Vec<AuthorizationSession>, VaultError> {
         let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
         let mut statement = connection.prepare(
-            "SELECT id, provider, status, user_code, verification_uri, expires_at, interval_seconds, next_poll_at, last_error, created_at, updated_at FROM authorization_sessions ORDER BY created_at, id",
+            "SELECT id, provider, status, user_code, verification_uri, expires_at, interval_seconds, next_poll_at, attempts, last_error, created_at, updated_at FROM authorization_sessions ORDER BY created_at, id",
         )?;
         let rows = statement.query_map([], |row| {
             Ok(AuthorizationSession {
@@ -427,9 +433,10 @@ impl Vault {
                 expires_at: row.get(5)?,
                 interval_seconds: row.get(6)?,
                 next_poll_at: row.get(7)?,
-                last_error: row.get(8)?,
-                created_at: row.get(9)?,
-                updated_at: row.get(10)?,
+                attempts: row.get(8)?,
+                last_error: row.get(9)?,
+                created_at: row.get(10)?,
+                updated_at: row.get(11)?,
             })
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
@@ -471,8 +478,8 @@ impl Vault {
     ) -> Result<(), VaultError> {
         let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
         connection.execute(
-            "UPDATE authorization_sessions SET status=?2, user_code=?3, expires_at=?4, interval_seconds=?5, next_poll_at=?6, last_error=?7, updated_at=?8 WHERE id=?1",
-            params![session.id, session.status, session.user_code, session.expires_at, session.interval_seconds, session.next_poll_at, session.last_error, session.updated_at],
+            "UPDATE authorization_sessions SET status=?2, user_code=?3, expires_at=?4, interval_seconds=?5, next_poll_at=?6, attempts=?7, last_error=?8, updated_at=?9 WHERE id=?1",
+            params![session.id, session.status, session.user_code, session.expires_at, session.interval_seconds, session.next_poll_at, session.attempts, session.last_error, session.updated_at],
         )?;
         Ok(())
     }

@@ -23,6 +23,7 @@ try {
   run('rust-format', 'cargo', ['fmt', '--all', '--', '--check'])
   run('rust-tests', 'cargo', ['test', '-p', 'elegy-accountd', '-p', 'elegy-accounts'])
   run('workspace-checks', 'npm', ['run', 'check'], pluginRoot)
+  run('provider-neutrality', 'node', ['scripts/provider-neutrality.mjs'], pluginRoot)
   run('ui-e2e', 'npm', ['run', 'test:e2e'], pluginRoot)
   run('rust-vulnerability-audit', 'cargo', ['audit', '-q'])
   run('rust-policy-audit', 'cargo', ['deny', 'check', 'advisories', 'licenses', 'bans', 'sources'])

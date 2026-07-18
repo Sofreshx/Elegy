@@ -12,8 +12,8 @@ Use the `elegy-accounts` MCP tools. Treat account metadata, grants, leases, and 
 1. State the concrete purpose and smallest named operations required by the downstream tool, such as `dns.records.read` or `deployments.create`.
 2. Call `account_require` with provider, purpose, operations, and an account ID only when the user already selected one.
 3. If an account is available, call `account_request_access`. Never widen operations to avoid a later approval.
-4. If interaction is required, call `account_discover` and explain the provider-supported choices. Use `account_open_center` when the person needs to act.
-5. If no suitable account exists and creation is appropriate, call `account_request_creation` with purpose and user constraints. Poll only when useful with `account_request_status`; do not busy-wait.
+4. If interaction is required, call `account_discover` and explain the runtime provider-pack choices. Use `account_present` with the request ID so Account Center opens at the exact durable checkpoint. Fall back to `account_open_center` only when there is no request yet.
+5. If no suitable account exists and creation is appropriate, call `account_request_creation` with purpose and user constraints. Use `account_attention_list` to recover durable work. Poll only when useful with `account_request_status`; do not busy-wait.
 6. Continue the original task only after the request reports approved/connected and the downstream provider tool accepts the capability.
 
 ## Human checkpoints
@@ -28,4 +28,4 @@ Describe Brave discovery as "continue with your signed-in browser." It is an unv
 
 When more than one identity matches, show sanitized provider identities and ask the user to select; do not guess. Use `account_revoke_grant` when requested or when access is no longer needed. Use `account_audit_list` to explain a decision or failure without requesting secret diagnostics.
 
-Read [references/provider-modes.md](references/provider-modes.md) only when choosing between provider-specific connection methods.
+Read [references/provider-modes.md](references/provider-modes.md) only when choosing between connection methods. Pack authors use [the provider-pack contract](../../docs/provider-packs.md).

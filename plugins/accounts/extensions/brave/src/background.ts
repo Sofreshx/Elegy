@@ -1,19 +1,19 @@
-import { discoveryHintForUrl, sanitizeNativeMessage } from './security'
+import { discoveryHintForUrl, sanitizeNativeMessage, type ProviderDescriptor } from './security'
 
 const nativeHost = 'com.elegy.accounts'
 
 chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
-  if (request?.type !== 'connect-current-tab') return false
-  void connectCurrentTab().then(sendResponse, error => sendResponse({ ok: false, error: safeError(error) }))
+  if (!['connect-current-tab', 'provider-registry'].includes(request?.type)) return false
+  const action = request.type === 'provider-registry' ? loadRegistry() : connectCurrentTab()
+  void action.then(sendResponse, error => sendResponse({ ok: false, error: safeError(error) }))
   return true
 })
 
 async function connectCurrentTab(): Promise<Record<string, unknown>> {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true })
-  const hint = tab.url ? discoveryHintForUrl(tab.url) : null
+  const registry = await loadRegistry()
+  const hint = tab.url ? discoveryHintForUrl(tab.url, registry.providers as ProviderDescriptor[]) : null
   if (!hint) return { ok: false, error: 'Open a supported provider account page first.' }
-  const granted = await chrome.permissions.request({ origins: [`${hint.origin}/*`] })
-  if (!granted) return { ok: false, error: 'Provider access was not allowed.' }
   const message = sanitizeNativeMessage({ type: 'account.discovery', version: 1, hint, interaction: 'explicit-user-allow' })
   const response = await chrome.runtime.sendNativeMessage(nativeHost, message)
   const safeResponse = sanitizeNativeMessage(response)
@@ -24,6 +24,12 @@ async function connectCurrentTab(): Promise<Record<string, unknown>> {
     await chrome.tabs.create({ url: center.toString() })
   }
   return safeResponse
+}
+
+async function loadRegistry(): Promise<{ ok: boolean; providers: ProviderDescriptor[] }> {
+  const response = sanitizeNativeMessage(await chrome.runtime.sendNativeMessage(nativeHost, { type: 'account.providers', version: 1 })) as { ok?: boolean; providers?: ProviderDescriptor[]; error?: string }
+  if (!response.ok || !Array.isArray(response.providers)) throw new Error(response.error ?? 'Could not load trusted provider packs.')
+  return { ok: true, providers: response.providers }
 }
 
 function safeError(error: unknown): string {

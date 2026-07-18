@@ -345,6 +345,18 @@ impl BrokerStore {
         Ok(())
     }
 
+    pub(crate) fn account_id_for_lease(&self, token: &str) -> Result<String, BrokerError> {
+        let connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;
+        connection
+            .query_row(
+                "SELECT g.account_id FROM leases l JOIN grants g ON g.id=l.grant_id WHERE l.token_hash=?1",
+                [token_hash(token)],
+                |row| row.get(0),
+            )
+            .optional()?
+            .ok_or(BrokerError::NotFound)
+    }
+
     pub fn revoke_grant(&self, grant_id: &str, reason: &str) -> Result<(), BrokerError> {
         let grant = self.get_grant(grant_id)?;
         let connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;

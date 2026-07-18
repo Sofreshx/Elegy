@@ -121,6 +121,7 @@ fn pending_authorization_survives_restart_without_plaintext_device_secret() {
         expires_at: "2099-01-01T00:00:00Z".into(),
         interval_seconds: 5,
         next_poll_at: "2098-12-31T23:59:00Z".into(),
+        attempts: 2,
         last_error: None,
         created_at: "2098-12-31T23:58:00Z".into(),
         updated_at: "2098-12-31T23:58:00Z".into(),
