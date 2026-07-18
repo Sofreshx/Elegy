@@ -2411,7 +2411,77 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
         };
 
         if skills_src.exists() && skills_src.is_dir() {
-            if let Ok(entries) = fs::read_dir(&skills_src) {
+            if skills_src.join("SKILL.md").is_file() {
+                let dest_dir = host_skills_dir.join(&plugin.name);
+                if dest_dir.exists() && !overwrite {
+                    return Err(ToolingError::OutputExists { path: dest_dir });
+                }
+                fs::create_dir_all(&dest_dir).map_err(|e| ToolingError::Io {
+                    operation: "create directory",
+                    path: dest_dir.clone(),
+                    source: e,
+                })?;
+                if let Ok(entries) = fs::read_dir(&skills_src) {
+                    for entry in entries.flatten() {
+                        if entry.file_name() == ".elegy-plugin" {
+                            continue;
+                        }
+                        let source = entry.path();
+                        let destination = dest_dir.join(entry.file_name());
+                        if source.is_dir() {
+                            copy_dir_all(&source, &destination)?;
+                        } else if source.is_file() {
+                            fs::copy(&source, &destination).map_err(|e| ToolingError::Io {
+                                operation: "copy",
+                                path: source,
+                                source: e,
+                            })?;
+                        }
+                    }
+                }
+                if host == "codex" {
+                    let skill_path = dest_dir.join("SKILL.md");
+                    let content =
+                        fs::read_to_string(&skill_path).map_err(|e| ToolingError::Io {
+                            operation: "read",
+                            path: skill_path.clone(),
+                            source: e,
+                        })?;
+                    let frontmatter_end = content.find("\n---").ok_or_else(|| {
+                        ToolingError::InvalidPluginPackage {
+                            path: skill_path.clone(),
+                            issues: vec!["skill frontmatter is missing its closing fence".into()],
+                        }
+                    })?;
+                    let (frontmatter, body) = content.split_at(frontmatter_end);
+                    let normalized_frontmatter = frontmatter
+                        .replacen(
+                            "disable-model-invocation: true",
+                            "disable-model-invocation: false",
+                            1,
+                        )
+                        .replacen(
+                            "disable_model_invocation: true",
+                            "disable_model_invocation: false",
+                            1,
+                        );
+                    if normalized_frontmatter != frontmatter {
+                        fs::write(&skill_path, format!("{normalized_frontmatter}{body}")).map_err(
+                            |e| ToolingError::Io {
+                                operation: "write",
+                                path: skill_path,
+                                source: e,
+                            },
+                        )?;
+                    }
+                }
+                if let Ok(walked) = walk_dir_files(&dest_dir) {
+                    for f in walked {
+                        written_files.push(display_path(&f));
+                    }
+                }
+                skills_count += 1;
+            } else if let Ok(entries) = fs::read_dir(&skills_src) {
                 for entry in entries.flatten() {
                     let skill_dir = entry.path();
                     if !skill_dir.is_dir() {
@@ -4085,6 +4155,81 @@ mod tests {
             .join("my-plugin")
             .join("SKILL.md")
             .exists());
+    }
+
+    #[test]
+    fn export_plugin_v1_wraps_a_root_skill_with_its_support_files() {
+        let temp_dir = unique_temp_dir("elegy-export-root-skill");
+        let plugin_dir = temp_dir.join("root-skill-plugin");
+        fs::create_dir_all(plugin_dir.join(".elegy-plugin")).expect("create manifest dir");
+        fs::create_dir_all(plugin_dir.join("references")).expect("create references dir");
+        fs::write(
+            plugin_dir.join(".elegy-plugin").join("plugin.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion": "elegy-plugin/v1",
+                "name": "root-skill-plugin",
+                "version": "0.1.0",
+                "description": "Root skill export fixture",
+                "author": {"name": "Test Author"},
+                "license": "MIT",
+                "skills": "./",
+                "extensions": {
+                    "codex.plugin/v1": {
+                        "schemaVersion": "codex.plugin/v1",
+                        "interface": {
+                            "displayName": "Root Skill Plugin",
+                            "shortDescription": "Root skill export fixture",
+                            "longDescription": "Verifies that a root skill and its support files remain one Codex skill.",
+                            "developerName": "Test Author",
+                            "category": "Developer Tools",
+                            "capabilities": ["Read"],
+                            "defaultPrompt": ["Use the root skill fixture."]
+                        }
+                    }
+                }
+            }))
+            .expect("serialize manifest"),
+        )
+        .expect("write manifest");
+        fs::write(
+            plugin_dir.join("SKILL.md"),
+            "---\nname: root-skill-plugin\ndescription: Root skill export fixture\ndisable-model-invocation: true\n---\n\n# Root skill\n",
+        )
+        .expect("write skill");
+        fs::write(plugin_dir.join("references").join("guide.md"), "# Guide\n")
+            .expect("write reference");
+
+        let export_dir = temp_dir.join("exported");
+        let result = export_plugin_v1(&plugin_dir, "codex", &export_dir, false)
+            .expect("export should succeed");
+
+        assert_eq!(result.emitted_components.skills_count, 1);
+        assert!(export_dir
+            .join("skills")
+            .join("root-skill-plugin")
+            .join("SKILL.md")
+            .is_file());
+        assert!(export_dir
+            .join("skills")
+            .join("root-skill-plugin")
+            .join("references")
+            .join("guide.md")
+            .is_file());
+        assert!(!export_dir.join("skills").join("references").exists());
+        assert!(!export_dir
+            .join("skills")
+            .join("root-skill-plugin")
+            .join(".elegy-plugin")
+            .exists());
+        let exported_skill = fs::read_to_string(
+            export_dir
+                .join("skills")
+                .join("root-skill-plugin")
+                .join("SKILL.md"),
+        )
+        .expect("read exported skill");
+        assert!(exported_skill.contains("disable-model-invocation: false"));
+        assert!(!exported_skill.contains("disable-model-invocation: true"));
     }
 
     #[test]
