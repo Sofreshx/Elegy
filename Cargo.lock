@@ -675,6 +675,7 @@ dependencies = [
  "axum",
  "base64",
  "chrono",
+ "hmac",
  "rand 0.9.4",
  "reqwest",
  "rusqlite",
@@ -698,6 +699,7 @@ dependencies = [
  "axum",
  "chrono",
  "elegy-accountd",
+ "rand 0.9.4",
  "reqwest",
  "rmcp",
  "schemars",
@@ -774,7 +776,6 @@ dependencies = [
  "semver",
  "serde",
  "serde_json",
- "serde_yaml",
  "thiserror 2.0.18",
  "url",
  "zip",
@@ -834,7 +835,6 @@ dependencies = [
  "base64",
  "clap",
  "elegy-core",
- "elegy-skills",
  "rmcp",
  "serde",
  "serde_json",
@@ -982,18 +982,6 @@ dependencies = [
  "elegy-policy",
  "serde",
  "serde_json",
-]
-
-[[package]]
-name = "elegy-skills"
-version = "0.1.0"
-dependencies = [
- "clap",
- "elegy-core",
- "elegy-plugin-sdk",
- "serde",
- "serde_json",
- "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1357,6 +1345,15 @@ name = "hex"
 version = "0.4.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
+
+[[package]]
+name = "hmac"
+version = "0.12.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6c49c37c09c17a53d937dfbb742eb3a961d65a994e6bcdcf37e7399d0cc8ab5e"
+dependencies = [
+ "digest",
+]
 
 [[package]]
 name = "http"

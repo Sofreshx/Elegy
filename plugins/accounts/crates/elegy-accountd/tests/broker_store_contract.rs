@@ -24,7 +24,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
         let request = store
             .request_access(NewAccessRequest {
                 account_id: account.id,
-                client_id: "codex-local".into(),
+                client_id: "registered-test-client".into(),
                 purpose: "research client DNS posture".into(),
                 operations: vec!["dns.list".into()],
                 duration_minutes: 60,
@@ -38,7 +38,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
             store
                 .authorize(
                     &lease.token,
-                    "codex-local",
+                    "registered-test-client",
                     "research client DNS posture",
                     "cloudflare",
                     "dns.list"
@@ -49,7 +49,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
             store
                 .authorize(
                     &lease.token,
-                    "codex-local",
+                    "registered-test-client",
                     "research client DNS posture",
                     "cloudflare",
                     "dns.write"
@@ -61,7 +61,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
             store
                 .authorize(
                     &once.token,
-                    "codex-local",
+                    "registered-test-client",
                     "research client DNS posture",
                     "cloudflare",
                     "dns.list"
@@ -72,7 +72,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
             store
                 .authorize(
                     &once.token,
-                    "codex-local",
+                    "registered-test-client",
                     "research client DNS posture",
                     "cloudflare",
                     "dns.list"
@@ -91,7 +91,7 @@ fn requests_grants_audit_and_revocation_survive_restart() {
             store
                 .authorize(
                     &lease.token,
-                    "codex-local",
+                    "registered-test-client",
                     "research client DNS posture",
                     "cloudflare",
                     "dns.list"
@@ -147,5 +147,50 @@ fn creation_request_is_idempotent_and_resumable() {
             .unwrap()
             .iter()
             .any(|event| event.event == "request.cancelled")
+    );
+}
+
+#[test]
+#[cfg(windows)]
+fn reopening_the_broker_preserves_accounts_but_revokes_legacy_codex_grants() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("accounts.sqlite");
+    let account_id;
+    let grant_id;
+    {
+        let broker = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector)).unwrap());
+        let account = broker
+            .vault()
+            .store_account("github", "owner", "device_authorization", b"secret")
+            .unwrap();
+        account_id = account.id.clone();
+        let request = broker
+            .request_access(NewAccessRequest {
+                account_id: account.id,
+                client_id: "codex-local".into(),
+                purpose: "legacy request".into(),
+                operations: vec!["profile.read".into()],
+                duration_minutes: 60,
+            })
+            .unwrap();
+        grant_id = broker.approve_access(&request.id).unwrap().id;
+    }
+
+    let reopened = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector)).unwrap());
+    assert!(
+        reopened
+            .vault()
+            .list_accounts()
+            .unwrap()
+            .iter()
+            .any(|account| account.id == account_id)
+    );
+    assert!(reopened.get_grant(&grant_id).unwrap().revoked);
+    assert!(
+        reopened
+            .list_audit(20)
+            .unwrap()
+            .iter()
+            .any(|event| event.event == "grant.legacy_revoked")
     );
 }

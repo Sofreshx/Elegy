@@ -98,7 +98,6 @@ require editing this README.
 | `elegy-memory` | `plugins/memory/` | [DISTRIBUTION.md](plugins/memory/DISTRIBUTION.md) |
 | `elegy-mcp` | `plugins/mcp/` | [DISTRIBUTION.md](plugins/mcp/DISTRIBUTION.md) |
 | `elegy-planning` | `plugins/planning/` | [DISTRIBUTION.md](plugins/planning/DISTRIBUTION.md) |
-| `elegy-skills` | `tools/skills/` | [DISTRIBUTION.md](tools/skills/DISTRIBUTION.md) |
 | `elegy-configuration` | `tools/configuration/` | [DISTRIBUTION.md](tools/configuration/DISTRIBUTION.md) |
 | `elegy-documentation` | `plugins/documentation/` | [DISTRIBUTION.md](plugins/documentation/DISTRIBUTION.md) |
 | `elegy-memory-mcp-stdio` | `hosts/memory-mcp/` | [DISTRIBUTION.md](hosts/memory-mcp/DISTRIBUTION.md) |
@@ -109,9 +108,9 @@ require editing this README.
 
 Plugin-owned skills live under
 `plugins/{plugin-name}/skills/elegy-{skill-id}/SKILL.md`. Standalone skill-only
-packages live under `skills/elegy-{skill-id}/SKILL.md`. The `elegy-skills` CLI
-discovers skills from plugin manifests and `skills/elegy-*` packages, failing
-on duplicate skill IDs.
+packages live under `skills/elegy-{skill-id}/SKILL.md`. Hosts discover only the
+skills supplied by the plugins installed into that host. There is no central
+Elegy skill registry or cross-plugin resolver.
 
 ## Configuration Materialization
 
@@ -126,14 +125,15 @@ elegy-configuration apply --profile-id repo-opencode-minimal --target . --dry-ru
 See [docs/architecture/README.md](docs/architecture/README.md) for built-in
 templates and profile details.
 
-## Skill Tools
+## Skill Validation
 
-Elegy's skills product is registry-first. Plugin-owned skills under
-`plugins/{plugin-name}/skills/` and standalone packages under `skills/elegy-*`
-are the discovery authority. The `elegy-skills` CLI provides search, resolve,
-inspect, and validation.
+Each plugin owns the content and specificity of its skills. Validate a plugin
+package, including its declared skill directory, with:
 
-`elegy-skills list/search/describe/resolve/validate --json`
+`elegy-plugin-packaging verify --plugin <plugin-root>`
+
+Skill authoring and body audits belong to the `elegy-skill-authoring` skill;
+they are not mediated by a central runtime registry.
 
 ## Plugins
 

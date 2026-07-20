@@ -10,18 +10,18 @@ Put local packs in the installed `providers` directory or set `ELEGY_ACCOUNTS_PR
 
 ## Contract
 
-Each file uses `elegy-account-provider/v1` and declares:
+Pack v1 remains the enrollment contract. Pack v2 adds trusted typed execution. Each file declares:
 
 - stable lowercase `id`, display metadata, publisher, and pack version;
 - browser origins used only for discovery hints;
 - one or more auth profiles with endpoints, audience, identity verification, client registration, scopes, and optional credential fields;
-- named operations mapped to the scopes required by provider tools.
+- named operations mapped to required scopes; v2 operations additionally declare description, risk, input/result schemas, and a constrained executor.
 
 All remote URLs must be HTTPS. Loopback HTTP is accepted only for deterministic tests and the local callback. Identity selectors are JSON Pointers and at least one must resolve before a credential can be stored. `required` assertions must all match.
 
 ```json
 {
-  "schema_version": "elegy-account-provider/v1",
+  "schema_version": "elegy-account-provider/v2",
   "id": "example-mail",
   "display_name": "Example Mail",
   "version": "1.0.0",
@@ -38,15 +38,26 @@ All remote URLs must be HTTPS. Loopback HTTP is accepted only for deterministic 
     "client": { "mode": "environment", "client_id_env": "EXAMPLE_CLIENT_ID" },
     "scopes": ["mail.read"]
   }],
-  "operations": { "mail.messages.read": ["mail.read"] }
+  "operations": {
+    "mail.messages.read": {
+      "description": "List message metadata.",
+      "risk": "read",
+      "scopes": ["mail.read"],
+      "input_schema": {"type": "object", "additionalProperties": false},
+      "result_schema": {"type": "object"},
+      "executor": {"kind": "http", "profile": "desktop", "method": "GET", "path": "/v1/messages"}
+    }
+  }
 }
 ```
+
+HTTP executors accept only audience-relative paths and fixed methods. Read operations must use `GET`. Path placeholders consume schema-declared safe segment arguments. Agents cannot supply destinations, headers, credentials, or scopes.
 
 For manual credentials, declare `credential_fields` with `id`, `label`, `secret`, and optional browser `autocomplete`. Field values go directly from Account Center to the loopback broker, are verified, then encrypted with the OS-bound vault key. They are never returned to agents or stored by the extension.
 
 ## Trust and review
 
-Bundled packs are trusted with the plugin release. Local third-party packs are configuration, not executable code, but still control where credentials are sent. Review their publisher, endpoints, identity assertions, scopes, and operation map before installation. A future signed-pack registry can add distribution trust without changing this contract.
+Bundled packs are trusted with the plugin release. A directory selected through `ELEGY_ACCOUNTS_PROVIDER_DIR` is enrollment-only by default. A supervised local development proof may set `ELEGY_ACCOUNTS_TRUST_LOCAL_PACKS=1` after reviewing publisher, endpoints, identity assertions, scopes, schemas, and operation recipes. Production distribution should use bundled or signed packs.
 
 ## Proof requirements
 

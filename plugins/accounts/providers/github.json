@@ -1,5 +1,5 @@
 {
-  "schema_version": "elegy-account-provider/v1",
+  "schema_version": "elegy-account-provider/v2",
   "id": "github",
   "display_name": "GitHub",
   "version": "1.0.0",
@@ -26,8 +26,21 @@
     }
   ],
   "operations": {
-    "profile.read": ["read:user"],
-    "repositories.read": ["repo:status"],
-    "pull_requests.write": ["repo"]
+    "profile.read": {
+      "description": "Read the verified GitHub profile.",
+      "risk": "read",
+      "scopes": ["read:user"],
+      "input_schema": {"type": "object", "additionalProperties": false},
+      "result_schema": {"type": "object"},
+      "executor": {"kind": "http", "profile": "device", "method": "GET", "path": "/user"}
+    },
+    "repositories.read": {
+      "description": "List repositories visible to the connected GitHub account.",
+      "risk": "read",
+      "scopes": ["read:user"],
+      "input_schema": {"type": "object", "additionalProperties": false},
+      "result_schema": {"type": "array"},
+      "executor": {"kind": "http", "profile": "device", "method": "GET", "path": "/user/repos"}
+    }
   }
 }

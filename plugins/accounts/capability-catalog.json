@@ -25,6 +25,18 @@
         "executable": "elegy-accounts",
         "command": ["open"]
       }
+    },
+    {
+      "id": "accounts.actions.mcp",
+      "kind": "mcp",
+      "sideEffectClass": "query",
+      "contractVersion": "v1",
+      "description": "Perform trusted typed GitHub and Cloudflare reads through the local broker without exposing credentials or leases.",
+      "invocation": {
+        "executable": "elegy-accounts",
+        "command": ["actions-mcp"],
+        "toolName": "github_profile_read"
+      }
     }
   ]
 }

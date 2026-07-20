@@ -52,7 +52,7 @@
 
 | Feature | Milestone | Notes |
 | --- | --- | --- |
-| Machine-friendly JSON envelopes | **MVP** | Same posture as `elegy-skills` |
+| Machine-friendly JSON envelopes | **MVP** | Shared Elegy CLI envelope posture |
 | Structured machine-mode runtime errors | **MVP** | Missing-parent failures return machine-readable `invalid` envelopes |
 | Goal create/list/show | **MVP** | Implemented |
 | Roadmap create/add-section/add-work-point/list/show | **MVP** | Implemented |

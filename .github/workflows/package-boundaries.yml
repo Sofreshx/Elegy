@@ -45,4 +45,4 @@ jobs:
 
       - name: Validate contracts (conformance)
         working-directory: .
-        run: cargo test -p elegy-skills --test conformance -p elegy-mcp --test conformance -p elegy-configuration --test conformance -p elegy-memory --test conformance -- --nocapture
+        run: cargo test -p elegy-mcp --test conformance -p elegy-configuration --test conformance -p elegy-memory --test conformance -- --nocapture

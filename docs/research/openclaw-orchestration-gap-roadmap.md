@@ -33,7 +33,7 @@ Status in this session: direction clarified, ownership preserved, shipped baseli
 - A replaceable provider or session-manager abstraction above the existing backplane remains an important later gap. It should support Copilot SDK now and raw API providers later, but it is no longer the immediate next seam in this sequencing.
 - Copilot-compatible delegated depth should stay at one bounded child or subagent hop by default.
 - Greater depth can be added later for raw API providers, but only behind explicit host policy, budgets, and stop conditions.
-- Relevant Elegy CLI capabilities can be integrated where useful, especially `elegy-mcp`, `elegy-skills`, and `elegy-memory`.
+- Relevant Elegy CLI capabilities can be integrated where useful, especially `elegy-mcp` and `elegy-memory`; skill discovery remains host-owned over installed plugins.
 - If a capability cannot materially become a bounded CLI plus skill path or a strong reusable shared capability, it should stay in Holon or SAASTools.
 
 ### What remains carryover
@@ -43,7 +43,7 @@ Status in this session: direction clarified, ownership preserved, shipped baseli
 - define broader typed policy and stop-condition contracts
 - define the minimum orchestration event family and execution-tree truth surface
 - map the current Copilot SDK backplane into a later provider or session-manager seam without breaking host ownership
-- identify which first uses of `elegy-mcp`, `elegy-skills`, and `elegy-memory` are genuinely reusable instead of just convenient to extract
+- identify which first uses of `elegy-mcp` and `elegy-memory` are genuinely reusable instead of just convenient to extract
 
 ## Shipped baseline and immediate follow-on
 
@@ -103,7 +103,7 @@ That said, OpenClaw should influence the questions, not decide the ownership mod
 
 Good candidates for Elegy remain bounded and reusable:
 
-- CLI-managed helpers that a host can invoke deliberately, such as `elegy-mcp`, `elegy-skills`, or `elegy-memory`
+- CLI-managed helpers that a host can invoke deliberately, such as `elegy-mcp` or `elegy-memory`
 - governed contracts for typed result envelopes, policy or stop-condition descriptors, capability disclosure metadata, or event envelopes if multiple consumers need them
 - strong reusable runtime helpers only after real cross-consumer proof exists
 

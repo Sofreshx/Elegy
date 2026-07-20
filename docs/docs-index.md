@@ -124,6 +124,17 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-07-20",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-07-20-retire-central-skill-registry.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Elegy plugins own and distribute their Agent Skills. The retired",
+      "title": "Retire the central skill registry and resolver"
+    },
+    {
+      "authorityClass": "current",
       "created": "2026-05-29",
       "docKind": "adr",
       "freshness": "unknown",
@@ -190,7 +201,7 @@
       "path": "docs/architecture/mcp-skill-tooling-placement.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "Simplified. MCP authoring and descriptor validation remain in `elegy-mcp`. The skill registry (`elegy-skills`) serves list/search/resolve/get/validate against Agent Skills (SKILL.md). MCP-to-skill generation has been removed. Package-backed configuration has been removed.",
+      "summary": "MCP authoring and descriptor validation remain in `elegy-mcp`. Agent Skills",
       "title": "MCP, Skill, and Tooling Placement"
     },
     {
@@ -373,6 +384,7 @@
     "docs/adr/2026-07-01-adopt-static-plugin-marketplace.md",
     "docs/adr/2026-07-07-adopt-repo-surface-taxonomy.md",
     "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
+    "docs/adr/2026-07-20-retire-central-skill-registry.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",

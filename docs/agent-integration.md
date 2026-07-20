@@ -8,7 +8,7 @@ doc_kind: guide
 # Agent Integration
 
 Elegy is designed for AI-agent hosts that can run local subprocesses. The
-canonical path is skill discovery plus dedicated `elegy-*` binaries:
+canonical path is installed-plugin discovery plus dedicated `elegy-*` binaries:
 
 1. validate the setup
 2. discover the minimum needed capability
@@ -19,27 +19,21 @@ MCP is supported as an optional projection for MCP-native clients, but it is not
 
 ## Canonical Flow
 
-Search and then invoke the dedicated binary:
+Verify the plugin package and then invoke its dedicated binary:
 
 ```bash
-elegy-skills search --query "planning" --json
+elegy-plugin-packaging verify --plugin plugins/planning
 elegy-planning --help
 ```
 
 ## Discovery Layers
 
-Use `elegy-skills` when developing Elegy itself or when a host needs the full
-registry surface:
-
-```bash
-elegy-skills list --json
-elegy-skills search --query "diagram" --json
-elegy-skills describe --skill-id diagram --json
-```
-
 Skill definitions in `plugins/<name>/skills/<skill-id>/SKILL.md` and standalone root
-`<skill-id>/SKILL.md` packages are the discovery authority. Contract schemas live
-under `plugins/<name>/schemas/` and cross-cutting fixtures under `shared/core/fixtures/`.
+`<skill-id>/SKILL.md` packages are the discovery authority. Each plugin manifest
+declares the skill directory packaged with that plugin. A host discovers and
+routes only the plugins installed or projected into that host; Elegy does not
+provide a central registry or cross-plugin resolver. Contract schemas live under
+`plugins/<name>/schemas/` and cross-cutting fixtures under `shared/core/fixtures/`.
 
 ## Optional MCP Adapter
 
@@ -62,13 +56,12 @@ Use MCP only when it is the host's preferred protocol boundary. CLI invocation r
 Tagged releases include dedicated binaries for each runtime surface.
 
 - `elegy-planning` binary
-- `elegy-skills` binary
 - `elegy-memory` binary
 - `elegy-mcp` binary
 - `elegy-configuration` binary
 - `elegy-documentation` binary
 
-Plugin-packaged binary surfaces (`elegy-planning`, `elegy-skills`, `elegy-memory`,
+Plugin-packaged binary surfaces (`elegy-planning`, `elegy-memory`,
 `elegy-mcp`, `elegy-documentation`, `elegy-observe`, `elegy-desktop`) ship as
 `<surface>-plugin-<target>.zip` archives containing manifest, skills, and
 binary. Skill-only plugin packages ship as `<surface>-plugin-any.zip` archives.

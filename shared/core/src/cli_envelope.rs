@@ -12,7 +12,7 @@ pub const CLI_SCHEMA_VERSION: &str = "elegy.cli/v1";
 
 /// Shared JSON envelope for all Elegy CLI machine-readable output.
 ///
-/// Every dedicated CLI surface (`elegy-skills`, `elegy-mcp`, `elegy-planning`, etc.)
+/// Every dedicated CLI surface (`elegy-mcp`, `elegy-planning`, etc.)
 /// emits this envelope when `--json` or `--format json` is active. The envelope
 /// carries the schema version, a correlation ID for event tracing, the command
 /// that produced the result, and either [`data`] on success or [`failure`] on error.

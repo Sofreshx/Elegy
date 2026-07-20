@@ -24,7 +24,7 @@ Elegy is currently centered on two implementation anchors:
 Protocol-baseline drift would now affect:
 
 - published schemas, fixtures, compatibility manifests, and bundle exports
-- Rust contract consumers and operator crates such as `elegy-contracts`, `elegy-plugin-packaging`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-skills`, `elegy-configuration`, and `elegy-run`
+- Rust contract consumers and operator crates such as `elegy-contracts`, `elegy-plugin-packaging`, `elegy-memory`, `elegy-mcp`, `elegy-planning`, `elegy-configuration`, and `elegy-run`
 - downstream consumers that rely on the exported contract bundle or Rust executable surfaces
 
 ## Baseline

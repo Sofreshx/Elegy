@@ -1,9 +1,11 @@
 use rmcp::{
     ServiceExt,
+    model::CallToolRequestParams,
     transport::{ConfigureCommandExt, TokioChildProcess},
 };
 use std::fs;
-use std::process::Command as StdCommand;
+use std::process::{Command as StdCommand, Stdio};
+use std::sync::Arc;
 use tokio::process::Command;
 
 #[test]
@@ -90,6 +92,191 @@ async fn mcp_server_advertises_only_the_bounded_account_tools() {
         ]
     );
     client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn action_mcp_advertises_only_the_bundled_typed_read_operations() {
+    let local_data = tempfile::tempdir().unwrap();
+    let mut command = Command::new(env!("CARGO_BIN_EXE_elegy-accounts"));
+    command
+        .arg("actions-mcp")
+        .env("LOCALAPPDATA", local_data.path());
+    let client = ()
+        .serve(
+            TokioChildProcess::new(command.configure(|child| {
+                child.kill_on_drop(true);
+            }))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let mut names: Vec<_> = client
+        .list_all_tools()
+        .await
+        .unwrap()
+        .into_iter()
+        .map(|tool| tool.name.to_string())
+        .collect();
+    names.sort();
+    assert_eq!(
+        names,
+        [
+            "cloudflare_dns_records_read",
+            "cloudflare_zones_read",
+            "github_profile_read",
+            "github_repositories_read",
+        ]
+    );
+    client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+#[cfg(windows)]
+async fn action_mcp_executes_a_typed_read_through_the_running_broker() {
+    use axum::{Json, Router, http::HeaderMap, routing::get};
+    use elegy_accountd::{BrokerStore, DpapiProtector, NewAccessRequest, Vault};
+    use serde_json::json;
+
+    let app = Router::new().route(
+        "/user",
+        get(|headers: HeaderMap| async move {
+            assert_eq!(
+                headers.get("authorization").expect("authorization"),
+                "Bearer action-secret-canary"
+            );
+            Json(json!({"login":"action-user"}))
+        }),
+    );
+    let provider_listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let provider_base = format!("http://{}", provider_listener.local_addr().unwrap());
+    let provider_task = tokio::spawn(async move {
+        axum::serve(provider_listener, app).await.unwrap();
+    });
+
+    let local_data = tempfile::tempdir().unwrap();
+    let provider_dir = tempfile::tempdir().unwrap();
+    let manifest = format!(
+        r#"{{
+          "schema_version":"elegy-account-provider/v2",
+          "id":"github","display_name":"GitHub","version":"2.0.0","publisher":"test",
+          "browser_origins":["{provider_base}"],
+          "auth_profiles":[{{
+            "id":"device","method":"api_token","audience":"{provider_base}",
+            "identity":{{"url":"{provider_base}/user","selectors":["/login"]}},
+            "client":{{"mode":"user_provided"}},"scopes":["read:user"]
+          }}],
+          "operations":{{
+            "profile.read":{{
+              "description":"Read profile.","risk":"read","scopes":["read:user"],
+              "input_schema":{{"type":"object","additionalProperties":false}},
+              "result_schema":{{"type":"object"}},
+              "executor":{{"kind":"http","profile":"device","method":"GET","path":"/user"}}
+            }}
+          }}
+        }}"#
+    );
+    fs::write(provider_dir.path().join("github.json"), manifest).unwrap();
+
+    let database = local_data
+        .path()
+        .join("Elegy")
+        .join("Accounts")
+        .join("accounts.sqlite");
+    fs::create_dir_all(database.parent().unwrap()).unwrap();
+    let broker_store = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector)).unwrap());
+    let account = broker_store
+        .vault()
+        .store_account(
+            "github",
+            "action-user",
+            "api_token",
+            b"action-secret-canary",
+        )
+        .unwrap();
+    let access = broker_store
+        .request_access(NewAccessRequest {
+            account_id: account.id.clone(),
+            client_id: "codex-actions".into(),
+            purpose: "github.profile.read".into(),
+            operations: vec!["profile.read".into()],
+            duration_minutes: 43_200,
+        })
+        .unwrap();
+    broker_store.approve_access(&access.id).unwrap();
+    drop(broker_store);
+
+    let port_probe = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = port_probe.local_addr().unwrap().port();
+    drop(port_probe);
+    let port_text = port.to_string();
+    let pipe_name = format!(r"\\.\pipe\elegy-accounts-test-{}", std::process::id());
+    let mut broker = Command::new(env!("CARGO_BIN_EXE_elegy-accounts"));
+    broker
+        .arg("broker")
+        .env("LOCALAPPDATA", local_data.path())
+        .env("ELEGY_ACCOUNTS_PROVIDER_DIR", provider_dir.path())
+        .env("ELEGY_ACCOUNTS_TRUST_LOCAL_PACKS", "1")
+        .env("ELEGY_ACCOUNT_CENTER_PORT", &port_text)
+        .env("ELEGY_ACCOUNTS_PIPE_NAME", &pipe_name)
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .kill_on_drop(true);
+    let mut broker = broker.spawn().unwrap();
+    let health = format!("http://127.0.0.1:{port}/api/state");
+    let http = reqwest::Client::new();
+    for _ in 0..50 {
+        if http
+            .get(&health)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+        {
+            break;
+        }
+        tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+    }
+
+    let mut action = Command::new(env!("CARGO_BIN_EXE_elegy-accounts"));
+    action
+        .arg("actions-mcp")
+        .env("LOCALAPPDATA", local_data.path())
+        .env("ELEGY_ACCOUNTS_PROVIDER_DIR", provider_dir.path())
+        .env("ELEGY_ACCOUNTS_TRUST_LOCAL_PACKS", "1")
+        .env("ELEGY_ACCOUNT_CENTER_PORT", &port_text)
+        .env("ELEGY_ACCOUNTS_PIPE_NAME", &pipe_name);
+    let client = ()
+        .serve(
+            TokioChildProcess::new(action.configure(|child| {
+                child.kill_on_drop(true);
+            }))
+            .unwrap(),
+        )
+        .await
+        .unwrap();
+    let result = client
+        .call_tool(
+            CallToolRequestParams::new("github_profile_read").with_arguments(
+                json!({"account_id":account.id})
+                    .as_object()
+                    .unwrap()
+                    .clone(),
+            ),
+        )
+        .await
+        .unwrap();
+    let public = serde_json::to_value(result).unwrap();
+    let text = public
+        .pointer("/content/0/text")
+        .and_then(|value| value.as_str())
+        .unwrap();
+    assert!(text.contains("action-user"), "{text}");
+    assert!(!text.contains("action-secret-canary"));
+    assert!(!text.contains("ela_"));
+
+    client.cancel().await.unwrap();
+    broker.kill().await.unwrap();
+    provider_task.abort();
 }
 
 #[test]

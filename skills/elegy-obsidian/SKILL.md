@@ -217,10 +217,10 @@ Side-effecting commands (`create`, `append`, `patch`, `move`, `delete`, `daily:a
 | **Consumer-side discovery** (mirror) | `instruction-engine/contracts/elegy/fixtures/skill-discovery-index.elegy-obsidian.json` | Discovery projection for consumer repo |
 | **Consumer-side SKILL.md** (mirror) | `instruction-engine/catalog-assets/shared-skills/elegy-obsidian/SKILL.md` | Consumer repo mirror of this skill |
 
-The `elegy-skills` registry in the Elegy repo discovers this skill by
-scanning `skills/elegy-obsidian/SKILL.md` and
-`.elegy-plugin/plugin.json`. No separate `contracts/fixtures/` tree is
-used for skill-package discovery in this repo.
+Hosts discover this skill from the installed package's
+`.elegy-plugin/plugin.json` and its declared `SKILL.md`. No central Elegy
+registry or separate `contracts/fixtures/` tree participates in skill-package
+discovery.
 
 ## Future Work (not in foundation)
 

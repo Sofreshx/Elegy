@@ -16,6 +16,9 @@ Elegy library crates.
 
 Four crates did not set `publish = false`:
 `elegy-memory`, `elegy-planning`, `elegy-skills`, `elegy-contracts`.
+The `elegy-skills` crate was subsequently retired by
+[`2026-07-20-retire-central-skill-registry.md`](2026-07-20-retire-central-skill-registry.md);
+its presence here records the workspace state when this decision was made.
 The `publish-crate.yml` workflow was wired to publish `elegy-memory`
 to crates.io on release events.  This pipeline used nonexistent
 action versions (`actions/checkout@v6.0.2`,

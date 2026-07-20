@@ -3,7 +3,7 @@ use rand::Rng;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::{
-    collections::{BTreeMap, HashMap},
+    collections::{BTreeMap, HashMap, HashSet},
     fs,
     path::Path,
 };
@@ -83,6 +83,45 @@ pub struct AuthProfile {
     pub credential_fields: Vec<CredentialField>,
 }
 
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum OperationRisk {
+    Read,
+    Write,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum OperationExecutor {
+    Http {
+        profile: String,
+        method: String,
+        path: String,
+    },
+    Adapter {
+        adapter: String,
+        version: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ProviderOperation {
+    pub description: String,
+    pub risk: OperationRisk,
+    #[serde(default)]
+    pub scopes: Vec<String>,
+    pub input_schema: serde_json::Value,
+    pub result_schema: serde_json::Value,
+    pub executor: OperationExecutor,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum OperationSpec {
+    LegacyScopes(Vec<String>),
+    Executable(ProviderOperation),
+}
+
 #[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct ProviderSpec {
     pub schema_version: String,
@@ -92,7 +131,23 @@ pub struct ProviderSpec {
     pub publisher: String,
     pub browser_origins: Vec<String>,
     pub auth_profiles: Vec<AuthProfile>,
-    pub operations: BTreeMap<String, Vec<String>>,
+    pub operations: BTreeMap<String, OperationSpec>,
+}
+
+impl ProviderSpec {
+    pub fn operation_scopes(&self, operation: &str) -> Option<&[String]> {
+        match self.operations.get(operation)? {
+            OperationSpec::LegacyScopes(scopes) => Some(scopes),
+            OperationSpec::Executable(spec) => Some(&spec.scopes),
+        }
+    }
+
+    pub fn executable_operation(&self, operation: &str) -> Option<&ProviderOperation> {
+        match self.operations.get(operation)? {
+            OperationSpec::Executable(spec) => Some(spec),
+            OperationSpec::LegacyScopes(_) => None,
+        }
+    }
 }
 
 #[derive(Debug, Error)]
@@ -101,7 +156,7 @@ pub enum ProviderError {
     InvalidJson(#[from] serde_json::Error),
     #[error("provider directory could not be read: {0}")]
     Io(#[from] std::io::Error),
-    #[error("provider manifest must use schema elegy-account-provider/v1")]
+    #[error("provider manifest must use schema elegy-account-provider/v1 or v2")]
     UnsupportedSchema,
     #[error("provider identifier is invalid")]
     InvalidId,
@@ -113,30 +168,70 @@ pub enum ProviderError {
     InvalidUrl,
     #[error("provider auth profile is incomplete")]
     IncompleteProfile,
+    #[error("provider v2 operations must use typed executable definitions")]
+    IncompleteOperation,
+    #[error("provider read operation must use GET")]
+    MutatingReadOperation,
+    #[error("provider HTTP operation must use an audience-relative path")]
+    UnsafeOperationPath,
+    #[error("provider operation references an unknown auth profile")]
+    UnknownOperationProfile,
 }
 
 #[derive(Clone, Debug)]
 pub struct ProviderCatalog {
     providers: HashMap<String, ProviderSpec>,
+    executable_providers: HashSet<String>,
 }
 
 impl ProviderCatalog {
     pub fn from_json_documents<'a>(
         documents: impl IntoIterator<Item = &'a str>,
     ) -> Result<Self, ProviderError> {
+        Self::from_documents_with_trust(documents, true)
+    }
+
+    pub fn from_untrusted_json_documents<'a>(
+        documents: impl IntoIterator<Item = &'a str>,
+    ) -> Result<Self, ProviderError> {
+        Self::from_documents_with_trust(documents, false)
+    }
+
+    fn from_documents_with_trust<'a>(
+        documents: impl IntoIterator<Item = &'a str>,
+        trusted: bool,
+    ) -> Result<Self, ProviderError> {
         let mut providers = HashMap::new();
+        let mut executable_providers = HashSet::new();
         for document in documents {
             let provider: ProviderSpec = serde_json::from_str(document)?;
             validate_provider(&provider)?;
             let id = provider.id.clone();
+            if trusted {
+                executable_providers.insert(id.clone());
+            }
             if providers.insert(id.clone(), provider).is_some() {
                 return Err(ProviderError::Duplicate(id));
             }
         }
-        Ok(Self { providers })
+        Ok(Self {
+            providers,
+            executable_providers,
+        })
     }
 
     pub fn load_directory(path: impl AsRef<Path>) -> Result<Self, ProviderError> {
+        Self::load_directory_with_trust(path, true)
+    }
+
+    pub fn load_untrusted_directory(path: impl AsRef<Path>) -> Result<Self, ProviderError> {
+        Self::load_directory_with_trust(path, false)
+    }
+
+    fn load_directory_with_trust(
+        path: impl AsRef<Path>,
+        trusted: bool,
+    ) -> Result<Self, ProviderError> {
         let mut documents = Vec::new();
         for entry in fs::read_dir(path)? {
             let entry = entry?;
@@ -148,7 +243,7 @@ impl ProviderCatalog {
                 documents.push(fs::read_to_string(entry.path())?);
             }
         }
-        Self::from_json_documents(documents.iter().map(String::as_str))
+        Self::from_documents_with_trust(documents.iter().map(String::as_str), trusted)
     }
 
     pub fn get(&self, id: &str) -> Option<&ProviderSpec> {
@@ -167,10 +262,24 @@ impl ProviderCatalog {
             .iter()
             .find(|candidate| candidate.id == profile)
     }
+
+    pub fn executable_operation(
+        &self,
+        provider: &str,
+        operation: &str,
+    ) -> Option<&ProviderOperation> {
+        if !self.executable_providers.contains(provider) {
+            return None;
+        }
+        self.get(provider)?.executable_operation(operation)
+    }
 }
 
 fn validate_provider(provider: &ProviderSpec) -> Result<(), ProviderError> {
-    if provider.schema_version != "elegy-account-provider/v1" {
+    if !matches!(
+        provider.schema_version.as_str(),
+        "elegy-account-provider/v1" | "elegy-account-provider/v2"
+    ) {
         return Err(ProviderError::UnsupportedSchema);
     }
     if provider.id.is_empty()
@@ -212,6 +321,43 @@ fn validate_provider(provider: &ProviderSpec) -> Result<(), ProviderError> {
         };
         if !complete || profile.identity.selectors.is_empty() {
             return Err(ProviderError::IncompleteProfile);
+        }
+    }
+    for operation in provider.operations.values() {
+        match operation {
+            OperationSpec::LegacyScopes(_) if provider.schema_version.ends_with("/v2") => {
+                return Err(ProviderError::IncompleteOperation);
+            }
+            OperationSpec::LegacyScopes(_) => {}
+            OperationSpec::Executable(spec) => {
+                if !provider.schema_version.ends_with("/v2") || spec.description.trim().is_empty() {
+                    return Err(ProviderError::IncompleteOperation);
+                }
+                if let OperationExecutor::Http {
+                    profile,
+                    method,
+                    path,
+                } = &spec.executor
+                {
+                    if !provider
+                        .auth_profiles
+                        .iter()
+                        .any(|candidate| candidate.id == *profile)
+                    {
+                        return Err(ProviderError::UnknownOperationProfile);
+                    }
+                    if !path.starts_with('/')
+                        || path.starts_with("//")
+                        || path.split('/').any(|segment| segment == "..")
+                        || Url::parse(path).is_ok()
+                    {
+                        return Err(ProviderError::UnsafeOperationPath);
+                    }
+                    if spec.risk == OperationRisk::Read && !method.eq_ignore_ascii_case("GET") {
+                        return Err(ProviderError::MutatingReadOperation);
+                    }
+                }
+            }
         }
     }
     Ok(())

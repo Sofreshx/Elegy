@@ -14,7 +14,8 @@ flowchart LR
   U --> ES["Holon / Elegy Studio\nAccounts & Access route"]
   U --> BX["Brave extension\nexplicit Allow / Continue"]
 
-  C["Codex agent"] --> CP["Codex plugin skills + MCP tools"]
+  C["Codex agent"] --> CP["Account-control MCP"]
+  C --> CA["Typed action MCP"]
   E["Elegy/Holon agent"] --> HC["Host capability adapter"]
 
   AC --> IPC["Current-user local transports\nloopback UI / stdio MCP"]
@@ -22,6 +23,8 @@ flowchart LR
   BX --> NM["Native Messaging host"]
   NM --> IPC
   CP --> IPC
+  CA --> PIPE["Authenticated current-user named pipe"]
+  PIPE --> B
   HC --> IPC
 
   IPC --> B["elegy-accountd broker"]
@@ -51,8 +54,8 @@ flowchart LR
 2. The broker resolves an existing account or returns a structured interaction requirement: discover, connect, approve, create, CAPTCHA, MFA, terms, payment, or identity verification.
 3. The broker persists an authorization session before presenting it. OAuth uses authorization code with PKCE or device authorization where supported. Device polling and callback ownership remain in the broker, so closing Account Center cannot lose progress. Manual tokens are captured by trusted UI and sent only to the broker.
 4. The vault encrypts secret material with a per-record data key; Windows DPAPI protects the key for the current user. Metadata contains no secret values.
-5. The policy engine issues a short-lived opaque lease bound to the requesting client, account, provider adapter, purpose, operation set, audience, and expiry.
-6. A host-only executor redeems the lease internally and performs the narrow action. Agent-facing tools receive sanitized results and audit identifiers, never authorization headers or secret bytes.
+5. The policy engine reuses a matching time-bounded read grant or creates a durable approval request. New typed execution keeps its short-lived single-use lease inside the broker.
+6. A credential-free action host sends a signed typed operation over current-user local IPC. The broker validates the trusted operation definition, redeems the internal lease, performs the narrow action, and returns a sanitized result plus audit identifier.
 7. Revocation invalidates grants and all derived leases immediately. Every security-relevant transition is appended to the audit log.
 
 ## Deterministic authorization lifecycle
@@ -97,8 +100,8 @@ sequenceDiagram
   Agent->>Broker: Request named operations + purpose
   Broker-->>Center: Pending access decision
   User->>Center: Approve limited duration
-  Broker-->>Agent: Opaque scoped lease
-  Agent->>Broker: Tool action with lease
+  Agent->>Broker: Invoke typed action (no credential or lease)
+  Broker->>Broker: Validate client, grant, and issue internal single-use lease
   Broker->>Provider: Host-only API call with decrypted credential
   Provider-->>Broker: Provider response
   Broker-->>Agent: Sanitized result + audit ID
@@ -111,7 +114,7 @@ sequenceDiagram
 
 ### Broker (`elegy-accountd`)
 
-The broker is the sole authority for account metadata, secret envelopes, grants, leases, provisioning state, and audit records. The MVP uses MCP stdio for Codex, Brave Native Messaging for browser discovery, and an Account Center server bound only to `127.0.0.1`. Mutating UI calls require a non-simple intent header, while agent grants accept only the installed client allowlist. Windows DPAPI supplies the current-user vault boundary. A future multi-process/team layer can replace these transports without changing the policy contract.
+The broker is the sole authority for account metadata, secret envelopes, grants, leases, provisioning state, execution, and audit records. Account control uses MCP stdio, typed actions use a signed current-user Windows named pipe, Brave uses Native Messaging, and Account Center binds only to `127.0.0.1`. Client authentication keys and credentials are independently DPAPI-protected; neither is LLM-visible.
 
 ### Vault
 
@@ -119,7 +122,7 @@ Secrets use envelope encryption. The database stores ciphertext, nonce, algorith
 
 ### Provider packs and adapters
 
-Runtime JSON packs declare auth methods, authorization metadata, safe discovery origins, allowed operations, credential fields, identity verification, and sanitized identity selectors. The broker and UIs contain no provider-name branches. OAuth PKCE, device authorization, scoped tokens, HTTP Basic/app passwords, and client credentials use built-in audited adapters. A service credential requires a separately reviewed code adapter. GitHub, Cloudflare, and Google are conformance and live-proof packs, not product limits. See [provider packs](provider-packs.md).
+Runtime JSON packs declare auth methods, authorization metadata, safe discovery origins, credential fields, identity verification, and sanitized identity selectors. Pack v2 additionally declares typed operation risk, schemas, fixed profiles, and audience-relative HTTP recipes. Only bundled or explicitly trusted packs may execute; untrusted local packs remain enrollment-only. OAuth PKCE, device authorization, scoped tokens, HTTP Basic/app passwords, and client credentials use built-in audited adapters.
 
 ### Brave extension
 
@@ -135,7 +138,7 @@ One React component system powers a standalone local app and an embeddable route
 
 ## Agent-facing contract
 
-Agent tools expose account discovery, selection, access/creation requests, durable attention listing, request-specific presentation/resume/cancel, revocation, and sanitized audit reads. `account_present` opens the exact loopback checkpoint and remains the deterministic fallback when a host cannot elicit a URL inline. Authenticated execution primitives are host-only and are not declared as raw secret or general execute tools.
+Account-control tools expose discovery, selection, access/creation requests, durable attention, presentation/resume/cancel, revocation, and sanitized audit reads. A separate action MCP exposes only trusted typed GitHub and Cloudflare reads. It carries neither credentials nor leases and cannot accept arbitrary HTTP requests. `account_present` remains the deterministic fallback for human interaction.
 
 ## Compatibility contract
 

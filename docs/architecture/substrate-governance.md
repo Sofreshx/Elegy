@@ -39,7 +39,6 @@ These crates consume governed artifacts and provide reusable executable behavior
 | `shared/policy` | Policy enforcement helpers |
 | `plugins/memory` | Dedicated bounded-memory executable behavior and CLI surface |
 | `plugins/mcp` | Dedicated MCP descriptor authoring/analysis behavior and CLI surface |
-| `tools/skills` | Dedicated MCP-to-skill generation behavior and CLI surface |
 | `shared/tooling` | Binary-only operator tooling package (`elegy-plugin-packaging`) over the plugin SDK |
 | `shared/descriptor` | Descriptor loading and normalization |
 | `shared/adapter-fs` and `shared/adapter-http` | Bounded adapter behavior |

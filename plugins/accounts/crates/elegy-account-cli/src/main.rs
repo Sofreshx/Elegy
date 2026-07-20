@@ -7,10 +7,12 @@ use axum::{
     routing::{get, post},
 };
 use elegy_accountd::{
-    AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, IdentitySpec,
-    NewAccessRequest, OAuthAdapterConfig, OAuthTransaction, ProviderCatalog, TokenAdapterConfig,
+    AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, ExecutionEnvelope,
+    IdentitySpec, KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthTransaction,
+    ProviderCatalog, ReplayGuard, TokenAdapterConfig, TypedExecutionOutcome, TypedExecutionRequest,
     Vault, VerifiedCredential, exchange_and_verify, verify_credentials, verify_token,
 };
+use rand::Rng;
 use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::router::tool::ToolRouter,
@@ -21,7 +23,7 @@ use rmcp::{
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::{
@@ -38,6 +40,121 @@ struct AccountsMcp {
     catalog: Arc<ProviderCatalog>,
     #[allow(dead_code)]
     tool_router: ToolRouter<Self>,
+}
+
+#[derive(Clone)]
+struct ActionsMcp {
+    #[allow(dead_code)]
+    tool_router: ToolRouter<Self>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct ActionAccountParams {
+    account_id: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+struct CloudflareDnsParams {
+    zone_id: String,
+    account_id: Option<String>,
+}
+
+impl ActionsMcp {
+    fn new() -> Self {
+        Self {
+            tool_router: Self::tool_router(),
+        }
+    }
+}
+
+#[tool_router]
+impl ActionsMcp {
+    #[tool(description = "Read the verified profile for a connected GitHub account.")]
+    async fn github_profile_read(
+        &self,
+        Parameters(params): Parameters<ActionAccountParams>,
+    ) -> String {
+        invoke_action(action_request(
+            "github_profile_read",
+            params.account_id,
+            json!({}),
+        ))
+        .await
+    }
+
+    #[tool(description = "List repositories visible to a connected GitHub account.")]
+    async fn github_repositories_read(
+        &self,
+        Parameters(params): Parameters<ActionAccountParams>,
+    ) -> String {
+        invoke_action(action_request(
+            "github_repositories_read",
+            params.account_id,
+            json!({}),
+        ))
+        .await
+    }
+
+    #[tool(description = "List zones visible to a connected Cloudflare account.")]
+    async fn cloudflare_zones_read(
+        &self,
+        Parameters(params): Parameters<ActionAccountParams>,
+    ) -> String {
+        invoke_action(action_request(
+            "cloudflare_zones_read",
+            params.account_id,
+            json!({}),
+        ))
+        .await
+    }
+
+    #[tool(description = "List DNS records for one zone using a connected Cloudflare account.")]
+    async fn cloudflare_dns_records_read(
+        &self,
+        Parameters(params): Parameters<CloudflareDnsParams>,
+    ) -> String {
+        invoke_action(action_request(
+            "cloudflare_dns_records_read",
+            params.account_id,
+            json!({"zone_id":params.zone_id}),
+        ))
+        .await
+    }
+}
+
+#[tool_handler]
+impl ServerHandler for ActionsMcp {
+    fn get_info(&self) -> ServerInfo {
+        ServerInfo::new(ServerCapabilities::builder().enable_tools().build()).with_instructions(
+            "Typed provider reads through the local Elegy Accounts broker. Credentials and leases never enter this MCP surface.",
+        )
+    }
+}
+
+fn action_request(
+    tool: &str,
+    account_id: Option<String>,
+    arguments: Value,
+) -> Result<TypedExecutionRequest> {
+    let (provider, operation, purpose_class) = match tool {
+        "github_profile_read" => ("github", "profile.read", "github.profile.read"),
+        "github_repositories_read" => ("github", "repositories.read", "github.repositories.read"),
+        "cloudflare_zones_read" => ("cloudflare", "zones.read", "cloudflare.zones.read"),
+        "cloudflare_dns_records_read" => (
+            "cloudflare",
+            "dns.records.read",
+            "cloudflare.dns.records.read",
+        ),
+        _ => anyhow::bail!("typed action is not registered"),
+    };
+    Ok(TypedExecutionRequest {
+        client_id: "codex-actions".into(),
+        purpose_class: purpose_class.into(),
+        provider: provider.into(),
+        operation: operation.into(),
+        account_id,
+        arguments,
+    })
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -237,7 +354,7 @@ impl AccountsMcp {
                     "provider": request.provider,
                     "purpose": request.purpose,
                     "status": request.status,
-                    "url": format!("{ACCOUNT_CENTER_URL}?request={}", request.id),
+                    "url": format!("{}?request={}", account_center_url(), request.id),
                 })
             });
         let authorizations = self
@@ -260,7 +377,7 @@ impl AccountsMcp {
                     "status": session.status,
                     "expires_at": session.expires_at,
                     "reason": session.last_error,
-                    "url": format!("{ACCOUNT_CENTER_URL}?request={}", session.id),
+                    "url": format!("{}?request={}", account_center_url(), session.id),
                 })
             });
         json!({"attention": requests.chain(authorizations).take(limit).collect::<Vec<_>>()})
@@ -333,7 +450,7 @@ impl AccountsMcp {
             "request_id": params.request_id,
             "status":"interaction_required",
             "action":"open_account_center",
-            "url":format!("{ACCOUNT_CENTER_URL}?request={}", params.request_id)
+            "url":format!("{}?request={}", account_center_url(), params.request_id)
         })
         .to_string()
     }
@@ -342,7 +459,7 @@ impl AccountsMcp {
         description = "Return the local Account Center URL for user review. No credential is included in the URL."
     )]
     fn account_open_center(&self) -> String {
-        json!({ "url": "http://127.0.0.1:43119/", "local_only": true }).to_string()
+        json!({ "url": account_center_url(), "local_only": true }).to_string()
     }
 
     #[tool(
@@ -389,6 +506,217 @@ fn local_data_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(base).join("Elegy").join("Accounts"))
 }
 
+const MAX_EXECUTION_MESSAGE_BYTES: usize = 1024 * 1024;
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ExecutionWireResponse {
+    outcome: Option<TypedExecutionOutcome>,
+    error: Option<ExecutionWireError>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+struct ExecutionWireError {
+    code: String,
+    message: String,
+}
+
+async fn invoke_action(request: Result<TypedExecutionRequest>) -> String {
+    let request = match request {
+        Ok(request) => request,
+        Err(error) => {
+            return json!({"error":"invalid_operation","message":error.to_string()}).to_string();
+        }
+    };
+    match call_execution_broker(request).await {
+        Ok(response) => match (response.outcome, response.error) {
+            (Some(outcome), None) => json!(outcome).to_string(),
+            (_, Some(error)) => json!({"error":error.code,"message":error.message}).to_string(),
+            _ => json!({"error":"invalid_broker_response"}).to_string(),
+        },
+        Err(error) => json!({
+            "error":"broker_unavailable",
+            "message":error.to_string(),
+            "open_center":account_center_url()
+        })
+        .to_string(),
+    }
+}
+
+fn execution_pipe_name() -> String {
+    std::env::var("ELEGY_ACCOUNTS_PIPE_NAME")
+        .ok()
+        .filter(|name| {
+            name.starts_with(r"\\.\pipe\")
+                && name.len() <= 240
+                && name.bytes().all(|byte| {
+                    byte.is_ascii_alphanumeric() || matches!(byte, b'\\' | b'.' | b'_' | b'-')
+                })
+        })
+        .unwrap_or_else(|| r"\\.\pipe\elegy-accounts-v1".into())
+}
+
+fn load_or_create_client_key() -> Result<Zeroizing<Vec<u8>>> {
+    let key_path = local_data_dir()?
+        .join("clients")
+        .join("codex-actions.dpapi");
+    if let Some(parent) = key_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let protector = DpapiProtector;
+    if key_path.exists() {
+        let protected = std::fs::read(&key_path)?;
+        return Ok(Zeroizing::new(protector.unprotect(&protected)?));
+    }
+    let mut key = Zeroizing::new(vec![0_u8; 32]);
+    rand::rng().fill(key.as_mut_slice());
+    let protected = protector.protect(key.as_slice())?;
+    match std::fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&key_path)
+    {
+        Ok(mut file) => {
+            file.write_all(&protected)?;
+            file.sync_all()?;
+            Ok(key)
+        }
+        Err(error) if error.kind() == std::io::ErrorKind::AlreadyExists => {
+            let protected = std::fs::read(&key_path)?;
+            Ok(Zeroizing::new(protector.unprotect(&protected)?))
+        }
+        Err(error) => Err(error.into()),
+    }
+}
+
+#[cfg(windows)]
+async fn call_execution_broker(request: TypedExecutionRequest) -> Result<ExecutionWireResponse> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::windows::named_pipe::ClientOptions;
+
+    ensure_broker_running().await?;
+    let key = load_or_create_client_key()?;
+    let envelope = ExecutionEnvelope::sign(
+        request,
+        key.as_slice(),
+        chrono::Utc::now(),
+        format!("nonce_{}", uuid::Uuid::new_v4().simple()),
+    )?;
+    let payload = serde_json::to_vec(&envelope)?;
+    if payload.len() > MAX_EXECUTION_MESSAGE_BYTES {
+        anyhow::bail!("execution request is too large");
+    }
+    let pipe_name = execution_pipe_name();
+    let mut pipe = None;
+    for _ in 0..30 {
+        match ClientOptions::new().open(&pipe_name) {
+            Ok(client) => {
+                pipe = Some(client);
+                break;
+            }
+            Err(_) => tokio::time::sleep(Duration::from_millis(100)).await,
+        }
+    }
+    let mut pipe = pipe.context("account execution pipe is unavailable")?;
+    pipe.write_u32_le(payload.len() as u32).await?;
+    pipe.write_all(&payload).await?;
+    pipe.flush().await?;
+    let length = pipe.read_u32_le().await? as usize;
+    if length > MAX_EXECUTION_MESSAGE_BYTES {
+        anyhow::bail!("execution response is too large");
+    }
+    let mut response = vec![0_u8; length];
+    pipe.read_exact(&mut response).await?;
+    Ok(serde_json::from_slice(&response)?)
+}
+
+#[cfg(not(windows))]
+async fn call_execution_broker(_request: TypedExecutionRequest) -> Result<ExecutionWireResponse> {
+    anyhow::bail!("the local account execution pipe is currently available only on Windows")
+}
+
+#[cfg(windows)]
+async fn run_execution_pipe(state: WebState) -> Result<()> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::windows::named_pipe::ServerOptions;
+
+    let pipe_name = execution_pipe_name();
+    let key = Arc::new(load_or_create_client_key()?);
+    let replay = Arc::new(Mutex::new(ReplayGuard::default()));
+    loop {
+        let mut pipe = ServerOptions::new().create(&pipe_name)?;
+        pipe.connect().await?;
+        let state = state.clone();
+        let key = key.clone();
+        let replay = replay.clone();
+        tokio::spawn(async move {
+            let response = async {
+                let length = pipe.read_u32_le().await? as usize;
+                if length > MAX_EXECUTION_MESSAGE_BYTES {
+                    anyhow::bail!("execution request is too large");
+                }
+                let mut payload = vec![0_u8; length];
+                pipe.read_exact(&mut payload).await?;
+                let envelope: ExecutionEnvelope = serde_json::from_slice(&payload)?;
+                let request = {
+                    let mut guard = replay
+                        .lock()
+                        .map_err(|_| anyhow::anyhow!("replay guard is unavailable"))?;
+                    envelope.verify(
+                        key.as_slice(),
+                        "codex-actions",
+                        chrono::Utc::now(),
+                        &mut guard,
+                    )?
+                };
+                let outcome = state
+                    .broker
+                    .execute_typed_operation(&state.http, &state.catalog, request)
+                    .await
+                    .map_err(|error| anyhow::anyhow!("{}: {}", error.code(), error))?;
+                Ok::<_, anyhow::Error>(ExecutionWireResponse {
+                    outcome: Some(outcome),
+                    error: None,
+                })
+            }
+            .await;
+            let response = match response {
+                Ok(response) => response,
+                Err(error) => {
+                    let message = error.to_string();
+                    let code = message
+                        .split_once(':')
+                        .map(|(code, _)| code)
+                        .filter(|code| {
+                            code.bytes()
+                                .all(|byte| byte.is_ascii_lowercase() || byte == b'_')
+                        })
+                        .unwrap_or("execution_failed")
+                        .to_owned();
+                    ExecutionWireResponse {
+                        outcome: None,
+                        error: Some(ExecutionWireError {
+                            code,
+                            message: "The broker could not complete this typed operation.".into(),
+                        }),
+                    }
+                }
+            };
+            if let Ok(payload) = serde_json::to_vec(&response)
+                && payload.len() <= MAX_EXECUTION_MESSAGE_BYTES
+            {
+                let _ = pipe.write_u32_le(payload.len() as u32).await;
+                let _ = pipe.write_all(&payload).await;
+                let _ = pipe.flush().await;
+            }
+        });
+    }
+}
+
+#[cfg(not(windows))]
+async fn run_execution_pipe(_state: WebState) -> Result<()> {
+    std::future::pending::<Result<()>>().await
+}
+
 fn provider_directory() -> PathBuf {
     if let Some(configured) = std::env::var_os("ELEGY_ACCOUNTS_PROVIDER_DIR") {
         return PathBuf::from(configured);
@@ -404,7 +732,16 @@ fn provider_directory() -> PathBuf {
 }
 
 fn load_provider_catalog() -> Result<ProviderCatalog> {
-    ProviderCatalog::load_directory(provider_directory()).context("load account provider packs")
+    let directory = provider_directory();
+    let configured = std::env::var_os("ELEGY_ACCOUNTS_PROVIDER_DIR").is_some();
+    let explicitly_trusted =
+        std::env::var("ELEGY_ACCOUNTS_TRUST_LOCAL_PACKS").is_ok_and(|value| value == "1");
+    if configured && !explicitly_trusted {
+        ProviderCatalog::load_untrusted_directory(directory)
+            .context("load enrollment-only local account provider packs")
+    } else {
+        ProviderCatalog::load_directory(directory).context("load trusted account provider packs")
+    }
 }
 
 #[tokio::main]
@@ -423,6 +760,11 @@ async fn main() -> Result<()> {
     match args.first().map(String::as_str) {
         None | Some("mcp") => {
             let service = AccountsMcp::new()?.serve(stdio()).await?;
+            service.waiting().await?;
+            Ok(())
+        }
+        Some("actions-mcp") => {
+            let service = ActionsMcp::new().serve(stdio()).await?;
             service.waiting().await?;
             Ok(())
         }
@@ -472,11 +814,21 @@ async fn main() -> Result<()> {
     }
 }
 
-const ACCOUNT_CENTER_URL: &str = "http://127.0.0.1:43119/";
+fn account_center_port() -> u16 {
+    std::env::var("ELEGY_ACCOUNT_CENTER_PORT")
+        .ok()
+        .and_then(|value| value.parse::<u16>().ok())
+        .filter(|value| *value > 0)
+        .unwrap_or(43119)
+}
+
+fn account_center_url() -> String {
+    format!("http://127.0.0.1:{}/", account_center_port())
+}
 
 fn request_url(request_id: Option<&str>) -> Result<String> {
     let Some(request_id) = request_id else {
-        return Ok(ACCOUNT_CENTER_URL.into());
+        return Ok(account_center_url());
     };
     if request_id.is_empty()
         || request_id.len() > 128
@@ -486,7 +838,7 @@ fn request_url(request_id: Option<&str>) -> Result<String> {
     {
         anyhow::bail!("request identifier is invalid");
     }
-    Ok(format!("{ACCOUNT_CENTER_URL}?request={request_id}"))
+    Ok(format!("{}?request={request_id}", account_center_url()))
 }
 
 async fn run_open(print_only: bool, request_id: Option<&str>) -> Result<()> {
@@ -496,7 +848,20 @@ async fn run_open(print_only: bool, request_id: Option<&str>) -> Result<()> {
         return Ok(());
     }
 
-    let health_url = format!("{ACCOUNT_CENTER_URL}api/state");
+    ensure_broker_running().await?;
+
+    #[cfg(windows)]
+    Command::new("explorer.exe")
+        .arg(&open_url)
+        .spawn()
+        .context("failed to open Account Center")?;
+    #[cfg(not(windows))]
+    println!("{open_url}");
+    Ok(())
+}
+
+async fn ensure_broker_running() -> Result<()> {
+    let health_url = format!("{}api/state", account_center_url());
     let client = reqwest::Client::builder()
         .timeout(Duration::from_millis(500))
         .build()?;
@@ -542,13 +907,6 @@ async fn run_open(print_only: bool, request_id: Option<&str>) -> Result<()> {
         }
     }
 
-    #[cfg(windows)]
-    Command::new("explorer.exe")
-        .arg(&open_url)
-        .spawn()
-        .context("failed to open Account Center")?;
-    #[cfg(not(windows))]
-    println!("{open_url}");
     Ok(())
 }
 
@@ -1030,16 +1388,17 @@ async fn run_account_center() -> Result<()> {
         .fallback_service(tower_http::services::ServeDir::new(ui_dir).append_index_html_on_directories(true))
         .layer(tower_http::set_header::SetResponseHeaderLayer::if_not_present(header::CACHE_CONTROL, HeaderValue::from_static("no-store")))
         .layer(tower_http::set_header::SetResponseHeaderLayer::if_not_present(header::CONTENT_SECURITY_POLICY, HeaderValue::from_static("default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'self' http://127.0.0.1:*")))
-        .with_state(state);
-    let port = std::env::var("ELEGY_ACCOUNT_CENTER_PORT")
-        .ok()
-        .and_then(|value| value.parse::<u16>().ok())
-        .filter(|value| *value > 0)
-        .unwrap_or(43119);
+        .with_state(state.clone());
+    let port = account_center_port();
     let listener = tokio::net::TcpListener::bind(("127.0.0.1", port)).await?;
     eprintln!("Elegy Account Center: http://127.0.0.1:{port}/");
-    axum::serve(listener, app).await?;
-    Ok(())
+    tokio::select! {
+        result = run_execution_pipe(state) => result,
+        result = axum::serve(listener, app) => {
+            result?;
+            Ok(())
+        }
+    }
 }
 
 async fn web_state(State(state): State<WebState>) -> impl IntoResponse {
@@ -1900,8 +2259,8 @@ fn contains_secret_key(value: &serde_json::Value) -> bool {
 #[cfg(test)]
 mod native_host_tests {
     use super::{
-        DeviceFlowConfig, DevicePoll, handle_native_message, poll_device_flow, start_device_flow,
-        valid_user_intent,
+        DeviceFlowConfig, DevicePoll, action_request, handle_native_message, poll_device_flow,
+        start_device_flow, valid_user_intent,
     };
     use axum::{
         Json, Router,
@@ -1916,6 +2275,30 @@ mod native_host_tests {
         Arc,
         atomic::{AtomicUsize, Ordering},
     };
+
+    #[test]
+    fn bundled_action_tools_bind_client_purpose_and_provider_outside_llm_arguments() {
+        let github = action_request("github_repositories_read", None, json!({})).unwrap();
+        assert_eq!(github.client_id, "codex-actions");
+        assert_eq!(github.purpose_class, "github.repositories.read");
+        assert_eq!(github.provider, "github");
+        assert_eq!(github.operation, "repositories.read");
+
+        let cloudflare = action_request(
+            "cloudflare_dns_records_read",
+            Some("acct_fixture".into()),
+            json!({"zone_id":"zone_fixture"}),
+        )
+        .unwrap();
+        assert_eq!(cloudflare.client_id, "codex-actions");
+        assert_eq!(cloudflare.purpose_class, "cloudflare.dns.records.read");
+        assert_eq!(cloudflare.provider, "cloudflare");
+        assert_eq!(cloudflare.operation, "dns.records.read");
+        assert_eq!(cloudflare.account_id.as_deref(), Some("acct_fixture"));
+        assert_eq!(cloudflare.arguments["zone_id"], "zone_fixture");
+
+        assert!(action_request("generic_http", None, json!({})).is_err());
+    }
 
     #[test]
     fn accepts_discovery_hint_but_rejects_any_secret_bearing_message() {

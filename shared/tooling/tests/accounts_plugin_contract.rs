@@ -36,6 +36,21 @@ fn accounts_plugin_is_a_portable_bundled_capability() {
         mcp["mcpServers"]["elegy-accounts"]["args"],
         serde_json::json!(["mcp"])
     );
+    assert_eq!(
+        mcp["mcpServers"]["elegy-account-actions"]["args"],
+        serde_json::json!(["actions-mcp"])
+    );
+
+    let catalog: Value = serde_json::from_str(
+        &fs::read_to_string(plugin.join("capability-catalog.json"))
+            .expect("capability catalog should exist"),
+    )
+    .expect("capability catalog should be JSON");
+    assert!(catalog["capabilities"]
+        .as_array()
+        .expect("capabilities")
+        .iter()
+        .any(|capability| capability["id"] == "accounts.actions.mcp"));
 
     for required in [
         "skills/elegy-manage-accounts/SKILL.md",

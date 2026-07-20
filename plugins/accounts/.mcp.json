@@ -3,6 +3,10 @@
     "elegy-accounts": {
       "command": "./bin/elegy-accounts.exe",
       "args": ["mcp"]
+    },
+    "elegy-account-actions": {
+      "command": "./bin/elegy-accounts.exe",
+      "args": ["actions-mcp"]
     }
   }
 }
