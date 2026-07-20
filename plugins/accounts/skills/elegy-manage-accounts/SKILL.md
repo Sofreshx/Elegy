@@ -16,6 +16,8 @@ Use the `elegy-accounts` MCP tools. Treat account metadata, grants, leases, and 
 5. If no suitable account exists and creation is appropriate, call `account_request_creation` with purpose and user constraints. Use `account_attention_list` to recover durable work. Poll only when useful with `account_request_status`; do not busy-wait.
 6. Continue the original task only after the request reports approved/connected and the downstream provider tool accepts the capability.
 
+For bundled GitHub and Cloudflare reads, use the typed `elegy-account-actions` tools after account resolution. The action host reuses an active read grant, requests one durable approval when needed, and keeps the credential and lease inside the broker. Never ask the user to reconnect merely because a new Codex session started.
+
 ## Human checkpoints
 
 Stop automation and hand control to the person for CAPTCHA, MFA, terms, payment, KYC/identity verification, ambiguous plans, unexpected pages, or provider consent. Explain exactly what is waiting and how the agent will resume. Never click through, accept, solve, or bypass these boundaries without the user's direct action where policy permits.

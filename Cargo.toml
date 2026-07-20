@@ -22,7 +22,6 @@ members = [
     "shared/tooling",
     "tools/codegraph",
     "tools/configuration",
-    "tools/skills",
 ]
 resolver = "2"
 

@@ -9,7 +9,7 @@ The MVP is complete only when every `MUST` item passes and evidence is saved by 
 | AC-01 | Account Center launches locally and shows connected, needs-attention, and revoked accounts without exposing secret values. | MUST | E2E + screenshot |
 | AC-02 | On an arbitrary pack-declared provider origin, the Brave extension offers **Allow**, starts the provider flow without host/cookie/password permission, and the verified account appears in Account Center. | MUST | extension integration test + E2E |
 | AC-03 | The same connected account is visible through Codex tools and the Holon/Elegy embedded surface without reconnecting. | MUST | contract + embed E2E |
-| AC-04 | An agent can request a pack-declared read operation; the user can approve it; the broker injects auth for the allowlisted audience and returns sanitized results, never a credential. | MUST | broker proxy integration test |
+| AC-04 | A Codex-visible typed action requests one read approval, reuses the approved 30-day grant, executes through authenticated local IPC, and returns sanitized results without a credential or lease. | MUST | action MCP + named-pipe broker integration test |
 | AC-05 | A write operation not included in a read-only grant is denied and audited. | MUST | policy integration test |
 | AC-06 | Multiple accounts for one provider are distinguishable by verified identity and can be selected explicitly. | MUST | broker + UI test |
 | AC-07 | Revoking a grant immediately invalidates derived leases and updates all surfaces. | MUST | broker + E2E |
@@ -35,7 +35,7 @@ The MVP is complete only when every `MUST` item passes and evidence is saved by 
 | AC-17 | Expired, wrong-client, wrong-purpose, wrong-audience, widened-operation, revoked, and replayed single-use leases fail closed. | MUST | policy parameterized tests |
 | AC-18 | OAuth callback validation rejects state, nonce, issuer, audience/resource, redirect, and PKCE mismatches. | MUST | OAuth negative tests |
 | AC-19 | Brave manifest has no password API, no unconditional broad host access, and no secret-bearing extension storage. | MUST | manifest/static + runtime tests |
-| AC-20 | UI transport binds only IPv4 loopback; Codex uses stdio; Brave uses exact-origin Native Messaging; unknown agent client IDs and forged UI mutations are rejected. | MUST | transport boundary + packaging tests |
+| AC-20 | UI transport binds only IPv4 loopback; account/action MCP uses stdio; typed execution uses signed current-user named-pipe requests with replay rejection; Brave uses exact-origin Native Messaging; unknown clients and forged UI mutations are rejected. | MUST | transport boundary + packaging tests |
 | AC-21 | Dependency, license, secret, and vulnerability checks have no unresolved critical finding. | MUST | audit report |
 
 ## Usability and quality gates

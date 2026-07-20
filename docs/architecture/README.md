@@ -19,6 +19,7 @@ plugin metadata wrappers, and `shared/` for reusable libraries.
 - [Ecosystem topology](ecosystem-topology.md) — current repo centers, dependency direction, and contributor-facing scope
 - [Substrate governance](substrate-governance.md) — active artifact/runtime boundary and validation rules
 - [Skill Core V1](skill-core-v1.md) — current skill authority split between governed artifacts and Rust executable behavior
+- [Retire the central skill registry ADR](../adr/2026-07-20-retire-central-skill-registry.md) — direct installed-plugin discovery and the removal of `elegy-skills`
 - [Codex plugin projection](codex-plugin-projection.md) — optional Codex projection slice (derived adapter surface, not the primary plugin path)
 - [Static plugin marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — host-neutral marketplace authority and closed-source binary boundary
 - [Plugin marketplace v1](../specs/plugin-marketplace-v1.md) — index, artifact, install, and projection contract

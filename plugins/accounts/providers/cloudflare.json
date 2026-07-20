@@ -1,5 +1,5 @@
 {
-  "schema_version": "elegy-account-provider/v1",
+  "schema_version": "elegy-account-provider/v2",
   "id": "cloudflare",
   "display_name": "Cloudflare",
   "version": "1.0.0",
@@ -29,9 +29,34 @@
     }
   ],
   "operations": {
-    "account.profile.read": ["user:read"],
-    "zones.read": ["zone:read"],
-    "dns.records.read": ["dns:read"],
-    "dns.records.write": ["dns:write"]
+    "account.profile.read": {
+      "description": "Read the active Cloudflare token identity.",
+      "risk": "read",
+      "scopes": ["user:read"],
+      "input_schema": {"type": "object", "additionalProperties": false},
+      "result_schema": {"type": "object"},
+      "executor": {"kind": "http", "profile": "scoped-token", "method": "GET", "path": "/client/v4/user/tokens/verify"}
+    },
+    "zones.read": {
+      "description": "List zones visible to the connected Cloudflare account.",
+      "risk": "read",
+      "scopes": ["zone:read"],
+      "input_schema": {"type": "object", "additionalProperties": false},
+      "result_schema": {"type": "object"},
+      "executor": {"kind": "http", "profile": "scoped-token", "method": "GET", "path": "/client/v4/zones"}
+    },
+    "dns.records.read": {
+      "description": "List DNS records for one Cloudflare zone.",
+      "risk": "read",
+      "scopes": ["dns:read"],
+      "input_schema": {
+        "type": "object",
+        "properties": {"zone_id": {"type": "string", "pattern": "^[A-Za-z0-9_-]{1,128}$"}},
+        "required": ["zone_id"],
+        "additionalProperties": false
+      },
+      "result_schema": {"type": "object"},
+      "executor": {"kind": "http", "profile": "scoped-token", "method": "GET", "path": "/client/v4/zones/{zone_id}/dns_records"}
+    }
   }
 }

@@ -11,7 +11,7 @@ set -euo pipefail
 #
 # Usage:
 #   ./install-distribution.sh -t v0.1.0 -d ./tools/elegy -s elegy-planning
-#   ./install-distribution.sh -t v0.1.0 -d ./tools/elegy -s elegy-skills -f
+#   ./install-distribution.sh -t v0.1.0 -d ./tools/elegy -s elegy-memory -f
 # ─────────────────────────────────────────────────────────────────────
 
 REPOSITORY="Sofreshx/Elegy"
@@ -33,7 +33,7 @@ Options:
 
 Examples:
   ./install-distribution.sh -t v0.1.0 -d .elegy -s elegy-planning
-  ./install-distribution.sh -t v0.1.0 -d .elegy -s elegy-skills -f
+  ./install-distribution.sh -t v0.1.0 -d .elegy -s elegy-memory -f
 HELP
     exit 0
 }

@@ -16,7 +16,6 @@ elegy-runtime = { version = "0.1.0", path = "../runtime" }
 semver = "1"
 serde.workspace = true
 serde_json.workspace = true
-serde_yaml.workspace = true
 thiserror.workspace = true
 url.workspace = true
 zip.workspace = true

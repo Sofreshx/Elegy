@@ -92,9 +92,8 @@ Typical downstream consumption flow:
 ## Discovery Surface
 
 The governed discovery authority for this surface is the observe plugin's
-`SKILL.md` and fixtures. Repo-local inspection can use:
-
-- `elegy-skills describe --skill-id elegy-observe --json`
+`SKILL.md` and fixtures. Hosts load that skill from the installed observe
+plugin; repo-local inspection reads the co-located files directly.
 
 ## What Is Still Missing
 

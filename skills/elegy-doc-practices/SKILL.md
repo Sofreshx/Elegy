@@ -101,8 +101,7 @@ Do not block automatically on subjective document quality.
 
 ## Companion skills
 
-- `elegy-skills` — for governed skill-registry work that produces a skill
-  definition or package.
+- `elegy-skill-authoring` — for creating and auditing SKILL.md content.
 - `elegy-planning` — for durable planning state (goals, roadmaps, plans).
 - `elegy-mcp` — for MCP descriptor authoring and analysis.
 

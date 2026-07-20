@@ -11,6 +11,6 @@ Choose from the runtime provider pack returned by `account_discover`; never infe
 | Client credentials | A machine identity is appropriate | user supplies client registration; broker exchanges tokens per use |
 | Service credential | A reviewed code adapter exists | unsupported by the current declarative executor |
 
-GitHub, Cloudflare, and Google are bundled proof packs. They demonstrate device authorization, scoped tokens, and OAuth PKCE; they are not compiled special cases or the boundary of supported providers.
+GitHub and Cloudflare are bundled v2 execution proof packs; Google remains a v1 enrollment proof pack. Together they demonstrate device authorization, scoped tokens, and OAuth PKCE without making provider names part of the broker core.
 
 When a provider flow expires, use `account_attention_list`, then `account_present` or `account_resume_request`. Do not poll indefinitely or ask for secrets in chat.

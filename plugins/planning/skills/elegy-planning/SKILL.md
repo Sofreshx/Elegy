@@ -475,8 +475,6 @@ Expected: `status: "ok"`, `data.scopeMode = "all"`, `data.scopeKey = "all"`, fin
     memories that span planning sessions.
   - `elegy-obsidian` — for vault-side mirrors; planning is the
     authority and Obsidian is the read/write target.
-  - `elegy-skills` — for registry operations; planning does not
-    register skills.
   - `elegy-skill-authoring` — for SKILL.md audit and review.
 
 ## References

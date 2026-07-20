@@ -23,7 +23,6 @@
     { "name": "elegy-run", "kind": "host-adapter", "package": "elegy-host-mcp", "crateRoot": "hosts/host-mcp", "description": "MCP stdio host for running Elegy as an agent server." },
     { "name": "elegy-skill-authoring", "kind": "skill-package", "packaging": "plugin", "pluginRoot": "skills/elegy-skill-authoring", "skillRoot": "skills/elegy-skill-authoring", "marketplaceCategory": "Developer Tools", "description": "Portable agent skill authoring skill for creating and refining SKILL.md files." },
     { "name": "elegy-memory-mcp-stdio", "kind": "host-adapter", "package": "elegy-memory-mcp", "crateRoot": "hosts/memory-mcp", "description": "MCP stdio transport adapter for the memory plugin." },
-    { "name": "elegy-memory-mcp-http", "kind": "host-adapter", "package": "elegy-memory-mcp", "crateRoot": "hosts/memory-mcp", "description": "MCP HTTP transport adapter for the memory plugin." },
-    { "name": "elegy-skills", "kind": "cli", "package": "elegy-skills", "crateRoot": "tools/skills", "packaging": "plugin", "pluginRoot": "tools/skills", "description": "Skill registry and discovery CLI." }
+    { "name": "elegy-memory-mcp-http", "kind": "host-adapter", "package": "elegy-memory-mcp", "crateRoot": "hosts/memory-mcp", "description": "MCP HTTP transport adapter for the memory plugin." }
   ]
 }

@@ -13,8 +13,8 @@ pub use vault::{
 mod provider;
 pub use provider::{
     AuthMethod, AuthProfile, ClientRegistration, ClientRegistrationMode, CredentialField,
-    IdentitySpec, OAuthCallback, OAuthError, OAuthTransaction, PkceVerifier, ProviderCatalog,
-    ProviderError, ProviderSpec,
+    IdentitySpec, OAuthCallback, OAuthError, OAuthTransaction, OperationExecutor, OperationRisk,
+    OperationSpec, PkceVerifier, ProviderCatalog, ProviderError, ProviderOperation, ProviderSpec,
 };
 mod broker;
 pub use broker::{
@@ -27,6 +27,12 @@ pub use adapter::{
 };
 mod proxy;
 pub use proxy::{AuthenticatedRequest, AuthenticatedResponse, ProxyError};
+mod typed;
+pub use typed::{
+    TypedAccountChoice, TypedExecutionError, TypedExecutionOutcome, TypedExecutionRequest,
+};
+mod protocol;
+pub use protocol::{ExecutionEnvelope, ExecutionProtocolError, ReplayGuard};
 
 #[derive(Clone, Debug)]
 pub struct GrantRequest {

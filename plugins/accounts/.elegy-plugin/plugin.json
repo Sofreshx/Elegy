@@ -2,7 +2,7 @@
   "schemaVersion": "elegy-plugin/v1",
   "name": "elegy-accounts",
   "version": "0.1.0",
-  "description": "Generic local account authentication, encrypted credential storage, scoped broker execution, grants, and revocation for people and agents.",
+  "description": "Portable local authorization and typed broker execution for registered agent tools without exposing account credentials.",
   "author": {
     "name": "Elegy Contributors"
   },
@@ -21,13 +21,14 @@
       "assets": ["./ui/", "./browser/", "./providers/"],
       "interface": {
         "displayName": "Elegy Accounts",
-        "shortDescription": "Connect accounts without exposing credentials",
-        "longDescription": "Discover, connect, select, review, and revoke local accounts while agents receive only scoped, auditable access grants.",
+        "shortDescription": "Authorize local agent tools once",
+        "longDescription": "Connect accounts once, then let registered local agent tools perform typed, scoped, auditable provider operations without receiving credentials.",
         "developerName": "Elegy Contributors",
         "category": "Productivity",
         "capabilities": ["Read", "Write", "Interactive"],
         "defaultPrompt": [
           "Connect the account I need with minimum access.",
+          "Use my connected GitHub or Cloudflare account for a read-only operation.",
           "Show my connected accounts and agent access.",
           "Revoke account access I no longer need."
         ]

@@ -125,7 +125,7 @@ Dependent entities are revalidated after writes when their validation can be aff
 
 ## CLI Posture
 
-The CLI copies the same machine-usable posture already used by `elegy-skills`:
+The CLI uses the shared Elegy machine-readable output posture:
 
 - `--json`
 - `--non-interactive`

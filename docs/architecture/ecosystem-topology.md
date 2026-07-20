@@ -49,7 +49,7 @@ flowchart TD
     subgraph exec["hosts/ + plugins/ + tools/ + shared/ — Rust workspace"]
         hosts["hosts/\nhost adapters\n(elegy-run, memory MCP)"]
         plugins["plugins/\nbundled plugin packages\n(mcp, planning, memory, ...)"]
-        tools["tools/\nstandalone CLIs\n(skills, configuration, codegraph)"]
+        tools["tools/\nstandalone CLIs\n(configuration, codegraph)"]
         shared["shared/\n10 crates\n(libraries + operator tooling:\ncore, runtime, tooling,\nplugin-sdk, ...)"]
     end
 
@@ -113,7 +113,6 @@ The key current crates are:
 - `elegy-tooling` (`shared/tooling`) as the binary-only home of `elegy-plugin-packaging` for plugin verify/pack/export/install
 - `elegy-plugin-sdk` (`shared/plugin-sdk`) for the publishable external plugin SDK
 - `elegy-mcp` (`plugins/mcp`) for MCP analysis and related runtime behavior over governed descriptors
-- `elegy-skills` (`tools/skills`) for governed skill-registry access and validation
 - `elegy-planning` (`plugins/planning`) for durable planning authority
 - `elegy-memory` (`plugins/memory`) for bounded local memory surfaces
 - `elegy-documentation` (`plugins/documentation`) for documentation inspection, mapping, and export
@@ -124,7 +123,7 @@ The key current crates are:
 
 The current shipped operator path is intentionally narrow.
 
-The current shipped operator surfaces are each shipped as dedicated binaries: `elegy-planning`, `elegy-skills`, `elegy-memory`, `elegy-mcp`, `elegy-documentation`, `elegy-configuration`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`.
+The current shipped operator surfaces are each shipped as dedicated binaries: `elegy-planning`, `elegy-memory`, `elegy-mcp`, `elegy-documentation`, `elegy-configuration`, `elegy-observe`, `elegy-desktop`, `elegy-contracts`, `elegy-codegraph`, and `elegy-run`.
 
 Bundled plugins and skill packages are packaged as `elegy-plugin/v1` plugin
 archives. External/private plugin wrappers publish marketplace metadata under
@@ -134,7 +133,6 @@ CLI binaries.
 What the repo proves today:
 
 - `elegy-mcp` provides MCP descriptor authoring and analysis
-- `elegy-skills` provides governed skill-registry access and validation
 - `elegy-planning` provides durable planning authority
 - `elegy-memory` provides a bounded local operator surface
 - `elegy-configuration` provides governed template and profile flows
@@ -240,14 +238,14 @@ flowchart TB
 
     subgraph L2["L2 — Plugin capability crates"]
         memory["elegy-memory\nelegy-planning"]
-        skills["elegy-skills\nelegy-configuration"]
+        config_tools["elegy-configuration"]
         docs_feat["elegy-documentation\nelegy-mcp"]
         other["elegy-observe\nelegy-desktop\nelegy-codegraph\n..."]
     end
 
     subgraph L3["L3 — Operator surfaces"]
         run["elegy-run\nstdio MCP host"]
-        dedicated["elegy-memory\nelegy-planning\nelegy-skills\nelegy-mcp\nelegy-contracts\nelegy-codegraph\n..."]
+        dedicated["elegy-memory\nelegy-planning\nelegy-mcp\nelegy-contracts\nelegy-codegraph\n..."]
     end
 
     subgraph L4["L4 — CI & consumers"]
@@ -292,5 +290,8 @@ For now, the most coherent working model is:
 - `Elegy` is the single active repo
 - governed authority lives in co-located plugin artifacts (`plugins/<name>/schemas/`, `plugins/<name>/fixtures/`, `plugins/<name>/contracts/`) and cross-cutting `shared/core/fixtures/`, not in a removed `.NET` source tree or a centralized `contracts/` directory
 - `hosts/`, `plugins/`, and `shared/` form the first-party home for reusable executable surfaces — MCP analysis, descriptor tooling, policy-bounded runtime composition, and the `elegy-run` MCP host
-- the current contributor-facing self-authoring story is the Rust CLI author/analyze/generate path over governed descriptors, exposed through the dedicated `elegy-mcp` / `elegy-skills` binaries
+- the current contributor-facing MCP authoring story is the Rust CLI
+  author/analyze path over governed descriptors exposed through `elegy-mcp`;
+  Agent Skill authoring and audit are handled by the plugin-owned
+  `elegy-skill-authoring` workflow without a central registry
 - built-in MCP or skill-driven self-authoring remains a target and should not be documented as a completed surface until the repo proves it end to end

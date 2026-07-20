@@ -259,6 +259,17 @@ impl Vault {
             "ALTER TABLE authorization_sessions ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
             [],
         );
+        let now = Utc::now().to_rfc3339();
+        let revoked = connection.execute(
+            "UPDATE grants SET revoked_at=?1,generation=generation+1 WHERE client_id='codex-local' AND revoked_at IS NULL",
+            [&now],
+        )?;
+        if revoked > 0 {
+            connection.execute(
+                "INSERT INTO audit_events (time,event,account_id,detail_json) VALUES (?1,'grant.legacy_revoked',NULL,?2)",
+                params![now, serde_json::json!({"client_id":"codex-local","count":revoked}).to_string()],
+            )?;
+        }
         Ok(Self {
             connection: Mutex::new(connection),
             protector,

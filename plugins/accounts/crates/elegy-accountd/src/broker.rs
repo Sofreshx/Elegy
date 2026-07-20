@@ -412,7 +412,7 @@ impl BrokerStore {
             .collect::<Result<Vec<_>, _>>()?)
     }
 
-    fn audit(
+    pub(crate) fn audit(
         &self,
         event: &str,
         account_id: Option<&str>,
