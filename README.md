@@ -9,6 +9,10 @@ hosts. Governed artifacts stay in the repo. Dedicated `elegy-*` binaries expose
 the executable surfaces. CLI invocation is the default integration boundary.
 MCP is optional.
 
+Automation Packs remain a separate delivery lane. Their cross-repository
+relationship to Elegy is governed by the
+[Automation Program ecosystem decision](https://github.com/Sofreshx/elegy-automation-program/blob/main/docs/adr/2026-07-21-automation-ecosystem-governance.md).
+
 Core model:
 
 - governed plugin artifacts stay co-located with owning bundled plugins

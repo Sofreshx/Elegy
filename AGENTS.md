@@ -29,6 +29,8 @@ adapter.
 
 - Read `docs/plans/automation-portability-handoff.md` before changing plugin,
   host-projection, or automation-pack terminology.
+- Keep Automation Program role, lifecycle, and readiness truth in the Program
+  governance ADR; Elegy owns only the plugin-platform side of that boundary.
 
 - Update an existing ADR or spec when extending the same decision slice.
 - Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation.
