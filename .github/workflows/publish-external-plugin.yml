@@ -44,7 +44,7 @@ jobs:
             target: aarch64-apple-darwin
     steps:
       - name: Check out plugin source
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Resolve governed workflow source
         id: governance
@@ -64,7 +64,7 @@ jobs:
           "ref=$($parts[1])" >> $env:GITHUB_OUTPUT
 
       - name: Check out governed Elegy tooling
-        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           repository: ${{ steps.governance.outputs.repository }}
           ref: ${{ steps.governance.outputs.ref }}
