@@ -12,7 +12,8 @@ doc_kind: planning
 The canonical terminology boundary landed on 2026-07-15. Automation Pack
 delivery contracts continue to incubate in `elegy-automation-forge`; no Pack
 schema, native workflow authority, target adapter, or client deployment state
-has moved into Elegy.
+has moved into Elegy. The cross-repository boundary is now recorded by the
+[Automation Program ecosystem governance ADR](https://github.com/Sofreshx/elegy-automation-program/blob/main/docs/adr/2026-07-21-automation-ecosystem-governance.md).
 
 ## Goal
 
@@ -47,9 +48,9 @@ flowchart LR
 
 ## Remaining adoption work
 
-- Record the durable ADR that the current Automation Forge Pack v2 contracts
-  incubate in `elegy-automation-forge` and become eligible for core promotion
-  only after two unrelated conforming Packs.
+- Record an Elegy-local ADR only when Forge Pack contracts become eligible for
+  core promotion after two unrelated conforming Packs; the Program ADR already
+  owns the current cross-repository boundary.
 - Add a governed fixture proving isolated host extensions remain projections.
 - Update compatibility specifications only when a public Pack-to-capability
   binding contract is ready for Elegy ownership.
