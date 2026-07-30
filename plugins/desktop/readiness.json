@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-desktop",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Windows mouse, keyboard, and window-control primitives exist, but no clean installed application workflow is proven.",
+  "worksToday": ["Builds click, type, key, focus, move, minimize, and maximize commands with dry-run support."],
+  "limitations": ["Windows only.", "Coordinates and title matching are low-level and do not provide semantic application understanding."],
+  "supportedEnvironments": ["x86_64-pc-windows-msvc source checkout"],
+  "installation": "Build from source with cargo build -p elegy-desktop.",
+  "invocation": "Run elegy-desktop --help and select one bounded command.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

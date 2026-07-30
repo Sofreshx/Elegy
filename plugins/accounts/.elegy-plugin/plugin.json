@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "elegy-plugin/v1",
+  "schemaVersion": "elegy-plugin/v2",
   "name": "elegy-accounts",
   "version": "0.1.0",
   "description": "Portable local authorization and typed broker execution for registered agent tools without exposing account credentials.",
@@ -13,6 +13,20 @@
     "path": "./capability-catalog.json",
     "schemaVersion": "elegy-capability-catalog/v1",
     "readinessCommand": "elegy-accounts status --json"
+  },
+  "connections": {
+    "requirements": {
+      "mode": "none"
+    },
+    "provider": {
+      "path": "./connection-provider.json",
+      "schemaVersion": "elegy-connection-provider/v1"
+    }
+  },
+  "readiness": {
+    "stage": "implemented",
+    "path": "./readiness.json",
+    "schemaVersion": "elegy-readiness/v1"
   },
   "extensions": {
     "codex.plugin/v1": {

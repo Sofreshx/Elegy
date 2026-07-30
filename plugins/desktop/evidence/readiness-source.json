@@ -1,0 +1,1 @@
+{"scope":"source-checkout","result":"passed","commands":["cargo test --workspace --all-targets --all-features"],"limitations":["Desktop was exercised as a source-built adapter candidate, not as a packaged Elegy plugin.","No clean packaged installation or non-fixture desktop workflow was exercised."]}

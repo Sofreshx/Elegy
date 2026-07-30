@@ -1,27 +1,9 @@
-# elegy-opencode-workers
+# elegy-opencode-workers historical integration
 
-Marketplace wrapper for the external `elegy-opencode-workers` plugin.
+**Readiness: concept/blocked; not agent-routable.** This is a host-specific
+extension, not a portable Elegy plugin. The referenced checkout has an
+unresolved merge conflict, so packaging and a real worker task are unverified.
+The former marketplace manifest is removed. Do not install or invoke it through
+Elegy. See [readiness.json](readiness.json).
 
-Authority:
-
-```text
-implementation repo -> plugin archive -> this wrapper -> .elegy/marketplace.json
-```
-
-Implementation repository:
-
-```text
-https://github.com/Sofreshx/elegy-opencode-workers
-```
-
-This directory only provides public Elegy marketplace discovery metadata. Runtime
-files, skills, optional MCP descriptors, and binaries are supplied by the
-published plugin archive from the private implementation repo. The primary
-runtime contract is the bundled CLI.
-
-Windows Codex projection:
-
-```text
-bin/elegy-opencode-workers.exe
-.mcp.json command -> ./bin/elegy-opencode-workers.exe
-```
+Implementation repository: `https://github.com/Sofreshx/elegy-opencode-workers`.

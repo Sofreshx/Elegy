@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-contracts",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Contract export, validation, and project inspection are implemented over the currently supported descriptor contracts.",
+  "worksToday": ["Validates governed contract fixtures.", "Composes supported runtime state through the core facade."],
+  "limitations": ["Contract validity does not prove a provider, host, or end-user task works.", "No clean packaged installation or non-fixture installed task has been reviewed."],
+  "supportedEnvironments": ["Windows source build; portable Rust implementation"],
+  "installation": "Build from source with cargo build -p elegy-core.",
+  "invocation": "Run elegy-contracts with an explicit validation or inspection subcommand.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Core facade and fixture validation tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The workspace package compiled as part of the source suite."}
+  ]
+}

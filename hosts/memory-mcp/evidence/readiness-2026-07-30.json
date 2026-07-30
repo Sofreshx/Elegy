@@ -1,0 +1,7 @@
+{
+  "recordedAt": "2026-07-30",
+  "environment": "Windows workspace checkout",
+  "command": "cargo test -p elegy-codegraph -p elegy-configuration -p elegy-core -p elegy-host-mcp -p elegy-memory-mcp",
+  "result": "passed",
+  "scope": "Memory MCP library, HTTP/OAuth, stdio, bootstrap, regression, and benchmark-fixture tests passed; fixtures and in-process clients do not qualify as real-task evidence."
+}

@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-doc-practices",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Instruction package under review; its installed behavior has not been proven independently of this repository.",
+  "worksToday": ["Provides repository-local documentation guidance for maintainer inspection."],
+  "limitations": ["No clean-install or non-fixture task receipt exists.", "Not agent-routable through default Elegy discovery."],
+  "supportedEnvironments": ["Repository-local authoring"],
+  "installation": "No supported packaged installation is recorded.",
+  "invocation": "Inspect the source only; do not route agents to it by default.",
+  "evidence": []
+}

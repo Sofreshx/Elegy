@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-opencode-workers",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Blocked host extension: the referenced checkout has an unresolved merge conflict, so no current package can be verified.",
+  "worksToday": ["Retains readiness and historical integration metadata for maintainer inspection."],
+  "limitations": ["Not agent-routable.", "No qualifying clean checkout, clean installation, or non-fixture task receipt exists."],
+  "supportedEnvironments": ["None verified"],
+  "installation": "Do not install from the Elegy marketplace.",
+  "invocation": "No supported invocation is recorded.",
+  "evidence": []
+}

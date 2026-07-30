@@ -29,6 +29,13 @@ failure code with an audit correlation identifier.
 
 Opaque leases remain broker-internal on the new execution path.
 
+Connection lifecycle uses the separate `elegy-connection-control/v1`
+protocol. Its signed, replay-protected envelopes are bound to an installed host
+client and support list, connect-session status, verify, disconnect preview,
+and confirmed disconnect. Snapshots expose only explicit state, sanitized
+account summaries, adapter identity, verification/expiry times, and stable
+error codes. They cannot serialize credentials.
+
 ## Provider operations and policy
 
 Provider-pack v2 adds executable operation definitions with stable identifiers,
@@ -49,7 +56,10 @@ deferred.
 The existing MCP server remains the account-control surface. The plugin also
 ships a separate credential-free MCP action host that exposes trusted typed
 operations and calls the broker execution boundary. Holon consumes the same
-versioned protocol through its own adapter.
+versioned protocol through its own adapter. The portable
+`connection-provider.json` descriptor tells Holon how to locate that control
+boundary; Holon embeds or opens Account Center for human authentication and
+stores only opaque connection references.
 
 Existing encrypted accounts migrate unchanged. Legacy `codex-local` grants and
 leases are invalidated because they are not bound to an authenticated client.

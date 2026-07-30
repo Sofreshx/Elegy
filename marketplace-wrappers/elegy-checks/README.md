@@ -1,22 +1,10 @@
-# elegy-checks
+# elegy-checks historical integration
 
-Marketplace wrapper for the external `elegy-checks` plugin.
+**Readiness: implemented; not agent-routable.** The external source contains a
+repository-check runner, but Elegy classifies it as a tool, not a plugin. The
+former marketplace wrapper and manifest are deprecated and no default
+installation or invocation exists here. No clean installed real-repository task
+receipt is recorded. See [readiness.json](readiness.json).
 
-Authority:
-
-```text
-implementation repo -> plugin archive -> this wrapper -> .elegy/marketplace.json
-```
-
-This directory only provides public Elegy marketplace discovery metadata. Runtime
-files, skills, schemas, and binaries are supplied by the published plugin
-archive from the private implementation repo. The primary runtime contract is
-the bundled CLI.
-
-Release assets are published to the public `Sofreshx/Elegy` GitHub release
-namespace using the canonical external plugin names:
-
-```text
-elegy-checks-plugin-<target>.zip
-elegy-checks-plugin-<target>.zip.sha256
-```
+Keep this directory only for historical release context and readiness. New
+consumers should install the owning tool directly.

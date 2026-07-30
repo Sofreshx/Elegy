@@ -130,8 +130,19 @@
       "path": "docs/adr/2026-07-20-retire-central-skill-registry.md",
       "sourceOfTruth": "current-canon",
       "status": "accepted",
-      "summary": "Elegy plugins own and distribute their Agent Skills. The retired",
+      "summary": "Adapters may own optional Agent Skills, while standalone skills use host-native",
       "title": "Retire the central skill registry and resolver"
+    },
+    {
+      "authorityClass": "current",
+      "created": "2026-07-30",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Elegy documentation and discovery previously treated several different facts as if they proved the same thing:",
+      "title": "Adopt evidence-backed readiness and a system-adapter plugin boundary"
     },
     {
       "authorityClass": "current",
@@ -190,9 +201,9 @@
       "freshness": "unknown",
       "path": "docs/architecture/ecosystem-topology.md",
       "sourceOfTruth": "current-canon",
-      "status": "active",
-      "summary": "This document defines the current high-level organization of the Elegy ecosystem so docs, exports, and implementation ownership stay aligned with the repo that actually exists.",
-      "title": "Elegy Ecosystem Topology"
+      "status": "current",
+      "summary": "Elegy is a Rust toolkit and evidence-gated distribution layer for reusable",
+      "title": "Elegy ecosystem topology"
     },
     {
       "authorityClass": "current",
@@ -221,8 +232,8 @@
       "path": "docs/architecture/skill-core-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "Agent Skills are standard SKILL.md files. Plugin-owned skills live under",
-      "title": "Skill Core"
+      "summary": "Agent skills are standard `SKILL.md` instruction packages.",
+      "title": "Skill placement"
     },
     {
       "authorityClass": "current",
@@ -243,6 +254,16 @@
       "status": "active",
       "summary": "This glossary defines the canonical terms used across the Elegy umbrella repo.",
       "title": "Elegy Terminology"
+    },
+    {
+      "authorityClass": "other",
+      "docKind": "reference",
+      "freshness": "unknown",
+      "path": "docs/deprecations.md",
+      "sourceOfTruth": "unclassified",
+      "status": "current",
+      "summary": "This page records labels and distribution forms that agents must no longer",
+      "title": "Elegy deprecations and reclassification"
     },
     {
       "authorityClass": "other",
@@ -276,13 +297,33 @@
     },
     {
       "authorityClass": "other",
+      "docKind": "generated",
+      "freshness": "unknown",
+      "path": "docs/readiness.md",
+      "sourceOfTruth": "unclassified",
+      "status": "current",
+      "summary": "This file is generated from the release catalog, adapter manifests, and canonical readiness artifacts. `surface class` states what a component is; `kind` only controls build mechanics. `implemented` means source behavior and tests exist, not that a clean installation is usable. Default agent discovery includes only `usable` and `production` active adapter plugins.",
+      "title": "Elegy ecosystem readiness"
+    },
+    {
+      "authorityClass": "other",
       "docKind": "reference",
       "freshness": "unknown",
       "path": "docs/repo-layout.md",
       "sourceOfTruth": "unclassified",
       "status": "active",
-      "summary": "Elegy separates shipped surfaces by role. Directory placement is part of the",
+      "summary": "Elegy records every distributed surface's role in",
       "title": "Repository Layout"
+    },
+    {
+      "authorityClass": "research",
+      "docKind": "research",
+      "freshness": "unknown",
+      "path": "docs/research/historical-monetization-infrastructure.md",
+      "sourceOfTruth": "research-non-canon",
+      "status": "exploratory",
+      "summary": "> This is retained research, not current architecture or distribution policy.",
+      "title": "Historical monetization infrastructure proposal"
     },
     {
       "authorityClass": "research",
@@ -335,18 +376,18 @@
       "path": "docs/specs/capability-catalog-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "`elegy-capability-catalog/v1` is the shared governed contract for plugin",
+      "summary": "A capability catalog describes implemented invocation shape. It is not evidence",
       "title": "Capability Catalog V1"
     },
     {
       "authorityClass": "current",
       "docKind": "spec",
       "freshness": "unknown",
-      "path": "docs/specs/monetization-infrastructure.md",
+      "path": "docs/specs/plugin-connections-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "Define the create → distribute → sell → self-use infrastructure for monetizable",
-      "title": "Monetization infrastructure"
+      "summary": "Authentication is a host lifecycle, not an LLM task. `elegy-plugin/v2`",
+      "title": "Plugin Connections V1"
     },
     {
       "authorityClass": "current",
@@ -357,6 +398,17 @@
       "status": "active",
       "summary": "The marketplace root contains `.elegy/marketplace.json`.",
       "title": "Plugin marketplace v1"
+    },
+    {
+      "authorityClass": "current",
+      "created": "2026-07-30",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/readiness-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "Each distributed surface owns one JSON artifact with `schemaVersion: elegy-readiness/v1`. Plugin manifests reference it through `readiness`; standalone entries reference it from `distribution/surfaces.json`.",
+      "title": "Evidence-backed readiness v1"
     }
   ],
   "entrypoints": [
@@ -385,20 +437,25 @@
     "docs/adr/2026-07-07-adopt-repo-surface-taxonomy.md",
     "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
     "docs/adr/2026-07-20-retire-central-skill-registry.md",
+    "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",
-    "docs/specs/monetization-infrastructure.md",
+    "docs/specs/plugin-connections-v1.md",
     "docs/specs/plugin-marketplace-v1.md",
+    "docs/specs/readiness-v1.md",
     "docs/architecture/README.md",
     "docs/plans/automation-portability-handoff.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
+    "docs/research/historical-monetization-infrastructure.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",
     "docs/agent-integration.md",
     "docs/distribution.md",
+    "docs/deprecations.md",
     "docs/ops/main-ruleset.md",
     "docs/repo-layout.md",
-    "docs/spec-baseline.md"
+    "docs/spec-baseline.md",
+    "docs/readiness.md"
   ],
   "schemaVersion": "documentation-bundle/v1"
 }

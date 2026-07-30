@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-skill-authoring",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Instruction package whose installed task behavior has not yet been proven.",
+  "worksToday": ["Provides repository-local skill authoring guidance for inspection."],
+  "limitations": ["No clean-install or non-fixture authoring task receipt exists.", "Not agent-routable through default Elegy discovery."],
+  "supportedEnvironments": ["Repository-local authoring"],
+  "installation": "No supported packaged installation is recorded.",
+  "invocation": "Inspect the source only; do not route by default.",
+  "evidence": []
+}

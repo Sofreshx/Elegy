@@ -6,6 +6,8 @@ version: "2.0"
 
 # Elegy Skill Authoring
 
+> **Readiness: concept; not agent-routable.** This instruction package has no reviewed clean-install and non-fixture authoring receipt.
+
 Doctrine for drafting, auditing, and fixing Elegy skills.
 
 ## Capabilities

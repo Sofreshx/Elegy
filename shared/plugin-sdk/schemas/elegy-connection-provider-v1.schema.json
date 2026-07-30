@@ -1,0 +1,48 @@
+{
+  "$defs": {
+    "ElegyConnectionProviderInvocation": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "executable",
+        "command"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "Host-neutral descriptor for a plugin that brokers connection lifecycle.\n\nThe invocation exposes connection control, not credentials. Hosts retain\nresponsibility for authentication UX and secure credential storage.",
+  "properties": {
+    "controlProtocol": {
+      "type": "string"
+    },
+    "id": {
+      "type": "string"
+    },
+    "invocation": {
+      "$ref": "#/$defs/ElegyConnectionProviderInvocation"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "id",
+    "controlProtocol",
+    "invocation"
+  ],
+  "title": "ElegyConnectionProviderV1",
+  "type": "object"
+}

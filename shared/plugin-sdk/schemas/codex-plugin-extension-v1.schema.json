@@ -1,5 +1,17 @@
 {
   "$defs": {
+    "CodexConnectionBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "type": "object"
+    },
     "CodexPluginInterface": {
       "additionalProperties": true,
       "properties": {
@@ -123,6 +135,15 @@
       },
       "type": [
         "array",
+        "null"
+      ]
+    },
+    "connectionBindings": {
+      "additionalProperties": {
+        "$ref": "#/$defs/CodexConnectionBinding"
+      },
+      "type": [
+        "object",
         "null"
       ]
     },

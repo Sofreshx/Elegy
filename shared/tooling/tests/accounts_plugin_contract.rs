@@ -18,15 +18,31 @@ fn accounts_plugin_is_a_portable_bundled_capability() {
     )
     .expect("accounts plugin manifest should be JSON");
 
-    assert_eq!(manifest["schemaVersion"], "elegy-plugin/v1");
+    assert_eq!(manifest["schemaVersion"], "elegy-plugin/v2");
     assert_eq!(manifest["name"], "elegy-accounts");
     assert_eq!(manifest["skills"], "./skills/");
+    assert_eq!(manifest["connections"]["requirements"]["mode"], "none");
+    assert_eq!(
+        manifest["connections"]["provider"]["schemaVersion"],
+        "elegy-connection-provider/v1"
+    );
     assert_eq!(
         manifest["extensions"]["codex.plugin/v1"]["mcpServers"],
         "./.mcp.json"
     );
     assert!(manifest.get("apps").is_none());
     assert!(!plugin.join(".app.json").exists());
+
+    let provider: Value = serde_json::from_str(
+        &fs::read_to_string(plugin.join("connection-provider.json"))
+            .expect("connection provider descriptor should exist"),
+    )
+    .expect("connection provider descriptor should be JSON");
+    assert_eq!(provider["controlProtocol"], "elegy-connection-control/v1");
+    assert_eq!(
+        provider["invocation"]["command"],
+        serde_json::json!(["broker"])
+    );
 
     let mcp: Value = serde_json::from_str(
         &fs::read_to_string(plugin.join(".mcp.json")).expect("MCP descriptor should exist"),
@@ -55,6 +71,7 @@ fn accounts_plugin_is_a_portable_bundled_capability() {
     for required in [
         "skills/elegy-manage-accounts/SKILL.md",
         "capability-catalog.json",
+        "connection-provider.json",
         "ui/account-center/index.html",
         "browser/brave/manifest.json",
         "DISTRIBUTION.md",

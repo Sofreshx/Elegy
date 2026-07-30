@@ -5,8 +5,9 @@ use elegy_core::{
 };
 use elegy_documentation::{
     documentation_check, documentation_export_bundle, documentation_export_llms,
-    documentation_init, documentation_inspect, documentation_map, DocumentationCheckResult,
-    DocumentationError, DocumentationExportResult, DocumentationInitResult, DocumentationMapResult,
+    documentation_export_readiness, documentation_init, documentation_inspect, documentation_map,
+    DocumentationCheckResult, DocumentationError, DocumentationExportResult,
+    DocumentationInitResult, DocumentationMapResult,
 };
 use serde::Serialize;
 use std::path::PathBuf;
@@ -80,6 +81,12 @@ enum ExportCommand {
         #[arg(long)]
         output: PathBuf,
     },
+    Readiness {
+        #[arg(long)]
+        project: PathBuf,
+        #[arg(long)]
+        output: PathBuf,
+    },
 }
 
 #[derive(Clone, Debug)]
@@ -137,6 +144,9 @@ fn run() -> Result<ExitCode, serde_json::Error> {
             }
             ExportCommand::Bundle { project, output } => {
                 execute_export_bundle(project, output, &context)
+            }
+            ExportCommand::Readiness { project, output } => {
+                execute_export_readiness(project, output, &context)
             }
         },
     }
@@ -199,6 +209,17 @@ fn execute_export_bundle(
     match documentation_export_bundle(&project, &output) {
         Ok(result) => emit_export_result(vec!["export", "bundle"], result, context),
         Err(error) => emit_error(vec!["export", "bundle"], error, context),
+    }
+}
+
+fn execute_export_readiness(
+    project: PathBuf,
+    output: PathBuf,
+    context: &MachineContext,
+) -> Result<ExitCode, serde_json::Error> {
+    match documentation_export_readiness(&project, &output) {
+        Ok(result) => emit_export_result(vec!["export", "readiness"], result, context),
+        Err(error) => emit_error(vec!["export", "readiness"], error, context),
     }
 }
 

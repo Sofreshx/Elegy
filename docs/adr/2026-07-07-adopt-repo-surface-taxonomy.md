@@ -37,10 +37,17 @@ Elegy will use top-level directories that match surface roles:
 `distribution/surfaces.json` remains the canonical release catalog. Plugin
 manifests remain the canonical package metadata for installable plugin roots.
 
+Amendment (2026-07-30): filesystem placement no longer establishes product
+class. `elegy-surfaces/v3` separates build `kind` from `surfaceClass` and
+`lifecycle`. Several tools retain historical `plugins/` paths to avoid coupling
+the semantic cleanup to a broad crate move. New surfaces should use the
+role-specific directory, but agents must classify existing ones from the
+catalog.
+
 ## Consequences
 
-- Existing directories under `plugins/` need migration into the role-specific
-  roots.
+- Existing historical directories may move later as a mechanical cleanup; the
+  move is not required to enforce plugin eligibility.
 - Validation can check directory kind, catalog entries, and local artifact
   hygiene without inferring intent from names.
 - README and architecture docs can route contributors to one authoritative

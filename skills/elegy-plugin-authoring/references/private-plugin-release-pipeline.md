@@ -1,4 +1,10 @@
-# Private Plugin Release Pipeline
+# Deprecated Private Plugin Release Pipeline
+
+> Deprecated: this public-wrapper pipeline is retained only to explain old
+> releases. Do not use it for a new integration. Current Elegy distribution
+> requires one independently qualifying active adapter surface with a typed
+> capability catalog; it does not publish a wrapper that substitutes metadata
+> for verified runtime behavior.
 
 How to ship closed-source Elegy plugins from a private repo to the public
 `Sofreshx/Elegy` marketplace. Two pipelines are supported. Prefer the
@@ -112,7 +118,7 @@ gh release view main-snapshot --repo Sofreshx/Elegy --json assets | jq '.assets[
 When creating a new private plugin repo for the Elegy marketplace:
 
 1. **Impl repo**: Create a private GitHub repo with the Rust crate, skills, schemas, `.elegy-plugin/plugin.json`, `.codex-plugin/plugin.json`.
-2. **Packaging scripts**: Add `scripts/validate.ps1` and `scripts/package.ps1` (mirror an existing private plugin like `elegy-checks` or `elegy-client-radar`).
+2. **Packaging scripts**: Add `scripts/validate.ps1` and `scripts/package.ps1` for a qualifying system adapter (mirror `elegy-checks` only when the target exposes reusable executable or platform operations).
 3. **Release workflow**: Add `.github/workflows/release-plugin.yml` (mirror an existing private plugin). The workflow references `secrets.ELEGY_RELEASE_TOKEN`.
 4. **CI workflow**: Add `.github/workflows/ci.yml` for basic fmt/clippy/test on push/PR.
 5. **Elegy wrapper**: Add `marketplace-wrappers/<plugin-name>/` in the public Elegy repo with `.elegy-plugin/plugin.json` (Proprietary license, `elegy.marketplace-wrapper/v1` + `codex.plugin/v1` extensions) and `README.md`.
@@ -135,5 +141,3 @@ When creating a new private plugin repo for the Elegy marketplace:
 | Repo | Secret set | Pipeline |
 |---|---|---|
 | Sofreshx/elegy-checks | Yes (ELEGY_RELEASE_TOKEN) | A (token-based CI) |
-| Sofreshx/elegy-client-radar | Pending | A (token-based CI) |
-| Sofreshx/elegy-ai-radar | Pending | A (token-based CI) |

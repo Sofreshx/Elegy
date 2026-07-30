@@ -1,0 +1,1 @@
+{"scope":"source-checkout","result":"passed","commands":["cargo test --workspace --all-targets --all-features"],"limitations":["Descriptor tooling was exercised as a source-built tool, not as an Elegy plugin.","No clean installed live-server task was exercised."]}

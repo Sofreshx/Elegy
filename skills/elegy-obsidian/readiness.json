@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-obsidian",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Potentially valid system-adapter skill, but its referenced Obsidian runtime and installed task have not been proven.",
+  "worksToday": ["Provides instructions that can be inspected by maintainers."],
+  "limitations": ["Does not prove the required Obsidian CLI is present or compatible.", "No clean-install or non-fixture vault task receipt exists.", "Not agent-routable by default."],
+  "supportedEnvironments": ["None verified"],
+  "installation": "No supported packaged installation is recorded.",
+  "invocation": "Do not invoke through default Elegy discovery.",
+  "evidence": []
+}

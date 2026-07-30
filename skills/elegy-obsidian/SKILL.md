@@ -8,6 +8,8 @@ disable-model-invocation: true
 ---
 
 > **Invocation posture**: user-invoked only. This skill wraps the Obsidian CLI and can mutate vault content (create, append, patch, move, delete, task toggle). It must not be auto-invoked by the model.
+>
+> **Readiness: concept; not agent-routable.** The required Obsidian runtime and an installed non-fixture vault task have not been verified.
 
 # Elegy Obsidian
 
@@ -209,18 +211,15 @@ Side-effecting commands (`create`, `append`, `patch`, `move`, `delete`, `daily:a
 | Artifact | Location | Role |
 |---|---|---|
 | **SKILL.md** (canonical) | `skills/elegy-obsidian/SKILL.md` | Governed source of truth for the skill |
-| **plugin.json** (canonical) | `skills/elegy-obsidian/.elegy-plugin/plugin.json` | Plugin package manifest |
-| **Surface registration** | `distribution/surfaces.json` (`elegy-obsidian` entry) | Release catalog entry |
-| **Marketplace packaging** | `.elegy/marketplace.json` (`elegy-obsidian` entry) | Install/archive packaging |
+| **Surface registration** | `distribution/surfaces.json` (`elegy-obsidian` entry) | Classification and readiness routing |
 | **CLI catalog** (canonical) | `skills/elegy-obsidian/references/obsidian-cli-catalog.md` | Full command/capability reference |
 | **Consumer-side definition** (mirror) | `instruction-engine/contracts/elegy/fixtures/skill-definition-v2.elegy-obsidian.json` | Governed definition for consumer repo |
 | **Consumer-side discovery** (mirror) | `instruction-engine/contracts/elegy/fixtures/skill-discovery-index.elegy-obsidian.json` | Discovery projection for consumer repo |
 | **Consumer-side SKILL.md** (mirror) | `instruction-engine/catalog-assets/shared-skills/elegy-obsidian/SKILL.md` | Consumer repo mirror of this skill |
 
-Hosts discover this skill from the installed package's
-`.elegy-plugin/plugin.json` and its declared `SKILL.md`. No central Elegy
-registry or separate `contracts/fixtures/` tree participates in skill-package
-discovery.
+Hosts may install this source through their native skill mechanism. Elegy does
+not package or route it as a plugin, and no central registry participates in
+skill discovery.
 
 ## Future Work (not in foundation)
 

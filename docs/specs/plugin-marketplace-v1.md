@@ -15,25 +15,26 @@ The marketplace root contains `.elegy/marketplace.json`.
   "schemaVersion": "elegy-marketplace/v1",
   "name": "elegy",
   "interface": { "displayName": "Elegy" },
-  "plugins": [
-    {
-      "name": "elegy-planning",
-      "source": { "source": "local", "path": "./plugins/planning" },
-      "category": "Productivity",
-      "artifacts": [
-        {
-          "target": "x86_64-pc-windows-msvc",
-          "url": "https://example.invalid/plugin.zip",
-          "checksumUrl": "https://example.invalid/plugin.zip.sha256"
-        }
-      ]
-    }
-  ]
+  "plugins": []
 }
 ```
 
 Rules:
 
+- Only a surface with `surfaceClass: adapter-plugin`, `lifecycle: active`, and
+  `packaging: plugin` is eligible for this marketplace.
+- An eligible adapter must declare a typed `capabilityCatalog`. Skills are
+  optional guidance and MCP is an optional projection; neither qualifies a
+  surface by itself.
+- An empty marketplace is valid and expected when no surface has qualifying
+  `usable` or `production` evidence.
+- Generation, list, search, installation, update, and Codex export omit or
+  reject non-routable surfaces by default.
+- `--include-incubating` permits explicit maintainer inspection.
+  `--allow-incubating` permits an explicit install, update, or export; it never
+  changes recorded readiness.
+- Schema validity, packaging, fixture conformance, and generated projections
+  cannot add a surface to default discovery.
 - Plugin order is presentation order.
 - `source.path` stays inside the marketplace root and resolves to a directory
   containing `.elegy-plugin/plugin.json`.
@@ -43,10 +44,9 @@ Rules:
 - The archive manifest name and version must match the public wrapper manifest.
 - A `distribution/surfaces.json` surface may set `artifactBaseUrl` to publish
   plugin archives from an external release repository.
-- Skill-only plugin packages publish one `target: "any"` artifact named
-  `<plugin-name>-plugin-any.zip`; the archive has no `bin/` directory.
-- External wrapper surfaces with `marketplacePublished: false` are drafts. The
-  generated marketplace omits them until the public archives exist.
+- Skill-only bundles and host-specific wrappers are not Elegy marketplace
+  plugins. A target host may package a skill natively without changing its
+  Elegy `surfaceClass`.
 - Installation normalizes legacy `skills/` and `mcpServers` paths to `./` form;
   authoring and generated manifests remain strict.
 - Extraction stages files before atomically publishing the install directory.
@@ -57,15 +57,12 @@ Rules:
 elegy-plugin-packaging marketplace generate --project .
 elegy-plugin-packaging marketplace validate --source .
 elegy-plugin-packaging marketplace list --source . --json
-elegy-plugin-packaging marketplace search planning --source . --json
-elegy-plugin-packaging marketplace install elegy-planning --source .
-elegy-plugin-packaging marketplace status --source . --plugin elegy-planning --json
-elegy-plugin-packaging marketplace update elegy-planning --source . --json
-elegy-plugin-packaging marketplace monitor --source . --plugin elegy-planning --jsonl
+elegy-plugin-packaging marketplace search accounts --source . --json
 elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --output ./dist/codex
 elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --output ./dist/codex --check
 elegy-plugin-packaging marketplace export-codex --source . --target x86_64-pc-windows-msvc --artifact-dir ./artifacts/distribution --output ./dist/codex
-elegy-plugin-packaging marketplace export-codex --source . --plugin elegy-opencode-workers --target x86_64-pc-windows-msvc --output ./dist/codex
+elegy-plugin-packaging marketplace list --source . --include-incubating --json
+elegy-plugin-packaging marketplace export-codex --source . --plugin <incubating-adapter> --allow-incubating --target x86_64-pc-windows-msvc --artifact-dir ./artifacts/distribution --output ./dist/codex
 ```
 
 `--source` accepts a local root or an HTTPS base URL. Remote roots must serve
@@ -103,13 +100,16 @@ validation fails closed on missing artifacts, checksum failures, identity
 mismatches, unsupported targets, or stale generated projections. Agents should
 not poll freshness during normal turns.
 
-## Closed-source wrappers
+## Historical closed-source wrappers
+
+This wrapper form is deprecated for current Elegy distribution. The section is
+retained only so old archives can be inspected; it is not an authoring pattern.
 
 Public wrappers may use `license: "Proprietary"` and omit `repository`. Put
 private behavior in compiled artifacts or a hosted service. Do not put secrets
 in manifests, skills, scripts, app descriptors, or archives.
 
-Discovery-only wrappers must declare:
+Legacy discovery-only wrappers declared:
 
 ```json
 {

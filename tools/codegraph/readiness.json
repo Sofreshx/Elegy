@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-codegraph",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Source extraction and graph-query behavior are implemented and tested in the workspace.",
+  "worksToday": ["Extracts Rust and TypeScript source into a graph.", "Runs symbol, neighbor, impact, and summary queries over that graph."],
+  "limitations": ["No clean packaged installation or non-fixture installed task has been reviewed.", "Language and parser coverage is narrower than general code intelligence."],
+  "supportedEnvironments": ["Windows source build; portable Rust implementation"],
+  "installation": "Build from source with cargo build -p elegy-codegraph.",
+  "invocation": "Run elegy-codegraph extract followed by elegy-codegraph query.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Unit and CLI integration tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The workspace package compiled as part of the source suite."}
+  ]
+}

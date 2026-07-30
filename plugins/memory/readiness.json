@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-memory",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "The SQLite memory store, retrieval, correction, provenance, and optional provider paths exist in source; installed cross-session value is not yet proven.",
+  "worksToday": ["Persists and searches scoped local memories.", "Supports correction, contradiction, consolidation, export, and optional embeddings."],
+  "limitations": ["No clean installed cross-host task receipt exists.", "Provider-backed behavior requires separate configuration and evidence."],
+  "supportedEnvironments": ["Windows, Linux, and macOS source builds"],
+  "installation": "Build from source with cargo build -p elegy-memory.",
+  "invocation": "Run elegy-memory --help and configure an explicit local database scope.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

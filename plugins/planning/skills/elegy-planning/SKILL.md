@@ -479,8 +479,10 @@ Expected: `status: "ok"`, `data.scopeMode = "all"`, `data.scopeKey = "all"`, fin
 
 ## References
 
-- Governed plugin manifest: `plugins/planning/.elegy-plugin/plugin.json`.
-- Capability catalog: `plugins/planning/capability-catalog.json`.
+- Surface classification and readiness: `distribution/surfaces.json` and
+  `plugins/planning/readiness.json`.
+- Tool capability catalog: `plugins/planning/capability-catalog.json`. The
+  catalog describes executable operations; it does not make Planning a plugin.
 - Architecture: `plugins/planning/docs/architecture/ARCHITECTURE.md`.
 - MVP boundary: `plugins/planning/docs/architecture/mvp-scope.md`.
 - Spec: `plugins/planning/docs/specs/index.md`.

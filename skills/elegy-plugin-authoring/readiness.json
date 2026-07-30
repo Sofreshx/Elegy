@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-plugin-authoring",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Authoring guidance under revision to enforce adapter eligibility and evidence-backed readiness.",
+  "worksToday": ["Provides source guidance for maintainers reviewing plugin structure."],
+  "limitations": ["No installed authoring task receipt exists.", "Must not be treated as proof that a generated plugin is usable.", "Not agent-routable by default."],
+  "supportedEnvironments": ["Repository-local authoring"],
+  "installation": "No supported packaged installation is recorded.",
+  "invocation": "Inspect the source only until qualifying receipts exist.",
+  "evidence": []
+}

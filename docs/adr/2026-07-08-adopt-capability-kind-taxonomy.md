@@ -10,6 +10,31 @@ owner: elegy-core
 
 Accepted.
 
+## 2026-07-30 readiness and eligibility amendment
+
+Capability kinds classify invocation shape; they do not establish that a
+surface is a qualifying plugin or a usable product. Default discovery joins the
+catalog with `elegy-readiness/v1` and exposes only `usable` or `production`
+surfaces.
+
+New adapter kinds and generalized catalog fields are frozen until two
+independent working consumers demonstrate the same stable boundary. Domain and
+business logic does not become a plugin by declaring a capability kind.
+
+## 2026-07-23 amendment
+
+The catalog's `app-binding` shape remains a v1 compatibility contract, but it
+is no longer connection or authentication authority. Treating a portable
+service slug such as `github` as a Codex connector ID was incorrect: Codex app
+IDs are registered, opaque host identifiers, and connection lifecycle belongs
+to the host.
+
+`elegy-plugin/v2` therefore moves requirements to the
+`elegy-plugin-connections/v1` declaration and maps them to Codex through
+explicit `connectionBindings`. The v2 exporter never derives `.app.json` from
+catalog slugs. Marketplace publication requires v2. See
+[Plugin Connections V1](../specs/plugin-connections-v1.md).
+
 ## Context
 
 Elegy's `elegy-capability-catalog/v1` currently models every capability as a

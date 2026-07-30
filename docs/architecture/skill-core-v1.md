@@ -1,24 +1,26 @@
 ---
-title: Skill Core
+title: Skill placement
 status: active
 owner: elegy-core
 doc_kind: reference
 ---
 
-# Skill Core
+# Skill placement
 
-Agent Skills are standard SKILL.md files. Plugin-owned skills live under
-`plugins/<name>/skills/<skill-id>/SKILL.md`; standalone skill-only packages live at
-the repo root (`<skill-id>/SKILL.md`). Each plugin manifest declares its own skill
-directory, and a host discovers those skills when that plugin is installed or
-projected for the host.
+Agent skills are standard `SKILL.md` instruction packages.
 
-Elegy does not maintain a central skill registry, search index, or cross-plugin
-resolver. Those surfaces cannot accurately represent independently installed,
-versioned, or host-specific plugin sets. Plugin verification validates package
-shape and declared skill paths; the host owns discovery and routing over its
-installed skills.
+- An active adapter may bundle optional skills under
+  `plugins/<name>/skills/<skill-id>/SKILL.md`.
+- Standalone Elegy-authored guidance lives under
+  `skills/<skill-id>/SKILL.md`.
+- A standalone skill is installed through the target host's native skill
+  mechanism. It is not an Elegy marketplace plugin.
 
-Skills do not project capabilities, MCP tools, invocation templates, or
-side-effect metadata. Those contracts remain with the owning plugin and host
-projection.
+Elegy does not maintain a central skill registry or cross-host resolver. A
+skill can describe a repeatable workflow and call tools the host already has;
+it does not prove that a runtime, connector, authentication flow, typed
+capability, or provider operation exists.
+
+Adapter verification checks bundled skill shape only as one optional component
+of the package. Executable discovery authority remains the adapter's typed
+capability catalog. MCP and host plugin layouts are projections.

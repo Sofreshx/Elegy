@@ -7228,8 +7228,8 @@ fn skill_references_existing_contract_files() {
     }
 
     for relative in [
-        ".elegy-plugin/plugin.json",
         "capability-catalog.json",
+        "readiness.json",
         "docs/architecture/ARCHITECTURE.md",
         "docs/architecture/mvp-scope.md",
         "docs/specs/index.md",

@@ -27,9 +27,9 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter" or .kind == "skill-package") | {surface_name: .name, surface_kind: .kind, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // ""), surface_targets: (.targets // [])}]' distribution/surfaces.json)"
+          surfaces="$(jq -c '[.surfaces[] | select(.kind == "cli" or .kind == "bundled-plugin" or .kind == "host-adapter") | {surface_name: .name, surface_kind: .kind, surface_package: (.package // .name), surface_packaging: (.packaging // "flat"), plugin_root: (.pluginRoot // ""), surface_targets: (.targets // [])}]' distribution/surfaces.json)"
           targets='[{"runner":"ubuntu-24.04","target":"x86_64-unknown-linux-gnu"},{"runner":"windows-2022","target":"x86_64-pc-windows-msvc"},{"runner":"macos-15","target":"aarch64-apple-darwin"}]'
-          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $surfaces[] as $surface | if $surface.surface_kind == "skill-package" then $surface + {runner:"ubuntu-24.04",target:"any"} else ($targets[] as $target | select(($surface.surface_targets | length) == 0 or any($surface.surface_targets[]; . == $target.target)) | $surface + $target) end | del(.surface_targets) ]')"
+          matrix="$(jq -nc --argjson surfaces "$surfaces" --argjson targets "$targets" '[ $surfaces[] as $surface | $targets[] as $target | select(($surface.surface_targets | length) == 0 or any($surface.surface_targets[]; . == $target.target)) | $surface + $target | del(.surface_targets) ]')"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
 
   build:
@@ -45,10 +45,6 @@ jobs:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
       - uses: dtolnay/rust-toolchain@1.96.1
-        if: ${{ matrix.surface_kind == 'skill-package' }}
-
-      - uses: dtolnay/rust-toolchain@1.96.1
-        if: ${{ matrix.surface_kind != 'skill-package' }}
         with:
           targets: ${{ matrix.target }}
 
@@ -57,7 +53,6 @@ jobs:
           workspaces: . -> target
 
       - name: cargo build --release
-        if: ${{ matrix.surface_kind != 'skill-package' }}
         working-directory: .
         run: cargo build --release --target ${{ matrix.target }} -p ${{ matrix.surface_package }}
 
@@ -73,7 +68,7 @@ jobs:
           fi
           binary_name="${{ matrix.surface_name }}${ext}"
           binary_path="target/${{ matrix.target }}/release/${binary_name}"
-          if [[ "${{ matrix.surface_kind }}" != "skill-package" && ! -f "$binary_path" ]]; then
+          if [[ ! -f "$binary_path" ]]; then
             echo "Missing build output: $binary_path" >&2
             exit 1
           fi
@@ -85,19 +80,12 @@ jobs:
             fi
             asset_name="${{ matrix.surface_name }}-plugin-${{ matrix.target }}.zip"
             asset_path="artifacts/distribution/${asset_name}"
-            if [[ "${{ matrix.surface_kind }}" == "skill-package" ]]; then
-              cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
-                pack \
-                --plugin "$plugin_root" \
-                --output "$asset_path"
-            else
-              cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
-                pack \
-                --plugin "$plugin_root" \
-                --output "$asset_path" \
-                --binary "$binary_path" \
-                --binary-name "bin/${binary_name}"
-            fi
+            cargo run --quiet -p elegy-tooling --bin elegy-plugin-packaging -- \
+              pack \
+              --plugin "$plugin_root" \
+              --output "$asset_path" \
+              --binary "$binary_path" \
+              --binary-name "bin/${binary_name}"
           else
             asset_name="${{ matrix.surface_name }}-${{ matrix.target }}${ext}"
             asset_path="artifacts/distribution/${asset_name}"
@@ -207,7 +195,7 @@ jobs:
 
           mapfile -t wrapper_prefixes < <(
             jq -r '.surfaces[]
-              | select(.kind == "external-plugin-wrapper" and (.marketplacePublished != false))
+              | select(.kind == "external-plugin-wrapper" and .surfaceClass == "adapter-plugin" and .lifecycle == "active" and .packaging == "plugin" and (.marketplacePublished != false))
               | .name + "-plugin-"' distribution/surfaces.json
           )
 
@@ -315,7 +303,7 @@ jobs:
             elif [[ "$base" =~ ^(.+)-plugin-(any|x86_64-pc-windows-msvc|x86_64-unknown-linux-gnu|aarch64-apple-darwin)\.zip$ ]]; then
               archive_family="${BASH_REMATCH[1]}"
               target="${BASH_REMATCH[2]}"
-              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select((.kind == "cli" or .kind == "bundled-plugin" or .kind == "skill-package" or (.kind == "external-plugin-wrapper" and (.marketplacePublished != false))) and .name == $family) | .name' distribution/surfaces.json)"
+              surface_name="$(jq -r --arg family "$archive_family" '.surfaces[] | select(.surfaceClass == "adapter-plugin" and .lifecycle == "active" and .packaging == "plugin" and .name == $family) | .name' distribution/surfaces.json)"
               if [[ -z "$surface_name" ]]; then
                 echo "Could not resolve plugin-packaged surface for archive family: $archive_family" >&2
                 exit 1
@@ -383,7 +371,7 @@ jobs:
           set -euo pipefail
           release_id="$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${RELEASE_TAG}" --jq '.id')"
           mapfile -t external_plugin_prefixes < <(
-            jq -r '.surfaces[] | select(.kind == "external-plugin-wrapper" and (.marketplacePublished != false)) | .name + "-plugin-"' distribution/surfaces.json
+            jq -r '.surfaces[] | select(.kind == "external-plugin-wrapper" and .surfaceClass == "adapter-plugin" and .lifecycle == "active" and .packaging == "plugin" and (.marketplacePublished != false)) | .name + "-plugin-"' distribution/surfaces.json
           )
           while IFS=$'\t' read -r asset_id asset_name; do
             preserve_external=false

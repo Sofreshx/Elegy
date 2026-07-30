@@ -1,0 +1,1 @@
+{"scope":"source-checkout","result":"passed","commands":["cargo test --workspace --all-targets --all-features"],"limitations":["Planning was exercised as a source-built tool, not as an Elegy plugin.","No clean packaged, cross-session agent task was exercised."]}

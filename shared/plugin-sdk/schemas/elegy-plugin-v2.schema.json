@@ -1,0 +1,239 @@
+{
+  "$defs": {
+    "ElegyPluginCapabilityCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "readinessCommand": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnectionProvider": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnectionRequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnections": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyPluginConnectionProvider"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirements": {
+          "$ref": "#/$defs/ElegyPluginConnectionRequirements"
+        }
+      },
+      "required": [
+        "requirements"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginReadiness": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "stage": {
+          "$ref": "#/$defs/ElegyReadinessStage"
+        }
+      },
+      "required": [
+        "stage",
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginV1Author": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "ElegyReadinessStage": {
+      "enum": [
+        "concept",
+        "implemented",
+        "usable",
+        "production"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "author": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginV1Author"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "capabilityCatalog": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginCapabilityCatalog"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "connections": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginConnections"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "extensions": {
+      "additionalProperties": true,
+      "type": [
+        "object",
+        "null"
+      ]
+    },
+    "license": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "mcpServers": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "readiness": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginReadiness"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "repository": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schemaVersion": {
+      "const": "elegy-plugin/v2"
+    },
+    "skills": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "version",
+    "description",
+    "capabilityCatalog",
+    "connections",
+    "readiness"
+  ],
+  "title": "ElegyPluginV1",
+  "type": "object"
+}

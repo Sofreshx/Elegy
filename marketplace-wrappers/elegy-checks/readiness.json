@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-checks",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "The external repository contains a working local check runner and evidence store, but no reviewed clean-install task proof is recorded here.",
+  "worksToday": ["Records the external repository-check tool and its historical release context."],
+  "limitations": ["The implementation is external to this repository.", "No qualifying installed archive and real repository task receipt is recorded here."],
+  "supportedEnvironments": ["x86_64-pc-windows-msvc source builds"],
+  "installation": "Build the external elegy-checks repository from source.",
+  "invocation": "Run elegy-checks run --repo <path> --profile <name> --json.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "External source tests passed during the readiness audit."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The external tool package passed its recorded source verification."}
+  ]
+}

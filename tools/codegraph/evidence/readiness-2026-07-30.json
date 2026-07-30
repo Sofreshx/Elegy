@@ -1,0 +1,7 @@
+{
+  "recordedAt": "2026-07-30",
+  "environment": "Windows workspace checkout",
+  "command": "cargo test -p elegy-codegraph -p elegy-configuration -p elegy-core -p elegy-host-mcp -p elegy-memory-mcp",
+  "result": "passed",
+  "scope": "32 codegraph unit tests and 14 CLI/integration tests passed; this is source evidence, not a clean-install or real-task receipt."
+}

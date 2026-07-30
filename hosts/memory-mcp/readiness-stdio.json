@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-memory-mcp-stdio",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "The local stdio adapter exposes the memory tool set and has source-level transport and degraded-mode tests.",
+  "worksToday": ["Initializes over stdio and lists the expected memory tools.", "Supports an explicit degraded mode when embeddings are unavailable."],
+  "limitations": ["Normal operation depends on a reachable compatible Ollama model.", "No clean-installed task through a real external MCP client has been reviewed."],
+  "supportedEnvironments": ["Windows source build; portable Rust implementation"],
+  "installation": "Build from source with cargo build -p elegy-memory-mcp --bin elegy-memory-mcp-stdio.",
+  "invocation": "Set ELEGY_DB_PATH and embedding provider variables, then run elegy-memory-mcp-stdio.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Stdio, bootstrap, semantic search, and degraded-mode tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The stdio binary compiled as part of the workspace suite."}
+  ]
+}

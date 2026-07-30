@@ -1,0 +1,17 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-accounts",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "The Windows package installs cleanly and reads local account status; broker, encrypted vault, UI, and typed provider paths exist, but a real provider operation is not yet proven.",
+  "worksToday": ["Installs the Windows archive into a fresh local root and returns typed local account status.", "Runs the local broker and Account Center.", "Executes source-tested typed GitHub and Cloudflare read operations through the broker."],
+  "limitations": ["Provider conformance primarily uses deterministic fakes.", "No reviewed non-fixture provider API, authentication, refresh, or revocation task receipt exists."],
+  "supportedEnvironments": ["x86_64-pc-windows-msvc source checkout", "x86_64-pc-windows-msvc packaged local install"],
+  "installation": "Build and pack elegy-accounts, then install its target archive with elegy-plugin-packaging install.",
+  "invocation": "Run elegy-accounts status or start its MCP/broker modes.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Rust and UI source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."},
+    {"kind": "clean-install", "path": "./evidence/clean-install-windows-2026-07-30.json", "summary": "A fresh Windows archive install retained portable authority and returned typed local account status.", "nonFixture": true}
+  ]
+}

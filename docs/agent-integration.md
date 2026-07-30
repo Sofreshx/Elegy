@@ -8,7 +8,8 @@ doc_kind: guide
 # Agent Integration
 
 Elegy is designed for AI-agent hosts that can run local subprocesses. The
-canonical path is installed-plugin discovery plus dedicated `elegy-*` binaries:
+canonical path is the typed catalog of an installed adapter plugin plus its
+dedicated `elegy-*` binary:
 
 1. validate the setup
 2. discover the minimum needed capability
@@ -22,18 +23,18 @@ MCP is supported as an optional projection for MCP-native clients, but it is not
 Verify the plugin package and then invoke its dedicated binary:
 
 ```bash
-elegy-plugin-packaging verify --plugin plugins/planning
-elegy-planning --help
+elegy-plugin-packaging verify --plugin plugins/accounts
+elegy-accounts --help
 ```
 
 ## Discovery Layers
 
-Skill definitions in `plugins/<name>/skills/<skill-id>/SKILL.md` and standalone root
-`<skill-id>/SKILL.md` packages are the discovery authority. Each plugin manifest
-declares the skill directory packaged with that plugin. A host discovers and
-routes only the plugins installed or projected into that host; Elegy does not
-provide a central registry or cross-plugin resolver. Contract schemas live under
-`plugins/<name>/schemas/` and cross-cutting fixtures under `shared/core/fixtures/`.
+The adapter's `capabilityCatalog` is executable discovery authority. Bundled
+skills are optional workflow guidance, never proof that behavior exists.
+Standalone skills use the target host's normal skill installation lane and do
+not enter the Elegy plugin marketplace. A host discovers and routes only
+installed, readiness-qualified adapters; Elegy does not provide a cross-plugin
+runtime resolver.
 
 ## Optional MCP Adapter
 

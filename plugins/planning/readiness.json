@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-planning",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Durable SQLite planning, graph, workflow preparation, events, and evidence behavior exist in source; clean installed agent use is not yet proven.",
+  "worksToday": ["Persists goals, roadmaps, plans, work points, issues, reviews, graph state, leases, and evidence.", "Prepares bounded host dispatch records without spawning workers."],
+  "limitations": ["Does not execute workers or workflows.", "No clean installed cross-session real-task receipt exists."],
+  "supportedEnvironments": ["Windows, Linux, and macOS source builds"],
+  "installation": "Build from source with cargo build -p elegy-planning.",
+  "invocation": "Run elegy-planning with an explicit --db and --scope.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

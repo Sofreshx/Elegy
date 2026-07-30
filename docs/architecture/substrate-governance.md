@@ -65,7 +65,9 @@ The following rules are mandatory until a later architecture decision changes th
 4. Operator binaries such as `elegy-run`, `elegy-contracts`, and other dedicated `elegy-*` CLIs must remain thin over explicit runtime and tooling crates.
 5. Export scripts and workflows validate or package the repo surfaces; they are not alternate places to invent contract truth.
 6. Downstream consumers should integrate through exported bundles, documented policy artifacts, explicit Rust crates, or CLI outputs rather than through removed solution-level or source-package assumptions.
-7. External agents outside Elegy should load the associated skill guidance and invoke the dedicated `elegy-*` CLI directly when one exists.
+7. External agents may load skill guidance or invoke a dedicated `elegy-*` CLI
+   only when its readiness is `usable` or `production`; source existence is not
+   routing authority.
 
 ## Post-legacy rule
 
@@ -83,10 +85,14 @@ A concept should become a durable Elegy-owned surface only when all of the follo
 
 1. the responsibility is stable and not just a temporary helper
 2. the boundary is clearer as a governed artifact or reusable Rust executable feature than as consumer-local behavior
-3. the concept has at least one real validation path
+3. two independent working consumers demonstrate the same stable boundary
 4. the concept improves ownership more than it increases maintenance cost
 
 If those conditions are not met, keep the capability as docs, policy, or consumer-local logic until the abstraction proves itself.
+
+While a generalized surface lacks two consumers, freeze schema versions,
+adapters, projections, and compatibility claims. Only fixes, removal, or work
+that obtains concrete proof may expand its implementation.
 
 ## Core contract change policy
 

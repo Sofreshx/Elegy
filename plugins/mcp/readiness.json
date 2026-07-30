@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-mcp",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Manual MCP descriptor authoring and static descriptor analysis exist; live server discovery and hosted execution do not.",
+  "worksToday": ["Authors governed descriptor files from explicit tool declarations.", "Analyzes descriptor files for tool-schema posture."],
+  "limitations": ["Does not inspect a live MCP server.", "Does not host or autonomously build an MCP implementation."],
+  "supportedEnvironments": ["Windows, Linux, and macOS source builds"],
+  "installation": "Build from source with cargo build -p elegy-mcp.",
+  "invocation": "Run elegy-mcp author or elegy-mcp analyze.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

@@ -1,6 +1,14 @@
 # elegy-memory-mcp
 
-`elegy-memory-mcp` now ships two binaries that expose the same 8 MCP tools over different transports.
+**Readiness: implemented; neither transport is agent-routable.** Source tests
+exercise stdio bootstrap and the HTTP/OAuth tool flow. They do not prove a clean
+installation through a real external MCP client; normal stdio use also requires
+a compatible Ollama model. Build with `cargo build -p elegy-memory-mcp`, then
+follow the environment-specific invocation below. See
+[stdio readiness](readiness-stdio.json) and
+[HTTP readiness](readiness-http.json) for exact evidence.
+
+`elegy-memory-mcp` implements two binaries that expose the same 8 MCP tools over different transports.
 
 ## Status
 
