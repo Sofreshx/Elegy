@@ -10,8 +10,8 @@ date: 2026-07-20
 
 ## Context
 
-Elegy plugins own and distribute their Agent Skills. The retired
-`elegy-skills` CLI instead compiled a fixed list of repo skills into its binary
+Adapters may own optional Agent Skills, while standalone skills use host-native
+installation. The retired `elegy-skills` CLI instead compiled a fixed list of repo skills into its binary
 and exposed list, search, resolve, get, and validation commands over that
 snapshot.
 
@@ -26,11 +26,10 @@ making the central resolver both redundant and less authoritative.
 Remove the `elegy-skills` Rust crate, binary, plugin package, marketplace entry,
 and release surface.
 
-Agent Skills remain co-located with and governed by their owning plugin.
-Standalone skill-only packages remain valid plugins. Plugin manifests declare
-their skill directories, plugin verification validates the package boundary,
-and each host discovers and routes the plugins installed or projected into that
-host.
+An adapter may co-locate optional Agent Skills. Standalone skills remain valid
+host instruction packages, but are not Elegy adapter plugins. Adapter manifests
+declare bundled skill directories; each host owns discovery over its installed
+adapter bundles and native standalone skills.
 
 Elegy will not maintain a global skill search index, cross-plugin ranking
 algorithm, or embedded catalog of repo skills.
@@ -40,8 +39,8 @@ algorithm, or embedded catalog of repo skills.
 - Skill availability is truthful to the installed host rather than a compiled
   Elegy snapshot.
 - Plugin authors own their skill wording, triggers, references, and validation.
-- `elegy-plugin-packaging verify --plugin <plugin-root>` is the package-level
-  validation path.
+- `elegy-plugin-packaging verify --plugin <adapter-root>` validates a complete
+  adapter package; standalone skills use host-native validation.
 - `elegy-skill-authoring` remains the contributor workflow for creating and
   auditing `SKILL.md` content.
 - Hosts that want search or ranking may implement it over their own installed

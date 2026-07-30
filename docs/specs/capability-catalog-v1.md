@@ -6,11 +6,23 @@ owner: Elegy
 
 # Capability Catalog V1
 
+## Readiness boundary
+
+A capability catalog describes implemented invocation shape. It is not evidence
+that a capability is installed, usable, agent-routable, or production-ready.
+Default discovery must join catalog data with the owning
+`elegy-readiness/v1` artifact and omit every surface below `usable`.
+
+Do not introduce a catalog or broaden this contract for hypothetical reuse.
+Extraction requires two independent working consumers that demonstrate the
+same smallest stable boundary.
+
 ## Contract
 
-`elegy-capability-catalog/v1` is the shared governed contract for plugin
-capability catalogs. It is referenced by the portable `elegy-plugin/v1` manifest
-via `capabilityCatalog.path`.
+`elegy-capability-catalog/v1` is the shared governed contract for typed
+executable discovery. Every active Elegy adapter plugin references one through
+`capabilityCatalog.path`; standalone tools may also use a catalog without
+becoming plugins.
 
 Authority:
 
@@ -20,16 +32,16 @@ Rust types in shared/plugin-sdk
     -> capability-catalog.json files
 ```
 
-The catalog is a portable, host-neutral artifact. Codex-specific projection
-(such as `.app.json` connector files) is derived by the host exporter, not
-authored into the catalog.
+The catalog is a portable, host-neutral artifact. It does not own
+authentication requirements or host app IDs. Those live in
+[`plugin-connections-v1`](plugin-connections-v1.md).
 
 ## Schema shape
 
 ```json
 {
   "schemaVersion": "elegy-capability-catalog/v1",
-  "plugin": "elegy-planning",
+  "plugin": "elegy-accounts",
   "pluginVersion": "0.1.0",
   "generatedAt": "2026-07-08T00:00:00Z",
   "digest": "sha256:...",
@@ -109,8 +121,8 @@ descriptor.
 
 ### `app-binding`
 
-Host-authenticated external-service connector. Maps to a Codex app connector.
-The `appBinding` field declares the portable external-service identity.
+Legacy host-authenticated external-service capability metadata. The
+`appBinding` field declares only a portable service identity.
 
 ```json
 {
@@ -152,9 +164,10 @@ The `appBinding` field declares the portable external-service identity.
 | `connector` | string | yes | External-service identity (e.g. `github`, `gmail`, `slack`). Portable and host-neutral. |
 | `category` | string | no | Display category for the connector (e.g. `Developer Tools`). |
 
-The Codex exporter emits `connector` as the `id` in `.app.json` and
-`category` as the `category`. The connector identity is portable — other hosts
-may map it to their own connector system.
+For `elegy-plugin/v1`, the Codex exporter may retain the historical
+`connector`-as-ID projection. `elegy-plugin/v2` never does this because Codex
+app IDs are opaque registered identifiers. V2 plugins declare connection
+requirements separately and provide explicit host bindings.
 
 ## Fallback
 

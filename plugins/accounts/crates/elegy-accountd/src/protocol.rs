@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::TypedExecutionRequest;
 
 const PROTOCOL_VERSION: &str = "elegy-account-execution/v1";
+const CONNECTION_CONTROL_PROTOCOL_VERSION: &str = "elegy-connection-control/v1";
 const MAX_CLOCK_SKEW: Duration = Duration::minutes(2);
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
@@ -18,6 +19,103 @@ pub struct ExecutionEnvelope {
     pub issued_at: String,
     pub nonce: String,
     pub request: TypedExecutionRequest,
+    pub signature: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConnectionState {
+    Disconnected,
+    Connecting,
+    Connected,
+    Stale,
+    AttentionRequired,
+    Unavailable,
+    Error,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionSnapshot {
+    pub id: String,
+    pub service: String,
+    pub account_summary: String,
+    pub state: ConnectionState,
+    pub verified_at: Option<String>,
+    pub valid_until: Option<String>,
+    pub adapter: String,
+    pub last_error_code: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct ConnectionSession {
+    pub id: String,
+    pub service: String,
+    pub state: ConnectionState,
+    pub user_action_url: Option<String>,
+    pub expires_at: Option<String>,
+    pub last_error_code: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+pub struct DisconnectPreview {
+    pub connection_id: String,
+    pub account_summary: String,
+    pub revoked_grant_count: usize,
+    pub confirmation_digest: String,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "result", rename_all = "kebab-case")]
+pub enum ConnectionControlResult {
+    Connections {
+        connections: Vec<ConnectionSnapshot>,
+    },
+    Session {
+        session: ConnectionSession,
+    },
+    Verified {
+        connection: ConnectionSnapshot,
+    },
+    DisconnectPreview {
+        preview: DisconnectPreview,
+    },
+    Disconnected {
+        connection_id: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(tag = "operation", rename_all = "kebab-case")]
+pub enum ConnectionControlOperation {
+    List,
+    Start {
+        service: String,
+    },
+    Session {
+        session_id: String,
+    },
+    Verify {
+        connection_id: String,
+    },
+    DisconnectPreview {
+        connection_id: String,
+    },
+    DisconnectExecute {
+        connection_id: String,
+        confirmation_digest: String,
+    },
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct ConnectionControlEnvelope {
+    pub schema_version: String,
+    pub issued_at: String,
+    pub nonce: String,
+    pub client_id: String,
+    pub request: ConnectionControlOperation,
     pub signature: String,
 }
 
@@ -93,6 +191,59 @@ impl ExecutionEnvelope {
     }
 }
 
+impl ConnectionControlEnvelope {
+    pub fn sign(
+        client_id: impl Into<String>,
+        request: ConnectionControlOperation,
+        key: &[u8],
+        issued_at: DateTime<Utc>,
+        nonce: impl Into<String>,
+    ) -> Result<Self, ExecutionProtocolError> {
+        let mut envelope = Self {
+            schema_version: CONNECTION_CONTROL_PROTOCOL_VERSION.into(),
+            issued_at: issued_at.to_rfc3339(),
+            nonce: nonce.into(),
+            client_id: client_id.into(),
+            request,
+            signature: String::new(),
+        };
+        envelope.signature = connection_signature_for(&envelope, key)?;
+        Ok(envelope)
+    }
+
+    pub fn verify(
+        &self,
+        key: &[u8],
+        expected_client: &str,
+        now: DateTime<Utc>,
+        replay: &mut ReplayGuard,
+    ) -> Result<ConnectionControlOperation, ExecutionProtocolError> {
+        if self.schema_version != CONNECTION_CONTROL_PROTOCOL_VERSION {
+            return Err(ExecutionProtocolError::UnsupportedVersion);
+        }
+        if self.client_id != expected_client {
+            return Err(ExecutionProtocolError::WrongClient);
+        }
+        let issued_at = DateTime::parse_from_rfc3339(&self.issued_at)
+            .map_err(|_| ExecutionProtocolError::Stale)?
+            .with_timezone(&Utc);
+        if issued_at < now - MAX_CLOCK_SKEW || issued_at > now + MAX_CLOCK_SKEW {
+            return Err(ExecutionProtocolError::Stale);
+        }
+        let signature = URL_SAFE_NO_PAD
+            .decode(&self.signature)
+            .map_err(|_| ExecutionProtocolError::InvalidSignature)?;
+        let payload = connection_signing_payload(self)?;
+        let mut mac = Hmac::<Sha256>::new_from_slice(key)
+            .map_err(|_| ExecutionProtocolError::InvalidSignature)?;
+        mac.update(&payload);
+        mac.verify_slice(&signature)
+            .map_err(|_| ExecutionProtocolError::InvalidSignature)?;
+        replay.check_and_record(&self.nonce, issued_at, now)?;
+        Ok(self.request.clone())
+    }
+}
+
 impl ReplayGuard {
     fn check_and_record(
         &mut self,
@@ -133,6 +284,38 @@ fn signing_payload(envelope: &ExecutionEnvelope) -> Result<Vec<u8>, ExecutionPro
         schema_version: &envelope.schema_version,
         issued_at: &envelope.issued_at,
         nonce: &envelope.nonce,
+        request: &envelope.request,
+    })
+    .map_err(|_| ExecutionProtocolError::Serialization)
+}
+
+fn connection_signature_for(
+    envelope: &ConnectionControlEnvelope,
+    key: &[u8],
+) -> Result<String, ExecutionProtocolError> {
+    let payload = connection_signing_payload(envelope)?;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key)
+        .map_err(|_| ExecutionProtocolError::InvalidSignature)?;
+    mac.update(&payload);
+    Ok(URL_SAFE_NO_PAD.encode(mac.finalize().into_bytes()))
+}
+
+fn connection_signing_payload(
+    envelope: &ConnectionControlEnvelope,
+) -> Result<Vec<u8>, ExecutionProtocolError> {
+    #[derive(Serialize)]
+    struct Payload<'a> {
+        schema_version: &'a str,
+        issued_at: &'a str,
+        nonce: &'a str,
+        client_id: &'a str,
+        request: &'a ConnectionControlOperation,
+    }
+    serde_json::to_vec(&Payload {
+        schema_version: &envelope.schema_version,
+        issued_at: &envelope.issued_at,
+        nonce: &envelope.nonce,
+        client_id: &envelope.client_id,
         request: &envelope.request,
     })
     .map_err(|_| ExecutionProtocolError::Serialization)

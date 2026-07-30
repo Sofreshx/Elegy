@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-observe",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Bounded process, window, clipboard, screen, filesystem, and system observation commands exist; clean installed workflow proof is missing.",
+  "worksToday": ["Builds bounded Windows observation commands and cross-platform process/system subsets."],
+  "limitations": ["Several window and screen operations are Windows-specific.", "No clean installed non-fixture observation task receipt exists."],
+  "supportedEnvironments": ["x86_64-pc-windows-msvc source checkout"],
+  "installation": "Build from source with cargo build -p elegy-observe.",
+  "invocation": "Run elegy-observe --help and select one bounded query.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

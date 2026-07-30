@@ -1,5 +1,11 @@
 # elegy-planning
 
+**Readiness: implemented; not agent-routable.** Today the source CLI persists
+and validates durable planning state and prepares bounded dispatch records. It
+does not execute workers or workflows, and no clean-installed cross-session
+agent task is proven. Build with `cargo build -p elegy-planning` and invoke
+`elegy-planning --help`; see [readiness.json](readiness.json) for evidence.
+
 `elegy-planning` is Elegy's dedicated durable planning authority for goals, roadmaps, plans, todos, issues, attached review points, validation findings, and event history.
 
 It is intentionally not an extension of `elegy-memory`.

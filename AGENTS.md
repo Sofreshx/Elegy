@@ -7,6 +7,10 @@ Durable contracts and discovery metadata live in repo-visible artifacts. CLI
 invocation templates are the default integration contract; MCP is an optional
 adapter.
 
+Current agent-facing readiness is generated in `docs/readiness.md`. Treat
+`concept` and `implemented` surfaces as non-routable. Passing tests, schemas,
+fixtures, archives, and generated projections do not establish usability.
+
 ## Authority Hierarchy
 
 | Priority | Source |
@@ -21,6 +25,18 @@ adapter.
 ## Boundary Rules
 
 - Discovery indexes, generated bundles, SKILL.md mirrors, and MCP projections are derived outputs, not independent authority.
+- An Elegy plugin must adapt a reusable data source, database, platform, API,
+  local-system, or executable/CLI boundary. Put business/domain logic in a
+  library, application, Automation Pack, or product-local command.
+- Only an active `surfaceClass: adapter-plugin` may use Elegy plugin packaging,
+  and it must declare a typed capability catalog. A skill or historical
+  `plugins/` directory is not executable discovery authority.
+- Do not conform an implementation to an incubating Elegy contract or add an
+  Elegy dependency solely because a schema, catalog entry, or wrapper exists.
+- Do not generalize a contract or adapter without two independent working
+  consumers and a documented smallest shared boundary.
+- Default agent discovery may route only to `usable` and `production`
+  readiness. Incubating overrides are for explicit maintainer inspection.
 - Profiles are allowlists, not approvals. Side-effecting MCP tools stay blocked unless the host is started with `--allow-side-effects`.
 - CLI invocation templates are the default contract. Use MCP only when the host specifically needs an MCP protocol boundary.
 - Obsidian is a non-authoritative vault bridge. Not a source of truth for plans, roadmaps, or review state.
@@ -33,7 +49,7 @@ adapter.
   governance ADR; Elegy owns only the plugin-platform side of that boundary.
 
 - Update an existing ADR or spec when extending the same decision slice.
-- Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation.
+- Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation. Regenerate `docs/readiness.md` through `elegy-documentation export readiness`.
 - Keep harness files thin. Root `AGENTS.md` is the repo authority; other harness files should point back here.
 
 ## Validation

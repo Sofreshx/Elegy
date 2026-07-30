@@ -1,54 +1,11 @@
 # `elegy-mcp` — distribution
 
-## What this binary does
-
-Dedicated CLI for MCP descriptor authoring and analysis. Wraps the reusable
-author/analyze behavior over governed MCP descriptors.
-
-Lower-level MCP-to-skill generation is contributor tooling; this binary
-focuses on the authoring and analysis lane.
-
-This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is in
-`distribution/surfaces.json`.
-
-## Binary surface
-
-- **Crate:** `plugins/mcp/`
-- **Binary name:** `elegy-mcp`
-- **Source:** `plugins/mcp/src/main.rs`
-- **Plugin manifest:** `.elegy-plugin/plugin.json`
-- **Plugin skills:** `plugins/mcp/skills/elegy-mcp/`
-
-## Distribution shape
-
-- **Release plugin archive:** `elegy-mcp-plugin-<target>.zip` (primary GitHub release and marketplace contract)
-- **Local pack default:** `elegy-mcp-v<version>.plugin.zip` (ad hoc output when `pack --output` is omitted)
-- **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
-- **Versioning:** follows workspace `version`.
-
-## Install
-
-```bash
-# Install as a plugin package (primary lane)
-elegy-plugin-packaging install --archive elegy-mcp-plugin-<target>.zip
-
-# Export for Codex host (derived lane)
-elegy-plugin-packaging export --plugin plugins/mcp --host codex --output ./export
-```
-
-## Build from source
+`elegy-mcp` is a development CLI for descriptor authoring and static analysis.
+It does not connect to or host a live MCP server. Its former plugin manifest
+and archive lane are deprecated; release it only as a flat tool binary.
 
 ```bash
 cargo build -p elegy-mcp
 cargo run -p elegy-mcp -- --help
+cargo test -p elegy-mcp
 ```
-
-## Validation
-
-- `cargo test -p elegy-mcp`
-- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/mcp`
-
-## Where to read more
-
-- Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
-- Crate boundaries: [`AGENTS.md`](./AGENTS.md)

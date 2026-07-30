@@ -23,6 +23,11 @@ Plugin manifests own package identity and version. `distribution/surfaces.json`
 owns listing order, category, and release routing. The checked-in marketplace
 index is generated from those sources.
 
+As amended by the evidence-backed plugin-boundary ADR, only active
+`adapter-plugin` surfaces with a typed capability catalog participate. Skills,
+tools, and host extensions are not marketplace entries merely because Codex
+could package them in a native plugin bundle.
+
 Compiled plugins publish one archive and SHA-256 sidecar per supported target.
 Private source code may produce public proprietary binaries. Files shipped in
 the wrapper or archive remain readable.
@@ -34,4 +39,3 @@ the wrapper or archive remain readable.
 - Codex marketplace files remain derived host projections.
 - V1 has no service, account system, dependency solver, or authenticated feed.
 - Hosts continue to own credentials, OAuth state, approvals, and execution policy.
-

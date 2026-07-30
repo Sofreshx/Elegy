@@ -85,7 +85,7 @@ cargo run -p elegy-observe -- record --duration-seconds 1 --poll-interval-ms 50 
 
 Typical downstream consumption flow:
 
-- install `elegy-observe` or the plugin archive that carries it
+- install the flat `elegy-observe` binary
 - resolve the extracted `elegy-observe` executable directly
 - keep governed contract consumption anchored to the installed bundle
 

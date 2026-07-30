@@ -7,19 +7,20 @@ doc_kind: reference
 
 # Repository Layout
 
-Elegy separates shipped surfaces by role. Directory placement is part of the
-contract because release tooling, agent navigation, and validation all depend on
-the same surface taxonomy.
+Elegy records every distributed surface's role in
+`distribution/surfaces.json`. Directory names help navigation but are not
+classification: several tools retain historical paths under `plugins/` until a
+separate low-risk source move is justified.
 
 ## Directory Kinds
 
 | Directory | Contract |
 | --- | --- |
-| `plugins/` | Bundled installable plugin packages. |
+| `plugins/` | Historical runtime root containing the Accounts adapter, tools, and adapter candidates. |
 | `tools/` | Standalone CLI crates that are not plugin packages. |
 | `hosts/` | Host adapters and transport servers. |
 | `skills/` | Standalone skill-only packages. |
-| `marketplace-wrappers/` | Public metadata wrappers for external or private plugin archives. |
+| `marketplace-wrappers/` | Historical or blocked external integration metadata. |
 | `shared/` | Reusable Rust libraries and platform tooling. |
 | `distribution/` | Canonical release and surface catalog. |
 | `docs/` | Architecture, ADRs, specs, governance, and operations docs. |
@@ -29,11 +30,11 @@ the same surface taxonomy.
 
 | Kind | Root | Required files |
 | --- | --- | --- |
-| Bundled plugin | `plugins/{plugin-name}` | `.elegy-plugin/plugin.json`, `skills/elegy-{skill-id}/SKILL.md`, `DISTRIBUTION.md` |
-| Standalone CLI | `tools/{tool-name}` | `Cargo.toml`, `src/`, `DISTRIBUTION.md` when shipped |
+| Active adapter plugin | catalog-declared `pluginRoot` (currently `plugins/accounts`) | `.elegy-plugin/plugin.json`, typed capability catalog, readiness artifact, optional skills |
+| Standalone tool | catalog-declared `crateRoot` | `Cargo.toml`, `src/`, readiness artifact, and `DISTRIBUTION.md` when shipped |
 | Host adapter | `hosts/{host-name}` | `Cargo.toml`, `src/`, `DISTRIBUTION.md` when shipped |
 | Skill package | `skills/elegy-{skill-id}` | `SKILL.md` |
-| Marketplace wrapper | `marketplace-wrappers/{plugin-name}` | `.elegy-plugin/plugin.json` |
+| Historical integration metadata | `marketplace-wrappers/{name}` | readiness and limitation documentation; no active plugin manifest unless independently requalified |
 | Shared crate | `shared/{crate-name}` | `Cargo.toml`, `src/` |
 
 `distribution/surfaces.json` is the release catalog. Every shipped CLI, plugin
@@ -53,8 +54,8 @@ pwsh scripts/check-repo-shape.ps1 -Project . -FailOnIssues
 | Pattern | Fix |
 | --- | --- |
 | Transport adapters under `plugins/` | Move to `hosts/` or an owning plugin adapter directory. |
-| Standalone CLI crates under `plugins/` | Move to `tools/`. |
-| External/private marketplace wrappers under `plugins/` | Move to `marketplace-wrappers/`. |
+| Inferring plugin status from a `plugins/` path | Read `surfaceClass`, `lifecycle`, and `packaging` from the catalog. |
+| Adding a new standalone tool under `plugins/` | Use `tools/`; historical paths are not precedent. |
 | Flat `SKILL.md` directly under `plugins/{name}` | Move to `skills/elegy-{skill-id}/SKILL.md` or make it a bundled plugin skill. |
 | Active `.cargo/config.toml` with local paths | Keep only `.cargo/config.example.toml` in the repo. |
 | Local database or agent state files | Ignore and keep outside version control. |

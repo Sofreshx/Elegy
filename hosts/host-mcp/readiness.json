@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-run",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "The MCP stdio host can list and read supported static resources in source tests.",
+  "worksToday": ["Serves supported resources over an MCP duplex transport.", "Preserves text and binary resource payload distinctions."],
+  "limitations": ["Does not make every Elegy surface a working MCP tool.", "No clean packaged installation or non-fixture host task has been reviewed."],
+  "supportedEnvironments": ["Windows source build; portable Rust implementation"],
+  "installation": "Build from source with cargo build -p elegy-host-mcp.",
+  "invocation": "Run elegy-run with a supported project descriptor.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Host resource transport tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The workspace package compiled as part of the source suite."}
+  ]
+}

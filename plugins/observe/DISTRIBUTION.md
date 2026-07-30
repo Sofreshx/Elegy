@@ -1,51 +1,15 @@
 # `elegy-observe` — distribution
 
-## What this binary does
-
-Desktop and OS observation for agentic workflows. Process snapshots, window
-tracking, clipboard, screen capture, and filesystem diffing.
-
-This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is in
-`distribution/surfaces.json`.
-
-## Binary surface
-
-- **Crate:** `plugins/observe/`
-- **Binary name:** `elegy-observe`
-- **Source:** `plugins/observe/src/main.rs`
-- **Plugin manifest:** `.elegy-plugin/plugin.json`
-- **Plugin skills:** `plugins/observe/skills/elegy-observe/`
-
-## Distribution shape
-
-- **Release plugin archive:** `elegy-observe-plugin-<target>.zip` (primary GitHub release and marketplace contract)
-- **Local pack default:** `elegy-observe-v<version>.plugin.zip` (ad hoc output when `pack --output` is omitted)
-- **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
-- **Versioning:** follows workspace `version`.
-
-## Install
-
-```bash
-# Install as a plugin package (primary lane)
-elegy-plugin-packaging install --archive elegy-observe-plugin-<target>.zip
-
-# Export for Codex host (derived lane)
-elegy-plugin-packaging export --plugin plugins/observe --host codex --output ./export
-```
-
-## Build from source
+`elegy-observe` is an OS-observation CLI and an adapter candidate in `rework`.
+Its former plugin manifest and archive lane are deprecated. It is released only
+as a flat binary while a typed capability catalog and portable package evidence
+are absent.
 
 ```bash
 cargo build -p elegy-observe
 cargo run -p elegy-observe -- --help
+cargo test -p elegy-observe
 ```
 
-## Validation
-
-- `cargo test -p elegy-observe`
-- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/observe`
-
-## Where to read more
-
-- Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
-- Crate boundaries: [`AGENTS.md`](./AGENTS.md)
+Do not add it to the marketplace or export it as a plugin until
+`distribution/surfaces.json` promotes it to an active adapter plugin.

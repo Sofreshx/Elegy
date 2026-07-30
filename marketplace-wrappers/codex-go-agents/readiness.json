@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-codex-go-agents",
+  "surfaceVersion": "0.1.0",
+  "stage": "concept",
+  "summary": "Experimental host extension only; the documented native child turn stalls and the local repository has no committed proof baseline.",
+  "worksToday": ["Retains readiness and historical integration metadata for maintainer inspection."],
+  "limitations": ["A full native child turn is not proven to complete.", "No clean-install or non-fixture task receipt exists.", "Not agent-routable."],
+  "supportedEnvironments": ["None verified"],
+  "installation": "Do not install from default discovery.",
+  "invocation": "No supported invocation is recorded.",
+  "evidence": []
+}

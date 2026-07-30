@@ -1,13 +1,14 @@
 # Codex Plugin Projection
 
-Codex export is a derived host projection over the `elegy-plugin/v1` plugin manifest.
-The portable plugin archive format is the primary package contract. Release
-archives use `<surface>-plugin-<target>.zip` or `<surface>-plugin-any.zip`;
+Codex export is a derived host projection over the `elegy-plugin/v2` plugin manifest.
+The portable adapter archive format is the primary package contract. Release
+archives use `<surface>-plugin-<target>.zip`;
 Codex export generates a `.codex-plugin/plugin.json` and `skills/` directory
 from the plugin manifest through `elegy-plugin-packaging export --host codex`.
 
 Codex-specific metadata lives in the manifest's `extensions["codex.plugin/v1"]`
-namespace. The base `elegy-plugin/v1` manifest is not widened with host-specific fields.
+namespace. The base manifest owns portable connection requirements, while the
+Codex extension owns opaque registered app bindings.
 
 Required authority and output flow:
 
@@ -29,9 +30,9 @@ Current Codex plugin compatibility covers:
 
 | Codex surface | Elegy authority |
 |---|---|
-| `.codex-plugin/plugin.json` identity and display metadata | `elegy-plugin/v1` plus `extensions["codex.plugin/v1"]` |
+| `.codex-plugin/plugin.json` identity and display metadata | `elegy-plugin/v2` plus `extensions["codex.plugin/v1"]` |
 | `skills/` | base `skills` field |
-| `.app.json` connector references | `extensions["codex.plugin/v1"].apps` |
+| `.app.json` app references | `connections` plus `extensions["codex.plugin/v1"].connectionBindings` |
 | lifecycle hooks | `extensions["codex.plugin/v1"].hooks` or default `hooks/hooks.json` |
 | plugin-bundled MCP config | `extensions["codex.plugin/v1"].mcpServers` |
 | marketplace UI metadata | `extensions["codex.plugin/v1"].interface` |
@@ -56,28 +57,32 @@ elegy-plugin-packaging export --host codex \
 The manifest does not infer a build artifact. The caller selects the target
 binary and its host-relative path.
 
-Codex app connector files are generated from `app-binding` capabilities in the
-`elegy-capability-catalog/v1` catalog. The exporter collects app-binding
-capabilities and emits `.app.json` with `id` (from `appBinding.connector`) and
-optional `category` (from `appBinding.category`).
+Every Codex, OpenCode, and Claude export also retains a stripped
+`.elegy-plugin/plugin.json` plus its capability catalog, readiness/evidence,
+connection descriptors, skills, portable MCP descriptors, and selected binary.
+The stripped manifest omits host extensions so another harness never inherits
+Codex-only asset claims. Native host manifests remain projections over that
+same portable core.
 
-When the catalog has no `app-binding` capabilities but
-`codex.plugin/v1.apps` points to a hand-authored file, the exporter copies
-that file for backward compat. If both exist, catalog wins.
+Codex app files are generated from declared connection requirements. Each
+portable requirement ID must have an explicit `connectionBindings` entry with
+the opaque ID of a registered Codex app. Service names are never inferred as
+Codex IDs.
 
 ```json
 {
   "apps": {
-    "github": {
-      "id": "github",
-      "category": "Developer Tools"
+    "github-main": {
+      "id": "connector_76869538009648d5b282a4bb21c3d157",
+      "required": true
     }
   }
 }
 ```
 
-They are not an OAuth, token, provider-action, or approval-policy schema.
-Hosts own connector authentication, tool approvals, and runtime sessions.
+Plugin install does not imply connection. Codex owns app authentication,
+credential storage, tool approvals, and runtime connection state. Legacy v1
+catalog inference remains read/export compatible but is disabled for v2.
 
 ## SDK surface
 

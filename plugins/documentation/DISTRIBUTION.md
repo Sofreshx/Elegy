@@ -1,53 +1,11 @@
 # `elegy-documentation` — distribution
 
-## What this binary does
-
-Dedicated CLI for the authority-aware documentation inspector. Provides
-`inspect | map | check | new (adr|spec|note)` and `index` flows over the
-Elegy documentation doctrine. Validates frontmatter, freshness, ADR/spec
-classification, and the `docs/docs-index.md` content bundle shape.
-
-This binary is packaged as an `elegy-plugin/v1` plugin. Release configuration is in
-`distribution/surfaces.json`.
-
-## Binary surface
-
-- **Crate:** `plugins/documentation/`
-- **Binary name:** `elegy-documentation`
-- **Source:** `plugins/documentation/src/main.rs`
-- **Plugin manifest:** `.elegy-plugin/plugin.json`
-- **Plugin skills:** `plugins/documentation/skills/elegy-documentation/`
-
-## Distribution shape
-
-- **Release plugin archive:** `elegy-documentation-plugin-<target>.zip` (primary GitHub release and marketplace contract)
-- **Local pack default:** `elegy-documentation-v<version>.plugin.zip` (ad hoc output when `pack --output` is omitted)
-- **Codex export** (derived host projection): `.codex-plugin/plugin.json` + `skills/` directory
-- **Versioning:** follows workspace `version`.
-
-## Install
-
-```bash
-# Install as a plugin package (primary lane)
-elegy-plugin-packaging install --archive elegy-documentation-plugin-<target>.zip
-
-# Export for Codex host (derived lane)
-elegy-plugin-packaging export --plugin plugins/documentation --host codex --output ./export
-```
-
-## Build from source
+`elegy-documentation` is a repository documentation-governance tool. Its former
+plugin manifest and archive lane are deprecated; release it only as a flat
+binary.
 
 ```bash
 cargo build -p elegy-documentation
 cargo run -p elegy-documentation -- check --project . --json
+cargo test -p elegy-documentation
 ```
-
-## Validation
-
-- `cargo test -p elegy-documentation`
-- Plugin verify: `cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/documentation`
-
-## Where to read more
-
-- Plugin manifest authority: `shared/plugin-sdk/src/lib.rs`
-- Crate boundaries: [`AGENTS.md`](./AGENTS.md)

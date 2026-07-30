@@ -15,6 +15,25 @@ These definitions exist to prevent later phases from overloading the same words 
 
 ## Glossary
 
+### Plugin
+
+A reusable adapter that lets an agent operate against a concrete data source,
+database, platform, API, local-system, or executable/CLI boundary.
+
+A plugin is not a general name for packaged business logic. Domain analysis,
+scoring, reports, and product workflows remain libraries, applications,
+Automation Packs, or product-local commands. A manifest proves package shape,
+not plugin eligibility or usability.
+
+### Readiness
+
+The evidence-backed stage of one distributed surface: `concept`, `implemented`,
+`usable`, or `production`.
+
+Only `usable` and `production` are agent-routable. Source tests, fixture
+conformance, compilation, schemas, archives, and generated projections can
+support `implemented`; they never establish usability by themselves.
+
 ### Substrate
 
 The lowest reusable authority layer in the repo.
@@ -38,6 +57,7 @@ Monorepo does not mean that every language surface has the same authority. It me
 A machine-readable structural definition for a serialized artifact.
 
 Schemas describe shape. They do not automatically define runtime ownership, orchestration behavior, or host lifecycle semantics.
+They also do not establish readiness or justify a consumer dependency.
 
 ### Fixture
 
@@ -59,9 +79,14 @@ A capability is what a host invokes — it includes an identity, input/output co
 
 ### Skill
 
-A formalized capability definition with identity, metadata, and execution-oriented semantics.
+Reusable agent instructions plus optional references, scripts, templates, and
+assets for a focused workflow.
 
-In Elegy, a skill is a governed capability contract. It is a portable package/contract bundle — not inherently tied to a specific LLM vendor, prompt engine, runtime host, or MCP transport. A skill declares capabilities and their constraints; it does not own host-side execution decisions.
+A skill may explain how to use an adapter or tools already available to a host.
+It is not executable product evidence, a typed capability contract, or a
+connector by itself. Native hosts may distribute skills in installable plugin
+bundles; Elegy still classifies the subject as a `skill` unless a real adapter
+boundary is present.
 
 ### Portable plugin core
 
@@ -142,13 +167,30 @@ consumer exists.
 
 ### App binding
 
-A capability kind that maps to a host-authenticated external-service connector
-(e.g. GitHub, Gmail, Slack). Declared in the capability catalog with a portable
-`connector` identity (the external-service name) and optional `category`. The
-Codex exporter generates `.app.json` from app-binding capabilities. App bindings
-are the distinction between a plugin that is streamlined packaging (skills +
-CLI/MCP) and one that crosses into host-authenticated external-service
-integration.
+A legacy capability-catalog kind describing an external-service capability.
+Its `connector` is a portable service name, not a host app ID. V1 exporters may
+retain the historical catalog projection, but v2 authentication authority is a
+connection requirement.
+
+### Connection requirement
+
+A portable declaration that a plugin needs a verified account/service
+connection. It has a plugin-local identity, service identity, required state,
+and human description. It contains no credentials and does not imply that
+installing the plugin connects the account.
+
+### Connection binding
+
+A host-projection mapping from a portable connection requirement to a
+host-registered integration. For Codex, the target is an opaque app ID in
+`.app.json`; it is never inferred from a service slug.
+
+### Connection provider
+
+A credential-owning component that implements
+`elegy-connection-control/v1`. It owns human authentication UX, secure storage,
+verification, refresh, and revocation. Hosts consume sanitized connection state
+and opaque references through a signed, credential-free control boundary.
 
 ### Fallback
 

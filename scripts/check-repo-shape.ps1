@@ -98,14 +98,25 @@ if (Test-RelativePath "package.json") {
 $surfacesPath = Join-Path $root "distribution/surfaces.json"
 if (Test-Path -LiteralPath $surfacesPath) {
     $surfacesCatalog = Get-Content -LiteralPath $surfacesPath -Raw | ConvertFrom-Json
-    if ($surfacesCatalog.schemaVersion -ne "elegy-surfaces/v2") {
-        Add-Issue "surfaces.schema_version" "distribution/surfaces.json" "Surface catalog must declare schemaVersion elegy-surfaces/v2."
+    if ($surfacesCatalog.schemaVersion -ne "elegy-surfaces/v3") {
+        Add-Issue "surfaces.schema_version" "distribution/surfaces.json" "Surface catalog must declare schemaVersion elegy-surfaces/v3."
     }
     $surfaces = $surfacesCatalog.surfaces
     $allowedSurfaceKinds = @("bundled-plugin", "cli", "host-adapter", "skill-package", "external-plugin-wrapper")
     foreach ($surface in $surfaces) {
         if (-not $surface.kind -or $allowedSurfaceKinds -notcontains $surface.kind) {
             Add-Issue "surfaces.invalid_kind" "distribution/surfaces.json" "Surface '$($surface.name)' must use one of: $($allowedSurfaceKinds -join ', ')."
+        }
+        $allowedSurfaceClasses = @("adapter-plugin", "tool", "skill", "host-adapter", "host-extension")
+        if (-not $surface.surfaceClass -or $allowedSurfaceClasses -notcontains $surface.surfaceClass) {
+            Add-Issue "surfaces.invalid_class" "distribution/surfaces.json" "Surface '$($surface.name)' must declare a surfaceClass from: $($allowedSurfaceClasses -join ', ')."
+        }
+        $allowedLifecycles = @("active", "rework", "deprecated", "blocked")
+        if (-not $surface.lifecycle -or $allowedLifecycles -notcontains $surface.lifecycle) {
+            Add-Issue "surfaces.invalid_lifecycle" "distribution/surfaces.json" "Surface '$($surface.name)' must declare a lifecycle from: $($allowedLifecycles -join ', ')."
+        }
+        if ($surface.packaging -eq "plugin" -and ($surface.surfaceClass -ne "adapter-plugin" -or $surface.lifecycle -ne "active")) {
+            Add-Issue "surfaces.invalid_plugin_boundary" "distribution/surfaces.json" "Only active adapter-plugin surfaces may set packaging to plugin."
         }
 
         if ($surface.pluginRoot -and -not (Test-RelativePath $surface.pluginRoot)) {
@@ -127,11 +138,8 @@ if (Test-Path -LiteralPath $surfacesPath) {
                 }
             }
             "skill-package" {
-                if (-not $surface.pluginRoot -or -not $surface.pluginRoot.StartsWith("skills/elegy-")) {
-                    Add-Issue "surfaces.skill_package_root" "distribution/surfaces.json" "Skill package '$($surface.name)' must use pluginRoot under skills/elegy-*."
-                }
-                if ($surface.skillRoot -and $surface.skillRoot -ne $surface.pluginRoot) {
-                    Add-Issue "surfaces.skill_root_mismatch" "distribution/surfaces.json" "Skill package '$($surface.name)' should keep skillRoot equal to pluginRoot."
+                if (-not $surface.skillRoot -or -not $surface.skillRoot.StartsWith("skills/elegy-")) {
+                    Add-Issue "surfaces.skill_package_root" "distribution/surfaces.json" "Skill package '$($surface.name)' must use skillRoot under skills/elegy-*."
                 }
             }
             "external-plugin-wrapper" {
@@ -196,29 +204,17 @@ if (Test-Path -LiteralPath $surfacesPath) {
     }
 }
 
-$pluginsRoot = Join-Path $root "plugins"
-if (Test-Path -LiteralPath $pluginsRoot) {
-    Get-ChildItem -LiteralPath $pluginsRoot -Directory | ForEach-Object {
-        $relative = "plugins/$($_.Name)"
-        $manifest = Join-Path $_.FullName ".elegy-plugin/plugin.json"
-        $flatSkill = Join-Path $_.FullName "SKILL.md"
-        $cargo = Join-Path $_.FullName "Cargo.toml"
-        $skillFiles = @(Get-ChildItem -LiteralPath $_.FullName -Recurse -Filter "SKILL.md" -ErrorAction SilentlyContinue)
-
+if ($surfaces) {
+    foreach ($surface in $surfaces) {
+        if ($surface.packaging -ne "plugin") { continue }
+        $manifest = Join-Path $root "$($surface.pluginRoot)/.elegy-plugin/plugin.json"
         if (-not (Test-Path -LiteralPath $manifest)) {
-            Add-Issue "plugins.missing_manifest" $relative "plugins/ entries should be bundled plugin packages with .elegy-plugin/plugin.json."
+            Add-Issue "plugins.missing_manifest" $surface.pluginRoot "Active adapter plugin '$($surface.name)' is missing .elegy-plugin/plugin.json."
+            continue
         }
-
-        if (Test-Path -LiteralPath $flatSkill) {
-            Add-Issue "plugins.flat_skill" "$relative/SKILL.md" "Standalone skill packages should live under skills/elegy-*."
-        }
-
-        if ((Test-Path -LiteralPath $cargo) -and -not (Test-Path -LiteralPath $manifest)) {
-            Add-Issue "plugins.cli_without_plugin_manifest" $relative "Standalone CLI crate under plugins/ should move to tools/ or become a bundled plugin."
-        }
-
-        if ((Test-Path -LiteralPath $manifest) -and $skillFiles.Count -eq 0) {
-            Add-Issue "plugins.manifest_without_skill" $relative "Bundled plugin packages should expose at least one SKILL.md unless they are marketplace wrappers."
+        $pluginManifest = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
+        if (-not $pluginManifest.capabilityCatalog) {
+            Add-Issue "plugins.missing_capability_boundary" $surface.pluginRoot "Active adapter plugin '$($surface.name)' must declare capabilityCatalog."
         }
     }
 }

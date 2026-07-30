@@ -32,7 +32,11 @@ pub use typed::{
     TypedAccountChoice, TypedExecutionError, TypedExecutionOutcome, TypedExecutionRequest,
 };
 mod protocol;
-pub use protocol::{ExecutionEnvelope, ExecutionProtocolError, ReplayGuard};
+pub use protocol::{
+    ConnectionControlEnvelope, ConnectionControlOperation, ConnectionControlResult,
+    ConnectionSession, ConnectionSnapshot, ConnectionState, DisconnectPreview, ExecutionEnvelope,
+    ExecutionProtocolError, ReplayGuard,
+};
 
 #[derive(Clone, Debug)]
 pub struct GrantRequest {

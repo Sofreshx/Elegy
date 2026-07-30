@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "elegy-connection-provider/v1",
+  "id": "elegy-accounts",
+  "controlProtocol": "elegy-connection-control/v1",
+  "invocation": {
+    "executable": "elegy-accounts",
+    "command": [
+      "broker"
+    ]
+  }
+}

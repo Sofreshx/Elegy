@@ -1,3 +1,4 @@
+use elegy_plugin_sdk::{ElegyPluginV1, ElegyReadinessV1};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
@@ -13,6 +14,7 @@ const DOCS_CONFIG_SCHEMA_VERSION: &str = "elegy-docs/v1";
 const DEFAULT_ADR_PATH: &str = "docs/adr";
 const DEFAULT_SPEC_PATH: &str = "docs/specs";
 const DEFAULT_INDEX_PATH: &str = "docs/docs-index.md";
+const READINESS_MATRIX_PATH: &str = "docs/readiness.md";
 const KNOWN_REQUIRED_DOC_TRIGGERS: &[&str] = &[
     "architecture-change",
     "durable-decision",
@@ -712,6 +714,29 @@ pub fn documentation_check(
     let derived_surfaces = collect_derived_surface_states(&resolved, &documents)?;
     issues.extend(collect_derived_surface_issues(&resolved, &documents)?);
     issues.extend(collect_entrypoint_issues(&resolved, &documents));
+    let (readiness_records, mut readiness_issues) = collect_readiness_records(project_root)?;
+    issues.append(&mut readiness_issues);
+    if !readiness_records.is_empty() {
+        let matrix_path = project_root.join(READINESS_MATRIX_PATH);
+        let expected = render_readiness_matrix(&readiness_records);
+        match fs::read_to_string(&matrix_path) {
+            Ok(actual) if actual == expected => {}
+            Ok(_) => issues.push(DocumentationCheckIssue {
+                code: "readiness-matrix-drift".to_string(),
+                severity: "error".to_string(),
+                path: READINESS_MATRIX_PATH.to_string(),
+                message:
+                    "Generated readiness matrix has drifted; run `elegy-documentation export readiness --project . --output docs/readiness.md`."
+                        .to_string(),
+            }),
+            Err(_) => issues.push(DocumentationCheckIssue {
+                code: "readiness-matrix-missing".to_string(),
+                severity: "error".to_string(),
+                path: READINESS_MATRIX_PATH.to_string(),
+                message: "Canonical generated readiness matrix is missing.".to_string(),
+            }),
+        }
+    }
     issues.sort_by(|left, right| {
         left.path
             .cmp(&right.path)
@@ -752,6 +777,304 @@ pub fn documentation_export_bundle(
     output_path: &Path,
 ) -> Result<DocumentationExportResult, DocumentationError> {
     export_documentation(project_root, output_path, ExportKind::Bundle)
+}
+
+/// Exports the canonical, deterministic ecosystem readiness matrix.
+pub fn documentation_export_readiness(
+    project_root: &Path,
+    output_path: &Path,
+) -> Result<DocumentationExportResult, DocumentationError> {
+    let resolved = resolve_docs_config(project_root)?;
+    let (records, issues) = collect_readiness_records(project_root)?;
+    if !issues.is_empty() {
+        return Err(DocumentationError::InvalidRequest {
+            issues: issues.into_iter().map(|issue| issue.message).collect(),
+        });
+    }
+    write_output_file(output_path, &render_readiness_matrix(&records))?;
+
+    Ok(DocumentationExportResult {
+        schema_version: DOCUMENTATION_EXPORT_RESULT_SCHEMA_VERSION.to_string(),
+        project_root: display_path(project_root),
+        config_path: resolved.relative_path(&resolved.config_path),
+        export_kind: "readiness".to_string(),
+        output_path: display_path(output_path),
+        document_count: records.len(),
+        source_count: records.len(),
+        generated_at: render_now_rfc3339()?,
+        authority_posture: AUTHORITY_POSTURE.to_string(),
+        drift_detected: false,
+    })
+}
+
+fn collect_readiness_records(
+    project_root: &Path,
+) -> Result<(Vec<ReadinessMatrixRecord>, Vec<DocumentationCheckIssue>), DocumentationError> {
+    let catalog_path = project_root.join("distribution").join("surfaces.json");
+    if !catalog_path.is_file() {
+        return Ok((Vec::new(), Vec::new()));
+    }
+    let raw = fs::read_to_string(&catalog_path).map_err(|source| DocumentationError::Io {
+        operation: "read",
+        path: catalog_path.clone(),
+        source,
+    })?;
+    let catalog: ReadinessDistributionCatalog =
+        serde_json::from_str(&raw).map_err(|source| DocumentationError::Json {
+            path: catalog_path,
+            source,
+        })?;
+    let mut records = Vec::new();
+    let mut issues = Vec::new();
+
+    for surface in catalog.surfaces {
+        if surface.packaging.as_deref() == Some("plugin")
+            && (surface.surface_class != "adapter-plugin" || surface.lifecycle != "active")
+        {
+            issues.push(readiness_issue(
+                &surface.name,
+                "plugin-boundary-invalid",
+                "Only active adapter-plugin surfaces may use Elegy plugin packaging.",
+            ));
+            continue;
+        }
+        let documentation_root = surface
+            .plugin_root
+            .clone()
+            .or_else(|| surface.crate_root.clone())
+            .or_else(|| surface.skill_root.clone());
+        let (reference, manifest_stage) = if surface.packaging.as_deref() == Some("plugin") {
+            let Some(plugin_root) = surface.plugin_root.as_deref() else {
+                issues.push(readiness_issue(
+                    &surface.name,
+                    "readiness-reference-missing",
+                    "Packaged plugin surface has no pluginRoot.",
+                ));
+                continue;
+            };
+            let manifest_path = project_root
+                .join(plugin_root)
+                .join(".elegy-plugin")
+                .join("plugin.json");
+            let manifest_raw =
+                fs::read_to_string(&manifest_path).map_err(|source| DocumentationError::Io {
+                    operation: "read",
+                    path: manifest_path.clone(),
+                    source,
+                })?;
+            let manifest: ElegyPluginV1 =
+                serde_json::from_str(&manifest_raw).map_err(|source| DocumentationError::Json {
+                    path: manifest_path,
+                    source,
+                })?;
+            if manifest.capability_catalog.is_none() {
+                issues.push(readiness_issue(
+                    &surface.name,
+                    "plugin-capability-boundary-missing",
+                    "An active adapter plugin must declare a typed capabilityCatalog; skills and metadata are not executable product evidence.",
+                ));
+                continue;
+            }
+            let Some(readiness) = manifest.readiness.as_ref() else {
+                issues.push(readiness_issue(
+                    &surface.name,
+                    "readiness-reference-missing",
+                    "Plugin manifest has no readiness reference and is non-routable.",
+                ));
+                continue;
+            };
+            (
+                ReadinessReference {
+                    path: format!(
+                        "{}/{}",
+                        plugin_root.trim_end_matches('/'),
+                        readiness.path.trim_start_matches("./")
+                    ),
+                    schema_version: readiness.schema_version.clone(),
+                },
+                Some(readiness.stage),
+            )
+        } else {
+            let Some(readiness) = surface.readiness else {
+                issues.push(readiness_issue(
+                    &surface.name,
+                    "readiness-reference-missing",
+                    "Standalone surface has no readiness reference.",
+                ));
+                continue;
+            };
+            (readiness, None)
+        };
+
+        if reference.schema_version != "elegy-readiness/v1" {
+            issues.push(readiness_issue(
+                &surface.name,
+                "readiness-schema-mismatch",
+                "Readiness reference must use elegy-readiness/v1.",
+            ));
+            continue;
+        }
+        let normalized_path = reference.path.trim_start_matches("./").replace('\\', "/");
+        let readiness_path = project_root.join(&normalized_path);
+        let readiness_raw =
+            fs::read_to_string(&readiness_path).map_err(|source| DocumentationError::Io {
+                operation: "read",
+                path: readiness_path.clone(),
+                source,
+            })?;
+        let readiness: ElegyReadinessV1 =
+            serde_json::from_str(&readiness_raw).map_err(|source| DocumentationError::Json {
+                path: readiness_path,
+                source,
+            })?;
+
+        for message in readiness.validation_issues() {
+            issues.push(readiness_issue(
+                &normalized_path,
+                "readiness-invalid",
+                &message,
+            ));
+        }
+        if readiness.surface != surface.name {
+            issues.push(readiness_issue(
+                &normalized_path,
+                "readiness-surface-mismatch",
+                &format!(
+                    "Readiness surface '{}' does not match catalog surface '{}'.",
+                    readiness.surface, surface.name
+                ),
+            ));
+        }
+        if manifest_stage.is_some_and(|stage| stage != readiness.stage) {
+            issues.push(readiness_issue(
+                &normalized_path,
+                "readiness-stage-mismatch",
+                "Manifest and readiness artifact stages differ.",
+            ));
+        }
+        if let Some(documentation_root) = documentation_root {
+            let readme_path = project_root.join(documentation_root).join("README.md");
+            if readme_path.is_file() {
+                let readme = fs::read_to_string(&readme_path).unwrap_or_default();
+                let lead = readme
+                    .lines()
+                    .take(25)
+                    .collect::<Vec<_>>()
+                    .join("\n")
+                    .to_ascii_lowercase();
+                let expected_stage = format!("readiness: {}", readiness.stage);
+                let relative = readme_path
+                    .strip_prefix(project_root)
+                    .unwrap_or(&readme_path)
+                    .to_string_lossy();
+                if !lead.contains(&expected_stage) {
+                    issues.push(readiness_issue(
+                        &relative,
+                        "readiness-claim-mismatch",
+                        &format!(
+                            "Surface README must lead with recorded stage `{}`.",
+                            readiness.stage
+                        ),
+                    ));
+                }
+                if !readiness.is_agent_routable()
+                    && !lead.contains("not agent-routable")
+                    && !lead.contains("neither transport is agent-routable")
+                {
+                    issues.push(readiness_issue(
+                        &relative,
+                        "readiness-claim-exceeds-evidence",
+                        "A concept or implemented README must lead by stating that the surface is not agent-routable.",
+                    ));
+                }
+            } else {
+                issues.push(readiness_issue(
+                    &readme_path
+                        .strip_prefix(project_root)
+                        .unwrap_or(&readme_path)
+                        .to_string_lossy(),
+                    "surface-readme-missing",
+                    "Every distributed surface must have a README that leads with readiness, working behavior, limitations, installation, invocation, and evidence scope.",
+                ));
+            }
+        }
+        if let Some(skill_root) = surface.skill_root.as_deref() {
+            let skill_path = project_root.join(skill_root).join("SKILL.md");
+            let skill = fs::read_to_string(&skill_path).unwrap_or_default();
+            if !readiness.is_agent_routable()
+                && !skill.to_ascii_lowercase().contains("not agent-routable")
+            {
+                let relative = skill_path
+                    .strip_prefix(project_root)
+                    .unwrap_or(&skill_path)
+                    .to_string_lossy();
+                issues.push(readiness_issue(
+                    &relative,
+                    "incubating-skill-routable",
+                    "A non-routable skill must state `Not agent-routable` near its entrypoint.",
+                ));
+            }
+        }
+
+        records.push(ReadinessMatrixRecord {
+            name: surface.name,
+            kind: surface.kind,
+            surface_class: surface.surface_class,
+            lifecycle: surface.lifecycle,
+            disposition: surface.disposition,
+            stage: readiness.stage.to_string(),
+            routable: readiness.is_agent_routable(),
+            summary: readiness.summary,
+            works_today: readiness.works_today,
+            limitations: readiness.limitations,
+            evidence_path: format!("../{normalized_path}"),
+        });
+    }
+    records.sort_by(|left, right| left.name.cmp(&right.name));
+    Ok((records, issues))
+}
+
+fn readiness_issue(path: &str, code: &str, message: &str) -> DocumentationCheckIssue {
+    DocumentationCheckIssue {
+        code: code.to_string(),
+        severity: "error".to_string(),
+        path: path.to_string(),
+        message: message.to_string(),
+    }
+}
+
+fn render_readiness_matrix(records: &[ReadinessMatrixRecord]) -> String {
+    fn cell(value: &str) -> String {
+        value.replace('|', "\\|").replace(['\r', '\n'], " ")
+    }
+    fn list_cell(values: &[String]) -> String {
+        values
+            .iter()
+            .map(|value| cell(value))
+            .collect::<Vec<_>>()
+            .join("<br>")
+    }
+
+    let mut output = String::from(
+        "---\ntitle: Elegy ecosystem readiness\nstatus: current\nowner: Elegy maintainers\ndoc_kind: generated\n---\n\n# Elegy ecosystem readiness\n\nThis file is generated from the release catalog, adapter manifests, and canonical readiness artifacts. `surface class` states what a component is; `kind` only controls build mechanics. `implemented` means source behavior and tests exist, not that a clean installation is usable. Default agent discovery includes only `usable` and `production` active adapter plugins.\n\n| Surface | Surface class | Lifecycle | Build kind | Stage | Agent-routable | Disposition | What works today | Explicit limitations | Evidence authority |\n|---|---|---|---|---|---|---|---|---|---|\n",
+    );
+    for record in records {
+        output.push_str(&format!(
+            "| {} | {} | {} | {} | {} | {} | {} | {} | {} | [{}]({}) |\n",
+            cell(&record.name),
+            cell(&record.surface_class),
+            cell(&record.lifecycle),
+            cell(&record.kind),
+            cell(&record.stage),
+            if record.routable { "yes" } else { "no" },
+            cell(&record.disposition),
+            list_cell(&record.works_today),
+            list_cell(&record.limitations),
+            cell(&record.summary),
+            record.evidence_path,
+        ));
+    }
+    output
 }
 
 #[derive(Clone, Copy)]
@@ -2132,6 +2455,65 @@ fn parse_dateish(value: &str) -> Option<Date> {
     })
 }
 
+#[derive(Clone, Debug)]
+struct ReadinessMatrixRecord {
+    name: String,
+    kind: String,
+    surface_class: String,
+    lifecycle: String,
+    disposition: String,
+    stage: String,
+    routable: bool,
+    summary: String,
+    works_today: Vec<String>,
+    limitations: Vec<String>,
+    evidence_path: String,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadinessDistributionCatalog {
+    surfaces: Vec<ReadinessDistributionSurface>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadinessDistributionSurface {
+    name: String,
+    kind: String,
+    #[serde(default = "default_surface_class")]
+    surface_class: String,
+    #[serde(default = "default_surface_lifecycle")]
+    lifecycle: String,
+    #[serde(default)]
+    packaging: Option<String>,
+    #[serde(default)]
+    plugin_root: Option<String>,
+    #[serde(default)]
+    crate_root: Option<String>,
+    #[serde(default)]
+    skill_root: Option<String>,
+    #[serde(default)]
+    readiness: Option<ReadinessReference>,
+    #[serde(default)]
+    disposition: String,
+}
+
+fn default_surface_lifecycle() -> String {
+    "deprecated".to_string()
+}
+
+fn default_surface_class() -> String {
+    "unclassified".to_string()
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ReadinessReference {
+    path: String,
+    schema_version: String,
+}
+
 fn generated_content_matches(actual: &str, expected: &str) -> bool {
     actual.replace("\r\n", "\n") == expected
 }
@@ -2376,11 +2758,13 @@ fn default_research_warning_days() -> u32 {
 #[cfg(test)]
 mod tests {
     use super::{
-        documentation_check, documentation_export_bundle, documentation_export_llms,
-        documentation_init, documentation_map, DocumentationError, DOCS_CONFIG_PATH,
+        collect_readiness_records, documentation_check, documentation_export_bundle,
+        documentation_export_llms, documentation_export_readiness, documentation_init,
+        documentation_map, render_readiness_matrix, DocumentationError, ReadinessMatrixRecord,
+        DOCS_CONFIG_PATH,
     };
     use std::fs;
-    use std::path::PathBuf;
+    use std::path::{Path, PathBuf};
     use std::time::{SystemTime, UNIX_EPOCH};
 
     fn unique_temp_dir(prefix: &str) -> PathBuf {
@@ -2391,6 +2775,209 @@ mod tests {
         let dir = std::env::temp_dir().join(format!("{prefix}-{unique}"));
         fs::create_dir_all(&dir).expect("create temp directory");
         dir
+    }
+
+    #[test]
+    fn readiness_matrix_never_routes_implemented_surfaces() {
+        let matrix = render_readiness_matrix(&[ReadinessMatrixRecord {
+            name: "elegy-example".to_string(),
+            kind: "cli".to_string(),
+            surface_class: "tool".to_string(),
+            lifecycle: "active".to_string(),
+            disposition: "Keep as a standalone tool.".to_string(),
+            stage: "implemented".to_string(),
+            routable: false,
+            summary: "Source behavior exists.".to_string(),
+            works_today: vec!["Runs source tests.".to_string()],
+            limitations: vec!["No clean-install proof.".to_string()],
+            evidence_path: "./example/readiness.json".to_string(),
+        }]);
+
+        assert!(matrix.contains("| elegy-example | tool | active | cli | implemented | no |"));
+        assert!(matrix.contains("No clean-install proof."));
+        assert!(!matrix.contains("| elegy-example | tool | active | cli | implemented | yes |"));
+    }
+
+    #[test]
+    fn readiness_catalog_rejects_non_adapter_plugin_packaging() {
+        let root = unique_temp_dir("elegy-documentation-non-adapter-plugin");
+        fs::create_dir_all(root.join("distribution")).expect("create distribution");
+        fs::write(
+            root.join("distribution/surfaces.json"),
+            r#"{
+  "schemaVersion": "elegy-surfaces/v3",
+  "surfaces": [{
+    "name": "business-radar",
+    "kind": "cli",
+    "surfaceClass": "tool",
+    "lifecycle": "active",
+    "packaging": "plugin",
+    "pluginRoot": "tools/business-radar",
+    "readiness": {
+      "path": "./tools/business-radar/readiness.json",
+      "schemaVersion": "elegy-readiness/v1"
+    }
+  }]
+}"#,
+        )
+        .expect("write surfaces");
+
+        let (_, issues) = collect_readiness_records(&root).expect("collect readiness");
+
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "plugin-boundary-invalid"),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn readiness_catalog_rejects_adapter_without_typed_capability_boundary() {
+        let root = unique_temp_dir("elegy-documentation-untyped-adapter");
+        fs::create_dir_all(root.join("distribution")).expect("create distribution");
+        fs::create_dir_all(root.join("plugins/example/.elegy-plugin")).expect("create plugin");
+        fs::write(
+            root.join("distribution/surfaces.json"),
+            r#"{
+  "schemaVersion": "elegy-surfaces/v3",
+  "surfaces": [{
+    "name": "example-adapter",
+    "kind": "bundled-plugin",
+    "surfaceClass": "adapter-plugin",
+    "lifecycle": "active",
+    "packaging": "plugin",
+    "pluginRoot": "plugins/example"
+  }]
+}"#,
+        )
+        .expect("write surfaces");
+        fs::write(
+            root.join("plugins/example/.elegy-plugin/plugin.json"),
+            r#"{
+  "schemaVersion": "elegy-plugin/v2",
+  "name": "example-adapter",
+  "version": "0.1.0",
+  "description": "An untyped adapter fixture.",
+  "skills": "./skills/",
+  "connections": {"requirements": {"mode": "none"}},
+  "readiness": {
+    "stage": "implemented",
+    "path": "./readiness.json",
+    "schemaVersion": "elegy-readiness/v1"
+  }
+}"#,
+        )
+        .expect("write manifest");
+
+        let (_, issues) = collect_readiness_records(&root).expect("collect readiness");
+
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "plugin-capability-boundary-missing"),
+            "{issues:?}"
+        );
+    }
+
+    fn write_readiness_fixture(root: &Path, skill_body: &str) {
+        fs::create_dir_all(root.join("distribution")).expect("create distribution");
+        fs::create_dir_all(root.join("skills/example/.elegy-plugin")).expect("create plugin");
+        fs::write(
+            root.join("distribution/surfaces.json"),
+            r#"{"schemaVersion":"elegy-surfaces/v3","surfaces":[{"name":"example-skill","kind":"skill-package","surfaceClass":"skill","lifecycle":"active","skillRoot":"skills/example","readiness":{"path":"./skills/example/readiness.json","schemaVersion":"elegy-readiness/v1"},"disposition":"Keep as a skill."}]}"#,
+        )
+        .expect("write surfaces");
+        fs::write(
+            root.join("skills/example/.elegy-plugin/plugin.json"),
+            r#"{"schemaVersion":"elegy-plugin/v2","name":"example-skill","version":"0.1.0","description":"Fixture skill.","skills":"./","connections":{"requirements":{"mode":"none"}},"readiness":{"stage":"concept","path":"./readiness.json","schemaVersion":"elegy-readiness/v1"}}"#,
+        )
+        .expect("write manifest");
+        fs::write(
+            root.join("skills/example/readiness.json"),
+            r#"{"schemaVersion":"elegy-readiness/v1","surface":"example-skill","surfaceVersion":"0.1.0","stage":"concept","summary":"Fixture only.","worksToday":["Can be inspected."],"limitations":["No installed task."],"supportedEnvironments":["test"],"installation":"Do not install.","invocation":"Do not invoke.","evidence":[]}"#,
+        )
+        .expect("write readiness");
+        fs::write(root.join("skills/example/SKILL.md"), skill_body).expect("write skill");
+        fs::write(
+            root.join("skills/example/README.md"),
+            "# Example\n\nReadiness: concept; not agent-routable.\n\nThe fixture can be inspected. It cannot perform a real task. No installation or invocation is available. Evidence scope: fixture only.\n",
+        )
+        .expect("write readme");
+    }
+
+    #[test]
+    fn documentation_readiness_rejects_skill_routing_to_incubating_surface() {
+        let root = unique_temp_dir("elegy-documentation-incubating-skill");
+        write_readiness_fixture(&root, "# Example\n\nUse this capability.");
+
+        let (_, issues) = collect_readiness_records(&root).expect("collect readiness");
+
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "incubating-skill-routable"),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn documentation_readiness_rejects_readme_claim_above_recorded_stage() {
+        let root = unique_temp_dir("elegy-documentation-readiness-claim");
+        write_readiness_fixture(
+            &root,
+            "# Example\n\nReadiness: concept; not agent-routable.",
+        );
+        fs::write(
+            root.join("skills/example/README.md"),
+            "# Example\n\nReadiness: production\n",
+        )
+        .expect("write misleading readme");
+
+        let (_, issues) = collect_readiness_records(&root).expect("collect readiness");
+
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "readiness-claim-mismatch"),
+            "{issues:?}"
+        );
+        assert!(
+            issues
+                .iter()
+                .any(|issue| issue.code == "readiness-claim-exceeds-evidence"),
+            "{issues:?}"
+        );
+    }
+
+    #[test]
+    fn documentation_check_rejects_stale_readiness_matrix() {
+        let root = unique_temp_dir("elegy-documentation-readiness-drift");
+        write_readiness_fixture(
+            &root,
+            "# Example\n\nReadiness: concept; not agent-routable.",
+        );
+        fs::create_dir_all(root.join(".elegy")).expect("create config");
+        fs::create_dir_all(root.join("docs/architecture")).expect("create docs");
+        fs::write(
+            root.join(DOCS_CONFIG_PATH),
+            "schemaVersion: elegy-documentation/v2\nauthorityRoots:\n  current: [docs/architecture]\n  planning: []\n  research: []\n  generated: []\nentrypoints: []\nderivedSurfaces: {sidebars: [], manifests: [], llms: [], bundles: []}\nrequiredFrontmatter: [title, status, owner]\n",
+        )
+        .expect("write config");
+        documentation_export_readiness(&root, &root.join("docs/readiness.md"))
+            .expect("export readiness");
+        fs::write(root.join("docs/readiness.md"), "stale\n").expect("make matrix stale");
+
+        let result = documentation_check(&root).expect("check docs");
+
+        assert!(
+            result
+                .issues
+                .iter()
+                .any(|issue| issue.code == "readiness-matrix-drift"),
+            "{:?}",
+            result.issues
+        );
     }
 
     #[test]

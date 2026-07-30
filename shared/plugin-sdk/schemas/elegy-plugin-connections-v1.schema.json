@@ -1,0 +1,55 @@
+{
+  "$defs": {
+    "ElegyConnectionRequirement": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "service": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "service",
+        "required",
+        "description"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "plugin": {
+      "type": "string"
+    },
+    "pluginVersion": {
+      "type": "string"
+    },
+    "requirements": {
+      "items": {
+        "$ref": "#/$defs/ElegyConnectionRequirement"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "plugin",
+    "pluginVersion",
+    "requirements"
+  ],
+  "title": "ElegyPluginConnectionsV1",
+  "type": "object"
+}

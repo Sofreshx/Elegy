@@ -1,0 +1,112 @@
+{
+  "$defs": {
+    "ElegyReadinessEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "$ref": "#/$defs/ElegyReadinessEvidenceKind"
+        },
+        "nonFixture": {
+          "default": false,
+          "type": "boolean"
+        },
+        "path": {
+          "type": "string"
+        },
+        "summary": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "path",
+        "summary"
+      ],
+      "type": "object"
+    },
+    "ElegyReadinessEvidenceKind": {
+      "enum": [
+        "source-tests",
+        "package-verification",
+        "clean-install",
+        "real-task",
+        "release",
+        "consumer"
+      ],
+      "type": "string"
+    },
+    "ElegyReadinessStage": {
+      "enum": [
+        "concept",
+        "implemented",
+        "usable",
+        "production"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "evidence": {
+      "items": {
+        "$ref": "#/$defs/ElegyReadinessEvidence"
+      },
+      "type": "array"
+    },
+    "installation": {
+      "type": "string"
+    },
+    "invocation": {
+      "type": "string"
+    },
+    "limitations": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "string"
+    },
+    "stage": {
+      "$ref": "#/$defs/ElegyReadinessStage"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "supportedEnvironments": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "surface": {
+      "type": "string"
+    },
+    "surfaceVersion": {
+      "type": "string"
+    },
+    "worksToday": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "surface",
+    "surfaceVersion",
+    "stage",
+    "summary",
+    "worksToday",
+    "limitations",
+    "supportedEnvironments",
+    "installation",
+    "invocation",
+    "evidence"
+  ],
+  "title": "ElegyReadinessV1",
+  "type": "object"
+}

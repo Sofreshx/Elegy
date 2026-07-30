@@ -5,7 +5,7 @@ use elegy_plugin_sdk::{
     validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, CodexProjectionMode,
     ElegyMarketplaceArtifact, ElegyMarketplaceInterface, ElegyMarketplacePlugin,
     ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, PluginArchiveBinary,
-    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
+    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_V2_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -117,6 +117,9 @@ enum MarketplaceCommand {
         release_tag: String,
         #[arg(long, default_value_t = false)]
         check: bool,
+        /// Include non-routable surfaces for explicit maintainer inspection.
+        #[arg(long, default_value_t = false)]
+        include_incubating: bool,
     },
     /// Validate a marketplace and its plugin manifests
     Validate {
@@ -129,6 +132,9 @@ enum MarketplaceCommand {
         source: String,
         #[arg(long, default_value_t = false)]
         json: bool,
+        /// Include non-routable surfaces for explicit maintainer inspection.
+        #[arg(long, default_value_t = false)]
+        include_incubating: bool,
     },
     /// Search marketplace names, descriptions, and categories
     Search {
@@ -137,6 +143,9 @@ enum MarketplaceCommand {
         source: String,
         #[arg(long, default_value_t = false)]
         json: bool,
+        /// Include non-routable surfaces for explicit maintainer inspection.
+        #[arg(long, default_value_t = false)]
+        include_incubating: bool,
     },
     /// Install a marketplace plugin for the current or selected target
     Install {
@@ -147,6 +156,9 @@ enum MarketplaceCommand {
         target: Option<String>,
         #[arg(long)]
         install_root: Option<PathBuf>,
+        /// Permit installation of a non-routable surface selected explicitly.
+        #[arg(long, default_value_t = false)]
+        allow_incubating: bool,
     },
     /// Report whether installed plugins match the selected marketplace artifacts
     Status {
@@ -172,6 +184,9 @@ enum MarketplaceCommand {
         install_root: Option<PathBuf>,
         #[arg(long, default_value_t = false)]
         json: bool,
+        /// Permit update of a non-routable surface selected explicitly.
+        #[arg(long, default_value_t = false)]
+        allow_incubating: bool,
     },
     /// Poll marketplace freshness and emit JSON lines
     Monitor {
@@ -206,6 +221,9 @@ enum MarketplaceCommand {
         /// Resolve marketplace artifacts from this local release asset directory
         #[arg(long)]
         artifact_dir: Option<PathBuf>,
+        /// Permit export of a non-routable surface selected explicitly.
+        #[arg(long, default_value_t = false)]
+        allow_incubating: bool,
     },
 }
 
@@ -220,6 +238,8 @@ struct DistributionCatalog {
 struct DistributionSurface {
     name: String,
     kind: String,
+    surface_class: String,
+    lifecycle: String,
     #[serde(default)]
     packaging: Option<String>,
     #[serde(default)]
@@ -534,7 +554,15 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
             release_base_url,
             release_tag,
             check,
-        } => generate_marketplace(&project, &output, &release_base_url, &release_tag, check),
+            include_incubating,
+        } => generate_marketplace(
+            &project,
+            &output,
+            &release_base_url,
+            &release_tag,
+            check,
+            include_incubating,
+        ),
         MarketplaceCommand::Validate { source } => load_marketplace(&source).map(|loaded| {
             println!(
                 "Marketplace '{}' is valid ({} plugins).",
@@ -542,24 +570,32 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
                 loaded.plugins.len()
             );
         }),
-        MarketplaceCommand::List { source, json } => load_marketplace(&source)
-            .and_then(|loaded| print_marketplace_plugins(&loaded, None, json)),
+        MarketplaceCommand::List {
+            source,
+            json,
+            include_incubating,
+        } => load_marketplace_for_discovery(&source, include_incubating)
+            .and_then(|loaded| print_marketplace_plugins(&loaded, None, json, include_incubating)),
         MarketplaceCommand::Search {
             query,
             source,
             json,
-        } => load_marketplace(&source)
-            .and_then(|loaded| print_marketplace_plugins(&loaded, Some(&query), json)),
+            include_incubating,
+        } => load_marketplace_for_discovery(&source, include_incubating).and_then(|loaded| {
+            print_marketplace_plugins(&loaded, Some(&query), json, include_incubating)
+        }),
         MarketplaceCommand::Install {
             plugin,
             source,
             target,
             install_root,
+            allow_incubating,
         } => install_marketplace_plugin(
             &source,
             &plugin,
             target.as_deref().unwrap_or(current_release_target()),
             install_root.as_deref(),
+            allow_incubating,
         ),
         MarketplaceCommand::Status {
             source,
@@ -580,12 +616,14 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
             target,
             install_root,
             json,
+            allow_incubating,
         } => update_marketplace_plugin(
             &source,
             &plugin,
             target.as_deref().unwrap_or(current_release_target()),
             install_root.as_deref(),
             json,
+            allow_incubating,
         ),
         MarketplaceCommand::Monitor {
             source,
@@ -610,15 +648,17 @@ fn run_marketplace_command(command: MarketplaceCommand) -> ExitCode {
             overwrite,
             check,
             artifact_dir,
-        } => export_codex_marketplace(
-            &source,
-            plugin.as_deref(),
-            &output,
-            target.as_deref().unwrap_or(current_release_target()),
+            allow_incubating,
+        } => export_codex_marketplace(CodexMarketplaceExportRequest {
+            source: &source,
+            plugin_name: plugin.as_deref(),
+            output: &output,
+            target: target.as_deref().unwrap_or(current_release_target()),
             overwrite,
             check,
-            artifact_dir.as_deref(),
-        ),
+            artifact_dir: artifact_dir.as_deref(),
+            allow_incubating,
+        }),
     };
 
     match result {
@@ -638,12 +678,17 @@ fn default_marketplace_published() -> bool {
     true
 }
 
+fn include_manifest_in_marketplace(manifest: &ElegyPluginV1, include_incubating: bool) -> bool {
+    include_incubating || manifest.is_agent_routable()
+}
+
 fn generate_marketplace(
     project: &Path,
     output: &Path,
     release_base_url: &str,
     release_tag: &str,
     check: bool,
+    include_incubating: bool,
 ) -> Result<(), String> {
     if release_tag.trim().is_empty() || release_tag.contains('/') || release_tag.contains('\\') {
         return Err("release tag must be a non-empty single path segment".to_string());
@@ -694,14 +739,32 @@ fn generate_marketplace(
                 surface.name, manifest.name
             ));
         }
+        if manifest.capability_catalog.is_none() {
+            return Err(format!(
+                "active adapter plugin '{}' is missing capabilityCatalog",
+                surface.name
+            ));
+        }
+        if !include_manifest_in_marketplace(&manifest, include_incubating) {
+            continue;
+        }
+        let manifest_dir = manifest_path
+            .parent()
+            .ok_or_else(|| format!("manifest path has no parent: {}", manifest_path.display()))?;
+        let verification = verify_plugin_v1(manifest_dir).map_err(|error| error.to_string())?;
+        if !verification.valid {
+            return Err(format!(
+                "invalid {}: {}",
+                manifest_path.display(),
+                verification.issues.join("; ")
+            ));
+        }
         let artifact_base = surface
             .artifact_base_url
             .as_deref()
             .unwrap_or(base)
             .trim_end_matches('/');
-        let artifact_targets = if surface.kind == "skill-package" {
-            vec!["any"]
-        } else if !surface.targets.is_empty() {
+        let artifact_targets = if !surface.targets.is_empty() {
             surface.targets.iter().map(String::as_str).collect()
         } else {
             targets.to_vec()
@@ -772,7 +835,10 @@ fn generate_marketplace(
 }
 
 fn is_plugin_packaged_surface(surface: &DistributionSurface) -> bool {
-    if surface.packaging.as_deref() != Some("plugin") {
+    if surface.packaging.as_deref() != Some("plugin")
+        || surface.surface_class != "adapter-plugin"
+        || surface.lifecycle != "active"
+    {
         return false;
     }
 
@@ -816,6 +882,120 @@ fn load_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
         let manifest = parse_marketplace_plugin_manifest(&entry.name, &manifest_raw)?;
         plugins.push((entry.clone(), manifest));
     }
+    Ok(LoadedMarketplace {
+        marketplace,
+        plugins,
+        local_root: Some(root),
+    })
+}
+
+fn load_marketplace_for_discovery(
+    source: &str,
+    include_incubating: bool,
+) -> Result<LoadedMarketplace, String> {
+    if !include_incubating || source.starts_with("https://") {
+        return load_marketplace(source);
+    }
+
+    let root = fs::canonicalize(source)
+        .map_err(|error| format!("resolve marketplace root '{source}': {error}"))?;
+    let catalog_path = root.join("distribution").join("surfaces.json");
+    if !catalog_path.is_file() {
+        return load_marketplace(source);
+    }
+
+    let catalog_raw = fs::read_to_string(&catalog_path)
+        .map_err(|error| format!("read {}: {error}", catalog_path.display()))?;
+    let catalog: DistributionCatalog = serde_json::from_str(&catalog_raw)
+        .map_err(|error| format!("parse {}: {error}", catalog_path.display()))?;
+    let default_marketplace = load_marketplace(source)?.marketplace;
+    let release_base = "https://github.com/Sofreshx/Elegy/releases/download";
+    let release_tag = "main-snapshot";
+    let default_targets = [
+        "x86_64-pc-windows-msvc",
+        "x86_64-unknown-linux-gnu",
+        "aarch64-apple-darwin",
+    ];
+    let mut entries = Vec::new();
+    let mut plugins = Vec::new();
+
+    for surface in catalog
+        .surfaces
+        .into_iter()
+        .filter(is_plugin_packaged_surface)
+    {
+        if !surface.marketplace_published {
+            continue;
+        }
+        let plugin_root = surface
+            .plugin_root
+            .ok_or_else(|| format!("surface '{}' is missing pluginRoot", surface.name))?;
+        let manifest_path = root
+            .join(&plugin_root)
+            .join(".elegy-plugin")
+            .join("plugin.json");
+        let manifest_raw = fs::read_to_string(&manifest_path)
+            .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
+        let manifest = parse_marketplace_plugin_manifest(&surface.name, &manifest_raw)?;
+        let verification =
+            verify_plugin_v1(manifest_path.parent().ok_or_else(|| {
+                format!("manifest path has no parent: {}", manifest_path.display())
+            })?)
+            .map_err(|error| error.to_string())?;
+        if !verification.valid {
+            return Err(format!(
+                "invalid {}: {}",
+                manifest_path.display(),
+                verification.issues.join("; ")
+            ));
+        }
+
+        let artifact_base = surface
+            .artifact_base_url
+            .as_deref()
+            .unwrap_or(release_base)
+            .trim_end_matches('/');
+        let targets = if surface.targets.is_empty() {
+            default_targets
+                .iter()
+                .map(|target| (*target).to_string())
+                .collect()
+        } else {
+            surface.targets
+        };
+        let entry = ElegyMarketplacePlugin {
+            name: surface.name,
+            source: ElegyMarketplaceSource {
+                source: "local".to_string(),
+                path: format!("./{plugin_root}").replace('\\', "/"),
+            },
+            category: surface.marketplace_category,
+            artifacts: targets
+                .into_iter()
+                .map(|target| {
+                    let file_name = format!("{}-plugin-{target}.zip", manifest.name);
+                    let url = format!("{artifact_base}/{release_tag}/{file_name}");
+                    ElegyMarketplaceArtifact {
+                        target,
+                        checksum_url: format!("{url}.sha256"),
+                        url,
+                    }
+                })
+                .collect(),
+        };
+        entries.push(entry.clone());
+        plugins.push((entry, manifest));
+    }
+
+    let marketplace = ElegyMarketplaceV1 {
+        plugins: entries,
+        ..default_marketplace
+    };
+    let validation = validate_elegy_marketplace_v1(&marketplace);
+    if !validation.is_valid() {
+        return Err(validation.issues.join("; "));
+    }
+
     Ok(LoadedMarketplace {
         marketplace,
         plugins,
@@ -870,6 +1050,12 @@ fn parse_marketplace_plugin_manifest(
             validation.issues.join("; ")
         ));
     }
+    if manifest.schema_version != ELEGY_PLUGIN_V2_SCHEMA_VERSION {
+        return Err(format!(
+            "invalid plugin '{}': marketplace publication requires schemaVersion '{}'.",
+            expected_name, ELEGY_PLUGIN_V2_SCHEMA_VERSION
+        ));
+    }
     if manifest.name != expected_name {
         return Err(format!(
             "marketplace entry '{expected_name}' points to plugin '{}'",
@@ -893,11 +1079,13 @@ fn print_marketplace_plugins(
     loaded: &LoadedMarketplace,
     query: Option<&str>,
     as_json: bool,
+    include_incubating: bool,
 ) -> Result<(), String> {
     let query = query.map(str::to_ascii_lowercase);
     let summaries = loaded
         .plugins
         .iter()
+        .filter(|(_, manifest)| include_manifest_in_marketplace(manifest, include_incubating))
         .filter(|(entry, manifest)| {
             query.as_ref().is_none_or(|query| {
                 entry.name.to_ascii_lowercase().contains(query)
@@ -1167,8 +1355,9 @@ fn update_marketplace_plugin(
     target: &str,
     install_root: Option<&Path>,
     as_json: bool,
+    allow_incubating: bool,
 ) -> Result<(), String> {
-    let loaded = load_marketplace(source)?;
+    let loaded = load_marketplace_for_discovery(source, allow_incubating)?;
     let (entry, manifest) = loaded
         .plugins
         .iter()
@@ -1179,6 +1368,13 @@ fn update_marketplace_plugin(
                 loaded.marketplace.name
             )
         })?;
+    if !include_manifest_in_marketplace(manifest, allow_incubating) {
+        return Err(format!(
+            "plugin '{}' is not agent-routable at readiness stage '{}'; pass --allow-incubating for explicit maintainer use",
+            entry.name,
+            manifest.readiness_stage()
+        ));
+    }
     if !is_supported_marketplace_target(target) {
         return Err(format!("unsupported marketplace target '{target}'"));
     }
@@ -1380,8 +1576,9 @@ fn install_marketplace_plugin(
     plugin_name: &str,
     target: &str,
     install_root: Option<&Path>,
+    allow_incubating: bool,
 ) -> Result<(), String> {
-    let loaded = load_marketplace(source)?;
+    let loaded = load_marketplace_for_discovery(source, allow_incubating)?;
     let (entry, manifest) = loaded
         .plugins
         .iter()
@@ -1392,6 +1589,13 @@ fn install_marketplace_plugin(
                 loaded.marketplace.name
             )
         })?;
+    if !include_manifest_in_marketplace(manifest, allow_incubating) {
+        return Err(format!(
+            "plugin '{}' is not agent-routable at readiness stage '{}'; pass --allow-incubating for explicit maintainer use",
+            entry.name,
+            manifest.readiness_stage()
+        ));
+    }
     let root = install_root
         .map(Path::to_path_buf)
         .unwrap_or_else(|| dirs_or_manual_home().join(".elegy").join("plugins"));
@@ -1439,16 +1643,29 @@ fn install_marketplace_plugin(
     Ok(())
 }
 
-fn export_codex_marketplace(
-    source: &str,
-    plugin_name: Option<&str>,
-    output: &Path,
-    target: &str,
+struct CodexMarketplaceExportRequest<'a> {
+    source: &'a str,
+    plugin_name: Option<&'a str>,
+    output: &'a Path,
+    target: &'a str,
     overwrite: bool,
     check: bool,
-    artifact_dir: Option<&Path>,
-) -> Result<(), String> {
-    let loaded = load_marketplace(source)?;
+    artifact_dir: Option<&'a Path>,
+    allow_incubating: bool,
+}
+
+fn export_codex_marketplace(request: CodexMarketplaceExportRequest<'_>) -> Result<(), String> {
+    let CodexMarketplaceExportRequest {
+        source,
+        plugin_name,
+        output,
+        target,
+        overwrite,
+        check,
+        artifact_dir,
+        allow_incubating,
+    } = request;
+    let loaded = load_marketplace_for_discovery(source, allow_incubating)?;
     let local_root = loaded
         .local_root
         .ok_or_else(|| "Codex export requires a local marketplace source".to_string())?;
@@ -1473,19 +1690,25 @@ fn export_codex_marketplace(
         .iter()
         .filter(|(entry, _)| plugin_name.is_none_or(|plugin_name| entry.name == plugin_name))
         .collect::<Vec<_>>();
-    if selected_plugins.is_empty() {
+    if selected_plugins.is_empty() && plugin_name.is_some() {
         return Err(match plugin_name {
             Some(plugin_name) => format!(
                 "plugin '{plugin_name}' is not in marketplace '{}'",
                 loaded.marketplace.name
             ),
-            None => format!(
-                "marketplace '{}' contains no plugins",
-                loaded.marketplace.name
-            ),
+            None => unreachable!("plugin_name was checked"),
         });
     }
     for (entry, manifest) in selected_plugins {
+        if !include_manifest_in_marketplace(manifest, allow_incubating) {
+            if plugin_name.is_some() {
+                return Err(format!(
+                    "plugin '{}' is not agent-routable; pass --allow-incubating only for explicit maintainer inspection",
+                    entry.name
+                ));
+            }
+            continue;
+        }
         if !entry.artifacts.is_empty() && select_marketplace_artifact(entry, target).is_none() {
             if plugin_name.is_some() {
                 return Err(format!(
@@ -2177,6 +2400,92 @@ mod tests {
         assert_eq!(receipt.name, "legacy-plugin");
         assert_eq!(receipt.target, None);
         assert_eq!(receipt.artifact_sha256, None);
+    }
+
+    #[test]
+    fn default_marketplace_routing_excludes_missing_and_implemented_readiness() {
+        let legacy: ElegyPluginV1 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v1",
+            "name": "legacy-plugin",
+            "version": "0.1.0",
+            "description": "Legacy plugin.",
+            "skills": "./skills/"
+        }))
+        .expect("legacy manifest");
+        let implemented: ElegyPluginV1 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v2",
+            "name": "implemented-plugin",
+            "version": "0.1.0",
+            "description": "Implemented plugin.",
+            "skills": "./skills/",
+            "connections": {"requirements": {"mode": "none"}},
+            "readiness": {
+                "stage": "implemented",
+                "path": "./readiness.json",
+                "schemaVersion": "elegy-readiness/v1"
+            }
+        }))
+        .expect("implemented manifest");
+
+        assert!(!include_manifest_in_marketplace(&legacy, false));
+        assert!(!include_manifest_in_marketplace(&implemented, false));
+        assert!(include_manifest_in_marketplace(&implemented, true));
+    }
+
+    #[test]
+    fn default_marketplace_routing_includes_usable_readiness() {
+        let usable: ElegyPluginV1 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v2",
+            "name": "usable-plugin",
+            "version": "0.1.0",
+            "description": "Usable plugin.",
+            "skills": "./skills/",
+            "connections": {"requirements": {"mode": "none"}},
+            "readiness": {
+                "stage": "usable",
+                "path": "./readiness.json",
+                "schemaVersion": "elegy-readiness/v1"
+            }
+        }))
+        .expect("usable manifest");
+
+        assert!(include_manifest_in_marketplace(&usable, false));
+    }
+
+    #[test]
+    fn marketplace_publication_rejects_legacy_plugin_manifests() {
+        let raw = r#"{
+            "schemaVersion": "elegy-plugin/v1",
+            "name": "legacy-plugin",
+            "version": "0.1.0",
+            "description": "Legacy plugin without an explicit authentication posture.",
+            "skills": "./skills/"
+        }"#;
+
+        let error = parse_marketplace_plugin_manifest("legacy-plugin", raw)
+            .expect_err("marketplace publication must require plugin v2");
+
+        assert!(error.contains("elegy-plugin/v2"), "{error}");
+    }
+
+    #[test]
+    fn explicit_incubating_discovery_uses_project_catalog_without_rewriting_default() {
+        let project = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let source = project.to_string_lossy();
+        let default_before = fs::read_to_string(project.join(".elegy/marketplace.json"))
+            .expect("read default marketplace");
+
+        let loaded = load_marketplace_for_discovery(&source, true)
+            .expect("load explicitly incubating marketplace");
+
+        assert_eq!(loaded.plugins.len(), 1);
+        assert_eq!(loaded.plugins[0].0.name, "elegy-accounts");
+        assert!(!loaded.plugins[0].1.is_agent_routable());
+        assert_eq!(
+            fs::read_to_string(project.join(".elegy/marketplace.json"))
+                .expect("read unchanged default marketplace"),
+            default_before
+        );
     }
 
     #[test]

@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-documentation",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Documentation init, inspection, mapping, checking, and export exist in source; installed use outside this checkout is unproven.",
+  "worksToday": ["Maps configured documentation authority.", "Checks metadata, links, entrypoints, freshness, and derived-output drift."],
+  "limitations": ["Truthfulness depends on explicit readiness evidence and cannot be inferred from prose alone.", "No clean installed task receipt exists."],
+  "supportedEnvironments": ["Windows, Linux, and macOS source builds"],
+  "installation": "Build from source with cargo build -p elegy-documentation.",
+  "invocation": "Run elegy-documentation check --project <repo>.",
+  "evidence": [
+    {"kind": "source-tests", "path": "./evidence/readiness-source.json", "summary": "Workspace source tests passed."},
+    {"kind": "package-verification", "path": "./evidence/readiness-source.json", "summary": "The local plugin package passed structural verification."}
+  ]
+}

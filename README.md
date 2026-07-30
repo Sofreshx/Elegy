@@ -9,27 +9,37 @@ hosts. Governed artifacts stay in the repo. Dedicated `elegy-*` binaries expose
 the executable surfaces. CLI invocation is the default integration boundary.
 MCP is optional.
 
+## Current readiness
+
+Elegy currently exposes **no agent-routable surface by default**. Source behavior exists for many packages, but none has yet earned `usable` through both a clean packaged installation and a non-fixture end-to-end task. See the generated [ecosystem readiness matrix](docs/readiness.md) before installing or invoking anything.
+
+`implemented` means source behavior and checks exist. It does not mean usable, shipped, or production-ready. The default marketplace is therefore intentionally empty.
+
 Automation Packs remain a separate delivery lane. Their cross-repository
 relationship to Elegy is governed by the
 [Automation Program ecosystem decision](https://github.com/Sofreshx/elegy-automation-program/blob/main/docs/adr/2026-07-21-automation-ecosystem-governance.md).
 
 Core model:
 
-- governed plugin artifacts stay co-located with owning bundled plugins
+- plugins are reusable adapters to data sources, databases, platforms, APIs,
+  local systems, or executable/CLI boundaries
+- domain and business logic stays in libraries, applications, Automation Packs,
+  or product-local commands
 - Rust implements reusable behavior over those artifacts
 - `SKILL.md` files are the skill discovery authority
-- dedicated `elegy-*` binaries are the shipped surfaces
+- dedicated `elegy-*` binaries are implementation surfaces whose readiness is
+  proven separately
 - `elegy-run` is the MCP host adapter
 
 ## Repository Model
 
 | Area | Purpose |
 | --- | --- |
-| `plugins/` | Bundled installable plugin packages. |
+| `plugins/` | Historical runtime root containing one active adapter plus tools and adapter candidates; path is not classification. |
 | `tools/` | Standalone CLI crates that are not plugin packages. |
 | `hosts/` | Host adapters and transport servers. |
 | `skills/` | Standalone skill-only packages. |
-| `marketplace-wrappers/` | Public metadata wrappers for external/private plugin archives. |
+| `marketplace-wrappers/` | Historical or blocked external integration metadata; not default plugin discovery. |
 | `shared/` | Reusable Rust libraries and platform tooling. |
 | `distribution/` | Canonical release and surface catalog. |
 | `docs/` | Architecture, ADRs, specs, governance, and operations docs. |
@@ -39,58 +49,28 @@ When those surfaces disagree, prefer the smallest relevant architecture or spec
 document under `docs/`, then the owning package manifest and
 `distribution/surfaces.json`.
 
-## Install
+## Maintainer use from source
 
-Latest stable release: [github.com/Sofreshx/Elegy/releases/latest](https://github.com/Sofreshx/Elegy/releases/latest)
-
-Rolling prerelease from `main`: [github.com/Sofreshx/Elegy/releases/tag/main-snapshot](https://github.com/Sofreshx/Elegy/releases/tag/main-snapshot)
-
-Published targets:
-
-- `x86_64-pc-windows-msvc`
-- `x86_64-unknown-linux-gnu`
-- `aarch64-apple-darwin`
-
-Plugin-packaged surfaces ship as portable release archives named
-`<surface>-plugin-<target>.zip`. Skill-only packages use
-`<surface>-plugin-any.zip`. Use `elegy-plugin-packaging` to install or export
-them.
-
-```bash
-elegy-plugin-packaging install --archive elegy-planning-plugin-x86_64-pc-windows-msvc.zip
-elegy-plugin-packaging export --plugin plugins/planning --host codex --output ./export
-```
-
-Codex-native consumers should use the generated marketplace projection asset
-named `elegy-codex-marketplace-<target>.zip`. Extract it to a Codex marketplace
-directory, register that marketplace, then install the selected plugin:
-
-```bash
-codex plugin marketplace add <CODEX_HOME>/marketplaces/elegy --json
-codex plugin add elegy-planning@elegy --json
-```
-
-Non-plugin surfaces ship as standalone binaries. See
-[docs/distribution.md](docs/distribution.md) for the release index and each
-binary's `DISTRIBUTION.md` for install details.
-
-### From source
+There is no generally recommended Elegy installation today. Maintainers can
+inspect and exercise implemented surfaces from a source checkout:
 
 ```bash
 git clone https://github.com/Sofreshx/Elegy.git
 cd Elegy
 cargo build
-cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/planning
-cargo run -p elegy-planning -- --json version
+cargo run -p elegy-tooling --bin elegy-plugin-packaging -- verify --plugin plugins/accounts
+cargo run -p elegy-accounts -- --help
 ```
+
+These commands are source verification, not clean-install or real-task receipts.
 
 Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
 [docs/architecture/README.md](docs/architecture/README.md).
 
-## Shipped Binaries
+## Implemented source binaries
 
-Each binary owns its own distribution note. Adding a new binary does not
-require editing this README.
+This list says what can be built from the workspace, not what is agent-routable.
+The [readiness matrix](docs/readiness.md) is authoritative for current claims.
 
 | Binary | Crate | Per-feature note |
 | --- | --- | --- |
@@ -110,11 +90,11 @@ require editing this README.
 
 ## Skill Surfaces
 
-Plugin-owned skills live under
-`plugins/{plugin-name}/skills/elegy-{skill-id}/SKILL.md`. Standalone skill-only
-packages live under `skills/elegy-{skill-id}/SKILL.md`. Hosts discover only the
-skills supplied by the plugins installed into that host. There is no central
-Elegy skill registry or cross-plugin resolver.
+An adapter may bundle optional workflow guidance under
+`plugins/{name}/skills/`. Standalone guidance lives under
+`skills/elegy-{skill-id}/SKILL.md` and must be installed through the target
+host's normal skill lane. A skill is not executable discovery authority and
+does not enter the Elegy marketplace by itself.
 
 ## Configuration Materialization
 
@@ -131,20 +111,23 @@ templates and profile details.
 
 ## Skill Validation
 
-Each plugin owns the content and specificity of its skills. Validate a plugin
-package, including its declared skill directory, with:
+Each active adapter owns any optional skills it bundles. Validate the entire
+adapter package, including its typed capability catalog, with:
 
-`elegy-plugin-packaging verify --plugin <plugin-root>`
+`elegy-plugin-packaging verify --plugin plugins/accounts`
 
 Skill authoring and body audits belong to the `elegy-skill-authoring` skill;
 they are not mediated by a central runtime registry.
 
 ## Plugins
 
-`elegy-plugin/v1` is the minimal plugin manifest format for `.elegy-plugin/plugin.json`.
-Plugins declare identity and Agent Skills (SKILL.md) in a single filesystem directory.
-The `ElegyPluginV1` Rust type defines the contract. Generated JSON schemas under
-`shared/plugin-sdk/schemas/` provide machine-readable projections.
+An Elegy plugin is a reusable system adapter, not a synonym for any package of
+business logic. Client Radar, AI Radar, and Question Studio are intentionally
+not Elegy plugins; they belong in product libraries, tools, or applications.
+
+`elegy-plugin/v2` declares identity, connection posture, and readiness authority
+in `.elegy-plugin/plugin.json`. The manifest and schema prove structure only.
+They do not prove installed behavior.
 
 Setup flow:
 
@@ -153,14 +136,18 @@ elegy-plugin-packaging verify --plugin ./my-plugin
 ```
 
 Release configuration uses `distribution/surfaces.json` as the central release catalog.
+Only active `adapter-plugin` entries with a typed capability catalog may set
+`packaging: plugin`.
 
-The generated marketplace lives at `.elegy/marketplace.json`:
+The generated default marketplace lives at `.elegy/marketplace.json` and
+contains only validated `usable` or `production` surfaces. It is currently
+empty. Maintainers can inspect the project catalog explicitly with
+`--include-incubating` without rewriting that default; install or export then
+requires `--allow-incubating`.
 
 ```bash
 elegy-plugin-packaging marketplace list --source . --json
-elegy-plugin-packaging marketplace search planning --source . --json
-elegy-plugin-packaging marketplace status --source . --plugin elegy-planning --json
-elegy-plugin-packaging marketplace update elegy-planning --source . --json
+elegy-plugin-packaging marketplace list --source . --include-incubating --json
 ```
 
 Boundaries: the plugin manifest is a metadata envelope, not a runtime,
@@ -173,7 +160,7 @@ install, auth, approvals, runtime sessions, and execution policy.
 elegy-run
 ```
 
-MCP is an adapter over governed skills and CLI behavior. Side-effecting tools
+MCP is an optional projection over governed capabilities and CLI behavior. Side-effecting tools
 stay blocked unless the host is started with `--allow-side-effects`.
 
 ## Documentation
@@ -182,6 +169,8 @@ stay blocked unless the host is started with `--allow-side-effects`.
 - [Distribution index (thin)](docs/distribution.md) — per-binary notes live in
   each binary's `DISTRIBUTION.md`
 - [Architecture index](docs/architecture/README.md)
+- [Evidence-backed readiness](docs/readiness.md)
+- [Deprecations and reclassification](docs/deprecations.md)
 - [Ecosystem topology](docs/architecture/ecosystem-topology.md)
 - [Substrate governance](docs/architecture/substrate-governance.md)
 - [Contributing guide](CONTRIBUTING.md) | [Security policy](SECURITY.md)

@@ -38,7 +38,6 @@ stability promise.
 | Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
 | Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
 | Plugin archive | `<surface>-plugin-<target>.zip` | Primary release for binary-backed plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
-| Skill-only plugin archive | `<surface>-plugin-any.zip` | Primary release for skill-only plugin packages. Contains plugin.json and skills/, with no `bin/`. |
 | Codex marketplace projection | `elegy-codex-marketplace-<target>.zip` | Generated Codex-native marketplace tree containing `.agents/plugins/marketplace.json`, plugin projections, skills, companion files, and target binaries. |
 | Local pack default | `<plugin-name>-v<version>.plugin.zip` | Ad hoc output from `elegy-plugin-packaging pack` when `--output` is omitted. Not the GitHub release naming contract. |
 | CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in plugin archives. |
@@ -47,56 +46,44 @@ stability promise.
 ## Surface Catalog
 
 Release configuration uses `distribution/surfaces.json` as the central catalog.
-It declares `schemaVersion: "elegy-surfaces/v2"` and maps workspace crates and
-surfaces to their release identities, build targets, and description. The
+It declares `schemaVersion: "elegy-surfaces/v3"` and maps workspace crates and
+surfaces to their release identities, product class, lifecycle, build targets,
+and disposition. The
 publish orchestrator reads this catalog to discover which surfaces to build and
 release.
 
 To add a new release surface, add an entry to `distribution/surfaces.json` and ensure the crate builds. No per-feature workflow files are needed.
 
-Each surface uses one explicit repository role:
+`kind` controls build mechanics:
 
 | Kind | Contract |
 | --- | --- |
-| `bundled-plugin` | Installable plugin package under `plugins/`, usually with a Rust crate and skill surface. |
+| `bundled-plugin` | Installable adapter package with a Rust runtime and optional skills or MCP projection. |
 | `cli` | Standalone CLI under `tools/` or `shared/`, not a host adapter. |
 | `host-adapter` | Host or transport surface under `hosts/`. |
-| `skill-package` | Standalone skill package under `skills/elegy-*`, with no dedicated Rust binary. |
-| `external-plugin-wrapper` | Public marketplace metadata under `marketplace-wrappers/` for an external/private implementation. |
+| `skill-package` | Standalone skill source under `skills/elegy-*`; not an Elegy plugin class. |
+| `external-plugin-wrapper` | Historical external metadata retained for inspection; not published unless it independently qualifies as an active adapter plugin. |
 
-External plugin wrappers use `kind: "external-plugin-wrapper"`,
-`packaging: "plugin"`, `pluginRoot`, and `artifactBaseUrl`. The generated
-marketplace keeps `source.path` local for wrapper metadata and points artifact
-URLs at the external release repository.
+`surfaceClass` states what the surface is: `adapter-plugin`, `tool`, `skill`,
+`host-adapter`, or `host-extension`. `lifecycle` is `active`, `rework`,
+`deprecated`, or `blocked`. Only an active `adapter-plugin` may set
+`packaging: "plugin"`, and it must declare a typed capability catalog.
 
 Binary surfaces may declare a `targets` array of supported Rust target triples.
 When omitted, the publisher uses the default Windows, Linux, and macOS matrix;
-skill-only surfaces continue to publish for the target-independent `any` target.
+skill sources are not emitted as Elegy plugin archives.
 
-External plugin repositories own their release pipeline. They must publish
-`<name>-plugin-<target>.zip` plus `<name>-plugin-<target>.zip.sha256` for each
-marketplace target under the release tag used by the generated index.
-For the public Elegy marketplace, those assets live on the public Elegy release
-even when the producing source repository is private.
-
-Clean external repositories call the pinned reusable
-`.github/workflows/publish-external-plugin.yml` workflow. Main-branch builds may
-refresh only the rolling `main-snapshot` integration channel. Stable upload is
-accepted only from an exact matching semver tag, with explicit marketplace
-eligibility, a matching plugin manifest version, an existing Elegy release,
-and non-clobbering asset publication. Publication credentials are checked
-before any release mutation.
-
-External wrapper surfaces may set `marketplacePublished: false` while archives
-are not yet public. Draft wrappers stay in source, but the generated
-marketplace omits them until the public archives exist.
+The former reusable external-wrapper publication workflow is removed. External
+projects own their own releases; they enter Elegy only after the concrete
+adapter independently satisfies the active plugin boundary and readiness
+requirements. Public metadata cannot substitute for runtime proof.
 
 ## Install
 
 Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
 
 ```bash
-elegy-plugin-packaging install --archive elegy-planning-plugin-x86_64-pc-windows-msvc.zip
+elegy-plugin-packaging install --archive elegy-accounts-plugin-x86_64-pc-windows-msvc.zip
 ```
 
 Non-plugin surfaces install via `scripts/install-distribution.sh`:
@@ -109,11 +96,16 @@ bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy 
 Plugin-packaged surfaces should use `elegy-plugin-packaging install` as the
 primary install lane.
 
+Portable archives and host projections retain the typed capability catalog,
+readiness artifact and receipts, and connection descriptors referenced by the
+manifest. Packaging must not leave those authorities behind in the source
+checkout.
+
 Marketplace consumers use the generated static index:
 
 ```bash
 elegy-plugin-packaging marketplace list --source . --json
-elegy-plugin-packaging marketplace install elegy-planning --source .
+elegy-plugin-packaging marketplace install elegy-accounts --source .
 ```
 
 The same `--source` contract accepts an HTTPS base URL, so Holon and other

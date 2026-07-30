@@ -5,6 +5,8 @@ description: Use when an agent or contributor needs to classify, place, scaffold
 
 # Elegy Documentation Practices
 
+> **Readiness: concept; not agent-routable.** This source guidance has no reviewed clean-install and non-fixture task receipt.
+
 > Use when a contributor or agent needs to apply the central Elegy documentation
 > doctrine: decide whether a change needs an ADR, spec, guide, note, or roadmap
 > entry, scaffold it with the right template, and validate it objectively.
