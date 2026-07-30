@@ -9,7 +9,7 @@ See [readiness.json](readiness.json) for the exact evidence and limitations.
 
 Elegy Accounts is a strictly local authorization broker for people and AI agents. Connect an account once, then registered local tools can perform approved typed operations across sessions without receiving the credential. The broker owns provider authorization, encrypted storage, risk-based grants, authenticated execution, durable human checkpoints, audit, and revocation.
 
-The current release is provider-generic. Runtime JSON packs describe OAuth PKCE, device authorization, scoped API tokens, HTTP Basic/app passwords, and client credentials. GitHub, Cloudflare, and Google are bundled proof packs—not compiled limits. See [provider packs](docs/provider-packs.md) to add another provider.
+The current release is provider-generic. Runtime JSON packs describe OAuth PKCE, device authorization, scoped API tokens, HTTP Basic/app passwords, and client credentials. Google has a typed v3 PKCE/refresh/revocation contract; those lifecycle paths are fixture-tested but have no reviewed live Google receipt. GitHub, Cloudflare, and Google are bundled proof packs—not compiled limits. See [provider packs](docs/provider-packs.md) to add another provider.
 
 ## Surfaces
 
@@ -22,9 +22,18 @@ The current release is provider-generic. Runtime JSON packs describe OAuth PKCE,
 
 The bundled Codex action host currently exposes GitHub profile/repository reads and Cloudflare zone/DNS-record reads. Holon can embed Account Center and consume the connection-control contract, but its typed execution adapter remains a separate host integration. Existing host-owned connectors keep their own authentication; Elegy Accounts is the portable authorization path for local and custom tools.
 
+Authentication evidence is separate by boundary:
+
+| Boundary | Exercised now |
+|---|---|
+| Host-to-MCP authentication | No; Accounts MCP is local and adds no OAuth. |
+| Adapter-to-upstream authentication | Deterministic provider fixtures for the current readiness claim. |
+| Refresh | Deterministic OAuth fixture plus an expired stored credential exercised through the authenticated execution proxy; no reviewed live provider refresh. |
+| Provider revocation | Deterministic success/failure and `revocation_pending` retry state; no reviewed live Google revocation. |
+
 ## Security boundary
 
-Credentials are authenticated-encrypted at rest with per-record keys protected by Windows DPAPI. OAuth state, PKCE, issuer/audience/redirect binding, provider identity verification, explicit user intent headers, operation maps, audience allowlists, expiring grants, single-use leases, redacted audit events, restart-safe authorization sessions, and deterministic retries are enforced locally.
+Credentials are authenticated-encrypted at rest with per-record keys protected by Windows DPAPI. The current browser OAuth path enforces transaction state and PKCE, requests provider-specific consent parameters, verifies the granted scopes and identity through the configured HTTPS userinfo endpoint, and refreshes near-expiry credentials inside the broker. It does not claim local OIDC ID-token issuer/audience/nonce validation. Explicit user intent headers, operation maps, provider-audience allowlists, expiring grants, single-use leases, redacted audit events, and restart-safe authorization sessions are enforced locally.
 
 The user must act for consent, CAPTCHA, MFA, terms, payment, KYC, ambiguous plans, and credential entry. Agents never receive passwords, tokens, OAuth codes, browser cookies, or refresh material. Browser discovery is only a hint until the broker verifies identity.
 

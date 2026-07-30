@@ -1,4 +1,4 @@
-use elegy_plugin_sdk::{ElegyPluginV1, ElegyReadinessV1};
+use elegy_plugin_sdk::{ElegyPluginV1, ElegyPluginV3, ElegyReadinessV1};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value as YamlValue;
 use std::collections::{BTreeMap, BTreeSet};
@@ -862,12 +862,37 @@ fn collect_readiness_records(
                     path: manifest_path.clone(),
                     source,
                 })?;
-            let manifest: ElegyPluginV1 =
+            let manifest_value: serde_json::Value =
                 serde_json::from_str(&manifest_raw).map_err(|source| DocumentationError::Json {
-                    path: manifest_path,
+                    path: manifest_path.clone(),
                     source,
                 })?;
-            if manifest.capability_catalog.is_none() {
+            let schema_version = manifest_value
+                .get("schemaVersion")
+                .and_then(serde_json::Value::as_str);
+            let (has_capability_catalog, readiness) = if schema_version == Some("elegy-plugin/v3") {
+                let manifest: ElegyPluginV3 =
+                    serde_json::from_value(manifest_value).map_err(|source| {
+                        DocumentationError::Json {
+                            path: manifest_path,
+                            source,
+                        }
+                    })?;
+                (
+                    manifest.elegy.capability_catalog.is_some(),
+                    Some(manifest.elegy.readiness),
+                )
+            } else {
+                let manifest: ElegyPluginV1 =
+                    serde_json::from_value(manifest_value).map_err(|source| {
+                        DocumentationError::Json {
+                            path: manifest_path,
+                            source,
+                        }
+                    })?;
+                (manifest.capability_catalog.is_some(), manifest.readiness)
+            };
+            if !has_capability_catalog {
                 issues.push(readiness_issue(
                     &surface.name,
                     "plugin-capability-boundary-missing",
@@ -875,7 +900,7 @@ fn collect_readiness_records(
                 ));
                 continue;
             }
-            let Some(readiness) = manifest.readiness.as_ref() else {
+            let Some(readiness) = readiness.as_ref() else {
                 issues.push(readiness_issue(
                     &surface.name,
                     "readiness-reference-missing",

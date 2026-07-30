@@ -18,18 +18,32 @@ fn accounts_plugin_is_a_portable_bundled_capability() {
     )
     .expect("accounts plugin manifest should be JSON");
 
-    assert_eq!(manifest["schemaVersion"], "elegy-plugin/v2");
+    assert_eq!(manifest["schemaVersion"], "elegy-plugin/v3");
     assert_eq!(manifest["name"], "elegy-accounts");
     assert_eq!(manifest["skills"], "./skills/");
-    assert_eq!(manifest["connections"]["requirements"]["mode"], "none");
+    assert_eq!(manifest["elegy"]["surfaceClass"], "adapter-plugin");
     assert_eq!(
-        manifest["connections"]["provider"]["schemaVersion"],
+        manifest["elegy"]["connections"]["requirements"]["mode"],
+        "none"
+    );
+    assert_eq!(
+        manifest["elegy"]["connections"]["provider"]["schemaVersion"],
         "elegy-connection-provider/v1"
     );
+    assert_eq!(manifest["mcpServers"], "./.mcp.json");
     assert_eq!(
-        manifest["extensions"]["codex.plugin/v1"]["mcpServers"],
-        "./.mcp.json"
+        manifest["elegy"]["mcpAuthentication"]["elegy-accounts"]["mode"],
+        "none"
     );
+    assert_eq!(
+        manifest["elegy"]["mcpAuthentication"]["elegy-account-actions"]["mode"],
+        "none"
+    );
+    assert_eq!(
+        manifest["assets"],
+        serde_json::json!(["./ui/", "./browser/", "./providers/"])
+    );
+    assert!(manifest["elegy"].get("packageAssets").is_none());
     assert!(manifest.get("apps").is_none());
     assert!(!plugin.join(".app.json").exists());
 

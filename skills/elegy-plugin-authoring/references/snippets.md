@@ -20,24 +20,29 @@ plugins/<adapter-name>/
 
 ```json
 {
-  "schemaVersion": "elegy-plugin/v2",
+  "schemaVersion": "elegy-plugin/v3",
   "name": "elegy-example-adapter",
   "version": "0.1.0",
   "description": "Adapt a concrete external system for typed agent use.",
-  "capabilityCatalog": {
-    "path": "./capability-catalog.json",
-    "schemaVersion": "elegy-capability-catalog/v1",
-    "readinessCommand": "elegy-example-adapter status --json"
-  },
-  "connections": {
-    "requirements": {
-      "mode": "none"
-    }
-  },
-  "readiness": {
-    "stage": "implemented",
-    "path": "./readiness.json",
-    "schemaVersion": "elegy-readiness/v1"
+  "skills": "./skills/",
+  "elegy": {
+    "surfaceClass": "adapter-plugin",
+    "capabilityCatalog": {
+      "path": "./capability-catalog.json",
+      "schemaVersion": "elegy-capability-catalog/v1",
+      "readinessCommand": "elegy-example-adapter status --json"
+    },
+    "connections": {
+      "requirements": {
+        "mode": "none"
+      }
+    },
+    "readiness": {
+      "stage": "implemented",
+      "path": "./readiness.json",
+      "schemaVersion": "elegy-readiness/v1"
+    },
+    "mcpAuthentication": {}
   }
 }
 ```

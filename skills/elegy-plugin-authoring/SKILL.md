@@ -11,7 +11,7 @@ An Elegy plugin is a reusable system adapter: it connects an agent to a data sou
 
 ## Workflow
 
-1. Read the nearest repo instructions, then `docs/architecture/README.md`, `docs/architecture/skill-core-v1.md`, `docs/architecture/codex-plugin-projection.md`, `docs/specs/plugin-connections-v1.md`, `docs/specs/plugin-marketplace-v1.md`, and the current plugin examples that match the target lane.
+1. Read the nearest repo instructions, then `docs/architecture/README.md`, `docs/architecture/skill-core-v1.md`, `docs/architecture/codex-plugin-projection.md`, `docs/specs/plugin-connections-v1.md`, `docs/specs/plugin-marketplace-v2.md`, and the current plugin examples that match the target lane.
 2. Apply the eligibility gate before authoring anything:
    - Identify the external or local system boundary being adapted.
    - Identify reusable operations an agent can invoke across tasks.
@@ -31,8 +31,10 @@ An Elegy plugin is a reusable system adapter: it connects an agent to a data sou
 
 - `.elegy-plugin/plugin.json` is the plugin manifest authority.
 - Every active Elegy adapter plugin declares a typed `capabilityCatalog`.
-- New and publishable plugins use `elegy-plugin/v2` and explicitly declare
-  `connections.requirements.mode` as `none` or `declared`.
+- New and publishable packages use `elegy-plugin/v3`. Keep Codex-native
+  package fields at the top level and put classification, connections,
+  readiness, capability authority, and expected MCP authentication under
+  `elegy`.
 - A service slug is not a Codex app ID. Connected Codex plugins require an
   explicit opaque `connectionBindings` mapping; the host owns OAuth and
   connection state.
@@ -41,7 +43,14 @@ An Elegy plugin is a reusable system adapter: it connects an agent to a data sou
   credential-owning `elegy-connection-provider/v1`.
 - `distribution/surfaces.json` owns marketplace listing order, category, release routing, and wrapper artifact base URLs.
 - `.elegy/marketplace.json` is generated. Do not edit it by hand.
-- Codex plugin output is a derived projection. Put Codex-specific metadata under `extensions["codex.plugin/v1"]`.
+- Codex plugin output is a derived projection. Preserve native Codex fields
+  at the v3 top level; export removes only `schemaVersion` and `elegy`.
+- Declare every MCP server's expected authentication under
+  `elegy.mcpAuthentication`. Do not infer OAuth from a remote URL. For
+  `bearer-env`, declare only the environment-variable name under Elegy
+  governance and keep the secret outside the package.
+- Git and npm marketplace sources are descriptor-only today. They must remain
+  `NOT_AVAILABLE` until a source materializer and installed-task proof exist.
 - CLI invocation templates are the default integration contract. Use MCP only when the host specifically needs an MCP boundary.
 - Profiles are allowlists, not approvals. Do not treat a profile as permission for side effects.
 
@@ -68,4 +77,4 @@ cargo test -p <plugin-crate>
 - Architecture entrypoint: `docs/architecture/README.md`
 - Skill authority: `docs/architecture/skill-core-v1.md`
 - Codex projection: `docs/architecture/codex-plugin-projection.md`
-- Marketplace contract: `docs/specs/plugin-marketplace-v1.md`
+- Marketplace contract: `docs/specs/plugin-marketplace-v2.md`

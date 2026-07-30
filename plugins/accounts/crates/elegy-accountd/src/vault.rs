@@ -21,6 +21,7 @@ pub struct AccountMetadata {
     pub verified_identity: String,
     pub auth_method: String,
     pub created_at: String,
+    pub status: String,
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -51,6 +52,8 @@ pub enum VaultError {
     Authentication,
     #[error("vault is busy")]
     Busy,
+    #[error("credential changed during the operation")]
+    Conflict,
 }
 
 pub trait KeyProtector: Send + Sync {
@@ -180,14 +183,16 @@ impl Vault {
                 provider TEXT NOT NULL,
                 verified_identity TEXT NOT NULL,
                 auth_method TEXT NOT NULL,
-                created_at TEXT NOT NULL
+                created_at TEXT NOT NULL,
+                status TEXT NOT NULL DEFAULT 'connected'
             );
             CREATE TABLE IF NOT EXISTS credentials (
                 account_id TEXT PRIMARY KEY REFERENCES accounts(id) ON DELETE CASCADE,
                 algorithm TEXT NOT NULL CHECK (algorithm = 'AES-256-GCM+DPAPI-v1'),
                 nonce BLOB NOT NULL,
                 ciphertext BLOB NOT NULL,
-                protected_key BLOB NOT NULL
+                protected_key BLOB NOT NULL,
+                generation INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS broker_requests (
                 id TEXT PRIMARY KEY,
@@ -259,6 +264,14 @@ impl Vault {
             "ALTER TABLE authorization_sessions ADD COLUMN attempts INTEGER NOT NULL DEFAULT 0",
             [],
         );
+        let _ = connection.execute(
+            "ALTER TABLE accounts ADD COLUMN status TEXT NOT NULL DEFAULT 'connected'",
+            [],
+        );
+        let _ = connection.execute(
+            "ALTER TABLE credentials ADD COLUMN generation INTEGER NOT NULL DEFAULT 0",
+            [],
+        );
         let now = Utc::now().to_rfc3339();
         let revoked = connection.execute(
             "UPDATE grants SET revoked_at=?1,generation=generation+1 WHERE client_id='codex-local' AND revoked_at IS NULL",
@@ -289,6 +302,7 @@ impl Vault {
             verified_identity: verified_identity.into(),
             auth_method: auth_method.into(),
             created_at: Utc::now().to_rfc3339(),
+            status: "connected".into(),
         };
         let mut key = [0_u8; 32];
         let mut nonce_bytes = [0_u8; 12];
@@ -311,8 +325,8 @@ impl Vault {
         let mut connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
         let transaction = connection.transaction()?;
         transaction.execute(
-            "INSERT INTO accounts (id, provider, verified_identity, auth_method, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-            params![account.id, account.provider, account.verified_identity, account.auth_method, account.created_at],
+            "INSERT INTO accounts (id, provider, verified_identity, auth_method, created_at, status) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+            params![account.id, account.provider, account.verified_identity, account.auth_method, account.created_at, account.status],
         )?;
         transaction.execute(
             "INSERT INTO credentials (account_id, algorithm, nonce, ciphertext, protected_key) VALUES (?1, 'AES-256-GCM+DPAPI-v1', ?2, ?3, ?4)",
@@ -325,7 +339,7 @@ impl Vault {
     pub fn list_accounts(&self) -> Result<Vec<AccountMetadata>, VaultError> {
         let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
         let mut statement = connection.prepare(
-            "SELECT id, provider, verified_identity, auth_method, created_at FROM accounts ORDER BY created_at, id",
+            "SELECT id, provider, verified_identity, auth_method, created_at, status FROM accounts ORDER BY created_at, id",
         )?;
         let rows = statement.query_map([], |row| {
             Ok(AccountMetadata {
@@ -334,6 +348,7 @@ impl Vault {
                 verified_identity: row.get(2)?,
                 auth_method: row.get(3)?,
                 created_at: row.get(4)?,
+                status: row.get(5)?,
             })
         })?;
         Ok(rows.collect::<Result<Vec<_>, _>>()?)
@@ -376,6 +391,141 @@ impl Vault {
             .map_err(|_| VaultError::Authentication);
         key.zeroize();
         Ok(Zeroizing::new(plaintext?))
+    }
+
+    pub fn load_secret_versioned(
+        &self,
+        account_id: &str,
+    ) -> Result<(Zeroizing<Vec<u8>>, i64), VaultError> {
+        let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
+        let record = connection
+            .query_row(
+                "SELECT a.provider,c.nonce,c.ciphertext,c.protected_key,c.generation
+                 FROM accounts a JOIN credentials c ON c.account_id=a.id WHERE a.id=?1",
+                [account_id],
+                |row| {
+                    Ok((
+                        row.get::<_, String>(0)?,
+                        row.get::<_, Vec<u8>>(1)?,
+                        row.get::<_, Vec<u8>>(2)?,
+                        row.get::<_, Vec<u8>>(3)?,
+                        row.get::<_, i64>(4)?,
+                    ))
+                },
+            )
+            .optional()?
+            .ok_or(VaultError::NotFound)?;
+        drop(connection);
+        if record.1.len() != 12 {
+            return Err(VaultError::Authentication);
+        }
+        let mut key = self.protector.unprotect(&record.3)?;
+        let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| VaultError::Authentication)?;
+        let aad = associated_data(account_id, &record.0);
+        let plaintext = cipher
+            .decrypt(
+                Nonce::from_slice(&record.1),
+                Payload {
+                    msg: &record.2,
+                    aad: aad.as_bytes(),
+                },
+            )
+            .map_err(|_| VaultError::Authentication);
+        key.zeroize();
+        Ok((Zeroizing::new(plaintext?), record.4))
+    }
+
+    pub fn replace_secret(&self, account_id: &str, secret: &[u8]) -> Result<(), VaultError> {
+        self.replace_secret_inner(account_id, secret, None)
+    }
+
+    pub fn replace_secret_if_generation(
+        &self,
+        account_id: &str,
+        expected_generation: i64,
+        secret: &[u8],
+    ) -> Result<(), VaultError> {
+        self.replace_secret_inner(account_id, secret, Some(expected_generation))
+    }
+
+    fn replace_secret_inner(
+        &self,
+        account_id: &str,
+        secret: &[u8],
+        expected_generation: Option<i64>,
+    ) -> Result<(), VaultError> {
+        let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
+        let provider = connection
+            .query_row(
+                "SELECT provider FROM accounts WHERE id=?1",
+                [account_id],
+                |row| row.get::<_, String>(0),
+            )
+            .optional()?
+            .ok_or(VaultError::NotFound)?;
+        drop(connection);
+
+        let mut key = [0_u8; 32];
+        let mut nonce_bytes = [0_u8; 12];
+        rand::rng().fill(&mut key);
+        rand::rng().fill(&mut nonce_bytes);
+        let cipher = Aes256Gcm::new_from_slice(&key).map_err(|_| VaultError::Authentication)?;
+        let aad = associated_data(account_id, &provider);
+        let ciphertext = cipher
+            .encrypt(
+                Nonce::from_slice(&nonce_bytes),
+                Payload {
+                    msg: secret,
+                    aad: aad.as_bytes(),
+                },
+            )
+            .map_err(|_| VaultError::Authentication)?;
+        let protected_key = self.protector.protect(&key)?;
+        key.zeroize();
+
+        let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
+        let changed = if let Some(expected_generation) = expected_generation {
+            connection.execute(
+                "UPDATE credentials SET nonce=?2,ciphertext=?3,protected_key=?4,generation=generation+1 WHERE account_id=?1 AND generation=?5",
+                params![
+                    account_id,
+                    nonce_bytes.as_slice(),
+                    ciphertext,
+                    protected_key,
+                    expected_generation
+                ],
+            )?
+        } else {
+            connection.execute(
+                "UPDATE credentials SET nonce=?2,ciphertext=?3,protected_key=?4,generation=generation+1 WHERE account_id=?1",
+                params![
+                    account_id,
+                    nonce_bytes.as_slice(),
+                    ciphertext,
+                    protected_key
+                ],
+            )?
+        };
+        if changed == 0 {
+            return if expected_generation.is_some() {
+                Err(VaultError::Conflict)
+            } else {
+                Err(VaultError::NotFound)
+            };
+        }
+        Ok(())
+    }
+
+    pub fn set_account_status(&self, account_id: &str, status: &str) -> Result<(), VaultError> {
+        let connection = self.connection.lock().map_err(|_| VaultError::Busy)?;
+        let changed = connection.execute(
+            "UPDATE accounts SET status=?2 WHERE id=?1",
+            params![account_id, status],
+        )?;
+        if changed == 0 {
+            return Err(VaultError::NotFound);
+        }
+        Ok(())
     }
 
     pub fn export_backup(&self, destination: impl AsRef<Path>) -> Result<(), VaultError> {

@@ -165,7 +165,7 @@ Legacy host-authenticated external-service capability metadata. The
 | `category` | string | no | Display category for the connector (e.g. `Developer Tools`). |
 
 For `elegy-plugin/v1`, the Codex exporter may retain the historical
-`connector`-as-ID projection. `elegy-plugin/v2` never does this because Codex
+`connector`-as-ID projection. `elegy-plugin/v3` never does this because Codex
 app IDs are opaque registered identifiers. V2 plugins declare connection
 requirements separately and provide explicit host bindings.
 

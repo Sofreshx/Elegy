@@ -95,7 +95,7 @@ impl BrokerStore {
             .vault
             .list_accounts()?
             .into_iter()
-            .find(|a| a.id == request.account_id)
+            .find(|a| a.id == request.account_id && a.status == "connected")
             .ok_or(BrokerError::NotFound)?;
         let now = Utc::now().to_rfc3339();
         let id = format!("access_{}", Uuid::new_v4().simple());
@@ -293,7 +293,7 @@ impl BrokerStore {
         let connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;
         let hash = token_hash(token);
         let record: Option<LeaseAuthorizationRecord> = connection.query_row(
-            "SELECT l.expires_at,g.expires_at,g.client_id,g.purpose,g.operations_json,l.generation,g.generation,l.remaining_uses FROM leases l JOIN grants g ON g.id=l.grant_id WHERE l.token_hash=?1 AND g.provider=?2 AND g.revoked_at IS NULL",
+            "SELECT l.expires_at,g.expires_at,g.client_id,g.purpose,g.operations_json,l.generation,g.generation,l.remaining_uses FROM leases l JOIN grants g ON g.id=l.grant_id JOIN accounts a ON a.id=g.account_id WHERE l.token_hash=?1 AND g.provider=?2 AND g.revoked_at IS NULL AND a.status='connected'",
             params![hash, audience], |row| Ok((row.get(0)?,row.get(1)?,row.get(2)?,row.get(3)?,row.get(4)?,row.get(5)?,row.get(6)?,row.get(7)?)),
         ).optional()?;
         let Some((
@@ -391,6 +391,54 @@ impl BrokerStore {
             "account.disconnected",
             Some(account_id),
             json!({"credential_deleted": true, "leases_invalidated": true}),
+        )
+    }
+
+    pub fn begin_provider_disconnect(&self, account_id: &str) -> Result<(), BrokerError> {
+        let mut connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;
+        let transaction = connection.transaction()?;
+        transaction.execute(
+            "DELETE FROM leases WHERE grant_id IN (SELECT id FROM grants WHERE account_id=?1)",
+            [account_id],
+        )?;
+        transaction.execute(
+            "UPDATE grants SET revoked_at=COALESCE(revoked_at,?2),generation=generation+1 WHERE account_id=?1",
+            params![account_id, Utc::now().to_rfc3339()],
+        )?;
+        transaction.execute(
+            "UPDATE broker_requests SET status='cancelled',updated_at=?2 WHERE account_id=?1 AND status='awaiting_user'",
+            params![account_id, Utc::now().to_rfc3339()],
+        )?;
+        let changed = transaction.execute(
+            "UPDATE accounts SET status='revocation_pending' WHERE id=?1",
+            [account_id],
+        )?;
+        transaction.commit()?;
+        drop(connection);
+        if changed == 0 {
+            return Err(BrokerError::NotFound);
+        }
+        self.audit(
+            "account.revocation_pending",
+            Some(account_id),
+            json!({"local_execution_disabled": true, "leases_invalidated": true}),
+        )
+    }
+
+    pub fn complete_provider_disconnect(&self, account_id: &str) -> Result<(), BrokerError> {
+        let mut connection = self.vault.connection.lock().map_err(|_| VaultError::Busy)?;
+        let transaction = connection.transaction()?;
+        transaction.execute("DELETE FROM grants WHERE account_id=?1", [account_id])?;
+        let changed = transaction.execute("DELETE FROM accounts WHERE id=?1", [account_id])?;
+        transaction.commit()?;
+        drop(connection);
+        if changed == 0 {
+            return Err(BrokerError::NotFound);
+        }
+        self.audit(
+            "account.disconnected",
+            Some(account_id),
+            json!({"provider_revoked": true, "credential_deleted": true}),
         )
     }
 

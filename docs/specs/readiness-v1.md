@@ -53,6 +53,13 @@ Mocks, fixtures, generated files, source compilation, schema validation, and arc
 
 Surface documentation must state current stage, what works today, limitations, exact source/install invocation, and whether providers or external consumers were exercised. Claims of usability or production must point to the qualifying receipts.
 
+Evidence entries are maintainer attestations: the validator enforces their
+kind, package-relative path, summary, promotion combination, and file
+existence, but it does not infer whether an arbitrary receipt truly exercised
+the stated environment or consumer. Promotion to `usable` or `production`
+therefore requires human review of each receipt; setting `nonFixture: true` is
+not self-proving and must never be generated from fixture success.
+
 ## Acceptance
 
 A default-discovery consumer must be unable to route to a surface below `usable`, including when a valid schema, fixture, package archive, or host projection exists.

@@ -161,6 +161,10 @@
       "packaging": "plugin",
       "pluginRoot": "plugins/accounts",
       "marketplaceCategory": "Productivity",
+      "marketplacePolicy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_USE"
+      },
       "targets": ["x86_64-pc-windows-msvc"],
       "disposition": "Retained as the reference adapter plugin because it owns authentication, provider boundaries, typed capabilities, and credential-safe execution.",
       "description": "Local account authentication, encrypted credential storage, grants, and revocation."

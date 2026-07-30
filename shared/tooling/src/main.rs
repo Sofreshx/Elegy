@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand};
 use elegy_plugin_sdk::{
-    export_plugin_v1_with_codex_mode_and_binary, inspect_plugin_v1, pack_plugin_v1,
-    pack_plugin_v1_with_binary, resolve_plugin_root, select_marketplace_artifact,
-    validate_elegy_marketplace_v1, validate_elegy_plugin_v1, verify_plugin_v1, CodexProjectionMode,
-    ElegyMarketplaceArtifact, ElegyMarketplaceInterface, ElegyMarketplacePlugin,
-    ElegyMarketplaceSource, ElegyMarketplaceV1, ElegyPluginV1, PluginArchiveBinary,
-    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, ELEGY_PLUGIN_V2_SCHEMA_VERSION,
+    export_plugin_with_policy_and_binary, pack_plugin_v3, pack_plugin_v3_with_binary,
+    resolve_plugin_root, select_marketplace_artifact_v2, validate_elegy_marketplace_v2,
+    validate_elegy_plugin_v3, verify_plugin_v1, verify_plugin_v3, ElegyMarketplaceArtifact,
+    ElegyMarketplaceInstallationPolicy, ElegyMarketplaceInterface, ElegyMarketplacePluginV2,
+    ElegyMarketplacePolicy, ElegyMarketplaceSourceV2, ElegyMarketplaceV2, ElegyPluginV1,
+    ElegyPluginV3, HostProjectionPolicy, PluginArchiveBinary, ELEGY_MARKETPLACE_V2_SCHEMA_VERSION,
+    ELEGY_PLUGIN_V3_SCHEMA_VERSION,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -16,6 +17,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::thread;
 use std::time::Duration;
+
+#[cfg(test)]
+use elegy_plugin_sdk::ElegyMarketplaceAuthenticationPolicy;
 
 mod installer;
 use installer::{
@@ -68,9 +72,10 @@ enum Command {
         /// Overwrite existing output
         #[arg(long, default_value_t = false)]
         overwrite: bool,
-        /// Emit documented experimental Codex manifest fields
+        /// Permit a documented non-routable projection when the target cannot
+        /// represent every declared plugin behavior.
         #[arg(long, default_value_t = false)]
-        experimental_codex: bool,
+        allow_lossy: bool,
         /// Optional compiled binary to include in the host export.
         #[arg(long)]
         binary: Option<PathBuf>,
@@ -251,14 +256,37 @@ struct DistributionSurface {
     #[serde(default = "default_marketplace_category")]
     marketplace_category: String,
     #[serde(default)]
+    marketplace_policy: Option<ElegyMarketplacePolicy>,
+    #[serde(default)]
     targets: Vec<String>,
 }
 
 #[derive(Debug)]
 struct LoadedMarketplace {
-    marketplace: ElegyMarketplaceV1,
-    plugins: Vec<(ElegyMarketplacePlugin, ElegyPluginV1)>,
+    marketplace: ElegyMarketplaceV2,
+    plugins: Vec<(ElegyMarketplacePluginV2, LoadedPluginManifest)>,
     local_root: Option<PathBuf>,
+}
+
+#[derive(Debug)]
+struct LoadedPluginManifest {
+    manifest: ElegyPluginV1,
+    surface_class: String,
+    verified: bool,
+}
+
+impl std::ops::Deref for LoadedPluginManifest {
+    type Target = ElegyPluginV1;
+
+    fn deref(&self) -> &Self::Target {
+        &self.manifest
+    }
+}
+
+impl LoadedPluginManifest {
+    fn is_agent_routable(&self) -> bool {
+        self.verified && self.surface_class == "adapter-plugin" && self.manifest.is_agent_routable()
+    }
 }
 
 #[derive(Serialize)]
@@ -320,8 +348,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     match cli.command {
         Command::Verify { plugin } => {
-            // verify_plugin_v1 expects the .elegy-plugin directory directly.
-            let (repo_root, _manifest) = match resolve_plugin_root(&plugin) {
+            let (repo_root, manifest_path) = match resolve_plugin_root(&plugin) {
                 Ok(r) => r,
                 Err(e) => {
                     eprintln!("Error: {e}");
@@ -329,8 +356,13 @@ fn main() -> ExitCode {
                 }
             };
             let package_dir = repo_root.join(".elegy-plugin");
-
-            match verify_plugin_v1(&package_dir) {
+            let schema_version = manifest_schema_version(&manifest_path).unwrap_or_default();
+            let verification = if schema_version == ELEGY_PLUGIN_V3_SCHEMA_VERSION {
+                verify_plugin_v3(&package_dir)
+            } else {
+                verify_plugin_v1(&package_dir)
+            };
+            match verification {
                 Ok(result) => {
                     if result.valid {
                         println!("Plugin verified successfully.");
@@ -366,18 +398,21 @@ fn main() -> ExitCode {
                 Some(p) => p,
                 None => {
                     // Resolve root and inspect manifest to build default filename.
-                    let (repo_root, _manifest) = match resolve_plugin_root(&plugin) {
+                    let (_repo_root, _manifest) = match resolve_plugin_root(&plugin) {
                         Ok(r) => r,
                         Err(e) => {
                             eprintln!("Error: {e}");
                             return ExitCode::from(2);
                         }
                     };
-                    let plugin_dir = repo_root.join(".elegy-plugin");
-                    let summary = match inspect_plugin_v1(&plugin_dir) {
-                        Ok(s) => s,
-                        Err(e) => {
-                            eprintln!("Error inspecting plugin: {e}");
+                    let summary: Value = match fs::read_to_string(&_manifest)
+                        .map_err(|error| error.to_string())
+                        .and_then(|raw| {
+                            serde_json::from_str(&raw).map_err(|error| error.to_string())
+                        }) {
+                        Ok(summary) => summary,
+                        Err(error) => {
+                            eprintln!("Error inspecting plugin: {error}");
                             return ExitCode::from(2);
                         }
                     };
@@ -410,16 +445,30 @@ fn main() -> ExitCode {
                 (None, None) => None,
             };
 
+            if manifest_schema_version(
+                &resolve_plugin_root(&plugin)
+                    .map(|(_, manifest)| manifest)
+                    .unwrap_or_else(|_| plugin.clone()),
+            )
+            .as_deref()
+                != Some(ELEGY_PLUGIN_V3_SCHEMA_VERSION)
+            {
+                eprintln!(
+                    "Error: publishing archives requires schemaVersion '{}'; legacy manifests are readable but non-publishable.",
+                    ELEGY_PLUGIN_V3_SCHEMA_VERSION
+                );
+                return ExitCode::from(2);
+            }
             let pack_result = match binary_spec {
                 Some(binary_spec) => {
-                    pack_plugin_v1_with_binary(&plugin, &output_path, Some(binary_spec))
+                    pack_plugin_v3_with_binary(&plugin, &output_path, Some(binary_spec))
                 }
                 None => {
                     if plugin_requires_binary(&plugin) {
                         eprintln!("Error: plugin archive for a CLI surface must include --binary.");
                         return ExitCode::from(2);
                     }
-                    pack_plugin_v1(&plugin, &output_path)
+                    pack_plugin_v3(&plugin, &output_path)
                 }
             };
 
@@ -439,7 +488,7 @@ fn main() -> ExitCode {
             host,
             output,
             overwrite,
-            experimental_codex,
+            allow_lossy,
             binary,
             binary_name,
         } => {
@@ -467,15 +516,15 @@ fn main() -> ExitCode {
                 }
                 (None, None) => None,
             };
-            match export_plugin_v1_with_codex_mode_and_binary(
+            match export_plugin_with_policy_and_binary(
                 &plugin,
                 &host,
                 &output,
                 overwrite,
-                if experimental_codex {
-                    CodexProjectionMode::Experimental
+                if allow_lossy {
+                    HostProjectionPolicy::AllowLossy
                 } else {
-                    CodexProjectionMode::Current
+                    HostProjectionPolicy::Strict
                 },
                 binary_spec,
             ) {
@@ -678,8 +727,36 @@ fn default_marketplace_published() -> bool {
     true
 }
 
-fn include_manifest_in_marketplace(manifest: &ElegyPluginV1, include_incubating: bool) -> bool {
-    include_incubating || manifest.is_agent_routable()
+fn distribution_marketplace_policy(
+    surface: &DistributionSurface,
+    agent_routable: bool,
+) -> Result<ElegyMarketplacePolicy, String> {
+    let mut policy = surface.marketplace_policy.clone().ok_or_else(|| {
+        format!(
+            "packaged surface '{}' must declare marketplacePolicy",
+            surface.name
+        )
+    })?;
+    if !agent_routable {
+        policy.installation = ElegyMarketplaceInstallationPolicy::NotAvailable;
+    }
+    Ok(policy)
+}
+
+fn include_manifest_in_marketplace(
+    entry: &ElegyMarketplacePluginV2,
+    manifest: &LoadedPluginManifest,
+    include_incubating: bool,
+) -> bool {
+    include_incubating
+        || (entry.policy.installation != ElegyMarketplaceInstallationPolicy::NotAvailable
+            && manifest.is_agent_routable())
+}
+
+fn include_manifest_v3_in_marketplace(manifest: &ElegyPluginV3, include_incubating: bool) -> bool {
+    include_incubating
+        || (manifest.elegy.readiness.stage.is_agent_routable()
+            && manifest.elegy.readiness.path.len() > 1)
 }
 
 fn generate_marketplace(
@@ -716,6 +793,7 @@ fn generate_marketplace(
         }
         let plugin_root = surface
             .plugin_root
+            .clone()
             .ok_or_else(|| format!("surface '{}' is missing pluginRoot", surface.name))?;
         let manifest_path = project
             .join(&plugin_root)
@@ -723,9 +801,9 @@ fn generate_marketplace(
             .join("plugin.json");
         let manifest_raw = fs::read_to_string(&manifest_path)
             .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
-        let manifest: ElegyPluginV1 = serde_json::from_str(&manifest_raw)
+        let manifest: ElegyPluginV3 = serde_json::from_str(&manifest_raw)
             .map_err(|error| format!("parse {}: {error}", manifest_path.display()))?;
-        let validation = validate_elegy_plugin_v1(&manifest);
+        let validation = validate_elegy_plugin_v3(&manifest);
         if !validation.is_valid() {
             return Err(format!(
                 "invalid {}: {}",
@@ -739,19 +817,27 @@ fn generate_marketplace(
                 surface.name, manifest.name
             ));
         }
-        if manifest.capability_catalog.is_none() {
+        if manifest.elegy.surface_class != surface.surface_class
+            || manifest.elegy.surface_class != "adapter-plugin"
+        {
+            return Err(format!(
+                "surface '{}' class '{}' does not match plugin manifest class '{}'",
+                surface.name, surface.surface_class, manifest.elegy.surface_class
+            ));
+        }
+        if manifest.elegy.capability_catalog.is_none() {
             return Err(format!(
                 "active adapter plugin '{}' is missing capabilityCatalog",
                 surface.name
             ));
         }
-        if !include_manifest_in_marketplace(&manifest, include_incubating) {
+        if !include_manifest_v3_in_marketplace(&manifest, include_incubating) {
             continue;
         }
         let manifest_dir = manifest_path
             .parent()
             .ok_or_else(|| format!("manifest path has no parent: {}", manifest_path.display()))?;
-        let verification = verify_plugin_v1(manifest_dir).map_err(|error| error.to_string())?;
+        let verification = verify_plugin_v3(manifest_dir).map_err(|error| error.to_string())?;
         if !verification.valid {
             return Err(format!(
                 "invalid {}: {}",
@@ -781,26 +867,30 @@ fn generate_marketplace(
                 }
             })
             .collect();
-        plugins.push(ElegyMarketplacePlugin {
+        let policy = distribution_marketplace_policy(
+            &surface,
+            manifest.elegy.readiness.stage.is_agent_routable(),
+        )?;
+        plugins.push(ElegyMarketplacePluginV2 {
             name: surface.name,
-            source: ElegyMarketplaceSource {
-                source: "local".to_string(),
+            source: ElegyMarketplaceSourceV2::Local {
                 path: format!("./{plugin_root}").replace('\\', "/"),
             },
+            policy,
             category: surface.marketplace_category,
             artifacts,
         });
     }
 
-    let marketplace = ElegyMarketplaceV1 {
-        schema_version: ELEGY_MARKETPLACE_V1_SCHEMA_VERSION.to_string(),
+    let marketplace = ElegyMarketplaceV2 {
+        schema_version: ELEGY_MARKETPLACE_V2_SCHEMA_VERSION.to_string(),
         name: "elegy".to_string(),
         interface: Some(ElegyMarketplaceInterface {
             display_name: Some("Elegy".to_string()),
         }),
         plugins,
     };
-    let validation = validate_elegy_marketplace_v1(&marketplace);
+    let validation = validate_elegy_marketplace_v2(&marketplace);
     if !validation.is_valid() {
         return Err(validation.issues.join("; "));
     }
@@ -864,7 +954,14 @@ fn load_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
     let marketplace = parse_marketplace(&raw, &index_path.display().to_string())?;
     let mut plugins = Vec::new();
     for entry in &marketplace.plugins {
-        let relative = entry.source.path.trim_start_matches("./");
+        if !matches!(
+            entry.source,
+            ElegyMarketplaceSourceV2::Local { .. } | ElegyMarketplaceSourceV2::ElegyArtifact { .. }
+        ) {
+            plugins.push((entry.clone(), descriptor_only_manifest(entry)));
+            continue;
+        }
+        let relative = marketplace_local_source_path(entry)?.trim_start_matches("./");
         let manifest_path = root
             .join(relative)
             .join(".elegy-plugin")
@@ -879,7 +976,20 @@ fn load_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
         }
         let manifest_raw = fs::read_to_string(&manifest_path)
             .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
-        let manifest = parse_marketplace_plugin_manifest(&entry.name, &manifest_raw)?;
+        let mut manifest = parse_marketplace_plugin_manifest(&entry.name, &manifest_raw)?;
+        let verification =
+            verify_plugin_v3(manifest_path.parent().ok_or_else(|| {
+                format!("manifest path has no parent: {}", manifest_path.display())
+            })?)
+            .map_err(|error| error.to_string())?;
+        manifest.verified = verification.valid;
+        if !verification.valid {
+            return Err(format!(
+                "invalid {}: {}",
+                manifest_path.display(),
+                verification.issues.join("; ")
+            ));
+        }
         plugins.push((entry.clone(), manifest));
     }
     Ok(LoadedMarketplace {
@@ -929,6 +1039,7 @@ fn load_marketplace_for_discovery(
         }
         let plugin_root = surface
             .plugin_root
+            .clone()
             .ok_or_else(|| format!("surface '{}' is missing pluginRoot", surface.name))?;
         let manifest_path = root
             .join(&plugin_root)
@@ -936,9 +1047,17 @@ fn load_marketplace_for_discovery(
             .join("plugin.json");
         let manifest_raw = fs::read_to_string(&manifest_path)
             .map_err(|error| format!("read {}: {error}", manifest_path.display()))?;
-        let manifest = parse_marketplace_plugin_manifest(&surface.name, &manifest_raw)?;
+        let mut manifest = parse_marketplace_plugin_manifest(&surface.name, &manifest_raw)?;
+        if manifest.surface_class != surface.surface_class
+            || manifest.surface_class != "adapter-plugin"
+        {
+            return Err(format!(
+                "surface '{}' class '{}' does not match plugin manifest class '{}'",
+                surface.name, surface.surface_class, manifest.surface_class
+            ));
+        }
         let verification =
-            verify_plugin_v1(manifest_path.parent().ok_or_else(|| {
+            verify_plugin_v3(manifest_path.parent().ok_or_else(|| {
                 format!("manifest path has no parent: {}", manifest_path.display())
             })?)
             .map_err(|error| error.to_string())?;
@@ -949,12 +1068,14 @@ fn load_marketplace_for_discovery(
                 verification.issues.join("; ")
             ));
         }
+        manifest.verified = true;
 
         let artifact_base = surface
             .artifact_base_url
             .as_deref()
             .unwrap_or(release_base)
             .trim_end_matches('/');
+        let policy = distribution_marketplace_policy(&surface, manifest.is_agent_routable())?;
         let targets = if surface.targets.is_empty() {
             default_targets
                 .iter()
@@ -963,12 +1084,12 @@ fn load_marketplace_for_discovery(
         } else {
             surface.targets
         };
-        let entry = ElegyMarketplacePlugin {
+        let entry = ElegyMarketplacePluginV2 {
             name: surface.name,
-            source: ElegyMarketplaceSource {
-                source: "local".to_string(),
+            source: ElegyMarketplaceSourceV2::Local {
                 path: format!("./{plugin_root}").replace('\\', "/"),
             },
+            policy,
             category: surface.marketplace_category,
             artifacts: targets
                 .into_iter()
@@ -987,11 +1108,11 @@ fn load_marketplace_for_discovery(
         plugins.push((entry, manifest));
     }
 
-    let marketplace = ElegyMarketplaceV1 {
+    let marketplace = ElegyMarketplaceV2 {
         plugins: entries,
         ..default_marketplace
     };
-    let validation = validate_elegy_marketplace_v1(&marketplace);
+    let validation = validate_elegy_marketplace_v2(&marketplace);
     if !validation.is_valid() {
         return Err(validation.issues.join("; "));
     }
@@ -1010,7 +1131,14 @@ fn load_remote_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
     let marketplace = parse_marketplace(&raw, &index_url)?;
     let mut plugins = Vec::new();
     for entry in &marketplace.plugins {
-        let relative = entry.source.path.trim_start_matches("./");
+        if !matches!(
+            entry.source,
+            ElegyMarketplaceSourceV2::Local { .. } | ElegyMarketplaceSourceV2::ElegyArtifact { .. }
+        ) {
+            plugins.push((entry.clone(), descriptor_only_manifest(entry)));
+            continue;
+        }
+        let relative = marketplace_local_source_path(entry)?.trim_start_matches("./");
         let manifest_url = format!("{base}{relative}/.elegy-plugin/plugin.json");
         let manifest_raw = get_text(&manifest_url)?;
         let manifest = parse_marketplace_plugin_manifest(&entry.name, &manifest_raw)?;
@@ -1023,10 +1151,10 @@ fn load_remote_marketplace(source: &str) -> Result<LoadedMarketplace, String> {
     })
 }
 
-fn parse_marketplace(raw: &str, source: &str) -> Result<ElegyMarketplaceV1, String> {
-    let marketplace: ElegyMarketplaceV1 =
+fn parse_marketplace(raw: &str, source: &str) -> Result<ElegyMarketplaceV2, String> {
+    let marketplace: ElegyMarketplaceV2 =
         serde_json::from_str(raw).map_err(|error| format!("parse {source}: {error}"))?;
-    let validation = validate_elegy_marketplace_v1(&marketplace);
+    let validation = validate_elegy_marketplace_v2(&marketplace);
     if !validation.is_valid() {
         return Err(format!(
             "invalid marketplace {source}: {}",
@@ -1039,21 +1167,27 @@ fn parse_marketplace(raw: &str, source: &str) -> Result<ElegyMarketplaceV1, Stri
 fn parse_marketplace_plugin_manifest(
     expected_name: &str,
     raw: &str,
-) -> Result<ElegyPluginV1, String> {
-    let manifest: ElegyPluginV1 = serde_json::from_str(raw)
+) -> Result<LoadedPluginManifest, String> {
+    let value: serde_json::Value = serde_json::from_str(raw)
         .map_err(|error| format!("parse plugin '{expected_name}': {error}"))?;
-    let validation = validate_elegy_plugin_v1(&manifest);
+    if value
+        .get("schemaVersion")
+        .and_then(serde_json::Value::as_str)
+        != Some(ELEGY_PLUGIN_V3_SCHEMA_VERSION)
+    {
+        return Err(format!(
+            "invalid plugin '{}': marketplace publication requires schemaVersion '{}'.",
+            expected_name, ELEGY_PLUGIN_V3_SCHEMA_VERSION
+        ));
+    }
+    let manifest: ElegyPluginV3 = serde_json::from_value(value)
+        .map_err(|error| format!("parse plugin '{expected_name}': {error}"))?;
+    let validation = validate_elegy_plugin_v3(&manifest);
     if !validation.is_valid() {
         return Err(format!(
             "invalid plugin '{}': {}",
             expected_name,
             validation.issues.join("; ")
-        ));
-    }
-    if manifest.schema_version != ELEGY_PLUGIN_V2_SCHEMA_VERSION {
-        return Err(format!(
-            "invalid plugin '{}': marketplace publication requires schemaVersion '{}'.",
-            expected_name, ELEGY_PLUGIN_V2_SCHEMA_VERSION
         ));
     }
     if manifest.name != expected_name {
@@ -1062,7 +1196,54 @@ fn parse_marketplace_plugin_manifest(
             manifest.name
         ));
     }
-    Ok(manifest)
+    Ok(LoadedPluginManifest {
+        surface_class: manifest.elegy.surface_class,
+        verified: false,
+        manifest: ElegyPluginV1 {
+            schema_version: manifest.schema_version,
+            name: manifest.name,
+            version: manifest.version,
+            description: manifest.description,
+            author: manifest.author,
+            license: manifest.license,
+            repository: manifest.repository,
+            skills: manifest
+                .skills
+                .and_then(|value| value.as_str().map(str::to_string)),
+            mcp_servers: manifest
+                .mcp_servers
+                .and_then(|value| value.as_str().map(str::to_string)),
+            capability_catalog: manifest.elegy.capability_catalog,
+            connections: Some(manifest.elegy.connections),
+            readiness: Some(manifest.elegy.readiness),
+            extensions: None,
+        },
+    })
+}
+
+fn descriptor_only_manifest(entry: &ElegyMarketplacePluginV2) -> LoadedPluginManifest {
+    LoadedPluginManifest {
+        manifest: ElegyPluginV1 {
+            schema_version: ELEGY_PLUGIN_V3_SCHEMA_VERSION.to_string(),
+            name: entry.name.clone(),
+            version: "unmaterialized".to_string(),
+            description: "Descriptor-only source; package metadata is unavailable until local materialization and verification.".to_string(),
+            ..Default::default()
+        },
+        surface_class: "adapter-plugin".to_string(),
+        verified: false,
+    }
+}
+
+fn marketplace_local_source_path(entry: &ElegyMarketplacePluginV2) -> Result<&str, String> {
+    match &entry.source {
+        ElegyMarketplaceSourceV2::Local { path }
+        | ElegyMarketplaceSourceV2::ElegyArtifact { path } => Ok(path),
+        other => Err(format!(
+            "plugin '{}' uses source {:?}; this command requires a materialized local source",
+            entry.name, other
+        )),
+    }
 }
 
 fn get_text(url: &str) -> Result<String, String> {
@@ -1085,7 +1266,9 @@ fn print_marketplace_plugins(
     let summaries = loaded
         .plugins
         .iter()
-        .filter(|(_, manifest)| include_manifest_in_marketplace(manifest, include_incubating))
+        .filter(|(entry, manifest)| {
+            include_manifest_in_marketplace(entry, manifest, include_incubating)
+        })
         .filter(|(entry, manifest)| {
             query.as_ref().is_none_or(|query| {
                 entry.name.to_ascii_lowercase().contains(query)
@@ -1211,7 +1394,7 @@ fn build_marketplace_status_records(
 
 fn build_marketplace_status_record(
     source: &str,
-    entry: &ElegyMarketplacePlugin,
+    entry: &ElegyMarketplacePluginV2,
     manifest: &ElegyPluginV1,
     target: &str,
     install_root: &Path,
@@ -1242,7 +1425,7 @@ fn build_marketplace_status_record(
         });
     }
 
-    let Some(artifact) = select_marketplace_artifact(entry, target) else {
+    let Some(artifact) = select_marketplace_artifact_v2(entry, target) else {
         return Ok(MarketplaceStatusRecord {
             plugin: entry.name.clone(),
             target: target.to_string(),
@@ -1368,7 +1551,7 @@ fn update_marketplace_plugin(
                 loaded.marketplace.name
             )
         })?;
-    if !include_manifest_in_marketplace(manifest, allow_incubating) {
+    if !include_manifest_in_marketplace(entry, manifest, allow_incubating) {
         return Err(format!(
             "plugin '{}' is not agent-routable at readiness stage '{}'; pass --allow-incubating for explicit maintainer use",
             entry.name,
@@ -1378,7 +1561,7 @@ fn update_marketplace_plugin(
     if !is_supported_marketplace_target(target) {
         return Err(format!("unsupported marketplace target '{target}'"));
     }
-    let artifact = select_marketplace_artifact(entry, target).ok_or_else(|| {
+    let artifact = select_marketplace_artifact_v2(entry, target).ok_or_else(|| {
         format!(
             "plugin '{}' has no artifact for target '{}'",
             entry.name, target
@@ -1514,12 +1697,16 @@ fn installed_capability_digest(install_dir: &Path) -> Option<String> {
 
 fn manifest_capability_digest(
     loaded: &LoadedMarketplace,
-    entry: &ElegyMarketplacePlugin,
+    entry: &ElegyMarketplacePluginV2,
     manifest: &ElegyPluginV1,
 ) -> Option<String> {
     let catalog = manifest.capability_catalog.as_ref()?;
     let local_root = loaded.local_root.as_ref()?;
-    let plugin_root = local_root.join(entry.source.path.trim_start_matches("./"));
+    let plugin_root = local_root.join(
+        marketplace_local_source_path(entry)
+            .ok()?
+            .trim_start_matches("./"),
+    );
     let catalog_raw =
         fs::read_to_string(plugin_root.join(catalog.path.trim_start_matches("./"))).ok()?;
     serde_json::from_str::<Value>(&catalog_raw)
@@ -1589,7 +1776,7 @@ fn install_marketplace_plugin(
                 loaded.marketplace.name
             )
         })?;
-    if !include_manifest_in_marketplace(manifest, allow_incubating) {
+    if !include_manifest_in_marketplace(entry, manifest, allow_incubating) {
         return Err(format!(
             "plugin '{}' is not agent-routable at readiness stage '{}'; pass --allow-incubating for explicit maintainer use",
             entry.name,
@@ -1600,7 +1787,7 @@ fn install_marketplace_plugin(
         .map(Path::to_path_buf)
         .unwrap_or_else(|| dirs_or_manual_home().join(".elegy").join("plugins"));
 
-    let receipt = if let Some(artifact) = select_marketplace_artifact(entry, target) {
+    let receipt = if let Some(artifact) = select_marketplace_artifact_v2(entry, target) {
         let metadata = InstallReceiptMetadata {
             target: Some(artifact.target.clone()),
             marketplace_name: Some(loaded.marketplace.name.clone()),
@@ -1626,9 +1813,10 @@ fn install_marketplace_plugin(
             entry.name, target
         ));
     } else if let Some(local_root) = loaded.local_root {
-        let plugin_root = local_root.join(entry.source.path.trim_start_matches("./"));
+        let plugin_root =
+            local_root.join(marketplace_local_source_path(entry)?.trim_start_matches("./"));
         let temp = tempfile::NamedTempFile::new().map_err(|error| error.to_string())?;
-        pack_plugin_v1(&plugin_root, temp.path()).map_err(|error| error.to_string())?;
+        pack_plugin_v3(&plugin_root, temp.path()).map_err(|error| error.to_string())?;
         install_from_archive(temp.path(), &root).map_err(|error| error.to_string())?
     } else {
         return Err(format!(
@@ -1700,7 +1888,7 @@ fn export_codex_marketplace(request: CodexMarketplaceExportRequest<'_>) -> Resul
         });
     }
     for (entry, manifest) in selected_plugins {
-        if !include_manifest_in_marketplace(manifest, allow_incubating) {
+        if !include_manifest_in_marketplace(entry, manifest, allow_incubating) {
             if plugin_name.is_some() {
                 return Err(format!(
                     "plugin '{}' is not agent-routable; pass --allow-incubating only for explicit maintainer inspection",
@@ -1709,7 +1897,7 @@ fn export_codex_marketplace(request: CodexMarketplaceExportRequest<'_>) -> Resul
             }
             continue;
         }
-        if !entry.artifacts.is_empty() && select_marketplace_artifact(entry, target).is_none() {
+        if !entry.artifacts.is_empty() && select_marketplace_artifact_v2(entry, target).is_none() {
             if plugin_name.is_some() {
                 return Err(format!(
                     "plugin '{}' has no artifact for Codex export target '{}'",
@@ -1718,7 +1906,8 @@ fn export_codex_marketplace(request: CodexMarketplaceExportRequest<'_>) -> Resul
             }
             continue;
         }
-        let wrapper_root = local_root.join(entry.source.path.trim_start_matches("./"));
+        let wrapper_root =
+            local_root.join(marketplace_local_source_path(entry)?.trim_start_matches("./"));
         let plugin_output = generation_output.join("plugins").join(&entry.name);
         let materialized = materialize_marketplace_artifact(
             entry,
@@ -1738,19 +1927,19 @@ fn export_codex_marketplace(request: CodexMarketplaceExportRequest<'_>) -> Resul
                 source_path: binary.source_path.as_path(),
                 archive_path: binary.archive_path.clone(),
             });
-        export_plugin_v1_with_codex_mode_and_binary(
+        export_plugin_with_policy_and_binary(
             plugin_root,
             "codex",
             &plugin_output,
             overwrite,
-            CodexProjectionMode::Current,
+            HostProjectionPolicy::Strict,
             binary_spec,
         )
         .map_err(|error| error.to_string())?;
         codex_entries.push(json!({
             "name": entry.name,
             "source": {"source": "local", "path": format!("./plugins/{}", entry.name)},
-            "policy": {"installation": "AVAILABLE", "authentication": "ON_INSTALL"},
+            "policy": entry.policy,
             "category": entry.category
         }));
     }
@@ -1861,7 +2050,7 @@ struct MaterializedMarketplaceBinary {
 }
 
 fn install_from_local_marketplace_artifact(
-    entry: &ElegyMarketplacePlugin,
+    entry: &ElegyMarketplacePluginV2,
     manifest: &ElegyPluginV1,
     artifact: &ElegyMarketplaceArtifact,
     artifact_dir: &Path,
@@ -2070,7 +2259,7 @@ fn apply_external_wrapper_manifest_metadata(
 }
 
 fn materialize_marketplace_artifact(
-    entry: &ElegyMarketplacePlugin,
+    entry: &ElegyMarketplacePluginV2,
     manifest: &ElegyPluginV1,
     target: &str,
     staging_root: &Path,
@@ -2079,7 +2268,7 @@ fn materialize_marketplace_artifact(
     if entry.artifacts.is_empty() {
         return Ok(None);
     }
-    let artifact = select_marketplace_artifact(entry, target).ok_or_else(|| {
+    let artifact = select_marketplace_artifact_v2(entry, target).ok_or_else(|| {
         format!(
             "plugin '{}' has no artifact for Codex export target '{}'",
             entry.name, target
@@ -2286,6 +2475,15 @@ fn default_plugin_install_root() -> PathBuf {
     dirs_or_manual_home().join(".elegy").join("plugins")
 }
 
+fn manifest_schema_version(path: &Path) -> Option<String> {
+    let raw = fs::read_to_string(path).ok()?;
+    serde_json::from_str::<Value>(&raw)
+        .ok()?
+        .get("schemaVersion")?
+        .as_str()
+        .map(str::to_string)
+}
+
 fn plugin_requires_binary(plugin: &Path) -> bool {
     let Ok((repo_root, manifest_path)) = resolve_plugin_root(plugin) else {
         return false;
@@ -2321,11 +2519,14 @@ mod tests {
     }
 
     fn marketplace_fixture(version: &str) -> LoadedMarketplace {
-        let entry = ElegyMarketplacePlugin {
+        let entry = ElegyMarketplacePluginV2 {
             name: "demo-plugin".to_string(),
-            source: ElegyMarketplaceSource {
-                source: "local".to_string(),
+            source: ElegyMarketplaceSourceV2::Local {
                 path: "./plugins/demo-plugin".to_string(),
+            },
+            policy: ElegyMarketplacePolicy {
+                installation: ElegyMarketplaceInstallationPolicy::Available,
+                authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
             },
             category: "Developer Tools".to_string(),
             artifacts: vec![ElegyMarketplaceArtifact {
@@ -2342,15 +2543,60 @@ mod tests {
             ..Default::default()
         };
         LoadedMarketplace {
-            marketplace: ElegyMarketplaceV1 {
-                schema_version: ELEGY_MARKETPLACE_V1_SCHEMA_VERSION.to_string(),
+            marketplace: ElegyMarketplaceV2 {
+                schema_version: ELEGY_MARKETPLACE_V2_SCHEMA_VERSION.to_string(),
                 name: "test-market".to_string(),
                 interface: None,
                 plugins: vec![entry.clone()],
             },
-            plugins: vec![(entry, manifest)],
+            plugins: vec![(
+                entry,
+                LoadedPluginManifest {
+                    manifest,
+                    surface_class: "adapter-plugin".to_string(),
+                    verified: true,
+                },
+            )],
             local_root: None,
         }
+    }
+
+    #[test]
+    fn descriptor_only_marketplace_sources_load_but_remain_non_routable() {
+        let root = temp_dir("descriptor-only-marketplace");
+        fs::create_dir_all(root.join(".elegy")).expect("marketplace directory");
+        fs::write(
+            root.join(".elegy/marketplace.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion":"elegy-marketplace/v2",
+                "name":"descriptor-market",
+                "plugins":[{
+                    "name":"npm-adapter",
+                    "source":{
+                        "source":"npm",
+                        "package":"@example/npm-adapter",
+                        "version":"1.0.0"
+                    },
+                    "policy":{
+                        "installation":"NOT_AVAILABLE",
+                        "authentication":"ON_USE"
+                    },
+                    "category":"Developer Tools",
+                    "artifacts":[]
+                }]
+            }))
+            .expect("serialize marketplace"),
+        )
+        .expect("write marketplace");
+
+        let loaded = load_marketplace(root.to_str().expect("UTF-8 path"))
+            .expect("descriptor-only marketplace loads");
+        assert_eq!(loaded.plugins.len(), 1);
+        let (entry, manifest) = &loaded.plugins[0];
+        assert!(!manifest.verified);
+        assert!(!include_manifest_in_marketplace(entry, manifest, false));
+        assert!(include_manifest_in_marketplace(entry, manifest, true));
+        fs::remove_dir_all(root).ok();
     }
 
     fn write_installed_plugin(root: &Path, version: &str, artifact_sha256: &str) {
@@ -2427,9 +2673,36 @@ mod tests {
         }))
         .expect("implemented manifest");
 
-        assert!(!include_manifest_in_marketplace(&legacy, false));
-        assert!(!include_manifest_in_marketplace(&implemented, false));
-        assert!(include_manifest_in_marketplace(&implemented, true));
+        let entry = ElegyMarketplacePluginV2 {
+            name: "fixture".to_string(),
+            source: ElegyMarketplaceSourceV2::Local {
+                path: "./fixture".to_string(),
+            },
+            policy: ElegyMarketplacePolicy {
+                installation: ElegyMarketplaceInstallationPolicy::Available,
+                authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
+            },
+            category: "Test".to_string(),
+            artifacts: Vec::new(),
+        };
+        let legacy = LoadedPluginManifest {
+            manifest: legacy,
+            surface_class: "adapter-plugin".to_string(),
+            verified: true,
+        };
+        let implemented = LoadedPluginManifest {
+            manifest: implemented,
+            surface_class: "adapter-plugin".to_string(),
+            verified: true,
+        };
+
+        assert!(!include_manifest_in_marketplace(&entry, &legacy, false));
+        assert!(!include_manifest_in_marketplace(
+            &entry,
+            &implemented,
+            false
+        ));
+        assert!(include_manifest_in_marketplace(&entry, &implemented, true));
     }
 
     #[test]
@@ -2449,7 +2722,24 @@ mod tests {
         }))
         .expect("usable manifest");
 
-        assert!(include_manifest_in_marketplace(&usable, false));
+        let entry = ElegyMarketplacePluginV2 {
+            name: "usable-plugin".to_string(),
+            source: ElegyMarketplaceSourceV2::Local {
+                path: "./usable-plugin".to_string(),
+            },
+            policy: ElegyMarketplacePolicy {
+                installation: ElegyMarketplaceInstallationPolicy::Available,
+                authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
+            },
+            category: "Test".to_string(),
+            artifacts: Vec::new(),
+        };
+        let usable = LoadedPluginManifest {
+            manifest: usable,
+            surface_class: "adapter-plugin".to_string(),
+            verified: true,
+        };
+        assert!(include_manifest_in_marketplace(&entry, &usable, false));
     }
 
     #[test]
@@ -2463,9 +2753,9 @@ mod tests {
         }"#;
 
         let error = parse_marketplace_plugin_manifest("legacy-plugin", raw)
-            .expect_err("marketplace publication must require plugin v2");
+            .expect_err("marketplace publication must require plugin v3");
 
-        assert!(error.contains("elegy-plugin/v2"), "{error}");
+        assert!(error.contains("elegy-plugin/v3"), "{error}");
     }
 
     #[test]
@@ -2546,8 +2836,8 @@ mod tests {
     fn marketplace_target_selection_rejects_unsupported_platform() {
         let loaded = marketplace_fixture("0.1.0");
         let entry = &loaded.plugins[0].0;
-        assert!(select_marketplace_artifact(entry, "x86_64-pc-windows-msvc").is_some());
-        assert!(select_marketplace_artifact(entry, "x86_64-unknown-linux-gnu").is_none());
+        assert!(select_marketplace_artifact_v2(entry, "x86_64-pc-windows-msvc").is_some());
+        assert!(select_marketplace_artifact_v2(entry, "x86_64-unknown-linux-gnu").is_none());
     }
 
     #[test]

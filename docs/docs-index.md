@@ -98,8 +98,8 @@
       "freshness": "unknown",
       "path": "docs/adr/2026-07-01-adopt-static-plugin-marketplace.md",
       "sourceOfTruth": "current-canon",
-      "status": "accepted",
-      "summary": "Elegy distributes marketplace metadata as one static `elegy-marketplace/v1`",
+      "status": "superseded",
+      "summary": "> Superseded on 2026-07-30 by marketplace v2 and the Codex-parity ADR. This",
       "title": "Adopt a static plugin marketplace"
     },
     {
@@ -132,6 +132,17 @@
       "status": "accepted",
       "summary": "Adapters may own optional Agent Skills, while standalone skills use host-native",
       "title": "Retire the central skill registry and resolver"
+    },
+    {
+      "authorityClass": "current",
+      "created": "2026-07-30",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Elegy's v1/v2 abstraction renamed or omitted native Codex package behavior and",
+      "title": "Adopt Codex-parity packages and delegated authentication"
     },
     {
       "authorityClass": "current",
@@ -386,18 +397,18 @@
       "path": "docs/specs/plugin-connections-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "Authentication is a host lifecycle, not an LLM task. `elegy-plugin/v2`",
-      "title": "Plugin Connections V1"
+      "summary": "Authentication is not one boundary.",
+      "title": "Plugin connections and authentication"
     },
     {
       "authorityClass": "current",
       "docKind": "spec",
       "freshness": "unknown",
-      "path": "docs/specs/plugin-marketplace-v1.md",
+      "path": "docs/specs/plugin-marketplace-v2.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "The marketplace root contains `.elegy/marketplace.json`.",
-      "title": "Plugin marketplace v1"
+      "summary": "The canonical index is `.elegy/marketplace.json` with",
+      "title": "Plugin marketplace v2"
     },
     {
       "authorityClass": "current",
@@ -437,12 +448,13 @@
     "docs/adr/2026-07-07-adopt-repo-surface-taxonomy.md",
     "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
     "docs/adr/2026-07-20-retire-central-skill-registry.md",
+    "docs/adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md",
     "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",
     "docs/specs/plugin-connections-v1.md",
-    "docs/specs/plugin-marketplace-v1.md",
+    "docs/specs/plugin-marketplace-v2.md",
     "docs/specs/readiness-v1.md",
     "docs/architecture/README.md",
     "docs/plans/automation-portability-handoff.md",

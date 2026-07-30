@@ -147,6 +147,52 @@ fn pending_authorization_survives_restart_without_plaintext_device_secret() {
 }
 
 #[test]
+#[cfg(windows)]
+fn credential_rotation_replaces_encrypted_material_atomically() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("accounts.sqlite");
+    let vault = Vault::open(&path, Arc::new(DpapiProtector)).unwrap();
+    let account = vault
+        .store_account("google", "owner@example.test", "oauth_pkce", b"old-secret")
+        .unwrap();
+    vault
+        .replace_secret(&account.id, b"rotated-secret")
+        .unwrap();
+
+    assert_eq!(
+        vault.load_secret(&account.id).unwrap().as_slice(),
+        b"rotated-secret"
+    );
+    let bytes = fs::read(path).unwrap();
+    let database = String::from_utf8_lossy(&bytes);
+    assert!(!database.contains("old-secret"));
+    assert!(!database.contains("rotated-secret"));
+}
+
+#[test]
+#[cfg(windows)]
+fn stale_concurrent_credential_rotation_fails_closed() {
+    let dir = tempdir().unwrap();
+    let vault = Vault::open(dir.path().join("accounts.sqlite"), Arc::new(DpapiProtector)).unwrap();
+    let account = vault
+        .store_account("google", "owner@example.test", "oauth_pkce", b"original")
+        .unwrap();
+    let (_, generation) = vault.load_secret_versioned(&account.id).unwrap();
+
+    vault
+        .replace_secret_if_generation(&account.id, generation, b"first-rotation")
+        .unwrap();
+    assert!(matches!(
+        vault.replace_secret_if_generation(&account.id, generation, b"stale-rotation"),
+        Err(VaultError::Conflict)
+    ));
+    assert_eq!(
+        vault.load_secret(&account.id).unwrap().as_slice(),
+        b"first-rotation"
+    );
+}
+
+#[test]
 #[cfg(not(windows))]
 fn dpapi_fails_closed_on_unsupported_platforms() {
     let error = DpapiProtector.protect(b"secret").unwrap_err();

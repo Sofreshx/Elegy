@@ -1,4 +1,8 @@
-use crate::{AuthMethod, BrokerError, BrokerStore, ProviderCatalog, Redactor, VaultError};
+use crate::{
+    AdapterError, AuthMethod, BrokerError, BrokerStore, OAuthAdapterConfig, OAuthCredential,
+    ProviderCatalog, Redactor, VaultError, refresh_stored_oauth_credential,
+};
+use chrono::Duration;
 use reqwest::{Client, Method};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -44,6 +48,8 @@ pub enum ProxyError {
     UnsupportedCredential,
     #[error("provider request failed")]
     Network,
+    #[error("provider credential could not be refreshed")]
+    CredentialRefresh,
 }
 
 impl BrokerStore {
@@ -81,13 +87,70 @@ impl BrokerStore {
             return Err(ProxyError::InvalidMethod);
         }
         let account_id = self.account_id_for_lease(request.lease)?;
-        let secret = self.vault().load_secret(&account_id)?;
-        let secret_text = std::str::from_utf8(secret.as_slice())
+        let mut secret = self.vault().load_secret(&account_id)?;
+        let mut secret_text = std::str::from_utf8(secret.as_slice())
             .map_err(|_| ProxyError::UnsupportedCredential)?;
         let builder = client.request(method, target);
         let mut redactions = vec![secret_text.to_owned()];
         let mut builder = match profile.method {
-            AuthMethod::OAuthPkce | AuthMethod::DeviceAuthorization | AuthMethod::ApiToken => {
+            AuthMethod::OAuthPkce => {
+                let mut credential = OAuthCredential::from_secret(secret_text)
+                    .map_err(|_| ProxyError::UnsupportedCredential)?;
+                if credential
+                    .expires_within(Duration::seconds(60))
+                    .map_err(|_| ProxyError::UnsupportedCredential)?
+                {
+                    let lifecycle = profile
+                        .oauth_lifecycle
+                        .as_ref()
+                        .ok_or(ProxyError::CredentialRefresh)?;
+                    let config = OAuthAdapterConfig {
+                        provider: provider.id.clone(),
+                        client_id: profile
+                            .configured_client_id()
+                            .ok_or(ProxyError::CredentialRefresh)?,
+                        token_url: profile
+                            .token_url
+                            .clone()
+                            .ok_or(ProxyError::CredentialRefresh)?,
+                        identity: profile.identity.clone(),
+                        required_scopes: profile.scopes.clone(),
+                    };
+                    credential = match refresh_stored_oauth_credential(
+                        client,
+                        self.vault(),
+                        &account_id,
+                        &config,
+                        lifecycle,
+                    )
+                    .await
+                    {
+                        Ok(credential) => credential,
+                        Err(AdapterError::RefreshConflict) => {
+                            secret = self.vault().load_secret(&account_id)?;
+                            secret_text = std::str::from_utf8(secret.as_slice())
+                                .map_err(|_| ProxyError::UnsupportedCredential)?;
+                            let credential = OAuthCredential::from_secret(secret_text)
+                                .map_err(|_| ProxyError::UnsupportedCredential)?;
+                            if credential
+                                .expires_within(Duration::seconds(60))
+                                .map_err(|_| ProxyError::UnsupportedCredential)?
+                            {
+                                return Err(ProxyError::CredentialRefresh);
+                            }
+                            credential
+                        }
+                        Err(_) => return Err(ProxyError::CredentialRefresh),
+                    };
+                }
+                redactions.extend([credential.access_token.clone(), credential.refresh_token]);
+                if let Some(header) = &profile.credential_header {
+                    builder.header(header, format!("Bearer {}", credential.access_token))
+                } else {
+                    builder.bearer_auth(credential.access_token)
+                }
+            }
+            AuthMethod::DeviceAuthorization | AuthMethod::ApiToken => {
                 if let Some(header) = &profile.credential_header {
                     builder.header(header, format!("Bearer {secret_text}"))
                 } else {

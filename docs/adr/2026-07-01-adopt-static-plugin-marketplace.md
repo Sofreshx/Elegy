@@ -1,11 +1,14 @@
 ---
 title: Adopt a static plugin marketplace
-status: accepted
+status: superseded
 date: 2026-07-01
 owner: Elegy
 ---
 
 # Adopt a static plugin marketplace
+
+> Superseded on 2026-07-30 by marketplace v2 and the Codex-parity ADR. This
+> file is historical rationale, not current implementation guidance.
 
 ## Decision
 

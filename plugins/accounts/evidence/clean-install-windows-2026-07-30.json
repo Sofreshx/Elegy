@@ -1,17 +1,19 @@
 {
   "scope": "fresh local install root on x86_64-pc-windows-msvc",
   "result": "passed",
-  "archive": "elegy-accounts-plugin-x86_64-pc-windows-msvc.zip",
+  "manifestSchema": "elegy-plugin/v3",
+  "archive": "accounts-v3.zip",
   "commands": [
     "elegy-plugin-packaging pack --plugin plugins/accounts --binary target/debug/elegy-accounts.exe --binary-name bin/elegy-accounts.exe",
     "elegy-plugin-packaging install --archive elegy-accounts-plugin-x86_64-pc-windows-msvc.zip --install-root <fresh-root>",
     "<fresh-root>/elegy-accounts/bin/elegy-accounts.exe status --json"
   ],
   "observed": [
-    "The installed archive retained its manifest, typed capability catalog, readiness artifact, evidence, connection provider, skills, UI assets, and binary.",
+    "The installed archive retained its v3 manifest, typed capability catalog, readiness artifact, evidence, connection provider, skills, UI assets, provider packs, and binary.",
     "The installed binary returned an elegy-accounts-status/v1 envelope against the local Windows account store."
   ],
   "limitations": [
+    "The status command read the existing current-user Accounts store; it did not create an isolated provider account.",
     "No provider API operation, new authentication flow, credential refresh, or revocation was exercised.",
     "This receipt does not satisfy the non-fixture real-provider task requirement and does not promote the surface to usable."
   ]

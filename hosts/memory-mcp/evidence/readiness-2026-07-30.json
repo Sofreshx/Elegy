@@ -1,7 +1,10 @@
 {
   "recordedAt": "2026-07-30",
   "environment": "Windows workspace checkout",
-  "command": "cargo test -p elegy-codegraph -p elegy-configuration -p elegy-core -p elegy-host-mcp -p elegy-memory-mcp",
+  "commands": [
+    "cargo test -p elegy-memory-mcp",
+    "cargo test --workspace -j 1"
+  ],
   "result": "passed",
-  "scope": "Memory MCP library, HTTP/OAuth, stdio, bootstrap, regression, and benchmark-fixture tests passed; fixtures and in-process clients do not qualify as real-task evidence."
+  "scope": "Memory MCP library, delegated HTTP resource authentication, stdio, bootstrap, regression, and benchmark-fixture tests passed. The HTTP tests cover fail-closed startup configuration, ES256/RS256 JWKS validation, key rotation, challenges, and a valid signed token crossing the MCP middleware boundary. Fixtures and in-process clients do not qualify as real-task evidence."
 }

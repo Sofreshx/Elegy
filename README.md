@@ -125,9 +125,11 @@ An Elegy plugin is a reusable system adapter, not a synonym for any package of
 business logic. Client Radar, AI Radar, and Question Studio are intentionally
 not Elegy plugins; they belong in product libraries, tools, or applications.
 
-`elegy-plugin/v2` declares identity, connection posture, and readiness authority
-in `.elegy-plugin/plugin.json`. The manifest and schema prove structure only.
-They do not prove installed behavior.
+`elegy-plugin/v3` keeps Codex-native package fields at the top level and
+declares Elegy classification, connection posture, readiness, capability
+authority, and expected MCP authentication under `elegy`. The manifest and
+schema prove structure only. They do not prove installed behavior or Codex
+runtime compatibility.
 
 Setup flow:
 

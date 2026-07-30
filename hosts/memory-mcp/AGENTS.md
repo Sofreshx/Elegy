@@ -13,7 +13,10 @@
 - This crate adapts `elegy-memory` to MCP transports. It does not define new memory authority or bypass memory guardrails.
 - Tool calls must stay bound to `MemoryScope::Agent`; do not accept request-level `scope`, `scopes`, `namespace`, or similar override fields.
 - The stdio binary is a local subprocess transport. It must not gain OAuth, DCR, JWT, HTTP discovery, or public network behavior.
-- The HTTP binary owns the remote OAuth/Bearer lane. Keep `/mcp` protected and keep OAuth metadata, DCR, consent, and token routes deliberate and documented.
+- The HTTP binary is only an OAuth resource server. It must never own login,
+  consent, DCR, token issuance, refresh tokens, client secrets, or signing keys.
+  Keep `/mcp` protected for remote use and delegate authorization to the
+  configured external issuer.
 - `stdout` is reserved for the stdio MCP protocol. Send diagnostics and logs to `stderr`.
 - Audit logs may include tool, id, scope, timestamp, and token id. Do not log memory content by default.
 - Successful write tools must reuse the underlying salience gate and correction behavior rather than writing around `elegy-memory`.
