@@ -6,14 +6,14 @@ Transport adapters that expose the `elegy-memory` library over MCP. Two
 binaries are published:
 
 - `elegy-memory-mcp-stdio` — local subprocess transport, no OAuth, no network.
-- `elegy-memory-mcp-http` — remote OAuth 2.1 + bearer JWT transport over
-  streamable HTTP.
+- `elegy-memory-mcp-http` — streamable HTTP resource server with explicit
+  loopback-only no-auth or externally issued bearer validation.
 
 This crate adapts `elegy-memory` to MCP transports. It does not define new
 memory authority, salience, correction, or scope behavior — those stay in
 `elegy-memory`.
 
-**This surface is NOT packaged as an `elegy-plugin/v1` plugin.** It ships as a
+**This surface is not an Elegy adapter plugin.** It ships as a
 standalone CLI binary.
 
 ## Binary surface

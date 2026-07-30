@@ -117,7 +117,7 @@ impl BrokerStore {
             .list_accounts()
             .map_err(BrokerError::from)?
             .into_iter()
-            .filter(|account| account.provider == request.provider)
+            .filter(|account| account.provider == request.provider && account.status == "connected")
             .collect::<Vec<_>>();
         let account = match request.account_id.as_deref() {
             Some(account_id) => matching_accounts

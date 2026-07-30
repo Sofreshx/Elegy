@@ -194,3 +194,51 @@ fn reopening_the_broker_preserves_accounts_but_revokes_legacy_codex_grants() {
             .any(|event| event.event == "grant.legacy_revoked")
     );
 }
+
+#[test]
+#[cfg(windows)]
+fn provider_disconnect_disables_local_execution_before_remote_cleanup() {
+    let directory = tempfile::tempdir().unwrap();
+    let database = directory.path().join("accounts.sqlite");
+    let broker = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector)).unwrap());
+    let account = broker
+        .vault()
+        .store_account("google", "owner", "oauth_pkce", b"encrypted-oauth-envelope")
+        .unwrap();
+    let request = broker
+        .request_access(NewAccessRequest {
+            account_id: account.id.clone(),
+            client_id: "registered-test-client".into(),
+            purpose: "read mail".into(),
+            operations: vec!["gmail.messages.read".into()],
+            duration_minutes: 60,
+        })
+        .unwrap();
+    let grant = broker.approve_access(&request.id).unwrap();
+    let lease = broker.issue_lease(&grant.id, 10).unwrap();
+
+    broker.begin_provider_disconnect(&account.id).unwrap();
+    assert!(
+        broker
+            .authorize(
+                &lease.token,
+                "registered-test-client",
+                "read mail",
+                "google",
+                "gmail.messages.read"
+            )
+            .is_err()
+    );
+    let retained = broker
+        .vault()
+        .list_accounts()
+        .unwrap()
+        .into_iter()
+        .find(|candidate| candidate.id == account.id)
+        .expect("credential retained for retry");
+    assert_eq!(retained.status, "revocation_pending");
+    assert!(broker.vault().load_secret(&account.id).is_ok());
+
+    broker.complete_provider_disconnect(&account.id).unwrap();
+    assert!(broker.vault().load_secret(&account.id).is_err());
+}

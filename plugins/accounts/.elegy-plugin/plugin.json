@@ -1,5 +1,5 @@
 {
-  "schemaVersion": "elegy-plugin/v2",
+  "schemaVersion": "elegy-plugin/v3",
   "name": "elegy-accounts",
   "version": "0.1.0",
   "description": "Portable local authorization and typed broker execution for registered agent tools without exposing account credentials.",
@@ -9,43 +9,53 @@
   "license": "Apache-2.0",
   "repository": "https://github.com/Sofreshx/Elegy",
   "skills": "./skills/",
-  "capabilityCatalog": {
-    "path": "./capability-catalog.json",
-    "schemaVersion": "elegy-capability-catalog/v1",
-    "readinessCommand": "elegy-accounts status --json"
+  "mcpServers": "./.mcp.json",
+  "assets": ["./ui/", "./browser/", "./providers/"],
+  "interface": {
+    "displayName": "Elegy Accounts",
+    "shortDescription": "Authorize local agent tools once",
+    "longDescription": "Connect accounts once, then let registered local agent tools perform typed, scoped, auditable provider operations without receiving credentials.",
+    "developerName": "Elegy Contributors",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write",
+      "Interactive"
+    ],
+    "defaultPrompt": [
+      "Connect the account I need with minimum access.",
+      "Use my connected GitHub or Cloudflare account for a read-only operation.",
+      "Show my connected accounts and agent access.",
+      "Revoke account access I no longer need."
+    ]
   },
-  "connections": {
-    "requirements": {
-      "mode": "none"
+  "elegy": {
+    "surfaceClass": "adapter-plugin",
+    "capabilityCatalog": {
+      "path": "./capability-catalog.json",
+      "schemaVersion": "elegy-capability-catalog/v1",
+      "readinessCommand": "elegy-accounts status --json"
     },
-    "provider": {
-      "path": "./connection-provider.json",
-      "schemaVersion": "elegy-connection-provider/v1"
-    }
-  },
-  "readiness": {
-    "stage": "implemented",
-    "path": "./readiness.json",
-    "schemaVersion": "elegy-readiness/v1"
-  },
-  "extensions": {
-    "codex.plugin/v1": {
-      "schemaVersion": "codex.plugin/v1",
-      "mcpServers": "./.mcp.json",
-      "assets": ["./ui/", "./browser/", "./providers/"],
-      "interface": {
-        "displayName": "Elegy Accounts",
-        "shortDescription": "Authorize local agent tools once",
-        "longDescription": "Connect accounts once, then let registered local agent tools perform typed, scoped, auditable provider operations without receiving credentials.",
-        "developerName": "Elegy Contributors",
-        "category": "Productivity",
-        "capabilities": ["Read", "Write", "Interactive"],
-        "defaultPrompt": [
-          "Connect the account I need with minimum access.",
-          "Use my connected GitHub or Cloudflare account for a read-only operation.",
-          "Show my connected accounts and agent access.",
-          "Revoke account access I no longer need."
-        ]
+    "connections": {
+      "requirements": {
+        "mode": "none"
+      },
+      "provider": {
+        "path": "./connection-provider.json",
+        "schemaVersion": "elegy-connection-provider/v1"
+      }
+    },
+    "readiness": {
+      "stage": "implemented",
+      "path": "./readiness.json",
+      "schemaVersion": "elegy-readiness/v1"
+    },
+    "mcpAuthentication": {
+      "elegy-accounts": {
+        "mode": "none"
+      },
+      "elegy-account-actions": {
+        "mode": "none"
       }
     }
   }

@@ -5,7 +5,8 @@ use axum::{
 };
 use elegy_accountd::{
     AuthMethod, AuthProfile, ClientRegistration, ClientRegistrationMode, IdentitySpec,
-    OAuthAdapterConfig, TokenAdapterConfig, exchange_and_verify, verify_credentials, verify_token,
+    OAuthAdapterConfig, OAuthCredential, OAuthLifecycle, TokenAdapterConfig, exchange_and_verify,
+    refresh_oauth_credential, revoke_oauth_credential, verify_credentials, verify_token,
 };
 use serde_json::{Value, json};
 use std::collections::BTreeMap;
@@ -18,7 +19,12 @@ async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
             post(|headers: HeaderMap, body: String| async move {
                 assert_eq!(headers.get("accept").unwrap(), "application/json");
                 assert!(body.contains("code_verifier=verifier-canary"));
-                Json(json!({"access_token":"SYNTHETIC_SECRET_CANARY"}))
+                Json(json!({
+                    "access_token":"SYNTHETIC_SECRET_CANARY",
+                    "refresh_token":"SYNTHETIC_REFRESH_CANARY",
+                    "scope":"profile.read",
+                    "expires_in":3600
+                }))
             }),
         )
         .route(
@@ -46,6 +52,7 @@ async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
                 selectors: vec!["/email".into()],
                 required: BTreeMap::new(),
             },
+            required_scopes: vec!["profile.read".into()],
         };
         let verified = exchange_and_verify(
             &client,
@@ -58,7 +65,10 @@ async fn oauth_exchange_primitive_uses_pkce_and_verifies_identity() {
         .unwrap();
         assert_eq!(verified.provider, provider);
         assert_eq!(verified.identity, "verified@example.test");
-        assert_eq!(verified.secret.as_str(), "SYNTHETIC_SECRET_CANARY");
+        let stored = elegy_accountd::OAuthCredential::from_secret(verified.secret.as_str())
+            .expect("OAuth envelope");
+        assert_eq!(stored.access_token, "SYNTHETIC_SECRET_CANARY");
+        assert_eq!(stored.refresh_token, "SYNTHETIC_REFRESH_CANARY");
     }
 }
 
@@ -125,6 +135,7 @@ async fn adapter_fails_closed_on_provider_rejection() {
             selectors: vec!["/id".into()],
             required: BTreeMap::new(),
         },
+        required_scopes: vec![],
     };
     assert!(
         exchange_and_verify(
@@ -137,6 +148,114 @@ async fn adapter_fails_closed_on_provider_rejection() {
         .await
         .is_err()
     );
+}
+
+#[tokio::test]
+async fn refresh_preserves_an_unrotated_refresh_token_and_rejects_reduced_scopes() {
+    let app = Router::new()
+        .route(
+            "/refresh",
+            post(|body: String| async move {
+                assert!(body.contains("refresh_token=refresh-original"));
+                Json(json!({
+                    "access_token":"access-rotated",
+                    "scope":"profile.read mail.read",
+                    "expires_in":3600
+                }))
+            }),
+        )
+        .route(
+            "/reduced",
+            post(|| async {
+                Json(json!({
+                    "access_token":"access-reduced",
+                    "scope":"profile.read",
+                    "expires_in":3600
+                }))
+            }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let config = OAuthAdapterConfig {
+        provider: "synthetic".into(),
+        client_id: "public-client".into(),
+        token_url: format!("http://{address}/token"),
+        identity: IdentitySpec {
+            url: format!("http://{address}/identity"),
+            selectors: vec!["/id".into()],
+            required: BTreeMap::new(),
+        },
+        required_scopes: vec!["profile.read".into(), "mail.read".into()],
+    };
+    let current = OAuthCredential {
+        version: "elegy-oauth-credential/v1".into(),
+        access_token: "access-original".into(),
+        refresh_token: "refresh-original".into(),
+        scopes: vec!["profile.read".into(), "mail.read".into()],
+        expires_at: "2026-01-01T00:00:00Z".into(),
+    };
+    let lifecycle = OAuthLifecycle {
+        refresh_url: format!("http://{address}/refresh"),
+        revocation_url: format!("http://{address}/revoke"),
+        revocation_token_type_hint: Some("refresh_token".into()),
+    };
+
+    let refreshed =
+        refresh_oauth_credential(&reqwest::Client::new(), &config, &lifecycle, &current)
+            .await
+            .expect("refresh");
+    assert_eq!(refreshed.access_token, "access-rotated");
+    assert_eq!(refreshed.refresh_token, "refresh-original");
+
+    let reduced = OAuthLifecycle {
+        refresh_url: format!("http://{address}/reduced"),
+        ..lifecycle
+    };
+    assert!(matches!(
+        refresh_oauth_credential(&reqwest::Client::new(), &config, &reduced, &current).await,
+        Err(elegy_accountd::AdapterError::ReducedScopes)
+    ));
+}
+
+#[tokio::test]
+async fn provider_revocation_uses_the_declared_endpoint_and_reports_pending_cleanup() {
+    let app = Router::new()
+        .route(
+            "/revoke",
+            post(|body: String| async move {
+                assert!(body.contains("token=refresh-secret"));
+                assert!(body.contains("token_type_hint=refresh_token"));
+                StatusCode::OK
+            }),
+        )
+        .route(
+            "/unavailable",
+            post(|| async { StatusCode::SERVICE_UNAVAILABLE }),
+        );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, app).await.unwrap() });
+    let credential = OAuthCredential {
+        version: "elegy-oauth-credential/v1".into(),
+        access_token: "access-secret".into(),
+        refresh_token: "refresh-secret".into(),
+        scopes: vec!["profile.read".into()],
+        expires_at: "2026-01-01T00:00:00Z".into(),
+    };
+    let mut lifecycle = OAuthLifecycle {
+        refresh_url: format!("http://{address}/refresh"),
+        revocation_url: format!("http://{address}/revoke"),
+        revocation_token_type_hint: Some("refresh_token".into()),
+    };
+    revoke_oauth_credential(&reqwest::Client::new(), &lifecycle, &credential)
+        .await
+        .expect("provider revocation");
+    lifecycle.revocation_url = format!("http://{address}/unavailable");
+    assert!(matches!(
+        revoke_oauth_credential(&reqwest::Client::new(), &lifecycle, &credential).await,
+        Err(elegy_accountd::AdapterError::RevocationPending)
+    ));
 }
 
 #[tokio::test]
@@ -160,6 +279,7 @@ async fn common_basic_credentials_are_verified_and_serialized_as_an_encrypted_en
         audience: format!("http://{address}"),
         issuer: None,
         authorization_url: None,
+        authorization_parameters: BTreeMap::new(),
         token_url: None,
         device_authorization_url: None,
         identity: IdentitySpec {
@@ -176,6 +296,7 @@ async fn common_basic_credentials_are_verified_and_serialized_as_an_encrypted_en
         credential_header: None,
         creation_url: None,
         credential_fields: vec![],
+        oauth_lifecycle: None,
     };
     let fields = BTreeMap::from([
         ("username".into(), "user".into()),
@@ -221,6 +342,7 @@ async fn client_credentials_are_verified_but_only_the_long_lived_inputs_are_stor
         audience: format!("http://{address}"),
         issuer: None,
         authorization_url: None,
+        authorization_parameters: BTreeMap::new(),
         token_url: Some(format!("http://{address}/token")),
         device_authorization_url: None,
         identity: IdentitySpec {
@@ -237,6 +359,7 @@ async fn client_credentials_are_verified_but_only_the_long_lived_inputs_are_stor
         credential_header: None,
         creation_url: None,
         credential_fields: vec![],
+        oauth_lifecycle: None,
     };
     let fields = BTreeMap::from([
         ("client_id".into(), "fixture-client".into()),

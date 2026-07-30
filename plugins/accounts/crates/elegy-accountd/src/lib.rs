@@ -13,7 +13,7 @@ pub use vault::{
 mod provider;
 pub use provider::{
     AuthMethod, AuthProfile, ClientRegistration, ClientRegistrationMode, CredentialField,
-    IdentitySpec, OAuthCallback, OAuthError, OAuthTransaction, OperationExecutor, OperationRisk,
+    IdentitySpec, OAuthLifecycle, OAuthTransaction, OperationExecutor, OperationRisk,
     OperationSpec, PkceVerifier, ProviderCatalog, ProviderError, ProviderOperation, ProviderSpec,
 };
 mod broker;
@@ -22,8 +22,9 @@ pub use broker::{
 };
 mod adapter;
 pub use adapter::{
-    AdapterError, OAuthAdapterConfig, TokenAdapterConfig, VerifiedCredential, exchange_and_verify,
-    verify_credentials, verify_token,
+    AdapterError, OAuthAdapterConfig, OAuthCredential, TokenAdapterConfig, VerifiedCredential,
+    exchange_and_verify, refresh_oauth_credential, refresh_stored_oauth_credential,
+    revoke_oauth_credential, verify_credentials, verify_token,
 };
 mod proxy;
 pub use proxy::{AuthenticatedRequest, AuthenticatedResponse, ProxyError};

@@ -1,118 +1,44 @@
 ---
-title: Plugin Connections V1
+title: Plugin connections and authentication
 status: active
 owner: Elegy
 ---
 
-# Plugin Connections V1
+# Plugin connections and authentication
 
-## Purpose
+Authentication is not one boundary.
 
-Authentication is a host lifecycle, not an LLM task. `elegy-plugin/v2`
-requires every plugin to state whether it needs managed connections, and keeps
-credential acquisition, storage, refresh, verification, and revocation outside
-skills, CLI arguments, MCP tool inputs, and model context.
+| Boundary | Owner | Elegy responsibility |
+|---|---|---|
+| host to remote MCP | MCP server identity provider and agent host | Declare expected mode and validate representability; never store endpoints, client secrets, or host tokens. |
+| local adapter to upstream API | Codex app binding or optional Elegy Accounts broker | Declare connection requirement; keep credentials outside manifests/model context. |
+| host approvals and side effects | Agent host and adapter policy | Preserve annotations/policy; never claim authentication proves approval. |
 
-## Manifest declaration
+`elegy-plugin/v3` records connection requirements and per-server expected MCP
+authentication under `elegy`. Modes are `none`, `mcp-oauth`, and `bearer-env`.
+Inline HTTP MCP declarations without a mode are invalid. Remote unauthenticated
+configurations are invalid.
 
-Every `elegy-plugin/v2` manifest has a `connections` field.
+For `mcp-oauth`, the host follows MCP protected-resource discovery and the
+remote server's challenge. Elegy does not project OAuth endpoints, manufacture
+a client, or receive tokens. Local stdio normally declares `none`; it does not
+gain a second OAuth layer.
 
-Connectionless plugins declare:
+Codex-native apps remain native top-level package fields and use Codex's
+connection behavior. Other hosts must represent the same binding or reject
+projection. Accounts is an optional broker for credentials used by local
+adapters, not an MCP authorization server.
 
-```json
-{
-  "connections": {
-    "requirements": { "mode": "none" }
-  }
-}
-```
+Credentials, bearer values, authorization headers, codes, refresh tokens,
+cookies, signing keys, and client secrets are forbidden in package manifests,
+skills, catalogs, loss reports, and receipts.
 
-Connected plugins reference a governed requirements file:
+Readiness documents for adapters must report four facts separately:
 
-```json
-{
-  "connections": {
-    "requirements": {
-      "mode": "declared",
-      "path": "./connections.json",
-      "schemaVersion": "elegy-plugin-connections/v1"
-    }
-  }
-}
-```
+1. host authentication exercised;
+2. upstream authentication exercised;
+3. refresh exercised;
+4. provider revocation exercised.
 
-`elegy-plugin-connections/v1` binds the requirements to the plugin name and
-version. Each requirement has a stable plugin-local `id`, portable `service`
-identity, `required` flag, and user-facing description.
-
-## Host bindings
-
-Portable service identities are not host connector IDs. A Codex projection
-must explicitly map every declared requirement in
-`extensions["codex.plugin/v1"].connectionBindings`:
-
-```json
-{
-  "connectionBindings": {
-    "github-main": {
-      "id": "connector_76869538009648d5b282a4bb21c3d157"
-    }
-  }
-}
-```
-
-The exporter emits that opaque registered ID and the requirement's `required`
-state into `.app.json`. It never manufactures an ID from `github`, `gmail`, or
-another service slug. Plugin installation and app connection remain separate
-host operations; Codex owns OAuth and connection state for Codex apps.
-
-The catalog-driven v1 `appBinding.connector -> .app.json id` projection remains
-read-compatible only for `elegy-plugin/v1`. Marketplace publication requires
-`elegy-plugin/v2`.
-
-## Connection providers
-
-A plugin may additionally implement a host-neutral connection provider:
-
-```json
-{
-  "connections": {
-    "requirements": { "mode": "none" },
-    "provider": {
-      "path": "./connection-provider.json",
-      "schemaVersion": "elegy-connection-provider/v1"
-    }
-  }
-}
-```
-
-The provider descriptor declares an ID, the
-`elegy-connection-control/v1` protocol, and a CLI invocation. The control
-protocol supports list, connect-session status, verify, disconnect preview, and
-confirmed disconnect operations. Requests are client-bound, signed, replay
-protected, and credential-free. Responses expose explicit connection states
-and sanitized account summaries, never tokens, cookies, authorization codes,
-or refresh material.
-
-Elegy Accounts is the first provider. A Holon integration embeds or launches
-the provider's human authentication UI, calls the signed control protocol, and
-stores only opaque connection references and status. Holon does not parse
-provider credentials or ask an LLM to perform authentication.
-
-## Lifecycle and safety
-
-Connection states are `disconnected`, `connecting`, `connected`, `stale`,
-`attention-required`, `unavailable`, and `error`. A plugin is ready only when
-all required connections are verified as `connected`.
-
-Disconnect is destructive and therefore uses preview plus execute with a
-confirmation digest. Provider-owned credentials remain encrypted in the
-provider vault; host-owned Codex credentials remain in Codex.
-
-## Validation
-
-Verification fails when a v2 plugin omits its connection posture, a referenced
-requirements/provider file is missing or invalid, plugin identity does not
-match, a Codex binding is missing or extra, or a binding uses a service slug in
-place of an opaque registered ID.
-
+Fixture OAuth, local grant revocation, or schema conformance cannot be called
+authenticated usability.

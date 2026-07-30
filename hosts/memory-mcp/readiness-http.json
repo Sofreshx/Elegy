@@ -3,14 +3,22 @@
   "surface": "elegy-memory-mcp-http",
   "surfaceVersion": "0.1.0",
   "stage": "implemented",
-  "summary": "The HTTP adapter implements OAuth-protected MCP memory operations and passes source-level end-to-end tests.",
-  "worksToday": ["Serves the memory tools through MCP Streamable HTTP.", "Exercises OAuth code flow, token validation, persistence, and all memory tools in source tests."],
-  "limitations": ["Public deployment security and scope isolation remain review-sensitive.", "The end-to-end evidence is a test harness, not a clean-installed real consumer receipt."],
+  "summary": "The HTTP host adapter serves Memory over MCP and implements a fail-closed local or external-OAuth resource-server boundary.",
+  "worksToday": [
+    "Serves Memory tools through MCP Streamable HTTP.",
+    "Restricts unauthenticated HTTP to loopback.",
+    "Validates externally issued JWT signature, issuer, audience, expiry, and required scopes."
+  ],
+  "limitations": [
+    "Memory is not an OAuth authorization server and supplies no login, DCR, consent, token, or refresh endpoint.",
+    "Only deterministic JWKS/JWT fixtures were exercised.",
+    "No authenticated clean-install or real-consumer task receipt exists."
+  ],
   "supportedEnvironments": ["Windows source build; portable Rust implementation"],
   "installation": "Build from source with cargo build -p elegy-memory-mcp --bin elegy-memory-mcp-http.",
-  "invocation": "Configure the documented ELEGY_MCP_* variables, then run elegy-memory-mcp-http.",
+  "invocation": "Set ELEGY_MCP_AUTH_MODE and the mode-specific documented variables, then run elegy-memory-mcp-http.",
   "evidence": [
-    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "HTTP/OAuth and memory tool source tests passed."},
+    {"kind": "source-tests", "path": "./evidence/readiness-2026-07-30.json", "summary": "Local guard, external JWT validation, challenge, endpoint isolation, and Memory source tests passed."},
     {"kind": "package-verification", "path": "./evidence/readiness-2026-07-30.json", "summary": "The HTTP binary compiled as part of the workspace suite."}
   ]
 }

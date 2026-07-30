@@ -1,0 +1,259 @@
+{
+  "$defs": {
+    "ElegyMarketplaceArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "checksumUrl": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "target",
+        "url",
+        "checksumUrl"
+      ],
+      "type": "object"
+    },
+    "ElegyMarketplaceAuthenticationPolicy": {
+      "enum": [
+        "ON_INSTALL",
+        "ON_USE"
+      ],
+      "type": "string"
+    },
+    "ElegyMarketplaceInstallationPolicy": {
+      "enum": [
+        "NOT_AVAILABLE",
+        "AVAILABLE",
+        "INSTALLED_BY_DEFAULT"
+      ],
+      "type": "string"
+    },
+    "ElegyMarketplaceInterface": {
+      "additionalProperties": false,
+      "properties": {
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ElegyMarketplacePluginV2": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ElegyMarketplaceArtifact"
+          },
+          "type": "array"
+        },
+        "category": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "policy": {
+          "$ref": "#/$defs/ElegyMarketplacePolicy"
+        },
+        "source": {
+          "$ref": "#/$defs/ElegyMarketplaceSourceV2"
+        }
+      },
+      "required": [
+        "name",
+        "source",
+        "policy",
+        "category"
+      ],
+      "type": "object"
+    },
+    "ElegyMarketplacePolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "authentication": {
+          "$ref": "#/$defs/ElegyMarketplaceAuthenticationPolicy"
+        },
+        "installation": {
+          "$ref": "#/$defs/ElegyMarketplaceInstallationPolicy"
+        }
+      },
+      "required": [
+        "installation",
+        "authentication"
+      ],
+      "type": "object"
+    },
+    "ElegyMarketplaceSourceV2": {
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "const": "local",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "sha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "const": "git",
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "url"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "ref": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "root": {
+              "type": "string"
+            },
+            "sha": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "const": "git-subdirectory",
+              "type": "string"
+            },
+            "url": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "url",
+            "root"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "package": {
+              "type": "string"
+            },
+            "registry": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "source": {
+              "const": "npm",
+              "type": "string"
+            },
+            "version": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "source",
+            "package"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "path": {
+              "type": "string"
+            },
+            "source": {
+              "const": "elegy-artifact",
+              "type": "string"
+            }
+          },
+          "required": [
+            "source",
+            "path"
+          ],
+          "type": "object"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "interface": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyMarketplaceInterface"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "plugins": {
+      "items": {
+        "$ref": "#/$defs/ElegyMarketplacePluginV2"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "const": "elegy-marketplace/v2"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "plugins"
+  ],
+  "title": "ElegyMarketplaceV2",
+  "type": "object"
+}

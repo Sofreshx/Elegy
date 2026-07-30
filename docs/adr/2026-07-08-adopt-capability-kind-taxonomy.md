@@ -29,10 +29,9 @@ service slug such as `github` as a Codex connector ID was incorrect: Codex app
 IDs are registered, opaque host identifiers, and connection lifecycle belongs
 to the host.
 
-`elegy-plugin/v2` therefore moves requirements to the
-`elegy-plugin-connections/v1` declaration and maps them to Codex through
-explicit `connectionBindings`. The v2 exporter never derives `.app.json` from
-catalog slugs. Marketplace publication requires v2. See
+`elegy-plugin/v3` therefore keeps requirements under its `elegy` governance
+namespace and preserves native Codex apps. The v3 exporter never derives a
+Codex app ID from catalog slugs. Marketplace publication requires v3. See
 [Plugin Connections V1](../specs/plugin-connections-v1.md).
 
 ## Context

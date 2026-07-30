@@ -25,7 +25,7 @@ The MVP does not claim protection from malware executing as the same fully compr
 | Database copied | AES-GCM envelope + current-user DPAPI key protection | ciphertext inspection and restore test |
 | Lease replay by another client | client/audience binding and expiry | cross-client and expired-lease tests |
 | Revoked access remains usable | revocation generation checked on every redemption | revoke-then-execute test |
-| OAuth interception/substitution | PKCE, exact redirect matching, state/nonce, issuer/audience/resource validation | callback negative tests |
+| OAuth interception/substitution | PKCE, one-time state removal, fixed loopback redirect, scope validation, and HTTPS provider identity lookup | transaction, adapter, and proxy tests; no local ID-token validation claim |
 | Malicious page fakes discovery | discovery marked unverified; broker validates connected credential | discovery/identity mismatch test |
 | Browser extension compromise | optional hosts, no cookie/password APIs, no extension secret persistence | manifest and storage tests |
 | Secret leaks through diagnostics | structured redactor at all output boundaries | seeded-canary scan of logs/errors/audit/export |
@@ -37,7 +37,7 @@ The MVP does not claim protection from malware executing as the same fully compr
 ## Credential lifecycle
 
 - Capture: trusted local UI, OAuth redirect handler, device flow, or Native Messaging handoff.
-- Validate: provider identity endpoint; requested operation compatibility; issuer/audience/resource checks where applicable.
+- Validate: provider HTTPS identity endpoint, granted scopes, and requested operation compatibility. OIDC ID-token issuer/audience/nonce validation is not implemented by the current provider adapter.
 - Store: encrypted envelope plus non-secret account metadata and credential fingerprint.
 - Use: internal host executor under a valid lease.
 - Refresh: broker-owned rotation with old-secret replacement performed transactionally.

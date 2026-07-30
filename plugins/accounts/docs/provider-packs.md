@@ -4,18 +4,19 @@ Provider packs are the extension boundary for Elegy Accounts. The broker, Accoun
 
 ## When to add a pack
 
-Add a pack when a downstream tool needs an account-backed operation and the provider uses one of the supported declarative methods: OAuth 2.0 authorization code with PKCE, OAuth device authorization, scoped API token, HTTP Basic/app password, or OAuth client credentials. `service_credential` is reserved for a reviewed code adapter and is not executable in the current release.
+Add a pack when a downstream tool needs an account-backed operation and the provider uses one of the supported declarative methods: OAuth 2.0 authorization code with PKCE, OAuth device authorization, scoped API token, HTTP Basic/app password, or OAuth client credentials. Provider v3 may additionally declare OAuth refresh and provider-revocation endpoints. `service_credential` is reserved for a reviewed code adapter and is not executable in the current release.
 
 Put local packs in the installed `providers` directory or set `ELEGY_ACCOUNTS_PROVIDER_DIR` to a directory containing JSON packs. Restart the local broker after changing packs.
 
 ## Contract
 
-Pack v1 remains the enrollment contract. Pack v2 adds trusted typed execution. Each file declares:
+Pack v1 remains the legacy enrollment contract. Pack v2 adds trusted typed execution. Pack v3 adds a typed OAuth credential lifecycle. Each file declares:
 
 - stable lowercase `id`, display metadata, publisher, and pack version;
 - browser origins used only for discovery hints;
 - one or more auth profiles with endpoints, audience, identity verification, client registration, scopes, and optional credential fields;
-- named operations mapped to required scopes; v2 operations additionally declare description, risk, input/result schemas, and a constrained executor.
+- named operations mapped to required scopes; v2/v3 operations additionally declare description, risk, input/result schemas, and a constrained executor;
+- for v3 OAuth PKCE, explicit refresh and provider-revocation endpoints.
 
 All remote URLs must be HTTPS. Loopback HTTP is accepted only for deterministic tests and the local callback. Identity selectors are JSON Pointers and at least one must resolve before a credential can be stored. `required` assertions must all match.
 

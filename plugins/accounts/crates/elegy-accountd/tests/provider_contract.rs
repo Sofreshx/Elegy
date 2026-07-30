@@ -1,6 +1,5 @@
 use elegy_accountd::{
-    AuthMethod, OAuthCallback, OAuthError, OAuthTransaction, OperationExecutor, OperationRisk,
-    ProviderCatalog,
+    AuthMethod, OAuthTransaction, OperationExecutor, OperationRisk, ProviderCatalog,
 };
 use std::path::Path;
 
@@ -47,8 +46,31 @@ fn bundled_provider_packs_are_data_driven_conformance_examples() {
     );
 
     let google = catalog.get("google").expect("google pack");
-    assert_eq!(google.schema_version, "elegy-account-provider/v1");
-    assert!(google.executable_operation("profile.read").is_none());
+    assert_eq!(google.schema_version, "elegy-account-provider/v3");
+    assert!(google.executable_operation("profile.read").is_some());
+    assert!(google.executable_operation("gmail.messages.read").is_some());
+    let lifecycle = google.auth_profiles[0]
+        .oauth_lifecycle
+        .as_ref()
+        .expect("Google OAuth lifecycle");
+    assert_eq!(
+        lifecycle.revocation_url,
+        "https://oauth2.googleapis.com/revoke"
+    );
+    assert_eq!(
+        google.auth_profiles[0]
+            .authorization_parameters
+            .get("access_type")
+            .map(String::as_str),
+        Some("offline")
+    );
+    assert_eq!(
+        google.auth_profiles[0]
+            .authorization_parameters
+            .get("prompt")
+            .map(String::as_str),
+        Some("consent")
+    );
 }
 
 #[test]
@@ -263,78 +285,8 @@ fn provider_catalog_rejects_non_loopback_plain_http_endpoints() {
 }
 
 #[test]
-fn oauth_callback_requires_exact_transaction_binding() {
-    let transaction = OAuthTransaction::new(
-        "cloudflare",
-        "https://dash.cloudflare.com",
-        "https://api.cloudflare.com",
-        "http://127.0.0.1:43119/oauth/callback",
-    );
-    let valid = OAuthCallback {
-        state: transaction.state.clone(),
-        nonce: transaction.nonce.clone(),
-        issuer: "https://dash.cloudflare.com".into(),
-        audience: "https://api.cloudflare.com".into(),
-        redirect_uri: "http://127.0.0.1:43119/oauth/callback".into(),
-        code: "synthetic-code".into(),
-    };
-    assert!(transaction.validate(&valid).is_ok());
-
-    let cases = [
-        (
-            "state",
-            OAuthCallback {
-                state: "wrong".into(),
-                ..valid.clone()
-            },
-            OAuthError::StateMismatch,
-        ),
-        (
-            "nonce",
-            OAuthCallback {
-                nonce: "wrong".into(),
-                ..valid.clone()
-            },
-            OAuthError::NonceMismatch,
-        ),
-        (
-            "issuer",
-            OAuthCallback {
-                issuer: "https://evil.test".into(),
-                ..valid.clone()
-            },
-            OAuthError::IssuerMismatch,
-        ),
-        (
-            "audience",
-            OAuthCallback {
-                audience: "https://evil.test".into(),
-                ..valid.clone()
-            },
-            OAuthError::AudienceMismatch,
-        ),
-        (
-            "redirect",
-            OAuthCallback {
-                redirect_uri: "http://127.0.0.1:9999/callback".into(),
-                ..valid.clone()
-            },
-            OAuthError::RedirectMismatch,
-        ),
-    ];
-    for (label, callback, error) in cases {
-        assert_eq!(transaction.validate(&callback), Err(error), "{label}");
-    }
-}
-
-#[test]
 fn pkce_verifier_is_secret_and_s256_challenge_is_stable() {
-    let transaction = OAuthTransaction::new(
-        "test-oauth",
-        "https://issuer.example",
-        "https://api.example",
-        "http://127.0.0.1:43119/oauth/callback",
-    );
+    let transaction = OAuthTransaction::new("test-oauth");
     assert!(transaction.pkce_verifier.expose_for_token_exchange().len() >= 43);
     assert!(!transaction.pkce_challenge.contains('='));
     assert_ne!(

@@ -20,8 +20,9 @@ classification; directory names do not. Historical runtimes remain under
 - [Skill Core V1](skill-core-v1.md) — current skill authority split between governed artifacts and Rust executable behavior
 - [Retire the central skill registry ADR](../adr/2026-07-20-retire-central-skill-registry.md) — host-owned skill discovery and the removal of `elegy-skills`
 - [Codex plugin projection](codex-plugin-projection.md) — optional Codex projection slice (derived adapter surface, not the primary plugin path)
-- [Static plugin marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — host-neutral marketplace authority and closed-source binary boundary
-- [Plugin marketplace v1](../specs/plugin-marketplace-v1.md) — index, artifact, install, and projection contract
+- [Codex-parity and delegated-authentication ADR](../adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md) — current package-envelope, authentication, and marketplace decision
+- [Historical static marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — superseded v1 context
+- [Plugin marketplace v2](../specs/plugin-marketplace-v2.md) — current index, policy, source-descriptor, artifact, install, and projection contract
 - [Capability catalog v1](../specs/capability-catalog-v1.md) — shared governed catalog contract with capability-kind taxonomy
 - [Plugin connections v1](../specs/plugin-connections-v1.md) — explicit authentication requirements, host bindings, and credential-free connection control
 - [Evidence-backed readiness ADR](../adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md) — proof stages, default routing gate, plugin eligibility, and the two-consumer extraction rule

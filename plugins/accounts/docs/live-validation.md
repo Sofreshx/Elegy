@@ -42,8 +42,17 @@ The July 16, 2026 live run verified `Sofreshx`, UI close/reopen recovery, broker
 | Deterministic fake providers | OAuth PKCE and GitHub Device Flow | exact request shape, pending/slow/deny/success, identity validation, secret redaction | 0 | required in CI |
 | GitHub live | OAuth Device Flow, `read:user` | connect, identity, persistence, lease, read, revoke, plaintext scan | 0 | first live release gate |
 | Cloudflare live | user-created scoped token | verify active token; list account/zones only; no DNS edits | 0 | next proof target |
-| Google live | OAuth PKCE/OIDC | verify userinfo; optional Gmail read-only metadata; no mailbox mutation | 0 | OAuth PKCE proof target |
+| Google live | OAuth PKCE/OIDC | consent, identity, restart, forced refresh, narrow read, local grant revoke, provider revoke, post-revoke failure, plaintext scan, cleanup | 0 | required before any Google usability claim |
 
-For Google, create a dedicated desktop OAuth client, set `ELEGY_GOOGLE_CLIENT_ID`, and authorize only the bundled pack's declared scopes. CAPTCHA, MFA, account selection, consent, and recovery remain user checkpoints. Do not send mail, modify labels, or retain a broader credential for the proof.
+For Google, obtain explicit human approval, create a dedicated desktop OAuth
+client, set `ELEGY_GOOGLE_CLIENT_ID`, and authorize only the bundled pack's
+declared scopes. Record no token, code, cookie, client secret, or refresh
+material. The reviewed receipt must cover consent and verified identity,
+encrypted restart persistence, forced refresh and scope validation, one narrow
+read, local grant revocation, Google's provider revocation endpoint,
+post-revocation failure, plaintext scans, and cleanup.
+
+CAPTCHA, MFA, account selection, consent, and recovery remain human
+checkpoints. Do not send mail, modify labels, or retain a broader credential.
 
 CAPTCHA, MFA, passkeys, consent, email verification, and provider risk challenges are always human checkpoints. The system can open the correct page and resume afterward; it does not bypass them.

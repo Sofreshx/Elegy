@@ -3,8 +3,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use elegy_plugin_sdk::{
-    validate_elegy_marketplace_v1, validate_elegy_plugin_v1, ElegyMarketplaceV1, ElegyPluginV1,
-    ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
+    validate_elegy_marketplace_v2, validate_elegy_plugin_v3, verify_plugin_v3,
+    ElegyMarketplacePolicy, ElegyMarketplaceSourceV2, ElegyMarketplaceV2, ElegyPluginV3,
+    ELEGY_MARKETPLACE_V2_SCHEMA_VERSION,
 };
 use serde::Deserialize;
 
@@ -27,6 +28,8 @@ struct DistributionSurface {
     packaging: Option<String>,
     #[serde(default)]
     plugin_root: Option<String>,
+    #[serde(default)]
+    marketplace_policy: Option<ElegyMarketplacePolicy>,
     #[serde(default = "default_marketplace_published")]
     marketplace_published: bool,
     #[serde(default)]
@@ -85,7 +88,7 @@ fn read_json<T: for<'de> Deserialize<'de>>(path: &Path) -> T {
         .unwrap_or_else(|error| panic!("parse {} as JSON: {error}", path.display()))
 }
 
-fn load_marketplace() -> ElegyMarketplaceV1 {
+fn load_marketplace() -> ElegyMarketplaceV2 {
     read_json(&repo_root().join(".elegy").join("marketplace.json"))
 }
 
@@ -99,9 +102,9 @@ fn generated_marketplace_is_valid() {
 
     assert_eq!(
         marketplace.schema_version,
-        ELEGY_MARKETPLACE_V1_SCHEMA_VERSION
+        ELEGY_MARKETPLACE_V2_SCHEMA_VERSION
     );
-    let validation = validate_elegy_marketplace_v1(&marketplace);
+    let validation = validate_elegy_marketplace_v2(&marketplace);
     assert!(
         validation.is_valid(),
         "invalid marketplace: {}",
@@ -149,6 +152,31 @@ fn distribution_catalog_uses_explicit_surface_roles() {
         if surface.packaging.as_deref() == Some("plugin") {
             assert_eq!(surface.surface_class, "adapter-plugin");
             assert_eq!(surface.lifecycle, "active");
+            assert!(
+                surface.marketplace_policy.is_some(),
+                "{} must declare marketplacePolicy",
+                surface.name
+            );
+            let plugin_root = surface
+                .plugin_root
+                .as_deref()
+                .unwrap_or_else(|| panic!("{} must declare pluginRoot", surface.name));
+            let manifest: ElegyPluginV3 = read_json(
+                &repo_root()
+                    .join(plugin_root)
+                    .join(".elegy-plugin")
+                    .join("plugin.json"),
+            );
+            assert_eq!(manifest.elegy.surface_class, surface.surface_class);
+            let verification =
+                verify_plugin_v3(&repo_root().join(plugin_root).join(".elegy-plugin"))
+                    .unwrap_or_else(|error| panic!("verify {}: {error}", surface.name));
+            assert!(
+                verification.valid,
+                "{} plugin verification failed: {}",
+                surface.name,
+                verification.issues.join("; ")
+            );
         }
     }
 }
@@ -169,13 +197,21 @@ fn generated_marketplace_matches_packaged_surfaces() {
             let plugin_root = surface
                 .plugin_root
                 .unwrap_or_else(|| panic!("{} must declare pluginRoot", surface.name));
-            let manifest: ElegyPluginV1 = read_json(
+            let manifest: ElegyPluginV3 = read_json(
                 &root
                     .join(&plugin_root)
                     .join(".elegy-plugin")
                     .join("plugin.json"),
             );
+            assert_eq!(
+                manifest.elegy.surface_class, surface.surface_class,
+                "{} catalog and manifest surface classes must match",
+                surface.name
+            );
             manifest
+                .elegy
+                .readiness
+                .stage
                 .is_agent_routable()
                 .then(|| (surface.name, format!("./{plugin_root}")))
         })
@@ -183,7 +219,10 @@ fn generated_marketplace_matches_packaged_surfaces() {
     let actual: BTreeMap<String, String> = marketplace
         .plugins
         .into_iter()
-        .map(|plugin| (plugin.name, plugin.source.path))
+        .filter_map(|plugin| match plugin.source {
+            ElegyMarketplaceSourceV2::Local { path } => Some((plugin.name, path)),
+            _ => None,
+        })
         .collect();
 
     assert_eq!(actual, expected);
@@ -229,17 +268,20 @@ fn generated_marketplace_points_to_matching_plugin_manifests() {
             "duplicate marketplace plugin: {}",
             plugin.name
         );
-        let source_path = plugin.source.path.trim_start_matches("./");
+        let ElegyMarketplaceSourceV2::Local { path } = plugin.source else {
+            panic!("generated repository marketplace entries must use local sources");
+        };
+        let source_path = path.trim_start_matches("./");
         let manifest_path = root
             .join(source_path)
             .join(".elegy-plugin")
             .join("plugin.json");
-        let manifest: ElegyPluginV1 = read_json(&manifest_path);
-        let validation = validate_elegy_plugin_v1(&manifest);
+        let manifest: ElegyPluginV3 = read_json(&manifest_path);
+        let validation = validate_elegy_plugin_v3(&manifest);
 
         assert_eq!(
             manifest.schema_version,
-            "elegy-plugin/v2",
+            "elegy-plugin/v3",
             "published manifest {} must declare its authentication posture",
             manifest_path.display()
         );

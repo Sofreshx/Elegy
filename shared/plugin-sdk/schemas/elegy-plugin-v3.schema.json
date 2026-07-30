@@ -1,0 +1,494 @@
+{
+  "$defs": {
+    "CodexPluginInterface": {
+      "additionalProperties": true,
+      "properties": {
+        "brandColor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "capabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "category": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "composerIcon": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "defaultPrompt": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "developerName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "displayName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "logo": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "logoDark": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "longDescription": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "privacyPolicyURL": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "screenshots": {
+          "items": {
+            "type": "string"
+          },
+          "type": [
+            "array",
+            "null"
+          ]
+        },
+        "shortDescription": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "termsOfServiceURL": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "websiteURL": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ElegyMcpAuthenticationExpectation": {
+      "additionalProperties": false,
+      "properties": {
+        "environmentVariable": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "mode": {
+          "$ref": "#/$defs/ElegyMcpAuthenticationMode"
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "ElegyMcpAuthenticationMode": {
+      "enum": [
+        "none",
+        "mcp-oauth",
+        "bearer-env"
+      ],
+      "type": "string"
+    },
+    "ElegyPluginCapabilityCatalog": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "readinessCommand": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnectionProvider": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnectionRequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "type": "string"
+        },
+        "path": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "schemaVersion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "mode"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginConnections": {
+      "additionalProperties": false,
+      "properties": {
+        "provider": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyPluginConnectionProvider"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "requirements": {
+          "$ref": "#/$defs/ElegyPluginConnectionRequirements"
+        }
+      },
+      "required": [
+        "requirements"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginGovernanceV3": {
+      "additionalProperties": false,
+      "properties": {
+        "capabilityCatalog": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ElegyPluginCapabilityCatalog"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "connections": {
+          "$ref": "#/$defs/ElegyPluginConnections"
+        },
+        "mcpAuthentication": {
+          "additionalProperties": {
+            "$ref": "#/$defs/ElegyMcpAuthenticationExpectation"
+          },
+          "default": {},
+          "type": "object"
+        },
+        "packageAssets": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "readiness": {
+          "$ref": "#/$defs/ElegyPluginReadiness"
+        },
+        "surfaceClass": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "surfaceClass",
+        "connections",
+        "readiness"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginReadiness": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "schemaVersion": {
+          "type": "string"
+        },
+        "stage": {
+          "$ref": "#/$defs/ElegyReadinessStage"
+        }
+      },
+      "required": [
+        "stage",
+        "path",
+        "schemaVersion"
+      ],
+      "type": "object"
+    },
+    "ElegyPluginV1Author": {
+      "additionalProperties": false,
+      "properties": {
+        "email": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "type": "object"
+    },
+    "ElegyReadinessStage": {
+      "enum": [
+        "concept",
+        "implemented",
+        "usable",
+        "production"
+      ],
+      "type": "string"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": true,
+  "description": "Codex-compatible plugin envelope with Elegy governance kept in one\nnamespaced object. Codex-native values deliberately remain JSON values\nwhere Codex accepts multiple wire shapes (path, path list, or inline map).",
+  "properties": {
+    "apps": {
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": [
+              "string",
+              "object"
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "minProperties": 1,
+          "type": "object"
+        }
+      ]
+    },
+    "assets": {
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": [
+              "string",
+              "object"
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "minProperties": 1,
+          "type": "object"
+        }
+      ]
+    },
+    "author": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPluginV1Author"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "description": {
+      "type": "string"
+    },
+    "elegy": {
+      "$ref": "#/$defs/ElegyPluginGovernanceV3"
+    },
+    "homepage": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "hooks": {
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": [
+              "string",
+              "object"
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "minProperties": 1,
+          "type": "object"
+        }
+      ]
+    },
+    "interface": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CodexPluginInterface"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "keywords": {
+      "items": {
+        "type": "string"
+      },
+      "type": [
+        "array",
+        "null"
+      ]
+    },
+    "license": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "mcpServers": {
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "additionalProperties": {
+            "type": "object"
+          },
+          "minProperties": 1,
+          "type": "object"
+        }
+      ]
+    },
+    "name": {
+      "type": "string"
+    },
+    "repository": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schemaVersion": {
+      "const": "elegy-plugin/v3"
+    },
+    "skills": {
+      "oneOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "items": {
+            "type": [
+              "string",
+              "object"
+            ]
+          },
+          "minItems": 1,
+          "type": "array"
+        },
+        {
+          "minProperties": 1,
+          "type": "object"
+        }
+      ]
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "version",
+    "description",
+    "elegy"
+  ],
+  "title": "ElegyPluginV3",
+  "type": "object"
+}

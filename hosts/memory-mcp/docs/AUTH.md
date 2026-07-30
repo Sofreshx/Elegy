@@ -1,66 +1,51 @@
-# elegy-memory-mcp OAuth 2.1 + MCP Bearer Enforcement (WU4/WU5)
+# Memory MCP authentication
 
-This auth model applies to `elegy-memory-mcp-http` only; `elegy-memory-mcp-stdio` does not use OAuth or JWT.
+`elegy-memory-mcp` is never an OAuth authorization server.
 
-## Fixed behavior
+## Security boundaries
 
-- Scope is fixed to `claude-ai-remote`.
-- Auth server and resource server live in the same binary.
-- Public clients only: `token_endpoint_auth_method = "none"`, `client_id` is a UUID, no client secret.
-- Redirect allowlist:
-  - `https://claude.ai/...`
-  - `https://claude.com/...`
-  - `http://127.0.0.1:<port>/...`
-  - `http://localhost:<port>/...`
-- Access tokens are HS256 JWTs with a 1 hour lifetime.
-- Refresh tokens are random 32-byte values, persisted as hashes, valid for 30 days, and rotated on refresh.
-- Dynamic client registrations, refresh tokens, and the signing key are stored under `ELEGY_MCP_DATA_DIR`.
-- `ELEGY_MCP_ADMIN_PASSWORD` is the consent-page password itself; startup hashes it with Argon2 for in-memory verification and rejects pre-hashed Argon2 strings.
-- `POST /mcp` requires `Authorization: Bearer <jwt>` with an HS256 signature, non-expired `exp`, and `scope = "claude-ai-remote"`.
-- Missing or invalid `/mcp` bearer tokens return `401` with `WWW-Authenticate: Bearer realm="elegy-mcp", resource_metadata="<PUBLIC_URL>/.well-known/oauth-protected-resource"`.
+1. The MCP host and external identity provider own user login, OAuth discovery,
+   client registration, consent, tokens, and refresh.
+2. The Memory HTTP binary is only an OAuth resource server: it validates the
+   external issuer, audience, expiry, signature, and required scopes.
+3. Host approvals and Memory write policy remain separate from bearer
+   authentication. Evidence for one boundary proves nothing about another.
 
-## Endpoints
+The shipping binary has no authorization, token, dynamic-client-registration,
+or consent endpoints and stores no OAuth client secret, signing key, access
+token, or refresh token.
 
-- `GET /.well-known/oauth-protected-resource`
-- `GET /.well-known/oauth-authorization-server`
-- `POST /oauth/register`
-- `GET /oauth/authorize`
-- `POST /oauth/authorize`
-- `POST /oauth/token`
-- `POST /mcp` (bearer required)
+## Modes
 
-## Flow
+`ELEGY_MCP_AUTH_MODE=local-none` is accepted only when
+`ELEGY_MCP_BIND` is loopback. It is intended for an explicitly local HTTP
+boundary.
 
-```text
-Claude -> POST /oauth/register
-Claude -> GET /oauth/authorize?response_type=code&scope=claude-ai-remote&code_challenge=...
-User   -> POST /oauth/authorize (password form)
-Server -> 302 redirect_uri?code=...&state=...
-Claude -> POST /oauth/token (authorization_code + PKCE verifier)
-Claude -> POST /oauth/token (refresh_token) later, with rotation
-```
+`ELEGY_MCP_AUTH_MODE=external-oauth` requires:
 
-## Example
+- `ELEGY_MCP_PUBLIC_URL`
+- `ELEGY_MCP_OAUTH_ISSUER`
+- `ELEGY_MCP_OAUTH_AUDIENCE`
+- `ELEGY_MCP_OAUTH_JWKS_URL`
+- `ELEGY_MCP_OAUTH_SCOPES`
 
-```bash
-curl -X POST "$ELEGY_MCP_PUBLIC_URL/oauth/register" \
-  -H "content-type: application/json" \
-  -d '{"redirect_uris":["https://claude.ai/callback"],"token_endpoint_auth_method":"none"}'
+All external URLs must use HTTPS and contain no credentials, query, or
+fragment. Startup fetches the configured JWKS with a bounded, no-redirect
+client and fails unless it contains unique, usable ES256 or RS256 public
+signature keys. Token algorithms must exactly match the declared JWK
+algorithm. A rate-limited refresh is attempted when a previously unknown key
+ID appears.
+Requests to `/mcp` without a valid token return `401` and an MCP
+protected-resource challenge. The only OAuth metadata published by Memory is
+`GET /.well-known/oauth-protected-resource`, which delegates to the configured
+issuer.
 
-curl "$ELEGY_MCP_PUBLIC_URL/.well-known/oauth-authorization-server"
+Local stdio uses the subprocess boundary and has no OAuth layer.
 
-curl -X POST "$ELEGY_MCP_PUBLIC_URL/oauth/token" \
-  -H "content-type: application/x-www-form-urlencoded" \
-  --data-urlencode "grant_type=refresh_token" \
-  --data-urlencode "client_id=<uuid>" \
-  --data-urlencode "refresh_token=<token>" \
-  --data-urlencode "scope=claude-ai-remote"
-```
+## Evidence limit
 
-## Persistence files
-
-- `{DATA_DIR}/signing-key`
-- `{DATA_DIR}/clients.json`
-- `{DATA_DIR}/refresh-tokens.json`
-
-None of these files should be committed.
+Source tests cover the local guard, HTTPS configuration, asymmetric key policy,
+JWKS rotation, external JWT signature/issuer/audience/expiry/scope checks, the
+MCP bearer challenge, and absence of authorization-server endpoints. These are
+implementation evidence only. They are not an authenticated clean-install or
+real-consumer receipt.

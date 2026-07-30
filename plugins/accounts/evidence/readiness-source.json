@@ -1,1 +1,18 @@
-{"scope":"source-checkout","result":"passed","commands":["cargo test --workspace --all-targets --all-features","npm test -- --run","elegy-plugin-packaging verify --plugin plugins/accounts"],"limitations":["A clean Windows archive installation is recorded separately.","No non-fixture provider API, authentication, refresh, or revocation task was exercised."]}
+{
+  "recordedAt": "2026-07-30",
+  "environment": "Windows workspace checkout",
+  "scope": "source-checkout",
+  "result": "passed",
+  "commands": [
+    "cargo test --workspace -j 1",
+    "cargo test -p elegy-accounts --all-targets",
+    "npm test -- --run",
+    "npm run build",
+    "elegy-plugin-packaging verify --plugin plugins/accounts"
+  ],
+  "limitations": [
+    "A clean Windows archive installation is recorded separately.",
+    "OAuth authentication, refresh, scope reduction, encrypted rotation, and provider revocation use deterministic fixtures.",
+    "No non-fixture Google provider task was exercised."
+  ]
+}

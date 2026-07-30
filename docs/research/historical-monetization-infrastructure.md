@@ -23,7 +23,7 @@ installable products second.
 
 ## Context evidence
 
-- `docs/specs/plugin-marketplace-v1.md`: marketplace contract, wrapper pattern,
+- `docs/specs/plugin-marketplace-v2.md`: marketplace contract, wrapper pattern,
   archive distribution.
 - `docs/adr/2026-07-01-adopt-static-plugin-marketplace.md`: private source →
   public proprietary binary archive pattern.

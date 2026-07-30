@@ -59,6 +59,14 @@ pub struct CredentialField {
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize)]
+pub struct OAuthLifecycle {
+    pub refresh_url: String,
+    pub revocation_url: String,
+    #[serde(default)]
+    pub revocation_token_type_hint: Option<String>,
+}
+
+#[derive(Clone, Debug, Deserialize, Serialize)]
 pub struct AuthProfile {
     pub id: String,
     pub method: AuthMethod,
@@ -67,6 +75,8 @@ pub struct AuthProfile {
     pub issuer: Option<String>,
     #[serde(default)]
     pub authorization_url: Option<String>,
+    #[serde(default)]
+    pub authorization_parameters: BTreeMap<String, String>,
     #[serde(default)]
     pub token_url: Option<String>,
     #[serde(default)]
@@ -81,6 +91,20 @@ pub struct AuthProfile {
     pub creation_url: Option<String>,
     #[serde(default)]
     pub credential_fields: Vec<CredentialField>,
+    #[serde(default)]
+    pub oauth_lifecycle: Option<OAuthLifecycle>,
+}
+
+impl AuthProfile {
+    pub fn configured_client_id(&self) -> Option<String> {
+        self.client.client_id.clone().or_else(|| {
+            self.client
+                .client_id_env
+                .as_deref()
+                .and_then(|name| std::env::var(name).ok())
+                .filter(|value| !value.trim().is_empty())
+        })
+    }
 }
 
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, Eq)]
@@ -156,7 +180,7 @@ pub enum ProviderError {
     InvalidJson(#[from] serde_json::Error),
     #[error("provider directory could not be read: {0}")]
     Io(#[from] std::io::Error),
-    #[error("provider manifest must use schema elegy-account-provider/v1 or v2")]
+    #[error("provider manifest must use schema elegy-account-provider/v1, v2, or v3")]
     UnsupportedSchema,
     #[error("provider identifier is invalid")]
     InvalidId,
@@ -278,7 +302,7 @@ impl ProviderCatalog {
 fn validate_provider(provider: &ProviderSpec) -> Result<(), ProviderError> {
     if !matches!(
         provider.schema_version.as_str(),
-        "elegy-account-provider/v1" | "elegy-account-provider/v2"
+        "elegy-account-provider/v1" | "elegy-account-provider/v2" | "elegy-account-provider/v3"
     ) {
         return Err(ProviderError::UnsupportedSchema);
     }
@@ -303,6 +327,14 @@ fn validate_provider(provider: &ProviderSpec) -> Result<(), ProviderError> {
             profile.token_url.as_deref(),
             profile.device_authorization_url.as_deref(),
             profile.creation_url.as_deref(),
+            profile
+                .oauth_lifecycle
+                .as_ref()
+                .map(|lifecycle| lifecycle.refresh_url.as_str()),
+            profile
+                .oauth_lifecycle
+                .as_ref()
+                .map(|lifecycle| lifecycle.revocation_url.as_str()),
         ]
         .into_iter()
         .flatten()
@@ -322,15 +354,50 @@ fn validate_provider(provider: &ProviderSpec) -> Result<(), ProviderError> {
         if !complete || profile.identity.selectors.is_empty() {
             return Err(ProviderError::IncompleteProfile);
         }
+        const RESERVED_AUTHORIZATION_PARAMETERS: [&str; 8] = [
+            "client_id",
+            "redirect_uri",
+            "response_type",
+            "scope",
+            "state",
+            "nonce",
+            "code_challenge",
+            "code_challenge_method",
+        ];
+        if profile
+            .authorization_parameters
+            .iter()
+            .any(|(name, value)| {
+                name.trim().is_empty()
+                    || value.is_empty()
+                    || RESERVED_AUTHORIZATION_PARAMETERS
+                        .iter()
+                        .any(|reserved| name.eq_ignore_ascii_case(reserved))
+            })
+        {
+            return Err(ProviderError::IncompleteProfile);
+        }
+        if provider.schema_version.ends_with("/v3")
+            && profile.method == AuthMethod::OAuthPkce
+            && profile.oauth_lifecycle.is_none()
+        {
+            return Err(ProviderError::IncompleteProfile);
+        }
     }
     for operation in provider.operations.values() {
         match operation {
-            OperationSpec::LegacyScopes(_) if provider.schema_version.ends_with("/v2") => {
+            OperationSpec::LegacyScopes(_)
+                if provider.schema_version.ends_with("/v2")
+                    || provider.schema_version.ends_with("/v3") =>
+            {
                 return Err(ProviderError::IncompleteOperation);
             }
             OperationSpec::LegacyScopes(_) => {}
             OperationSpec::Executable(spec) => {
-                if !provider.schema_version.ends_with("/v2") || spec.description.trim().is_empty() {
+                if !(provider.schema_version.ends_with("/v2")
+                    || provider.schema_version.ends_with("/v3"))
+                    || spec.description.trim().is_empty()
+                {
                     return Err(ProviderError::IncompleteOperation);
                 }
                 if let OperationExecutor::Http {
@@ -393,39 +460,10 @@ pub struct OAuthTransaction {
     pub nonce: String,
     pub pkce_verifier: PkceVerifier,
     pub pkce_challenge: String,
-    expected_issuer: String,
-    expected_audience: String,
-    expected_redirect_uri: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct OAuthCallback {
-    pub state: String,
-    pub nonce: String,
-    pub issuer: String,
-    pub audience: String,
-    pub redirect_uri: String,
-    pub code: String,
-}
-
-#[derive(Clone, Debug, Error, PartialEq, Eq)]
-pub enum OAuthError {
-    #[error("OAuth state did not match")]
-    StateMismatch,
-    #[error("OIDC nonce did not match")]
-    NonceMismatch,
-    #[error("issuer did not match")]
-    IssuerMismatch,
-    #[error("audience or resource did not match")]
-    AudienceMismatch,
-    #[error("redirect URI did not match")]
-    RedirectMismatch,
-    #[error("authorization code was missing")]
-    MissingCode,
 }
 
 impl OAuthTransaction {
-    pub fn new(provider_id: &str, issuer: &str, audience: &str, redirect_uri: &str) -> Self {
+    pub fn new(provider_id: &str) -> Self {
         let state = random_urlsafe(32);
         let nonce = random_urlsafe(32);
         let verifier = random_urlsafe(64);
@@ -436,32 +474,7 @@ impl OAuthTransaction {
             nonce,
             pkce_verifier: PkceVerifier(verifier),
             pkce_challenge,
-            expected_issuer: issuer.into(),
-            expected_audience: audience.into(),
-            expected_redirect_uri: redirect_uri.into(),
         }
-    }
-
-    pub fn validate(&self, callback: &OAuthCallback) -> Result<(), OAuthError> {
-        if callback.state != self.state {
-            return Err(OAuthError::StateMismatch);
-        }
-        if callback.nonce != self.nonce {
-            return Err(OAuthError::NonceMismatch);
-        }
-        if callback.issuer != self.expected_issuer {
-            return Err(OAuthError::IssuerMismatch);
-        }
-        if callback.audience != self.expected_audience {
-            return Err(OAuthError::AudienceMismatch);
-        }
-        if callback.redirect_uri != self.expected_redirect_uri {
-            return Err(OAuthError::RedirectMismatch);
-        }
-        if callback.code.is_empty() {
-            return Err(OAuthError::MissingCode);
-        }
-        Ok(())
     }
 }
 

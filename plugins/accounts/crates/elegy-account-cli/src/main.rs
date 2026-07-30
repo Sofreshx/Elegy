@@ -8,9 +8,10 @@ use axum::{
 };
 use elegy_accountd::{
     AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, ExecutionEnvelope,
-    IdentitySpec, KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthTransaction,
-    ProviderCatalog, ReplayGuard, TokenAdapterConfig, TypedExecutionOutcome, TypedExecutionRequest,
-    Vault, VerifiedCredential, exchange_and_verify, verify_credentials, verify_token,
+    IdentitySpec, KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthCredential,
+    OAuthTransaction, ProviderCatalog, ReplayGuard, TokenAdapterConfig, TypedExecutionOutcome,
+    TypedExecutionRequest, Vault, VerifiedCredential, exchange_and_verify, revoke_oauth_credential,
+    verify_credentials, verify_token,
 };
 use rand::Rng;
 use rmcp::{
@@ -1501,6 +1502,80 @@ async fn web_disconnect(
         )
             .into_response();
     }
+    let account = state
+        .broker
+        .vault()
+        .list_accounts()
+        .ok()
+        .and_then(|accounts| accounts.into_iter().find(|account| account.id == id));
+    let oauth_lifecycle = account.as_ref().and_then(|account| {
+        state
+            .catalog
+            .get(&account.provider)
+            .and_then(|provider| {
+                provider
+                    .auth_profiles
+                    .iter()
+                    .find(|profile| profile.method == AuthMethod::OAuthPkce)
+            })
+            .and_then(|profile| profile.oauth_lifecycle.clone())
+    });
+    if account
+        .as_ref()
+        .is_some_and(|account| account.auth_method == "oauth_pkce")
+        && oauth_lifecycle.is_none()
+    {
+        return (
+            StatusCode::PRECONDITION_FAILED,
+            Json(json!({
+                "error":"provider_revocation_unsupported",
+                "message":"OAuth account remains connected because its provider pack declares no revocation endpoint."
+            })),
+        )
+            .into_response();
+    }
+    if let Some(lifecycle) = oauth_lifecycle {
+        if let Err(error) = state.broker.begin_provider_disconnect(&id) {
+            return (
+                StatusCode::CONFLICT,
+                Json(json!({"error":"disconnect_failed","message":error.to_string()})),
+            )
+                .into_response();
+        }
+        let credential = state
+            .broker
+            .vault()
+            .load_secret(&id)
+            .ok()
+            .and_then(|secret| {
+                std::str::from_utf8(secret.as_slice())
+                    .ok()
+                    .map(str::to_owned)
+            })
+            .and_then(|secret| OAuthCredential::from_secret(&secret).ok());
+        let Some(credential) = credential else {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"status":"revocation_pending","error":"stored_oauth_credential_invalid"})),
+            )
+                .into_response();
+        };
+        if let Err(error) = revoke_oauth_credential(&state.http, &lifecycle, &credential).await {
+            return (
+                StatusCode::BAD_GATEWAY,
+                Json(json!({"status":"revocation_pending","error":"provider_revocation_failed","message":error.to_string()})),
+            )
+                .into_response();
+        }
+        return match state.broker.complete_provider_disconnect(&id) {
+            Ok(()) => (StatusCode::OK, Json(json!({"status":"disconnected"}))).into_response(),
+            Err(error) => (
+                StatusCode::CONFLICT,
+                Json(json!({"error":"disconnect_failed","message":error.to_string()})),
+            )
+                .into_response(),
+        };
+    }
     match state.broker.disconnect_account(&id) {
         Ok(()) => (StatusCode::OK, Json(json!({"status":"disconnected"}))).into_response(),
         Err(error) => (
@@ -1573,12 +1648,7 @@ async fn web_start_connection(
         return provider_configuration_required(&provider);
     };
     let redirect_uri = "http://127.0.0.1:43119/oauth/callback";
-    let transaction = OAuthTransaction::new(
-        &provider,
-        profile.issuer.as_deref().unwrap_or(&config.authorize_url),
-        &profile.audience,
-        redirect_uri,
-    );
+    let transaction = OAuthTransaction::new(&provider);
     let mut authorization = match url::Url::parse(&config.authorize_url) {
         Ok(url) => url,
         Err(_) => {
@@ -1599,6 +1669,9 @@ async fn web_start_connection(
         .append_pair("nonce", &transaction.nonce)
         .append_pair("code_challenge", &transaction.pkce_challenge)
         .append_pair("code_challenge_method", "S256");
+    for (name, value) in &profile.authorization_parameters {
+        authorization.query_pairs_mut().append_pair(name, value);
+    }
     let state_key = transaction.state.clone();
     if let Ok(mut pending) = state.oauth.lock() {
         pending.insert(
@@ -2084,6 +2157,12 @@ async fn web_oauth_callback(
         client_id: pending.config.client_id.clone(),
         token_url: pending.config.token_url.clone(),
         identity: pending.config.identity.clone(),
+        required_scopes: pending
+            .config
+            .scopes
+            .split_whitespace()
+            .map(str::to_string)
+            .collect(),
     };
     let verified = exchange_and_verify(
         &state.http,
@@ -2128,14 +2207,7 @@ fn oauth_redirect(status: &str) -> axum::response::Response {
 }
 
 fn configured_client_id(profile: &AuthProfile) -> Option<String> {
-    profile.client.client_id.clone().or_else(|| {
-        profile
-            .client
-            .client_id_env
-            .as_deref()
-            .and_then(|name| std::env::var(name).ok())
-            .filter(|value| !value.trim().is_empty())
-    })
+    profile.configured_client_id()
 }
 
 fn oauth_config(provider: &str, profile: &AuthProfile) -> Option<OAuthConfig> {

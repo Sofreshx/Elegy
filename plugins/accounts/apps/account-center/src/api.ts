@@ -49,7 +49,7 @@ export type ProviderPack = {
   operations: Record<string, string[]>
 }
 
-type AccountMetadata = { id: string; provider: string; verified_identity: string; auth_method: string; created_at: string }
+type AccountMetadata = { id: string; provider: string; verified_identity: string; auth_method: string; created_at: string; status: "connected" | "revocation_pending" }
 export type AccountState = { accounts: Account[]; requests: BrokerRequest[]; audit: AuditEvent[]; authorizations: AuthorizationSession[]; providers: ProviderPack[] }
 export type ConnectionStart =
   | { mode: 'browser'; authorization_url: string }

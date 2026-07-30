@@ -145,6 +145,17 @@ async fn typed_read_requests_one_thirty_day_grant_then_reuses_it_without_exposin
         .expect("grant expiry")
         .with_timezone(&Utc);
     assert!(expiry > Utc::now() + Duration::days(29));
+
+    broker
+        .vault()
+        .set_account_status(&account.id, "revocation_pending")
+        .expect("disable local account execution");
+    let error = broker
+        .execute_typed_operation(&reqwest::Client::new(), &catalog, request)
+        .await
+        .expect_err("disabled account cannot execute");
+    assert_eq!(error.code(), "account_unavailable");
+    assert_eq!(calls.load(Ordering::SeqCst), 2);
 }
 
 #[tokio::test]

@@ -1,4 +1,7 @@
-use elegy_plugin_sdk::{is_safe_package_relative_path, validate_elegy_plugin_v1, ElegyPluginV1};
+use elegy_plugin_sdk::{
+    is_safe_package_relative_path, validate_elegy_plugin_v1, validate_elegy_plugin_v3,
+    ElegyPluginV1, ElegyPluginV3, ELEGY_PLUGIN_V3_SCHEMA_VERSION,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::BTreeSet;
@@ -141,7 +144,7 @@ fn install_from_archive_with_identity_and_source(
     let mut archive = zip::ZipArchive::new(file)?;
 
     // Find and validate plugin.json
-    let mut manifest: Option<ElegyPluginV1> = None;
+    let mut manifest: Option<InstallableManifest> = None;
     let mut manifest_index = None;
     for i in 0..archive.len() {
         let name = archive.by_index(i)?.name().to_string();
@@ -153,15 +156,44 @@ fn install_from_archive_with_identity_and_source(
             }
             let mut content = String::new();
             archive.by_index(i)?.read_to_string(&mut content)?;
-            let mut plugin: ElegyPluginV1 = serde_json::from_str(&content)
+            let value: serde_json::Value = serde_json::from_str(&content)
                 .map_err(|e| InstallError::InvalidManifest(format!("JSON parse: {e}")))?;
-            normalize_legacy_component_path(&mut plugin.skills);
-            normalize_legacy_component_path(&mut plugin.mcp_servers);
-            let validation = validate_elegy_plugin_v1(&plugin);
-            if !validation.is_valid() {
-                return Err(InstallError::InvalidManifest(validation.issues.join("; ")));
-            }
-            manifest = Some(plugin);
+            let schema_version = value
+                .get("schemaVersion")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let installable = if schema_version == ELEGY_PLUGIN_V3_SCHEMA_VERSION {
+                let plugin: ElegyPluginV3 = serde_json::from_value(value)
+                    .map_err(|e| InstallError::InvalidManifest(format!("JSON parse: {e}")))?;
+                let validation = validate_elegy_plugin_v3(&plugin);
+                if !validation.is_valid() {
+                    return Err(InstallError::InvalidManifest(validation.issues.join("; ")));
+                }
+                InstallableManifest {
+                    name: plugin.name.clone(),
+                    version: plugin.version.clone(),
+                    value: serde_json::to_value(plugin).map_err(|e| {
+                        InstallError::InvalidManifest(format!("manifest serialize: {e}"))
+                    })?,
+                }
+            } else {
+                let mut plugin: ElegyPluginV1 = serde_json::from_value(value)
+                    .map_err(|e| InstallError::InvalidManifest(format!("JSON parse: {e}")))?;
+                normalize_legacy_component_path(&mut plugin.skills);
+                normalize_legacy_component_path(&mut plugin.mcp_servers);
+                let validation = validate_elegy_plugin_v1(&plugin);
+                if !validation.is_valid() {
+                    return Err(InstallError::InvalidManifest(validation.issues.join("; ")));
+                }
+                InstallableManifest {
+                    name: plugin.name.clone(),
+                    version: plugin.version.clone(),
+                    value: serde_json::to_value(plugin).map_err(|e| {
+                        InstallError::InvalidManifest(format!("manifest serialize: {e}"))
+                    })?,
+                }
+            };
+            manifest = Some(installable);
             manifest_index = Some(i);
         }
     }
@@ -239,7 +271,7 @@ fn install_from_archive_with_identity_and_source(
         installed_files.push(normalized);
     }
 
-    let manifest_json = serde_json::to_string_pretty(&manifest)
+    let manifest_json = serde_json::to_string_pretty(&manifest.value)
         .map_err(|e| InstallError::InvalidManifest(format!("manifest serialize: {e}")))?;
     let installed_manifest_dir = staged_install_dir.join(".elegy-plugin");
     fs::create_dir_all(&installed_manifest_dir)?;
@@ -277,6 +309,12 @@ fn install_from_archive_with_identity_and_source(
     fs::rename(&staged_install_dir, &install_dir)?;
 
     Ok(receipt)
+}
+
+struct InstallableManifest {
+    name: String,
+    version: String,
+    value: serde_json::Value,
 }
 
 /// Install a plugin from a URL after verifying its SHA-256 sidecar.

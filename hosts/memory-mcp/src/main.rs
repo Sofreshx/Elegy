@@ -1,10 +1,7 @@
-mod oauth;
-
 #[cfg(test)]
 mod tests;
 
-use std::net::{Ipv4Addr, SocketAddr};
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 
 use anyhow::Context;
 use axum::{
@@ -14,13 +11,14 @@ use axum::{
         HeaderValue, StatusCode,
     },
     middleware::{self, Next},
-    response::{IntoResponse, Response},
-    routing::{get, post},
+    response::{IntoResponse, Json, Response},
+    routing::get,
     Router,
 };
 use elegy_memory_mcp::{
-    config::Config,
+    config::{AuthMode, Config},
     memory_tools::{MemoryBinding, MemoryRepository},
+    resource_auth::{ExternalTokenValidator, ValidatedTokenClaims},
     server::{ElegyMemoryMcpServer, WriteAuditor},
 };
 use rmcp::{
@@ -33,16 +31,22 @@ use rmcp::{
 use tokio::net::TcpListener;
 use tracing::{error, info};
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
-
-use crate::oauth::{
-    authorization_server_metadata, authorize_get, authorize_post, protected_resource_metadata,
-    register_client, token, AppState, OAuthService,
-};
+use url::Url;
 
 #[derive(Clone)]
-struct HttpWriteAuditor {
-    oauth: Arc<OAuthService>,
+enum HttpAuth {
+    LocalNone,
+    External(Arc<ExternalTokenValidator>),
 }
+
+#[derive(Clone)]
+struct AppState {
+    auth: HttpAuth,
+    public_url: Url,
+}
+
+#[derive(Clone, Default)]
+struct HttpWriteAuditor;
 
 impl WriteAuditor for HttpWriteAuditor {
     fn audit_write(
@@ -52,7 +56,11 @@ impl WriteAuditor for HttpWriteAuditor {
         id: &str,
         memory_repository: &MemoryRepository,
     ) {
-        let jti = audit_jti(request_context, &self.oauth);
+        let jti = request_context
+            .extensions
+            .get::<axum::http::request::Parts>()
+            .and_then(|parts| parts.extensions.get::<ValidatedTokenClaims>())
+            .and_then(|claims| claims.jti.as_deref());
         let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
         info!(
             tool,
@@ -79,15 +87,26 @@ async fn main() {
 
 async fn run() -> anyhow::Result<()> {
     let config = Config::from_env().context("loading startup configuration")?;
-    let bind_address = SocketAddr::from((Ipv4Addr::LOCALHOST, config.port));
-    let oauth = Arc::new(OAuthService::new(config.clone()).context("initializing OAuth service")?);
+    let bind_address = SocketAddr::from((config.bind_ip, config.port));
+    let auth = match config.auth {
+        AuthMode::LocalNone => HttpAuth::LocalNone,
+        AuthMode::ExternalOAuth(external) => HttpAuth::External(Arc::new(
+            ExternalTokenValidator::load(external)
+                .await
+                .context("loading external identity-provider JWKS")?,
+        )),
+    };
+    let auth_mode = match auth {
+        HttpAuth::LocalNone => "local-none",
+        HttpAuth::External(_) => "external-oauth",
+    };
     let memory_repository = Arc::new(
         MemoryRepository::new(&config.db_path, MemoryBinding::default())
             .context("initializing claude-ai-remote memory repository")?,
     );
 
     info!(
-        admin_password_configured = !config.admin_password_verifier.is_empty(),
+        auth_mode,
         port = config.port,
         bind_address = %bind_address,
         mcp_path = "/mcp",
@@ -95,7 +114,6 @@ async fn run() -> anyhow::Result<()> {
         memory_agent_id = memory_repository.agent_id(),
         public_url = %config.public_url,
         db_path = %config.db_path.display(),
-        data_dir = %config.data_dir.display(),
         log_content = config.log_content,
         "elegy-memory-mcp starting"
     );
@@ -108,16 +126,16 @@ async fn run() -> anyhow::Result<()> {
         listener,
         build_router(
             AppState {
-                oauth: Arc::clone(&oauth),
+                auth,
+                public_url: config.public_url,
             },
             memory_repository,
-            oauth,
             StreamableHttpServerConfig::default(),
         )
         .into_make_service_with_connect_info::<SocketAddr>(),
     )
     .await
-    .context("serving MCP and OAuth endpoints")?;
+    .context("serving MCP resource endpoint")?;
 
     Ok(())
 }
@@ -125,40 +143,33 @@ async fn run() -> anyhow::Result<()> {
 fn build_router(
     state: AppState,
     memory_repository: Arc<MemoryRepository>,
-    oauth: Arc<OAuthService>,
     transport_config: StreamableHttpServerConfig,
 ) -> Router {
-    let public_routes = Router::new()
-        .route(
-            "/.well-known/oauth-protected-resource",
-            get(protected_resource_metadata),
-        )
-        .route(
-            "/.well-known/oauth-authorization-server",
-            get(authorization_server_metadata),
-        )
-        .route("/oauth/register", post(register_client))
-        .route("/oauth/authorize", get(authorize_get).post(authorize_post))
-        .route("/oauth/token", post(token));
     let mcp_routes = Router::new()
         .nest_service(
             "/mcp",
-            build_mcp_service(memory_repository, Arc::clone(&oauth), transport_config),
+            build_mcp_service(memory_repository, transport_config),
         )
         .route_layer(middleware::from_fn_with_state(
             state.clone(),
             require_mcp_bearer,
         ));
 
-    public_routes.merge(mcp_routes).with_state(state)
+    let router = match state.auth {
+        HttpAuth::LocalNone => Router::new(),
+        HttpAuth::External(_) => Router::new().route(
+            "/.well-known/oauth-protected-resource",
+            get(protected_resource_metadata),
+        ),
+    };
+    router.merge(mcp_routes).with_state(state)
 }
 
 fn build_mcp_service(
     memory_repository: Arc<MemoryRepository>,
-    oauth: Arc<OAuthService>,
     transport_config: StreamableHttpServerConfig,
 ) -> StreamableHttpService<ElegyMemoryMcpServer, LocalSessionManager> {
-    let write_auditor: Arc<dyn WriteAuditor> = Arc::new(HttpWriteAuditor { oauth });
+    let write_auditor: Arc<dyn WriteAuditor> = Arc::new(HttpWriteAuditor);
 
     StreamableHttpService::new(
         move || {
@@ -185,52 +196,70 @@ fn init_logging() {
         .init();
 }
 
+async fn protected_resource_metadata(State(state): State<AppState>) -> Response {
+    match state.auth {
+        HttpAuth::External(validator) => {
+            Json(validator.protected_resource_metadata(&state.public_url)).into_response()
+        }
+        HttpAuth::LocalNone => StatusCode::NOT_FOUND.into_response(),
+    }
+}
+
 async fn require_mcp_bearer(
     State(state): State<AppState>,
-    request: Request,
+    mut request: Request,
     next: Next,
 ) -> Response {
+    let HttpAuth::External(validator) = &state.auth else {
+        return next.run(request).await;
+    };
     let token = request
         .headers()
         .get(AUTHORIZATION)
         .and_then(|value| value.to_str().ok())
-        .and_then(extract_bearer_token);
+        .and_then(extract_bearer_token)
+        .map(str::to_owned);
 
-    match token {
-        Some(token) if state.oauth.validate_access_token(token).is_ok() => next.run(request).await,
-        Some(_) => unauthorized_mcp_response(&state),
-        _ => unauthorized_mcp_response(&state),
+    let claims = match token {
+        Some(token) => validator.validate_with_refresh(&token).await.ok(),
+        None => None,
+    };
+    match claims {
+        Some(claims) => {
+            request.extensions_mut().insert(claims);
+            next.run(request).await
+        }
+        None => unauthorized_mcp_response(&state, validator),
     }
 }
 
 fn extract_bearer_token(value: &str) -> Option<&str> {
-    value
-        .strip_prefix("Bearer ")
-        .filter(|token| !token.is_empty())
+    let (scheme, token) = value.trim().split_once(char::is_whitespace)?;
+    scheme
+        .eq_ignore_ascii_case("bearer")
+        .then_some(token.trim())
+        .filter(|token| !token.is_empty() && !token.chars().any(char::is_whitespace))
 }
 
-fn unauthorized_mcp_response(state: &AppState) -> Response {
+#[cfg(test)]
+mod auth_header_tests {
+    use super::extract_bearer_token;
+
+    #[test]
+    fn bearer_scheme_is_case_insensitive_but_token_shape_is_strict() {
+        assert_eq!(extract_bearer_token("bearer token"), Some("token"));
+        assert_eq!(extract_bearer_token("  BEARER   token  "), Some("token"));
+        assert_eq!(extract_bearer_token("Basic token"), None);
+        assert_eq!(extract_bearer_token("Bearer"), None);
+        assert_eq!(extract_bearer_token("Bearer token extra"), None);
+    }
+}
+
+fn unauthorized_mcp_response(state: &AppState, validator: &ExternalTokenValidator) -> Response {
     let mut response = StatusCode::UNAUTHORIZED.into_response();
-    let challenge = state.oauth.mcp_bearer_challenge();
+    let challenge = validator.bearer_challenge(&state.public_url);
     if let Ok(value) = HeaderValue::from_str(&challenge) {
         response.headers_mut().insert(WWW_AUTHENTICATE, value);
     }
     response
-}
-
-fn audit_jti(request_context: &RequestContext<RoleServer>, oauth: &OAuthService) -> Option<String> {
-    let parts = request_context
-        .extensions
-        .get::<axum::http::request::Parts>()?;
-    let token = parts
-        .headers
-        .get(AUTHORIZATION)?
-        .to_str()
-        .ok()
-        .and_then(extract_bearer_token)?;
-
-    oauth
-        .validate_access_token(token)
-        .ok()
-        .map(|claims| claims.jti)
 }

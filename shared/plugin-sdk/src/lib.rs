@@ -108,6 +108,7 @@ pub fn validate_structured_failure(
 
 pub const ELEGY_PLUGIN_V1_SCHEMA_VERSION: &str = "elegy-plugin/v1";
 pub const ELEGY_PLUGIN_V2_SCHEMA_VERSION: &str = "elegy-plugin/v2";
+pub const ELEGY_PLUGIN_V3_SCHEMA_VERSION: &str = "elegy-plugin/v3";
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -139,6 +140,75 @@ pub struct ElegyPluginV1 {
 /// Current plugin manifest shape. The v1 type name remains as a source-compatible
 /// alias while readers support both `elegy-plugin/v1` and `elegy-plugin/v2`.
 pub type ElegyPluginV2 = ElegyPluginV1;
+
+/// Codex-compatible plugin envelope with Elegy governance kept in one
+/// namespaced object. Codex-native values deliberately remain JSON values
+/// where Codex accepts multiple wire shapes (path, path list, or inline map).
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ElegyPluginV3 {
+    pub schema_version: String,
+    pub name: String,
+    pub version: String,
+    pub description: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub author: Option<ElegyPluginV1Author>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub homepage: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repository: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub license: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub keywords: Option<Vec<String>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub skills: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mcp_servers: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub apps: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hooks: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub assets: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<CodexPluginInterface>,
+    pub elegy: ElegyPluginGovernanceV3,
+    /// Preserve future Codex-native fields so import/export never silently
+    /// erases a field merely because this SDK predates it.
+    #[serde(flatten)]
+    pub extra: BTreeMap<String, Value>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyPluginGovernanceV3 {
+    pub surface_class: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capability_catalog: Option<ElegyPluginCapabilityCatalog>,
+    pub connections: ElegyPluginConnections,
+    pub readiness: ElegyPluginReadiness,
+    #[serde(default)]
+    pub mcp_authentication: BTreeMap<String, ElegyMcpAuthenticationExpectation>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub package_assets: Vec<String>,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ElegyMcpAuthenticationMode {
+    None,
+    McpOauth,
+    BearerEnv,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMcpAuthenticationExpectation {
+    pub mode: ElegyMcpAuthenticationMode,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub environment_variable: Option<String>,
+}
 
 pub const ELEGY_READINESS_V1_SCHEMA_VERSION: &str = "elegy-readiness/v1";
 
@@ -463,6 +533,87 @@ pub struct ElegyMarketplaceArtifact {
     pub checksum_url: String,
 }
 
+pub const ELEGY_MARKETPLACE_V2_SCHEMA_VERSION: &str = "elegy-marketplace/v2";
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplaceV2 {
+    pub schema_version: String,
+    pub name: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub interface: Option<ElegyMarketplaceInterface>,
+    pub plugins: Vec<ElegyMarketplacePluginV2>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplacePluginV2 {
+    pub name: String,
+    pub source: ElegyMarketplaceSourceV2,
+    pub policy: ElegyMarketplacePolicy,
+    pub category: String,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub artifacts: Vec<ElegyMarketplaceArtifact>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(tag = "source", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum ElegyMarketplaceSourceV2 {
+    Local {
+        path: String,
+    },
+    Git {
+        url: String,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        reference: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha: Option<String>,
+    },
+    GitSubdirectory {
+        url: String,
+        root: String,
+        #[serde(default, rename = "ref", skip_serializing_if = "Option::is_none")]
+        reference: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        sha: Option<String>,
+    },
+    Npm {
+        package: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        version: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        registry: Option<String>,
+    },
+    ElegyArtifact {
+        path: String,
+    },
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyMarketplacePolicy {
+    pub installation: ElegyMarketplaceInstallationPolicy,
+    pub authentication: ElegyMarketplaceAuthenticationPolicy,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub enum ElegyMarketplaceInstallationPolicy {
+    #[serde(rename = "NOT_AVAILABLE")]
+    NotAvailable,
+    #[serde(rename = "AVAILABLE")]
+    Available,
+    #[serde(rename = "INSTALLED_BY_DEFAULT")]
+    InstalledByDefault,
+}
+
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+pub enum ElegyMarketplaceAuthenticationPolicy {
+    #[serde(rename = "ON_INSTALL")]
+    OnInstall,
+    #[serde(rename = "ON_USE")]
+    OnUse,
+}
+
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct ElegyMarketplaceValidationResult {
     pub issues: Vec<String>,
@@ -472,6 +623,100 @@ impl ElegyMarketplaceValidationResult {
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
     }
+}
+
+pub fn validate_elegy_marketplace_v2(
+    marketplace: &ElegyMarketplaceV2,
+) -> ElegyMarketplaceValidationResult {
+    let mut issues = Vec::new();
+    if marketplace.schema_version != ELEGY_MARKETPLACE_V2_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{}'.",
+            ELEGY_MARKETPLACE_V2_SCHEMA_VERSION
+        ));
+    }
+    if !validate_kebab_case_name(&marketplace.name) {
+        issues.push("marketplace name must be lowercase kebab-case.".to_string());
+    }
+    let mut names = BTreeSet::new();
+    for plugin in &marketplace.plugins {
+        if !validate_kebab_case_name(&plugin.name) {
+            issues.push(format!(
+                "plugin name '{}' must be lowercase kebab-case.",
+                plugin.name
+            ));
+        } else if !names.insert(plugin.name.clone()) {
+            issues.push(format!("duplicate plugin name '{}'.", plugin.name));
+        }
+        if plugin.category.trim().is_empty() {
+            issues.push(format!(
+                "plugin '{}' category must not be blank.",
+                plugin.name
+            ));
+        }
+        match &plugin.source {
+            ElegyMarketplaceSourceV2::Local { path }
+            | ElegyMarketplaceSourceV2::ElegyArtifact { path } => {
+                if !is_safe_marketplace_source_path(path) {
+                    issues.push(format!(
+                        "plugin '{}' source path must be a safe ./-prefixed relative path.",
+                        plugin.name
+                    ));
+                }
+            }
+            ElegyMarketplaceSourceV2::Git { url, .. }
+            | ElegyMarketplaceSourceV2::GitSubdirectory { url, .. } => {
+                validate_https_url(
+                    &format!("plugin '{}' source url", plugin.name),
+                    url,
+                    &mut issues,
+                );
+            }
+            ElegyMarketplaceSourceV2::Npm {
+                package, registry, ..
+            } => {
+                if package.trim().is_empty() {
+                    issues.push(format!(
+                        "plugin '{}' npm package must not be blank.",
+                        plugin.name
+                    ));
+                }
+                if let Some(registry) = registry {
+                    validate_https_url(
+                        &format!("plugin '{}' npm registry", plugin.name),
+                        registry,
+                        &mut issues,
+                    );
+                }
+            }
+        }
+        if matches!(
+            plugin.source,
+            ElegyMarketplaceSourceV2::Git { .. }
+                | ElegyMarketplaceSourceV2::GitSubdirectory { .. }
+                | ElegyMarketplaceSourceV2::Npm { .. }
+        ) && plugin.policy.installation != ElegyMarketplaceInstallationPolicy::NotAvailable
+        {
+            issues.push(format!(
+                "plugin '{}' uses a descriptor-only source and must declare installation NOT_AVAILABLE until materialization is implemented.",
+                plugin.name
+            ));
+        }
+        if let ElegyMarketplaceSourceV2::GitSubdirectory { root, .. } = &plugin.source {
+            if root.trim().is_empty()
+                || root.starts_with('/')
+                || root.contains('\\')
+                || root.split('/').any(|segment| segment == "..")
+            {
+                issues.push(format!(
+                    "plugin '{}' git subdirectory root is unsafe.",
+                    plugin.name
+                ));
+            }
+        }
+        validate_marketplace_artifacts(&plugin.name, &plugin.artifacts, &mut issues);
+    }
+    ElegyMarketplaceValidationResult { issues }
 }
 
 pub fn validate_elegy_marketplace_v1(
@@ -516,39 +761,44 @@ pub fn validate_elegy_marketplace_v1(
             ));
         }
 
-        let mut targets = BTreeSet::new();
-        for artifact in &plugin.artifacts {
-            if !matches!(
-                artifact.target.as_str(),
-                "any"
-                    | "x86_64-pc-windows-msvc"
-                    | "x86_64-unknown-linux-gnu"
-                    | "aarch64-apple-darwin"
-            ) {
-                issues.push(format!(
-                    "plugin '{}' has unsupported artifact target '{}'.",
-                    plugin.name, artifact.target
-                ));
-            } else if !targets.insert(artifact.target.clone()) {
-                issues.push(format!(
-                    "plugin '{}' has duplicate artifact target '{}'.",
-                    plugin.name, artifact.target
-                ));
-            }
-            validate_https_url(
-                &format!("plugin '{}' artifact url", plugin.name),
-                &artifact.url,
-                &mut issues,
-            );
-            validate_https_url(
-                &format!("plugin '{}' artifact checksumUrl", plugin.name),
-                &artifact.checksum_url,
-                &mut issues,
-            );
-        }
+        validate_marketplace_artifacts(&plugin.name, &plugin.artifacts, &mut issues);
     }
 
     ElegyMarketplaceValidationResult { issues }
+}
+
+fn validate_marketplace_artifacts(
+    plugin_name: &str,
+    artifacts: &[ElegyMarketplaceArtifact],
+    issues: &mut Vec<String>,
+) {
+    let mut targets = BTreeSet::new();
+    for artifact in artifacts {
+        if !matches!(
+            artifact.target.as_str(),
+            "any" | "x86_64-pc-windows-msvc" | "x86_64-unknown-linux-gnu" | "aarch64-apple-darwin"
+        ) {
+            issues.push(format!(
+                "plugin '{plugin_name}' has unsupported artifact target '{}'.",
+                artifact.target
+            ));
+        } else if !targets.insert(artifact.target.clone()) {
+            issues.push(format!(
+                "plugin '{plugin_name}' has duplicate artifact target '{}'.",
+                artifact.target
+            ));
+        }
+        validate_https_url(
+            &format!("plugin '{plugin_name}' artifact url"),
+            &artifact.url,
+            issues,
+        );
+        validate_https_url(
+            &format!("plugin '{plugin_name}' artifact checksumUrl"),
+            &artifact.checksum_url,
+            issues,
+        );
+    }
 }
 
 fn is_safe_marketplace_source_path(path: &str) -> bool {
@@ -560,6 +810,22 @@ fn is_safe_marketplace_source_path(path: &str) -> bool {
 
 pub fn select_marketplace_artifact<'a>(
     plugin: &'a ElegyMarketplacePlugin,
+    target: &str,
+) -> Option<&'a ElegyMarketplaceArtifact> {
+    plugin
+        .artifacts
+        .iter()
+        .find(|artifact| artifact.target == target)
+        .or_else(|| {
+            plugin
+                .artifacts
+                .iter()
+                .find(|artifact| artifact.target == "any")
+        })
+}
+
+pub fn select_marketplace_artifact_v2<'a>(
+    plugin: &'a ElegyMarketplacePluginV2,
     target: &str,
 ) -> Option<&'a ElegyMarketplaceArtifact> {
     plugin
@@ -872,9 +1138,10 @@ pub fn extract_codex_extension_v1(
     serde_json::from_value::<CodexPluginExtensionV1>(raw.clone()).ok()
 }
 
-pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 9] = [
+pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 11] = [
     ("elegy-plugin-v1.schema.json", "elegy-plugin/v1"),
     ("elegy-plugin-v2.schema.json", "elegy-plugin/v2"),
+    ("elegy-plugin-v3.schema.json", "elegy-plugin/v3"),
     (
         "elegy-plugin-connections-v1.schema.json",
         "elegy-plugin-connections/v1",
@@ -884,6 +1151,7 @@ pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 9] = [
         "elegy-connection-provider/v1",
     ),
     ("elegy-marketplace-v1.schema.json", "elegy-marketplace/v1"),
+    ("elegy-marketplace-v2.schema.json", "elegy-marketplace/v2"),
     ("codex-plugin-extension-v1.schema.json", "codex.plugin/v1"),
     ("codex-plugin-manifest.schema.json", "codex-plugin-manifest"),
     (
@@ -911,6 +1179,55 @@ fn generate_plugin_v2_schema() -> Result<Value, serde_json::Error> {
     Ok(schema)
 }
 
+fn generate_plugin_v3_schema() -> Result<Value, serde_json::Error> {
+    let mut schema = serde_json::to_value(schema_for!(ElegyPluginV3))?;
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.insert(
+            "schemaVersion".to_string(),
+            serde_json::json!({"const": ELEGY_PLUGIN_V3_SCHEMA_VERSION}),
+        );
+        let path_list_or_map = serde_json::json!({
+            "oneOf": [
+                {"type":"string", "minLength":1},
+                {
+                    "type":"array",
+                    "minItems":1,
+                    "items":{"type":["string","object"]}
+                },
+                {"type":"object", "minProperties":1}
+            ]
+        });
+        for field in ["skills", "apps", "hooks", "assets"] {
+            properties.insert(field.to_string(), path_list_or_map.clone());
+        }
+        properties.insert(
+            "mcpServers".to_string(),
+            serde_json::json!({
+                "oneOf": [
+                    {"type":"string", "minLength":1},
+                    {
+                        "type":"object",
+                        "minProperties":1,
+                        "additionalProperties":{"type":"object"}
+                    }
+                ]
+            }),
+        );
+    }
+    Ok(schema)
+}
+
+fn generate_marketplace_v2_schema() -> Result<Value, serde_json::Error> {
+    let mut schema = serde_json::to_value(schema_for!(ElegyMarketplaceV2))?;
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.insert(
+            "schemaVersion".to_string(),
+            serde_json::json!({"const": ELEGY_MARKETPLACE_V2_SCHEMA_VERSION}),
+        );
+    }
+    Ok(schema)
+}
+
 pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, String>, ToolingError> {
     let schemas = [
         (
@@ -918,32 +1235,37 @@ pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, Strin
             serde_json::to_value(schema_for!(ElegyPluginV1)),
         ),
         (PLUGIN_SCHEMA_ARTIFACTS[1].0, generate_plugin_v2_schema()),
+        (PLUGIN_SCHEMA_ARTIFACTS[2].0, generate_plugin_v3_schema()),
         (
-            PLUGIN_SCHEMA_ARTIFACTS[2].0,
+            PLUGIN_SCHEMA_ARTIFACTS[3].0,
             serde_json::to_value(schema_for!(ElegyPluginConnectionsV1)),
         ),
         (
-            PLUGIN_SCHEMA_ARTIFACTS[3].0,
+            PLUGIN_SCHEMA_ARTIFACTS[4].0,
             serde_json::to_value(schema_for!(ElegyConnectionProviderV1)),
         ),
         (
-            PLUGIN_SCHEMA_ARTIFACTS[4].0,
+            PLUGIN_SCHEMA_ARTIFACTS[5].0,
             serde_json::to_value(schema_for!(ElegyMarketplaceV1)),
         ),
         (
-            PLUGIN_SCHEMA_ARTIFACTS[5].0,
-            serde_json::to_value(schema_for!(CodexPluginExtensionV1)),
-        ),
-        (
             PLUGIN_SCHEMA_ARTIFACTS[6].0,
-            serde_json::to_value(schema_for!(CodexPluginManifest)),
+            generate_marketplace_v2_schema(),
         ),
         (
             PLUGIN_SCHEMA_ARTIFACTS[7].0,
-            serde_json::to_value(schema_for!(ElegyCapabilityCatalogV1)),
+            serde_json::to_value(schema_for!(CodexPluginExtensionV1)),
         ),
         (
             PLUGIN_SCHEMA_ARTIFACTS[8].0,
+            serde_json::to_value(schema_for!(CodexPluginManifest)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[9].0,
+            serde_json::to_value(schema_for!(ElegyCapabilityCatalogV1)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[10].0,
             serde_json::to_value(schema_for!(ElegyReadinessV1)),
         ),
     ];
@@ -979,6 +1301,267 @@ impl ElegyPluginV1ValidationResult {
     pub fn is_valid(&self) -> bool {
         self.issues.is_empty()
     }
+}
+
+pub fn validate_elegy_plugin_v3(plugin: &ElegyPluginV3) -> ElegyPluginV1ValidationResult {
+    let mut issues = Vec::new();
+
+    if plugin.schema_version != ELEGY_PLUGIN_V3_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{}', found '{}'.",
+            ELEGY_PLUGIN_V3_SCHEMA_VERSION, plugin.schema_version
+        ));
+    }
+    if !validate_kebab_case_name(&plugin.name) {
+        issues.push("name must be lowercase kebab-case.".to_string());
+    }
+    if !validate_semver(&plugin.version) {
+        issues.push("version must be valid SemVer 2.0.0.".to_string());
+    }
+    if plugin.description.trim().is_empty() {
+        issues.push("description must not be blank.".to_string());
+    }
+    if !matches!(
+        plugin.elegy.surface_class.as_str(),
+        "adapter-plugin"
+            | "tool"
+            | "skill"
+            | "host-adapter"
+            | "host-extension"
+            | "package-envelope"
+    ) {
+        issues.push(
+            "elegy.surfaceClass must be adapter-plugin, tool, skill, host-adapter, host-extension, or package-envelope."
+                .to_string(),
+        );
+    }
+    if plugin.elegy.surface_class == "adapter-plugin" && plugin.elegy.capability_catalog.is_none() {
+        issues.push(
+            "adapter-plugin packages require elegy.capabilityCatalog as typed discovery authority."
+                .to_string(),
+        );
+    }
+    if plugin.elegy.readiness.schema_version != ELEGY_READINESS_V1_SCHEMA_VERSION {
+        issues.push(format!(
+            "elegy.readiness.schemaVersion must be '{}'.",
+            ELEGY_READINESS_V1_SCHEMA_VERSION
+        ));
+    }
+    if !is_safe_package_relative_path(&plugin.elegy.readiness.path) {
+        issues.push("elegy.readiness.path must be a safe package-relative path.".to_string());
+    }
+    for asset in &plugin.elegy.package_assets {
+        if !is_safe_package_relative_path(asset) {
+            issues.push(format!(
+                "elegy.packageAssets path '{asset}' is not package-relative."
+            ));
+        }
+    }
+
+    validate_codex_native_shape(
+        "skills",
+        plugin.skills.as_ref(),
+        CodexShape::PathListOrMap,
+        &mut issues,
+    );
+    validate_codex_native_shape(
+        "mcpServers",
+        plugin.mcp_servers.as_ref(),
+        CodexShape::PathOrServerMap,
+        &mut issues,
+    );
+    validate_codex_native_shape(
+        "apps",
+        plugin.apps.as_ref(),
+        CodexShape::PathListOrMap,
+        &mut issues,
+    );
+    validate_codex_native_shape(
+        "hooks",
+        plugin.hooks.as_ref(),
+        CodexShape::PathListOrMap,
+        &mut issues,
+    );
+    validate_codex_native_shape(
+        "assets",
+        plugin.assets.as_ref(),
+        CodexShape::PathListOrMap,
+        &mut issues,
+    );
+
+    if plugin.mcp_servers.is_none() && !plugin.elegy.mcp_authentication.is_empty() {
+        issues.push(
+            "elegy.mcpAuthentication cannot declare servers when mcpServers is absent.".to_string(),
+        );
+    }
+
+    if let Some(Value::Object(servers)) = &plugin.mcp_servers {
+        for (server_name, server) in servers {
+            let is_server_entry = server.is_object();
+            if is_server_entry && !plugin.elegy.mcp_authentication.contains_key(server_name) {
+                issues.push(format!(
+                    "MCP server '{server_name}' requires an explicit authentication expectation."
+                ));
+            }
+            let remote = server.as_object().is_some_and(|server| {
+                server.contains_key("url")
+                    || server.contains_key("httpUrl")
+                    || server.contains_key("http_url")
+            });
+            if remote
+                && plugin
+                    .elegy
+                    .mcp_authentication
+                    .get(server_name)
+                    .is_some_and(|expectation| expectation.mode == ElegyMcpAuthenticationMode::None)
+            {
+                issues.push(format!(
+                    "remote MCP server '{server_name}' cannot declare unauthenticated mode."
+                ));
+            }
+        }
+        for declared in plugin.elegy.mcp_authentication.keys() {
+            if !servers.contains_key(declared) {
+                issues.push(format!(
+                    "elegy.mcpAuthentication declares unknown MCP server '{declared}'."
+                ));
+            }
+        }
+    }
+
+    for (server_name, expectation) in &plugin.elegy.mcp_authentication {
+        if expectation.mode == ElegyMcpAuthenticationMode::BearerEnv {
+            if expectation
+                .environment_variable
+                .as_deref()
+                .is_none_or(|name| !is_environment_variable_name(name))
+            {
+                issues.push(format!(
+                    "MCP server '{server_name}' uses bearer-env but elegy.mcpAuthentication declares no valid environmentVariable."
+                ));
+            }
+        } else if expectation.environment_variable.is_some() {
+            issues.push(format!(
+                "MCP server '{server_name}' declares environmentVariable without bearer-env mode."
+            ));
+        }
+    }
+
+    if serde_json::to_value(plugin)
+        .ok()
+        .is_some_and(|value| contains_plaintext_authentication_material(&value))
+    {
+        issues.push(
+            "plugin manifest contains plaintext authentication material; use host OAuth or environment-backed bindings."
+                .to_string(),
+        );
+    }
+
+    ElegyPluginV1ValidationResult { issues }
+}
+
+fn is_environment_variable_name(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_ascii_alphabetic())
+        && characters.all(|character| character == '_' || character.is_ascii_alphanumeric())
+}
+
+#[derive(Clone, Copy)]
+enum CodexShape {
+    PathListOrMap,
+    PathOrServerMap,
+}
+
+fn validate_codex_native_shape(
+    field: &str,
+    value: Option<&Value>,
+    shape: CodexShape,
+    issues: &mut Vec<String>,
+) {
+    let Some(value) = value else {
+        return;
+    };
+    let valid_path = |value: &str| !value.trim().is_empty() && is_safe_package_relative_path(value);
+    let valid = match (shape, value) {
+        (_, Value::String(path)) => valid_path(path),
+        (CodexShape::PathListOrMap, Value::Array(values)) => {
+            !values.is_empty()
+                && values.iter().all(|value| match value {
+                    Value::String(path) => valid_path(path),
+                    Value::Object(object) => !object.is_empty(),
+                    _ => false,
+                })
+        }
+        (CodexShape::PathListOrMap, Value::Object(values)) => {
+            !values.is_empty()
+                && values.values().all(|value| match value {
+                    Value::String(path) => valid_path(path),
+                    Value::Object(object) => !object.is_empty(),
+                    _ => false,
+                })
+        }
+        (CodexShape::PathOrServerMap, Value::Object(values)) => {
+            !values.is_empty() && values.values().all(Value::is_object)
+        }
+        _ => false,
+    };
+    if !valid {
+        issues.push(format!(
+            "{field} must use a supported non-empty Codex path, list, or inline object shape."
+        ));
+    }
+}
+
+fn contains_plaintext_authentication_material(value: &Value) -> bool {
+    match value {
+        Value::Object(object) => object.iter().any(|(key, child)| {
+            let normalized = key
+                .chars()
+                .filter(|character| character.is_ascii_alphanumeric())
+                .flat_map(char::to_lowercase)
+                .collect::<String>();
+            let secret_key = normalized.ends_with("authorization")
+                || normalized == "cookie"
+                || normalized == "setcookie"
+                || normalized.ends_with("apikey")
+                || normalized.ends_with("token")
+                || normalized.ends_with("secret")
+                || normalized.ends_with("password");
+            secret_key || contains_plaintext_authentication_material(child)
+        }),
+        Value::Array(values) => values
+            .iter()
+            .any(contains_plaintext_authentication_material),
+        Value::String(value) => {
+            let normalized = value.trim_start().to_ascii_lowercase();
+            normalized.starts_with("bearer ") || normalized.starts_with("basic ")
+        }
+        _ => false,
+    }
+}
+
+/// Produce the native Codex manifest from a v3 envelope. Elegy governance is
+/// the only information removed; all Codex-native and future fields survive.
+pub fn project_codex_plugin_v3(plugin: &ElegyPluginV3) -> Result<Value, ToolingError> {
+    let validation = validate_elegy_plugin_v3(plugin);
+    if !validation.is_valid() {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: PathBuf::from(".elegy-plugin/plugin.json"),
+            issues: validation.issues,
+        });
+    }
+    let mut value = serde_json::to_value(plugin).map_err(|source| ToolingError::Json {
+        path: PathBuf::from(".elegy-plugin/plugin.json"),
+        source,
+    })?;
+    let object = value
+        .as_object_mut()
+        .expect("serialized plugin manifest is always an object");
+    object.remove("schemaVersion");
+    object.remove("elegy");
+    Ok(value)
 }
 
 pub fn validate_elegy_plugin_v1(plugin: &ElegyPluginV1) -> ElegyPluginV1ValidationResult {
@@ -1319,6 +1902,77 @@ pub fn import_codex_plugin_v1(codex_plugin_path: &Path) -> Result<ElegyPluginV1,
         connections: None,
         readiness: None,
         extensions: Some(extensions),
+    })
+}
+
+/// Import a Codex package into the v3 envelope without translating native
+/// fields. Imported packages are deliberately `concept` and non-adapter until
+/// a maintainer supplies Elegy capability and readiness authority.
+pub fn import_codex_plugin_v3(codex_plugin_path: &Path) -> Result<ElegyPluginV3, ToolingError> {
+    let (_package_root, manifest_path) = resolve_codex_plugin_root(codex_plugin_path)?;
+    let raw = fs::read_to_string(&manifest_path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: manifest_path.clone(),
+        source,
+    })?;
+    let mut value: Value = serde_json::from_str(&raw).map_err(|source| ToolingError::Json {
+        path: manifest_path.clone(),
+        source,
+    })?;
+    let object = value
+        .as_object_mut()
+        .ok_or_else(|| ToolingError::InvalidPluginPackage {
+            path: manifest_path.clone(),
+            issues: vec!["Codex plugin manifest must be a JSON object.".to_string()],
+        })?;
+    if object.contains_key("schemaVersion") || object.contains_key("elegy") {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: manifest_path.clone(),
+            issues: vec![
+                "Codex import reserves schemaVersion and elegy for the Elegy envelope.".to_string(),
+            ],
+        });
+    }
+
+    let mcp_authentication = object
+        .get("mcpServers")
+        .and_then(Value::as_object)
+        .map(|servers| {
+            servers
+                .iter()
+                .filter_map(|(name, server)| {
+                    let server = server.as_object()?;
+                    server.contains_key("command").then_some((
+                        name.clone(),
+                        ElegyMcpAuthenticationExpectation {
+                            mode: ElegyMcpAuthenticationMode::None,
+                            environment_variable: None,
+                        },
+                    ))
+                })
+                .collect::<BTreeMap<_, _>>()
+        })
+        .unwrap_or_default();
+    object.insert(
+        "schemaVersion".to_string(),
+        Value::String(ELEGY_PLUGIN_V3_SCHEMA_VERSION.to_string()),
+    );
+    object.insert(
+        "elegy".to_string(),
+        serde_json::json!({
+            "surfaceClass": "package-envelope",
+            "connections": {"requirements": {"mode": "none"}},
+            "readiness": {
+                "stage": "concept",
+                "path": "./readiness.json",
+                "schemaVersion": ELEGY_READINESS_V1_SCHEMA_VERSION
+            },
+            "mcpAuthentication": mcp_authentication
+        }),
+    );
+    serde_json::from_value(value).map_err(|source| ToolingError::Json {
+        path: manifest_path,
+        source,
     })
 }
 
@@ -1961,6 +2615,9 @@ pub struct GeneratedHostExport {
     pub source_package: String,
     pub plugin_name: String,
     pub plugin_version: String,
+    pub lossless: bool,
+    pub routable: bool,
+    pub losses: Vec<String>,
     pub emitted_components: GeneratedHostExportComponents,
     pub written_files: Vec<String>,
 }
@@ -2019,6 +2676,8 @@ pub enum ToolingError {
     OutputExists { path: PathBuf },
     #[error("unsupported host target: {host}")]
     UnsupportedHostTarget { host: String },
+    #[error("host '{host}' cannot represent this plugin: {reason}")]
+    UnsupportedHostProjection { host: String, reason: String },
 }
 
 // ── Plugin path resolution ────────────────────────────────────────────────
@@ -2300,6 +2959,279 @@ pub struct PluginV1VerifyResult {
     pub has_capability_catalog: bool,
     pub catalog_app_binding_count: usize,
     pub issues: Vec<String>,
+}
+
+pub fn verify_plugin_v3(package_dir: &Path) -> Result<PluginV1VerifyResult, ToolingError> {
+    let plugin_path = package_dir.join("plugin.json");
+    let raw = fs::read_to_string(&plugin_path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: plugin_path.clone(),
+        source,
+    })?;
+    let plugin: ElegyPluginV3 =
+        serde_json::from_str(&raw).map_err(|source| ToolingError::Json {
+            path: plugin_path,
+            source,
+        })?;
+    let package_root = package_dir.parent().unwrap_or(Path::new("."));
+    let validation = validate_elegy_plugin_v3(&plugin);
+    let mut issues = validation.issues;
+
+    if let Some(catalog) = &plugin.elegy.capability_catalog {
+        let path = resolve_package_path(package_root, &catalog.path);
+        if !path.is_file() {
+            issues.push(format!(
+                "capability catalog '{}' does not exist.",
+                catalog.path
+            ));
+        } else {
+            match load_capability_catalog_v1(&path) {
+                Ok(loaded) => {
+                    for issue in validate_elegy_capability_catalog_v1(&loaded).issues {
+                        issues.push(format!("capability catalog: {issue}"));
+                    }
+                    if loaded.plugin != plugin.name {
+                        issues.push(
+                            "capability catalog plugin does not match manifest name.".to_string(),
+                        );
+                    }
+                    if loaded.plugin_version != plugin.version {
+                        issues.push(
+                            "capability catalog pluginVersion does not match manifest version."
+                                .to_string(),
+                        );
+                    }
+                }
+                Err(error) => issues.push(format!(
+                    "capability catalog '{}' is invalid: {error}",
+                    catalog.path
+                )),
+            }
+        }
+    }
+
+    let readiness_path = resolve_package_path(package_root, &plugin.elegy.readiness.path);
+    match fs::read_to_string(&readiness_path) {
+        Ok(raw) => match serde_json::from_str::<ElegyReadinessV1>(&raw) {
+            Ok(readiness) => {
+                for issue in readiness.validation_issues() {
+                    issues.push(format!("readiness: {issue}"));
+                }
+                if readiness.surface != plugin.name {
+                    issues.push("readiness surface does not match manifest name.".to_string());
+                }
+                if readiness.surface_version != plugin.version {
+                    issues.push(
+                        "readiness surfaceVersion does not match manifest version.".to_string(),
+                    );
+                }
+                if readiness.stage != plugin.elegy.readiness.stage {
+                    issues.push("readiness stage does not match manifest declaration.".to_string());
+                }
+                for evidence in readiness.evidence {
+                    let evidence_path = resolve_package_path(package_root, &evidence.path);
+                    if !evidence_path.is_file() {
+                        issues.push(format!(
+                            "readiness evidence file '{}' does not exist.",
+                            evidence.path
+                        ));
+                    }
+                }
+            }
+            Err(error) => issues.push(format!(
+                "readiness file '{}' is invalid: {error}",
+                plugin.elegy.readiness.path
+            )),
+        },
+        Err(_) => issues.push(format!(
+            "readiness file '{}' does not exist.",
+            plugin.elegy.readiness.path
+        )),
+    }
+
+    let mut skill_count = 0;
+    for path in v3_string_paths(plugin.skills.as_ref()) {
+        let full_path = resolve_package_path(package_root, path);
+        if !full_path.exists() {
+            issues.push(format!("skills path '{path}' does not exist."));
+            continue;
+        }
+        skill_count += if full_path.join("SKILL.md").is_file() {
+            1
+        } else {
+            fs::read_dir(&full_path)
+                .map(|entries| {
+                    entries
+                        .flatten()
+                        .filter(|entry| entry.path().join("SKILL.md").is_file())
+                        .count()
+                })
+                .unwrap_or_default()
+        };
+    }
+    for path in v3_string_paths(plugin.apps.as_ref())
+        .into_iter()
+        .chain(v3_string_paths(plugin.hooks.as_ref()))
+    {
+        if !resolve_package_path(package_root, path).exists() {
+            issues.push(format!("declared Codex component '{path}' does not exist."));
+        }
+    }
+    for path in v3_asset_paths(plugin.assets.as_ref()) {
+        if path_is_uri(path) {
+            continue;
+        }
+        if !is_safe_package_relative_path(path) {
+            issues.push(format!(
+                "declared Codex asset '{path}' is not package-relative."
+            ));
+        } else if !resolve_package_path(package_root, path).exists() {
+            issues.push(format!("declared Codex asset '{path}' does not exist."));
+        }
+    }
+    for path in plugin
+        .elegy
+        .package_assets
+        .iter()
+        .map(String::as_str)
+        .chain(v3_interface_asset_paths(plugin.interface.as_ref()))
+    {
+        if !is_safe_package_relative_path(path) {
+            issues.push(format!(
+                "declared package asset '{path}' is not package-relative."
+            ));
+        } else if !resolve_package_path(package_root, path).exists() {
+            issues.push(format!("declared package asset '{path}' does not exist."));
+        }
+    }
+    if plugin.mcp_servers.as_ref().is_some_and(Value::is_string) {
+        for path in v3_string_paths(plugin.mcp_servers.as_ref()) {
+            let descriptor_path = resolve_package_path(package_root, path);
+            if !descriptor_path.exists() {
+                issues.push(format!("MCP server descriptor '{path}' does not exist."));
+                continue;
+            }
+            let descriptor = fs::read_to_string(&descriptor_path)
+                .ok()
+                .and_then(|raw| serde_json::from_str::<Value>(&raw).ok());
+            let Some(servers) = descriptor
+                .as_ref()
+                .and_then(|value| value.get("mcpServers"))
+                .and_then(Value::as_object)
+            else {
+                issues.push(format!(
+                    "MCP server descriptor '{path}' has no mcpServers object."
+                ));
+                continue;
+            };
+            for (server_name, server) in servers {
+                let Some(expectation) = plugin.elegy.mcp_authentication.get(server_name) else {
+                    issues.push(format!(
+                        "MCP server '{server_name}' requires an explicit authentication expectation."
+                    ));
+                    continue;
+                };
+                let remote = server.as_object().is_some_and(|server| {
+                    server.contains_key("url")
+                        || server.contains_key("httpUrl")
+                        || server.contains_key("http_url")
+                });
+                if remote && expectation.mode == ElegyMcpAuthenticationMode::None {
+                    issues.push(format!(
+                        "remote MCP server '{server_name}' cannot declare unauthenticated mode."
+                    ));
+                }
+                if expectation.mode == ElegyMcpAuthenticationMode::BearerEnv
+                    && expectation
+                        .environment_variable
+                        .as_deref()
+                        .is_none_or(|name| !is_environment_variable_name(name))
+                {
+                    issues.push(format!(
+                        "MCP server '{server_name}' uses bearer-env but elegy.mcpAuthentication declares no valid environmentVariable."
+                    ));
+                }
+            }
+            for declared in plugin.elegy.mcp_authentication.keys() {
+                if !servers.contains_key(declared) {
+                    issues.push(format!(
+                        "elegy.mcpAuthentication declares unknown MCP server '{declared}'."
+                    ));
+                }
+            }
+        }
+    }
+
+    let mcp_server_count = match plugin.mcp_servers.as_ref() {
+        Some(Value::Object(servers)) => servers.len(),
+        Some(_) => v3_string_paths(plugin.mcp_servers.as_ref())
+            .into_iter()
+            .filter_map(|path| {
+                fs::read_to_string(resolve_package_path(package_root, path))
+                    .ok()
+                    .and_then(|raw| serde_json::from_str::<Value>(&raw).ok())
+                    .and_then(|value| {
+                        value
+                            .get("mcpServers")
+                            .and_then(Value::as_object)
+                            .map(serde_json::Map::len)
+                    })
+            })
+            .sum(),
+        None => 0,
+    };
+    let valid = issues.is_empty();
+    Ok(PluginV1VerifyResult {
+        valid,
+        plugin_name: plugin.name,
+        plugin_version: plugin.version,
+        has_skills: plugin.skills.is_some(),
+        skill_count,
+        has_mcp: plugin.mcp_servers.is_some(),
+        mcp_server_count,
+        has_apps: plugin.apps.is_some(),
+        app_count: usize::from(plugin.apps.is_some()),
+        has_hooks: plugin.hooks.is_some(),
+        hook_event_count: usize::from(plugin.hooks.is_some()),
+        has_codex_interface: plugin.interface.is_some(),
+        has_codex_mcp_servers: plugin.mcp_servers.is_some(),
+        has_capability_catalog: plugin.elegy.capability_catalog.is_some(),
+        catalog_app_binding_count: 0,
+        issues,
+    })
+}
+
+fn v3_string_paths(value: Option<&Value>) -> Vec<&str> {
+    match value {
+        Some(Value::String(path)) => vec![path],
+        Some(Value::Array(values)) => values.iter().filter_map(Value::as_str).collect(),
+        _ => Vec::new(),
+    }
+}
+
+fn v3_asset_paths(value: Option<&Value>) -> Vec<&str> {
+    fn collect<'a>(value: &'a Value, paths: &mut Vec<&'a str>) {
+        match value {
+            Value::String(path) => paths.push(path),
+            Value::Array(values) => {
+                for value in values {
+                    collect(value, paths);
+                }
+            }
+            Value::Object(values) => {
+                for value in values.values() {
+                    collect(value, paths);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    let mut paths = Vec::new();
+    if let Some(value) = value {
+        collect(value, &mut paths);
+    }
+    paths
 }
 
 /// Verify a v1-format plugin manifest.
@@ -2864,6 +3796,440 @@ pub enum CodexProjectionMode {
     Experimental,
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum HostProjectionPolicy {
+    #[default]
+    Strict,
+    AllowLossy,
+}
+
+/// Export a current plugin manifest. V3 packages use the loss-aware projection
+/// contract; legacy v1/v2 packages remain readable for migration only.
+pub fn export_plugin_with_policy(
+    plugin_path: &Path,
+    host: &str,
+    output_dir: &Path,
+    overwrite: bool,
+    policy: HostProjectionPolicy,
+) -> Result<GeneratedHostExport, ToolingError> {
+    export_plugin_with_policy_and_binary(plugin_path, host, output_dir, overwrite, policy, None)
+}
+
+pub fn export_plugin_with_policy_and_binary(
+    plugin_path: &Path,
+    host: &str,
+    output_dir: &Path,
+    overwrite: bool,
+    policy: HostProjectionPolicy,
+    binary: Option<PluginArchiveBinary<'_>>,
+) -> Result<GeneratedHostExport, ToolingError> {
+    let (_, manifest_path) = resolve_plugin_root(plugin_path)?;
+    let raw = fs::read_to_string(&manifest_path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: manifest_path.clone(),
+        source,
+    })?;
+    let schema_version = serde_json::from_str::<Value>(&raw)
+        .ok()
+        .and_then(|value| {
+            value
+                .get("schemaVersion")
+                .and_then(Value::as_str)
+                .map(str::to_string)
+        })
+        .unwrap_or_default();
+    if schema_version == ELEGY_PLUGIN_V3_SCHEMA_VERSION {
+        return export_plugin_v3(plugin_path, host, output_dir, overwrite, policy, binary);
+    }
+    Err(ToolingError::UnsupportedHostProjection {
+        host: host.to_string(),
+        reason: "legacy elegy-plugin/v1 and v2 packages are readable for migration only; migrate to elegy-plugin/v3 before export".to_string(),
+    })
+}
+
+fn export_plugin_v3(
+    plugin_path: &Path,
+    host: &str,
+    output_dir: &Path,
+    overwrite: bool,
+    policy: HostProjectionPolicy,
+    binary: Option<PluginArchiveBinary<'_>>,
+) -> Result<GeneratedHostExport, ToolingError> {
+    let (package_root, manifest_path) = resolve_plugin_root(plugin_path)?;
+    let raw = fs::read_to_string(&manifest_path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: manifest_path.clone(),
+        source,
+    })?;
+    let plugin: ElegyPluginV3 =
+        serde_json::from_str(&raw).map_err(|source| ToolingError::Json {
+            path: manifest_path.clone(),
+            source,
+        })?;
+    let validation = validate_elegy_plugin_v3(&plugin);
+    if !validation.is_valid() {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: manifest_path,
+            issues: validation.issues,
+        });
+    }
+    let package_dir = manifest_path.parent().unwrap_or(Path::new("."));
+    let verification = verify_plugin_v3(package_dir)?;
+    if !verification.valid {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: manifest_path.clone(),
+            issues: verification.issues,
+        });
+    }
+    if !matches!(host, "codex" | "claude" | "opencode") {
+        return Err(ToolingError::UnsupportedHostTarget {
+            host: host.to_string(),
+        });
+    }
+
+    let losses = v3_projection_losses(&plugin, host);
+    if !losses.is_empty() && policy == HostProjectionPolicy::Strict {
+        return Err(ToolingError::UnsupportedHostProjection {
+            host: host.to_string(),
+            reason: losses.join("; "),
+        });
+    }
+
+    fs::create_dir_all(output_dir).map_err(|source| ToolingError::Io {
+        operation: "create directory",
+        path: output_dir.to_path_buf(),
+        source,
+    })?;
+    let mut written_files = Vec::new();
+    let portable_manifest_path = output_dir.join(".elegy-plugin").join("plugin.json");
+    let portable_value = serde_json::to_value(&plugin).map_err(|source| ToolingError::Json {
+        path: portable_manifest_path.clone(),
+        source,
+    })?;
+    write_json_file(&portable_manifest_path, &portable_value, overwrite)?;
+    written_files.push(display_path(&portable_manifest_path));
+
+    copy_v3_value_paths(
+        &package_root,
+        output_dir,
+        plugin.skills.as_ref(),
+        overwrite,
+        &mut written_files,
+    )?;
+    copy_v3_value_paths(
+        &package_root,
+        output_dir,
+        plugin.apps.as_ref(),
+        overwrite,
+        &mut written_files,
+    )?;
+    copy_v3_value_paths(
+        &package_root,
+        output_dir,
+        plugin.hooks.as_ref(),
+        overwrite,
+        &mut written_files,
+    )?;
+    for path in v3_asset_paths(plugin.assets.as_ref()) {
+        if !path_is_uri(path) {
+            copy_v3_package_path(
+                &package_root,
+                output_dir,
+                path,
+                overwrite,
+                &mut written_files,
+            )?;
+        }
+    }
+    if plugin.mcp_servers.as_ref().is_some_and(Value::is_string) {
+        copy_v3_value_paths(
+            &package_root,
+            output_dir,
+            plugin.mcp_servers.as_ref(),
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+    for path in v3_interface_asset_paths(plugin.interface.as_ref()) {
+        copy_v3_package_path(
+            &package_root,
+            output_dir,
+            path,
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+    for path in &plugin.elegy.package_assets {
+        copy_v3_package_path(
+            &package_root,
+            output_dir,
+            path,
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+    if let Some(catalog) = &plugin.elegy.capability_catalog {
+        copy_v3_package_path(
+            &package_root,
+            output_dir,
+            &catalog.path,
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+    copy_v3_package_path(
+        &package_root,
+        output_dir,
+        &plugin.elegy.readiness.path,
+        overwrite,
+        &mut written_files,
+    )?;
+    if let Some(path) = &plugin.elegy.connections.requirements.path {
+        copy_v3_package_path(
+            &package_root,
+            output_dir,
+            path,
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+    if let Some(provider) = &plugin.elegy.connections.provider {
+        copy_v3_package_path(
+            &package_root,
+            output_dir,
+            &provider.path,
+            overwrite,
+            &mut written_files,
+        )?;
+    }
+
+    let plugin_manifest = match host {
+        "codex" => {
+            let path = output_dir.join(".codex-plugin").join("plugin.json");
+            let projected = project_codex_plugin_v3(&plugin)?;
+            write_json_file(&path, &projected, overwrite)?;
+            written_files.push(display_path(&path));
+            ".codex-plugin/plugin.json".to_string()
+        }
+        "claude" => {
+            let path = output_dir.join(".claude-plugin").join("plugin.json");
+            let projected = serde_json::json!({
+                "name": plugin.name,
+                "version": plugin.version,
+                "description": plugin.description,
+                "skills": plugin.skills,
+            });
+            write_json_file(&path, &projected, overwrite)?;
+            written_files.push(display_path(&path));
+            ".claude-plugin/plugin.json".to_string()
+        }
+        "opencode" => String::new(),
+        _ => unreachable!("host was validated"),
+    };
+
+    if !losses.is_empty() {
+        let report_path = output_dir.join("projection-report.json");
+        write_json_file(
+            &report_path,
+            &serde_json::json!({
+                "schemaVersion": "elegy-projection-report/v1",
+                "sourcePlugin": plugin.name,
+                "targetHost": host,
+                "lossless": false,
+                "routable": false,
+                "losses": losses,
+            }),
+            overwrite,
+        )?;
+        written_files.push(display_path(&report_path));
+    }
+    if let Some(binary) = binary {
+        if !is_safe_archive_path(&binary.archive_path) || !binary.source_path.is_file() {
+            return Err(ToolingError::InvalidPluginPackage {
+                path: binary.source_path.to_path_buf(),
+                issues: vec!["binary source or destination path is invalid.".to_string()],
+            });
+        }
+        let destination = output_dir.join(normalize_package_relative_path(&binary.archive_path));
+        copy_file_component(binary.source_path, &destination, overwrite)?;
+        written_files.push(display_path(&destination));
+    }
+
+    let lossless = losses.is_empty();
+    let routable = lossless && plugin.elegy.readiness.stage.is_agent_routable();
+    let skills_count = count_v3_skill_paths(plugin.skills.as_ref());
+    let apps_emitted = plugin.apps.is_some() && host == "codex";
+    let mcp_servers_emitted = plugin.mcp_servers.is_some() && host == "codex";
+    let hooks_emitted = plugin.hooks.is_some() && host == "codex";
+    Ok(GeneratedHostExport {
+        source_package: format!("{}-v{}", plugin.name, plugin.version),
+        plugin_name: plugin.name,
+        plugin_version: plugin.version,
+        lossless,
+        routable,
+        losses,
+        emitted_components: GeneratedHostExportComponents {
+            plugin_manifest,
+            skills_dir: "skills".to_string(),
+            skills_count,
+            apps_emitted,
+            mcp_servers_emitted,
+            hooks_emitted,
+        },
+        written_files,
+    })
+}
+
+fn v3_projection_losses(plugin: &ElegyPluginV3, host: &str) -> Vec<String> {
+    if host == "codex" {
+        return Vec::new();
+    }
+    let mut losses = Vec::new();
+    if plugin.apps.is_some() {
+        losses.push(format!("{host} projection cannot represent Codex apps"));
+    }
+    if plugin.hooks.is_some() {
+        losses.push(format!("{host} projection cannot represent Codex hooks"));
+    }
+    if plugin.interface.is_some() {
+        losses.push(format!(
+            "{host} projection cannot represent Codex interface metadata"
+        ));
+    }
+    if plugin.assets.is_some() {
+        losses.push(format!(
+            "{host} projection cannot represent Codex package assets"
+        ));
+    }
+    if plugin.mcp_servers.is_some() {
+        losses.push(format!(
+            "{host} projection cannot represent the declared MCP server shape"
+        ));
+    }
+    if plugin
+        .elegy
+        .mcp_authentication
+        .values()
+        .any(|expectation| expectation.mode != ElegyMcpAuthenticationMode::None)
+    {
+        losses.push(format!(
+            "{host} projection cannot represent delegated MCP authentication"
+        ));
+    }
+    if !plugin.extra.is_empty() {
+        losses.push(format!(
+            "{host} projection cannot represent unknown Codex-native fields"
+        ));
+    }
+    if plugin.elegy.connections.requirements.mode != "none"
+        || plugin.elegy.connections.provider.is_some()
+    {
+        losses.push(format!(
+            "{host} projection cannot represent Elegy connection bindings"
+        ));
+    }
+    losses
+}
+
+fn copy_v3_value_paths(
+    package_root: &Path,
+    output_dir: &Path,
+    value: Option<&Value>,
+    overwrite: bool,
+    written_files: &mut Vec<String>,
+) -> Result<(), ToolingError> {
+    match value {
+        Some(Value::String(path)) => {
+            copy_v3_package_path(package_root, output_dir, path, overwrite, written_files)
+        }
+        Some(Value::Array(values)) => {
+            for value in values {
+                if let Value::String(path) = value {
+                    copy_v3_package_path(package_root, output_dir, path, overwrite, written_files)?;
+                }
+            }
+            Ok(())
+        }
+        _ => Ok(()),
+    }
+}
+
+fn copy_v3_package_path(
+    package_root: &Path,
+    output_dir: &Path,
+    relative_path: &str,
+    overwrite: bool,
+    written_files: &mut Vec<String>,
+) -> Result<(), ToolingError> {
+    if !is_safe_package_relative_path(relative_path) {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: package_root.join(relative_path),
+            issues: vec![format!(
+                "declared component path '{relative_path}' is not package-relative"
+            )],
+        });
+    }
+    let source = resolve_package_path(package_root, relative_path);
+    if !source.exists() {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: source,
+            issues: vec![format!(
+                "declared component '{relative_path}' does not exist"
+            )],
+        });
+    }
+    let destination = output_dir.join(normalize_package_relative_path(relative_path));
+    if source.is_dir() {
+        if destination.exists() && !overwrite {
+            return Err(ToolingError::OutputExists { path: destination });
+        }
+        copy_dir_all(&source, &destination)?;
+        for path in walk_dir_files(&destination)? {
+            written_files.push(display_path(&path));
+        }
+    } else {
+        copy_file_component(&source, &destination, overwrite)?;
+        written_files.push(display_path(&destination));
+    }
+    Ok(())
+}
+
+fn v3_interface_asset_paths(interface: Option<&CodexPluginInterface>) -> Vec<&str> {
+    let Some(interface) = interface else {
+        return Vec::new();
+    };
+    let mut paths = Vec::new();
+    for path in [
+        interface.composer_icon.as_deref(),
+        interface.logo.as_deref(),
+        interface.logo_dark.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        if !path_is_uri(path) {
+            paths.push(path);
+        }
+    }
+    if let Some(screenshots) = &interface.screenshots {
+        paths.extend(
+            screenshots
+                .iter()
+                .map(String::as_str)
+                .filter(|path| !path_is_uri(path)),
+        );
+    }
+    paths
+}
+
+fn count_v3_skill_paths(value: Option<&Value>) -> usize {
+    match value {
+        Some(Value::String(_)) => 1,
+        Some(Value::Array(values)) => values.iter().filter(|value| value.is_string()).count(),
+        _ => 0,
+    }
+}
+
 /// Export v1 plugin skills for a host target.
 ///
 /// Accepts any of the three path forms supported by `resolve_plugin_root`.
@@ -3423,10 +4789,21 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
         written_files.push(display_path(&destination));
     }
 
+    let legacy_routable = host == "codex" && plugin.is_agent_routable();
     Ok(GeneratedHostExport {
         source_package: format!("{}-v{}", plugin.name, plugin.version),
         plugin_name: plugin.name,
         plugin_version: plugin.version,
+        lossless: host == "codex",
+        routable: legacy_routable,
+        losses: if host == "codex" {
+            Vec::new()
+        } else {
+            vec![
+                "legacy projection does not prove preservation of host-specific behavior"
+                    .to_string(),
+            ]
+        },
         emitted_components: GeneratedHostExportComponents {
             plugin_manifest: match host {
                 "codex" => ".codex-plugin/plugin.json".to_string(),
@@ -3698,6 +5075,168 @@ fn validate_current_codex_projection(
         issues.push("current Codex export requires non-empty interface.defaultPrompt.".to_string());
     }
     issues
+}
+
+pub fn pack_plugin_v3(plugin_path: &Path, output_zip: &Path) -> Result<String, ToolingError> {
+    pack_plugin_v3_with_binary(plugin_path, output_zip, None)
+}
+
+pub fn pack_plugin_v3_with_binary(
+    plugin_path: &Path,
+    output_zip: &Path,
+    binary: Option<PluginArchiveBinary<'_>>,
+) -> Result<String, ToolingError> {
+    let (repo_root, manifest_path) = resolve_plugin_root(plugin_path)?;
+    let verification = verify_plugin_v3(&repo_root.join(".elegy-plugin"))?;
+    if !verification.valid {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: manifest_path,
+            issues: verification.issues,
+        });
+    }
+    let raw = fs::read_to_string(&manifest_path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: manifest_path.clone(),
+        source,
+    })?;
+    let plugin: ElegyPluginV3 =
+        serde_json::from_str(&raw).map_err(|source| ToolingError::Json {
+            path: manifest_path.clone(),
+            source,
+        })?;
+    let mut entries = vec![(manifest_path.clone(), "plugin.json".to_string())];
+
+    for path in v3_string_paths(plugin.skills.as_ref())
+        .into_iter()
+        .chain(v3_string_paths(plugin.apps.as_ref()))
+        .chain(v3_string_paths(plugin.hooks.as_ref()))
+    {
+        collect_component_path(&repo_root, path, &mut entries)?;
+    }
+    for path in v3_asset_paths(plugin.assets.as_ref()) {
+        if !path_is_uri(path) {
+            collect_component_path(&repo_root, path, &mut entries)?;
+        }
+    }
+    if plugin.mcp_servers.as_ref().is_some_and(Value::is_string) {
+        for path in v3_string_paths(plugin.mcp_servers.as_ref()) {
+            collect_component_path(&repo_root, path, &mut entries)?;
+        }
+    }
+    for path in v3_interface_asset_paths(plugin.interface.as_ref()) {
+        collect_component_path(&repo_root, path, &mut entries)?;
+    }
+    for path in &plugin.elegy.package_assets {
+        collect_component_path(&repo_root, path, &mut entries)?;
+    }
+    if let Some(catalog) = &plugin.elegy.capability_catalog {
+        collect_component_path(&repo_root, &catalog.path, &mut entries)?;
+    }
+    collect_component_path(&repo_root, &plugin.elegy.readiness.path, &mut entries)?;
+    let readiness_path = resolve_package_path(&repo_root, &plugin.elegy.readiness.path);
+    let readiness: ElegyReadinessV1 =
+        serde_json::from_str(&fs::read_to_string(&readiness_path).map_err(|source| {
+            ToolingError::Io {
+                operation: "read",
+                path: readiness_path.clone(),
+                source,
+            }
+        })?)
+        .map_err(|source| ToolingError::Json {
+            path: readiness_path,
+            source,
+        })?;
+    let mut evidence_paths = BTreeSet::new();
+    for evidence in readiness.evidence {
+        if evidence_paths.insert(evidence.path.clone()) {
+            collect_component_path(&repo_root, &evidence.path, &mut entries)?;
+        }
+    }
+    if let Some(path) = &plugin.elegy.connections.requirements.path {
+        collect_component_path(&repo_root, path, &mut entries)?;
+    }
+    if let Some(provider) = &plugin.elegy.connections.provider {
+        collect_component_path(&repo_root, &provider.path, &mut entries)?;
+    }
+    if let Some(binary) = binary {
+        if !is_safe_archive_path(&binary.archive_path) || !binary.source_path.is_file() {
+            return Err(ToolingError::InvalidPluginPackage {
+                path: binary.source_path.to_path_buf(),
+                issues: vec!["binary source or destination path is invalid.".to_string()],
+            });
+        }
+        entries.push((binary.source_path.to_path_buf(), binary.archive_path));
+    }
+    write_plugin_archive(entries, &manifest_path, output_zip)
+}
+
+fn write_plugin_archive(
+    mut entries: Vec<(PathBuf, String)>,
+    manifest_path: &Path,
+    output_zip: &Path,
+) -> Result<String, ToolingError> {
+    entries.sort_by(|a, b| a.1.cmp(&b.1));
+    if let Some(duplicate) = entries
+        .windows(2)
+        .find(|pair| pair[0].1 == pair[1].1)
+        .map(|pair| pair[0].1.clone())
+    {
+        return Err(ToolingError::InvalidPluginPackage {
+            path: manifest_path.to_path_buf(),
+            issues: vec![format!("duplicate archive target '{duplicate}'.")],
+        });
+    }
+    let file = fs::File::create(output_zip).map_err(|source| ToolingError::Io {
+        operation: "create",
+        path: output_zip.to_path_buf(),
+        source,
+    })?;
+    let mut zip_writer = zip::ZipWriter::new(file);
+    let options = zip::write::SimpleFileOptions::default()
+        .compression_method(zip::CompressionMethod::Deflated);
+    let mut buffer = Vec::new();
+    for (entry_path, relative_str) in &entries {
+        if should_exclude_from_pack(relative_str) {
+            continue;
+        }
+        let entry_options = options.unix_permissions(if relative_str.starts_with("bin/") {
+            0o755
+        } else {
+            0o644
+        });
+        zip_writer
+            .start_file(relative_str.clone(), entry_options)
+            .map_err(|source| ToolingError::Io {
+                operation: "write zip entry",
+                path: PathBuf::from(relative_str),
+                source: source.into(),
+            })?;
+        buffer.clear();
+        let mut file = fs::File::open(entry_path).map_err(|source| ToolingError::Io {
+            operation: "read",
+            path: entry_path.clone(),
+            source,
+        })?;
+        file.read_to_end(&mut buffer)
+            .map_err(|source| ToolingError::Io {
+                operation: "read",
+                path: entry_path.clone(),
+                source,
+            })?;
+        zip_writer
+            .write_all(&buffer)
+            .map_err(|source| ToolingError::Io {
+                operation: "write zip content",
+                path: entry_path.clone(),
+                source,
+            })?;
+    }
+    zip_writer.finish().map_err(|source| ToolingError::Io {
+        operation: "finalize zip",
+        path: output_zip.to_path_buf(),
+        source: source.into(),
+    })?;
+    Ok(display_path(output_zip))
 }
 
 /// Pack a v1-format plugin into a portable zip archive.
@@ -4640,22 +6179,28 @@ pub(crate) fn display_path(path: &Path) -> String {
 mod tests {
     use super::{
         analyze_mcp_descriptor_file, author_mcp_descriptor_to_path, build_codex_apps_from_catalog,
-        build_codex_apps_from_connections, copy_dir_all, export_plugin_v1,
-        export_plugin_v1_with_codex_mode, export_plugin_v1_with_codex_mode_and_binary,
+        build_codex_apps_from_connections, contains_plaintext_authentication_material,
+        copy_dir_all, export_plugin_v1, export_plugin_v1_with_codex_mode,
+        export_plugin_v1_with_codex_mode_and_binary, export_plugin_with_policy,
         generate_plugin_schema_artifacts, generate_skills_from_descriptor_file,
-        import_codex_plugin_v1, inspect_plugin_v1, is_safe_package_relative_path, pack_plugin_v1,
-        pack_plugin_v1_with_binary, select_marketplace_artifact,
-        validate_elegy_capability_catalog_v1, validate_elegy_marketplace_v1,
-        validate_elegy_plugin_v1, verify_plugin_v1, AuthorMcpDescriptorRequest,
+        import_codex_plugin_v1, import_codex_plugin_v3, inspect_plugin_v1,
+        is_safe_package_relative_path, pack_plugin_v1, pack_plugin_v1_with_binary, pack_plugin_v3,
+        project_codex_plugin_v3, select_marketplace_artifact, validate_elegy_capability_catalog_v1,
+        validate_elegy_marketplace_v1, validate_elegy_marketplace_v2, validate_elegy_plugin_v1,
+        validate_elegy_plugin_v3, verify_plugin_v1, verify_plugin_v3, AuthorMcpDescriptorRequest,
         AuthorMcpToolRequest, CodexConnectionBinding, CodexPluginExtensionV1, CodexProjectionMode,
         ElegyAppBinding, ElegyCapability, ElegyCapabilityCatalogV1, ElegyCapabilityFallback,
         ElegyCapabilityInvocation, ElegyCapabilityKind, ElegyConnectionRequirement,
-        ElegyMarketplaceArtifact, ElegyMarketplacePlugin, ElegyMarketplaceSource,
-        ElegyMarketplaceV1, ElegyPluginConnectionsV1, ElegyPluginV1, ElegyReadinessEvidence,
-        ElegyReadinessEvidenceKind, ElegyReadinessStage, ElegyReadinessV1, ElegySideEffectClass,
-        McpServerDescriptor, McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary, ToolingError,
+        ElegyMarketplaceArtifact, ElegyMarketplaceAuthenticationPolicy,
+        ElegyMarketplaceInstallationPolicy, ElegyMarketplacePlugin, ElegyMarketplacePluginV2,
+        ElegyMarketplacePolicy, ElegyMarketplaceSource, ElegyMarketplaceSourceV2,
+        ElegyMarketplaceV1, ElegyMarketplaceV2, ElegyPluginConnectionsV1, ElegyPluginV1,
+        ElegyPluginV3, ElegyReadinessEvidence, ElegyReadinessEvidenceKind, ElegyReadinessStage,
+        ElegyReadinessV1, ElegySideEffectClass, HostProjectionPolicy, McpServerDescriptor,
+        McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary, ToolingError,
         ELEGY_CAPABILITY_CATALOG_V1_SCHEMA_VERSION, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
-        ELEGY_PLUGIN_V1_SCHEMA_VERSION, ELEGY_READINESS_V1_SCHEMA_VERSION,
+        ELEGY_MARKETPLACE_V2_SCHEMA_VERSION, ELEGY_PLUGIN_V1_SCHEMA_VERSION,
+        ELEGY_READINESS_V1_SCHEMA_VERSION,
     };
     use serde_json::{json, Value};
     use std::collections::BTreeMap;
@@ -6815,5 +8360,635 @@ mod tests {
         assert_eq!(manifest["apps"], "./.app.json");
 
         fs::remove_dir_all(&temp_dir).ok();
+    }
+
+    #[test]
+    fn plugin_v3_projects_codex_native_fields_without_loss() {
+        let manifest: ElegyPluginV3 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "author": {
+                "name": "Elegy Contributors",
+                "email": "maintainers@example.com",
+                "url": "https://example.com/team"
+            },
+            "homepage": "https://example.com/calendar",
+            "repository": "https://example.com/repository",
+            "license": "Apache-2.0",
+            "keywords": ["calendar", "adapter"],
+            "skills": ["./skills/calendar", "./skills/scheduling"],
+            "mcpServers": {
+                "calendar": {
+                    "url": "https://calendar.example.com/mcp"
+                }
+            },
+            "apps": "./.app.json",
+            "hooks": [
+                "./hooks/a.json",
+                {
+                    "hooks": {
+                        "SessionStart": [{
+                            "hooks": [{"type": "command", "command": "calendar prepare"}]
+                        }]
+                    }
+                }
+            ],
+            "interface": {
+                "displayName": "Calendar",
+                "shortDescription": "Calendar access",
+                "longDescription": "Read and update a connected calendar.",
+                "developerName": "Elegy Contributors",
+                "category": "Productivity",
+                "capabilities": ["Read", "Write"],
+                "defaultPrompt": ["Show my next meeting."]
+            },
+            "elegy": {
+                "surfaceClass": "adapter-plugin",
+                "capabilityCatalog": {
+                    "path": "./capability-catalog.json",
+                    "schemaVersion": "elegy-capability-catalog/v1"
+                },
+                "connections": {
+                    "requirements": {"mode": "none"}
+                },
+                "readiness": {
+                    "stage": "implemented",
+                    "path": "./readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {
+                    "calendar": {"mode": "mcp-oauth"}
+                }
+            }
+        }))
+        .expect("v3 manifest parses");
+
+        assert!(validate_elegy_plugin_v3(&manifest).is_valid());
+
+        let projected = project_codex_plugin_v3(&manifest).expect("projection succeeds");
+        let mut expected = serde_json::to_value(&manifest).expect("serialize source");
+        expected
+            .as_object_mut()
+            .expect("manifest object")
+            .remove("schemaVersion");
+        expected
+            .as_object_mut()
+            .expect("manifest object")
+            .remove("elegy");
+        assert_eq!(projected, expected);
+    }
+
+    #[test]
+    fn plugin_v3_rejects_http_mcp_without_declared_authentication() {
+        let manifest: ElegyPluginV3 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "mcpServers": {
+                "calendar": {"url": "https://calendar.example.com/mcp"}
+            },
+            "elegy": {
+                "surfaceClass": "adapter-plugin",
+                "capabilityCatalog": {
+                    "path": "./capability-catalog.json",
+                    "schemaVersion": "elegy-capability-catalog/v1"
+                },
+                "connections": {
+                    "requirements": {"mode": "none"}
+                },
+                "readiness": {
+                    "stage": "implemented",
+                    "path": "./readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {}
+            }
+        }))
+        .expect("v3 manifest parses");
+
+        let validation = validate_elegy_plugin_v3(&manifest);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| { issue.contains("calendar") && issue.contains("authentication") }));
+    }
+
+    #[test]
+    fn generated_schema_artifacts_include_strict_plugin_v3() {
+        let artifacts = generate_plugin_schema_artifacts().expect("generate schemas");
+        let schema: Value = serde_json::from_str(
+            artifacts
+                .get("elegy-plugin-v3.schema.json")
+                .expect("v3 schema artifact"),
+        )
+        .expect("parse schema");
+
+        assert_eq!(
+            schema["properties"]["schemaVersion"]["const"],
+            "elegy-plugin/v3"
+        );
+        assert!(schema["required"]
+            .as_array()
+            .is_some_and(|required| required.iter().any(|field| field == "elegy")));
+    }
+
+    #[test]
+    fn plugin_v3_codex_export_is_lossless_and_other_hosts_fail_closed() {
+        let root = unique_temp_dir("plugin-v3-export");
+        fs::create_dir_all(root.join(".elegy-plugin")).expect("manifest directory");
+        fs::create_dir_all(root.join("skills").join("calendar")).expect("skill directory");
+        fs::write(
+            root.join("skills").join("calendar").join("SKILL.md"),
+            "---\nname: calendar\ndescription: Calendar adapter.\n---\n",
+        )
+        .expect("write skill");
+        fs::write(
+            root.join("capability-catalog.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion":"elegy-capability-catalog/v1",
+                "plugin":"calendar-adapter",
+                "pluginVersion":"1.2.3",
+                "capabilities":[{
+                    "id":"calendar.read",
+                    "kind":"mcp",
+                    "sideEffectClass":"query",
+                    "contractVersion":"1.0.0",
+                    "description":"Read calendar events.",
+                    "invocation":{
+                        "executable":"calendar-helper",
+                        "command":["serve"],
+                        "toolName":"calendar_read"
+                    }
+                }]
+            }))
+            .expect("serialize catalog"),
+        )
+        .expect("write catalog");
+        fs::write(
+            root.join("readiness.json"),
+            serde_json::to_string_pretty(&json!({
+                "schemaVersion":"elegy-readiness/v1",
+                "surface":"calendar-adapter",
+                "surfaceVersion":"1.2.3",
+                "stage":"concept",
+                "summary":"Projection fixture only.",
+                "worksToday":["Preserves the tested package fields."],
+                "limitations":["Does not exercise a Codex runtime."],
+                "supportedEnvironments":["Test fixture"],
+                "installation":"No supported installation.",
+                "invocation":"Maintainer inspection only.",
+                "evidence":[]
+            }))
+            .expect("serialize readiness"),
+        )
+        .expect("write readiness");
+        let source = json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "skills": "./skills/calendar",
+            "mcpServers": {
+                "calendar": {"url": "https://calendar.example.com/mcp"}
+            },
+            "hooks": {"hooks": {"SessionStart": [{"hooks": [{"type":"command","command":"echo ready"}]}]}},
+            "interface": {"displayName": "Calendar"},
+            "elegy": {
+                "surfaceClass": "adapter-plugin",
+                "capabilityCatalog": {
+                    "path": "./capability-catalog.json",
+                    "schemaVersion": "elegy-capability-catalog/v1"
+                },
+                "connections": {"requirements": {"mode": "none"}},
+                "readiness": {
+                    "stage": "concept",
+                    "path": "./readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {
+                    "calendar": {"mode": "mcp-oauth"}
+                }
+            }
+        });
+        fs::write(
+            root.join(".elegy-plugin").join("plugin.json"),
+            serde_json::to_string_pretty(&source).expect("serialize source"),
+        )
+        .expect("write manifest");
+
+        let codex_output = root.join("codex");
+        let result = export_plugin_with_policy(
+            &root,
+            "codex",
+            &codex_output,
+            true,
+            HostProjectionPolicy::Strict,
+        )
+        .expect("Codex export");
+        assert!(result.lossless);
+        assert!(result.losses.is_empty());
+
+        let mut expected = source;
+        expected
+            .as_object_mut()
+            .expect("source object")
+            .remove("schemaVersion");
+        expected
+            .as_object_mut()
+            .expect("source object")
+            .remove("elegy");
+        let actual: Value = serde_json::from_str(
+            &fs::read_to_string(codex_output.join(".codex-plugin/plugin.json"))
+                .expect("read Codex manifest"),
+        )
+        .expect("parse Codex manifest");
+        assert_eq!(actual, expected);
+
+        let claude_error = export_plugin_with_policy(
+            &root,
+            "claude",
+            &root.join("claude"),
+            true,
+            HostProjectionPolicy::Strict,
+        )
+        .expect_err("Claude projection must fail closed");
+        assert!(claude_error.to_string().contains("cannot represent"));
+
+        let lossy = export_plugin_with_policy(
+            &root,
+            "claude",
+            &root.join("claude-lossy"),
+            true,
+            HostProjectionPolicy::AllowLossy,
+        )
+        .expect("explicit lossy export");
+        assert!(!lossy.lossless);
+        assert!(!lossy.routable);
+        assert!(!lossy.losses.is_empty());
+        assert!(root.join("claude-lossy/projection-report.json").is_file());
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn codex_import_v3_preserves_flexible_native_shapes() {
+        let root = unique_temp_dir("codex-import-v3");
+        fs::create_dir_all(root.join(".codex-plugin")).expect("manifest directory");
+        let source = json!({
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "skills": ["./skills/calendar", "./skills/scheduling"],
+            "mcpServers": {
+                "calendar": {"url": "https://calendar.example.com/mcp"},
+                "local-helper": {"command": "calendar-helper", "args": ["serve"]}
+            },
+            "hooks": ["./hooks/a.json", {"hooks": {}}],
+            "interface": {"displayName": "Calendar"},
+            "futureCodexField": {"preserved": true}
+        });
+        fs::write(
+            root.join(".codex-plugin/plugin.json"),
+            serde_json::to_string_pretty(&source).expect("serialize source"),
+        )
+        .expect("write Codex manifest");
+
+        let mut imported = import_codex_plugin_v3(&root).expect("import v3");
+        assert!(!imported.elegy.mcp_authentication.contains_key("calendar"));
+        assert_eq!(
+            imported.elegy.mcp_authentication["local-helper"].mode,
+            super::ElegyMcpAuthenticationMode::None
+        );
+        imported.elegy.mcp_authentication.insert(
+            "calendar".to_string(),
+            super::ElegyMcpAuthenticationExpectation {
+                mode: super::ElegyMcpAuthenticationMode::McpOauth,
+                environment_variable: None,
+            },
+        );
+        let projected = project_codex_plugin_v3(&imported).expect("project imported manifest");
+        assert_eq!(projected, source);
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn plugin_v3_verification_checks_governed_files() {
+        let root = unique_temp_dir("plugin-v3-verify");
+        fs::create_dir_all(root.join(".elegy-plugin")).expect("manifest directory");
+        let manifest = json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "mcpServers": {"calendar": {"command": "calendar-helper"}},
+            "assets": {
+                "logo": "./missing-logo.svg",
+                "gallery": ["./missing-screenshot.png"]
+            },
+            "interface": {"logo": "./missing-interface.svg"},
+            "elegy": {
+                "surfaceClass": "adapter-plugin",
+                "capabilityCatalog": {
+                    "path": "./missing-catalog.json",
+                    "schemaVersion": "elegy-capability-catalog/v1"
+                },
+                "connections": {"requirements": {"mode": "none"}},
+                "readiness": {
+                    "stage": "implemented",
+                    "path": "./missing-readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {"calendar": {"mode": "none"}},
+                "packageAssets": ["./missing-package-assets/"]
+            }
+        });
+        fs::write(
+            root.join(".elegy-plugin/plugin.json"),
+            serde_json::to_string_pretty(&manifest).expect("serialize manifest"),
+        )
+        .expect("write manifest");
+
+        let result = verify_plugin_v3(&root.join(".elegy-plugin")).expect("verification result");
+        assert!(!result.valid);
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("missing-catalog.json")));
+        assert!(result
+            .issues
+            .iter()
+            .any(|issue| issue.contains("missing-readiness.json")));
+        for path in [
+            "missing-logo.svg",
+            "missing-screenshot.png",
+            "missing-interface.svg",
+            "missing-package-assets",
+        ] {
+            assert!(
+                result.issues.iter().any(|issue| issue.contains(path)),
+                "missing verification issue for {path}: {:?}",
+                result.issues
+            );
+        }
+        fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn plugin_v3_rejects_authentication_without_an_mcp_server_source() {
+        let manifest: ElegyPluginV3 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "orphan-auth",
+            "version": "1.0.0",
+            "description": "Authentication declaration without an MCP source.",
+            "skills": "./skills/",
+            "elegy": {
+                "surfaceClass": "skill",
+                "connections": {"requirements": {"mode": "none"}},
+                "readiness": {
+                    "stage": "concept",
+                    "path": "./readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {"missing": {"mode": "mcp-oauth"}}
+            }
+        }))
+        .expect("parse v3 manifest");
+
+        let validation = validate_elegy_plugin_v3(&manifest);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("mcpServers is absent")));
+    }
+
+    #[test]
+    fn plugin_v3_rejects_plaintext_authentication_material() {
+        let manifest: ElegyPluginV3 = serde_json::from_value(json!({
+            "schemaVersion": "elegy-plugin/v3",
+            "name": "calendar-adapter",
+            "version": "1.2.3",
+            "description": "Connects an agent to a calendar API.",
+            "mcpServers": {
+                "calendar": {
+                    "url": "https://calendar.example.com/mcp",
+                    "httpHeaders": {"Authorization": "Bearer plaintext-secret"}
+                }
+            },
+            "elegy": {
+                "surfaceClass": "adapter-plugin",
+                "capabilityCatalog": {
+                    "path": "./capability-catalog.json",
+                    "schemaVersion": "elegy-capability-catalog/v1"
+                },
+                "connections": {"requirements": {"mode": "none"}},
+                "readiness": {
+                    "stage": "implemented",
+                    "path": "./readiness.json",
+                    "schemaVersion": "elegy-readiness/v1"
+                },
+                "mcpAuthentication": {"calendar": {"mode": "mcp-oauth"}}
+            }
+        }))
+        .expect("parse manifest");
+
+        let validation = validate_elegy_plugin_v3(&manifest);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("plaintext authentication material")));
+    }
+
+    #[test]
+    fn plaintext_authentication_scan_rejects_basic_and_opaque_token_headers() {
+        for value in [
+            json!({"Authorization": "Basic dXNlcjpwYXNz"}),
+            json!({"X-Auth-Token": "opaque-value"}),
+            json!({"X-Api-Token": "opaque-value"}),
+            json!({"X-API-Key": "opaque-value"}),
+            json!({"clientSecret": "opaque-value"}),
+        ] {
+            assert!(
+                contains_plaintext_authentication_material(&value),
+                "secret-bearing header was accepted: {value}"
+            );
+        }
+        assert!(!contains_plaintext_authentication_material(
+            &json!({"environmentVariable": "SERVICE_ACCESS_TOKEN"})
+        ));
+    }
+
+    #[test]
+    fn marketplace_v2_supports_codex_source_and_policy_parity() {
+        let marketplace = ElegyMarketplaceV2 {
+            schema_version: "elegy-marketplace/v2".to_string(),
+            name: "elegy".to_string(),
+            interface: None,
+            plugins: vec![
+                ElegyMarketplacePluginV2 {
+                    name: "local-adapter".to_string(),
+                    source: ElegyMarketplaceSourceV2::Local {
+                        path: "./plugins/local-adapter".to_string(),
+                    },
+                    policy: super::ElegyMarketplacePolicy {
+                        installation: ElegyMarketplaceInstallationPolicy::Available,
+                        authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
+                    },
+                    category: "Productivity".to_string(),
+                    artifacts: Vec::new(),
+                },
+                ElegyMarketplacePluginV2 {
+                    name: "git-adapter".to_string(),
+                    source: ElegyMarketplaceSourceV2::GitSubdirectory {
+                        url: "https://github.com/example/plugins.git".to_string(),
+                        root: "plugins/git-adapter".to_string(),
+                        reference: Some("main".to_string()),
+                        sha: None,
+                    },
+                    policy: super::ElegyMarketplacePolicy {
+                        installation: ElegyMarketplaceInstallationPolicy::NotAvailable,
+                        authentication: ElegyMarketplaceAuthenticationPolicy::OnInstall,
+                    },
+                    category: "Developer Tools".to_string(),
+                    artifacts: Vec::new(),
+                },
+                ElegyMarketplacePluginV2 {
+                    name: "npm-adapter".to_string(),
+                    source: ElegyMarketplaceSourceV2::Npm {
+                        package: "@example/npm-adapter".to_string(),
+                        version: Some("1.0.0".to_string()),
+                        registry: Some("https://registry.npmjs.org".to_string()),
+                    },
+                    policy: super::ElegyMarketplacePolicy {
+                        installation: ElegyMarketplaceInstallationPolicy::NotAvailable,
+                        authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
+                    },
+                    category: "Developer Tools".to_string(),
+                    artifacts: Vec::new(),
+                },
+            ],
+        };
+
+        assert!(validate_elegy_marketplace_v2(&marketplace).is_valid());
+        let round_trip: ElegyMarketplaceV2 = serde_json::from_value(
+            serde_json::to_value(&marketplace).expect("serialize marketplace"),
+        )
+        .expect("deserialize marketplace");
+        assert_eq!(round_trip, marketplace);
+    }
+
+    #[test]
+    fn v3_rejects_malformed_codex_shapes_and_unknown_surface_classes() {
+        let base = json!({
+            "schemaVersion":"elegy-plugin/v3",
+            "name":"shape-test",
+            "version":"1.0.0",
+            "description":"Shape validation fixture.",
+            "skills":true,
+            "mcpServers":{"broken":false},
+            "apps":17,
+            "hooks":[false],
+            "elegy":{
+                "surfaceClass":"imaginary-subsystem",
+                "connections":{"requirements":{"mode":"none"}},
+                "readiness":{
+                    "stage":"implemented",
+                    "path":"./readiness.json",
+                    "schemaVersion":"elegy-readiness/v1"
+                }
+            }
+        });
+        let manifest: ElegyPluginV3 = serde_json::from_value(base).expect("parse envelope");
+        let validation = validate_elegy_plugin_v3(&manifest);
+        for field in ["skills", "mcpServers", "apps", "hooks", "surfaceClass"] {
+            assert!(
+                validation.issues.iter().any(|issue| issue.contains(field)),
+                "missing {field} issue: {:?}",
+                validation.issues
+            );
+        }
+    }
+
+    #[test]
+    fn marketplace_v2_rejects_unsafe_or_duplicate_artifacts() {
+        let marketplace = ElegyMarketplaceV2 {
+            schema_version: ELEGY_MARKETPLACE_V2_SCHEMA_VERSION.to_string(),
+            name: "elegy".to_string(),
+            interface: None,
+            plugins: vec![ElegyMarketplacePluginV2 {
+                name: "unsafe".to_string(),
+                source: ElegyMarketplaceSourceV2::Local {
+                    path: "./plugins/unsafe".to_string(),
+                },
+                policy: ElegyMarketplacePolicy {
+                    installation: ElegyMarketplaceInstallationPolicy::Available,
+                    authentication: ElegyMarketplaceAuthenticationPolicy::OnUse,
+                },
+                category: "Developer Tools".to_string(),
+                artifacts: vec![
+                    ElegyMarketplaceArtifact {
+                        target: "x86_64-pc-windows-msvc".to_string(),
+                        url: "http://downloads.example.test/plugin.zip".to_string(),
+                        checksum_url: "file:///tmp/plugin.sha256".to_string(),
+                    },
+                    ElegyMarketplaceArtifact {
+                        target: "x86_64-pc-windows-msvc".to_string(),
+                        url: "https://downloads.example.test/other.zip".to_string(),
+                        checksum_url: "https://downloads.example.test/other.sha256".to_string(),
+                    },
+                ],
+            }],
+        };
+        let validation = validate_elegy_marketplace_v2(&marketplace);
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("duplicate")));
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("artifact url")));
+        assert!(validation
+            .issues
+            .iter()
+            .any(|issue| issue.contains("checksum")));
+    }
+
+    #[test]
+    fn generated_schema_artifacts_include_marketplace_v2() {
+        let artifacts = generate_plugin_schema_artifacts().expect("generate schemas");
+        let schema: Value = serde_json::from_str(
+            artifacts
+                .get("elegy-marketplace-v2.schema.json")
+                .expect("marketplace v2 schema"),
+        )
+        .expect("parse marketplace schema");
+        assert_eq!(
+            schema["properties"]["schemaVersion"]["const"],
+            "elegy-marketplace/v2"
+        );
+    }
+
+    #[test]
+    fn pack_plugin_v3_includes_governance_and_package_assets() {
+        let repo = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let plugin = repo.join("plugins/accounts");
+        let temp = unique_temp_dir("pack-plugin-v3");
+        let archive = temp.join("accounts.zip");
+
+        pack_plugin_v3(&plugin, &archive).expect("pack v3");
+        let file = fs::File::open(&archive).expect("open archive");
+        let mut zip = zip::ZipArchive::new(file).expect("read archive");
+        let names = (0..zip.len())
+            .map(|index| zip.by_index(index).expect("zip entry").name().to_string())
+            .collect::<Vec<_>>();
+        assert!(names.iter().any(|name| name == "plugin.json"));
+        assert!(names.iter().any(|name| name == "capability-catalog.json"));
+        assert!(names
+            .iter()
+            .any(|name| name == "ui/account-center/index.html"));
+        assert!(names.iter().any(|name| name == "providers/google.json"));
+        fs::remove_dir_all(temp).ok();
     }
 }
