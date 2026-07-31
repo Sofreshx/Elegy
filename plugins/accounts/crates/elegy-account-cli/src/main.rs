@@ -8,13 +8,13 @@ use axum::{
 };
 use elegy_accountd::{
     AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, IdentitySpec,
-    KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthCredential, OAuthTransaction,
-    ProviderCatalog, TokenAdapterConfig, TypedExecutionOutcome, TypedExecutionRequest, Vault,
-    VerifiedCredential, exchange_and_verify, revoke_oauth_credential, verify_credentials,
-    verify_token,
+    NewAccessRequest, OAuthAdapterConfig, OAuthCredential, OAuthTransaction, ProviderCatalog,
+    TokenAdapterConfig, TypedExecutionOutcome, TypedExecutionRequest, Vault, VerifiedCredential,
+    exchange_and_verify, revoke_oauth_credential, verify_credentials, verify_token,
 };
 #[cfg(windows)]
-use elegy_accountd::{ExecutionEnvelope, ReplayGuard};
+use elegy_accountd::{ExecutionEnvelope, KeyProtector, ReplayGuard};
+#[cfg(windows)]
 use rand::Rng;
 use rmcp::{
     ServerHandler, ServiceExt,
