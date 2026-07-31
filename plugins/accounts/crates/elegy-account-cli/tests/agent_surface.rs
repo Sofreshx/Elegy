@@ -172,6 +172,16 @@ async fn packaged_accounts_archive_preserves_surface_and_advertises_all_tools() 
             "missing packaged {required}"
         );
     }
+    let packaged_manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(install.join("plugin.json")).unwrap()).unwrap();
+    assert_eq!(packaged_manifest["schemaVersion"], "elegy-plugin/v3");
+    let packaged_catalog: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(install.join("capability-catalog.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        packaged_catalog["schemaVersion"],
+        "elegy-capability-catalog/v2"
+    );
 
     let local_data = tempfile::tempdir().unwrap();
     for (argument, expected) in [
