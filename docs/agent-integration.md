@@ -7,16 +7,23 @@ doc_kind: guide
 
 # Agent Integration
 
-Elegy is designed for AI-agent hosts that can run local subprocesses. The
-canonical path is the typed catalog of an installed adapter plugin plus its
-dedicated `elegy-*` binary:
+Elegy is designed for AI-agent hosts that can run local subprocesses or speak
+MCP. The canonical path is the typed catalog of an installed adapter plugin;
+each capability declares one first-class interface: `cli`, `mcp-resource`, or
+`mcp-tool`.
+
+The CLI lane remains the default integration boundary when a local subprocess
+is sufficient. MCP resources and MCP tools are direct interfaces for
+MCP-native hosts, not fallback metadata:
 
 1. validate the setup
 2. discover the minimum needed capability
 3. invoke the advertised CLI template
 4. let the host enforce side-effect policy
 
-MCP is supported as an optional projection for MCP-native clients, but it is not the primary onboarding model.
+MCP is a first-class protocol interface for entries declared as
+`mcp-resource` or `mcp-tool`. It is optional only when a host does not speak
+MCP; the CLI remains the default onboarding lane for `cli` entries.
 
 ## Canonical Flow
 
@@ -36,7 +43,7 @@ not enter the Elegy plugin marketplace. A host discovers and routes only
 installed, readiness-qualified adapters; Elegy does not provide a cross-plugin
 runtime resolver.
 
-## Optional MCP Adapter
+## MCP interfaces
 
 MCP-native clients can start the stdio host:
 
@@ -44,13 +51,20 @@ MCP-native clients can start the stdio host:
 elegy-run
 ```
 
-The same side-effect rule applies: tools with side effects are blocked unless the call is an explicit dry run or the host is started with side-effect execution enabled by a surrounding approval policy.
+The host serves declared MCP resources and tools. The same side-effect rule
+applies: side-effecting tools are blocked unless the call is an explicit dry
+run or the host is started with side-effect execution enabled by a surrounding
+approval policy.
 
 ```bash
 elegy-run --allow-side-effects
 ```
 
-Use MCP only when it is the host's preferred protocol boundary. CLI invocation remains the default integration contract.
+Use MCP when the capability declares an MCP resource or tool and the host
+supports that protocol. CLI invocation remains the default integration contract
+for capabilities declared as `cli`. The legacy v1 `fallback` field is not
+runtime routing, and `app-binding` is only meaningful with a native Codex app
+connection binding.
 
 ## Release Assets
 

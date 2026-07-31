@@ -10,6 +10,40 @@ owner: elegy-core
 
 Accepted.
 
+## 2026-07-31 E1 authority amendment
+
+The v1 taxonomy is retained as a compatibility wire shape, but it is no
+longer the current authoring model. `elegy-capability-catalog/v2` gives every
+capability exactly one concrete interface kind:
+
+| Kind | Interface |
+|---|---|
+| `cli` | Local executable invocation template |
+| `mcp-resource` | Addressable MCP resource |
+| `mcp-tool` | Typed MCP tool call |
+
+CLI, MCP resource, and MCP tool are first-class interfaces. They are not
+fallbacks or projections of one another. If the same behavior is intentionally
+published twice, it uses separate capability IDs and separate evidence.
+
+The v1 `mcp` kind is migration-only and must be classified as a resource or
+tool. `app-binding` is legacy compatibility metadata and is only meaningful
+when a native Codex app connection binding exists in the host projection. A
+portable service slug is not a Codex app ID, and an unbound app-binding entry
+is not routable. Connection requirements and opaque host app IDs remain owned
+by the host connection boundary.
+
+The v1 `fallback` field has no active runtime consumer. It may be retained in
+legacy artifacts as descriptive migration guidance, but it does not create a
+second kind, select an invocation, or establish readiness. New runtime code
+must not branch on fallback metadata.
+
+Readiness evidence is explicit: `implemented` means source behavior and local
+tests; `conformance` means governed contract or fixture interpretation;
+`live-proof` means a clean installed non-fixture task; and `routable` means a
+validated `usable` or `production` surface. Only the last stage is agent
+routable by default.
+
 ## 2026-07-30 readiness and eligibility amendment
 
 Capability kinds classify invocation shape; they do not establish that a
@@ -70,8 +104,8 @@ Each capability in the catalog declares a `kind`:
 | Kind | Description | Codex export surface |
 |---|---|---|
 | `cli` | Executable deterministic or controlled commands. Invoked via `elegy-*` binaries. | Invoked by skills or MCP server. |
-| `mcp` | Typed agent-facing tool server. | `.mcp.json` |
-| `app-binding` | Host-authenticated external-service connector. Maps to a Codex app connector. | `.app.json` |
+| `mcp` (v1) | Typed MCP surface; migrate to `mcp-resource` or `mcp-tool`. | `.mcp.json` |
+| `app-binding` (v1) | Legacy host-authenticated metadata; requires a native Codex connection binding. | Derived `.app.json` only when bound |
 
 `provider-adapter` (for AI provider calls) is deferred until a real
 AI-provider consumer exists, per the substrate-governance public-surface
@@ -79,8 +113,9 @@ graduation rule.
 
 ### 3. Add a `fallback` mechanism
 
-A capability can declare a fallback surface. This lets the Codex export prefer
-the host-native connector while other hosts use the fallback (typically a CLI).
+A v1 capability can declare fallback metadata for migration guidance. Elegy has
+no active runtime consumer for it; it does not make the Codex export prefer a
+connector or execute another interface.
 
 ```json
 {
@@ -96,9 +131,11 @@ the host-native connector while other hosts use the fallback (typically a CLI).
 
 ### 4. App bindings declared in the catalog; `.app.json` becomes derived
 
-The capability catalog is the single source of truth for app bindings. The
-Codex exporter generates `.app.json` from `app-binding` capabilities in the
-catalog. Hand-authored `.app.json` files are no longer the authority.
+The capability catalog records only legacy portable app-binding metadata. A
+native host connection binding is required before a Codex exporter may derive
+`.app.json`; the host-owned binding, not the service slug, is the connection
+authority. Hand-authored `.app.json` remains a host projection, never the
+portable capability authority.
 
 Transition rule: if `codex.plugin/v1.apps` path exists and the catalog has no
 `app-binding` capabilities, the exporter keeps copying the hand-authored file
@@ -106,10 +143,11 @@ Transition rule: if `codex.plugin/v1.apps` path exists and the catalog has no
 
 ### 5. Portable/Codex split
 
-`kind`, `fallback`, and the `appBinding.connector` (external-service identity
-like `github`) are portable and host-neutral. The Codex exporter emits the
-connector as the `id` in `.app.json`. No Codex-only fields are added to the
-base `ElegyPluginV1` manifest — they stay in the catalog and projection layers.
+`kind` and the legacy `appBinding.connector` (an external-service identity like
+`github`) are portable and host-neutral. A Codex exporter may emit `.app.json`
+only from an explicit native connection binding; it never derives an opaque
+Codex app ID from the connector slug. No Codex-only fields are added to the
+base manifest — they stay in host connection and projection layers.
 
 ### 6. Backward compatibility
 
@@ -132,6 +170,11 @@ include `kind` explicitly.
 - A fixture proves the app-binding → `.app.json` export path.
 
 ## Validation
+
+The current contract authority and migration rules are maintained in
+[`capability-catalog-v2.md`](../specs/capability-catalog-v2.md). The commands
+below validate the existing v1 compatibility implementation while v2 code is
+introduced in a later phase.
 
 ```bash
 cargo run -p elegy-plugin-sdk --bin elegy-plugin-schemas -- --write
