@@ -948,6 +948,108 @@ pub struct ElegyCapabilityFallback {
     pub invocation: ElegyCapabilityInvocation,
 }
 
+// ── Capability Catalog V2 ─────────────────────────────────────────────────
+
+pub const ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION: &str = "elegy-capability-catalog/v2";
+
+/// Strict v2 capability kinds. Legacy `mcp` and `app-binding` are intentionally
+/// absent; those values are accepted only by the sealed v1 reader.
+#[derive(Clone, Copy, Debug, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub enum ElegyCapabilityKindV2 {
+    Cli,
+    McpResource,
+    McpTool,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyCapabilityInvocationV2 {
+    pub executable: String,
+    pub command: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub required_args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub optional_args: Vec<String>,
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyCapabilityV2Common {
+    pub id: String,
+    pub description: String,
+    pub contract_version: String,
+    pub side_effect_class: ElegySideEffectClass,
+    pub readiness: ElegyReadinessStage,
+}
+
+/// A v2 capability entry. The internally tagged representation makes the
+/// concrete interface and its required fields explicit on the wire.
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(tag = "kind", rename_all = "kebab-case", deny_unknown_fields)]
+pub enum ElegyCapabilityV2 {
+    Cli {
+        #[serde(flatten)]
+        common: ElegyCapabilityV2Common,
+        invocation: ElegyCapabilityInvocationV2,
+    },
+    McpResource {
+        #[serde(flatten)]
+        common: ElegyCapabilityV2Common,
+        #[serde(rename = "resourceUri", alias = "resourceTemplate")]
+        resource_uri: String,
+        #[serde(rename = "outputSchema")]
+        output_schema: Value,
+    },
+    McpTool {
+        #[serde(flatten)]
+        common: ElegyCapabilityV2Common,
+        #[serde(rename = "toolName")]
+        tool_name: String,
+        #[serde(rename = "inputSchema")]
+        input_schema: Value,
+        #[serde(rename = "outputSchema")]
+        output_schema: Value,
+    },
+}
+
+impl ElegyCapabilityV2 {
+    pub fn common(&self) -> &ElegyCapabilityV2Common {
+        match self {
+            Self::Cli { common, .. }
+            | Self::McpResource { common, .. }
+            | Self::McpTool { common, .. } => common,
+        }
+    }
+
+    pub fn kind(&self) -> ElegyCapabilityKindV2 {
+        match self {
+            Self::Cli { .. } => ElegyCapabilityKindV2::Cli,
+            Self::McpResource { .. } => ElegyCapabilityKindV2::McpResource,
+            Self::McpTool { .. } => ElegyCapabilityKindV2::McpTool,
+        }
+    }
+}
+
+#[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct ElegyCapabilityCatalogV2 {
+    pub schema_version: String,
+    pub plugin: String,
+    pub plugin_version: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generated_at: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub digest: Option<String>,
+    pub capabilities: Vec<ElegyCapabilityV2>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub enum ElegyCapabilityCatalog {
+    V1(ElegyCapabilityCatalogV1),
+    V2(ElegyCapabilityCatalogV2),
+}
+
 /// App-binding metadata for a capability.
 ///
 /// Declares the portable external-service identity. The Codex exporter
@@ -1138,7 +1240,7 @@ pub fn extract_codex_extension_v1(
     serde_json::from_value::<CodexPluginExtensionV1>(raw.clone()).ok()
 }
 
-pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 11] = [
+pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 12] = [
     ("elegy-plugin-v1.schema.json", "elegy-plugin/v1"),
     ("elegy-plugin-v2.schema.json", "elegy-plugin/v2"),
     ("elegy-plugin-v3.schema.json", "elegy-plugin/v3"),
@@ -1159,6 +1261,10 @@ pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 11] = [
         "elegy-capability-catalog/v1",
     ),
     ("elegy-readiness-v1.schema.json", "elegy-readiness/v1"),
+    (
+        "elegy-capability-catalog-v2.schema.json",
+        "elegy-capability-catalog/v2",
+    ),
 ];
 
 fn generate_plugin_v2_schema() -> Result<Value, serde_json::Error> {
@@ -1228,6 +1334,55 @@ fn generate_marketplace_v2_schema() -> Result<Value, serde_json::Error> {
     Ok(schema)
 }
 
+fn generate_capability_catalog_v2_schema() -> Result<Value, serde_json::Error> {
+    let mut schema = serde_json::to_value(schema_for!(ElegyCapabilityCatalogV2))?;
+    if let Some(properties) = schema.get_mut("properties").and_then(Value::as_object_mut) {
+        properties.insert(
+            "schemaVersion".to_string(),
+            serde_json::json!({"const": ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION}),
+        );
+    }
+    if let Some(branches) = schema
+        .get_mut("$defs")
+        .and_then(Value::as_object_mut)
+        .and_then(|defs| defs.get_mut("ElegyCapabilityV2"))
+        .and_then(|entry| entry.get_mut("oneOf"))
+        .and_then(Value::as_array_mut)
+    {
+        for branch in branches {
+            let kind = branch
+                .get("properties")
+                .and_then(|properties| properties.get("kind"))
+                .and_then(|kind| kind.get("const"))
+                .and_then(Value::as_str);
+            if matches!(kind, Some("mcp-resource")) {
+                if let Some(properties) =
+                    branch.get_mut("properties").and_then(Value::as_object_mut)
+                {
+                    properties.insert(
+                        "outputSchema".to_string(),
+                        serde_json::json!({"type": "object"}),
+                    );
+                }
+            } else if matches!(kind, Some("mcp-tool")) {
+                if let Some(properties) =
+                    branch.get_mut("properties").and_then(Value::as_object_mut)
+                {
+                    properties.insert(
+                        "inputSchema".to_string(),
+                        serde_json::json!({"type": "object"}),
+                    );
+                    properties.insert(
+                        "outputSchema".to_string(),
+                        serde_json::json!({"type": "object"}),
+                    );
+                }
+            }
+        }
+    }
+    Ok(schema)
+}
+
 pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, String>, ToolingError> {
     let schemas = [
         (
@@ -1267,6 +1422,10 @@ pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, Strin
         (
             PLUGIN_SCHEMA_ARTIFACTS[10].0,
             serde_json::to_value(schema_for!(ElegyReadinessV1)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[11].0,
+            generate_capability_catalog_v2_schema(),
         ),
     ];
     let mut artifacts = BTreeMap::new();
@@ -2985,9 +3144,25 @@ pub fn verify_plugin_v3(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
                 catalog.path
             ));
         } else {
-            match load_capability_catalog_v1(&path) {
-                Ok(loaded) => {
+            match load_capability_catalog(&path) {
+                Ok(ElegyCapabilityCatalog::V1(loaded)) => {
                     for issue in validate_elegy_capability_catalog_v1(&loaded).issues {
+                        issues.push(format!("capability catalog: {issue}"));
+                    }
+                    if loaded.plugin != plugin.name {
+                        issues.push(
+                            "capability catalog plugin does not match manifest name.".to_string(),
+                        );
+                    }
+                    if loaded.plugin_version != plugin.version {
+                        issues.push(
+                            "capability catalog pluginVersion does not match manifest version."
+                                .to_string(),
+                        );
+                    }
+                }
+                Ok(ElegyCapabilityCatalog::V2(loaded)) => {
+                    for issue in validate_elegy_capability_catalog_v2(&loaded).issues {
                         issues.push(format!("capability catalog: {issue}"));
                     }
                     if loaded.plugin != plugin.name {
@@ -3649,8 +3824,8 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
         if let Some(cat_config) = &plugin.capability_catalog {
             let catalog_path = resolve_package_path(package_root, &cat_config.path);
             if catalog_path.exists() {
-                match load_capability_catalog_v1(&catalog_path) {
-                    Ok(catalog) => {
+                match load_capability_catalog(&catalog_path) {
+                    Ok(ElegyCapabilityCatalog::V1(catalog)) => {
                         let catalog_validation = validate_elegy_capability_catalog_v1(&catalog);
                         for issue in &catalog_validation.issues {
                             issues.push(format!("capabilityCatalog: {issue}"));
@@ -3661,6 +3836,13 @@ pub fn verify_plugin_v1(package_dir: &Path) -> Result<PluginV1VerifyResult, Tool
                             .filter(|c| c.kind == ElegyCapabilityKind::AppBinding)
                             .count();
                         (true, app_binding_count)
+                    }
+                    Ok(ElegyCapabilityCatalog::V2(catalog)) => {
+                        let catalog_validation = validate_elegy_capability_catalog_v2(&catalog);
+                        for issue in &catalog_validation.issues {
+                            issues.push(format!("capabilityCatalog: {issue}"));
+                        }
+                        (true, 0)
                     }
                     Err(err) => {
                         issues.push(format!("capabilityCatalog: invalid catalog file: {err}"));
@@ -3744,15 +3926,18 @@ pub fn inspect_plugin_v1(package_dir: &Path) -> Result<serde_json::Value, Toolin
         .and_then(|cat_config| {
             let catalog_path = package_root_from_package_dir(package_dir)
                 .join(normalize_package_relative_path(&cat_config.path));
-            load_capability_catalog_v1(&catalog_path).ok()
+            load_capability_catalog(&catalog_path).ok()
         })
-        .map(|catalog| {
-            let app_binding_count = catalog
-                .capabilities
-                .iter()
-                .filter(|c| c.kind == ElegyCapabilityKind::AppBinding)
-                .count();
-            (true, catalog.capabilities.len(), app_binding_count)
+        .map(|catalog| match catalog {
+            ElegyCapabilityCatalog::V1(catalog) => {
+                let app_binding_count = catalog
+                    .capabilities
+                    .iter()
+                    .filter(|c| c.kind == ElegyCapabilityKind::AppBinding)
+                    .count();
+                (true, catalog.capabilities.len(), app_binding_count)
+            }
+            ElegyCapabilityCatalog::V2(catalog) => (true, catalog.capabilities.len(), 0),
         })
         .unwrap_or((false, 0, 0));
 
@@ -4307,7 +4492,7 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
     // Load capability catalog if present
     let catalog = plugin.capability_catalog.as_ref().and_then(|cat_config| {
         let catalog_path = resolve_package_path(&package_root, &cat_config.path);
-        load_capability_catalog_v1(&catalog_path).ok()
+        load_capability_catalog(&catalog_path).ok()
     });
 
     // Connection declarations are authoritative for v2. Catalog-derived apps
@@ -4350,7 +4535,10 @@ pub fn export_plugin_v1_with_codex_mode_and_binary(
             None
         };
     let catalog_apps = if plugin.schema_version == ELEGY_PLUGIN_V1_SCHEMA_VERSION {
-        catalog.as_ref().and_then(build_codex_apps_from_catalog)
+        catalog.as_ref().and_then(|catalog| match catalog {
+            ElegyCapabilityCatalog::V1(catalog) => build_codex_apps_from_catalog(catalog),
+            ElegyCapabilityCatalog::V2(_) => None,
+        })
     } else {
         None
     };
@@ -5750,6 +5938,188 @@ pub fn validate_elegy_capability_catalog_v1(
     ElegyCapabilityCatalogValidationResult { issues }
 }
 
+pub fn validate_elegy_capability_catalog_v2(
+    catalog: &ElegyCapabilityCatalogV2,
+) -> ElegyCapabilityCatalogValidationResult {
+    let mut issues = Vec::new();
+    if catalog.schema_version != ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION {
+        issues.push(format!(
+            "schemaVersion must be '{}', found '{}'.",
+            ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION, catalog.schema_version
+        ));
+    }
+    if catalog.plugin.is_empty() {
+        issues.push("plugin must not be empty.".into());
+    } else if !validate_kebab_case_name(&catalog.plugin) {
+        issues.push(format!(
+            "plugin '{}' is not valid lowercase kebab-case.",
+            catalog.plugin
+        ));
+    }
+    if catalog.plugin_version.is_empty() {
+        issues.push("pluginVersion must not be empty.".into());
+    } else if !validate_semver(&catalog.plugin_version) {
+        issues.push(format!(
+            "pluginVersion '{}' is not valid SemVer 2.0.0.",
+            catalog.plugin_version
+        ));
+    }
+    if catalog.capabilities.is_empty() {
+        issues.push("capabilities must contain at least one entry.".into());
+    }
+    let mut ids = BTreeSet::new();
+    for capability in &catalog.capabilities {
+        let common = capability.common();
+        if common.id.is_empty() {
+            issues.push("capabilities: id must not be empty.".into());
+        }
+        if !ids.insert(common.id.clone()) {
+            issues.push(format!("duplicate capability id '{}'.", common.id));
+        }
+        if common.description.trim().is_empty() {
+            issues.push(format!(
+                "capabilities.{}: description must not be empty.",
+                common.id
+            ));
+        }
+        if common.contract_version.trim().is_empty() {
+            issues.push(format!(
+                "capabilities.{}: contractVersion must not be empty.",
+                common.id
+            ));
+        }
+        match capability {
+            ElegyCapabilityV2::Cli { invocation, .. } => {
+                if invocation.executable.trim().is_empty() {
+                    issues.push(format!(
+                        "capabilities.{}: invocation.executable must not be empty.",
+                        common.id
+                    ));
+                }
+                if invocation.command.is_empty() {
+                    issues.push(format!(
+                        "capabilities.{}: invocation.command must not be empty.",
+                        common.id
+                    ));
+                }
+            }
+            ElegyCapabilityV2::McpResource {
+                resource_uri,
+                output_schema,
+                ..
+            } => {
+                if resource_uri.trim().is_empty() {
+                    issues.push(format!(
+                        "capabilities.{}: resourceUri must not be empty.",
+                        common.id
+                    ));
+                }
+                if !output_schema.is_object() {
+                    issues.push(format!(
+                        "capabilities.{}: outputSchema must be a JSON object.",
+                        common.id
+                    ));
+                }
+            }
+            ElegyCapabilityV2::McpTool {
+                tool_name,
+                input_schema,
+                output_schema,
+                ..
+            } => {
+                if tool_name.trim().is_empty() {
+                    issues.push(format!(
+                        "capabilities.{}: toolName must not be empty.",
+                        common.id
+                    ));
+                }
+                if !input_schema.is_object() {
+                    issues.push(format!(
+                        "capabilities.{}: inputSchema must be a JSON object.",
+                        common.id
+                    ));
+                }
+                if !output_schema.is_object() {
+                    issues.push(format!(
+                        "capabilities.{}: outputSchema must be a JSON object.",
+                        common.id
+                    ));
+                }
+            }
+        }
+    }
+    ElegyCapabilityCatalogValidationResult { issues }
+}
+
+pub fn migrate_capability_catalog_v1_to_v2(
+    catalog: &ElegyCapabilityCatalogV1,
+) -> Result<ElegyCapabilityCatalogV2, Vec<String>> {
+    let mut issues = Vec::new();
+    let mut capabilities = Vec::with_capacity(catalog.capabilities.len());
+    for capability in &catalog.capabilities {
+        let common = || ElegyCapabilityV2Common {
+            id: capability.id.clone(),
+            description: capability.description.clone(),
+            contract_version: capability.contract_version.clone(),
+            side_effect_class: capability.side_effect_class,
+            readiness: ElegyReadinessStage::Implemented,
+        };
+        match capability.kind {
+            ElegyCapabilityKind::Cli => match capability.invocation.as_ref() {
+                Some(invocation) => capabilities.push(ElegyCapabilityV2::Cli {
+                    common: common(),
+                    invocation: ElegyCapabilityInvocationV2 {
+                        executable: invocation.executable.clone(),
+                        command: invocation.command.clone(),
+                        required_args: invocation.required_args.clone(),
+                        optional_args: invocation.optional_args.clone(),
+                    },
+                }),
+                None => issues.push(format!("capability '{}' is missing invocation.", capability.id)),
+            },
+            ElegyCapabilityKind::Mcp => match capability.invocation.as_ref() {
+                Some(invocation) if invocation.tool_name.as_deref().is_some_and(|name| !name.trim().is_empty()) => {
+                    match (capability.input_schema.as_ref(), capability.output_schema.as_ref()) {
+                        (Some(input_schema), Some(output_schema))
+                            if input_schema.is_object() && output_schema.is_object() =>
+                        {
+                            capabilities.push(ElegyCapabilityV2::McpTool {
+                                common: common(),
+                                tool_name: invocation.tool_name.clone().unwrap_or_default(),
+                                input_schema: input_schema.clone(),
+                                output_schema: output_schema.clone(),
+                            });
+                        }
+                        _ => issues.push(format!(
+                            "capability '{}' mcp migration requires object inputSchema and outputSchema contracts.",
+                            capability.id
+                        )),
+                    }
+                }
+                _ => issues.push(format!(
+                    "capability '{}' mcp migration requires invocation.toolName; resource inference is not supported.",
+                    capability.id
+                )),
+            },
+            ElegyCapabilityKind::AppBinding => issues.push(format!(
+                "capability '{}' app-binding cannot be migrated to v2 without an explicit concrete interface.",
+                capability.id
+            )),
+        }
+    }
+    if !issues.is_empty() {
+        return Err(issues);
+    }
+    Ok(ElegyCapabilityCatalogV2 {
+        schema_version: ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION.to_string(),
+        plugin: catalog.plugin.clone(),
+        plugin_version: catalog.plugin_version.clone(),
+        generated_at: catalog.generated_at.clone(),
+        digest: catalog.digest.clone(),
+        capabilities,
+    })
+}
+
 fn validate_elegy_capability(capability: &ElegyCapability) -> Vec<String> {
     let mut issues = Vec::new();
 
@@ -5835,6 +6205,44 @@ pub fn load_capability_catalog_v1(path: &Path) -> Result<ElegyCapabilityCatalogV
             source,
         })?;
     Ok(catalog)
+}
+
+/// Load either supported capability-catalog wire version. Version dispatch is
+/// based solely on the declared schemaVersion; v1 is never upgraded implicitly.
+pub fn load_capability_catalog(path: &Path) -> Result<ElegyCapabilityCatalog, ToolingError> {
+    let content = fs::read_to_string(path).map_err(|source| ToolingError::Io {
+        operation: "read",
+        path: path.to_path_buf(),
+        source,
+    })?;
+    let value: Value = serde_json::from_str(&content).map_err(|source| ToolingError::Json {
+        path: path.to_path_buf(),
+        source,
+    })?;
+    match value.get("schemaVersion").and_then(Value::as_str) {
+        Some(ELEGY_CAPABILITY_CATALOG_V1_SCHEMA_VERSION) => serde_json::from_value(value)
+            .map(ElegyCapabilityCatalog::V1)
+            .map_err(|source| ToolingError::Json {
+                path: path.to_path_buf(),
+                source,
+            }),
+        Some(ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION) => serde_json::from_value(value)
+            .map(ElegyCapabilityCatalog::V2)
+            .map_err(|source| ToolingError::Json {
+                path: path.to_path_buf(),
+                source,
+            }),
+        Some(version) => Err(ToolingError::InvalidPluginPackage {
+            path: path.to_path_buf(),
+            issues: vec![format!(
+                "unsupported capability catalog schemaVersion '{version}'."
+            )],
+        }),
+        None => Err(ToolingError::InvalidPluginPackage {
+            path: path.to_path_buf(),
+            issues: vec!["capability catalog schemaVersion is required.".to_string()],
+        }),
+    }
 }
 
 /// Load an `elegy-plugin-connections/v1` file from disk.
@@ -6184,13 +6592,16 @@ mod tests {
         export_plugin_v1_with_codex_mode_and_binary, export_plugin_with_policy,
         generate_plugin_schema_artifacts, generate_skills_from_descriptor_file,
         import_codex_plugin_v1, import_codex_plugin_v3, inspect_plugin_v1,
-        is_safe_package_relative_path, pack_plugin_v1, pack_plugin_v1_with_binary, pack_plugin_v3,
-        project_codex_plugin_v3, select_marketplace_artifact, validate_elegy_capability_catalog_v1,
+        is_safe_package_relative_path, load_capability_catalog,
+        migrate_capability_catalog_v1_to_v2, pack_plugin_v1, pack_plugin_v1_with_binary,
+        pack_plugin_v3, project_codex_plugin_v3, select_marketplace_artifact,
+        validate_elegy_capability_catalog_v1, validate_elegy_capability_catalog_v2,
         validate_elegy_marketplace_v1, validate_elegy_marketplace_v2, validate_elegy_plugin_v1,
         validate_elegy_plugin_v3, verify_plugin_v1, verify_plugin_v3, AuthorMcpDescriptorRequest,
         AuthorMcpToolRequest, CodexConnectionBinding, CodexPluginExtensionV1, CodexProjectionMode,
-        ElegyAppBinding, ElegyCapability, ElegyCapabilityCatalogV1, ElegyCapabilityFallback,
-        ElegyCapabilityInvocation, ElegyCapabilityKind, ElegyConnectionRequirement,
+        ElegyAppBinding, ElegyCapability, ElegyCapabilityCatalog, ElegyCapabilityCatalogV1,
+        ElegyCapabilityCatalogV2, ElegyCapabilityFallback, ElegyCapabilityInvocation,
+        ElegyCapabilityKind, ElegyCapabilityV2, ElegyConnectionRequirement,
         ElegyMarketplaceArtifact, ElegyMarketplaceAuthenticationPolicy,
         ElegyMarketplaceInstallationPolicy, ElegyMarketplacePlugin, ElegyMarketplacePluginV2,
         ElegyMarketplacePolicy, ElegyMarketplaceSource, ElegyMarketplaceSourceV2,
@@ -6198,9 +6609,9 @@ mod tests {
         ElegyPluginV3, ElegyReadinessEvidence, ElegyReadinessEvidenceKind, ElegyReadinessStage,
         ElegyReadinessV1, ElegySideEffectClass, HostProjectionPolicy, McpServerDescriptor,
         McpToolAnalyzer, McpToolDefinition, PluginArchiveBinary, ToolingError,
-        ELEGY_CAPABILITY_CATALOG_V1_SCHEMA_VERSION, ELEGY_MARKETPLACE_V1_SCHEMA_VERSION,
-        ELEGY_MARKETPLACE_V2_SCHEMA_VERSION, ELEGY_PLUGIN_V1_SCHEMA_VERSION,
-        ELEGY_READINESS_V1_SCHEMA_VERSION,
+        ELEGY_CAPABILITY_CATALOG_V1_SCHEMA_VERSION, ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION,
+        ELEGY_MARKETPLACE_V1_SCHEMA_VERSION, ELEGY_MARKETPLACE_V2_SCHEMA_VERSION,
+        ELEGY_PLUGIN_V1_SCHEMA_VERSION, ELEGY_READINESS_V1_SCHEMA_VERSION,
     };
     use serde_json::{json, Value};
     use std::collections::BTreeMap;
@@ -8180,6 +8591,132 @@ mod tests {
             serde_json::from_str(json).expect("deserialize legacy catalog");
         assert_eq!(catalog.capabilities[0].kind, ElegyCapabilityKind::Cli);
         assert!(validate_elegy_capability_catalog_v1(&catalog).is_valid());
+    }
+
+    #[test]
+    fn capability_catalog_v2_accepts_only_concrete_kinds_and_kind_fields() {
+        let catalog: ElegyCapabilityCatalogV2 = serde_json::from_value(json!({
+            "schemaVersion": ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION,
+            "plugin": "example-plugin",
+            "pluginVersion": "1.2.3",
+            "capabilities": [
+                {
+                    "id": "status",
+                    "kind": "cli",
+                    "description": "Show status.",
+                    "contractVersion": "v1",
+                    "sideEffectClass": "query",
+                    "readiness": "implemented",
+                    "invocation": {"executable": "example", "command": ["status"]}
+                },
+                {
+                    "id": "document",
+                    "kind": "mcp-resource",
+                    "description": "Read a document.",
+                    "contractVersion": "v1",
+                    "sideEffectClass": "query",
+                    "readiness": "implemented",
+                    "resourceUri": "memory://document/{id}",
+                    "outputSchema": {"type": "object"}
+                },
+                {
+                    "id": "search",
+                    "kind": "mcp-tool",
+                    "description": "Search documents.",
+                    "contractVersion": "v1",
+                    "sideEffectClass": "query",
+                    "readiness": "implemented",
+                    "toolName": "search",
+                    "inputSchema": {"type": "object"},
+                    "outputSchema": {"type": "array"}
+                }
+            ]
+        }))
+        .expect("v2 catalog parses");
+
+        assert!(validate_elegy_capability_catalog_v2(&catalog).is_valid());
+        assert_eq!(catalog.capabilities.len(), 3);
+    }
+
+    #[test]
+    fn capability_catalog_v2_rejects_legacy_fallback_and_app_binding_fields() {
+        let error = serde_json::from_value::<ElegyCapabilityCatalogV2>(json!({
+            "schemaVersion": ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION,
+            "plugin": "example-plugin",
+            "pluginVersion": "1.2.3",
+            "capabilities": [{
+                "id": "status",
+                "kind": "cli",
+                "description": "Show status.",
+                "contractVersion": "v1",
+                "sideEffectClass": "query",
+                "readiness": "implemented",
+                "invocation": {"executable": "example", "command": ["status"]},
+                "fallback": {"kind": "cli", "invocation": {"executable": "x", "command": ["y"]}},
+                "appBinding": {"connector": "github"}
+            }]
+        }))
+        .expect_err("legacy v1 fields must be rejected by v2");
+        assert!(error.to_string().contains("unknown field"));
+    }
+
+    #[test]
+    fn v1_mcp_with_tool_name_migrates_to_mcp_tool_without_resource_inference() {
+        let mut legacy = sample_catalog(vec![ElegyCapability {
+            id: "search".to_string(),
+            kind: ElegyCapabilityKind::Mcp,
+            side_effect_class: ElegySideEffectClass::Query,
+            contract_version: "v1".to_string(),
+            description: "Search documents.".to_string(),
+            invocation: Some(ElegyCapabilityInvocation {
+                executable: "memory".to_string(),
+                command: vec!["mcp-server".to_string()],
+                tool_name: Some("search".to_string()),
+                ..Default::default()
+            }),
+            input_schema: Some(json!({"type": "object"})),
+            output_schema: Some(json!({"type": "array"})),
+            ..Default::default()
+        }]);
+        legacy.schema_version = ELEGY_CAPABILITY_CATALOG_V1_SCHEMA_VERSION.to_string();
+        let migrated = migrate_capability_catalog_v1_to_v2(&legacy).expect("migrate tool");
+        assert!(matches!(
+            migrated.capabilities[0],
+            ElegyCapabilityV2::McpTool { .. }
+        ));
+
+        legacy.capabilities[0]
+            .invocation
+            .as_mut()
+            .expect("invocation")
+            .tool_name = None;
+        let error = migrate_capability_catalog_v1_to_v2(&legacy).expect_err("resource inference");
+        assert!(error.iter().any(|issue| issue.contains("toolName")));
+    }
+
+    #[test]
+    fn capability_catalog_loader_dispatches_v1_and_v2() {
+        let dir = unique_temp_dir("catalog-dispatch");
+        let v2_path = dir.join("v2.json");
+        fs::write(
+            &v2_path,
+            serde_json::to_string(&json!({
+                "schemaVersion": ELEGY_CAPABILITY_CATALOG_V2_SCHEMA_VERSION,
+                "plugin": "example-plugin",
+                "pluginVersion": "1.2.3",
+                "capabilities": [{
+                    "id": "status", "kind": "cli", "description": "Status",
+                    "contractVersion": "v1", "sideEffectClass": "query", "readiness": "implemented",
+                    "invocation": {"executable": "example", "command": ["status"]}
+                }]
+            }))
+            .expect("serialize v2"),
+        )
+        .expect("write v2");
+        assert!(matches!(
+            load_capability_catalog(&v2_path).expect("load v2"),
+            ElegyCapabilityCatalog::V2(_)
+        ));
     }
 
     #[test]
