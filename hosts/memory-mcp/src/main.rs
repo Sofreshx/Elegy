@@ -91,7 +91,7 @@ async fn run() -> anyhow::Result<()> {
     let auth = match config.auth {
         AuthMode::LocalNone => HttpAuth::LocalNone,
         AuthMode::ExternalOAuth(external) => HttpAuth::External(Arc::new(
-            ExternalTokenValidator::load(external)
+            ExternalTokenValidator::load(*external)
                 .await
                 .context("loading external identity-provider JWKS")?,
         )),

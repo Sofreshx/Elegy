@@ -8,7 +8,7 @@ const DEFAULT_PORT: u16 = 8765;
 #[derive(Clone, Debug)]
 pub enum AuthMode {
     LocalNone,
-    ExternalOAuth(ExternalOAuthConfig),
+    ExternalOAuth(Box<ExternalOAuthConfig>),
 }
 
 #[derive(Clone, Debug)]
@@ -122,12 +122,12 @@ impl Config {
                 }
                 (
                     public_url,
-                    AuthMode::ExternalOAuth(ExternalOAuthConfig {
+                    AuthMode::ExternalOAuth(Box::new(ExternalOAuthConfig {
                         issuer,
                         audience,
                         jwks_url,
                         scopes,
-                    }),
+                    })),
                 )
             }
             other => {
