@@ -1,9 +1,12 @@
+use elegy_plugin_sdk::{PluginArchiveBinary, pack_plugin_v3_with_binary};
 use rmcp::{
     ServiceExt,
     model::CallToolRequestParams,
     transport::{ConfigureCommandExt, TokioChildProcess},
 };
 use std::fs;
+use std::fs::File;
+use std::path::PathBuf;
 use std::process::{Command as StdCommand, Stdio};
 use std::sync::Arc;
 use tokio::process::Command;
@@ -128,6 +131,114 @@ async fn action_mcp_advertises_only_the_bundled_typed_read_operations() {
         ]
     );
     client.cancel().await.unwrap();
+}
+
+#[tokio::test]
+async fn packaged_accounts_archive_preserves_surface_and_advertises_all_tools() {
+    let repo_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../../..")
+        .canonicalize()
+        .unwrap();
+    let plugin_root = repo_root.join("plugins/accounts");
+    let temp = tempfile::tempdir().unwrap();
+    let archive = temp.path().join("elegy-accounts.zip");
+    let binary_source = PathBuf::from(env!("CARGO_BIN_EXE_elegy-accounts"));
+    let binary_name = format!("bin/elegy-accounts{}", std::env::consts::EXE_SUFFIX);
+
+    pack_plugin_v3_with_binary(
+        &plugin_root,
+        &archive,
+        Some(PluginArchiveBinary {
+            source_path: &binary_source,
+            archive_path: binary_name.clone(),
+        }),
+    )
+    .expect("Accounts archive should package successfully");
+
+    let install = temp.path().join("installed");
+    fs::create_dir_all(&install).unwrap();
+    let file = File::open(&archive).unwrap();
+    let mut zip = zip::ZipArchive::new(file).unwrap();
+    zip.extract(&install).unwrap();
+    for required in [
+        "plugin.json",
+        "capability-catalog.json",
+        ".mcp.json",
+        "readiness.json",
+        binary_name.as_str(),
+    ] {
+        assert!(
+            install.join(required).is_file(),
+            "missing packaged {required}"
+        );
+    }
+    let packaged_manifest: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(install.join("plugin.json")).unwrap()).unwrap();
+    assert_eq!(packaged_manifest["schemaVersion"], "elegy-plugin/v3");
+    let packaged_catalog: serde_json::Value =
+        serde_json::from_str(&fs::read_to_string(install.join("capability-catalog.json")).unwrap())
+            .unwrap();
+    assert_eq!(
+        packaged_catalog["schemaVersion"],
+        "elegy-capability-catalog/v2"
+    );
+
+    let local_data = tempfile::tempdir().unwrap();
+    for (argument, expected) in [
+        (
+            None,
+            vec![
+                "account_attention_list",
+                "account_audit_list",
+                "account_cancel_request",
+                "account_discover",
+                "account_list",
+                "account_open_center",
+                "account_present",
+                "account_request_access",
+                "account_request_creation",
+                "account_request_status",
+                "account_require",
+                "account_resume_request",
+                "account_revoke_grant",
+            ],
+        ),
+        (
+            Some("actions-mcp"),
+            vec![
+                "cloudflare_dns_records_read",
+                "cloudflare_zones_read",
+                "github_profile_read",
+                "github_repositories_read",
+            ],
+        ),
+    ] {
+        let binary = install.join(&binary_name);
+        let mut command = Command::new(binary);
+        if let Some(argument) = argument {
+            command.arg(argument);
+        }
+        command.env("LOCALAPPDATA", local_data.path());
+        let client = ()
+            .serve(
+                TokioChildProcess::new(command.configure(|child| {
+                    child.kill_on_drop(true);
+                }))
+                .unwrap(),
+            )
+            .await
+            .unwrap();
+        let mut names: Vec<_> = client
+            .list_all_tools()
+            .await
+            .unwrap()
+            .into_iter()
+            .map(|tool| tool.name.to_string())
+            .collect();
+        names.sort();
+        assert_eq!(names, expected);
+        client.cancel().await.unwrap();
+    }
 }
 
 #[tokio::test]
