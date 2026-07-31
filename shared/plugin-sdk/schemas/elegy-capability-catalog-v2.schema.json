@@ -1,0 +1,236 @@
+{
+  "$defs": {
+    "ElegyCapabilityInvocationV2": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "optionalArgs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "requiredArgs": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "executable",
+        "command"
+      ],
+      "type": "object"
+    },
+    "ElegyCapabilityV2": {
+      "description": "A v2 capability entry. The internally tagged representation makes the\nconcrete interface and its required fields explicit on the wire.",
+      "oneOf": [
+        {
+          "additionalProperties": false,
+          "properties": {
+            "contractVersion": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "invocation": {
+              "$ref": "#/$defs/ElegyCapabilityInvocationV2"
+            },
+            "kind": {
+              "const": "cli",
+              "type": "string"
+            },
+            "readiness": {
+              "$ref": "#/$defs/ElegyReadinessStage"
+            },
+            "sideEffectClass": {
+              "$ref": "#/$defs/ElegySideEffectClass"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "description",
+            "contractVersion",
+            "sideEffectClass",
+            "readiness",
+            "invocation"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "contractVersion": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "kind": {
+              "const": "mcp-resource",
+              "type": "string"
+            },
+            "outputSchema": {
+              "type": "object"
+            },
+            "readiness": {
+              "$ref": "#/$defs/ElegyReadinessStage"
+            },
+            "resourceUri": {
+              "type": "string"
+            },
+            "sideEffectClass": {
+              "$ref": "#/$defs/ElegySideEffectClass"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "description",
+            "contractVersion",
+            "sideEffectClass",
+            "readiness",
+            "resourceUri",
+            "outputSchema"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "properties": {
+            "contractVersion": {
+              "type": "string"
+            },
+            "description": {
+              "type": "string"
+            },
+            "id": {
+              "type": "string"
+            },
+            "inputSchema": {
+              "type": "object"
+            },
+            "kind": {
+              "const": "mcp-tool",
+              "type": "string"
+            },
+            "outputSchema": {
+              "type": "object"
+            },
+            "readiness": {
+              "$ref": "#/$defs/ElegyReadinessStage"
+            },
+            "sideEffectClass": {
+              "$ref": "#/$defs/ElegySideEffectClass"
+            },
+            "toolName": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "id",
+            "description",
+            "contractVersion",
+            "sideEffectClass",
+            "readiness",
+            "toolName",
+            "inputSchema",
+            "outputSchema"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "ElegyReadinessStage": {
+      "enum": [
+        "concept",
+        "implemented",
+        "usable",
+        "production"
+      ],
+      "type": "string"
+    },
+    "ElegySideEffectClass": {
+      "description": "Side-effect classification for a capability.",
+      "oneOf": [
+        {
+          "const": "pure",
+          "description": "No side effects, pure computation.",
+          "type": "string"
+        },
+        {
+          "const": "query",
+          "description": "Read-only query.",
+          "type": "string"
+        },
+        {
+          "const": "mutation",
+          "description": "State-changing mutation.",
+          "type": "string"
+        },
+        {
+          "const": "fenced-mutation",
+          "description": "Mutation with fencing token for concurrency control.",
+          "type": "string"
+        }
+      ]
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/ElegyCapabilityV2"
+      },
+      "type": "array"
+    },
+    "digest": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "generatedAt": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "plugin": {
+      "type": "string"
+    },
+    "pluginVersion": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "const": "elegy-capability-catalog/v2"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "plugin",
+    "pluginVersion",
+    "capabilities"
+  ],
+  "title": "ElegyCapabilityCatalogV2",
+  "type": "object"
+}
