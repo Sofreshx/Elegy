@@ -33,7 +33,7 @@
     "surfaceClass": "adapter-plugin",
     "capabilityCatalog": {
       "path": "./capability-catalog.json",
-      "schemaVersion": "elegy-capability-catalog/v1",
+      "schemaVersion": "elegy-capability-catalog/v2",
       "readinessCommand": "elegy-accounts status --json"
     },
     "connections": {
