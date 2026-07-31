@@ -213,7 +213,17 @@ if ($surfaces) {
             continue
         }
         $pluginManifest = Get-Content -LiteralPath $manifest -Raw | ConvertFrom-Json
-        if (-not $pluginManifest.capabilityCatalog) {
+        $capabilityCatalog = $pluginManifest.elegy.capabilityCatalog
+        if (-not $capabilityCatalog) {
+            # Keep accepting the legacy top-level location when it contains a
+            # catalog object, while treating the v3 nested Elegy field as
+            # authoritative.
+            $legacyCatalog = $pluginManifest.capabilityCatalog
+            if ($legacyCatalog -is [pscustomobject] -and $legacyCatalog.PSObject.Properties.Count -gt 0) {
+                $capabilityCatalog = $legacyCatalog
+            }
+        }
+        if (-not ($capabilityCatalog -is [pscustomobject]) -or $capabilityCatalog.PSObject.Properties.Count -eq 0) {
             Add-Issue "plugins.missing_capability_boundary" $surface.pluginRoot "Active adapter plugin '$($surface.name)' must declare capabilityCatalog."
         }
     }

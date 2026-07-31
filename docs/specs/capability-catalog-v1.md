@@ -4,12 +4,16 @@ status: active
 owner: Elegy
 ---
 
-# Capability Catalog V1
+# Capability Catalog V1 (Compatibility)
+
+> Current authoring authority: [Capability Catalog V2](capability-catalog-v2.md).
+> This document records the v1 wire shape and migration rules only.
 
 ## Readiness boundary
 
-A capability catalog describes implemented invocation shape. It is not evidence
-that a capability is installed, usable, agent-routable, or production-ready.
+A capability catalog describes declared invocation shape. It is not evidence
+that a capability is implemented, conformant, live-proven, installed, usable,
+agent-routable, or production-ready.
 Default discovery must join catalog data with the owning
 `elegy-readiness/v1` artifact and omit every surface below `usable`.
 
@@ -73,7 +77,7 @@ authentication requirements or host app IDs. Those live in
 | `fallback` | object | no | Fallback surface. See Fallback. |
 | `appBinding` | object | conditional | Required for `app-binding` kind. See App Binding. |
 
-## Capability kinds
+## Capability kinds (v1 wire values)
 
 ### `cli`
 
@@ -97,7 +101,7 @@ Executable deterministic or controlled commands. Invoked via `elegy-*` binaries.
 }
 ```
 
-### `mcp`
+### `mcp` (migrate to `mcp-resource` or `mcp-tool`)
 
 Typed agent-facing tool server. The invocation points to an MCP server
 descriptor.
@@ -119,10 +123,12 @@ descriptor.
 }
 ```
 
-### `app-binding`
+### `app-binding` (legacy compatibility only)
 
 Legacy host-authenticated external-service capability metadata. The
-`appBinding` field declares only a portable service identity.
+`appBinding` field declares only a portable service identity. Keep this kind
+only when the host projection contains a native Codex app connection binding;
+otherwise it is not an active interface or a routable capability.
 
 ```json
 {
@@ -169,16 +175,16 @@ For `elegy-plugin/v1`, the Codex exporter may retain the historical
 app IDs are opaque registered identifiers. V2 plugins declare connection
 requirements separately and provide explicit host bindings.
 
-## Fallback
+## Fallback (legacy, non-runtime metadata)
 
 | Field | Type | Required | Description |
 |---|---|---|---|
 | `kind` | string | yes | One of `cli`, `mcp`. |
 | `invocation` | object | yes | Invocation for the fallback surface. |
 
-A fallback declares an alternative surface for hosts that do not support the
-primary kind. For example, an `app-binding` capability can fall back to a `cli`
-invocation.
+A fallback records historical migration guidance. Elegy currently has no active
+runtime consumer that selects or executes fallback entries. It does not create
+a second primary kind, change routing, or establish readiness.
 
 ## Decision rule
 
@@ -188,8 +194,11 @@ Use this to determine the correct kind for a capability:
 Can it run locally and deterministically?
   -> cli
 
+Does the host need addressable read-only context over MCP?
+  -> mcp-resource
+
 Does the host need typed repeated calls into an MCP tool server?
-  -> mcp
+  -> mcp-tool
 
 Does it need host-authenticated external-service integration (GitHub, Gmail, Slack)?
   -> app-binding
@@ -213,7 +222,7 @@ Capabilities are validated by kind:
 | Elegy capability kind | Codex export surface |
 |---|---|
 | `cli` | Invoked by skills or MCP server. No dedicated Codex file. |
-| `mcp` | `.mcp.json` |
+| `mcp` | `.mcp.json` (migrate to `mcp-resource` or `mcp-tool`) |
 | `app-binding` | `.app.json` (generated from catalog `appBinding` fields) |
 
 ## Schema generation

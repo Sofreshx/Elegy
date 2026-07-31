@@ -23,13 +23,14 @@ classification; directory names do not. Historical runtimes remain under
 - [Codex-parity and delegated-authentication ADR](../adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md) — current package-envelope, authentication, and marketplace decision
 - [Historical static marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — superseded v1 context
 - [Plugin marketplace v2](../specs/plugin-marketplace-v2.md) — current index, policy, source-descriptor, artifact, install, and projection contract
-- [Capability catalog v1](../specs/capability-catalog-v1.md) — shared governed catalog contract with capability-kind taxonomy
+- [Capability catalog v2](../specs/capability-catalog-v2.md) — current authority for one-kind CLI, MCP-resource, and MCP-tool entries
+- [Capability catalog v1 compatibility](../specs/capability-catalog-v1.md) — legacy wire shape and migration notes
 - [Plugin connections v1](../specs/plugin-connections-v1.md) — explicit authentication requirements, host bindings, and credential-free connection control
 - [Evidence-backed readiness ADR](../adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md) — proof stages, default routing gate, plugin eligibility, and the two-consumer extraction rule
 - [Readiness v1](../specs/readiness-v1.md) — manifest/artifact shape, evidence requirements, promotion, and documentation enforcement
 - [Generated ecosystem readiness](../readiness.md) — current evidence-backed surface matrix
 - [Deprecations and reclassification](../deprecations.md) — removed plugin labels and retained replacement surfaces
-- [Capability-kind taxonomy ADR](../adr/2026-07-08-adopt-capability-kind-taxonomy.md) — decision record for `cli`/`mcp`/`app-binding` kinds and catalog-driven `.app.json`
+- [Capability-kind taxonomy ADR](../adr/2026-07-08-adopt-capability-kind-taxonomy.md) — decision record for concrete interface kinds and legacy app-binding handling
 - [MCP, skill, and tooling placement](mcp-skill-tooling-placement.md) — placement rules for governed MCP and skill artifacts versus Rust tooling
 - [Shared crate boundaries](shared-crate-boundaries.md) — keep/merge criteria for shared Rust crates
 - [Documentation practices](documentation-practices.md) — central ADR/spec doctrine, placement rules, and the lean `elegy docs` validation posture

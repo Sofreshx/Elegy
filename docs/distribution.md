@@ -58,7 +58,7 @@ To add a new release surface, add an entry to `distribution/surfaces.json` and e
 
 | Kind | Contract |
 | --- | --- |
-| `bundled-plugin` | Installable adapter package with a Rust runtime and optional skills or MCP projection. |
+| `bundled-plugin` | Installable adapter package with a Rust runtime and optional skills plus declared CLI, MCP-resource, or MCP-tool interfaces. |
 | `cli` | Standalone CLI under `tools/` or `shared/`, not a host adapter. |
 | `host-adapter` | Host or transport surface under `hosts/`. |
 | `skill-package` | Standalone skill source under `skills/elegy-*`; not an Elegy plugin class. |
@@ -122,8 +122,9 @@ codex plugin list --marketplace elegy --available --json
 
 Downstream Codex apps should consume `elegy-codex-marketplace-<target>.zip`
 and install through Codex plugin commands. Do not copy shared skills as the
-primary Codex route for Elegy plugins. Shared skills are compatibility fallback
-assets when plugin installation is unavailable or disabled.
+primary Codex route for Elegy plugins. Shared skills are compatibility assets
+when plugin installation is unavailable or disabled; they are not capability
+authority. The v1 catalog `fallback` field has no active runtime consumer.
 
 Private-source plugins may publish public proprietary binaries. Their wrapper
 metadata, skills, scripts, and descriptors are public. Keep private behavior in

@@ -20,11 +20,18 @@ The current machine-readable inventory is
 flowchart LR
     product["Product or agent workflow"] --> catalog["Typed capability catalog"]
     catalog --> cli["Portable CLI boundary"]
-    catalog --> mcp["Optional MCP projection"]
+    catalog --> resource["MCP resource interface"]
+    catalog --> tool["MCP tool interface"]
     catalog --> skill["Optional workflow skill"]
     cli --> boundary["Data source, DB, API, platform, OS, app, or executable"]
-    mcp --> boundary
+    resource --> boundary
+    tool --> boundary
 ```
+
+Each catalog entry names exactly one concrete interface: `cli`,
+`mcp-resource`, or `mcp-tool`. Skills and host layouts are guidance or
+projections; they do not add a second kind. The v1 `app-binding` value is
+legacy metadata and is usable only with a native Codex app connection binding.
 
 ## Surface classes
 
@@ -49,10 +56,11 @@ An Elegy marketplace plugin must:
 4. declare a typed `capabilityCatalog`;
 5. reference canonical readiness evidence.
 
-The capability catalog and CLI invocation templates are portable authority.
-MCP, Codex metadata, OpenCode/Claude layouts, and bundled skills are derived or
-optional host surfaces. Credentials and deployment state stay with the
-connection provider or operating host.
+The capability catalog and its declared CLI, MCP-resource, or MCP-tool
+interfaces are portable authority. Codex metadata, OpenCode/Claude layouts,
+and bundled skills are derived or optional host surfaces. Credentials and
+deployment state stay with the connection provider or operating host. The v1
+`fallback` field has no active runtime consumer and cannot change routing.
 
 Accounts is the only active packaged adapter in the initial cleanup. Desktop
 and Observe remain valuable adapter candidates in `rework`; their former
