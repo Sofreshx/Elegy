@@ -651,6 +651,7 @@ dependencies = [
  "axum",
  "chrono",
  "elegy-accountd",
+ "elegy-plugin-sdk",
  "rand 0.9.4",
  "reqwest",
  "rmcp",
@@ -663,6 +664,7 @@ dependencies = [
  "url",
  "uuid",
  "zeroize",
+ "zip",
 ]
 
 [[package]]
