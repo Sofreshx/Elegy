@@ -22,5 +22,7 @@ it does not prove that a runtime, connector, authentication flow, typed
 capability, or provider operation exists.
 
 Adapter verification checks bundled skill shape only as one optional component
-of the package. Executable discovery authority remains the adapter's typed
-capability catalog. MCP and host plugin layouts are projections.
+of the package. Executable and protocol discovery authority remains the
+adapter's typed capability catalog. Each entry names one concrete interface
+(`cli`, `mcp-resource`, or `mcp-tool`); MCP resources and tools are first-class
+interfaces, while host plugin layouts and skills are projections or guidance.

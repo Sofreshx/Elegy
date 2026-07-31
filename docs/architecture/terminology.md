@@ -32,7 +32,33 @@ The evidence-backed stage of one distributed surface: `concept`, `implemented`,
 
 Only `usable` and `production` are agent-routable. Source tests, fixture
 conformance, compilation, schemas, archives, and generated projections can
-support `implemented`; they never establish usability by themselves.
+support `implemented` or `conformance`; they never establish a live proof or
+usability by themselves.
+
+### Implemented
+
+Evidence that source behavior and its local tests exist. `implemented` is not a
+claim that a package can be installed, connected to a real system, or routed to
+an agent.
+
+### Conformance
+
+Evidence that a governed schema, fixture, or contract consumer interprets a
+surface correctly. Conformance is stronger than a shape check but weaker than
+an installed task against a real system.
+
+### Live proof
+
+Evidence from a clean packaged installation completing a non-fixture task in a
+declared environment. A live proof is required before a surface can qualify as
+`usable`; it does not imply production durability or broad host support.
+
+### Routable
+
+A host may offer a surface for agent selection only when its readiness is
+`usable` or `production` and the declared interface has passed the required
+validation. Routable does not bypass host policy, approvals, credentials, or
+side-effect gates.
 
 ### Substrate
 
@@ -73,9 +99,14 @@ Examples include compatibility manifests, compatibility matrices, and governed f
 
 ### Capability
 
-A governed operation concept described by a skill or other source.
+A governed operation or addressable-resource concept described by the capability
+catalog and optionally guided by a skill.
 
-A capability is what a host invokes — it includes an identity, input/output contracts, execution metadata, and governance posture. Capabilities may be projected as tools (CLI, MCP, function calling, HTTP). Capability is the operational concept; a tool is one surface through which it is invoked. It should not be used as a synonym for a single runtime representation.
+A capability is what a host invokes — it includes an identity, input/output
+contracts, execution metadata, and governance posture. In v2 each entry names
+one concrete interface (`cli`, `mcp-resource`, or `mcp-tool`). The capability is
+the governed concept; a host projection is a derived installation or transport
+surface.
 
 ### Skill
 
@@ -158,19 +189,22 @@ the portable Elegy plugin core or the Pack distribution.
 
 ### Capability kind
 
-A taxonomy discriminator for capabilities in the `elegy-capability-catalog/v1`
-catalog. Current kinds: `cli` (executable deterministic commands), `mcp`
-(typed agent-facing tool server), `app-binding` (host-authenticated
-external-service connector). The kind determines which Codex export surface the
-capability maps to. `provider-adapter` is deferred until a real AI-provider
+A single concrete interface discriminator in the
+`elegy-capability-catalog/v2` catalog. Current kinds are `cli` (local
+executable invocation), `mcp-resource` (addressable MCP resource), and
+`mcp-tool` (typed MCP tool call). Each capability entry has exactly one kind;
+publishing the same behavior through more than one interface requires separate
+entries and evidence. The v1 `mcp` and `app-binding` values are compatibility
+metadata only. `provider-adapter` is deferred until a real AI-provider
 consumer exists.
 
 ### App binding
 
-A legacy capability-catalog kind describing an external-service capability.
-Its `connector` is a portable service name, not a host app ID. V1 exporters may
-retain the historical catalog projection, but v2 authentication authority is a
-connection requirement.
+A legacy capability-catalog value describing an external-service capability.
+Its `connector` is a portable service name, not a host app ID. It is meaningful
+only when a native Codex app connection binding exists in the host projection;
+otherwise it is not an active or routable interface. Connection requirements
+and opaque host app IDs remain the authentication authority.
 
 ### Connection requirement
 
@@ -194,11 +228,10 @@ and opaque references through a signed, credential-free control boundary.
 
 ### Fallback
 
-An alternative surface declared on a capability for hosts that do not support
-the primary kind. For example, an `app-binding` capability may declare a `cli`
-fallback so non-Codex hosts can invoke it via a command-line tool. Fallback is
-host-neutral guidance — the Codex exporter does not emit it into the Codex
-plugin.
+Legacy descriptive metadata for a possible alternative surface. Elegy has no
+active runtime consumer that selects or executes fallback entries. Fallback
+does not create a second capability kind, alter routing, or establish
+readiness; new runtime code must not branch on it.
 
 ### Dynamic skill
 
@@ -210,11 +243,15 @@ Dynamic does not mean ungoverned. The inputs and outputs still need formal contr
 
 A callable operation boundary exposed to an agent, model, or runtime.
 
-A tool is not the original capability — it is a surface projection through which a capability is invoked. The same governed capability may be projected as multiple tools across different host surfaces (CLI, MCP, OpenAI function calling, HTTP).
+A tool is a callable interface through which a capability is invoked. In the
+catalog, `cli`, `mcp-resource`, and `mcp-tool` are first-class concrete
+interfaces; a projection or wrapper must not silently change the declared kind.
 
 ### Tool projection
 
-A callable view of a capability for a specific host surface: CLI, MCP, OpenAI function calling, HTTP, or another runtime.
+A derived callable view of a capability for a specific host surface. CLI,
+MCP-resource, and MCP-tool entries are first-class catalog interfaces; Codex,
+skills, and other host layouts are projections of those entries.
 
 Each tool projection declares its projection kind, input/output schemas, invocation envelope, side-effect classification, dependency requirements, and provenance from the source capability. The projection is derived — it is not the canonical authority for the underlying contract.
 

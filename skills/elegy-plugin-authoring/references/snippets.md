@@ -29,7 +29,7 @@ plugins/<adapter-name>/
     "surfaceClass": "adapter-plugin",
     "capabilityCatalog": {
       "path": "./capability-catalog.json",
-      "schemaVersion": "elegy-capability-catalog/v1",
+      "schemaVersion": "elegy-capability-catalog/v2",
       "readinessCommand": "elegy-example-adapter status --json"
     },
     "connections": {
@@ -48,8 +48,11 @@ plugins/<adapter-name>/
 ```
 
 Add `skills` only when workflow guidance materially helps an agent use the
-typed operations. Add MCP only when a host requires that protocol. Neither
-replaces the capability catalog or CLI behavior.
+typed operations. Each catalog entry declares exactly one of `cli`,
+`mcp-resource`, or `mcp-tool`; MCP resources and tools are first-class
+interfaces, not fallback projections. The v1 `app-binding` and `fallback`
+fields are compatibility-only and do not replace the catalog or drive runtime
+routing.
 
 ## Surface registration
 

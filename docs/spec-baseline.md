@@ -42,7 +42,9 @@ The currently implemented slice is intentionally narrower than the full spec:
 
 - for contributor-facing MCP work, prefer the dedicated `elegy-mcp` surface
 - `elegy-run` is the thin stdio host over runtime-composed resources
-- resources-first behavior remains the current live runtime posture
+- resources-first behavior remains the current live runtime posture; a
+  catalog `mcp-tool` entry is a first-class contract only once its tool
+  implementation and live proof exist
 - no implied support for prompts, sampling, autonomous MCP-native self-authoring, or built-in skill-driven orchestration unless documentation and implementation are updated together
 
 ## Upgrade policy
@@ -67,7 +69,8 @@ Until that happens, the repository baseline remains `2025-11-25`.
 - current CLI posture: dedicated `elegy-*` binaries for bounded surfaces
 - current operator slice: narrow validation and inspection flows from the repo root
 - runtime model: runtime composition with a resources-first posture
-- future target: broader MCP-hosted or skill-driven self-authoring only after it is implemented and validated in-repo
+- future target: broader MCP-hosted or skill-driven self-authoring only after it
+  is implemented, conformant, and live-proven in-repo
 - OSS license baseline: Apache-2.0
 
 ## References

@@ -173,7 +173,7 @@
       "path": "docs/agent-integration.md",
       "sourceOfTruth": "unclassified",
       "status": "active",
-      "summary": "Elegy is designed for AI-agent hosts that can run local subprocesses. The",
+      "summary": "Elegy is designed for AI-agent hosts that can run local subprocesses or speak",
       "title": "Agent Integration"
     },
     {
@@ -387,8 +387,18 @@
       "path": "docs/specs/capability-catalog-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "A capability catalog describes implemented invocation shape. It is not evidence",
+      "summary": "> Current authoring authority: [Capability Catalog V2](capability-catalog-v2.md).",
       "title": "Capability Catalog V1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/capability-catalog-v2.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "`elegy-capability-catalog/v2` is the current authority for the interface that",
+      "title": "Capability Catalog V2"
     },
     {
       "authorityClass": "current",
@@ -453,6 +463,7 @@
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",
+    "docs/specs/capability-catalog-v2.md",
     "docs/specs/plugin-connections-v1.md",
     "docs/specs/plugin-marketplace-v2.md",
     "docs/specs/readiness-v1.md",
