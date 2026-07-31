@@ -810,14 +810,23 @@ async fn main() -> Result<()> {
             Ok(())
         }
         Some("proof-github") => {
-            let destination = PathBuf::from(
-                args.get(1)
-                    .context("usage: elegy-accounts proof-github <evidence.json>")?,
-            );
+            let destination = live_proof_destination(&args)?;
             run_live_github_proof(destination).await
         }
         Some(command) => anyhow::bail!("unknown command `{command}`"),
     }
+}
+
+const LIVE_GITHUB_PROOF_CONSENT: &str = "--consent=github-read-only";
+
+fn live_proof_destination(args: &[String]) -> Result<PathBuf> {
+    if args.len() != 3 || args.get(2).map(String::as_str) != Some(LIVE_GITHUB_PROOF_CONSENT) {
+        anyhow::bail!(
+            "usage: elegy-accounts proof-github <evidence.json> {}; this runs a supervised read-only proof using the existing GitHub CLI session",
+            LIVE_GITHUB_PROOF_CONSENT
+        );
+    }
+    Ok(PathBuf::from(&args[1]))
 }
 
 fn account_center_port() -> u16 {
@@ -2336,8 +2345,8 @@ fn contains_secret_key(value: &serde_json::Value) -> bool {
 #[cfg(test)]
 mod native_host_tests {
     use super::{
-        DeviceFlowConfig, DevicePoll, action_request, handle_native_message, poll_device_flow,
-        start_device_flow, valid_user_intent,
+        DeviceFlowConfig, DevicePoll, action_request, handle_native_message,
+        live_proof_destination, poll_device_flow, start_device_flow, valid_user_intent,
     };
     use axum::{
         Json, Router,
@@ -2398,6 +2407,29 @@ mod native_host_tests {
         assert!(!valid_user_intent(&headers));
         headers.insert("x-elegy-intent", HeaderValue::from_static("user-action"));
         assert!(valid_user_intent(&headers));
+    }
+
+    #[test]
+    fn live_github_proof_requires_explicit_read_only_consent() {
+        let missing = vec!["proof-github".to_owned(), "proof.json".to_owned()];
+        assert!(live_proof_destination(&missing).is_err());
+
+        let wrong = vec![
+            "proof-github".to_owned(),
+            "proof.json".to_owned(),
+            "--consent=github-write-capable".to_owned(),
+        ];
+        assert!(live_proof_destination(&wrong).is_err());
+
+        let approved = vec![
+            "proof-github".to_owned(),
+            "proof.json".to_owned(),
+            "--consent=github-read-only".to_owned(),
+        ];
+        assert_eq!(
+            live_proof_destination(&approved).unwrap(),
+            std::path::PathBuf::from("proof.json")
+        );
     }
 
     #[test]

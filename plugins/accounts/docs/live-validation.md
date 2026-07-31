@@ -19,7 +19,23 @@ GitHub is the device-authorization proof pack, not a compiled special case.
 
 ### Ephemeral broker proof
 
-`npm run proof:github` borrows the existing GitHub CLI session in memory, verifies `/user`, exercises encrypted storage, a read-only grant and lease, restart persistence, revocation, plaintext scans, and cleanup. It never adds that broad CLI credential to the user's permanent Elegy vault.
+`npm run proof:github` borrows the existing GitHub CLI session in memory, verifies `/user`, exercises encrypted storage, a read-only grant and lease, restart persistence, revocation, plaintext scans, and cleanup. It never adds that broad CLI credential to the user's permanent Elegy vault. The command fails closed unless `ELEGY_LIVE_PROOF_CONSENT=github-read-only` is set after the operator has approved this supervised run; the wrapper passes the matching `--consent=github-read-only` confirmation to the binary.
+
+The direct invocation is:
+
+```text
+cargo run -p elegy-accounts -- proof-github artifacts/live/github-proof.json --consent=github-read-only
+```
+
+For the package script, set the acknowledgement in the current process only:
+
+```powershell
+$env:ELEGY_LIVE_PROOF_CONSENT = 'github-read-only'
+npm run proof:github
+Remove-Item Env:ELEGY_LIVE_PROOF_CONSENT
+```
+
+The confirmation is an operator acknowledgement, not a substitute for the human GitHub consent or any CAPTCHA, MFA, account-selection, or provider checkpoint described below.
 
 ### Production Device Flow proof
 
