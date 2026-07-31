@@ -1,41 +1,205 @@
 {
-  "schemaVersion": "elegy-capability-catalog/v1",
+  "schemaVersion": "elegy-capability-catalog/v2",
   "plugin": "elegy-accounts",
   "pluginVersion": "0.1.0",
   "capabilities": [
     {
-      "id": "accounts.mcp",
-      "kind": "mcp",
-      "sideEffectClass": "mutation",
+      "id": "account_list",
+      "kind": "mcp-tool",
+      "description": "List sanitized connected account identities.",
       "contractVersion": "v1",
-      "description": "Discover generic provider packs and request, inspect, present, resume, or revoke credential-backed account access without revealing credentials.",
-      "invocation": {
-        "executable": "elegy-accounts",
-        "command": ["mcp"],
-        "toolName": "account_list"
-      }
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_list",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_discover",
+      "kind": "mcp-tool",
+      "description": "Discover available provider packs and supported account flows.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_discover",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_require",
+      "kind": "mcp-tool",
+      "description": "Inspect account requirements for a selected provider operation.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_require",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_request_access",
+      "kind": "mcp-tool",
+      "description": "Request access to a selected account with explicit scoped operations.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_request_access",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_request_creation",
+      "kind": "mcp-tool",
+      "description": "Request creation of a new account under explicit user constraints.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_request_creation",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_request_status",
+      "kind": "mcp-tool",
+      "description": "Read the status of a durable account request.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_request_status",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_attention_list",
+      "kind": "mcp-tool",
+      "description": "List durable account requests that need user attention.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_attention_list",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_present",
+      "kind": "mcp-tool",
+      "description": "Present a durable account request in the local human authorization surface.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_present",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_cancel_request",
+      "kind": "mcp-tool",
+      "description": "Cancel a durable account request.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_cancel_request",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_resume_request",
+      "kind": "mcp-tool",
+      "description": "Resume a durable account request from its last checkpoint.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_resume_request",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_open_center",
+      "kind": "mcp-tool",
+      "description": "Open the local human authorization and account-management surface.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_open_center",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_revoke_grant",
+      "kind": "mcp-tool",
+      "description": "Revoke an account grant and its scoped agent access.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
+      "toolName": "account_revoke_grant",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "account_audit_list",
+      "kind": "mcp-tool",
+      "description": "Read sanitized account authorization and access audit events.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "account_audit_list",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "github_profile_read",
+      "kind": "mcp-tool",
+      "description": "Read a typed GitHub profile through the local broker.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "github_profile_read",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "github_repositories_read",
+      "kind": "mcp-tool",
+      "description": "Read typed GitHub repositories through the local broker.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "github_repositories_read",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "cloudflare_zones_read",
+      "kind": "mcp-tool",
+      "description": "Read typed Cloudflare zones through the local broker.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "cloudflare_zones_read",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
+    },
+    {
+      "id": "cloudflare_dns_records_read",
+      "kind": "mcp-tool",
+      "description": "Read typed Cloudflare DNS records through the local broker.",
+      "contractVersion": "v1",
+      "sideEffectClass": "query",
+      "readiness": "implemented",
+      "toolName": "cloudflare_dns_records_read",
+      "inputSchema": { "type": "object" },
+      "outputSchema": { "type": "object" }
     },
     {
       "id": "accounts.center",
       "kind": "cli",
-      "sideEffectClass": "mutation",
-      "contractVersion": "v1",
       "description": "Open the local human authorization and account-management surface.",
+      "contractVersion": "v1",
+      "sideEffectClass": "mutation",
+      "readiness": "implemented",
       "invocation": {
         "executable": "elegy-accounts",
         "command": ["open"]
-      }
-    },
-    {
-      "id": "accounts.actions.mcp",
-      "kind": "mcp",
-      "sideEffectClass": "query",
-      "contractVersion": "v1",
-      "description": "Perform trusted typed GitHub and Cloudflare reads through the local broker without exposing credentials or leases.",
-      "invocation": {
-        "executable": "elegy-accounts",
-        "command": ["actions-mcp"],
-        "toolName": "github_profile_read"
       }
     }
   ]

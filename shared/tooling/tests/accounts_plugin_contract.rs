@@ -1,5 +1,9 @@
 use std::{fs, path::PathBuf};
 
+use elegy_plugin_sdk::{
+    load_capability_catalog, validate_elegy_capability_catalog_v2, ElegyCapabilityCatalog,
+    ElegyCapabilityV2, ElegySideEffectClass,
+};
 use serde_json::Value;
 
 fn repo_root() -> PathBuf {
@@ -76,11 +80,78 @@ fn accounts_plugin_is_a_portable_bundled_capability() {
             .expect("capability catalog should exist"),
     )
     .expect("capability catalog should be JSON");
-    assert!(catalog["capabilities"]
-        .as_array()
-        .expect("capabilities")
+    assert_eq!(catalog["schemaVersion"], "elegy-capability-catalog/v2");
+
+    let loaded = load_capability_catalog(&plugin.join("capability-catalog.json"))
+        .expect("capability catalog should load");
+    let ElegyCapabilityCatalog::V2(catalog) = loaded else {
+        panic!("Accounts catalog must use v2");
+    };
+    assert!(validate_elegy_capability_catalog_v2(&catalog).is_valid());
+    let ids = catalog
+        .capabilities
         .iter()
-        .any(|capability| capability["id"] == "accounts.actions.mcp"));
+        .map(|capability| capability.common().id.as_str())
+        .collect::<std::collections::BTreeSet<_>>();
+    assert_eq!(ids.len(), 18);
+    assert!(ids.contains("accounts.center"));
+    for id in [
+        "account_list",
+        "account_discover",
+        "account_require",
+        "account_request_access",
+        "account_request_creation",
+        "account_request_status",
+        "account_attention_list",
+        "account_present",
+        "account_cancel_request",
+        "account_resume_request",
+        "account_open_center",
+        "account_revoke_grant",
+        "account_audit_list",
+        "github_profile_read",
+        "github_repositories_read",
+        "cloudflare_zones_read",
+        "cloudflare_dns_records_read",
+    ] {
+        assert!(ids.contains(id), "missing tool {id}");
+    }
+    for capability in &catalog.capabilities {
+        let encoded = serde_json::to_value(capability).expect("v2 capability should serialize");
+        assert!(encoded.get("fallback").is_none());
+        assert!(encoded.get("appBinding").is_none());
+        match capability {
+            ElegyCapabilityV2::Cli { common, .. } => {
+                assert_eq!(common.id, "accounts.center");
+                assert_eq!(common.side_effect_class, ElegySideEffectClass::Mutation);
+            }
+            ElegyCapabilityV2::McpTool { common, .. } => {
+                assert_eq!(encoded["toolName"], common.id);
+                assert_eq!(encoded["inputSchema"]["type"], "object");
+                assert_eq!(encoded["outputSchema"]["type"], "object");
+                assert_eq!(common.readiness.as_str(), "implemented");
+                let expected = matches!(
+                    common.id.as_str(),
+                    "account_request_access"
+                        | "account_request_creation"
+                        | "account_present"
+                        | "account_cancel_request"
+                        | "account_resume_request"
+                        | "account_revoke_grant"
+                        | "account_open_center"
+                );
+                assert_eq!(
+                    common.side_effect_class == ElegySideEffectClass::Mutation,
+                    expected,
+                    "wrong side effect for {}",
+                    common.id
+                );
+            }
+            ElegyCapabilityV2::McpResource { .. } => {
+                panic!("Accounts catalog has no MCP resources")
+            }
+        }
+    }
 
     for required in [
         "skills/elegy-manage-accounts/SKILL.md",
