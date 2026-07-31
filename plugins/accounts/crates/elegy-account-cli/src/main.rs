@@ -7,12 +7,14 @@ use axum::{
     routing::{get, post},
 };
 use elegy_accountd::{
-    AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, ExecutionEnvelope,
-    IdentitySpec, KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthCredential,
-    OAuthTransaction, ProviderCatalog, ReplayGuard, TokenAdapterConfig, TypedExecutionOutcome,
-    TypedExecutionRequest, Vault, VerifiedCredential, exchange_and_verify, revoke_oauth_credential,
-    verify_credentials, verify_token,
+    AuthMethod, AuthProfile, AuthorizationSession, BrokerStore, DpapiProtector, IdentitySpec,
+    KeyProtector, NewAccessRequest, OAuthAdapterConfig, OAuthCredential, OAuthTransaction,
+    ProviderCatalog, TokenAdapterConfig, TypedExecutionOutcome, TypedExecutionRequest, Vault,
+    VerifiedCredential, exchange_and_verify, revoke_oauth_credential, verify_credentials,
+    verify_token,
 };
+#[cfg(windows)]
+use elegy_accountd::{ExecutionEnvelope, ReplayGuard};
 use rand::Rng;
 use rmcp::{
     ServerHandler, ServiceExt,
@@ -507,6 +509,7 @@ fn local_data_dir() -> Result<PathBuf> {
     Ok(PathBuf::from(base).join("Elegy").join("Accounts"))
 }
 
+#[cfg(windows)]
 const MAX_EXECUTION_MESSAGE_BYTES: usize = 1024 * 1024;
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -543,6 +546,7 @@ async fn invoke_action(request: Result<TypedExecutionRequest>) -> String {
     }
 }
 
+#[cfg(windows)]
 fn execution_pipe_name() -> String {
     std::env::var("ELEGY_ACCOUNTS_PIPE_NAME")
         .ok()
@@ -556,6 +560,7 @@ fn execution_pipe_name() -> String {
         .unwrap_or_else(|| r"\\.\pipe\elegy-accounts-v1".into())
 }
 
+#[cfg(windows)]
 fn load_or_create_client_key() -> Result<Zeroizing<Vec<u8>>> {
     let key_path = local_data_dir()?
         .join("clients")
