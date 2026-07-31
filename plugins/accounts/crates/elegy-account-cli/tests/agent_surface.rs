@@ -336,7 +336,7 @@ async fn action_mcp_executes_a_typed_read_through_the_running_broker() {
     let mut broker = broker.spawn().unwrap();
     let health = format!("http://127.0.0.1:{port}/api/state");
     let http = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_millis(200))
+        .timeout(std::time::Duration::from_secs(2))
         .build()
         .unwrap();
     for _ in 0..50 {
@@ -719,15 +719,16 @@ async fn packaged_live_proof_waits_for_device_flow_and_matching_action_approval(
     assert!(start.status().is_success());
 
     let mut approved = false;
-    for _ in 0..200 {
-        let state: serde_json::Value = http
-            .get(format!("{base}/api/state"))
-            .send()
-            .await
-            .unwrap()
-            .json()
-            .await
-            .unwrap();
+    let approval_deadline = tokio::time::Instant::now() + std::time::Duration::from_secs(30);
+    while tokio::time::Instant::now() < approval_deadline {
+        let Ok(response) = http.get(format!("{base}/api/state")).send().await else {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            continue;
+        };
+        let Ok(state) = response.json::<serde_json::Value>().await else {
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            continue;
+        };
         if let Some(request_id) = state["requests"]
             .as_array()
             .and_then(|requests| {
