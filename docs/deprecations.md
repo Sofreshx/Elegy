@@ -43,8 +43,13 @@ decision.
 - A schema, fixture, generated projection, skill, wrapper, or passing source
   suite does not establish plugin eligibility or usability.
 - `skill-package` is a release/build kind, not an Elegy plugin class.
-- MCP is an optional host projection over a capability. A CLI remains the
-  portable executable boundary when the same operation can run without MCP.
+- CLI, MCP resources, and MCP tools are first-class capability interfaces; each
+  catalog entry declares exactly one. CLI remains the default portable
+  executable boundary for local commands, while MCP is selected when the
+  declared resource or tool interface is the host's protocol boundary.
+- The v1 `app-binding` value is compatibility metadata only unless a native
+  Codex app connection binding exists. The v1 `fallback` field has no active
+  runtime consumer and cannot alter routing.
 - New business/domain logic must not be added to Elegy as a plugin. Extract an
   adapter only after the concrete external boundary exists; extract a generic
   contract only after two independent consumers prove it.

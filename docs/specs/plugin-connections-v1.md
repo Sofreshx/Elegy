@@ -29,6 +29,10 @@ connection behavior. Other hosts must represent the same binding or reject
 projection. Accounts is an optional broker for credentials used by local
 adapters, not an MCP authorization server.
 
+The capability-catalog v1 `app-binding` kind is legacy metadata, not a
+connection authority. It is meaningful only when a native Codex app connection
+binding is explicitly present; a service slug alone never authorizes routing.
+
 Credentials, bearer values, authorization headers, codes, refresh tokens,
 cookies, signing keys, and client secrets are forbidden in package manifests,
 skills, catalogs, loss reports, and receipts.

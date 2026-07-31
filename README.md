@@ -4,10 +4,12 @@
 [![Latest release](https://img.shields.io/github/v/release/Sofreshx/Elegy?display_name=tag&sort=semver)](https://github.com/Sofreshx/Elegy/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Elegy is a Rust toolkit for shipping governed local CLI capabilities to AI-agent
-hosts. Governed artifacts stay in the repo. Dedicated `elegy-*` binaries expose
-the executable surfaces. CLI invocation is the default integration boundary.
-MCP is optional.
+Elegy is a Rust toolkit for shipping governed capabilities to AI-agent hosts.
+Governed artifacts stay in the repo. The capability catalog gives each entry
+one concrete first-class interface: a local CLI invocation, an MCP resource, or
+an MCP tool. Dedicated `elegy-*` binaries expose CLI surfaces; MCP is available
+when a host needs the declared resource or tool protocol boundary. CLI remains
+the default integration contract for local executable capabilities.
 
 ## Current readiness
 
@@ -156,14 +158,19 @@ Boundaries: the plugin manifest is a metadata envelope, not a runtime,
 marketplace, auth store, approval record, or secret/session container. Hosts own
 install, auth, approvals, runtime sessions, and execution policy.
 
-## Optional MCP Projection
+## MCP interfaces
 
 ```bash
 elegy-run
 ```
 
-MCP is an optional projection over governed capabilities and CLI behavior. Side-effecting tools
-stay blocked unless the host is started with `--allow-side-effects`.
+MCP resources and tools are first-class catalog interfaces served by the host;
+they are not fallback routes for CLI entries. Side-effecting tools stay blocked
+unless the host is started with `--allow-side-effects`.
+
+The v1 `app-binding` kind is retained only for packages with a native Codex app
+connection binding. The v1 `fallback` field has no active runtime consumer and
+does not affect routing. See the [Capability Catalog V2 spec](docs/specs/capability-catalog-v2.md).
 
 ## Documentation
 
