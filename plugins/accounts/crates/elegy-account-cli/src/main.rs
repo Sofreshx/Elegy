@@ -20,21 +20,23 @@ use rmcp::{
     ServerHandler, ServiceExt,
     handler::server::router::tool::ToolRouter,
     handler::server::wrapper::Parameters,
-    model::{ServerCapabilities, ServerInfo},
+    model::{CallToolRequestParams, ServerCapabilities, ServerInfo},
     schemars, tool, tool_handler, tool_router,
-    transport::stdio,
+    transport::{ConfigureCommandExt, TokioChildProcess, stdio},
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
 use std::{
     collections::{BTreeMap, HashMap},
-    path::PathBuf,
+    path::{Path as FsPath, PathBuf},
     sync::{Arc, Mutex},
     time::{Duration, Instant},
 };
+use tokio::process::Command as TokioCommand;
 use zeroize::Zeroizing;
 
 #[derive(Clone)]
@@ -811,22 +813,57 @@ async fn main() -> Result<()> {
         }
         Some("proof-github") => {
             let destination = live_proof_destination(&args)?;
-            run_live_github_proof(destination).await
+            let package_root = installed_accounts_package_root(&std::env::current_exe()?)?;
+            run_live_github_proof(package_root, destination).await
         }
         Some(command) => anyhow::bail!("unknown command `{command}`"),
     }
 }
 
-const LIVE_GITHUB_PROOF_CONSENT: &str = "--consent=github-read-only";
+const LIVE_GITHUB_PROOF_CONSENT: &str = "--consent=github-device-read-only";
 
 fn live_proof_destination(args: &[String]) -> Result<PathBuf> {
     if args.len() != 3 || args.get(2).map(String::as_str) != Some(LIVE_GITHUB_PROOF_CONSENT) {
         anyhow::bail!(
-            "usage: elegy-accounts proof-github <evidence.json> {}; this runs a supervised read-only proof using the existing GitHub CLI session",
+            "usage: elegy-accounts proof-github <evidence.json> {}; this runs a supervised read-only proof through a dedicated GitHub Device Flow connection",
             LIVE_GITHUB_PROOF_CONSENT
         );
     }
     Ok(PathBuf::from(&args[1]))
+}
+
+fn installed_accounts_package_root(executable: &FsPath) -> Result<PathBuf> {
+    let package_root = executable
+        .parent()
+        .and_then(FsPath::parent)
+        .context("live proof must run from an installed Accounts package")?;
+    if !installed_manifest_path(package_root).is_file() {
+        anyhow::bail!(
+            "live proof must run from an installed Accounts package; missing installed plugin manifest"
+        );
+    }
+    for required in [
+        "capability-catalog.json",
+        ".mcp.json",
+        "readiness.json",
+        "providers/github.json",
+    ] {
+        if !package_root.join(required).is_file() {
+            anyhow::bail!(
+                "live proof must run from an installed Accounts package; missing {required}"
+            );
+        }
+    }
+    Ok(package_root.to_path_buf())
+}
+
+fn installed_manifest_path(package_root: &FsPath) -> PathBuf {
+    let installed = package_root.join(".elegy-plugin/plugin.json");
+    if installed.is_file() {
+        installed
+    } else {
+        package_root.join("plugin.json")
+    }
 }
 
 fn account_center_port() -> u16 {
@@ -976,144 +1013,551 @@ fn run_status() -> Result<()> {
     Ok(())
 }
 
-async fn run_live_github_proof(destination: PathBuf) -> Result<()> {
-    let output = Command::new("gh")
-        .args(["auth", "token"])
-        .env("GH_PROMPT_DISABLED", "1")
-        .output()
-        .context("GitHub CLI is unavailable")?;
-    if !output.status.success() {
-        anyhow::bail!("GitHub CLI has no usable authenticated account");
+async fn run_live_github_proof(package_root: PathBuf, destination: PathBuf) -> Result<()> {
+    let _client_id = std::env::var("ELEGY_GITHUB_CLIENT_ID")
+        .ok()
+        .filter(|value| !value.trim().is_empty())
+        .context(
+            "ELEGY_GITHUB_CLIENT_ID must name a dedicated GitHub Device Flow OAuth application",
+        )?;
+    let proof_root = std::env::var_os("ELEGY_ACCOUNTS_PROOF_ROOT")
+        .map(PathBuf::from)
+        .context(
+            "ELEGY_ACCOUNTS_PROOF_ROOT must identify the isolated LOCALAPPDATA root for this supervised proof",
+        )?;
+    let local_app_data = std::env::var_os("LOCALAPPDATA")
+        .map(PathBuf::from)
+        .context("LOCALAPPDATA is not set")?;
+    let proof_root = std::fs::canonicalize(proof_root)
+        .context("ELEGY_ACCOUNTS_PROOF_ROOT must exist before the proof starts")?;
+    let local_app_data = std::fs::canonicalize(local_app_data)
+        .context("LOCALAPPDATA must identify the existing isolated proof root")?;
+    if proof_root != local_app_data {
+        anyhow::bail!("LOCALAPPDATA must equal ELEGY_ACCOUNTS_PROOF_ROOT for live proof isolation");
     }
-    let mut secret = Zeroizing::new(output.stdout);
-    while secret
-        .last()
-        .is_some_and(|byte| matches!(byte, b'\r' | b'\n' | b' ' | b'\t'))
+    let marker_path = proof_root.join(".elegy-accounts-live-proof.json");
+    let marker: Value = serde_json::from_slice(
+        &std::fs::read(&marker_path)
+            .with_context(|| format!("read live-proof root marker {}", marker_path.display()))?,
+    )
+    .with_context(|| format!("parse live-proof root marker {}", marker_path.display()))?;
+    if marker["schemaVersion"] != "elegy-accounts-live-proof-root/v1" {
+        anyhow::bail!(
+            "live-proof root marker {} must declare schemaVersion elegy-accounts-live-proof-root/v1",
+            marker_path.display()
+        );
+    }
+    for forbidden in [
+        "ELEGY_ACCOUNTS_PROVIDER_DIR",
+        "ELEGY_ACCOUNTS_TRUST_LOCAL_PACKS",
+        "ELEGY_ACCOUNT_CENTER_DIST",
+    ] {
+        if std::env::var_os(forbidden).is_some() {
+            anyhow::bail!("{forbidden} must be unset for a packaged live proof");
+        }
+    }
+    let proof_port = std::env::var("ELEGY_ACCOUNT_CENTER_PORT")
+        .context("ELEGY_ACCOUNT_CENTER_PORT must select an isolated proof endpoint")?;
+    proof_port
+        .parse::<u16>()
+        .ok()
+        .filter(|port| *port > 0)
+        .context("ELEGY_ACCOUNT_CENTER_PORT must be a valid isolated proof endpoint")?;
+    let proof_pipe = std::env::var("ELEGY_ACCOUNTS_PIPE_NAME")
+        .context("ELEGY_ACCOUNTS_PIPE_NAME must select an isolated proof transport")?;
+    if !proof_pipe.starts_with(r"\\.\pipe\elegy-accounts-live-proof-")
+        || proof_pipe.len() > 240
+        || !proof_pipe
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'\\' | b'.' | b'_' | b'-'))
     {
-        secret.pop();
+        anyhow::bail!("ELEGY_ACCOUNTS_PIPE_NAME must be unique to the live proof session");
     }
-    let secret_text = std::str::from_utf8(secret.as_slice())
-        .context("GitHub CLI credential encoding is invalid")?;
-    if secret_text.is_empty() {
-        anyhow::bail!("GitHub CLI returned an empty credential");
+
+    let package_manifest: Value =
+        serde_json::from_slice(&std::fs::read(installed_manifest_path(&package_root))?)
+            .context("parse installed plugin manifest")?;
+    let capability_catalog: Value = serde_json::from_slice(&std::fs::read(
+        package_root.join("capability-catalog.json"),
+    )?)
+    .context("parse installed capability catalog")?;
+    let github_provider: Value =
+        serde_json::from_slice(&std::fs::read(package_root.join("providers/github.json"))?)
+            .context("parse installed GitHub provider pack")?;
+    if package_manifest["schemaVersion"] != "elegy-plugin/v3"
+        || capability_catalog["schemaVersion"] != "elegy-capability-catalog/v2"
+    {
+        anyhow::bail!("installed Accounts package uses an unsupported manifest or catalog schema");
     }
+    let non_fixture = is_official_github_provider(&github_provider);
+    let install_provenance = package_install_provenance(&package_root, &package_manifest)?;
+    if non_fixture && install_provenance.is_none() {
+        anyhow::bail!(
+            "official live proof requires a validated installer receipt and source archive"
+        );
+    }
+
+    let database = local_data_dir()?.join("accounts.sqlite");
+    if let Some(parent) = database.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let disposable_data = std::fs::canonicalize(
+        database
+            .parent()
+            .context("proof vault has no containing data directory")?,
+    )
+    .context("resolve disposable proof vault directory")?;
+    let database = disposable_data.join("accounts.sqlite");
+    let backup = proof_root.join("vault-backup.sqlite");
+    if !disposable_data.starts_with(&proof_root) || !backup.starts_with(&proof_root) {
+        anyhow::bail!("refusing proof artifacts outside the marked isolated root");
+    }
+    let _cleanup = ProofVaultCleanup {
+        data_dir: disposable_data.clone(),
+        backup: backup.clone(),
+    };
+    let executable = std::env::current_exe()?;
+    let broker_stdout = proof_root.join("broker.stdout.log");
+    let broker_stderr = proof_root.join("broker.stderr.log");
+    let action_stderr = proof_root.join("actions-mcp.stderr.log");
+    let mut broker_command = TokioCommand::new(&executable);
+    broker_command
+        .arg("broker")
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(std::fs::File::create(&broker_stdout)?))
+        .stderr(Stdio::from(std::fs::File::create(&broker_stderr)?))
+        .kill_on_drop(true);
+    let mut broker = broker_command
+        .spawn()
+        .context("start packaged Accounts broker")?;
 
     let http = reqwest::Client::builder()
-        .user_agent("Elegy-Accounts-Live-Proof/0.1")
+        .timeout(Duration::from_secs(2))
         .build()?;
-    let profile_response = http
-        .get("https://api.github.com/user")
-        .bearer_auth(secret_text)
-        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
-        .send()
-        .await
-        .context("GitHub identity verification failed")?;
-    if !profile_response.status().is_success() {
-        anyhow::bail!("GitHub rejected identity verification");
+    let health = format!("{}/api/state", account_center_url().trim_end_matches('/'));
+    let mut healthy = false;
+    for _ in 0..100 {
+        if broker.try_wait()?.is_some() {
+            anyhow::bail!("packaged Accounts broker exited before becoming healthy");
+        }
+        if http
+            .get(&health)
+            .send()
+            .await
+            .is_ok_and(|response| response.status().is_success())
+        {
+            healthy = true;
+            break;
+        }
+        tokio::time::sleep(Duration::from_millis(50)).await;
     }
-    let profile: serde_json::Value = profile_response.json().await?;
-    let login = profile
-        .get("login")
-        .and_then(|value| value.as_str())
-        .context("GitHub returned no verified login")?;
+    if !healthy {
+        anyhow::bail!("packaged Accounts broker did not become healthy");
+    }
+    tokio::time::sleep(Duration::from_millis(50)).await;
+    if broker.try_wait()?.is_some() {
+        anyhow::bail!("packaged Accounts broker exited during health verification");
+    }
+    eprintln!("Live proof: packaged broker healthy.");
 
-    let proof_dir = ProofDirectory::create(local_data_dir()?)?;
-    let database = proof_dir.path.join("proof.sqlite");
-    let backup = proof_dir.path.join("proof-backup.sqlite");
-    let broker = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector))?);
-    let account = broker.vault().store_account(
-        "github",
-        login,
-        "existing_cli_session_ephemeral",
-        secret.as_slice(),
-    )?;
-    let request = broker.request_access(NewAccessRequest {
-        account_id: account.id.clone(),
-        client_id: "codex-local".into(),
-        purpose: "supervised live GitHub read-only proof".into(),
-        operations: vec!["profile.read".into()],
-        duration_minutes: 5,
-    })?;
-    let grant = broker.approve_access(&request.id)?;
-    let lease = broker.issue_lease(&grant.id, 5)?;
-    broker.authorize(
-        &lease.token,
-        "codex-local",
-        "supervised live GitHub read-only proof",
-        "github",
-        "profile.read",
-    )?;
+    let interaction_timeout = std::env::var("ELEGY_LIVE_PROOF_TIMEOUT_SECONDS")
+        .ok()
+        .and_then(|value| value.parse::<u64>().ok())
+        .map(|value| value.min(1_800))
+        .unwrap_or(900);
+    let deadline = Instant::now() + Duration::from_secs(interaction_timeout);
+    eprintln!(
+        "Live proof: connect the dedicated GitHub account in Account Center at {}.",
+        account_center_url()
+    );
+    loop {
+        let state = http.get(&health).send().await?.json::<Value>().await?;
+        let connected = state["accounts"].as_array().is_some_and(|accounts| {
+            accounts
+                .iter()
+                .any(|account| account["provider"] == "github" && account["status"] == "connected")
+        });
+        if connected {
+            break;
+        }
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "complete GitHub Device Flow in Account Center before the packaged MCP proof; no connected GitHub account exists in the isolated proof root"
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    }
+    let vault = Vault::open(&database, Arc::new(DpapiProtector))?;
+    let account = vault
+        .list_accounts()?
+        .into_iter()
+        .find(|account| account.provider == "github" && account.status == "connected")
+        .context("connected GitHub account disappeared before MCP startup")?;
+    let secret = vault.load_secret(&account.id)?;
+    vault.export_backup(&backup)?;
+    drop(vault);
+    eprintln!("Live proof: connected GitHub identity verified by Account Center.");
 
-    let decrypted = broker.vault().load_secret(&account.id)?;
-    let decrypted_text = std::str::from_utf8(decrypted.as_slice())
-        .context("vault credential encoding is invalid")?;
-    let action_response = http
-        .get("https://api.github.com/user")
-        .bearer_auth(decrypted_text)
-        .header(reqwest::header::ACCEPT, "application/vnd.github+json")
+    let (action_executable, action_arguments) =
+        declared_mcp_invocation(&package_root, "elegy-account-actions")?;
+    let mut action_command = TokioCommand::new(action_executable);
+    action_command
+        .args(action_arguments)
+        .stderr(Stdio::from(std::fs::File::create(&action_stderr)?));
+    let client = tokio::time::timeout(
+        Duration::from_secs(15),
+        ().serve(TokioChildProcess::new(action_command.configure(|child| {
+            child.kill_on_drop(true);
+        }))?),
+    )
+    .await
+    .context("initialize packaged Actions MCP server timed out")?
+    .context("initialize packaged Actions MCP server")?;
+    eprintln!("Live proof: packaged Actions MCP initialized.");
+    let listed = tokio::time::timeout(Duration::from_secs(15), client.list_all_tools())
+        .await
+        .context("list packaged Actions MCP tools timed out")??
+        .into_iter()
+        .any(|tool| tool.name == "github_profile_read");
+    if !listed {
+        anyhow::bail!("packaged Actions MCP does not advertise github_profile_read");
+    }
+    eprintln!("Live proof: github_profile_read advertised.");
+    let arguments = json!({"account_id":account.id})
+        .as_object()
+        .cloned()
+        .context("construct MCP arguments")?;
+    let request_surface = serde_json::to_vec(&arguments)?;
+    let (first_text, first_value) = loop {
+        let first = tokio::time::timeout(
+            Duration::from_secs(15),
+            client.call_tool(
+                CallToolRequestParams::new("github_profile_read").with_arguments(arguments.clone()),
+            ),
+        )
+        .await
+        .context("first packaged MCP tool call timed out")??;
+        let first_surface = serde_json::to_vec(&first)?;
+        if contains_bytes(&first_surface, secret.as_slice()) {
+            anyhow::bail!("credential appeared in a packaged MCP response");
+        }
+        let first_text = mcp_text(&first)?;
+        let first_value: Value = serde_json::from_str(&first_text)?;
+        if first_value["outcome"] == "completed" {
+            break (first_text, first_value);
+        }
+        if first_value["outcome"] != "interaction_required" {
+            anyhow::bail!("github_profile_read did not complete through packaged MCP");
+        }
+        let request_id = first_value["request_id"]
+            .as_str()
+            .context("MCP interaction_required result has no request_id")?;
+        eprintln!(
+            "Live proof: approve the github.profile.read request in Account Center at {}.",
+            request_url(Some(request_id))?
+        );
+        if Instant::now() >= deadline {
+            anyhow::bail!(
+                "github_profile_read requires an approved codex-actions/github.profile.read grant"
+            );
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
+    };
+    eprintln!("Live proof: real GitHub profile call completed through packaged MCP.");
+    if first_value["result"]["login"] != account.verified_identity {
+        anyhow::bail!("MCP result identity does not match the connected account");
+    }
+
+    let disconnect = http
+        .post(format!(
+            "{}/api/accounts/{}/disconnect",
+            account_center_url().trim_end_matches('/'),
+            account.id
+        ))
+        .header("x-elegy-intent", "user-action")
         .send()
         .await?;
-    let read_only_api_call = action_response.status().is_success();
-    let action_profile: serde_json::Value =
-        action_response.json().await.unwrap_or_else(|_| json!({}));
-    let identity_matches = action_profile.get("login") == profile.get("login")
-        && action_profile.get("id") == profile.get("id");
+    if !disconnect.status().is_success() {
+        anyhow::bail!("Account Center could not remove the proof connection");
+    }
+    eprintln!("Live proof: local proof connection removed.");
+    let second = tokio::time::timeout(
+        Duration::from_secs(15),
+        client
+            .call_tool(CallToolRequestParams::new("github_profile_read").with_arguments(arguments)),
+    )
+    .await
+    .context("post-disconnect packaged MCP tool call timed out")??;
+    eprintln!("Live proof: post-disconnect MCP call returned.");
+    let second_surface = serde_json::to_vec(&second)?;
+    if contains_bytes(&second_surface, secret.as_slice()) {
+        anyhow::bail!("credential appeared in the post-disconnect MCP response");
+    }
+    let second_text = mcp_text(&second)?;
+    let second_value: Value = serde_json::from_str(&second_text)?;
+    if second_value["error"] != "account_unavailable" {
+        anyhow::bail!("post-disconnect MCP call must fail with account_unavailable");
+    }
 
-    broker.vault().export_backup(&backup)?;
-    let plaintext_absent = !contains_bytes(&std::fs::read(&database)?, secret.as_slice())
-        && !contains_bytes(&std::fs::read(&backup)?, secret.as_slice());
-    drop(broker);
+    tokio::time::timeout(Duration::from_secs(15), client.cancel())
+        .await
+        .context("stop packaged Actions MCP timed out")??;
+    eprintln!("Live proof: Actions MCP stopped.");
+    broker.kill().await?;
+    let _ = broker.wait().await;
+    eprintln!("Live proof: broker stopped.");
 
-    let restarted = BrokerStore::new(Vault::open(&database, Arc::new(DpapiProtector))?);
-    let persisted = restarted.get_request(&request.id)?.status == "approved"
-        && restarted.vault().load_secret(&account.id)?.as_slice() == secret.as_slice();
-    restarted.revoke_grant(&grant.id, "live proof completed")?;
-    let revocation_invalidated_lease = restarted
-        .authorize(
-            &lease.token,
-            "codex-local",
-            "supervised live GitHub read-only proof",
-            "github",
-            "profile.read",
-        )
-        .is_err();
-    restarted.disconnect_account(&account.id)?;
-    drop(restarted);
-
-    let evidence = sanitized_github_evidence(
-        &profile,
-        read_only_api_call && identity_matches,
-        persisted,
-        revocation_invalidated_lease,
-        plaintext_absent,
-    );
+    let evidence = json!({
+        "schemaVersion":"elegy-accounts-live-proof/v1",
+        "generatedAt":chrono::Utc::now().to_rfc3339(),
+        "result":"passed",
+        "provider":"github",
+        "verifiedIdentity":account.verified_identity,
+        "nonFixture":non_fixture,
+        "package":{
+            "installed":install_provenance.is_some(),
+            "manifestSchema":package_manifest["schemaVersion"],
+            "catalogSchema":capability_catalog["schemaVersion"],
+            "provenance":install_provenance
+        },
+        "interface":{
+            "kind":"mcp",
+            "server":"elegy-account-actions",
+            "tool":"github_profile_read",
+            "initialized":true,
+            "listed":listed
+        },
+        "task":{
+            "readOnly":true,
+            "providerStatus":first_value["status"],
+            "remoteMutations":0
+        },
+        "revocation":{
+            "localConnectionRemoved":true,
+            "postRevokeError":second_value["error"]
+        },
+        "redaction":{
+            "passed":true,
+            "mcpArgumentsSecretFree":true,
+            "mcpResponsesSecretFree":true,
+            "processLogsSecretFree":true,
+            "vaultArtifactsSecretFree":true,
+            "receiptSecretFree":true
+        }
+    });
+    let receipt = serde_json::to_vec_pretty(&evidence)?;
+    for surface in [
+        request_surface.as_slice(),
+        first_text.as_bytes(),
+        second_text.as_bytes(),
+        receipt.as_slice(),
+    ] {
+        if contains_bytes(surface, secret.as_slice()) {
+            anyhow::bail!("credential appeared in a public proof surface");
+        }
+    }
+    for path in [
+        disposable_data.as_path(),
+        backup.as_path(),
+        broker_stdout.as_path(),
+        broker_stderr.as_path(),
+        action_stderr.as_path(),
+    ] {
+        if let Some(secret_path) = secret_bearing_file(path, secret.as_slice())? {
+            anyhow::bail!(
+                "credential appeared in proof artifact {}",
+                secret_path.display()
+            );
+        }
+    }
     if let Some(parent) = destination.parent() {
         std::fs::create_dir_all(parent)?;
     }
-    std::fs::write(destination, serde_json::to_vec_pretty(&evidence)?)?;
+    std::fs::write(destination, receipt)?;
+    if disposable_data.is_dir() {
+        std::fs::remove_dir_all(&disposable_data).context("remove disposable proof vault")?;
+    }
+    if backup.is_file() {
+        std::fs::remove_file(&backup).context("remove disposable proof vault backup")?;
+    }
     Ok(())
 }
 
-fn sanitized_github_evidence(
-    profile: &serde_json::Value,
-    read_only_api_call: bool,
-    restart_persistence: bool,
-    revocation_invalidated_lease: bool,
-    plaintext_absent: bool,
-) -> serde_json::Value {
-    json!({
-        "generated_at": chrono::Utc::now().to_rfc3339(),
-        "provider": "github",
-        "verified_identity": profile.get("login").and_then(|value| value.as_str()),
-        "provider_user_id": profile.get("id").and_then(|value| value.as_u64()),
-        "read_only_api_call": read_only_api_call,
-        "restart_persistence": restart_persistence,
-        "revocation_invalidated_lease": revocation_invalidated_lease,
-        "plaintext_absent": plaintext_absent,
-        "source_scope_risk": "existing_cli_credential_is_broader_than_the_mvp_grant",
-        "persistent_account_created": false,
-        "remote_mutations": 0,
-    })
+struct ProofVaultCleanup {
+    data_dir: PathBuf,
+    backup: PathBuf,
+}
+
+impl Drop for ProofVaultCleanup {
+    fn drop(&mut self) {
+        for attempt in 0..40 {
+            if !self.data_dir.exists() || std::fs::remove_dir_all(&self.data_dir).is_ok() {
+                break;
+            }
+            if attempt < 39 {
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        }
+        for attempt in 0..40 {
+            if !self.backup.exists() || std::fs::remove_file(&self.backup).is_ok() {
+                break;
+            }
+            if attempt < 39 {
+                std::thread::sleep(Duration::from_millis(25));
+            }
+        }
+    }
+}
+
+fn is_official_github_provider(provider: &Value) -> bool {
+    let Some(profile) = provider["auth_profiles"]
+        .as_array()
+        .and_then(|profiles| profiles.iter().find(|profile| profile["id"] == "device"))
+    else {
+        return false;
+    };
+    let operation = &provider["operations"]["profile.read"];
+    provider["schema_version"] == "elegy-account-provider/v2"
+        && provider["id"] == "github"
+        && provider["publisher"] == "elegy"
+        && profile["method"] == "device_authorization"
+        && profile["issuer"] == "https://github.com"
+        && profile["audience"] == "https://api.github.com"
+        && profile["token_url"] == "https://github.com/login/oauth/access_token"
+        && profile["device_authorization_url"] == "https://github.com/login/device/code"
+        && profile["identity"]["url"] == "https://api.github.com/user"
+        && profile["client"]["mode"] == "environment"
+        && profile["client"]["client_id_env"] == "ELEGY_GITHUB_CLIENT_ID"
+        && profile["scopes"] == json!(["read:user"])
+        && operation["risk"] == "read"
+        && operation["scopes"] == json!(["read:user"])
+        && operation["executor"]["kind"] == "http"
+        && operation["executor"]["profile"] == "device"
+        && operation["executor"]["method"] == "GET"
+        && operation["executor"]["path"] == "/user"
+}
+
+fn package_install_provenance(package_root: &FsPath, manifest: &Value) -> Result<Option<Value>> {
+    let receipt_path = package_root.join("install-receipt.json");
+    if !receipt_path.is_file() {
+        return Ok(None);
+    }
+    let receipt: ProofInstallReceipt = serde_json::from_slice(&std::fs::read(&receipt_path)?)
+        .context("parse installer receipt")?;
+    if receipt.schema_version != "elegy-installer/v1"
+        || Some(receipt.name.as_str()) != manifest["name"].as_str()
+        || Some(receipt.version.as_str()) != manifest["version"].as_str()
+        || receipt.installed_at.trim().is_empty()
+    {
+        anyhow::bail!("installer receipt identity does not match the installed package");
+    }
+    let installed_dir = PathBuf::from(&receipt.install_dir);
+    if std::fs::canonicalize(installed_dir)? != std::fs::canonicalize(package_root)? {
+        anyhow::bail!("installer receipt path does not match the running package");
+    }
+    let source = PathBuf::from(&receipt.source);
+    if !source.is_file() {
+        anyhow::bail!("installer receipt source archive is unavailable for hashing");
+    }
+    let archive_sha256 = format!("{:x}", Sha256::digest(std::fs::read(source)?));
+    if receipt
+        .artifact_sha256
+        .as_deref()
+        .is_some_and(|expected| !expected.eq_ignore_ascii_case(&archive_sha256))
+    {
+        anyhow::bail!("installer receipt archive digest does not match its source archive");
+    }
+    let required_binary = format!("bin/elegy-accounts{}", std::env::consts::EXE_SUFFIX);
+    let required_files = [
+        ".elegy-plugin/plugin.json",
+        "capability-catalog.json",
+        ".mcp.json",
+        "readiness.json",
+        "providers/github.json",
+        required_binary.as_str(),
+    ];
+    for required in required_files {
+        if !receipt.files.iter().any(|file| file == required)
+            || !package_root.join(required).is_file()
+        {
+            anyhow::bail!("installer receipt is missing required installed file {required}");
+        }
+    }
+    for file in &receipt.files {
+        let relative = FsPath::new(file);
+        if relative.is_absolute()
+            || relative
+                .components()
+                .any(|component| matches!(component, std::path::Component::ParentDir))
+            || !package_root.join(relative).is_file()
+        {
+            anyhow::bail!("installer receipt contains an invalid installed file entry");
+        }
+    }
+    Ok(Some(json!({
+        "receiptSchema":"elegy-installer/v1",
+        "name":receipt.name,
+        "version":receipt.version,
+        "archiveSha256":archive_sha256
+    })))
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ProofInstallReceipt {
+    schema_version: String,
+    name: String,
+    version: String,
+    installed_at: String,
+    source: String,
+    install_dir: String,
+    #[serde(default)]
+    artifact_sha256: Option<String>,
+    files: Vec<String>,
+}
+
+fn declared_mcp_invocation(package_root: &FsPath, server: &str) -> Result<(PathBuf, Vec<String>)> {
+    let descriptor: Value =
+        serde_json::from_str(&std::fs::read_to_string(package_root.join(".mcp.json"))?)?;
+    let declaration = descriptor
+        .pointer(&format!("/mcpServers/{server}"))
+        .context("installed MCP declaration is missing the required server")?;
+    let command = declaration["command"]
+        .as_str()
+        .context("installed MCP declaration has no command")?
+        .trim_start_matches("./");
+    let command_path = FsPath::new(command);
+    if command_path.is_absolute()
+        || command_path
+            .components()
+            .any(|component| matches!(component, std::path::Component::ParentDir))
+    {
+        anyhow::bail!("installed MCP command is not package-relative");
+    }
+    let arguments = declaration["args"]
+        .as_array()
+        .context("installed MCP declaration has no args")?
+        .iter()
+        .map(|value| {
+            value
+                .as_str()
+                .map(str::to_owned)
+                .context("installed MCP argument is not a string")
+        })
+        .collect::<Result<Vec<_>>>()?;
+    let executable = package_root.join(command_path);
+    if !executable.is_file() {
+        anyhow::bail!("installed MCP executable is missing");
+    }
+    Ok((executable, arguments))
+}
+
+fn mcp_text(result: &rmcp::model::CallToolResult) -> Result<String> {
+    serde_json::to_value(result)?
+        .pointer("/content/0/text")
+        .and_then(Value::as_str)
+        .map(str::to_owned)
+        .context("MCP tool result contains no text payload")
 }
 
 fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
@@ -1123,22 +1567,20 @@ fn contains_bytes(haystack: &[u8], needle: &[u8]) -> bool {
             .any(|window| window == needle)
 }
 
-struct ProofDirectory {
-    path: PathBuf,
-}
-
-impl ProofDirectory {
-    fn create(base: PathBuf) -> Result<Self> {
-        let path = base.join(format!("live-proof-{}", uuid::Uuid::new_v4().simple()));
-        std::fs::create_dir_all(&path)?;
-        Ok(Self { path })
+fn secret_bearing_file(path: &FsPath, secret: &[u8]) -> Result<Option<PathBuf>> {
+    if path.is_file() {
+        return Ok(contains_bytes(&std::fs::read(path)?, secret).then(|| path.to_path_buf()));
     }
-}
-
-impl Drop for ProofDirectory {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_dir_all(&self.path);
+    if !path.is_dir() {
+        return Ok(None);
     }
+    for entry in std::fs::read_dir(path)? {
+        let found = secret_bearing_file(&entry?.path(), secret)?;
+        if found.is_some() {
+            return Ok(found);
+        }
+    }
+    Ok(None)
 }
 
 #[derive(Clone)]
@@ -2346,7 +2788,8 @@ fn contains_secret_key(value: &serde_json::Value) -> bool {
 mod native_host_tests {
     use super::{
         DeviceFlowConfig, DevicePoll, action_request, handle_native_message,
-        live_proof_destination, poll_device_flow, start_device_flow, valid_user_intent,
+        live_proof_destination, poll_device_flow, secret_bearing_file, start_device_flow,
+        valid_user_intent,
     };
     use axum::{
         Json, Router,
@@ -2424,7 +2867,7 @@ mod native_host_tests {
         let approved = vec![
             "proof-github".to_owned(),
             "proof.json".to_owned(),
-            "--consent=github-read-only".to_owned(),
+            "--consent=github-device-read-only".to_owned(),
         ];
         assert_eq!(
             live_proof_destination(&approved).unwrap(),
@@ -2433,24 +2876,17 @@ mod native_host_tests {
     }
 
     #[test]
-    fn live_proof_evidence_keeps_identity_but_never_credentials() {
-        let evidence = super::sanitized_github_evidence(
-            &serde_json::json!({"login":"Sofreshx","id":46634397,"name":"Private Name","email":"private@example.test"}),
-            true,
-            true,
-            true,
-            true,
+    fn live_proof_secret_scan_includes_nested_sqlite_sidecars() {
+        let root = tempfile::tempdir().unwrap();
+        let nested = root.path().join("Elegy/Accounts");
+        std::fs::create_dir_all(&nested).unwrap();
+        let wal = nested.join("accounts.sqlite-wal");
+        std::fs::write(&wal, b"prefix-secret-canary-suffix").unwrap();
+
+        assert_eq!(
+            secret_bearing_file(root.path(), b"secret-canary").unwrap(),
+            Some(wal)
         );
-        assert_eq!(evidence["provider"], "github");
-        assert_eq!(evidence["verified_identity"], "Sofreshx");
-        assert_eq!(evidence["provider_user_id"], 46634397);
-        assert_eq!(evidence["read_only_api_call"], true);
-        assert_eq!(evidence["revocation_invalidated_lease"], true);
-        assert_eq!(evidence["plaintext_absent"], true);
-        let serialized = evidence.to_string();
-        assert!(!serialized.contains("Private Name"));
-        assert!(!serialized.contains("private@example.test"));
-        assert!(!serialized.to_ascii_lowercase().contains("token"));
     }
 
     #[tokio::test]

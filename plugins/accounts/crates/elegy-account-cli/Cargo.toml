@@ -22,6 +22,7 @@ rand.workspace = true
 schemars = "1.0.4"
 serde.workspace = true
 serde_json.workspace = true
+sha2.workspace = true
 tokio = { version = "1.45.1", features = ["macros", "rt-multi-thread", "io-std", "io-util", "sync", "process", "net", "time"] }
 tower-http = { version = "0.6.6", features = ["fs", "set-header"] }
 url = "2.5.4"
