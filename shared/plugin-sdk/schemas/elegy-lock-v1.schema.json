@@ -1,0 +1,82 @@
+{
+  "$defs": {
+    "ElegyCapabilityReferenceV1": {
+      "additionalProperties": false,
+      "description": "One exact package selection in an agent's reviewed tool lock.",
+      "properties": {
+        "allowedCapabilities": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "archiveSha256": {
+          "type": "string"
+        },
+        "capabilityCatalogSha256": {
+          "type": "string"
+        },
+        "executableDigests": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "manifestSha256": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "publisher": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        },
+        "target": {
+          "type": "string"
+        },
+        "version": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "target",
+        "source",
+        "archiveSha256",
+        "manifestSha256",
+        "capabilityCatalogSha256",
+        "executableDigests",
+        "publisher",
+        "allowedCapabilities"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "agentId": {
+      "type": "string"
+    },
+    "packages": {
+      "items": {
+        "$ref": "#/$defs/ElegyCapabilityReferenceV1"
+      },
+      "type": "array"
+    },
+    "schemaVersion": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "agentId",
+    "packages"
+  ],
+  "title": "ElegyLockV1",
+  "type": "object"
+}

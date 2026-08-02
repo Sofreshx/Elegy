@@ -3,6 +3,28 @@
   "description": "Elegy release catalog. kind controls build mechanics; surfaceClass and lifecycle state the product boundary and release posture.",
   "surfaces": [
     {
+      "name": "elegy",
+      "kind": "cli",
+      "surfaceClass": "tool",
+      "lifecycle": "active",
+      "package": "elegy-tooling",
+      "crateRoot": "shared/tooling",
+      "readiness": { "path": "./shared/tooling/readiness.json", "schemaVersion": "elegy-readiness/v1" },
+      "disposition": "Host-neutral capability packaging toolkit; not a connector plugin.",
+      "description": "Capability package authoring, locking, installation, verification, and projection CLI."
+    },
+    {
+      "name": "elegy-capability-mcp",
+      "kind": "host-adapter",
+      "surfaceClass": "host-adapter",
+      "lifecycle": "active",
+      "package": "elegy-capability-mcp",
+      "crateRoot": "hosts/capability-mcp",
+      "readiness": { "path": "./hosts/capability-mcp/readiness.json", "schemaVersion": "elegy-readiness/v1" },
+      "disposition": "Generic MCP projection for host-neutral CLI capabilities; not a plugin or product domain.",
+      "description": "Schema-validated CLI-to-MCP stdio bridge."
+    },
+    {
       "name": "elegy-codegraph",
       "kind": "cli",
       "surfaceClass": "tool",

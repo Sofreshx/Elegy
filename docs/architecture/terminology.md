@@ -108,6 +108,16 @@ one concrete interface (`cli`, `mcp-resource`, or `mcp-tool`). The capability is
 the governed concept; a host projection is a derived installation or transport
 surface.
 
+### Capability package
+
+The reusable host-neutral distribution unit described by `elegy-package/v1`.
+It binds a tool's executable or native-MCP entrypoint, capability catalog,
+schemas, readiness, publisher identity, supported targets, packaged-file
+digests, and optional guidance skills. An agent setup selects exact package
+versions through `elegy-lock/v1`. Codex plugin manifests, MCP configuration,
+Holon registrations, and shell instructions are projections of the package,
+not competing authorities.
+
 ### Skill
 
 Reusable agent instructions plus optional references, scripts, templates, and
@@ -121,21 +131,22 @@ boundary is present.
 
 ### Portable plugin core
 
-The host-neutral plugin package and capability catalog from which host-specific
-install surfaces are derived.
+Compatibility terminology for the host-neutral portion of a capability
+package. New contracts should name the `elegy-package/v1` capability package
+directly.
 
-The portable plugin core owns capability identity, invocation contracts,
-dependencies, and distribution metadata. It does not contain a Codex plugin
-directory, a Holon package manifest, a native workflow graph, client
-credentials, or deployment state.
+The package owns capability identity, invocation contracts, publisher and
+distribution metadata. It does not contain a Codex plugin directory, a Holon
+package manifest, a native workflow graph, client credentials, or deployment
+state.
 
 ### Host projection
 
 A derived installation or discovery surface for one supported agent host.
 
 For example, the Codex `.codex-plugin` tree is a host projection of a portable
-Elegy plugin core. A host projection may adapt layout and host metadata, but it
-must not become a second authority for capability behavior.
+Elegy capability package. A host projection may adapt layout and host metadata,
+but it must not become a second authority for capability behavior.
 
 ### Capability binding
 
@@ -326,7 +337,11 @@ In the current topology, the crate trees under `hosts/`, `plugins/`, and `shared
 
 The package family or artifact set that is allowed to define canonical truth for a concept.
 
-In Elegy, authority surfaces are the governed artifact roots co-located in each plugin's directory (e.g., `plugins/<name>/schemas/`, `plugins/<name>/fixtures/`). Rust implements operational behavior that consumes those artifacts but does not replace their canonical truth. Operational policy lives at `docs/governance/`.
+In Elegy, `elegy-package/v1` and `elegy-capability-catalog/v2` are the
+authority for reusable capability packages and operations; `elegy-lock/v1` is
+the reviewed agent selection authority. Legacy plugin directories may retain
+governed artifacts during migration, but generated host projections never
+become canonical truth. Operational policy lives at `docs/governance/`.
 
 ### Governance
 

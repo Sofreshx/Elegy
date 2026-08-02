@@ -1,0 +1,40 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Host-neutral capability package contracts, exact locks, installation receipts, and host projections are implemented and source-tested.",
+  "worksToday": [
+    "Creates and validates independent capability package scaffolds.",
+    "Creates deterministic archives and exact elegy-lock/v1 files.",
+    "Installs, updates, verifies, and lock-guards uninstalls atomically."
+  ],
+  "limitations": [
+    "No clean independent-repository release receipt has been reviewed yet.",
+    "Publisher signatures and production marketplace proof remain pending; SBOM sidecars are implemented but not independently attested yet.",
+    "Implemented is not agent-routable readiness."
+  ],
+  "supportedEnvironments": [
+    "Windows source build",
+    "Linux source build expected; clean-install evidence pending"
+  ],
+  "installation": "Build from source with cargo build -p elegy-tooling.",
+  "invocation": "Run the elegy binary for init, check, test, pack, lock, install, update, verify, uninstall, and project.",
+  "evidence": [
+    {
+      "kind": "source-tests",
+      "path": "./shared/tooling/tests/capability_cli.rs",
+      "summary": "Unified package authoring, locking, installation, verification, and projection tests pass."
+    },
+    {
+      "kind": "source-tests",
+      "path": "./shared/tooling/tests/capability_install.rs",
+      "summary": "Exact-lock and tamper-detection installer tests pass."
+    },
+    {
+      "kind": "package-verification",
+      "path": "./shared/tooling/tests/capability_cli.rs",
+      "summary": "The package CLI creates and verifies an independent temporary package archive and lock."
+    }
+  ]
+}

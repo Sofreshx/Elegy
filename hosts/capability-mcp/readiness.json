@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "elegy-readiness/v1",
+  "surface": "elegy-capability-mcp",
+  "surfaceVersion": "0.1.0",
+  "stage": "implemented",
+  "summary": "Generic schema-validated MCP stdio bridge for exact capability package projections.",
+  "worksToday": [
+    "Lists routable CLI capabilities from a capability-catalog/v2 package.",
+    "Invokes package executables without a shell and validates JSON input and output.",
+    "Supports exact lock and installer-receipt verification before tool exposure."
+  ],
+  "limitations": [
+    "No clean installed MCP client task receipt has been reviewed yet.",
+    "Native MCP remains the package author's responsibility for stateful or streaming behavior.",
+    "Implemented is not agent-routable readiness."
+  ],
+  "supportedEnvironments": [
+    "Windows source build",
+    "Linux source build expected; clean-install evidence pending"
+  ],
+  "installation": "Build from source with cargo build -p elegy-capability-mcp.",
+  "invocation": "Run elegy-capability-mcp --package ./installed-package --lock ./agent.elegy.lock.json.",
+  "evidence": [
+    {
+      "kind": "source-tests",
+      "path": "./hosts/capability-mcp/tests/bridge.rs",
+      "summary": "Direct bridge, duplex MCP client, schema, and exact-lock tests pass."
+    },
+    {
+      "kind": "package-verification",
+      "path": "./hosts/capability-mcp/tests/bridge.rs",
+      "summary": "The bridge verifies package files and installer receipts before exposing a lock-backed capability."
+    }
+  ]
+}

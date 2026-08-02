@@ -8,7 +8,9 @@ doc_kind: guide
 # Distribution and downstream consumption
 
 Elegy ships release assets through GitHub Releases, not package feeds or
-sibling-repo workspace assumptions.
+sibling-repo workspace assumptions. A capability package is the portable
+release unit; Codex plugins, MCP configuration, Holon registrations, and shell
+instructions are derived projections.
 
 - **Stable semver tags** (e.g. `v1.3.2`) are the supported downstream contract that consumers should pin.
 - **Rolling prerelease `main-snapshot`** is refreshed on every push to `main` and is intended for validation, debugging, and latest-branch integration checks. Same asset families, different lifecycle promise.
@@ -38,6 +40,8 @@ stability promise.
 | Release manifest | `elegy-release-manifest-<tag>.json` | Emitted by `.github/workflows/publish-orchestrator.yml`. |
 | Release checksums | `elegy-release-checksums-<tag>.json` | SHA-256 of every published asset and the manifest. |
 | Plugin archive | `<surface>-plugin-<target>.zip` | Primary release for binary-backed plugin-packaged surfaces. Contains plugin.json, skills/, and binary. |
+| Capability package archive | `<package>-<version>-<target>.elegy.zip` | Host-neutral `elegy-package/v1` archive containing the executable, catalog, readiness, and optional skills. |
+| Capability package SBOM | `<package>-<version>-<target>.elegy.zip.sbom.json` | Deterministic archive inventory with package, provenance, archive, and per-file digests. |
 | Codex marketplace projection | `elegy-codex-marketplace-<target>.zip` | Generated Codex-native marketplace tree containing `.agents/plugins/marketplace.json`, plugin projections, skills, companion files, and target binaries. |
 | Local pack default | `<plugin-name>-v<version>.plugin.zip` | Ad hoc output from `elegy-plugin-packaging pack` when `--output` is omitted. Not the GitHub release naming contract. |
 | CLI asset | `<name>-<target>[.exe]` | Per binary surface and target, resolved through distribution/surfaces.json. Plugin-packaged surfaces bundle this with skills in plugin archives. |
@@ -80,21 +84,34 @@ requirements. Public metadata cannot substitute for runtime proof.
 
 ## Install
 
-Plugin-packaged surfaces install via `elegy-plugin-packaging install`:
+Legacy plugin-packaged surfaces install via `elegy-plugin-packaging install`:
 
 ```bash
 elegy-plugin-packaging install --archive elegy-accounts-plugin-x86_64-pc-windows-msvc.zip
 ```
 
-Non-plugin surfaces install via `scripts/install-distribution.sh`:
+Capability packages install from an exact reviewed lock:
+
+```bash
+elegy lock verify --lock ./agent.elegy.lock.json
+elegy install --archive ./my-tool.elegy.zip --lock ./agent.elegy.lock.json \
+  --install-root ./installed
+elegy verify --package ./installed/my-tool --lock ./agent.elegy.lock.json
+```
+
+Use `elegy install --update` for an integrity-checked atomic update and
+`elegy uninstall` for a lock-guarded removal.
+
+Non-plugin, non-package surfaces install via `scripts/install-distribution.sh`:
 
 ```bash
 # Legacy flat binary install (non-plugin surfaces only)
 bash ./scripts/install-distribution.sh --tag vX.Y.Z --destination ./tools/elegy --surface elegy-codegraph --force
 ```
 
-Plugin-packaged surfaces should use `elegy-plugin-packaging install` as the
-primary install lane.
+The host-neutral package lane should be preferred for new reusable tools.
+`elegy-plugin-packaging` remains a compatibility lane for existing v3 plugin
+archives during migration.
 
 Portable archives and host projections retain the typed capability catalog,
 readiness artifact and receipts, and connection descriptors referenced by the

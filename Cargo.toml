@@ -1,5 +1,6 @@
 [workspace]
 members = [
+    "hosts/capability-mcp",
     "hosts/host-mcp",
     "plugins/desktop",
     "plugins/documentation",
