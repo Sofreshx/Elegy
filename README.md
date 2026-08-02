@@ -4,12 +4,13 @@
 [![Latest release](https://img.shields.io/github/v/release/Sofreshx/Elegy?display_name=tag&sort=semver)](https://github.com/Sofreshx/Elegy/releases/latest)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 
-Elegy is a Rust toolkit for shipping governed capabilities to AI-agent hosts.
-Governed artifacts stay in the repo. The capability catalog gives each entry
-one concrete first-class interface: a local CLI invocation, an MCP resource, or
-an MCP tool. Dedicated `elegy-*` binaries expose CLI surfaces; MCP is available
-when a host needs the declared resource or tool protocol boundary. CLI remains
-the default integration contract for local executable capabilities.
+Elegy is a Rust toolkit for packaging one governed AI capability for reuse
+across agent hosts. Build the tool once, describe it once, package it once,
+then generate safe CLI, MCP, Codex, Holon, or skill projections. The canonical
+unit is `elegy-package/v1`; host-specific plugin manifests and registrations
+are derived outputs. The capability catalog gives each operation one concrete
+interface: a local CLI invocation, an MCP resource, or an MCP tool. CLI remains
+the default integration contract for deterministic executable capabilities.
 
 ## Current readiness
 
@@ -28,7 +29,7 @@ Core model:
 - domain and business logic stays in libraries, applications, Automation Packs,
   or product-local commands
 - Rust implements reusable behavior over those artifacts
-- `SKILL.md` files are the skill discovery authority
+- `SKILL.md` files are optional workflow guidance; they never establish executable behavior or authorization
 - dedicated `elegy-*` binaries are implementation surfaces whose readiness is
   proven separately
 - `elegy-run` is the MCP host adapter
@@ -66,6 +67,36 @@ cargo run -p elegy-accounts -- --help
 
 These commands are source verification, not clean-install or real-task receipts.
 
+## Capability package authoring
+
+Keep business logic in the independent tool repository, expose a stable
+JSON-first CLI, and use Elegy for the package contract and projections:
+
+```bash
+elegy init --name my-tool --output ./my-tool
+elegy check --package ./my-tool
+elegy test --package ./my-tool
+elegy pack --package ./my-tool --output ./dist/my-tool.zip
+elegy project --package ./my-tool --host mcp --output ./dist/mcp
+```
+
+`pack` also emits a deterministic `<archive>.sbom.json` sidecar. Create an
+exact reviewed lock, install it, and pass that lock to a projection before
+using it from an agent host:
+
+```bash
+elegy lock create --package ./my-tool --archive ./dist/my-tool.zip \
+  --agent-id my-agent --capability my-tool.example --output ./agent.elegy.lock.json
+elegy install --archive ./dist/my-tool.zip --lock ./agent.elegy.lock.json \
+  --install-root ./installed
+elegy project --package ./installed/my-tool --host mcp \
+  --lock ./agent.elegy.lock.json --output ./dist/mcp
+```
+
+Use a native MCP server only when the tool genuinely needs state, streaming,
+subscriptions, or sessions. For deterministic request/response tools,
+`elegy-capability-mcp` is the reusable protocol adapter.
+
 Read first: [CONTRIBUTING.md](CONTRIBUTING.md), [SECURITY.md](SECURITY.md),
 [docs/architecture/README.md](docs/architecture/README.md).
 
@@ -77,6 +108,8 @@ The [readiness matrix](docs/readiness.md) is authoritative for current claims.
 | Binary | Crate | Per-feature note |
 | --- | --- | --- |
 | `elegy-run` | `hosts/host-mcp/` | [DISTRIBUTION.md](hosts/host-mcp/DISTRIBUTION.md) |
+| `elegy` | `shared/tooling/` | Host-neutral package authoring, locking, installation, verification, and projection. |
+| `elegy-capability-mcp` | `hosts/capability-mcp/` | Generic schema-validated CLI-to-MCP bridge. |
 | `elegy-contracts` | `shared/core/` | _No dedicated distribution note yet_ |
 | `elegy-plugin-packaging` | `shared/tooling/` | [docs/distribution.md](docs/distribution.md) |
 | `elegy-desktop` | `plugins/desktop/` | [DISTRIBUTION.md](plugins/desktop/DISTRIBUTION.md) |

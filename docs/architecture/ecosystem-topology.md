@@ -56,11 +56,12 @@ An Elegy marketplace plugin must:
 4. declare a typed `capabilityCatalog`;
 5. reference canonical readiness evidence.
 
-The capability catalog and its declared CLI, MCP-resource, or MCP-tool
-interfaces are portable authority. Codex metadata, OpenCode/Claude layouts,
-and bundled skills are derived or optional host surfaces. Credentials and
-deployment state stay with the connection provider or operating host. The v1
-`fallback` field has no active runtime consumer and cannot change routing.
+The `elegy-package/v1` manifest and its declared `elegy-capability-catalog/v2`
+operations are portable authority. Codex metadata, OpenCode/Claude layouts,
+Holon registrations, and bundled skills are derived or optional host surfaces.
+Credentials and deployment state stay with the connection provider or
+operating host. The v1 `fallback` field has no active runtime consumer and
+cannot change routing.
 
 Accounts is the only active packaged adapter in the initial cleanup. Desktop
 and Observe remain valuable adapter candidates in `rework`; their former
@@ -94,8 +95,9 @@ the smallest stable common contract. Product-local behavior remains local.
 - Behavioral specifications: `docs/specs/`
 - Surface class, lifecycle, and disposition: `distribution/surfaces.json`
 - Readiness proof: each surface's `elegy-readiness/v1` artifact
-- Adapter identity and executable discovery: active `.elegy-plugin/plugin.json`
-  plus its capability catalog
+- Adapter identity and executable discovery: `elegy-package.json` plus its
+  capability catalog; active `.elegy-plugin/plugin.json` remains a migration
+  compatibility surface
 - Host projections: derived outputs, never primary authority
 
 Run:

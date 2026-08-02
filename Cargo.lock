@@ -687,6 +687,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "elegy-capability-mcp"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "elegy-plugin-sdk",
+ "jsonschema",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "thiserror 2.0.18",
+ "tokio",
+]
+
+[[package]]
 name = "elegy-codegraph"
 version = "0.1.0"
 dependencies = [
@@ -909,6 +925,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "tempfile",
  "thiserror 2.0.18",
  "url",
  "zip",
@@ -943,10 +960,12 @@ dependencies = [
  "clap",
  "elegy-plugin-sdk",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "sha2",
  "tempfile",
+ "thiserror 2.0.18",
  "zip",
 ]
 

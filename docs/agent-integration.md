@@ -8,17 +8,17 @@ doc_kind: guide
 # Agent Integration
 
 Elegy is designed for AI-agent hosts that can run local subprocesses or speak
-MCP. The canonical path is the typed catalog of an installed adapter plugin;
-each capability declares one first-class interface: `cli`, `mcp-resource`, or
-`mcp-tool`.
+MCP. The canonical path is an installed `elegy-package/v1` capability package
+selected by an exact `elegy-lock/v1`; its catalog declares one first-class
+interface: `cli`, `mcp-resource`, or `mcp-tool`.
 
 The CLI lane remains the default integration boundary when a local subprocess
 is sufficient. MCP resources and MCP tools are direct interfaces for
 MCP-native hosts, not fallback metadata:
 
-1. validate the setup
-2. discover the minimum needed capability
-3. invoke the advertised CLI template
+1. verify the exact lock and installer receipt
+2. discover the minimum needed capability from the package catalog
+3. invoke the advertised CLI template or generic MCP projection
 4. let the host enforce side-effect policy
 
 MCP is a first-class protocol interface for entries declared as
@@ -27,16 +27,22 @@ MCP; the CLI remains the default onboarding lane for `cli` entries.
 
 ## Canonical Flow
 
-Verify the plugin package and then invoke its dedicated binary:
+Create and install a package, then project it for the host:
 
 ```bash
-elegy-plugin-packaging verify --plugin plugins/accounts
-elegy-accounts --help
+elegy check --package ./my-tool
+elegy pack --package ./my-tool --output ./dist/my-tool.zip
+elegy lock create --package ./my-tool --archive ./dist/my-tool.zip \
+  --agent-id my-agent --capability my-tool.read --output ./agent.elegy.lock.json
+elegy install --archive ./dist/my-tool.zip --lock ./agent.elegy.lock.json \
+  --install-root ./installed
+elegy project --package ./installed/my-tool --host mcp \
+  --lock ./agent.elegy.lock.json --output ./dist/mcp
 ```
 
 ## Discovery Layers
 
-The adapter's `capabilityCatalog` is executable discovery authority. Bundled
+The package's `capabilityCatalog` is executable discovery authority. Bundled
 skills are optional workflow guidance, never proof that behavior exists.
 Standalone skills use the target host's normal skill installation lane and do
 not enter the Elegy plugin marketplace. A host discovers and routes only
@@ -69,6 +75,11 @@ connection binding.
 ## Release Assets
 
 Tagged releases include dedicated binaries for each runtime surface.
+
+Capability package releases should publish the package archive, its
+`<archive>.sbom.json` sidecar, and the exact lock update together. Codex,
+Holon, MCP, and shell artifacts are projections of that package; they are not
+separate package authorities.
 
 - `elegy-planning` binary
 - `elegy-memory` binary

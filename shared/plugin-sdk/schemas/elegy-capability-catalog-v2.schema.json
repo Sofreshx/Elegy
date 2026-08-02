@@ -12,12 +12,14 @@
         "executable": {
           "type": "string"
         },
+        "inputSchema": true,
         "optionalArgs": {
           "items": {
             "type": "string"
           },
           "type": "array"
         },
+        "outputSchema": true,
         "requiredArgs": {
           "items": {
             "type": "string"

@@ -1,0 +1,94 @@
+{
+  "$defs": {
+    "ElegyPackageProvenanceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "buildWorkflow": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "builder": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceCommit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ElegySbomFileV1": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "role",
+        "sha256"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "A deterministic software bill of materials for one packaged artifact.",
+  "properties": {
+    "archiveSha256": {
+      "type": "string"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ElegySbomFileV1"
+      },
+      "type": "array"
+    },
+    "package": {
+      "type": "string"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPackageProvenanceV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publisher": {
+      "type": "string"
+    },
+    "schemaVersion": {
+      "type": "string"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "package",
+    "version",
+    "publisher",
+    "archiveSha256",
+    "files"
+  ],
+  "title": "ElegySbomV1",
+  "type": "object"
+}

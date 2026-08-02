@@ -11,6 +11,10 @@ lastVerified: 2026-07-30
 evidence proves validated structural preservation for the fixture shapes in
 this repository. It does not yet prove complete Codex package/runtime parity.
 
+New reusable tools should author `elegy-package/v1` and use `elegy project
+--host codex`. The v3 contract below remains the backward-compatible Codex
+projection/import boundary; it is not the canonical package authority.
+
 ## Projection rule
 
 The v3 top level preserves Codex-native metadata, skills, MCP servers, apps,

@@ -83,7 +83,12 @@ default.
 
 - `id`, `kind`, `description`, side-effect classification, and contract version
   are required for every entry.
-- `cli` requires a CLI invocation template.
+- `cli` requires a CLI invocation template. A host-neutral capability package
+  must also declare object-valued `inputSchema` and `outputSchema` on that
+  invocation so a generic protocol projection can validate calls. Older v2
+  catalogs may omit those optional fields for compatibility, but the package
+  checker and generic bridge reject such CLI entries for new package
+  projections.
 - `mcp-resource` requires a resource URI/template and its output contract.
 - `mcp-tool` requires a tool name plus input and output contracts.
 - No entry may declare more than one primary kind.
