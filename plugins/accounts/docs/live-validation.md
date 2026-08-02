@@ -2,7 +2,7 @@
 
 Live checks complement the deterministic fake-provider suite. They are intentionally optional: CI and acceptance never require a personal account.
 
-Live proofs validate runtime packs; they never justify provider-name branches in the broker or UI. Before marking any pack ready, pass provider parsing, endpoint-policy, identity assertion, auth-adapter, proxy audience, lease, and redaction tests against a deterministic loopback fake. Then install the real pack, connect through Account Center, verify close/reopen recovery, approve one narrow read through the broker, restart, revoke, prove the old lease fails, scan artifacts for plaintext, and clean up.
+Live proofs validate runtime packs; they never justify provider-name branches in the broker or UI. Before marking any pack ready, pass provider parsing, endpoint-policy, identity assertion, auth-adapter, proxy audience, lease, and redaction tests against a deterministic loopback fake. The GitHub lane below is deliberately narrower: it proves installed-package Device Flow, one approved packaged MCP read, local disconnect, the identical MCP call failing afterward, artifact scanning, and cleanup. Restart persistence and provider-side revocation require separate evidence before either may be claimed.
 
 ## Safety contract
 
@@ -17,46 +17,63 @@ Live proofs validate runtime packs; they never justify provider-name branches in
 
 GitHub is the device-authorization proof pack, not a compiled special case.
 
-### Ephemeral broker proof
+### Packaged Device Flow proof
 
-`npm run proof:github` borrows the existing GitHub CLI session in memory, verifies `/user`, exercises encrypted storage, a read-only grant and lease, restart persistence, revocation, plaintext scans, and cleanup. It never adds that broad CLI credential to the user's permanent Elegy vault. The command fails closed unless `ELEGY_LIVE_PROOF_CONSENT=github-read-only` is set after the operator has approved this supervised run; the wrapper passes the matching `--consent=github-read-only` confirmation to the binary.
+Use a dedicated GitHub OAuth application configured for Device Flow. Set only
+its public client ID in `ELEGY_GITHUB_CLIENT_ID`; do not use a GitHub CLI
+session, a personal OAuth client, or a client secret. The proof wrapper builds
+the release binary, creates the plugin archive, installs that archive into a
+fresh session-local install root, and invokes only the installed proof binary.
+It never invokes `gh` or a source `cargo run -p elegy-accounts` proof.
 
-The direct invocation is:
-
-```text
-cargo run -p elegy-accounts -- proof-github artifacts/live/github-proof.json --consent=github-read-only
-```
-
-For the package script, set the acknowledgement in the current process only:
+For the package script, acknowledge the supervised read-only run in the
+current PowerShell process only:
 
 ```powershell
-$env:ELEGY_LIVE_PROOF_CONSENT = 'github-read-only'
+$env:ELEGY_LIVE_PROOF_CONSENT = 'github-device-read-only'
+$env:ELEGY_GITHUB_CLIENT_ID = '<dedicated-device-flow-client-id>'
 npm run proof:github
 Remove-Item Env:ELEGY_LIVE_PROOF_CONSENT
+Remove-Item Env:ELEGY_GITHUB_CLIENT_ID
 ```
 
-The confirmation is an operator acknowledgement, not a substitute for the human GitHub consent or any CAPTCHA, MFA, account-selection, or provider checkpoint described below.
+The wrapper creates a fresh temporary session root, writes
+`localappdata/.elegy-accounts-live-proof.json` with schema version
+`elegy-accounts-live-proof-root/v1`, and sets both `LOCALAPPDATA` and
+`ELEGY_ACCOUNTS_PROOF_ROOT` to that marked isolated root. It preserves the
+session root and prints the resulting `github-proof.json` path for review.
 
-### Production Device Flow proof
+The confirmation is an operator acknowledgement, not a substitute for the
+human GitHub consent or any CAPTCHA, MFA, account-selection, or provider
+checkpoint described below.
 
-1. Register a dedicated local GitHub OAuth app with Device Flow enabled.
-2. Set its public client ID in `ELEGY_GITHUB_CLIENT_ID`; no client secret is stored or used.
-3. Start Account Center and choose GitHub.
+1. Register a dedicated local GitHub Device Flow OAuth application. No client
+   secret is stored or used.
+2. Run the wrapper as above. It builds, packages, and installs the archive
+   before starting the installed `elegy-accounts.exe` proof binary.
+3. In the installed Account Center, choose GitHub.
 4. The UI shows only the user code and GitHub verification URL. The private device code is persisted only as an authenticated-encryption envelope so an unexpired session survives broker restart.
 5. The user approves the requested `read:user` permission on GitHub.
-6. Confirm the verified GitHub identity appears in Account Center and through the bounded MCP account-list tool.
-7. Restart Account Center and confirm the encrypted connection persists.
-8. Issue and approve a `profile.read` request, execute one read-only `/user` call through the broker boundary, revoke it, and prove the lease fails.
-9. Scan the database, backup, logs, evidence, and UI output for credential plaintext.
+6. Confirm the verified identity appears in Account Center. The installed
+   packaged Actions MCP server (`elegy-account-actions`) must advertise and execute exactly
+   `github_profile_read`; approve its narrow local request if Account Center
+   requires it.
+7. Confirm its read-only result identifies the connected GitHub account.
+8. Disconnect the account locally in Account Center. Call the same packaged
+   `github_profile_read` MCP tool again and confirm it returns
+   `account_unavailable`.
+9. Scan the isolated database, backup, logs, evidence, and UI output for
+   credential plaintext.
 
-The July 16, 2026 live run verified `Sofreshx`, UI close/reopen recovery, broker-owned polling, successful GitHub identity validation, encrypted account persistence across broker restart, zero active authorization sessions after completion, and zero remote mutations.
+This proof establishes only the local disconnect and subsequent packaged MCP
+failure. Provider-side GitHub token revocation is not yet supported or proven.
 
 ## Evidence matrix
 
 | Provider/lane | Auth path | Minimum proof | Remote writes | MVP state |
 |---|---|---|---:|---|
 | Deterministic fake providers | OAuth PKCE and GitHub Device Flow | exact request shape, pending/slow/deny/success, identity validation, secret redaction | 0 | required in CI |
-| GitHub live | OAuth Device Flow, `read:user` | connect, identity, persistence, lease, read, revoke, plaintext scan | 0 | first live release gate |
+| GitHub live | OAuth Device Flow, `read:user` | installed package, connect, identity, approved packaged MCP read, local disconnect, identical MCP failure, plaintext scan, cleanup | 0 | narrow live proof; not persistence or provider revocation evidence |
 | Cloudflare live | user-created scoped token | verify active token; list account/zones only; no DNS edits | 0 | next proof target |
 | Google live | OAuth PKCE/OIDC | consent, identity, restart, forced refresh, narrow read, local grant revoke, provider revoke, post-revoke failure, plaintext scan, cleanup | 0 | required before any Google usability claim |
 
