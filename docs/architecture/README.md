@@ -20,6 +20,10 @@ classification; directory names do not. Historical runtimes remain under
 - [Skill Core V1](skill-core-v1.md) — current skill authority split between governed artifacts and Rust executable behavior
 - [Retire the central skill registry ADR](../adr/2026-07-20-retire-central-skill-registry.md) — host-owned skill discovery and the removal of `elegy-skills`
 - [Codex plugin projection](codex-plugin-projection.md) — optional Codex projection slice (derived adapter surface, not the primary plugin path)
+- [Capability package authority ADR](../adr/2026-08-02-adopt-capability-packages-as-authority.md) — host-neutral package and exact-lock decision
+- [Capability package v1](../specs/capability-package-v1.md) — package manifest and authoring contract
+- [Elegy lock v1](../specs/elegy-lock-v1.md) — exact agent selection and digest contract
+- [Elegy SBOM v1](../specs/elegy-sbom-v1.md) — deterministic archive inventory and provenance sidecar
 - [Codex-parity and delegated-authentication ADR](../adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md) — current package-envelope, authentication, and marketplace decision
 - [Historical static marketplace ADR](../adr/2026-07-01-adopt-static-plugin-marketplace.md) — superseded v1 context
 - [Plugin marketplace v2](../specs/plugin-marketplace-v2.md) — current index, policy, source-descriptor, artifact, install, and projection contract

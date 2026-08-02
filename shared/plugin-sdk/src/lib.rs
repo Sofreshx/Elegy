@@ -14,6 +14,8 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use thiserror::Error;
 
+pub mod capability_package;
+
 // ── Structured Failure ────────────────────────────────────────────────────
 
 #[derive(Clone, Debug, Default, Serialize, Deserialize, PartialEq)]
@@ -971,6 +973,12 @@ pub struct ElegyCapabilityInvocationV2 {
     pub required_args: Vec<String>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub optional_args: Vec<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "inputSchema")]
+    pub input_schema: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[serde(rename = "outputSchema")]
+    pub output_schema: Option<Value>,
 }
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq, JsonSchema)]
@@ -1240,7 +1248,7 @@ pub fn extract_codex_extension_v1(
     serde_json::from_value::<CodexPluginExtensionV1>(raw.clone()).ok()
 }
 
-pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 12] = [
+pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 15] = [
     ("elegy-plugin-v1.schema.json", "elegy-plugin/v1"),
     ("elegy-plugin-v2.schema.json", "elegy-plugin/v2"),
     ("elegy-plugin-v3.schema.json", "elegy-plugin/v3"),
@@ -1265,6 +1273,9 @@ pub const PLUGIN_SCHEMA_ARTIFACTS: [(&str, &str); 12] = [
         "elegy-capability-catalog-v2.schema.json",
         "elegy-capability-catalog/v2",
     ),
+    ("elegy-package-v1.schema.json", "elegy-package/v1"),
+    ("elegy-lock-v1.schema.json", "elegy-lock/v1"),
+    ("elegy-sbom-v1.schema.json", "elegy-sbom/v1"),
 ];
 
 fn generate_plugin_v2_schema() -> Result<Value, serde_json::Error> {
@@ -1426,6 +1437,18 @@ pub fn generate_plugin_schema_artifacts() -> Result<BTreeMap<&'static str, Strin
         (
             PLUGIN_SCHEMA_ARTIFACTS[11].0,
             generate_capability_catalog_v2_schema(),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[12].0,
+            serde_json::to_value(schema_for!(capability_package::ElegyPackageV1)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[13].0,
+            serde_json::to_value(schema_for!(capability_package::ElegyLockV1)),
+        ),
+        (
+            PLUGIN_SCHEMA_ARTIFACTS[14].0,
+            serde_json::to_value(schema_for!(capability_package::ElegySbomV1)),
         ),
     ];
     let mut artifacts = BTreeMap::new();
@@ -6073,6 +6096,8 @@ pub fn migrate_capability_catalog_v1_to_v2(
                         command: invocation.command.clone(),
                         required_args: invocation.required_args.clone(),
                         optional_args: invocation.optional_args.clone(),
+                        input_schema: None,
+                        output_schema: None,
                     },
                 }),
                 None => issues.push(format!("capability '{}' is missing invocation.", capability.id)),

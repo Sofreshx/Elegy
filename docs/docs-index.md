@@ -157,6 +157,17 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-08-02",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-08-02-adopt-capability-packages-as-authority.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "Elegy has accumulated Codex plugin envelopes, MCP hosts, skills, and local",
+      "title": "Adopt capability packages as the portable authority"
+    },
+    {
+      "authorityClass": "current",
       "created": "2026-05-29",
       "docKind": "adr",
       "freshness": "unknown",
@@ -223,7 +234,7 @@
       "path": "docs/architecture/mcp-skill-tooling-placement.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "MCP authoring and descriptor validation remain in `elegy-mcp`. Agent Skills",
+      "summary": "Capability packages are the host-neutral authority. MCP authoring and",
       "title": "MCP, Skill, and Tooling Placement"
     },
     {
@@ -404,6 +415,36 @@
       "authorityClass": "current",
       "docKind": "spec",
       "freshness": "unknown",
+      "path": "docs/specs/capability-package-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "`elegy-package/v1` is the host-neutral package manifest. It is stored at",
+      "title": "Capability package v1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/elegy-lock-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "`elegy-lock/v1` is the exact reviewed package selection for one agent setup.",
+      "title": "Elegy lock v1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/elegy-sbom-v1.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "`elegy-sbom/v1` is a deterministic sidecar for one packaged archive. It binds",
+      "title": "Elegy SBOM v1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
       "path": "docs/specs/plugin-connections-v1.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
@@ -460,10 +501,14 @@
     "docs/adr/2026-07-20-retire-central-skill-registry.md",
     "docs/adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md",
     "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
+    "docs/adr/2026-08-02-adopt-capability-packages-as-authority.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",
     "docs/specs/capability-catalog-v2.md",
+    "docs/specs/capability-package-v1.md",
+    "docs/specs/elegy-lock-v1.md",
+    "docs/specs/elegy-sbom-v1.md",
     "docs/specs/plugin-connections-v1.md",
     "docs/specs/plugin-marketplace-v2.md",
     "docs/specs/readiness-v1.md",

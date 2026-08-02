@@ -7,10 +7,13 @@ doc_kind: reference
 
 # MCP, Skill, and Tooling Placement
 
-MCP authoring and descriptor validation remain in `elegy-mcp`. Agent Skills
-are owned and distributed by their individual plugins; installed hosts discover
-them directly without an Elegy-wide registry or resolver. MCP-to-skill
-generation has been removed. Package-backed configuration has been removed.
+Capability packages are the host-neutral authority. MCP authoring and
+descriptor validation remain in `elegy-mcp`; the generic CLI-to-MCP bridge is a
+host transport under `hosts/`. Agent Skills are optional guidance owned and
+distributed by the package that declares them; installed hosts discover them
+through their native skill lane. MCP-to-skill generation has been removed.
+Host-specific manifests and registrations are derived projections, not package
+authority or authorization.
 
 The placement rule is now:
 - `plugins/` — bundled installable plugin packages with co-located governed artifacts

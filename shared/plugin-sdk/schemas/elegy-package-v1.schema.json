@@ -1,0 +1,186 @@
+{
+  "$defs": {
+    "ElegyPackageEntrypointKind": {
+      "enum": [
+        "cli",
+        "mcp-stdio"
+      ],
+      "type": "string"
+    },
+    "ElegyPackageEntrypointV1": {
+      "additionalProperties": false,
+      "properties": {
+        "command": {
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "executable": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/ElegyPackageEntrypointKind"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "executable"
+      ],
+      "type": "object"
+    },
+    "ElegyPackageFileV1": {
+      "additionalProperties": false,
+      "properties": {
+        "path": {
+          "type": "string"
+        },
+        "role": {
+          "type": "string"
+        },
+        "sha256": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "path",
+        "role"
+      ],
+      "type": "object"
+    },
+    "ElegyPackageProvenanceV1": {
+      "additionalProperties": false,
+      "properties": {
+        "buildWorkflow": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "builder": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "sourceCommit": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "type": "object"
+    },
+    "ElegyPackagePublisherV1": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "workflowIdentity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "name",
+        "repository"
+      ],
+      "type": "object"
+    }
+  },
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "description": "The canonical package manifest. Host-specific manifests are generated from\nthis document and are not an independent source of truth.",
+  "properties": {
+    "capabilityCatalog": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "entrypoints": {
+      "items": {
+        "$ref": "#/$defs/ElegyPackageEntrypointV1"
+      },
+      "type": "array"
+    },
+    "files": {
+      "items": {
+        "$ref": "#/$defs/ElegyPackageFileV1"
+      },
+      "type": "array"
+    },
+    "license": {
+      "type": "string"
+    },
+    "name": {
+      "type": "string"
+    },
+    "provenance": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ElegyPackageProvenanceV1"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "publisher": {
+      "$ref": "#/$defs/ElegyPackagePublisherV1"
+    },
+    "readiness": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schemaVersion": {
+      "type": "string"
+    },
+    "skills": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "targets": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "version": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "schemaVersion",
+    "name",
+    "version",
+    "description",
+    "publisher",
+    "license",
+    "targets",
+    "capabilityCatalog",
+    "entrypoints",
+    "files"
+  ],
+  "title": "ElegyPackageV1",
+  "type": "object"
+}

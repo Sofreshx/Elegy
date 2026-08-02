@@ -34,8 +34,10 @@ Elegy will use top-level directories that match surface roles:
 | External/private plugin wrappers | `marketplace-wrappers/` |
 | Reusable Rust libraries | `shared/` |
 
-`distribution/surfaces.json` remains the canonical release catalog. Plugin
-manifests remain the canonical package metadata for installable plugin roots.
+`distribution/surfaces.json` remains the canonical release catalog. The
+2026-08-02 capability-package ADR supersedes plugin manifests as package
+authority for new reusable tools; existing plugin manifests remain readable
+during migration.
 
 Amendment (2026-07-30): filesystem placement no longer establishes product
 class. `elegy-surfaces/v3` separates build `kind` from `surfaceClass` and
