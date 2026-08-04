@@ -22,6 +22,15 @@ Both transports expose `memory_search`, `memory_recall`, `memory_list`,
 `memory_stats`, `memory_store`, `memory_update`, `memory_correct`, and
 `memory_delete`. Requests cannot override the configured agent namespace.
 
+## Stdio read visibility
+
+The local stdio binding can read the scopes visible from `ELEGY_MCP_READ_SCOPE`
+(default `session`, the widest range). It also includes memories without an
+`agent_id`, which is how the `elegy-memory` CLI writes shared local knowledge.
+Reads may be widened, but writes remain limited to the configured agent scope;
+a merely readable memory cannot be updated, corrected, or deleted through this
+surface.
+
 Build and test:
 
 ```powershell

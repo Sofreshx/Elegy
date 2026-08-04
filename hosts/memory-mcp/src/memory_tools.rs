@@ -58,6 +58,10 @@ impl MemoryRepository {
         embedding_provider: Option<Arc<dyn EmbeddingProvider>>,
     ) -> Result<Self, StoreError> {
         Ok(Self {
+            // The store stays pinned to the write scope: `validate_memory_for_store`
+            // rejects a memory whose scope differs. Read breadth is carried by the
+            // per-query scope instead, which neither `list` nor `search` validates
+            // against this one.
             store: SqliteMemoryStore::new_with_optional_embedding_provider(
                 path,
                 MemoryScope::Agent,
@@ -113,24 +117,30 @@ impl MemoryRepository {
             return Ok(Vec::new());
         }
 
+        // Unowned rows cannot be expressed as an `agent_id` equality filter, so
+        // that dimension moves to `is_visible_memory` and ranking runs
+        // untruncated. The store scores every candidate before truncating and
+        // the MCP never sets a context budget, so over-fetching is free here.
+        let owned_only = !self.binding.include_unowned();
         let matches = self
             .store
             .search(SearchQuery {
                 text: query.to_string(),
                 embedding: None,
-                scope: MemoryScope::Agent,
+                scope: self.binding.read_scope(),
                 state_filter: args.state_filter(),
                 type_filter: args.memory_types.clone().map(tool_memory_types),
-                max_results: args.limit(),
+                max_results: if owned_only { args.limit() } else { usize::MAX },
                 context_config: None,
                 session_id: None,
-                agent_id: Some(self.agent_id_owned()),
+                agent_id: owned_only.then(|| self.agent_id_owned()),
             })
             .await?;
 
         Ok(matches
             .into_iter()
             .filter(|result| self.is_visible_memory(&result.memory))
+            .take(args.limit())
             .map(
                 |ScoredMemory {
                      memory,
@@ -253,7 +263,7 @@ impl MemoryRepository {
                         "merged by salience gate from MCP memory_store",
                     )
                     .await?;
-                let memory = self.require_visible_memory(&target_id).await?;
+                let memory = self.require_writable_memory(&target_id).await?;
                 Ok(MemoryStoreResponse::new(
                     self,
                     "merged",
@@ -276,7 +286,7 @@ impl MemoryRepository {
                     let _ = self.store.hard_delete(&id).await;
                     return Err(error);
                 }
-                let memory = self.require_visible_memory(&id).await?;
+                let memory = self.require_writable_memory(&id).await?;
                 Ok(MemoryStoreResponse::new(
                     self,
                     "added",
@@ -288,7 +298,7 @@ impl MemoryRepository {
                 let memory = self.build_memory_from_candidate(&candidate, MemoryState::Dormant);
                 let id = memory.id;
                 self.store.store(memory).await?;
-                let memory = self.require_visible_memory(&id).await?;
+                let memory = self.require_writable_memory(&id).await?;
                 Ok(MemoryStoreResponse::new(
                     self,
                     "added",
@@ -303,7 +313,7 @@ impl MemoryRepository {
                 let memory = self.build_memory_from_candidate(&candidate, MemoryState::Active);
                 let id = memory.id;
                 self.store.store(memory).await?;
-                let memory = self.require_visible_memory(&id).await?;
+                let memory = self.require_writable_memory(&id).await?;
                 Ok(MemoryStoreResponse::new(
                     self,
                     "added",
@@ -322,13 +332,13 @@ impl MemoryRepository {
         args: &MemoryUpdateArgs,
     ) -> Result<MemoryUpdateResponse, StoreError> {
         let id = parse_memory_id(&args.id)?;
-        let _existing = self.require_visible_memory(&id).await?;
+        let _existing = self.require_writable_memory(&id).await?;
         let content = require_non_empty_text("content", &args.content)?;
         let reason = normalized_reason(args.reason.as_deref(), "updated via MCP memory_update");
         self.store
             .update_content(&id, content, "mcp:memory_update", &reason)
             .await?;
-        let memory = self.require_visible_memory(&id).await?;
+        let memory = self.require_writable_memory(&id).await?;
         Ok(MemoryUpdateResponse {
             namespace: self.namespace_owned(),
             updated: true,
@@ -341,7 +351,7 @@ impl MemoryRepository {
         args: &MemoryDeleteArgs,
     ) -> Result<MemoryDeleteResponse, StoreError> {
         let id = parse_memory_id(&args.id)?;
-        let _existing = self.require_visible_memory(&id).await?;
+        let _existing = self.require_writable_memory(&id).await?;
         self.store.hard_delete(&id).await?;
         Ok(MemoryDeleteResponse {
             namespace: self.namespace_owned(),
@@ -355,7 +365,7 @@ impl MemoryRepository {
         args: &MemoryCorrectArgs,
     ) -> Result<MemoryCorrectResponse, StoreError> {
         let id = parse_memory_id(&args.id)?;
-        let existing = self.require_visible_memory(&id).await?;
+        let existing = self.require_writable_memory(&id).await?;
         let content = require_non_empty_text("content", &args.content)?;
         if existing.content.trim() == content {
             return Err(StoreError::Validation(
@@ -370,7 +380,7 @@ impl MemoryRepository {
         let correction = self
             .store
             .correct_memory(&id, content, "mcp:memory_correct", reason)?;
-        let memory = self.require_visible_memory(&id).await?;
+        let memory = self.require_writable_memory(&id).await?;
         Ok(MemoryCorrectResponse {
             namespace: self.namespace_owned(),
             correction: MemoryCorrectionSummary::from(correction),
@@ -384,29 +394,68 @@ impl MemoryRepository {
         memory_types: Option<Vec<MemoryType>>,
         limit: Option<usize>,
     ) -> Result<Vec<Memory>, StoreError> {
-        let mut memories = self
-            .store
-            .list(MemoryFilter {
-                scope: Some(MemoryScope::Agent),
-                state,
-                memory_types,
-                provenance_levels: None,
-                tags: None,
-                status: None,
-                tenant_id: None,
-                user_id: None,
-                agent_id: Some(self.agent_id_owned()),
-                limit,
-            })
-            .await?;
-        memories.retain(|memory| self.is_visible_memory(memory));
+        // A single `MemoryFilter` pins one scope, so a widened binding queries
+        // each visible scope and merges. The per-scope limit is dropped because
+        // `is_visible_memory` still removes rows afterwards; truncating early
+        // would under-return.
+        let scopes = self.binding.read_scope().visible_scopes();
+        let owned_only = !self.binding.include_unowned();
+        let merge_needed = scopes.len() > 1 || !owned_only;
+
+        let mut memories = Vec::new();
+        for scope in scopes {
+            let mut page = self
+                .store
+                .list(MemoryFilter {
+                    scope: Some(*scope),
+                    state,
+                    memory_types: memory_types.clone(),
+                    provenance_levels: None,
+                    tags: None,
+                    status: None,
+                    tenant_id: None,
+                    user_id: None,
+                    agent_id: owned_only.then(|| self.agent_id_owned()),
+                    limit: if merge_needed { None } else { limit },
+                })
+                .await?;
+            page.retain(|memory| self.is_visible_memory(memory));
+            memories.append(&mut page);
+        }
+
+        if merge_needed {
+            // Mirrors the store's own `updated_at DESC` list ordering.
+            memories.sort_by(|left, right| {
+                right
+                    .updated_at
+                    .cmp(&left.updated_at)
+                    .then_with(|| right.id.cmp(&left.id))
+            });
+            if let Some(limit) = limit {
+                memories.truncate(limit);
+            }
+        }
+
         Ok(memories)
     }
 
     fn is_visible_memory(&self, memory: &Memory) -> bool {
-        memory.scope == MemoryScope::Agent
-            && memory.agent_id.as_deref() == Some(self.agent_id())
+        self.binding
+            .read_scope()
+            .visible_scopes()
+            .contains(&memory.scope)
+            && self.is_readable_owner(memory)
             && memory.state != MemoryState::Deleted
+    }
+
+    /// A memory is readable when this binding owns it, or when it carries no
+    /// owner at all. CLI writes always leave `agent_id` unset, so unowned rows
+    /// are shared local knowledge rather than another agent's private state.
+    fn is_readable_owner(&self, memory: &Memory) -> bool {
+        match memory.agent_id.as_deref() {
+            Some(agent_id) => agent_id == self.agent_id(),
+            None => self.binding.include_unowned(),
+        }
     }
 
     fn build_memory_from_candidate(
@@ -446,17 +495,28 @@ impl MemoryRepository {
         }
     }
 
-    async fn require_visible_memory(&self, id: &Uuid) -> Result<Memory, StoreError> {
+    /// Resolve a memory this connector may mutate.
+    ///
+    /// A widened binding can read narrower scopes, but every write goes through
+    /// the agent-scoped store. Reject a merely-readable memory here, with a
+    /// message that names the reason, instead of failing scope validation deep
+    /// inside the store.
+    async fn require_writable_memory(&self, id: &Uuid) -> Result<Memory, StoreError> {
         let memory = self
             .store
             .get_raw(id)
             .await?
             .ok_or(StoreError::NotFound(*id))?;
-        if self.is_visible_memory(&memory) {
-            Ok(memory)
-        } else {
-            Err(StoreError::NotFound(*id))
+        if !self.is_visible_memory(&memory) {
+            return Err(StoreError::NotFound(*id));
         }
+        if memory.scope != MemoryScope::Agent {
+            return Err(StoreError::Validation(format!(
+                "memory {id} is readable in the {:?} scope but this connector only writes agent-scoped memories",
+                memory.scope
+            )));
+        }
+        Ok(memory)
     }
 }
 
@@ -1200,6 +1260,8 @@ fn map_gate_error(error: GateError) -> StoreError {
 pub struct MemoryBinding {
     namespace: String,
     agent_id: String,
+    read_scope: MemoryScope,
+    include_unowned: bool,
 }
 
 impl Default for MemoryBinding {
@@ -1207,6 +1269,8 @@ impl Default for MemoryBinding {
         Self {
             namespace: DEFAULT_NAMESPACE.to_string(),
             agent_id: DEFAULT_AGENT_ID.to_string(),
+            read_scope: MemoryScope::Agent,
+            include_unowned: false,
         }
     }
 }
@@ -1229,7 +1293,28 @@ impl MemoryBinding {
         Ok(Self {
             namespace: namespace.trim().to_string(),
             agent_id: agent_id.trim().to_string(),
+            ..Self::default()
         })
+    }
+
+    /// Widen the readable range to every scope visible from `read_scope`.
+    ///
+    /// Writes are unaffected and stay pinned to [`MemoryScope::Agent`].
+    #[must_use]
+    pub fn with_read_scope(mut self, read_scope: MemoryScope) -> Self {
+        self.read_scope = read_scope;
+        self
+    }
+
+    /// Allow reading memories that carry no `agent_id`.
+    ///
+    /// Rows written by the CLI are unowned; treating them as readable keeps a
+    /// shared local store legible to every agent instead of hiding it behind an
+    /// ownership marker no caller ever set.
+    #[must_use]
+    pub fn including_unowned(mut self, include_unowned: bool) -> Self {
+        self.include_unowned = include_unowned;
+        self
     }
 
     pub fn namespace(&self) -> &str {
@@ -1238,6 +1323,14 @@ impl MemoryBinding {
 
     pub fn agent_id(&self) -> &str {
         &self.agent_id
+    }
+
+    pub fn read_scope(&self) -> MemoryScope {
+        self.read_scope
+    }
+
+    pub fn include_unowned(&self) -> bool {
+        self.include_unowned
     }
 }
 
@@ -1461,6 +1554,127 @@ mod tests {
             provider,
         )
         .expect("repository should build")
+    }
+
+    fn test_repository_with_binding(db_path: &Path, binding: MemoryBinding) -> MemoryRepository {
+        MemoryRepository::new(db_path, binding).expect("repository should build")
+    }
+
+    /// Persist a memory the MCP surface never writes itself: a narrower scope,
+    /// and no `agent_id` at all, exactly as the CLI writes it.
+    async fn seed_unowned_memory(db_path: &Path, content: &str, scope: MemoryScope) -> Uuid {
+        let store = SqliteMemoryStore::new(db_path, scope).expect("seed store should open");
+        let mut memory = test_agent_memory(content, "unused");
+        memory.scope = scope;
+        memory.agent_id = None;
+        let id = memory.id;
+        store.store(memory).await.expect("seed memory should store");
+        id
+    }
+
+    async fn listed_ids(repository: &MemoryRepository) -> Vec<Uuid> {
+        repository
+            .list(&MemoryListArgs {
+                limit: Some(50),
+                include_dormant: None,
+                state: None,
+                memory_types: None,
+            })
+            .await
+            .expect("list should succeed")
+            .into_iter()
+            .map(|memory| memory.id)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn default_binding_hides_narrower_scopes_and_unowned_memories() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let user_scoped =
+            seed_unowned_memory(&db_path, "cli written note", MemoryScope::User).await;
+
+        let repository = test_repository_with_binding(&db_path, MemoryBinding::default());
+
+        assert!(
+            !listed_ids(&repository).await.contains(&user_scoped),
+            "the default binding must keep the remote connector surface unchanged"
+        );
+    }
+
+    #[tokio::test]
+    async fn widened_binding_reads_unowned_memories_from_narrower_scopes() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let user_scoped =
+            seed_unowned_memory(&db_path, "cli written note", MemoryScope::User).await;
+        let workspace_scoped =
+            seed_unowned_memory(&db_path, "workspace routing rule", MemoryScope::Workspace).await;
+
+        let repository = test_repository_with_binding(
+            &db_path,
+            MemoryBinding::new(DEFAULT_NAMESPACE, "widened-agent")
+                .expect("binding should build")
+                .with_read_scope(MemoryScope::Session)
+                .including_unowned(true),
+        );
+
+        let ids = listed_ids(&repository).await;
+        assert!(ids.contains(&user_scoped), "user scope should be readable");
+        assert!(
+            ids.contains(&workspace_scoped),
+            "workspace scope should be readable"
+        );
+    }
+
+    #[tokio::test]
+    async fn widened_binding_still_hides_another_agents_memory() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let store =
+            SqliteMemoryStore::new(&db_path, MemoryScope::Agent).expect("store should open");
+        let foreign = test_agent_memory("another agent's private note", "other-agent");
+        let foreign_id = foreign.id;
+        store.store(foreign).await.expect("memory should store");
+
+        let repository = test_repository_with_binding(
+            &db_path,
+            MemoryBinding::new(DEFAULT_NAMESPACE, "widened-agent")
+                .expect("binding should build")
+                .with_read_scope(MemoryScope::Session)
+                .including_unowned(true),
+        );
+
+        assert!(
+            !listed_ids(&repository).await.contains(&foreign_id),
+            "widening must not expose memories owned by a different agent"
+        );
+    }
+
+    #[tokio::test]
+    async fn widened_binding_refuses_to_mutate_a_narrower_scope_memory() {
+        let temp_dir = TempDir::new().expect("tempdir should create");
+        let db_path = temp_dir.path().join("memory.db");
+        let user_scoped =
+            seed_unowned_memory(&db_path, "cli written note", MemoryScope::User).await;
+
+        let repository = test_repository_with_binding(
+            &db_path,
+            MemoryBinding::new(DEFAULT_NAMESPACE, "widened-agent")
+                .expect("binding should build")
+                .with_read_scope(MemoryScope::Session)
+                .including_unowned(true),
+        );
+
+        let error = repository
+            .require_writable_memory(&user_scoped)
+            .await
+            .expect_err("a readable-only memory must not be writable");
+
+        assert!(
+            matches!(error, StoreError::Validation(message) if message.contains("only writes agent-scoped")),
+            "the refusal should name the write boundary"
+        );
     }
 
     fn test_agent_memory(content: &str, agent_id: &str) -> Memory {
