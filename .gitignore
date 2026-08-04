@@ -55,6 +55,10 @@ elegy-memory-mvp-test-plan.md
 
 # Local agent session artifacts
 /target/agent-artifacts/
+/SESSION_TRACKING.md
+
+# Local Cargo configuration
+/.cargo/config.toml
 
 # elegy-memory-mcp local auth state
 signing-key
@@ -62,5 +66,5 @@ clients.json
 refresh-tokens.json
 
 # Prevent accidental commit of extracted release payloads and malformed literal-path artifacts
-/C*
+/C*AppData*Temp*
 /Users*AppData*Temp*

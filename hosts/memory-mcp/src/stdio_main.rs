@@ -1,7 +1,7 @@
 use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context};
-use elegy_memory::{EmbeddingProvider, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
+use elegy_memory::{EmbeddingProvider, MemoryScope, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
 use elegy_memory_mcp::{
     memory_tools::{MemoryBinding, MemoryRepository},
     server::{ElegyMemoryMcpServer, NoopWriteAuditor, WriteAuditor},
@@ -14,11 +14,13 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilte
 
 const ELEGY_DB_PATH: &str = "ELEGY_DB_PATH";
 const ELEGY_MCP_AGENT_ID: &str = "ELEGY_MCP_AGENT_ID";
+const ELEGY_MCP_READ_SCOPE: &str = "ELEGY_MCP_READ_SCOPE";
 const ELEGY_EMBEDDING_MODEL: &str = "ELEGY_EMBEDDING_MODEL";
 const ELEGY_ALLOW_NO_EMBEDDINGS: &str = "ELEGY_ALLOW_NO_EMBEDDINGS";
 const OLLAMA_URL: &str = "OLLAMA_URL";
 const RUST_LOG: &str = "RUST_LOG";
 const DEFAULT_AGENT_ID: &str = "default-agent";
+const DEFAULT_READ_SCOPE: &str = "session";
 const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 const OLLAMA_BOOT_TIMEOUT: Duration = Duration::from_secs(5);
 #[cfg(test)]
@@ -57,6 +59,7 @@ async fn run() -> anyhow::Result<()> {
         allow_no_embeddings = config.allow_no_embeddings,
         memory_namespace = runtime.memory_repository.namespace(),
         memory_agent_id = runtime.memory_repository.agent_id(),
+        memory_read_scope = ?config.read_scope,
         "elegy-memory-mcp stdio starting"
     );
 
@@ -123,7 +126,9 @@ fn build_stdio_runtime_with_bootstrap(
     embedding_bootstrap: StdioEmbeddingBootstrap,
 ) -> anyhow::Result<StdioServerRuntime> {
     let binding = MemoryBinding::new(&config.agent_id, &config.agent_id)
-        .context("configuring stdio memory binding")?;
+        .context("configuring stdio memory binding")?
+        .with_read_scope(config.read_scope)
+        .including_unowned(true);
     let memory_repository = Arc::new(match embedding_bootstrap {
         StdioEmbeddingBootstrap::ProviderBacked(embedding_provider) => {
             MemoryRepository::new_with_embedding_provider(
@@ -150,6 +155,7 @@ fn build_stdio_runtime_with_bootstrap(
 struct StdioConfig {
     db_path: PathBuf,
     agent_id: String,
+    read_scope: MemoryScope,
     ollama_url: String,
     embedding_model: String,
     allow_no_embeddings: bool,
@@ -160,10 +166,27 @@ impl StdioConfig {
         Ok(Self {
             db_path: required_path_env(ELEGY_DB_PATH)?,
             agent_id: configured_agent_id()?,
+            read_scope: configured_read_scope()?,
             ollama_url: optional_string_env(OLLAMA_URL, DEFAULT_OLLAMA_URL)?,
             embedding_model: optional_string_env(ELEGY_EMBEDDING_MODEL, DEFAULT_OLLAMA_MODEL)?,
             allow_no_embeddings: optional_bool_env(ELEGY_ALLOW_NO_EMBEDDINGS, false)?,
         })
+    }
+}
+
+/// Resolve the base scope reads expand from.
+///
+/// Defaults to the widest range: this binary is a single-user local surface, so
+/// hiding the narrower scopes only strands knowledge the CLI already wrote.
+/// Writes stay pinned to `MemoryScope::Agent` regardless.
+fn configured_read_scope() -> anyhow::Result<MemoryScope> {
+    let value = optional_string_env(ELEGY_MCP_READ_SCOPE, DEFAULT_READ_SCOPE)?;
+    match value.trim().to_ascii_lowercase().as_str() {
+        "session" => Ok(MemoryScope::Session),
+        "workspace" => Ok(MemoryScope::Workspace),
+        "user" => Ok(MemoryScope::User),
+        "agent" => Ok(MemoryScope::Agent),
+        _ => bail!("{ELEGY_MCP_READ_SCOPE} must be one of session, workspace, user, agent"),
     }
 }
 
@@ -371,6 +394,7 @@ mod tests {
         let config = StdioConfig {
             db_path,
             agent_id: "stdio-test-agent".to_string(),
+            read_scope: MemoryScope::Session,
             ollama_url: DEFAULT_OLLAMA_URL.to_string(),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
             allow_no_embeddings: false,
@@ -428,6 +452,7 @@ mod tests {
         let config = StdioConfig {
             db_path,
             agent_id: DEFAULT_AGENT_ID.to_string(),
+            read_scope: MemoryScope::Session,
             ollama_url: DEFAULT_OLLAMA_URL.to_string(),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
             allow_no_embeddings: true,
@@ -512,6 +537,7 @@ mod tests {
         let config = StdioConfig {
             db_path: PathBuf::from("unused.db"),
             agent_id: "stdio-test-agent".to_string(),
+            read_scope: MemoryScope::Session,
             ollama_url: format!("http://{address}"),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
             allow_no_embeddings: false,

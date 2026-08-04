@@ -33,8 +33,11 @@ store, or signing-key setting.
 |---|---|
 | `ELEGY_DB_PATH` | Required SQLite path. |
 | `ELEGY_MCP_AGENT_ID` | Optional fixed agent identity. |
+| `ELEGY_MCP_READ_SCOPE` | Optional readable scope range; defaults to `session` and accepts `session`, `workspace`, `user`, or `agent`. Writes remain agent-scoped. |
 | `OLLAMA_URL` | Optional; defaults to local Ollama. |
 | `ELEGY_EMBEDDING_MODEL` | Optional model name. |
 | `ELEGY_ALLOW_NO_EMBEDDINGS` | Explicit degraded mode when true. |
 
-Stdio never reads the HTTP authentication variables.
+Stdio never reads the HTTP authentication variables. Its read binding also
+includes memories without an `agent_id`; writes remain limited to the
+configured agent scope.
