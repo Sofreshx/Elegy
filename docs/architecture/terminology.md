@@ -164,10 +164,11 @@ An independently versioned and signed distribution for a reusable business
 automation outcome.
 
 An Automation Pack can contain native target workflows, data policy,
-configuration slots, target projections, Care metadata, and optional Elegy
-capability bindings. It is not an Elegy plugin and it does not make a native
-target workflow part of the Elegy substrate. The incubating Pack and delivery
-contracts are owned by Automation Forge until promotion criteria are met.
+configuration slots, target projections, diagnostic metadata, and optional
+Elegy capability bindings. It is not an Elegy plugin and it does not make a
+native target workflow part of the Elegy substrate. This is retained as a
+historical delivery term; current work belongs in target-native solution
+repositories governed by Overseer.
 
 ### Target adapter
 
@@ -357,13 +358,12 @@ Forge is not the same thing as the human-facing CLI. It is the subsystem that em
 
 ### Automation Forge
 
-The separately owned delivery toolchain that authors, validates, packages,
-signs, materializes, and controls Automation Pack projections through public
-delivery and adapter contracts.
+The historical separately owned delivery toolchain that authored, validated,
+packaged, signed, materialized, and controlled Automation Pack projections.
 
 Automation Forge is not the generic Elegy forge subsystem, an automation
-runtime, or a client control plane. Its Pack contracts remain outside Elegy
-while they incubate.
+runtime, or a client control plane. Its implementation is archive-bound; new
+delivery work uses target-native solution repositories instead.
 
 ### CLI
 

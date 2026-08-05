@@ -1,6 +1,6 @@
 ---
 title: Automation Portability Handoff
-status: active
+status: historical
 owner: elegy-core
 doc_kind: planning
 ---
@@ -9,11 +9,11 @@ doc_kind: planning
 
 ## Current status
 
-The canonical terminology boundary landed on 2026-07-15. Automation Pack
-delivery contracts continue to incubate in `elegy-automation-forge`; no Pack
-schema, native workflow authority, target adapter, or client deployment state
-has moved into Elegy. The cross-repository boundary is now recorded by the
-[Automation Program ecosystem governance ADR](https://github.com/Sofreshx/elegy-automation-program/blob/main/docs/adr/2026-07-21-automation-ecosystem-governance.md).
+This handoff is preserved as historical evidence from 2026-07-15. The current
+portfolio authority is the [canonical Overseer automation strategy](https://github.com/Sofreshx/Overseer/blob/main/docs/portfolio/automation-agent-delivery-strategy.md).
+No Automation Program, Forge, or Care document is current authority for Elegy,
+and no target-native workflow or client deployment state belongs in this
+repository.
 
 ## Goal
 
@@ -23,16 +23,16 @@ owned automation packs without implementing an automation engine in Elegy.
 ## Accepted boundary
 
 - [Canonical terminology](../architecture/terminology.md) defines portable
-  plugin core, host projection, capability binding, Automation Pack, target
-  adapter, agent-runner binding, automation deployment, and Automation Forge.
+  plugin core, host projection, capability binding, and the historical Pack and
+  target-adapter terms used by older delivery work.
 - An Elegy plugin is an optional capability dependency, not the root of every
   Automation Pack.
 - Keep native workflow graphs and client operation above the Elegy substrate.
 - Require Elegy + current-compatible Codex; require explicit conformance for
   other host and target claims.
-- Automation Forge owns delivery and adapter contracts outside
-  Elegy, including a separable installer protocol, while Elegy remains the
-  plugin and capability authority.
+- Current target-native solution repositories own delivery and adapter
+  behavior outside Elegy, while Elegy remains the plugin and capability
+  authority. The archived Forge implementation is preserved only as history.
 
 ```mermaid
 flowchart LR
@@ -48,9 +48,9 @@ flowchart LR
 
 ## Remaining adoption work
 
-- Record an Elegy-local ADR only when Forge Pack contracts become eligible for
-  core promotion after two unrelated conforming Packs; the Program ADR already
-  owns the current cross-repository boundary.
+- Do not promote the historical Forge/Pack contracts into Elegy. Reconsider a
+  small reusable capability only after repeated real target-native deliveries
+  prove a stable boundary and the Overseer strategy authorizes it.
 - Add a governed fixture proving isolated host extensions remain projections.
 - Update compatibility specifications only when a public Pack-to-capability
   binding contract is ready for Elegy ownership.
