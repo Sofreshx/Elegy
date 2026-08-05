@@ -18,9 +18,11 @@ Elegy currently exposes **no agent-routable surface by default**. Source behavio
 
 `implemented` means source behavior and checks exist. It does not mean usable, shipped, or production-ready. The default marketplace is therefore intentionally empty.
 
-Automation Packs remain a separate delivery lane. Their cross-repository
-relationship to Elegy is governed by the
-[Automation Program ecosystem decision](https://github.com/Sofreshx/elegy-automation-program/blob/main/docs/adr/2026-07-21-automation-ecosystem-governance.md).
+Automation Packs and target-native workflows remain separate delivery lanes.
+Their current portfolio strategy, lifecycle, and replacement direction are
+owned by the [canonical Overseer automation strategy](https://github.com/Sofreshx/Overseer/blob/main/docs/portfolio/automation-agent-delivery-strategy.md).
+Elegy exposes reusable capabilities; solution repositories own orchestration,
+deployment, and client operation.
 
 Core model:
 

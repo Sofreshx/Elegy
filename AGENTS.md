@@ -45,8 +45,9 @@ fixtures, archives, and generated projections do not establish usability.
 
 - Read `docs/plans/automation-portability-handoff.md` before changing plugin,
   host-projection, or automation-pack terminology.
-- Keep Automation Program role, lifecycle, and readiness truth in the Program
-  governance ADR; Elegy owns only the plugin-platform side of that boundary.
+- Keep portfolio automation strategy and lifecycle truth in the canonical
+  Overseer strategy; Elegy owns only its plugin/capability boundary. Target-
+  native solution repositories own workflow and delivery behavior.
 
 - Update an existing ADR or spec when extending the same decision slice.
 - Use `elegy-documentation inspect/map/check --project . --json` for objective docs validation. Regenerate `docs/readiness.md` through `elegy-documentation export readiness`.
