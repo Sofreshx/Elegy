@@ -2,9 +2,11 @@ use std::borrow::Cow;
 
 use crate::EmbeddingProvider;
 
+mod circuit_breaker;
 mod ollama;
 mod openai;
 
+pub use circuit_breaker::CircuitBreakerEmbeddingProvider;
 pub use ollama::{
     OllamaEmbeddingProvider, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_CONNECT_TIMEOUT,
     DEFAULT_OLLAMA_DIMENSIONS, DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_REQUEST_TIMEOUT,

@@ -7,6 +7,7 @@ pub mod gate;
 pub mod llm;
 mod local_store;
 pub mod promotion;
+pub mod runtime;
 mod similarity;
 pub mod storage;
 pub mod traits;
