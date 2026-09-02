@@ -16,6 +16,7 @@ const ELEGY_DB_PATH: &str = "ELEGY_DB_PATH";
 const ELEGY_MCP_AGENT_ID: &str = "ELEGY_MCP_AGENT_ID";
 const ELEGY_MCP_READ_SCOPE: &str = "ELEGY_MCP_READ_SCOPE";
 const ELEGY_EMBEDDING_MODEL: &str = "ELEGY_EMBEDDING_MODEL";
+const ELEGY_EMBEDDING_BOOT_POLICY: &str = "ELEGY_EMBEDDING_BOOT_POLICY";
 const ELEGY_ALLOW_NO_EMBEDDINGS: &str = "ELEGY_ALLOW_NO_EMBEDDINGS";
 const OLLAMA_URL: &str = "OLLAMA_URL";
 const RUST_LOG: &str = "RUST_LOG";
@@ -23,8 +24,12 @@ const DEFAULT_AGENT_ID: &str = "default-agent";
 const DEFAULT_READ_SCOPE: &str = "session";
 const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
 const OLLAMA_BOOT_TIMEOUT: Duration = Duration::from_secs(5);
+// Bounded to stay well under typical MCP client initialize handshake timeouts.
+const OLLAMA_BOOT_RETRY_ATTEMPTS: u32 = 3;
+const OLLAMA_BOOT_RETRY_BACKOFF: Duration = Duration::from_secs(2);
 #[cfg(test)]
-const EXPECTED_TOOL_NAMES: [&str; 8] = [
+const EXPECTED_TOOL_NAMES: [&str; 9] = [
+    "memory_consolidate",
     "memory_correct",
     "memory_delete",
     "memory_list",
@@ -56,7 +61,7 @@ async fn run() -> anyhow::Result<()> {
         db_path = %config.db_path.display(),
         ollama_url = %config.ollama_url,
         embedding_model = %config.embedding_model,
-        allow_no_embeddings = config.allow_no_embeddings,
+        embedding_boot_policy = %config.embedding_boot_policy,
         memory_namespace = runtime.memory_repository.namespace(),
         memory_agent_id = runtime.memory_repository.agent_id(),
         memory_read_scope = ?config.read_scope,
@@ -87,6 +92,23 @@ enum StdioEmbeddingBootstrap {
     DisabledNoProvider,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum EmbeddingBootPolicy {
+    Require,
+    Prefer,
+    Off,
+}
+
+impl std::fmt::Display for EmbeddingBootPolicy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            EmbeddingBootPolicy::Require => "require",
+            EmbeddingBootPolicy::Prefer => "prefer",
+            EmbeddingBootPolicy::Off => "off",
+        })
+    }
+}
+
 async fn build_stdio_runtime(config: &StdioConfig) -> anyhow::Result<StdioServerRuntime> {
     let embedding_bootstrap = resolve_embedding_bootstrap(config).await?;
     build_stdio_runtime_with_bootstrap(config, embedding_bootstrap)
@@ -108,17 +130,63 @@ fn build_embedding_provider(config: &StdioConfig) -> anyhow::Result<Arc<dyn Embe
 async fn resolve_embedding_bootstrap(
     config: &StdioConfig,
 ) -> anyhow::Result<StdioEmbeddingBootstrap> {
-    if config.allow_no_embeddings {
-        warn!(
-            "WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider."
-        );
-        return Ok(StdioEmbeddingBootstrap::DisabledNoProvider);
-    }
+    resolve_embedding_bootstrap_with_retry(
+        config,
+        OLLAMA_BOOT_RETRY_ATTEMPTS,
+        OLLAMA_BOOT_RETRY_BACKOFF,
+    )
+    .await
+}
 
-    verify_ollama_bootstrap(config).await?;
-    Ok(StdioEmbeddingBootstrap::ProviderBacked(
-        build_embedding_provider(config)?,
-    ))
+async fn resolve_embedding_bootstrap_with_retry(
+    config: &StdioConfig,
+    attempts: u32,
+    backoff: Duration,
+) -> anyhow::Result<StdioEmbeddingBootstrap> {
+    match config.embedding_boot_policy {
+        EmbeddingBootPolicy::Off => {
+            warn!(
+                "WARNING: Running in degraded mode without embedding provider. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider."
+            );
+            Ok(StdioEmbeddingBootstrap::DisabledNoProvider)
+        }
+        EmbeddingBootPolicy::Require => {
+            verify_ollama_bootstrap(config).await?;
+            Ok(StdioEmbeddingBootstrap::ProviderBacked(
+                build_embedding_provider(config)?,
+            ))
+        }
+        EmbeddingBootPolicy::Prefer => {
+            let attempts = attempts.max(1);
+            let mut last_error = None;
+            for attempt in 1..=attempts {
+                match verify_ollama_bootstrap(config).await {
+                    Ok(()) => {
+                        return Ok(StdioEmbeddingBootstrap::ProviderBacked(
+                            build_embedding_provider(config)?,
+                        ));
+                    }
+                    Err(error) => {
+                        warn!(
+                            attempt,
+                            attempts,
+                            error = %format!("{error:#}"),
+                            "embedding provider boot probe failed; will retry"
+                        );
+                        last_error = Some(error);
+                        if attempt < attempts {
+                            tokio::time::sleep(backoff).await;
+                        }
+                    }
+                }
+            }
+            warn!(
+                error = %format!("{:#}", last_error.expect("retry loop runs at least once")),
+                "WARNING: embedding provider unavailable after {attempts} attempts; starting in degraded mode. Semantic search will not work. All memory_store calls will return embeddingStatus: skipped_no_provider."
+            );
+            Ok(StdioEmbeddingBootstrap::DisabledNoProvider)
+        }
+    }
 }
 
 fn build_stdio_runtime_with_bootstrap(
@@ -158,7 +226,7 @@ struct StdioConfig {
     read_scope: MemoryScope,
     ollama_url: String,
     embedding_model: String,
-    allow_no_embeddings: bool,
+    embedding_boot_policy: EmbeddingBootPolicy,
 }
 
 impl StdioConfig {
@@ -169,7 +237,7 @@ impl StdioConfig {
             read_scope: configured_read_scope()?,
             ollama_url: optional_string_env(OLLAMA_URL, DEFAULT_OLLAMA_URL)?,
             embedding_model: optional_string_env(ELEGY_EMBEDDING_MODEL, DEFAULT_OLLAMA_MODEL)?,
-            allow_no_embeddings: optional_bool_env(ELEGY_ALLOW_NO_EMBEDDINGS, false)?,
+            embedding_boot_policy: configured_embedding_boot_policy()?,
         })
     }
 }
@@ -278,19 +346,50 @@ fn optional_string_env(name: &'static str, default_value: &'static str) -> anyho
     }
 }
 
-fn optional_bool_env(name: &'static str, default_value: bool) -> anyhow::Result<bool> {
-    match env::var(name) {
-        Ok(value) => parse_bool_env(name, &value),
-        Err(env::VarError::NotPresent) => Ok(default_value),
-        Err(env::VarError::NotUnicode(_)) => bail!("{name} must be valid Unicode"),
-    }
-}
-
 fn parse_bool_env(name: &'static str, value: &str) -> anyhow::Result<bool> {
     match value.trim().to_ascii_lowercase().as_str() {
         "1" | "true" | "yes" | "on" => Ok(true),
         "0" | "false" | "no" | "off" => Ok(false),
         _ => bail!("{name} must be one of 0, 1, true, false, yes, no, on, off"),
+    }
+}
+
+fn configured_embedding_boot_policy() -> anyhow::Result<EmbeddingBootPolicy> {
+    match env::var(ELEGY_EMBEDDING_BOOT_POLICY) {
+        Ok(value) => parse_boot_policy_env(&value),
+        Err(env::VarError::NotPresent) => legacy_allow_no_embeddings_policy(),
+        Err(env::VarError::NotUnicode(_)) => {
+            bail!("{ELEGY_EMBEDDING_BOOT_POLICY} must be valid Unicode")
+        }
+    }
+}
+
+fn legacy_allow_no_embeddings_policy() -> anyhow::Result<EmbeddingBootPolicy> {
+    match env::var(ELEGY_ALLOW_NO_EMBEDDINGS) {
+        Ok(value) => {
+            let allow = parse_bool_env(ELEGY_ALLOW_NO_EMBEDDINGS, &value)?;
+            warn!(
+                "{ELEGY_ALLOW_NO_EMBEDDINGS} is deprecated; set {ELEGY_EMBEDDING_BOOT_POLICY}=require|prefer|off instead"
+            );
+            Ok(if allow {
+                EmbeddingBootPolicy::Off
+            } else {
+                EmbeddingBootPolicy::Require
+            })
+        }
+        Err(env::VarError::NotPresent) => Ok(EmbeddingBootPolicy::Prefer),
+        Err(env::VarError::NotUnicode(_)) => {
+            bail!("{ELEGY_ALLOW_NO_EMBEDDINGS} must be valid Unicode")
+        }
+    }
+}
+
+fn parse_boot_policy_env(value: &str) -> anyhow::Result<EmbeddingBootPolicy> {
+    match value.trim().to_ascii_lowercase().as_str() {
+        "require" => Ok(EmbeddingBootPolicy::Require),
+        "prefer" => Ok(EmbeddingBootPolicy::Prefer),
+        "off" => Ok(EmbeddingBootPolicy::Off),
+        _ => bail!("{ELEGY_EMBEDDING_BOOT_POLICY} must be one of require, prefer, off"),
     }
 }
 
@@ -307,7 +406,7 @@ async fn verify_ollama_bootstrap(config: &StdioConfig) -> anyhow::Result<()> {
         .await
         .with_context(|| {
             format!(
-                "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true.",
+                "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. Set ELEGY_EMBEDDING_BOOT_POLICY=off to start without embeddings, or =prefer to retry and degrade automatically (default).",
                 config.ollama_url, config.embedding_model
             )
         })?;
@@ -315,7 +414,7 @@ async fn verify_ollama_bootstrap(config: &StdioConfig) -> anyhow::Result<()> {
     if !response.status().is_success() {
         let status = response.status();
         bail!(
-            "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true. /api/tags returned {}.",
+            "Ollama not reachable at {}. Start Ollama (open Ollama Desktop or run 'ollama serve'). Required model: {}. Set ELEGY_EMBEDDING_BOOT_POLICY=off to start without embeddings, or =prefer to retry and degrade automatically (default). /api/tags returned {}.",
             config.ollama_url,
             config.embedding_model,
             status
@@ -332,7 +431,7 @@ async fn verify_ollama_bootstrap(config: &StdioConfig) -> anyhow::Result<()> {
         .any(|model| ollama_model_matches(&model.name, &config.embedding_model))
     {
         bail!(
-            "Model {} not pulled. Run: 'ollama pull {}'. To start in degraded mode without embeddings, set ELEGY_ALLOW_NO_EMBEDDINGS=true.",
+            "Model {} not pulled. Run: 'ollama pull {}'. Set ELEGY_EMBEDDING_BOOT_POLICY=off to start without embeddings, or =prefer to retry and degrade automatically (default).",
             config.embedding_model,
             config.embedding_model
         );
@@ -397,7 +496,7 @@ mod tests {
             read_scope: MemoryScope::Session,
             ollama_url: DEFAULT_OLLAMA_URL.to_string(),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
-            allow_no_embeddings: false,
+            embedding_boot_policy: EmbeddingBootPolicy::Prefer,
         };
         let runtime = build_stdio_runtime_with_bootstrap(
             &config,
@@ -455,7 +554,7 @@ mod tests {
             read_scope: MemoryScope::Session,
             ollama_url: DEFAULT_OLLAMA_URL.to_string(),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
-            allow_no_embeddings: true,
+            embedding_boot_policy: EmbeddingBootPolicy::Off,
         };
         let runtime = build_stdio_runtime_with_bootstrap(
             &config,
@@ -540,12 +639,78 @@ mod tests {
             read_scope: MemoryScope::Session,
             ollama_url: format!("http://{address}"),
             embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
-            allow_no_embeddings: false,
+            embedding_boot_policy: EmbeddingBootPolicy::Require,
         };
 
         verify_ollama_bootstrap(&config)
             .await
             .expect("bootstrap should accept available model");
         server.abort();
+    }
+
+    #[test]
+    fn parse_boot_policy_env_accepts_known_values_case_insensitively() {
+        assert!(matches!(
+            parse_boot_policy_env("Require"),
+            Ok(EmbeddingBootPolicy::Require)
+        ));
+        assert!(matches!(
+            parse_boot_policy_env("prefer"),
+            Ok(EmbeddingBootPolicy::Prefer)
+        ));
+        assert!(matches!(
+            parse_boot_policy_env(" OFF "),
+            Ok(EmbeddingBootPolicy::Off)
+        ));
+    }
+
+    #[test]
+    fn parse_boot_policy_env_rejects_unknown_values() {
+        assert!(parse_boot_policy_env("sometimes").is_err());
+    }
+
+    #[tokio::test]
+    async fn resolve_embedding_bootstrap_prefer_degrades_after_exhausting_retries() {
+        let config = StdioConfig {
+            db_path: PathBuf::from("unused.db"),
+            agent_id: "stdio-test-agent".to_string(),
+            read_scope: MemoryScope::Session,
+            ollama_url: "http://127.0.0.1:1".to_string(),
+            embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
+            embedding_boot_policy: EmbeddingBootPolicy::Prefer,
+        };
+
+        let started = std::time::Instant::now();
+        let bootstrap =
+            resolve_embedding_bootstrap_with_retry(&config, 2, Duration::from_millis(10))
+                .await
+                .expect("prefer policy should degrade instead of failing");
+
+        assert!(matches!(
+            bootstrap,
+            StdioEmbeddingBootstrap::DisabledNoProvider
+        ));
+        assert!(started.elapsed() < Duration::from_secs(5));
+    }
+
+    #[tokio::test]
+    async fn resolve_embedding_bootstrap_off_skips_ollama_entirely() {
+        let config = StdioConfig {
+            db_path: PathBuf::from("unused.db"),
+            agent_id: "stdio-test-agent".to_string(),
+            read_scope: MemoryScope::Session,
+            ollama_url: "http://127.0.0.1:1".to_string(),
+            embedding_model: DEFAULT_OLLAMA_MODEL.to_string(),
+            embedding_boot_policy: EmbeddingBootPolicy::Off,
+        };
+
+        let bootstrap = resolve_embedding_bootstrap_with_retry(&config, 3, Duration::from_secs(30))
+            .await
+            .expect("off policy should never touch the network");
+
+        assert!(matches!(
+            bootstrap,
+            StdioEmbeddingBootstrap::DisabledNoProvider
+        ));
     }
 }
