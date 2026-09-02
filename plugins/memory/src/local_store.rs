@@ -662,7 +662,7 @@ fn nibble_to_hex(value: u8) -> char {
     match value {
         0..=9 => (b'0' + value) as char,
         10..=15 => (b'a' + (value - 10)) as char,
-        _ => unreachable!("nibble must fit in hex"),
+        16..=u8::MAX => '?',
     }
 }
 
