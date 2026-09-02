@@ -335,7 +335,7 @@
       "freshness": "unknown",
       "path": "docs/plans/automation-portability-handoff.md",
       "sourceOfTruth": "planning-non-canon",
-      "status": "historical",
+      "status": "superseded",
       "summary": "This handoff is preserved as historical evidence from 2026-07-15. The current",
       "title": "Automation Portability Handoff"
     },

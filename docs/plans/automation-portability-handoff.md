@@ -1,6 +1,6 @@
 ---
 title: Automation Portability Handoff
-status: historical
+status: superseded
 owner: elegy-core
 doc_kind: planning
 ---
