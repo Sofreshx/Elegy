@@ -2,7 +2,6 @@ use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     path::Path,
     sync::{Arc, Mutex},
-    thread,
 };
 
 use async_trait::async_trait;
@@ -6033,20 +6032,11 @@ fn evaluate_gate_sync(
 
 fn run_store_future<T, F>(future: F) -> Result<T, StoreError>
 where
-    T: Send + 'static,
-    F: std::future::Future<Output = Result<T, StoreError>> + Send + 'static,
+    T: Send,
+    F: std::future::Future<Output = Result<T, StoreError>> + Send,
 {
-    thread::spawn(move || {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .map_err(|error| {
-                StoreError::Validation(format!("failed to build async runtime: {error}"))
-            })?;
-        runtime.block_on(future)
-    })
-    .join()
-    .map_err(|_| StoreError::Validation("shared import worker thread panicked".to_string()))?
+    crate::runtime::block_on(future)
+        .map_err(|error| StoreError::Validation(format!("failed to run store future: {error}")))?
 }
 
 fn insert_memory_without_embedding(

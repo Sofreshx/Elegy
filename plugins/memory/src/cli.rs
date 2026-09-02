@@ -17,12 +17,12 @@ use elegy_core::{
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
-use tokio::runtime::Builder;
 use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
-    embedding::{prepare_embedding_input, EmbeddingTask},
+    embedding::{prepare_embedding_input, CircuitBreakerEmbeddingProvider, EmbeddingTask},
+    runtime::block_on,
     storage::{LearnedWeightValues, LearnedWeightsReport, Migration, ReembedMigration},
     ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
     EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
@@ -2458,6 +2458,8 @@ fn resolve_embedding_provider(
                 base_url.clone(),
                 model.clone(),
             )?) as Arc<dyn EmbeddingProvider>;
+            let provider = Arc::new(CircuitBreakerEmbeddingProvider::from_env(provider))
+                as Arc<dyn EmbeddingProvider>;
             Ok((
                 Some(provider),
                 Some(format!("ollama ({model} @ {base_url})")),
@@ -2485,6 +2487,8 @@ fn resolve_embedding_provider(
                 dimensions,
                 api_key,
             )?) as Arc<dyn EmbeddingProvider>;
+            let provider = Arc::new(CircuitBreakerEmbeddingProvider::from_env(provider))
+                as Arc<dyn EmbeddingProvider>;
             Ok((
                 Some(provider),
                 Some(format!("openai ({model} @ {base_url}, {dimensions}d)")),
@@ -2596,14 +2600,14 @@ fn home_dir() -> PathBuf {
 
 fn run_async<F, T, E>(future: F) -> Result<T, CliError>
 where
-    F: std::future::Future<Output = Result<T, E>>,
+    F: std::future::Future<Output = Result<T, E>> + Send,
+    T: Send,
+    E: Send,
     CliError: From<E>,
 {
-    let runtime = Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .map_err(CliError::Io)?;
-    runtime.block_on(future).map_err(CliError::from)
+    block_on(future)
+        .map_err(|error| CliError::Io(std::io::Error::other(error.to_string())))?
+        .map_err(CliError::from)
 }
 
 fn validate_importance(importance: f32) -> Result<(), CliError> {
@@ -2757,16 +2761,15 @@ fn reembed_stale_memories(ctx: &StoreContext, limit: usize) -> Result<ReembedRes
         move |content: &str| -> Result<(Vec<f32>, usize), StoreError> {
             let prepared =
                 prepare_embedding_input(provider.as_ref(), EmbeddingTask::Document, content);
-            let rt = Builder::new_current_thread()
-                .enable_all()
-                .build()
-                .map_err(|e| StoreError::Migration(format!("failed to build runtime: {e}")))?;
-            rt.block_on(async {
+            block_on(async {
                 provider
                     .embed(prepared.as_ref())
                     .await
                     .map_err(|e| StoreError::Migration(format!("embedding generation failed: {e}")))
             })
+            .map_err(|error| {
+                StoreError::Migration(format!("failed to run embedding runtime: {error}"))
+            })?
             .map(|v| {
                 let dims = v.len();
                 (v, dims)
