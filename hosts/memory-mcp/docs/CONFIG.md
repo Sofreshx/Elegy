@@ -36,8 +36,26 @@ store, or signing-key setting.
 | `ELEGY_MCP_READ_SCOPE` | Optional readable scope range; defaults to `session` and accepts `session`, `workspace`, `user`, or `agent`. Writes remain agent-scoped. |
 | `OLLAMA_URL` | Optional; defaults to local Ollama. |
 | `ELEGY_EMBEDDING_MODEL` | Optional model name. |
-| `ELEGY_ALLOW_NO_EMBEDDINGS` | Explicit degraded mode when true. |
+| `ELEGY_EMBEDDING_BOOT_POLICY` | Optional; one of `require`, `prefer` (default), `off`. See below. |
+| `ELEGY_ALLOW_NO_EMBEDDINGS` | Deprecated legacy alias for `ELEGY_EMBEDDING_BOOT_POLICY`, read only when the new variable is unset. `true` maps to `off`; `false` maps to `require`. |
 
 Stdio never reads the HTTP authentication variables. Its read binding also
 includes memories without an `agent_id`; writes remain limited to the
 configured agent scope.
+
+### Embedding boot policy
+
+The embedding provider probe is `GET <OLLAMA_URL>/api/tags` with a 5-second
+timeout, followed by a check that `ELEGY_EMBEDDING_MODEL` is present in the
+response. `ELEGY_EMBEDDING_BOOT_POLICY` controls what happens when that probe
+fails:
+
+- **`require`** — single attempt; on failure the binary exits with code `1`
+  and prints a remediation message on `stderr`.
+- **`prefer`** (default) — up to 3 attempts with a 2-second backoff between
+  them. If every attempt fails, the server logs a warning and starts anyway
+  with the embedding provider disabled: `memory_search` falls back to
+  keyword/FTS ranking, and `memory_store` reports
+  `embeddingStatus: "skipped_no_provider"`. The policy never re-probes after
+  startup; recovering embeddings requires a restart.
+- **`off`** — the probe never runs; the server starts degraded immediately.

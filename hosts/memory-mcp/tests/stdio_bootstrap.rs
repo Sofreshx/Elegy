@@ -160,21 +160,26 @@ async fn stdio_output_with_env(extra_env: &[(&str, &str)]) -> std::process::Outp
 }
 
 #[tokio::test]
-async fn stdio_binary_fails_fast_when_ollama_is_unreachable() {
-    let output = stdio_output_with_env(&[("OLLAMA_URL", "http://127.0.0.1:1")]).await;
+async fn stdio_binary_fails_fast_when_ollama_is_unreachable_under_require_policy() {
+    let output = stdio_output_with_env(&[
+        ("OLLAMA_URL", "http://127.0.0.1:1"),
+        ("ELEGY_EMBEDDING_BOOT_POLICY", "require"),
+    ])
+    .await;
 
     assert!(!output.status.success());
     let stderr = String::from_utf8(output.stderr).expect("stderr should be utf-8");
     assert!(stderr.contains("Ollama not reachable at http://127.0.0.1:1"));
-    assert!(stderr.contains("ELEGY_ALLOW_NO_EMBEDDINGS=true"));
+    assert!(stderr.contains("ELEGY_EMBEDDING_BOOT_POLICY=off"));
 }
 
 #[tokio::test]
-async fn stdio_binary_fails_fast_when_embedding_model_is_missing() {
+async fn stdio_binary_fails_fast_when_embedding_model_is_missing_under_require_policy() {
     let ollama_server = OllamaTagsServer::spawn(&["some-other-model:latest"]).await;
     let output = stdio_output_with_env(&[
         ("OLLAMA_URL", &ollama_server.base_url),
         ("ELEGY_EMBEDDING_MODEL", "nomic-embed-text"),
+        ("ELEGY_EMBEDDING_BOOT_POLICY", "require"),
     ])
     .await;
 
@@ -182,6 +187,27 @@ async fn stdio_binary_fails_fast_when_embedding_model_is_missing() {
     let stderr = String::from_utf8(output.stderr).expect("stderr should be utf-8");
     assert!(stderr.contains("Model nomic-embed-text not pulled"));
     assert!(stderr.contains("ollama pull nomic-embed-text"));
+}
+
+#[tokio::test]
+async fn stdio_binary_prefer_policy_degrades_instead_of_failing_by_default() {
+    let session = StdioChildSession::spawn(&[("OLLAMA_URL", "http://127.0.0.1:1")]).await;
+
+    let stored = session
+        .call_tool_with_arguments(
+            "memory_store",
+            json!({
+                "content": "Prefer policy should degrade automatically when Ollama never comes up."
+            }),
+        )
+        .await;
+
+    assert_eq!(stored["action"], json!("added"));
+    assert_eq!(stored["embeddingStatus"], json!("skipped_no_provider"));
+
+    let stderr = session.shutdown().await;
+    assert!(stderr.contains("embedding provider unavailable after"));
+    assert!(stderr.contains("starting in degraded mode"));
 }
 
 #[tokio::test]
