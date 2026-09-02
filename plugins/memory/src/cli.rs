@@ -18,6 +18,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::runtime::Builder;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -985,7 +986,7 @@ where
 }
 
 fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
-    let context = current_machine_context();
+    let context = current_machine_context()?;
     match cli.command {
         Command::Add {
             store,
@@ -1182,13 +1183,12 @@ fn command_name(command: &Command) -> &'static str {
     }
 }
 
-fn current_machine_context() -> &'static MachineContext {
-    // SAFETY: CLI_MACHINE_CONTEXT is always set in run_from_env() before any
-    // dispatch path that calls this function. All call sites are private and
-    // only reachable after initialization.
-    CLI_MACHINE_CONTEXT
-        .get()
-        .expect("memory CLI machine context should be initialized during run")
+fn current_machine_context() -> Result<&'static MachineContext, CliError> {
+    CLI_MACHINE_CONTEXT.get().ok_or_else(|| {
+        CliError::Validation(
+            "memory CLI machine context was not initialized before dispatch".to_string(),
+        )
+    })
 }
 
 fn execute_add_command(
@@ -1481,7 +1481,8 @@ fn execute_purge_command(
     yes: bool,
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
-    if !yes && current_machine_context().machine.non_interactive {
+    let machine_context = current_machine_context()?;
+    if !yes && machine_context.machine.non_interactive {
         return Err(CliError::Validation(
             "purge requires --yes when --non-interactive is set".to_string(),
         ));
@@ -1732,8 +1733,8 @@ fn execute_reembed_command(
 ) -> Result<ExitCode, CliError> {
     let effective_limit = limit.unwrap_or(DEFAULT_REEMBED_LIMIT);
     if limit.is_some() {
-        eprintln!(
-            "warning: --limit ignored; reembed on the migration path is all-or-nothing \
+        warn!(
+            "--limit ignored; reembed on the migration path is all-or-nothing \
              (all stale memories are re-embedded regardless of limit)"
         );
     }
@@ -3395,13 +3396,17 @@ fn print_success_json<T>(command: &'static str, data: &T) -> Result<(), CliError
 where
     T: Serialize,
 {
-    let machine = &current_machine_context().machine;
+    let context = current_machine_context()?;
     let data = serde_json::to_value(data)?;
-    print_json(&build_cli_success_envelope(machine, [command], data))
+    print_json(&build_cli_success_envelope(
+        &context.machine,
+        [command],
+        data,
+    ))
 }
 
 pub fn emit_machine_failure(error: &CliError) -> Result<(), CliError> {
-    let context = current_machine_context();
+    let context = current_machine_context()?;
     let kind = match error {
         CliError::Validation(_) | CliError::InvalidId { .. } => CliFailureKind::InvalidInput,
         CliError::Consolidation(_)

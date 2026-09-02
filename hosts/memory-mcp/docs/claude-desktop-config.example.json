@@ -8,7 +8,7 @@
         "ELEGY_MCP_AGENT_ID": "claude-desktop",
         "OLLAMA_URL": "http://localhost:11434",
         "ELEGY_EMBEDDING_MODEL": "nomic-embed-text",
-        "ELEGY_ALLOW_NO_EMBEDDINGS": "false",
+        "ELEGY_EMBEDDING_BOOT_POLICY": "prefer",
         "RUST_LOG": "info"
       }
     }

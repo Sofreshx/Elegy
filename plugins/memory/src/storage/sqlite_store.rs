@@ -10,6 +10,7 @@ use chrono::{DateTime, Utc};
 use rusqlite::{params, types::Type, Connection, OptionalExtension, Row};
 use serde::{de::DeserializeOwned, Serialize};
 use sha2::{Digest, Sha256};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 use super::schema::init_database;
@@ -1929,7 +1930,7 @@ impl SqliteMemoryStore {
                     Ok(None) => return Ok(()),
                     Err(error) => {
                         if let Some(warning) = embedding_degradation_warning(&error) {
-                            eprintln!("warning: {warning}");
+                            warn!("{warning}");
                         }
                         return Ok(());
                     }
@@ -2145,7 +2146,7 @@ impl MemoryStore for SqliteMemoryStore {
             Ok(None) => return Ok(id),
             Err(error) => {
                 if let Some(warning) = embedding_degradation_warning(&error) {
-                    eprintln!("warning: {warning}");
+                    warn!("{warning}");
                 }
                 return Ok(id);
             }
@@ -5091,15 +5092,15 @@ fn emit_search_score_explanations(
     } else {
         query_text
     };
-    eprintln!(
-        "search scoring mode={} query=\"{}\" candidates={}",
-        scoring_mode.as_str(),
+    debug!(
+        mode = %scoring_mode.as_str(),
+        candidates = ranked_candidates.len(),
+        "search scoring: query=\"{}\"",
         compact_retrieval_log_value(query_label, 120),
-        ranked_candidates.len()
     );
 
     for (rank, (scored_memory, breakdown)) in ranked_candidates.iter().take(limit).enumerate() {
-        eprintln!(
+        debug!(
             "  rank={} id={} score={:.3} raw_total_score={:.3} similarity={:.3} gap_to_best={:.3} secondary_fade={:.3} secondary_refinement={:.3} vector_similarity={} keyword_similarity={} weighted_similarity={:.3} weighted_recency={:.3} weighted_access={:.3} weighted_priority={:.3} recency_signal={:.3} access_signal={:.3} priority_signal={:.3} importance={:.3} reliability={:.3} preview=\"{}\"",
             rank + 1,
             scored_memory.memory.id,

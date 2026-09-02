@@ -8,11 +8,11 @@ use rmcp::{
 };
 
 use crate::memory_tools::{
-    map_store_error, parse_tool_arguments, MemoryCorrectArgs, MemoryCorrectResponse,
-    MemoryDeleteArgs, MemoryDeleteResponse, MemoryListArgs, MemoryListResponse, MemoryRecallArgs,
-    MemoryRecallResponse, MemoryRepository, MemorySearchArgs, MemorySearchResponse,
-    MemoryStatsArgs, MemoryStatsResponse, MemoryStoreArgs, MemoryStoreResponse, MemoryUpdateArgs,
-    MemoryUpdateResponse,
+    map_store_error, parse_tool_arguments, MemoryConsolidateArgs, MemoryConsolidateResponse,
+    MemoryCorrectArgs, MemoryCorrectResponse, MemoryDeleteArgs, MemoryDeleteResponse,
+    MemoryListArgs, MemoryListResponse, MemoryRecallArgs, MemoryRecallResponse, MemoryRepository,
+    MemorySearchArgs, MemorySearchResponse, MemoryStatsArgs, MemoryStatsResponse, MemoryStoreArgs,
+    MemoryStoreResponse, MemoryUpdateArgs, MemoryUpdateResponse,
 };
 
 pub trait WriteAuditor: Send + Sync {
@@ -219,6 +219,24 @@ impl ElegyMemoryMcpServer {
             &response.memory.id,
             self.memory_repository.as_ref(),
         );
+        Ok(Json(response))
+    }
+
+    #[tool(
+        name = "memory_consolidate",
+        description = "Find and merge duplicate memories within the configured agent namespace using the simple consolidation strategy",
+        input_schema = rmcp::handler::server::tool::schema_for_type::<MemoryConsolidateArgs>()
+    )]
+    async fn memory_consolidate(
+        &self,
+        raw_arguments: rmcp::model::JsonObject,
+    ) -> Result<Json<MemoryConsolidateResponse>, rmcp::ErrorData> {
+        let args = parse_tool_arguments::<MemoryConsolidateArgs>(raw_arguments)?;
+        let response = self
+            .memory_repository
+            .consolidate_memories(&args)
+            .await
+            .map_err(map_store_error)?;
         Ok(Json(response))
     }
 

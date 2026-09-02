@@ -1,4 +1,5 @@
-toolchain := "1.96.0"
+toolchain := "1.96.1"
+exe := if os() == "windows" { ".exe" } else { "" }
 
 ci: fmt-check clippy test
 
@@ -10,3 +11,9 @@ clippy:
 
 test:
     cargo +{{toolchain}} test --workspace
+
+install-mcp:
+    cargo +{{toolchain}} build --release -p elegy-memory-mcp --bin elegy-memory-mcp-stdio -p elegy-host-mcp --bin elegy-run
+    mkdir -p ~/.elegy/bin
+    cp target/release/elegy-memory-mcp-stdio{{exe}} ~/.elegy/bin/
+    cp target/release/elegy-run{{exe}} ~/.elegy/bin/

@@ -27,7 +27,7 @@ impl TestServer {
     async fn start(auth: HttpAuth) -> Self {
         let temp_dir = TempDir::new().expect("temp directory");
         let repository = Arc::new(
-            MemoryRepository::new(&temp_dir.path().join("memory.db"), MemoryBinding::default())
+            MemoryRepository::new(temp_dir.path().join("memory.db"), MemoryBinding::default())
                 .expect("memory repository"),
         );
         let listener = TcpListener::bind((std::net::Ipv4Addr::LOCALHOST, 0))
