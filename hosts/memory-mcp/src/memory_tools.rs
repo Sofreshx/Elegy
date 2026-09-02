@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use elegy_memory::{
     CorrectionDisposition, CorrectionRecord, DefaultSalienceGate, EmbeddingProvider, GateDecision,
-    GateError, Memory, MemoryCandidate, MemoryFilter, MemoryScope, MemoryState, MemoryStore,
-    MemoryType, ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery,
-    SensitivityLevel, SqliteMemoryStore, StoreError,
+    GateError, Memory, MemoryCandidate, MemoryConsolidator, MemoryFilter, MemoryScope, MemoryState,
+    MemoryStore, MemoryType, ProvenanceLevel, ResolutionStatus, SalienceGate, ScoredMemory,
+    SearchQuery, SensitivityLevel, SqliteMemoryStore, StoreError,
 };
 use rmcp::model::JsonObject;
 use rmcp::schemars;
@@ -346,6 +346,83 @@ impl MemoryRepository {
         })
     }
 
+    pub(crate) async fn consolidate_memories(
+        &self,
+        args: &MemoryConsolidateArgs,
+    ) -> Result<MemoryConsolidateResponse, StoreError> {
+        let candidates = self
+            .store
+            .list_consolidation_candidates(&[MemoryScope::Agent], None)?;
+
+        let pair_limit = args.limit.map(|l| l as usize);
+        let cross_scope = args.cross_scope.unwrap_or(false);
+
+        use elegy_memory::SimpleConsolidator;
+        let consolidator = SimpleConsolidator::default()
+            .with_cross_scope(cross_scope)
+            .with_pair_limit(pair_limit);
+
+        let actions = consolidator
+            .consolidate(&candidates)
+            .await
+            .map_err(|e| StoreError::Sqlite(e.to_string()))?;
+
+        let mut consolidated = 0u64;
+        let mut dormant = 0u64;
+        let mut contradicted = 0u64;
+
+        for action in &actions {
+            match action {
+                elegy_memory::ConsolidationAction::Merged { source_ids, result } => {
+                    consolidated += 1;
+                    let current = self.store.get_raw(&result.id).await?;
+                    if current
+                        .as_ref()
+                        .is_some_and(|m| m.content != result.content)
+                    {
+                        self.store
+                            .update_content(
+                                &result.id,
+                                &result.content,
+                                "mcp:memory_consolidate",
+                                "consolidated duplicate memories",
+                            )
+                            .await?;
+                    }
+                    for source_id in source_ids {
+                        self.store.make_dormant(source_id).await?;
+                        dormant += 1;
+                        let _ = self.store.record_link(&result.id, source_id, "supersedes");
+                    }
+                }
+                elegy_memory::ConsolidationAction::Contradiction {
+                    memory_a_id,
+                    memory_b_id,
+                    description,
+                } => {
+                    contradicted += 1;
+                    let memory_a = self.store.get_raw(memory_a_id).await?;
+                    let memory_b = self.store.get_raw(memory_b_id).await?;
+                    if memory_a.as_ref().is_some_and(|m| self.is_visible_memory(m))
+                        && memory_b.as_ref().is_some_and(|m| self.is_visible_memory(m))
+                    {
+                        let _ = self
+                            .store
+                            .record_contradiction(memory_a_id, memory_b_id, description)
+                            .await;
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        Ok(MemoryConsolidateResponse {
+            consolidated,
+            dormant,
+            contradicted,
+        })
+    }
+
     pub(crate) async fn delete_memory(
         &self,
         args: &MemoryDeleteArgs,
@@ -594,6 +671,15 @@ pub struct MemoryCorrectArgs {
     pub(crate) content: String,
     #[serde(default)]
     pub(crate) reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Default, Deserialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct MemoryConsolidateArgs {
+    #[serde(default)]
+    pub(crate) limit: Option<u64>,
+    #[serde(default)]
+    pub(crate) cross_scope: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize, schemars::JsonSchema)]
@@ -998,6 +1084,14 @@ impl From<CorrectionRecord> for MemoryCorrectionSummary {
             corrected_at: value.corrected_at.to_rfc3339(),
         }
     }
+}
+
+#[derive(Debug, Clone, Serialize, schemars::JsonSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemoryConsolidateResponse {
+    pub consolidated: u64,
+    pub dormant: u64,
+    pub contradicted: u64,
 }
 
 #[derive(Debug, Clone, Serialize, schemars::JsonSchema)]

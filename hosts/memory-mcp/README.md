@@ -19,8 +19,9 @@ identity provider own those behaviors; Memory validates the resulting bearer
 token.
 
 Both transports expose `memory_search`, `memory_recall`, `memory_list`,
-`memory_stats`, `memory_store`, `memory_update`, `memory_correct`, and
-`memory_delete`. Requests cannot override the configured agent namespace.
+`memory_stats`, `memory_store`, `memory_update`, `memory_correct`,
+`memory_delete`, and `memory_consolidate`. Requests cannot override the
+configured agent namespace.
 
 ## Stdio read visibility
 
