@@ -241,6 +241,15 @@ fn extract_bearer_token(value: &str) -> Option<&str> {
         .filter(|token| !token.is_empty() && !token.chars().any(char::is_whitespace))
 }
 
+fn unauthorized_mcp_response(state: &AppState, validator: &ExternalTokenValidator) -> Response {
+    let mut response = StatusCode::UNAUTHORIZED.into_response();
+    let challenge = validator.bearer_challenge(&state.public_url);
+    if let Ok(value) = HeaderValue::from_str(&challenge) {
+        response.headers_mut().insert(WWW_AUTHENTICATE, value);
+    }
+    response
+}
+
 #[cfg(test)]
 mod auth_header_tests {
     use super::extract_bearer_token;
@@ -253,13 +262,4 @@ mod auth_header_tests {
         assert_eq!(extract_bearer_token("Bearer"), None);
         assert_eq!(extract_bearer_token("Bearer token extra"), None);
     }
-}
-
-fn unauthorized_mcp_response(state: &AppState, validator: &ExternalTokenValidator) -> Response {
-    let mut response = StatusCode::UNAUTHORIZED.into_response();
-    let challenge = validator.bearer_challenge(&state.public_url);
-    if let Ok(value) = HeaderValue::from_str(&challenge) {
-        response.headers_mut().insert(WWW_AUTHENTICATE, value);
-    }
-    response
 }
