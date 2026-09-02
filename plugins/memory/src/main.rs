@@ -1,6 +1,15 @@
 use std::process::ExitCode;
 
 fn main() -> ExitCode {
+    tracing_subscriber::fmt()
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::try_from_default_env()
+                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+        )
+        .with_target(true)
+        .with_writer(std::io::stderr)
+        .init();
+
     match elegy_memory::cli::run_from_env() {
         Ok(code) => code,
         Err(error) => {
@@ -9,7 +18,7 @@ fn main() -> ExitCode {
             {
                 return ExitCode::from(1);
             }
-            eprintln!("{error}");
+            tracing::error!("{error}");
             ExitCode::from(1)
         }
     }

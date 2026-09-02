@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use tracing::warn;
 
 use crate::{
     embedding::{prepare_embedding_input, EmbeddingTask},
@@ -154,16 +155,16 @@ impl LlmConsolidator {
         match provider.embed(prepared_input.as_ref()).await {
             Ok(embedding) if !embedding.is_empty() => Some(embedding),
             Ok(_) => {
-                eprintln!(
-                    "warning: consolidation skipped memory {} because the embedding provider returned an empty vector",
-                    candidate.memory.id
+                warn!(
+                    memory_id = %candidate.memory.id,
+                    "consolidation skipped because the embedding provider returned an empty vector"
                 );
                 None
             }
             Err(error) => {
-                eprintln!(
-                    "warning: consolidation skipped memory {} because embeddings could not be generated: {error}",
-                    candidate.memory.id
+                warn!(
+                    memory_id = %candidate.memory.id,
+                    "consolidation skipped because embeddings could not be generated: {error}"
                 );
                 None
             }
@@ -261,12 +262,12 @@ impl MemoryConsolidator for LlmConsolidator {
                             });
                         }
                         None => {
-                            eprintln!(
-                                "warning: {} ({}) returned an unusable consolidation response; falling back to simple consolidation for {} and {}",
-                                self.llm_provider.name(),
-                                self.llm_provider.model(),
-                                survivor_candidate.memory.id,
-                                other_candidate.memory.id
+                            warn!(
+                                provider = %self.llm_provider.name(),
+                                model = %self.llm_provider.model(),
+                                survivor_id = %survivor_candidate.memory.id,
+                                other_id = %other_candidate.memory.id,
+                                "unusable consolidation response; falling back to simple consolidation"
                             );
                             consumed[other_index] = true;
                             merged_source_ids.push(other_candidate.memory.id);
@@ -279,12 +280,12 @@ impl MemoryConsolidator for LlmConsolidator {
                         }
                     },
                     Err(error) => {
-                        eprintln!(
-                            "warning: {} ({}) failed during consolidation for {} and {}: {error}. Falling back to simple consolidation.",
-                            self.llm_provider.name(),
-                            self.llm_provider.model(),
-                            survivor_candidate.memory.id,
-                            other_candidate.memory.id
+                        warn!(
+                            provider = %self.llm_provider.name(),
+                            model = %self.llm_provider.model(),
+                            survivor_id = %survivor_candidate.memory.id,
+                            other_id = %other_candidate.memory.id,
+                            "consolidation failed: {error}. Falling back to simple consolidation."
                         );
                         consumed[other_index] = true;
                         merged_source_ids.push(other_candidate.memory.id);

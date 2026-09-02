@@ -5,6 +5,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use tracing::warn;
 
 use crate::{
     embedding::{prepare_embedding_input, EmbeddingTask},
@@ -174,19 +175,19 @@ impl DefaultSalienceGate {
             Ok(response) => match parse_contradiction_response(&response) {
                 Some(verdict) => Some(verdict),
                 None => {
-                    eprintln!(
-                        "warning: {} ({}) returned an unusable contradiction verdict; falling back to heuristic contradiction detection",
-                        provider.name(),
-                        provider.model()
+                    warn!(
+                        provider = %provider.name(),
+                        model = %provider.model(),
+                        "unusable contradiction verdict; falling back to heuristic contradiction detection"
                     );
                     None
                 }
             },
             Err(error) => {
-                eprintln!(
-                    "warning: {} ({}) contradiction check failed: {error}. Falling back to heuristic contradiction detection.",
-                    provider.name(),
-                    provider.model()
+                warn!(
+                    provider = %provider.name(),
+                    model = %provider.model(),
+                    "contradiction check failed: {error}. Falling back to heuristic contradiction detection."
                 );
                 None
             }

@@ -18,6 +18,7 @@ use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use tokio::runtime::Builder;
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{
@@ -1732,8 +1733,8 @@ fn execute_reembed_command(
 ) -> Result<ExitCode, CliError> {
     let effective_limit = limit.unwrap_or(DEFAULT_REEMBED_LIMIT);
     if limit.is_some() {
-        eprintln!(
-            "warning: --limit ignored; reembed on the migration path is all-or-nothing \
+        warn!(
+            "--limit ignored; reembed on the migration path is all-or-nothing \
              (all stale memories are re-embedded regardless of limit)"
         );
     }
