@@ -179,3 +179,23 @@ jobs:
       - name: cargo run -p elegy-documentation -- check
         working-directory: .
         run: cargo run -p elegy-documentation -- check --project .
+
+  memory-eval:
+    name: cargo run -p elegy-memory -- eval run --ci
+    # `tests/eval.rs` already runs (and asserts against) `eval run --ci` inside
+    # the `test` job's `cargo test --workspace --all-targets --all-features`
+    # step above, on all three OSes, in debug mode. This job adds the one thing
+    # that step does not cover: a release-mode run, matching the build profile
+    # the eval harness's latency gates are meant to characterize. It is not a
+    # second copy of the debug-mode test suite.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: dtolnay/rust-toolchain@1.96.1
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        with:
+          workspaces: . -> target
+      - name: cargo run --release -p elegy-memory -- eval run --ci
+        working-directory: .
+        run: cargo run --release -p elegy-memory -- eval run --ci
