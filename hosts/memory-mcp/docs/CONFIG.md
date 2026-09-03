@@ -1,5 +1,12 @@
 # Memory MCP configuration
 
+## Both binaries
+
+| Variable | Purpose |
+|---|---|
+| `ELEGY_MCP_LOG_FORMAT` | Optional; `json` (default) or `text`. Both binaries log to `stderr`; an unrecognized value warns and falls back to `json`. |
+| `ELEGY_RUNTIME_WORKER_THREADS` | Optional; sizes the shared `elegy-memory` Tokio runtime both binaries and the CLI run on. Clamped to `1..=32`; defaults to `min(available_parallelism, 4)` when unset or unparseable. |
+
 ## HTTP binary
 
 Always required:
@@ -10,7 +17,10 @@ Always required:
 | `ELEGY_MCP_DB_PATH` | SQLite memory database path. |
 | `ELEGY_MCP_BIND` | Optional IPv4 bind address; defaults to `127.0.0.1`. |
 | `ELEGY_MCP_PORT` | Optional port; defaults to `8765`. |
-| `ELEGY_MCP_LOG_CONTENT` | Optional boolean; defaults to false. |
+| `ELEGY_MCP_LOG_CONTENT` | Optional boolean; defaults to false. Reserved for any future log path that would otherwise carry memory content — nothing currently logged is gated by it, since content is never logged by default regardless. |
+
+The HTTP binary never constructs an embedding provider, so the embedding
+circuit breaker below does not apply to it.
 
 `local-none` refuses a non-loopback bind.
 
@@ -38,6 +48,8 @@ store, or signing-key setting.
 | `ELEGY_EMBEDDING_MODEL` | Optional model name. |
 | `ELEGY_EMBEDDING_BOOT_POLICY` | Optional; one of `require`, `prefer` (default), `off`. See below. |
 | `ELEGY_ALLOW_NO_EMBEDDINGS` | Deprecated legacy alias for `ELEGY_EMBEDDING_BOOT_POLICY`, read only when the new variable is unset. `true` maps to `off`; `false` maps to `require`. |
+| `ELEGY_EMBEDDING_BREAKER_THRESHOLD` | Optional; consecutive embedding-provider failures before the circuit opens and short-circuits further calls instead of paying a full timeout each time. Defaults to 5; `0` disables the breaker. Shared with the CLI. |
+| `ELEGY_EMBEDDING_BREAKER_COOLDOWN_SECONDS` | Optional; how long the circuit stays open before a single trial call is allowed through. Defaults to 30. Shared with the CLI. |
 
 Stdio never reads the HTTP authentication variables. Its read binding also
 includes memories without an `agent_id`; writes remain limited to the
