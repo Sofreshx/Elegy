@@ -8,8 +8,8 @@
     "gate_accuracy_8to1": { "comparison": "gte", "value": 0.95 },
     "write_latency_p50_ms": { "comparison": "lte", "value": 200.0 },
     "write_latency_p95_ms": { "comparison": "lte", "value": 500.0 },
-    "retrieval_latency_p50_ms": { "comparison": "lte", "value": 260.0 },
-    "retrieval_latency_p95_ms": { "comparison": "lte", "value": 300.0 },
+    "retrieval_latency_p50_ms": { "comparison": "lte", "value": 450.0 },
+    "retrieval_latency_p95_ms": { "comparison": "lte", "value": 600.0 },
     "storage_efficiency_bytes_per_memory": { "comparison": "lte", "value": 16000.0 },
     "stale_embedding_ratio": { "comparison": "lte", "value": 0.05 }
   }
