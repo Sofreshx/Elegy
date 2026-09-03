@@ -37,17 +37,33 @@
     {
       "key": "gc-contradiction-numeric",
       "existing": [
-        { "key": "gc-contra-existing", "content": "The team's daily standup is at 9:30 local time.", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.6 }
+        { "key": "gc-contra-existing", "content": "The team's daily standup starts at 9am each day", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.6 }
       ],
       "candidate": {
         "key": "gc-contra-candidate",
-        "content": "The team's daily standup is at 14:00 local time.",
+        "content": "The team's daily standup starts at 2pm each day",
         "memoryType": "Fact",
         "provenance": "UserStated",
         "importance": 0.6,
         "anchor": { "key": "gc-contra-existing", "targetCosine": 0.92 }
       },
       "expected": "contradiction"
+    },
+    {
+      "key": "gc-reject-broader-scope-duplicate",
+      "existing": [
+        { "key": "gc-reject-existing", "content": "The user's timezone is Europe/Paris.", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.7, "scope": "user" }
+      ],
+      "candidate": {
+        "key": "gc-reject-candidate",
+        "content": "The user's timezone is Europe/Paris, confirmed again in this session.",
+        "memoryType": "Fact",
+        "provenance": "UserStated",
+        "importance": 0.6,
+        "anchor": { "key": "gc-reject-existing", "targetCosine": 0.9 },
+        "scope": "session"
+      },
+      "expected": "reject"
     }
   ]
 }

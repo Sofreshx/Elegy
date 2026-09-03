@@ -10,7 +10,7 @@ use std::{collections::HashMap, path::Path};
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::{MemoryType, ProvenanceLevel};
+use crate::{MemoryScope, MemoryType, ProvenanceLevel};
 
 /// Errors produced while loading or validating an eval corpus file.
 #[derive(Debug, Error)]
@@ -48,6 +48,38 @@ pub(crate) struct CorpusMemory {
     /// generator's uniform similarity spread.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub anchor: Option<MemoryAnchor>,
+    /// Scope this memory is written into. Defaults to `Workspace`, matching every
+    /// existing fixture. Only meaningful for `GateCase` memories — the retrieval
+    /// corpus injector (`runner::inject_retrieval_corpus`) always writes into a
+    /// single-scope store and ignores this field, so a `RetrievalCorpus` fixture
+    /// has no reason to set it. `GateCase` memories use it to construct a
+    /// `GateDecision::Reject` case: a near-duplicate existing memory in a scope
+    /// *broader* than the candidate's own scope.
+    #[serde(default)]
+    pub scope: CorpusScope,
+}
+
+/// Serializable mirror of `MemoryScope`, matching the CLI's own lowercase
+/// convention (`display_scope` in `cli.rs`).
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum CorpusScope {
+    Session,
+    #[default]
+    Workspace,
+    User,
+    Agent,
+}
+
+impl From<CorpusScope> for MemoryScope {
+    fn from(scope: CorpusScope) -> Self {
+        match scope {
+            CorpusScope::Session => MemoryScope::Session,
+            CorpusScope::Workspace => MemoryScope::Workspace,
+            CorpusScope::User => MemoryScope::User,
+            CorpusScope::Agent => MemoryScope::Agent,
+        }
+    }
 }
 
 /// Engineers a memory's embedding at `target_cosine` similarity to the memory

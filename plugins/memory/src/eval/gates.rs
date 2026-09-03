@@ -55,6 +55,7 @@ pub(crate) const REQUIRED_METRIC_NAMES: &[&str] = &[
     "ndcg_at_10",
     "hallucination_rate",
     "gate_accuracy_8to1",
+    "gate_accuracy_full",
     "write_latency_p50_ms",
     "write_latency_p95_ms",
     "retrieval_latency_p50_ms",

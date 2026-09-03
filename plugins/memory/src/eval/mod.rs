@@ -1,6 +1,6 @@
 //! Eval harness v1 (`docs/specs/eval-harness-v1/spec.md`): regression-tests the
 //! write→store→retrieve pipeline against an embedded, network-free corpus and
-//! gates all nine metrics from the spec's Metrics table.
+//! gates every metric in the spec's Metrics table.
 //!
 //! Internal to the crate — the CLI's `eval` subcommand (`src/cli.rs`) is the only
 //! consumer. `tests/eval.rs` drives this module indirectly, as a subprocess

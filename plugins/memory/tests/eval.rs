@@ -36,7 +36,7 @@ fn eval_run_ci_passes_against_the_embedded_corpus_and_thresholds() {
 }
 
 #[test]
-fn eval_run_ci_json_report_carries_all_eleven_gated_metrics() {
+fn eval_run_ci_json_report_carries_all_twelve_gated_metrics() {
     let output = run(&["--format", "json", "eval", "run", "--ci"]);
     assert!(output.status.success(), "eval run --ci must exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
@@ -50,8 +50,8 @@ fn eval_run_ci_json_report_carries_all_eleven_gated_metrics() {
         .expect("metrics must be an array");
     assert_eq!(
         metrics.len(),
-        11,
-        "every metric in the spec's Metrics table must be gated"
+        12,
+        "every metric in the spec's Metrics table, plus gate_accuracy_full, must be gated"
     );
 
     let required_names = [
@@ -60,6 +60,7 @@ fn eval_run_ci_json_report_carries_all_eleven_gated_metrics() {
         "ndcg_at_10",
         "hallucination_rate",
         "gate_accuracy_8to1",
+        "gate_accuracy_full",
         "write_latency_p50_ms",
         "write_latency_p95_ms",
         "retrieval_latency_p50_ms",
@@ -87,6 +88,7 @@ fn eval_run_ci_fails_closed_when_a_threshold_is_impossible_to_meet() {
     "ndcg_at_10": { "comparison": "gte", "value": 0.85 },
     "hallucination_rate": { "comparison": "lte", "value": 0.05 },
     "gate_accuracy_8to1": { "comparison": "gte", "value": 0.95 },
+    "gate_accuracy_full": { "comparison": "gte", "value": 1.0 },
     "write_latency_p50_ms": { "comparison": "lte", "value": 200.0 },
     "write_latency_p95_ms": { "comparison": "lte", "value": 500.0 },
     "retrieval_latency_p50_ms": { "comparison": "lte", "value": 450.0 },

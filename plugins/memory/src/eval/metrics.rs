@@ -1,7 +1,8 @@
 //! Pure metric computations for the eval harness. No I/O, no store access —
 //! every function here takes already-retrieved data and returns a number.
-//! Each of the nine metrics in `docs/specs/eval-harness-v1/spec.md` has a
-//! corresponding function; `runner.rs` is responsible for wiring a gate to
+//! Every metric in `docs/specs/eval-harness-v1/spec.md`'s Metrics table is
+//! computed via one of these functions (some, like `accuracy`, serve more
+//! than one gated metric); `runner.rs` is responsible for wiring a gate to
 //! every one of them (no metric is computed without a gate).
 
 use std::collections::{HashMap, HashSet};

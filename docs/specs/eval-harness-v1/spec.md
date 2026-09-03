@@ -21,7 +21,7 @@ Five deliberate deviations from the design below, each with a stated reason, are
 | Source | Use | Reference | Status |
 |---|---|---|---|
 | Golden retrieval corpus | recall/precision/NDCG/hallucination | Hand-authored, `plugins/memory/fixtures/eval/golden-v1.json` | **Implemented, embedded, CI-gated** |
-| Gate-decision corpus | Accept/Archive/Merge/Contradiction coverage | Hand-authored, `plugins/memory/fixtures/eval/gate-decisions-v1.json` | Implemented, embedded, loaded by `eval list-corpora`; not wired into a CI gate (see below) |
+| Gate-decision corpus | Accept/Archive/Merge/Contradiction/Reject coverage | Hand-authored, `plugins/memory/fixtures/eval/gate-decisions-v1.json` | **Implemented, embedded, CI-gated** (`gate_accuracy_full`) |
 | Synthetic distractors | Write-time gating accuracy at 1:1, 4:1, 8:1 ratios | Locally adapted from the Write-Time Gating paper (arXiv 2603.15994) §4 | **Implemented, generated at runtime, CI-gated at 8:1** |
 | LoCoMo | Multi-session long-conversation recall | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
 | LongMemEval | Factual recall after distraction | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
@@ -57,7 +57,7 @@ Ratios: 1:1, 4:1, 8:1 distractors per target, generated with `SYNTHETIC_TARGET_C
 
 **Deviation — 20 targets per ratio, not the specified minimum of 100**: `eval run --ci` builds one fresh SQLite store per gate case (so cases never observe each other's writes), and at 8:1 that is 20 × 9 = 180 fresh stores per run. Scaling to 100 targets (100 × 9 = 900 stores at 8:1) would push the CI job well past a reasonable timeout. 20 targets already gives 180 gate evaluations at the gated ratio, which is enough to detect a real regression in gate behavior; the count is a `const` in `synthetic.rs` and is the first thing to raise if more statistical power is needed later.
 
-Each corpus memory is annotated with a stable `key`, `content`, `memoryType`, `provenance`, `importance`, and an optional `anchor` (`{key, targetCosine}`) that engineers its embedding to an exact cosine similarity to another memory in the same corpus or gate case, instead of an independent random axis. Retrieval-corpus queries additionally carry `relevantKeys` (ground truth), optional `relevanceGrades` (0-3, for NDCG), and optional `contradicts` (hallucination-rate ground truth).
+Each corpus memory is annotated with a stable `key`, `content`, `memoryType`, `provenance`, `importance`, an optional `anchor` (`{key, targetCosine}`) that engineers its embedding to an exact cosine similarity to another memory in the same corpus or gate case instead of an independent random axis, and an optional `scope` (defaults to `workspace`, matching every retrieval-corpus fixture). `scope` is what makes `GateDecision::Reject` reachable in a `GateCase`: the runner opens a separate `SqliteMemoryStore` instance per distinct scope needed (`store()` rejects a memory whose scope doesn't match the store's own configured scope), so an `existing` memory in a *broader* scope than the candidate is visible to the gate's novelty check via `visible_scopes()` without being writable through the candidate's own store. Retrieval-corpus queries additionally carry `relevantKeys` (ground truth), optional `relevanceGrades` (0-3, for NDCG), and optional `contradicts` (hallucination-rate ground truth).
 
 ### Deviation: deterministic axis embeddings, not an `EmbeddingProvider`
 
@@ -74,6 +74,7 @@ Every row below has a corresponding gate key in `plugins/memory/eval-harness-v1.
 | NDCG@10 | Rank-weighted accuracy | ≥ 0.85 | ≥ 0.85 (met) |
 | Hallucination rate | Fraction of contradiction-bearing queries where a contradicting memory outranks (or stands in for a missing) correct answer — see deviation below for why this is rank-sensitive, not "any co-occurrence" | < 0.05 | < 0.05 (met) |
 | Gate accuracy (8:1) | % of correct gate decisions, synthetic distractor corpus | ≥ 0.95 | ≥ 0.95 (met) |
+| Gate accuracy (full) *(added in Phase A follow-through, not in the original design)* | % of correct gate decisions, hand-authored `gate-decisions-v1.json` — the only corpus that exercises all five `GateDecision` variants including Reject, which the synthetic 8:1 corpus deliberately never reaches (see the Corpus section) | — | ≥ 1.0 (met; 6 deterministic, hand-verified cases) |
 | Write p50/p95 latency | Time for `gate.evaluate` + `store()` + `store_embedding()`, isolated 30-sample pass | p50 < 200ms, p95 < 500ms | p50 < 200ms, p95 < 500ms (met) |
 | Retrieval p50/p95 latency | Time for `search()`, bulk pass at `RETRIEVAL_SCALE_MEMORY_COUNT` memories | p50 < 100ms, p95 < 200ms at 10k memories | p50 < 450ms, p95 < 600ms at 2,000 memories — see deviation below |
 | Storage efficiency | *Marginal* bytes / active memory (`(total_storage_bytes_after − total_storage_bytes_at_empty_store) / active_count`) — see deviation below for why this is marginal, not whole-file | ≤ 2 KB average | ≤ 4.5 KB average — see deviation below |
@@ -108,12 +109,12 @@ plugins/memory/
     corpus.rs       # RetrievalCorpus / GateCorpus schema, embedded + file loaders
     embedding.rs    # deterministic axis-based vectors, no EmbeddingProvider
     synthetic.rs    # Write-Time Gating-adapted distractor generator
-    metrics.rs      # the nine metrics, pure functions
+    metrics.rs      # pure metric functions, several shared across gated metrics
     gates.rs        # eval-harness-v1.json load + threshold comparison
     runner.rs        # fresh store -> inject -> query -> measure -> compute -> gate
   fixtures/eval/
     golden-v1.json          # hand-authored recall/precision/NDCG/hallucination corpus
-    gate-decisions-v1.json  # hand-authored Accept/Archive/Merge/Contradiction cases
+    gate-decisions-v1.json  # hand-authored Accept/Archive/Merge/Contradiction/Reject cases
   eval-harness-v1.json      # gate thresholds (single source for CI + sweep)
   tests/eval.rs             # subprocess driver against the built binary
 ```
@@ -121,9 +122,9 @@ plugins/memory/
 `src/eval` is `pub(crate)` — internal to the crate, not part of its public API — because three things it needs (`similarity::cosine_similarity`, `SqliteMemoryStore::learned_weights_report()`, `embedding::prepare_embedding_input`) are themselves crate-private, and `eval run` is a CLI subcommand regardless, so `src/cli.rs` is the only consumer either way. `tests/eval.rs` therefore drives it as a subprocess against `env!("CARGO_BIN_EXE_elegy-memory")`, matching the existing convention in `tests/cli.rs`, rather than exposing a second, test-only public surface.
 
 The runner:
-1. Opens a fresh `SqliteMemoryStore` for each store it needs — one for the golden retrieval corpus, one per gate-decision case (so cases never observe each other's writes), one for the isolated write-latency pass, one for the bulk retrieval-at-scale pass
+1. Opens a fresh `SqliteMemoryStore` for each store it needs — one for the golden retrieval corpus, one per gate-decision case (so cases never observe each other's writes; a case whose existing memories span more than one scope opens one store per distinct scope against the same database file, since a store instance can only write into the scope it was opened with), one for the isolated write-latency pass, one for the bulk retrieval-at-scale pass
 2. Injects memories directly via `store()` + `store_embedding()`, bypassing the write-time gate entirely for the golden corpus so a gate decision (e.g. an unexpected merge between two similar golden entries) can never perturb retrieval ground truth
-3. Runs queries built from `blended_vector` over each query's `relevantKeys`, computing all nine metrics
+3. Runs queries built from `blended_vector` over each query's `relevantKeys`, and separately evaluates both the synthetic 8:1 and hand-authored gate-decision corpora through the real `DefaultSalienceGate`, computing every gated metric
 4. Compares every metric against `eval-harness-v1.json`
 5. Reports pass/fail per metric, plus an overall `passed`
 
@@ -171,7 +172,7 @@ Format: one JSON object per line, camelCase (matching every other JSON surface i
 ## Acceptance Criteria
 
 - [x] `cargo run -p elegy-memory -- eval run --ci` exits non-zero when any metric in the Metrics table misses its gate target against the embedded corpus — verified against a `--thresholds` override with an impossible `recall_at_10` target, and against a threshold file missing a required metric key.
-- [x] Every metric in the Metrics table has a corresponding assertion in the harness; no metric is computed without a gate. `EvalGateThresholds::require_all` fails closed (a hard error, not a skipped metric) if any of the eleven required threshold keys is absent from a threshold file, embedded or supplied.
+- [x] Every metric in the Metrics table has a corresponding assertion in the harness; no metric is computed without a gate. `EvalGateThresholds::require_all` fails closed (a hard error, not a skipped metric) if any of the twelve required threshold keys (`gates::REQUIRED_METRIC_NAMES`) is absent from a threshold file, embedded or supplied.
 - [x] `cargo run -p elegy-memory -- eval sweep-threshold` can run against a changed threshold without modifying the checked-in corpus — it writes the swept `scope_config` value directly to each sweep point's own fresh temp store, never to `eval-harness-v1.json` or the fixture files.
 - [x] CI runs the harness on every PR touching the file list under CI Gates, and a failing gate blocks merge the same way `cargo test` does today (the `memory-eval` job; see CI Gates above for why this criterion is also independently met by the existing `test` job).
 - [x] The corpus used by `cargo test -p elegy-memory --test eval` requires no network access and no external download — confirmed by construction: the harness never constructs an `EmbeddingProvider`, and every corpus it runs against is either `include_str!`-embedded or generated at runtime.

@@ -1,10 +1,11 @@
 //! Orchestrates the eval harness: fresh store per run, inject corpus, query,
-//! measure, compute all nine metrics, compare against gate thresholds.
+//! measure, compute every metric, compare against gate thresholds.
 //!
-//! No metric here is optional — `run_eval` always computes and gates all nine
-//! (eleven gate entries, since write and retrieval latency each split into
-//! p50/p95), matching the spec's Acceptance Criteria ("no metric is computed
-//! without a gate").
+//! No metric here is optional — `run_eval` always computes and gates all
+//! twelve entries in `gates::REQUIRED_METRIC_NAMES` (the spec's nine metrics,
+//! where write and retrieval latency each split into p50/p95, plus
+//! `gate_accuracy_full`), matching the spec's Acceptance Criteria ("no metric
+//! is computed without a gate").
 
 use std::{
     collections::{HashMap, HashSet},
@@ -296,26 +297,47 @@ fn outcome_of(decision: &GateDecision) -> ExpectedGateOutcome {
     }
 }
 
-/// Runs every case in `gate_corpus` against a fresh store (one per case, so
+/// Runs every case in `gate_corpus` against a fresh database (one per case, so
 /// cases never see each other's writes) and returns, per case, whether the
 /// gate's actual decision matched the expected outcome.
+///
+/// Each case's candidate is evaluated through a store opened at the
+/// candidate's own scope. An existing memory whose `scope` differs from the
+/// candidate's is written through a *separate* `SqliteMemoryStore` instance
+/// opened at that memory's scope but pointed at the same database file —
+/// `SqliteMemoryStore::store()` rejects a memory whose scope doesn't match the
+/// store's configured scope, so a single store instance cannot write into two
+/// scopes. This is what makes `GateDecision::Reject` reachable: the gate's
+/// novelty check sees existing memories through `visible_scopes()`, which
+/// includes broader scopes, so a near-duplicate in a broader scope than the
+/// candidate is exactly the scenario the gate's Reject branch exists for.
 fn evaluate_gate_corpus(gate_corpus: &GateCorpus) -> Result<Vec<bool>, EvalError> {
     let mut correctness = Vec::with_capacity(gate_corpus.cases.len());
 
     for case in &gate_corpus.cases {
-        let (_temp_dir, store) = fresh_store("gate-case")?;
+        let temp_dir = EvalTempDir::new("gate-case")?;
+        let candidate_scope: MemoryScope = case.candidate.scope.into();
+        let store = SqliteMemoryStore::new(temp_dir.db_path(), candidate_scope)?;
 
         let mut case_memories: Vec<CorpusMemory> = case.existing.clone();
         case_memories.push(case.candidate.clone());
         let embeddings = assign_axis_embeddings(&case_memories);
 
         for existing in &case.existing {
-            let memory = build_memory(existing, store.scope());
-            let id = run_async(store.store(memory))?;
+            let existing_scope: MemoryScope = existing.scope.into();
+            let memory = build_memory(existing, existing_scope);
             let embedding = embeddings
                 .get(&existing.key)
-                .expect("axis embedding assigned for every existing memory");
-            run_async(store.store_embedding(&id, embedding))?;
+                .expect("axis embedding assigned for every existing memory")
+                .clone();
+            if existing_scope == candidate_scope {
+                let id = run_async(store.store(memory))?;
+                run_async(store.store_embedding(&id, &embedding))?;
+            } else {
+                let scoped_store = SqliteMemoryStore::new(temp_dir.db_path(), existing_scope)?;
+                let id = run_async(scoped_store.store(memory))?;
+                run_async(scoped_store.store_embedding(&id, &embedding))?;
+            }
         }
 
         let gate = DefaultSalienceGate::new(ScopeConfig::default());
@@ -507,8 +529,9 @@ pub(crate) struct EvalRunOptions {
 }
 
 /// Runs the full harness: golden retrieval corpus, 8:1 synthetic gate-accuracy
-/// corpus, an isolated write-latency pass, and a bulk retrieval-at-scale pass.
-/// Computes and gates all nine metrics from the spec's Metrics table.
+/// corpus, the hand-authored full-coverage gate-decision corpus, an isolated
+/// write-latency pass, and a bulk retrieval-at-scale pass. Computes and gates
+/// every metric in `gates::REQUIRED_METRIC_NAMES`.
 pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError> {
     let started = Instant::now();
 
@@ -548,6 +571,14 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     let gate_correctness = evaluate_gate_corpus(&gate_corpus)?;
     let gate_accuracy = metrics::accuracy(&gate_correctness);
 
+    // The hand-authored corpus, unlike the synthetic 8:1 corpus, exercises all
+    // five GateDecision variants (Accept/Archive/Merge/Contradiction/Reject) —
+    // the synthetic generator deliberately never reaches Merge/Contradiction/
+    // Reject (see synthetic.rs's module docs on the 0.75 cosine ceiling).
+    let full_gate_corpus = corpus::embedded_gate_corpus();
+    let full_gate_correctness = evaluate_gate_corpus(&full_gate_corpus)?;
+    let full_gate_accuracy = metrics::accuracy(&full_gate_correctness);
+
     let write_latencies_ms = measure_write_latencies_ms()?;
     let retrieval_latencies_ms = measure_retrieval_latencies_at_scale_ms()?;
 
@@ -569,6 +600,7 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             retrieval_metrics.hallucination_rate,
         )?,
         gate_metric(&thresholds, "gate_accuracy_8to1", gate_accuracy)?,
+        gate_metric(&thresholds, "gate_accuracy_full", full_gate_accuracy)?,
         gate_metric(
             &thresholds,
             "write_latency_p50_ms",
@@ -784,6 +816,38 @@ pub(crate) fn list_corpora() -> Vec<CorpusDescriptor> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn embedded_gate_corpus_reaches_every_expected_decision() {
+        let gate_corpus = corpus::embedded_gate_corpus();
+        let correctness =
+            evaluate_gate_corpus(&gate_corpus).expect("evaluate the embedded gate corpus");
+        for (case, correct) in gate_corpus.cases.iter().zip(&correctness) {
+            assert!(
+                *correct,
+                "case `{}` expected {:?} but the gate reached a different decision",
+                case.key, case.expected
+            );
+        }
+        // All five GateDecision variants must actually be exercised at least
+        // once, including Reject — otherwise this fixture would silently stop
+        // covering a disposition without anyone noticing.
+        for expected in [
+            ExpectedGateOutcome::Accept,
+            ExpectedGateOutcome::Archive,
+            ExpectedGateOutcome::Merge,
+            ExpectedGateOutcome::Contradiction,
+            ExpectedGateOutcome::Reject,
+        ] {
+            assert!(
+                gate_corpus
+                    .cases
+                    .iter()
+                    .any(|case| case.expected == expected),
+                "embedded gate corpus never exercises {expected:?}"
+            );
+        }
+    }
 
     #[test]
     fn run_eval_against_the_embedded_corpus_computes_every_required_metric() {

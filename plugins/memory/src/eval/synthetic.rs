@@ -18,7 +18,9 @@
 //! under test — that low-value candidates get archived regardless of topical
 //! similarity — while trivially avoiding the merge/contradiction branch entirely.
 
-use crate::eval::corpus::{CorpusMemory, ExpectedGateOutcome, GateCase, GateCorpus, MemoryAnchor};
+use crate::eval::corpus::{
+    CorpusMemory, CorpusScope, ExpectedGateOutcome, GateCase, GateCorpus, MemoryAnchor,
+};
 use crate::{MemoryType, ProvenanceLevel};
 
 /// Number of targets generated per ratio. The spec's methodology calls for a
@@ -75,6 +77,7 @@ pub(crate) fn generate_gate_corpus(ratio: DistractorRatio) -> GateCorpus {
             provenance: ProvenanceLevel::UserStated,
             importance: 0.8,
             anchor: None,
+            scope: CorpusScope::default(),
         };
 
         cases.push(GateCase {
@@ -101,6 +104,7 @@ pub(crate) fn generate_gate_corpus(ratio: DistractorRatio) -> GateCorpus {
                     key: target_key.clone(),
                     target_cosine,
                 }),
+                scope: CorpusScope::default(),
             };
 
             cases.push(GateCase {
