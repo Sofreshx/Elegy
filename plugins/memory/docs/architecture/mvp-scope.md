@@ -15,7 +15,7 @@
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | SQLite + rusqlite (bundled) | **MVP** | Single backend, all core tables created |
-| sqlite-vec virtual table | **MVP** | Vector storage/search path working |
+| sqlite-vec virtual table | **MVP** | Table creation and fallback path implemented; the KNN search query itself is not — see storage-schema.md. `sqlite-vec` is not currently a Cargo dependency. |
 | FTS5 virtual table | **MVP** | Keyword search working |
 | Hybrid search (vector + FTS5) | **MVP** | Vector similarity is blended ahead of final scoring |
 | `MemoryStore` trait definition | **MVP** | Full async CRUD/search/health contract |
@@ -247,4 +247,4 @@ Current default gate thresholds are stored in `scope_config` and default to:
 - salience threshold: `0.20`
 - agent-inferred archive threshold: `0.50`
 
-Retrieval scoring weights remain configurable (`0.40 / 0.25 / 0.15 / 0.20` by default). Thresholds are architecture defaults, not a claim that all higher-order tuning work is finished.
+Retrieval scoring weights remain configurable (`0.40 / 0.25 / 0.05 / 0.20` by default — access weight is deliberately saturated low so frequently-returned memories cannot snowball; see memory-model.md's Retrieval Scoring section). Thresholds are architecture defaults, not a claim that all higher-order tuning work is finished.

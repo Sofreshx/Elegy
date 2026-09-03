@@ -33,7 +33,7 @@ consumer to validate it against.
 
 | Area | Decision |
 |---|---|
-| Database | SQLite bundled (`rusqlite` + `sqlite-vec` + FTS5). WAL mode. |
+| Database | SQLite bundled (`rusqlite` + FTS5). WAL mode. Vector storage uses a `sqlite-vec`-shaped schema (`vec0` virtual table when available, a plain-table fallback otherwise), but `sqlite-vec` is not currently a Cargo dependency, and vector search is a Rust-side scan rather than an accelerated KNN query — see `plugins/memory/docs/architecture/storage-schema.md`. |
 | Concurrency | Connection pool (readers), dedicated writer. Single long-lived Tokio runtime. |
 | Security | Prompt-injection hardening in LLM gate/consolidator prompts. Provider URL allow-list (no SSRF). API key via env var with redacted Debug. No tenant isolation enforcement. |
 | Distribution | CLI binary (`elegy-memory`) + MCP adapters (`elegy-memory-mcp-stdio`, `elegy-memory-mcp-http`). |

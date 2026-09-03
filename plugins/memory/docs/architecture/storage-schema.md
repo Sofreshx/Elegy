@@ -86,6 +86,8 @@ CREATE TABLE vec_memories (
 
 This keeps the `rowid`-based mapping intact so that the rest of the schema can reference `vec_memories` uniformly.
 
+**Current status: this table's `rowid`/embedding storage is implemented, but the search path below is not.** `load_vector_similarity_scores` in `sqlite_store.rs` does not issue the KNN query shown below against either the `vec0` table or its fallback — it selects every embedding blob for candidate rows and computes cosine similarity in Rust. The KNN pattern below is the target design, not current behavior. `sqlite-vec` is also not currently a Cargo dependency of this crate (confirmed absent from `Cargo.lock`); the `vec0` branch of `ensure_vec_memories_object` is unreachable in a stock build today, so every build currently takes the fallback `BLOB` table.
+
 The `rowid` of `vec_memories` maps to a separate lookup. We maintain a mapping table:
 
 ```sql
@@ -100,7 +102,7 @@ CREATE INDEX idx_memory_embeddings_content_sha256
     WHERE content_sha256 IS NOT NULL;
 ```
 
-**KNN Query Pattern:**
+**KNN Query Pattern (target design — not implemented):**
 ```sql
 SELECT m.*, v.distance
 FROM vec_memories v

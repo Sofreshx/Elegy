@@ -106,7 +106,7 @@ Default weights remain:
 
 - `α = 0.40`
 - `β = 0.25`
-- `γ = 0.15`
+- `γ = 0.05`
 - `δ = 0.20`
 
 Vector and keyword similarity are blended before this score, with vector similarity intentionally dominant in the current store.
