@@ -470,7 +470,7 @@
       "path": "docs/specs/eval-harness-v1/spec.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "An evaluation harness for regression-testing elegy-memory's write→store→retrieve pipeline. Anchored on three academic benchmarks plus a synthetic distractor corpus. Metrics gate production readiness of threshold changes, decay parameter changes, and scoring weight changes.",
+      "summary": "An evaluation harness for regression-testing elegy-memory's write→store→retrieve pipeline. Anchored on a hand-authored embedded corpus plus a synthetic distractor corpus, with the three academic benchmarks reachable as advisory, non-gating extensions (see Corpus). Metrics gate production readiness of threshold changes, decay parameter changes, and scoring weight changes.",
       "title": "Eval harness v1"
     },
     {

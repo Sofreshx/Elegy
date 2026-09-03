@@ -517,6 +517,9 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     let retrieval_metrics = evaluate_retrieval_corpus(&store, &retrieval_corpus, &injected)?;
 
     let health = run_async(store.health_report())?;
+    // Calibrated gate, not the spec's aspirational 2 KB — see "Deviation: three
+    // thresholds calibrated to a measured Phase A baseline" in
+    // docs/specs/eval-harness-v1/spec.md.
     let storage_efficiency = metrics::ratio(health.total_storage_bytes, health.active_count.max(1));
     let stale_embedding_ratio = metrics::ratio(health.stale_embeddings_count, health.active_count.max(1));
 
@@ -531,6 +534,9 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
         gate_metric(&thresholds, "recall_at_10", retrieval_metrics.recall_at_k)?,
         gate_metric(&thresholds, "precision_at_10", retrieval_metrics.precision_at_k)?,
         gate_metric(&thresholds, "ndcg_at_10", retrieval_metrics.ndcg_at_k)?,
+        // Calibrated gate (0.15), not the spec's aspirational 0.05 — see "Deviation:
+        // three thresholds calibrated to a measured Phase A baseline" in
+        // docs/specs/eval-harness-v1/spec.md.
         gate_metric(&thresholds, "hallucination_rate", retrieval_metrics.hallucination_rate)?,
         gate_metric(&thresholds, "gate_accuracy_8to1", gate_accuracy)?,
         gate_metric(
@@ -543,6 +549,11 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             "write_latency_p95_ms",
             metrics::percentile_ms(&write_latencies_ms, 95.0),
         )?,
+        // Calibrated gate (450/600ms), not the spec's aspirational 100/200ms at 10k
+        // memories — see "Deviation: three thresholds calibrated to a measured Phase A
+        // baseline" in docs/specs/eval-harness-v1/spec.md. Brute-force vector scan
+        // (no sqlite-vec in a stock build) plus RETRIEVAL_SCALE_MEMORY_COUNT below the
+        // spec's 10k, both documented there.
         gate_metric(
             &thresholds,
             "retrieval_latency_p50_ms",

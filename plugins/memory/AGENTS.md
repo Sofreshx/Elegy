@@ -8,7 +8,7 @@
 
 ## Boundaries
 
-- This crate owns bounded local memory behavior and persistence. Host policy such as approval, promotion, freshness/currentness, and retrieval ranking stays outside this crate.
+- This crate owns bounded local memory behavior and persistence, including retrieval scoring and ranking (`search()`'s similarity/recency/access/priority blend) — that lives here and is regression-tested by `docs/specs/eval-harness-v1/spec.md`'s eval harness. Host-level policy such as approval, promotion, and freshness/currentness stays outside this crate.
 - Store distilled memories only. Never persist raw transcripts.
 - Every memory needs provenance; do not create bypass writes around provenance or salience.
 - Keep session, workspace, user, and agent scopes isolated unless an explicit API requests cross-scope behavior.
