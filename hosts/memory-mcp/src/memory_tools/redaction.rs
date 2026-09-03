@@ -14,8 +14,7 @@ fn url_pattern() -> &'static Regex {
 fn windows_path_pattern() -> &'static Regex {
     static RE: OnceLock<Regex> = OnceLock::new();
     RE.get_or_init(|| {
-        Regex::new(r"(?:[A-Za-z]:\\|\\\\)\S+")
-            .expect("windows path redaction pattern is valid")
+        Regex::new(r"(?:[A-Za-z]:\\|\\\\)\S+").expect("windows path redaction pattern is valid")
     })
 }
 
