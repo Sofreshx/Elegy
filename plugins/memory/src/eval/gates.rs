@@ -138,7 +138,9 @@ mod tests {
         let mut thresholds = embedded_default_thresholds();
         thresholds.thresholds.remove("hallucination_rate");
         let error = thresholds.require_all().expect_err("must fail closed");
-        assert!(matches!(error, EvalGateError::MissingMetric(name) if name == "hallucination_rate"));
+        assert!(
+            matches!(error, EvalGateError::MissingMetric(name) if name == "hallucination_rate")
+        );
     }
 
     #[test]

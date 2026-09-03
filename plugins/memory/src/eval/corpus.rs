@@ -143,7 +143,8 @@ pub(crate) fn embedded_golden_corpus() -> RetrievalCorpus {
     let corpus: RetrievalCorpus =
         serde_json::from_str(include_str!("../../fixtures/eval/golden-v1.json"))
             .expect("embedded golden-v1.json corpus must deserialize");
-    validate_retrieval_corpus(&corpus).expect("embedded golden-v1.json corpus must be internally consistent");
+    validate_retrieval_corpus(&corpus)
+        .expect("embedded golden-v1.json corpus must be internally consistent");
     corpus
 }
 
@@ -227,7 +228,8 @@ pub(crate) fn embedded_gate_corpus() -> GateCorpus {
     let corpus: GateCorpus =
         serde_json::from_str(include_str!("../../fixtures/eval/gate-decisions-v1.json"))
             .expect("embedded gate-decisions-v1.json corpus must deserialize");
-    validate_gate_corpus(&corpus).expect("embedded gate-decisions-v1.json corpus must be internally consistent");
+    validate_gate_corpus(&corpus)
+        .expect("embedded gate-decisions-v1.json corpus must be internally consistent");
     corpus
 }
 

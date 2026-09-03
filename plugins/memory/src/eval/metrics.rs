@@ -34,7 +34,9 @@ pub(crate) fn precision_at_k(retrieved: &[MemoryId], relevant: &HashSet<MemoryId
 /// using `grades` for relevance (0 for any id not present). `k` bounds the ideal
 /// ranking used to compute IDCG.
 pub(crate) fn ndcg_at_k(retrieved: &[MemoryId], grades: &HashMap<MemoryId, u8>, k: usize) -> f64 {
-    let retrieved_dcg = dcg(retrieved.iter().map(|id| f64::from(grades.get(id).copied().unwrap_or(0))));
+    let retrieved_dcg = dcg(retrieved
+        .iter()
+        .map(|id| f64::from(grades.get(id).copied().unwrap_or(0))));
 
     let mut ideal_grades: Vec<u8> = grades.values().copied().collect();
     ideal_grades.sort_unstable_by(|left, right| right.cmp(left));
@@ -188,7 +190,11 @@ mod tests {
         contradicting_a.insert(items[1]);
         let contradicting_per_query = vec![contradicting_a, HashSet::new()];
         // 1 hallucinated out of 3 total retrieved.
-        assert!((hallucination_rate(&retrieved_per_query, &contradicting_per_query) - (1.0 / 3.0)).abs() < 1e-9);
+        assert!(
+            (hallucination_rate(&retrieved_per_query, &contradicting_per_query) - (1.0 / 3.0))
+                .abs()
+                < 1e-9
+        );
     }
 
     #[test]

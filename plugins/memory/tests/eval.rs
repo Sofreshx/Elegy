@@ -40,12 +40,19 @@ fn eval_run_ci_json_report_carries_all_eleven_gated_metrics() {
     let output = run(&["--format", "json", "eval", "run", "--ci"]);
     assert!(output.status.success(), "eval run --ci must exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let envelope: Value = serde_json::from_str(&stdout).expect("eval run --format json must emit a JSON envelope");
+    let envelope: Value =
+        serde_json::from_str(&stdout).expect("eval run --format json must emit a JSON envelope");
     assert_eq!(envelope["status"], "ok");
     let data = &envelope["data"];
     assert_eq!(data["passed"], true);
-    let metrics = data["metrics"].as_array().expect("metrics must be an array");
-    assert_eq!(metrics.len(), 11, "every metric in the spec's Metrics table must be gated");
+    let metrics = data["metrics"]
+        .as_array()
+        .expect("metrics must be an array");
+    assert_eq!(
+        metrics.len(),
+        11,
+        "every metric in the spec's Metrics table must be gated"
+    );
 
     let required_names = [
         "recall_at_10",
@@ -142,13 +149,20 @@ fn eval_list_corpora_reports_the_two_embedded_and_three_generated_corpora() {
     let output = run(&["--format", "json", "eval", "list-corpora"]);
     assert!(output.status.success(), "eval list-corpora must exit 0");
     let stdout = String::from_utf8_lossy(&output.stdout);
-    let envelope: Value = serde_json::from_str(&stdout).expect("eval list-corpora must emit a JSON envelope");
-    let corpora = envelope["data"].as_array().expect("corpora must be an array");
+    let envelope: Value =
+        serde_json::from_str(&stdout).expect("eval list-corpora must emit a JSON envelope");
+    let corpora = envelope["data"]
+        .as_array()
+        .expect("corpora must be an array");
     assert_eq!(corpora.len(), 5);
 
     let names: Vec<&str> = corpora
         .iter()
-        .map(|corpus| corpus["name"].as_str().expect("corpus name must be a string"))
+        .map(|corpus| {
+            corpus["name"]
+                .as_str()
+                .expect("corpus name must be a string")
+        })
         .collect();
     for expected in [
         "golden-v1",
@@ -157,7 +171,10 @@ fn eval_list_corpora_reports_the_two_embedded_and_three_generated_corpora() {
         "synthetic-distractors-4to1",
         "synthetic-distractors-8to1",
     ] {
-        assert!(names.contains(&expected), "missing corpus `{expected}` in list-corpora output");
+        assert!(
+            names.contains(&expected),
+            "missing corpus `{expected}` in list-corpora output"
+        );
     }
 }
 

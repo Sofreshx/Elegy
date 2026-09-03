@@ -16,15 +16,17 @@ use thiserror::Error;
 use uuid::Uuid;
 
 use crate::eval::{
-    corpus::{self, CorpusMemory, EvalCorpusError, ExpectedGateOutcome, GateCorpus, RetrievalCorpus},
+    corpus::{
+        self, CorpusMemory, EvalCorpusError, ExpectedGateOutcome, GateCorpus, RetrievalCorpus,
+    },
     embedding::{axis_vector, blended_vector, vector_at_similarity, EVAL_EMBEDDING_DIMENSIONS},
     gates::{self, EvalGateError, EvalGateThresholds},
     metrics, synthetic,
 };
 use crate::{
     runtime::block_on, DefaultSalienceGate, GateDecision, Memory, MemoryCandidate, MemoryId,
-    MemoryScope, MemoryState, MemoryStore, MemoryType, ProvenanceLevel, SalienceGate,
-    ScopeConfig, ScoredMemory, SearchQuery, SensitivityLevel, SqliteMemoryStore, StoreError,
+    MemoryScope, MemoryState, MemoryStore, MemoryType, ProvenanceLevel, SalienceGate, ScopeConfig,
+    ScoredMemory, SearchQuery, SensitivityLevel, SqliteMemoryStore, StoreError,
 };
 
 /// Number of retrieval queries in the isolated write-latency timing pass. Kept
@@ -214,7 +216,8 @@ fn evaluate_retrieval_corpus(
     let mut precisions = Vec::with_capacity(corpus.queries.len());
     let mut ndcgs = Vec::with_capacity(corpus.queries.len());
     let mut retrieved_per_query: Vec<Vec<MemoryId>> = Vec::with_capacity(corpus.queries.len());
-    let mut contradicting_per_query: Vec<HashSet<MemoryId>> = Vec::with_capacity(corpus.queries.len());
+    let mut contradicting_per_query: Vec<HashSet<MemoryId>> =
+        Vec::with_capacity(corpus.queries.len());
 
     for query in &corpus.queries {
         let relevant_axes: Vec<usize> = query
@@ -272,7 +275,10 @@ fn evaluate_retrieval_corpus(
         recall_at_k: metrics::mean(&recalls),
         precision_at_k: metrics::mean(&precisions),
         ndcg_at_k: metrics::mean(&ndcgs),
-        hallucination_rate: metrics::hallucination_rate(&retrieved_per_query, &contradicting_per_query),
+        hallucination_rate: metrics::hallucination_rate(
+            &retrieved_per_query,
+            &contradicting_per_query,
+        ),
     })
 }
 
@@ -521,7 +527,8 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     // thresholds calibrated to a measured Phase A baseline" in
     // docs/specs/eval-harness-v1/spec.md.
     let storage_efficiency = metrics::ratio(health.total_storage_bytes, health.active_count.max(1));
-    let stale_embedding_ratio = metrics::ratio(health.stale_embeddings_count, health.active_count.max(1));
+    let stale_embedding_ratio =
+        metrics::ratio(health.stale_embeddings_count, health.active_count.max(1));
 
     let gate_corpus = synthetic::generate_gate_corpus(synthetic::DistractorRatio::EightToOne);
     let gate_correctness = evaluate_gate_corpus(&gate_corpus)?;
@@ -532,12 +539,20 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
 
     let metric_results = vec![
         gate_metric(&thresholds, "recall_at_10", retrieval_metrics.recall_at_k)?,
-        gate_metric(&thresholds, "precision_at_10", retrieval_metrics.precision_at_k)?,
+        gate_metric(
+            &thresholds,
+            "precision_at_10",
+            retrieval_metrics.precision_at_k,
+        )?,
         gate_metric(&thresholds, "ndcg_at_10", retrieval_metrics.ndcg_at_k)?,
         // Calibrated gate (0.15), not the spec's aspirational 0.05 — see "Deviation:
         // three thresholds calibrated to a measured Phase A baseline" in
         // docs/specs/eval-harness-v1/spec.md.
-        gate_metric(&thresholds, "hallucination_rate", retrieval_metrics.hallucination_rate)?,
+        gate_metric(
+            &thresholds,
+            "hallucination_rate",
+            retrieval_metrics.hallucination_rate,
+        )?,
         gate_metric(&thresholds, "gate_accuracy_8to1", gate_accuracy)?,
         gate_metric(
             &thresholds,
@@ -564,7 +579,11 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             "retrieval_latency_p95_ms",
             metrics::percentile_ms(&retrieval_latencies_ms, 95.0),
         )?,
-        gate_metric(&thresholds, "storage_efficiency_bytes_per_memory", storage_efficiency)?,
+        gate_metric(
+            &thresholds,
+            "storage_efficiency_bytes_per_memory",
+            storage_efficiency,
+        )?,
         gate_metric(&thresholds, "stale_embedding_ratio", stale_embedding_ratio)?,
     ];
 
@@ -770,9 +789,11 @@ mod tests {
 
     #[test]
     fn sweep_threshold_rejects_a_malformed_range() {
-        let error = sweep_threshold("merge_similarity_threshold", "0.9-0.8").expect_err("must reject");
+        let error =
+            sweep_threshold("merge_similarity_threshold", "0.9-0.8").expect_err("must reject");
         assert!(matches!(error, EvalError::InvalidRange(_)));
-        let error = sweep_threshold("merge_similarity_threshold", "0.9..0.2").expect_err("must reject reversed range");
+        let error = sweep_threshold("merge_similarity_threshold", "0.9..0.2")
+            .expect_err("must reject reversed range");
         assert!(matches!(error, EvalError::InvalidRange(_)));
     }
 
@@ -780,6 +801,8 @@ mod tests {
     fn list_corpora_reports_all_five_corpora() {
         let descriptors = list_corpora();
         assert_eq!(descriptors.len(), 5);
-        assert!(descriptors.iter().all(|descriptor| descriptor.item_count > 0));
+        assert!(descriptors
+            .iter()
+            .all(|descriptor| descriptor.item_count > 0));
     }
 }

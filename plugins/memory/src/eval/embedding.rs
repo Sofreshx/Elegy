@@ -32,8 +32,15 @@ pub(crate) fn axis_vector(axis: usize) -> Vec<f32> {
 ///
 /// # Panics
 /// Panics if `axis == companion_axis` or either is out of range.
-pub(crate) fn vector_at_similarity(axis: usize, companion_axis: usize, target_cosine: f32) -> Vec<f32> {
-    assert!(axis != companion_axis, "axis and companion_axis must differ");
+pub(crate) fn vector_at_similarity(
+    axis: usize,
+    companion_axis: usize,
+    target_cosine: f32,
+) -> Vec<f32> {
+    assert!(
+        axis != companion_axis,
+        "axis and companion_axis must differ"
+    );
     assert!(
         axis < EVAL_EMBEDDING_DIMENSIONS && companion_axis < EVAL_EMBEDDING_DIMENSIONS,
         "axis indices out of range for {EVAL_EMBEDDING_DIMENSIONS}-dimensional eval embeddings"
@@ -59,7 +66,11 @@ pub(crate) fn blended_vector(axes: &[usize]) -> Vec<f32> {
         );
         vector[axis] += 1.0;
     }
-    let norm = vector.iter().map(|component| component * component).sum::<f32>().sqrt();
+    let norm = vector
+        .iter()
+        .map(|component| component * component)
+        .sum::<f32>()
+        .sqrt();
     if norm > f32::EPSILON {
         for component in &mut vector {
             *component /= norm;
@@ -98,7 +109,10 @@ mod tests {
                 "target={target} achieved={achieved}"
             );
             let norm = produced.iter().map(|v| v * v).sum::<f32>().sqrt();
-            assert!((norm - 1.0).abs() < 1e-5, "produced vector must be unit length");
+            assert!(
+                (norm - 1.0).abs() < 1e-5,
+                "produced vector must be unit length"
+            );
         }
     }
 
