@@ -1,9 +1,10 @@
 //! Orchestrates the eval harness: fresh store per run, inject corpus, query,
 //! measure, compute all nine metrics, compare against gate thresholds.
 //!
-//! No metric here is optional — `EvalReport::from_measurements` always computes
-//! and gates all nine, matching the spec's Acceptance Criteria ("no metric is
-//! computed without a gate").
+//! No metric here is optional — `run_eval` always computes and gates all nine
+//! (eleven gate entries, since write and retrieval latency each split into
+//! p50/p95), matching the spec's Acceptance Criteria ("no metric is computed
+//! without a gate").
 
 use std::{
     collections::{HashMap, HashSet},
@@ -216,6 +217,7 @@ fn evaluate_retrieval_corpus(
     let mut precisions = Vec::with_capacity(corpus.queries.len());
     let mut ndcgs = Vec::with_capacity(corpus.queries.len());
     let mut retrieved_per_query: Vec<Vec<MemoryId>> = Vec::with_capacity(corpus.queries.len());
+    let mut relevant_per_query: Vec<HashSet<MemoryId>> = Vec::with_capacity(corpus.queries.len());
     let mut contradicting_per_query: Vec<HashSet<MemoryId>> =
         Vec::with_capacity(corpus.queries.len());
 
@@ -268,6 +270,7 @@ fn evaluate_retrieval_corpus(
         precisions.push(metrics::precision_at_k(&retrieved_ids, &relevant_ids));
         ndcgs.push(metrics::ndcg_at_k(&retrieved_ids, &grades, RETRIEVAL_TOP_K));
         retrieved_per_query.push(retrieved_ids);
+        relevant_per_query.push(relevant_ids);
         contradicting_per_query.push(contradicting_ids);
     }
 
@@ -277,6 +280,7 @@ fn evaluate_retrieval_corpus(
         ndcg_at_k: metrics::mean(&ndcgs),
         hallucination_rate: metrics::hallucination_rate(
             &retrieved_per_query,
+            &relevant_per_query,
             &contradicting_per_query,
         ),
     })
@@ -519,14 +523,24 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     };
 
     let (_temp_dir, store) = fresh_store("run")?;
+    // Baseline before any memory exists: `health_report().total_storage_bytes` is
+    // PRAGMA page_count * page_size for the *whole database file*, not scoped to
+    // active memories, so it includes 55+ fixed schema/index root pages that
+    // exist before the first write. Snapshotting this baseline and subtracting it
+    // below turns storage_efficiency into a marginal-cost metric (bytes an
+    // *additional* memory actually costs) instead of one dominated by fixed
+    // overhead at small corpus sizes — see the spec's Metrics section for the
+    // measured breakdown (fixed overhead was 67% of the number at N=28).
+    let baseline_storage_bytes = run_async(store.health_report())?.total_storage_bytes;
+
     let injected = inject_retrieval_corpus(&store, &retrieval_corpus)?;
     let retrieval_metrics = evaluate_retrieval_corpus(&store, &retrieval_corpus, &injected)?;
 
     let health = run_async(store.health_report())?;
-    // Calibrated gate, not the spec's aspirational 2 KB — see "Deviation: three
-    // thresholds calibrated to a measured Phase A baseline" in
-    // docs/specs/eval-harness-v1/spec.md.
-    let storage_efficiency = metrics::ratio(health.total_storage_bytes, health.active_count.max(1));
+    let marginal_storage_bytes = health
+        .total_storage_bytes
+        .saturating_sub(baseline_storage_bytes);
+    let storage_efficiency = metrics::ratio(marginal_storage_bytes, health.active_count.max(1));
     let stale_embedding_ratio =
         metrics::ratio(health.stale_embeddings_count, health.active_count.max(1));
 
@@ -545,9 +559,10 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             retrieval_metrics.precision_at_k,
         )?,
         gate_metric(&thresholds, "ndcg_at_10", retrieval_metrics.ndcg_at_k)?,
-        // Calibrated gate (0.15), not the spec's aspirational 0.05 — see "Deviation:
-        // three thresholds calibrated to a measured Phase A baseline" in
-        // docs/specs/eval-harness-v1/spec.md.
+        // Rank-sensitive by definition (metrics::hallucination_rate): a
+        // contradicting memory merely co-occurring in top-k does not count,
+        // only one that outranks the correct answer or stands in for a
+        // missing one does. See the doc comment on that function.
         gate_metric(
             &thresholds,
             "hallucination_rate",
@@ -565,10 +580,13 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             metrics::percentile_ms(&write_latencies_ms, 95.0),
         )?,
         // Calibrated gate (450/600ms), not the spec's aspirational 100/200ms at 10k
-        // memories — see "Deviation: three thresholds calibrated to a measured Phase A
-        // baseline" in docs/specs/eval-harness-v1/spec.md. Brute-force vector scan
-        // (no sqlite-vec in a stock build) plus RETRIEVAL_SCALE_MEMORY_COUNT below the
-        // spec's 10k, both documented there.
+        // memories. There is no KNN query anywhere in this crate today —
+        // load_vector_similarity_scores decodes every candidate embedding and
+        // computes cosine similarity in Rust regardless of whether sqlite-vec's
+        // vec0 module is available, so this is a brute-force scan either way.
+        // Tracked separately as real follow-up work (implement KNN), not a
+        // tuning problem this harness can fix. See
+        // docs/specs/eval-harness-v1/spec.md.
         gate_metric(
             &thresholds,
             "retrieval_latency_p50_ms",
@@ -579,6 +597,12 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             "retrieval_latency_p95_ms",
             metrics::percentile_ms(&retrieval_latencies_ms, 95.0),
         )?,
+        // Marginal cost, not whole-file bytes / count — see the
+        // baseline_storage_bytes computation above. A 768-dim f32 embedding
+        // (3072 B) plus SQLite's one-row-per-page behavior for a blob that
+        // size puts a hard floor of ~4096 B/memory on this metric regardless
+        // of corpus size; the spec's aspirational 2 KB target is unreachable
+        // without quantizing the stored embedding (tracked separately).
         gate_metric(
             &thresholds,
             "storage_efficiency_bytes_per_memory",
@@ -775,6 +799,30 @@ mod tests {
                 "missing computed metric {required}"
             );
         }
+
+        let metric_value = |name: &str| {
+            report
+                .metrics
+                .iter()
+                .find(|metric| metric.name == name)
+                .unwrap_or_else(|| panic!("metric {name} must be present"))
+                .value
+        };
+        assert_eq!(
+            metric_value("hallucination_rate"),
+            0.0,
+            "the golden corpus's two contradicting memories are anchored at 0.1 cosine \
+             similarity, well below their correct counterparts' 1.0 — none should ever \
+             outrank the correct answer"
+        );
+        assert_eq!(
+            metric_value("storage_efficiency_bytes_per_memory"),
+            4096.0,
+            "a 768-dim f32 embedding (3072 B) forces one row per 4096 B SQLite page; this \
+             exact value is a deterministic floor, not a measurement subject to timing noise \
+             — a change here means the encoding or page size changed, not drift"
+        );
+
         assert!(
             report.passed,
             "eval run against the embedded corpus and calibrated thresholds must pass: {report:#?}"

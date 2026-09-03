@@ -4,13 +4,13 @@
     "recall_at_10": { "comparison": "gte", "value": 0.90 },
     "precision_at_10": { "comparison": "gte", "value": 0.80 },
     "ndcg_at_10": { "comparison": "gte", "value": 0.85 },
-    "hallucination_rate": { "comparison": "lte", "value": 0.15 },
+    "hallucination_rate": { "comparison": "lte", "value": 0.05 },
     "gate_accuracy_8to1": { "comparison": "gte", "value": 0.95 },
     "write_latency_p50_ms": { "comparison": "lte", "value": 200.0 },
     "write_latency_p95_ms": { "comparison": "lte", "value": 500.0 },
     "retrieval_latency_p50_ms": { "comparison": "lte", "value": 450.0 },
     "retrieval_latency_p95_ms": { "comparison": "lte", "value": 600.0 },
-    "storage_efficiency_bytes_per_memory": { "comparison": "lte", "value": 16000.0 },
+    "storage_efficiency_bytes_per_memory": { "comparison": "lte", "value": 4608.0 },
     "stale_embedding_ratio": { "comparison": "lte", "value": 0.05 }
   }
 }

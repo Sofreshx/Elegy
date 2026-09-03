@@ -59,23 +59,53 @@ fn dcg(grades: impl Iterator<Item = f64>) -> f64 {
         .sum()
 }
 
-/// Fraction of retrieved memories, across all queries, that were a hallucinated
-/// (contradictory) retrieval. `retrieved_per_query[i]` pairs with
-/// `contradicting_per_query[i]`.
+/// Fraction of contradiction-bearing queries where a contradicting memory
+/// outranks the correct one — or where the correct memory is missing from
+/// the results entirely while a contradicting memory is present.
+///
+/// This is rank-sensitive by design: a contradicting memory merely
+/// *co-occurring* in top-k alongside the correct answer is not counted,
+/// since a correctly-functioning system still surfaces the right answer
+/// first. Only queries that declare at least one `contradicts` key are
+/// counted in the denominator — a query with no known contradiction has
+/// nothing to hallucinate, so it cannot dilute or inflate the rate.
+///
+/// `retrieved_per_query[i]`, `relevant_per_query[i]`, and
+/// `contradicting_per_query[i]` all describe the same query `i`, in the
+/// order results were actually returned (rank = index).
 pub(crate) fn hallucination_rate(
     retrieved_per_query: &[Vec<MemoryId>],
+    relevant_per_query: &[HashSet<MemoryId>],
     contradicting_per_query: &[HashSet<MemoryId>],
 ) -> f64 {
-    let mut total_retrieved: u64 = 0;
-    let mut total_hallucinated: u64 = 0;
-    for (retrieved, contradicting) in retrieved_per_query.iter().zip(contradicting_per_query) {
-        total_retrieved += retrieved.len() as u64;
-        total_hallucinated += retrieved
-            .iter()
-            .filter(|memory_id| contradicting.contains(memory_id))
-            .count() as u64;
+    let mut applicable: u64 = 0;
+    let mut hallucinated: u64 = 0;
+
+    for ((retrieved, relevant), contradicting) in retrieved_per_query
+        .iter()
+        .zip(relevant_per_query)
+        .zip(contradicting_per_query)
+    {
+        if contradicting.is_empty() {
+            continue;
+        }
+        applicable += 1;
+
+        let Some(contradicting_rank) = retrieved.iter().position(|id| contradicting.contains(id))
+        else {
+            continue; // no contradicting memory surfaced at all: not a hallucination
+        };
+        let relevant_rank = retrieved.iter().position(|id| relevant.contains(id));
+        let outranked = match relevant_rank {
+            Some(relevant_rank) => contradicting_rank < relevant_rank,
+            None => true, // correct answer missing entirely while a contradiction is present
+        };
+        if outranked {
+            hallucinated += 1;
+        }
     }
-    ratio(total_hallucinated, total_retrieved)
+
+    ratio(hallucinated, applicable)
 }
 
 /// Fraction of `correct` entries that are `true`. Used for write-time gate accuracy:
@@ -183,17 +213,89 @@ mod tests {
     }
 
     #[test]
-    fn hallucination_rate_counts_contradicting_hits_across_queries() {
+    fn hallucination_rate_is_zero_when_the_correct_answer_outranks_the_contradiction() {
         let items = ids(4);
-        let retrieved_per_query = vec![vec![items[0], items[1]], vec![items[2]]];
-        let mut contradicting_a = HashSet::new();
-        contradicting_a.insert(items[1]);
-        let contradicting_per_query = vec![contradicting_a, HashSet::new()];
-        // 1 hallucinated out of 3 total retrieved.
-        assert!(
-            (hallucination_rate(&retrieved_per_query, &contradicting_per_query) - (1.0 / 3.0))
-                .abs()
-                < 1e-9
+        // Query 0: correct (items[0]) ranks ahead of the contradiction (items[1]).
+        let retrieved_per_query = vec![vec![items[0], items[1]]];
+        let relevant_per_query = vec![HashSet::from([items[0]])];
+        let contradicting_per_query = vec![HashSet::from([items[1]])];
+        assert_eq!(
+            hallucination_rate(
+                &retrieved_per_query,
+                &relevant_per_query,
+                &contradicting_per_query
+            ),
+            0.0,
+            "co-occurrence alone must not count when the correct answer still ranks first"
+        );
+    }
+
+    #[test]
+    fn hallucination_rate_is_one_when_the_contradiction_outranks_the_correct_answer() {
+        let items = ids(4);
+        let retrieved_per_query = vec![vec![items[1], items[0]]];
+        let relevant_per_query = vec![HashSet::from([items[0]])];
+        let contradicting_per_query = vec![HashSet::from([items[1]])];
+        assert_eq!(
+            hallucination_rate(
+                &retrieved_per_query,
+                &relevant_per_query,
+                &contradicting_per_query
+            ),
+            1.0
+        );
+    }
+
+    #[test]
+    fn hallucination_rate_counts_a_missing_correct_answer_as_hallucinated() {
+        let items = ids(4);
+        // items[0] (correct) is never retrieved; items[1] (contradicting) is.
+        let retrieved_per_query = vec![vec![items[1], items[2]]];
+        let relevant_per_query = vec![HashSet::from([items[0]])];
+        let contradicting_per_query = vec![HashSet::from([items[1]])];
+        assert_eq!(
+            hallucination_rate(
+                &retrieved_per_query,
+                &relevant_per_query,
+                &contradicting_per_query
+            ),
+            1.0
+        );
+    }
+
+    #[test]
+    fn hallucination_rate_excludes_queries_with_no_declared_contradiction() {
+        let items = ids(2);
+        let retrieved_per_query = vec![vec![items[0]], vec![items[1]]];
+        let relevant_per_query = vec![HashSet::from([items[0]]), HashSet::new()];
+        // Only query 0 declares a contradiction; query 1 has none and must not
+        // appear in the denominator at all.
+        let contradicting_per_query = vec![HashSet::new(), HashSet::new()];
+        assert_eq!(
+            hallucination_rate(
+                &retrieved_per_query,
+                &relevant_per_query,
+                &contradicting_per_query
+            ),
+            0.0,
+            "denominator with zero applicable queries defaults to a perfect (zero) rate"
+        );
+    }
+
+    #[test]
+    fn hallucination_rate_is_zero_when_the_contradiction_never_surfaces() {
+        let items = ids(3);
+        let retrieved_per_query = vec![vec![items[0]]];
+        let relevant_per_query = vec![HashSet::from([items[0]])];
+        // items[1] is a known contradiction for this query but never retrieved.
+        let contradicting_per_query = vec![HashSet::from([items[1]])];
+        assert_eq!(
+            hallucination_rate(
+                &retrieved_per_query,
+                &relevant_per_query,
+                &contradicting_per_query
+            ),
+            0.0
         );
     }
 
