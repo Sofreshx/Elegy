@@ -720,7 +720,7 @@ pub fn documentation_check(
         let matrix_path = project_root.join(READINESS_MATRIX_PATH);
         let expected = render_readiness_matrix(&readiness_records);
         match fs::read_to_string(&matrix_path) {
-            Ok(actual) if actual == expected => {}
+            Ok(actual) if generated_content_matches(&actual, &expected) => {}
             Ok(_) => issues.push(DocumentationCheckIssue {
                 code: "readiness-matrix-drift".to_string(),
                 severity: "error".to_string(),
