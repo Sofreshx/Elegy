@@ -2132,8 +2132,16 @@ impl MemoryStore for SqliteMemoryStore {
         }
 
         if let Some(content_sha256) = content_sha256.as_deref() {
-            if self.reuse_cached_embedding(&id, content_sha256).await? {
-                return Ok(id);
+            match self.reuse_cached_embedding(&id, content_sha256).await {
+                Ok(true) => return Ok(id),
+                Ok(false) => {}
+                // The memory row above is already committed; a failure reusing a
+                // cached embedding (e.g. lock contention from a concurrent writer)
+                // must degrade to "no embedding yet", not fail the whole store —
+                // same principle as the generate_embedding fallback below.
+                Err(error) => {
+                    warn!("failed to reuse cached embedding, will regenerate: {error}");
+                }
             }
         }
 
@@ -2152,8 +2160,15 @@ impl MemoryStore for SqliteMemoryStore {
         };
 
         match self.store_embedding(&id, &embedding).await {
-            Ok(()) | Err(StoreError::Validation(_)) => Ok(id),
-            Err(error) => Err(error),
+            Ok(()) => Ok(id),
+            // Same principle as above: the memory row is already committed, so a
+            // failure persisting the embedding (validation, or e.g. lock contention
+            // from a concurrent writer) must not fail the whole store — the memory
+            // stays queryable via keyword search with embedding_stale left set.
+            Err(error) => {
+                warn!("failed to persist embedding after store, leaving it stale: {error}");
+                Ok(id)
+            }
         }
     }
 
