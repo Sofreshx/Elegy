@@ -2,6 +2,7 @@ pub mod cli;
 pub mod consolidator;
 pub mod decay;
 pub mod embedding;
+mod eval;
 pub mod error;
 pub mod gate;
 pub mod llm;

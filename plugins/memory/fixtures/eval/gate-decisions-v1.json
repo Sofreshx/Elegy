@@ -1,0 +1,53 @@
+{
+  "version": "gate-decisions-v1",
+  "cases": [
+    {
+      "key": "gc-accept-novel-fact",
+      "existing": [],
+      "candidate": { "key": "gc-accept-novel-fact-candidate", "content": "The user's favorite programming language is Rust.", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.7 },
+      "expected": "accept"
+    },
+    {
+      "key": "gc-accept-novel-decision",
+      "existing": [],
+      "candidate": { "key": "gc-accept-novel-decision-candidate", "content": "The team decided to pin every third-party GitHub Action by commit SHA.", "memoryType": "Decision", "provenance": "UserStated", "importance": 0.6 },
+      "expected": "accept"
+    },
+    {
+      "key": "gc-archive-low-importance",
+      "existing": [],
+      "candidate": { "key": "gc-archive-low-importance-candidate", "content": "Possibly the user likes the color blue, based on a single ambiguous remark.", "memoryType": "Observation", "provenance": "AgentInferred", "importance": 0.1 },
+      "expected": "archive"
+    },
+    {
+      "key": "gc-merge-additive-detail",
+      "existing": [
+        { "key": "gc-merge-existing", "content": "The user's primary code editor is VS Code.", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.7 }
+      ],
+      "candidate": {
+        "key": "gc-merge-candidate",
+        "content": "The user's primary code editor is VS Code with the rust-analyzer extension enabled for Rust development.",
+        "memoryType": "Fact",
+        "provenance": "UserStated",
+        "importance": 0.7,
+        "anchor": { "key": "gc-merge-existing", "targetCosine": 0.9 }
+      },
+      "expected": "merge"
+    },
+    {
+      "key": "gc-contradiction-numeric",
+      "existing": [
+        { "key": "gc-contra-existing", "content": "The team's daily standup is at 9:30 local time.", "memoryType": "Fact", "provenance": "UserStated", "importance": 0.6 }
+      ],
+      "candidate": {
+        "key": "gc-contra-candidate",
+        "content": "The team's daily standup is at 14:00 local time.",
+        "memoryType": "Fact",
+        "provenance": "UserStated",
+        "importance": 0.6,
+        "anchor": { "key": "gc-contra-existing", "targetCosine": 0.92 }
+      },
+      "expected": "contradiction"
+    }
+  ]
+}
