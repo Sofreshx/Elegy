@@ -30,7 +30,6 @@ use rmcp::{
 };
 use tokio::net::TcpListener;
 use tracing::{error, info};
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use url::Url;
 
 #[derive(Clone)]
@@ -74,14 +73,22 @@ impl WriteAuditor for HttpWriteAuditor {
     }
 }
 
-#[tokio::main]
-async fn main() {
-    init_logging();
+fn main() {
+    elegy_memory_mcp::observability::init_logging(
+        elegy_memory_mcp::observability::LogFormat::from_env(),
+    );
 
-    if let Err(error) = run().await {
-        let error_message = format!("{error:#}");
-        error!(error = %error_message, "startup failed");
-        std::process::exit(1);
+    match elegy_memory::runtime::block_on(run()) {
+        Ok(Ok(())) => {}
+        Ok(Err(error)) => {
+            let error_message = format!("{error:#}");
+            error!(error = %error_message, "startup failed");
+            std::process::exit(1);
+        }
+        Err(runtime_error) => {
+            error!(error = %runtime_error, "failed to start shared tokio runtime");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -134,6 +141,7 @@ async fn run() -> anyhow::Result<()> {
         )
         .into_make_service_with_connect_info::<SocketAddr>(),
     )
+    .with_graceful_shutdown(shutdown_signal())
     .await
     .context("serving MCP resource endpoint")?;
 
@@ -183,17 +191,29 @@ fn build_mcp_service(
     )
 }
 
-fn init_logging() {
-    tracing_subscriber::registry()
-        .with(
-            fmt::layer()
-                .json()
-                .with_writer(std::io::stdout)
-                .with_ansi(false)
-                .with_current_span(false)
-                .with_span_list(false),
-        )
-        .init();
+async fn shutdown_signal() {
+    let ctrl_c = tokio::signal::ctrl_c();
+
+    #[cfg(unix)]
+    {
+        if let Ok(mut sigterm) =
+            tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate())
+        {
+            tokio::select! {
+                _ = ctrl_c => {}
+                _ = sigterm.recv() => {}
+            }
+        } else {
+            ctrl_c.await.ok();
+        }
+    }
+
+    #[cfg(not(unix))]
+    {
+        ctrl_c.await.ok();
+    }
+
+    info!("received shutdown signal, stopping server");
 }
 
 async fn protected_resource_metadata(State(state): State<AppState>) -> Response {

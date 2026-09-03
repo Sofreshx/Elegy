@@ -857,6 +857,7 @@ dependencies = [
  "base64",
  "elegy-memory",
  "jsonwebtoken",
+ "regex",
  "reqwest",
  "rmcp",
  "serde",

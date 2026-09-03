@@ -1,7 +1,10 @@
 use std::{env, path::PathBuf, sync::Arc, time::Duration};
 
 use anyhow::{bail, Context};
-use elegy_memory::{EmbeddingProvider, MemoryScope, OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL};
+use elegy_memory::{
+    embedding::CircuitBreakerEmbeddingProvider, EmbeddingProvider, MemoryScope,
+    OllamaEmbeddingProvider, DEFAULT_OLLAMA_MODEL,
+};
 use elegy_memory_mcp::{
     memory_tools::{MemoryBinding, MemoryRepository},
     server::{ElegyMemoryMcpServer, NoopWriteAuditor, WriteAuditor},
@@ -10,7 +13,6 @@ use reqwest::Client;
 use rmcp::ServiceExt;
 use serde::Deserialize;
 use tracing::{error, info, warn};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter};
 
 const ELEGY_DB_PATH: &str = "ELEGY_DB_PATH";
 const ELEGY_MCP_AGENT_ID: &str = "ELEGY_MCP_AGENT_ID";
@@ -19,7 +21,6 @@ const ELEGY_EMBEDDING_MODEL: &str = "ELEGY_EMBEDDING_MODEL";
 const ELEGY_EMBEDDING_BOOT_POLICY: &str = "ELEGY_EMBEDDING_BOOT_POLICY";
 const ELEGY_ALLOW_NO_EMBEDDINGS: &str = "ELEGY_ALLOW_NO_EMBEDDINGS";
 const OLLAMA_URL: &str = "OLLAMA_URL";
-const RUST_LOG: &str = "RUST_LOG";
 const DEFAULT_AGENT_ID: &str = "default-agent";
 const DEFAULT_READ_SCOPE: &str = "session";
 const DEFAULT_OLLAMA_URL: &str = "http://localhost:11434";
@@ -40,14 +41,22 @@ const EXPECTED_TOOL_NAMES: [&str; 9] = [
     "memory_update",
 ];
 
-#[tokio::main]
-async fn main() {
-    init_logging();
+fn main() {
+    elegy_memory_mcp::observability::init_logging(
+        elegy_memory_mcp::observability::LogFormat::from_env(),
+    );
 
-    if let Err(startup_error) = run().await {
-        let error_message = format!("{startup_error:#}");
-        error!(error = %error_message, "startup failed");
-        std::process::exit(1);
+    match elegy_memory::runtime::block_on(run()) {
+        Ok(Ok(())) => {}
+        Ok(Err(startup_error)) => {
+            let error_message = format!("{startup_error:#}");
+            error!(error = %error_message, "startup failed");
+            std::process::exit(1);
+        }
+        Err(runtime_error) => {
+            error!(error = %runtime_error, "failed to start shared tokio runtime");
+            std::process::exit(1);
+        }
     }
 }
 
@@ -73,13 +82,77 @@ async fn run() -> anyhow::Result<()> {
         .serve(rmcp::transport::stdio())
         .await
         .context("starting MCP stdio transport")?;
-    let quit_reason = running_service
+    let stop_reason = run_until_shutdown(running_service).await?;
+    info!(?stop_reason, "elegy-memory-mcp stdio stopped");
+    Ok(())
+}
+
+#[derive(Debug)]
+enum StopReason {
+    ClientQuit,
+    SigInt,
+    #[cfg(unix)]
+    SigTerm,
+}
+
+async fn run_until_shutdown(
+    running_service: rmcp::service::RunningService<rmcp::RoleServer, ElegyMemoryMcpServer>,
+) -> anyhow::Result<StopReason> {
+    // `RunningService::waiting`/`cancel` both take `self` by value, so a signal
+    // future cannot share a `select!` with `.waiting()` directly. Instead, race the
+    // signal in a background task against the non-consuming cancellation token, and
+    // let `.waiting()` observe the resulting cancellation (or the client's own
+    // disconnect) so cleanup is always awaited to completion either way.
+    let cancellation_token = running_service.cancellation_token();
+    let signal_task: tokio::task::JoinHandle<StopReason> = tokio::spawn(async move {
+        let reason = wait_for_os_signal().await;
+        cancellation_token.cancel();
+        reason
+    });
+
+    running_service
         .waiting()
         .await
         .context("running MCP stdio transport")?;
 
-    info!(?quit_reason, "elegy-memory-mcp stdio stopped");
-    Ok(())
+    signal_task.abort();
+    let stop_reason = match signal_task.await {
+        Ok(reason) => reason,
+        Err(_) => StopReason::ClientQuit,
+    };
+    Ok(stop_reason)
+}
+
+async fn wait_for_os_signal() -> StopReason {
+    #[cfg(unix)]
+    {
+        match tokio::signal::unix::signal(tokio::signal::unix::SignalKind::terminate()) {
+            Ok(mut sigterm) => {
+                tokio::select! {
+                    _ = tokio::signal::ctrl_c() => {
+                        warn!("received SIGINT, shutting down");
+                        StopReason::SigInt
+                    }
+                    _ = sigterm.recv() => {
+                        warn!("received SIGTERM, shutting down");
+                        StopReason::SigTerm
+                    }
+                }
+            }
+            Err(error) => {
+                warn!(error = %error, "failed to register SIGTERM handler; watching SIGINT only");
+                tokio::signal::ctrl_c().await.ok();
+                warn!("received SIGINT, shutting down");
+                StopReason::SigInt
+            }
+        }
+    }
+    #[cfg(not(unix))]
+    {
+        tokio::signal::ctrl_c().await.ok();
+        warn!("received SIGINT, shutting down");
+        StopReason::SigInt
+    }
 }
 
 struct StdioServerRuntime {
@@ -115,7 +188,7 @@ async fn build_stdio_runtime(config: &StdioConfig) -> anyhow::Result<StdioServer
 }
 
 fn build_embedding_provider(config: &StdioConfig) -> anyhow::Result<Arc<dyn EmbeddingProvider>> {
-    Ok(Arc::new(
+    let provider: Arc<dyn EmbeddingProvider> = Arc::new(
         OllamaEmbeddingProvider::new(&config.ollama_url, &config.embedding_model).with_context(
             || {
                 format!(
@@ -124,7 +197,10 @@ fn build_embedding_provider(config: &StdioConfig) -> anyhow::Result<Arc<dyn Embe
                 )
             },
         )?,
-    ))
+    );
+    Ok(Arc::new(CircuitBreakerEmbeddingProvider::from_env(
+        provider,
+    )))
 }
 
 async fn resolve_embedding_bootstrap(
@@ -255,43 +331,6 @@ fn configured_read_scope() -> anyhow::Result<MemoryScope> {
         "user" => Ok(MemoryScope::User),
         "agent" => Ok(MemoryScope::Agent),
         _ => bail!("{ELEGY_MCP_READ_SCOPE} must be one of session, workspace, user, agent"),
-    }
-}
-
-fn init_logging() {
-    tracing_subscriber::registry()
-        .with(stdio_log_filter())
-        .with(
-            tracing_subscriber::fmt::layer()
-                .with_ansi(false)
-                .with_writer(std::io::stderr),
-        )
-        .init();
-}
-
-fn stdio_log_filter() -> EnvFilter {
-    match env::var(RUST_LOG) {
-        Ok(value) => {
-            let trimmed = value.trim();
-            if trimmed.is_empty() {
-                EnvFilter::new("info")
-            } else {
-                match EnvFilter::try_new(trimmed) {
-                    Ok(filter) => filter,
-                    Err(parse_error) => {
-                        eprintln!(
-                            "warning: {RUST_LOG}={trimmed:?} is invalid ({parse_error}); defaulting to info"
-                        );
-                        EnvFilter::new("info")
-                    }
-                }
-            }
-        }
-        Err(env::VarError::NotPresent) => EnvFilter::new("info"),
-        Err(env::VarError::NotUnicode(_)) => {
-            eprintln!("warning: {RUST_LOG} must be valid Unicode; defaulting to info");
-            EnvFilter::new("info")
-        }
     }
 }
 

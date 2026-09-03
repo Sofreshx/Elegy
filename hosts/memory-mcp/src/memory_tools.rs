@@ -1,3 +1,5 @@
+mod redaction;
+
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::sync::Arc;
@@ -1159,13 +1161,27 @@ pub(crate) fn parse_tool_arguments<T: DeserializeOwned>(
 }
 
 pub(crate) fn map_store_error(error: StoreError) -> ErrorData {
+    match &error {
+        StoreError::NotFound(_) | StoreError::Validation(_) => {}
+        _ => tracing::warn!(error = %error, "memory store operation failed"),
+    }
     match error {
         StoreError::NotFound(id) => ErrorData::invalid_params(
             format!("memory `{id}` was not found in the configured agent namespace"),
             None,
         ),
-        StoreError::Validation(message) => ErrorData::invalid_params(message, None),
-        other => ErrorData::internal_error(other.to_string(), None),
+        StoreError::Validation(message) => {
+            ErrorData::invalid_params(redaction::redact(&message), None)
+        }
+        StoreError::Sqlite(_) => {
+            ErrorData::internal_error("memory storage operation failed".to_string(), None)
+        }
+        StoreError::Serialization(_) => {
+            ErrorData::internal_error("stored memory could not be decoded".to_string(), None)
+        }
+        StoreError::Migration(_) => {
+            ErrorData::internal_error("memory schema migration failed".to_string(), None)
+        }
     }
 }
 
