@@ -27,6 +27,9 @@ use crate::{MemoryType, ProvenanceLevel};
 pub(crate) const SYNTHETIC_TARGET_COUNT: usize = 20;
 
 /// Distractor-to-target ratio, matching the spec's Synthetic Distractor Corpus section.
+// The shared "ToOne" suffix names the ratio family (N:1); it is not accidental
+// repetition, so the enum_variant_names lint doesn't apply here.
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum DistractorRatio {
     OneToOne,

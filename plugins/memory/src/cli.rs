@@ -52,6 +52,11 @@ pub enum CliError {
     Store(#[from] StoreError),
     #[error("{0}")]
     Gate(#[from] GateError),
+    /// Stringified rather than wrapping `crate::eval::EvalError` directly: that type is
+    /// intentionally `pub(crate)` (the eval harness is CLI-internal), and `CliError` is
+    /// part of this crate's public API, so it cannot hold a private type in a public variant.
+    #[error("{0}")]
+    Eval(String),
     #[error("{0}")]
     Embedding(#[from] EmbeddingError),
     #[error("{0}")]
@@ -73,6 +78,12 @@ pub enum CliError {
 impl From<rusqlite::Error> for CliError {
     fn from(e: rusqlite::Error) -> Self {
         CliError::Store(StoreError::from(e))
+    }
+}
+
+impl From<crate::eval::EvalError> for CliError {
+    fn from(error: crate::eval::EvalError) -> Self {
+        CliError::Eval(error.to_string())
     }
 }
 
@@ -326,6 +337,11 @@ enum Command {
         #[arg(long)]
         input: Option<PathBuf>,
     },
+    /// Regression-test the write-store-retrieve pipeline against the eval harness corpus.
+    Eval {
+        #[command(subcommand)]
+        action: EvalCommand,
+    },
 }
 
 #[derive(Args, Clone, Debug)]
@@ -444,6 +460,46 @@ enum CliLlmProvider {
 #[derive(Clone, Copy, Debug, Eq, PartialEq, Ord, PartialOrd, ValueEnum)]
 enum ContradictionsAction {
     Resolve,
+}
+
+#[derive(Subcommand, Debug)]
+enum EvalCommand {
+    /// Run the eval harness against the embedded golden corpus (or --corpus) and report metric results.
+    Run {
+        /// Path to a custom retrieval corpus JSON file. Defaults to the embedded golden corpus.
+        #[arg(long)]
+        corpus: Option<PathBuf>,
+        /// Write the full JSON report to this file in addition to printing a summary.
+        #[arg(long)]
+        output: Option<PathBuf>,
+        /// Path to a custom gate-threshold JSON file (same shape as eval-harness-v1.json).
+        /// Defaults to the embedded thresholds. Exists mainly so tests can force a gate
+        /// failure without mutating the checked-in threshold file.
+        #[arg(long)]
+        thresholds: Option<PathBuf>,
+        /// Exit with a non-zero status if any metric misses its gate.
+        #[arg(long)]
+        ci: bool,
+    },
+    /// List every corpus the eval harness can run against.
+    ListCorpora,
+    /// Sweep a scope_config threshold parameter across a range and report metric values at each point.
+    SweepThreshold {
+        /// scope_config parameter to sweep, e.g. `merge_similarity_threshold`.
+        #[arg(long)]
+        param: String,
+        /// Range as `start..end`, e.g. `0.80..0.90`.
+        #[arg(long)]
+        range: String,
+    },
+    /// Export labeled relevance judgments from the retrieval_feedback table as JSON lines.
+    ExportLabels {
+        #[command(flatten)]
+        store: Box<StoreArgs>,
+        /// Write JSON Lines output to this file. Prints to stdout when omitted (text format only).
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -835,6 +891,23 @@ struct FeedbackResponse {
     learning: WeightsSummaryResponse,
 }
 
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportedLabelRow {
+    feedback_id: String,
+    memory_id: String,
+    query_text: Option<String>,
+    relevant: bool,
+    recorded_at: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportLabelsResponse {
+    exported_count: usize,
+    labels: Vec<ExportedLabelRow>,
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 struct WeightsResponse {
@@ -1141,6 +1214,21 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         Command::ShareImport { store, input } => {
             execute_share_import_command(open_store(store)?, input, context.format)
         }
+        Command::Eval { action } => match action {
+            EvalCommand::Run {
+                corpus,
+                output,
+                thresholds,
+                ci,
+            } => execute_eval_run_command(corpus, output, thresholds, ci, context.format),
+            EvalCommand::ListCorpora => execute_eval_list_corpora_command(context.format),
+            EvalCommand::SweepThreshold { param, range } => {
+                execute_eval_sweep_threshold_command(param, range, context.format)
+            }
+            EvalCommand::ExportLabels { store, output } => {
+                execute_eval_export_labels_command(open_store(*store)?, output, context.format)
+            }
+        },
     }
 }
 
@@ -1180,6 +1268,12 @@ fn command_name(command: &Command) -> &'static str {
         Command::DeleteLink { .. } => "delete-link",
         Command::ShareExport { .. } => "share-export",
         Command::ShareImport { .. } => "share-import",
+        Command::Eval { action } => match action {
+            EvalCommand::Run { .. } => "eval.run",
+            EvalCommand::ListCorpora => "eval.list-corpora",
+            EvalCommand::SweepThreshold { .. } => "eval.sweep-threshold",
+            EvalCommand::ExportLabels { .. } => "eval.export-labels",
+        },
     }
 }
 
@@ -3415,6 +3509,7 @@ pub fn emit_machine_failure(error: &CliError) -> Result<(), CliError> {
         CliError::Consolidation(_)
         | CliError::Store(_)
         | CliError::Gate(_)
+        | CliError::Eval(_)
         | CliError::Embedding(_)
         | CliError::Llm(_)
         | CliError::Io(_)
@@ -4003,6 +4098,149 @@ fn execute_share_import_command(
         )?,
     }
 
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_eval_run_command(
+    corpus: Option<PathBuf>,
+    output: Option<PathBuf>,
+    thresholds: Option<PathBuf>,
+    ci: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let options = crate::eval::EvalRunOptions {
+        corpus_path: corpus,
+        thresholds_path: thresholds,
+    };
+    let report = crate::eval::run_eval(&options)?;
+
+    if let Some(output_path) = &output {
+        fs::write(output_path, serde_json::to_string_pretty(&report)?)?;
+    }
+
+    match format {
+        OutputFormat::Text => {
+            println!(
+                "Eval run: {} ({} metrics, {} ms)",
+                if report.passed { "PASSED" } else { "FAILED" },
+                report.metrics.len(),
+                report.duration_ms
+            );
+            for metric in &report.metrics {
+                println!(
+                    "  [{}] {} = {:.4} (threshold {} {:.4})",
+                    if metric.passed { "PASS" } else { "FAIL" },
+                    metric.name,
+                    metric.value,
+                    metric.comparison,
+                    metric.threshold
+                );
+            }
+        }
+        OutputFormat::Json => {
+            print_success_json("eval.run", &report)?;
+        }
+    }
+
+    if ci && !report.passed {
+        return Ok(ExitCode::FAILURE);
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_eval_list_corpora_command(format: OutputFormat) -> Result<ExitCode, CliError> {
+    let corpora = crate::eval::list_corpora();
+    match format {
+        OutputFormat::Text => {
+            for corpus in &corpora {
+                println!(
+                    "{} [{}] - {} items - {}",
+                    corpus.name, corpus.source, corpus.item_count, corpus.description
+                );
+            }
+        }
+        OutputFormat::Json => {
+            print_success_json("eval.list-corpora", &corpora)?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_eval_sweep_threshold_command(
+    param: String,
+    range: String,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let report = crate::eval::sweep_threshold(&param, &range)?;
+    match format {
+        OutputFormat::Text => {
+            println!("Sweep of {}:", report.param);
+            for point in &report.points {
+                println!(
+                    "  {:.4}: gate_accuracy_8to1={:.4} recall_at_10={:.4} precision_at_10={:.4}",
+                    point.param_value,
+                    point.gate_accuracy_8to1,
+                    point.recall_at_10,
+                    point.precision_at_10
+                );
+            }
+        }
+        OutputFormat::Json => {
+            print_success_json("eval.sweep-threshold", &report)?;
+        }
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
+fn execute_eval_export_labels_command(
+    ctx: StoreContext,
+    output: Option<PathBuf>,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    let connection = Connection::open(&ctx.db_path)?;
+    let mut statement = connection.prepare(
+        "SELECT id, memory_id, query_text, relevant, recorded_at FROM retrieval_feedback ORDER BY recorded_at ASC",
+    )?;
+    let rows = statement.query_map([], |row| {
+        Ok(ExportedLabelRow {
+            feedback_id: row.get::<_, String>(0)?,
+            memory_id: row.get::<_, String>(1)?,
+            query_text: row.get::<_, Option<String>>(2)?,
+            relevant: row.get::<_, i64>(3)? != 0,
+            recorded_at: row.get::<_, String>(4)?,
+        })
+    })?;
+    let mut labels = Vec::new();
+    for row in rows {
+        labels.push(row?);
+    }
+
+    let mut jsonl = String::new();
+    for label in &labels {
+        jsonl.push_str(&serde_json::to_string(label)?);
+        jsonl.push('\n');
+    }
+
+    if let Some(output_path) = &output {
+        fs::write(output_path, &jsonl)?;
+    } else if matches!(format, OutputFormat::Text) {
+        print!("{jsonl}");
+    }
+
+    match format {
+        OutputFormat::Text => {
+            println!("Exported {} labeled feedback rows", labels.len());
+        }
+        OutputFormat::Json => {
+            print_success_json(
+                "eval.export-labels",
+                &ExportLabelsResponse {
+                    exported_count: labels.len(),
+                    labels: if output.is_some() { Vec::new() } else { labels },
+                },
+            )?;
+        }
+    }
     Ok(ExitCode::SUCCESS)
 }
 
