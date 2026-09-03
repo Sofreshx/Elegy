@@ -4198,10 +4198,18 @@ fn execute_eval_export_labels_command(
     format: OutputFormat,
 ) -> Result<ExitCode, CliError> {
     let connection = Connection::open(&ctx.db_path)?;
+    // retrieval_feedback has no scope column of its own; join through memories to
+    // scope the export the same way every other command in this CLI is scoped.
     let mut statement = connection.prepare(
-        "SELECT id, memory_id, query_text, relevant, recorded_at FROM retrieval_feedback ORDER BY recorded_at ASC",
+        r#"
+        SELECT f.id, f.memory_id, f.query_text, f.relevant, f.recorded_at
+        FROM retrieval_feedback f
+        JOIN memories m ON m.id = f.memory_id
+        WHERE m.scope = ?1
+        ORDER BY f.recorded_at ASC
+        "#,
     )?;
-    let rows = statement.query_map([], |row| {
+    let rows = statement.query_map([display_scope(ctx.scope)], |row| {
         Ok(ExportedLabelRow {
             feedback_id: row.get::<_, String>(0)?,
             memory_id: row.get::<_, String>(1)?,
