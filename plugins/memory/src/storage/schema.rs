@@ -22,9 +22,10 @@ const SAFE_RECENCY_WEIGHT_CEILING: f64 = 0.45;
 const SAFE_ACCESS_WEIGHT_CEILING: f64 = 0.05;
 const SAFE_PRIORITY_WEIGHT_CEILING: f64 = 0.45;
 
-const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
+const DEFAULT_SCOPE_CONFIG: [(&str, &str); 28] = [
     ("budget_active_max", "500"),
     ("storage_cap_mb", "100"),
+    ("forgetting_policy", "importance-reliability"),
     ("decay_lambda_base", "0.10"),
     ("salience_threshold", "0.20"),
     ("novelty_doubt_threshold", "0.80"),

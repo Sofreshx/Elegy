@@ -4,6 +4,7 @@ pub mod decay;
 pub mod embedding;
 pub mod error;
 mod eval;
+pub mod forgetting;
 pub mod gate;
 pub mod llm;
 mod local_store;
@@ -29,6 +30,7 @@ pub use embedding::{
 pub use error::{
     ConsolidationError, EmbeddingError, GateError, LlmError, ObservabilityError, StoreError,
 };
+pub use forgetting::{Fifo, ImportanceReliability, Lru, PriorityDecay, RandomDrop};
 pub use gate::DefaultSalienceGate;
 pub use llm::{
     OllamaLlmProvider, OpenAiLlmProvider, DEFAULT_OLLAMA_LLM_BASE_URL,
@@ -48,9 +50,9 @@ pub use local_store::{
 pub use promotion::PromotionEngine;
 pub use storage::{init_database, SqliteMemoryStore, CURRENT_SCHEMA_VERSION};
 pub use traits::{
-    ConsolidationAction, EmbeddingProvider, GateDecision, LlmProvider, MemoryConsolidator,
-    MemoryFilter, MemoryObservability, MemoryStore, MetadataUpdate, OptionalFieldUpdate,
-    SalienceGate,
+    ConsolidationAction, EmbeddingProvider, ForgettingPolicy, GateDecision, LlmProvider,
+    MemoryConsolidator, MemoryFilter, MemoryObservability, MemoryStore, MetadataUpdate,
+    OptionalFieldUpdate, RetentionContext, SalienceGate,
 };
 pub use types::{
     ConsolidationCandidate, ContradictionEntry, ContradictionRecord, CorrectionDisposition,

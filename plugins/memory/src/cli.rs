@@ -25,16 +25,16 @@ use crate::{
     runtime::block_on,
     storage::{LearnedWeightValues, LearnedWeightsReport, Migration, ReembedMigration},
     ConsolidationAction, CorrectionDisposition, CorrectionRecord, DefaultSalienceGate,
-    EmbeddingError, EmbeddingProvider, ExportFormat, GateDecision, GateError, LlmConsolidator,
-    LlmProvider, Memory, MemoryCandidate, MemoryConsolidator, MemoryFilter, MemoryHealthReport,
-    MemoryId, MemoryObservability, MemoryScope, MemoryState, MemoryStore, MemoryType,
-    MemoryVersion, OllamaEmbeddingProvider, OllamaLlmProvider, OpenAiEmbeddingProvider,
-    OpenAiLlmProvider, PromotionEngine, ProvenanceLevel, ResolutionStatus, SalienceGate,
-    ScoredMemory, SearchQuery, SensitivityLevel, ShareConfig, SimpleConsolidator,
-    SqliteMemoryStore, StoreError, DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL,
-    DEFAULT_OLLAMA_LLM_MODEL, DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL,
-    DEFAULT_OPENAI_DIMENSIONS, DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL,
-    DEFAULT_OPENAI_MODEL,
+    EmbeddingError, EmbeddingProvider, ExportFormat, Fifo, ForgettingPolicy, GateDecision,
+    GateError, ImportanceReliability, LlmConsolidator, LlmProvider, Lru, Memory, MemoryCandidate,
+    MemoryConsolidator, MemoryFilter, MemoryHealthReport, MemoryId, MemoryObservability,
+    MemoryScope, MemoryState, MemoryStore, MemoryType, MemoryVersion, OllamaEmbeddingProvider,
+    OllamaLlmProvider, OpenAiEmbeddingProvider, OpenAiLlmProvider, PriorityDecay, PromotionEngine,
+    ProvenanceLevel, RandomDrop, ResolutionStatus, SalienceGate, ScoredMemory, SearchQuery,
+    SensitivityLevel, ShareConfig, SimpleConsolidator, SqliteMemoryStore, StoreError,
+    DEFAULT_OLLAMA_BASE_URL, DEFAULT_OLLAMA_LLM_BASE_URL, DEFAULT_OLLAMA_LLM_MODEL,
+    DEFAULT_OLLAMA_MODEL, DEFAULT_OPENAI_BASE_URL, DEFAULT_OPENAI_DIMENSIONS,
+    DEFAULT_OPENAI_LLM_BASE_URL, DEFAULT_OPENAI_LLM_MODEL, DEFAULT_OPENAI_MODEL,
 };
 
 const DEFAULT_IMPORTANCE: f32 = 0.5;
@@ -253,6 +253,10 @@ enum Command {
     Budget {
         #[command(flatten)]
         store: StoreArgs,
+        /// Eviction policy to use for this run, overriding the persisted
+        /// `forgetting_policy` scope-config default.
+        #[arg(long)]
+        policy: Option<CliForgettingPolicy>,
     },
     /// Apply a user correction to a memory.
     Correct {
@@ -539,6 +543,33 @@ impl From<CliSensitivityLevel> for SensitivityLevel {
             CliSensitivityLevel::Medium => SensitivityLevel::Medium,
             CliSensitivityLevel::High => SensitivityLevel::High,
             CliSensitivityLevel::Critical => SensitivityLevel::Critical,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
+enum CliForgettingPolicy {
+    /// `importance_score * reliability_score` (default; matches today's behavior).
+    #[default]
+    ImportanceReliability,
+    /// Oldest by `created_at` evicted first.
+    Fifo,
+    /// Least recently used, by `last_accessed_at` (falling back to `updated_at`).
+    Lru,
+    /// MaRS-style priority decay (type, activity, importance, access frequency).
+    PriorityDecay,
+    /// Deterministic hash-based eviction, not RNG-based.
+    RandomDrop,
+}
+
+impl CliForgettingPolicy {
+    fn to_policy(self) -> Box<dyn ForgettingPolicy> {
+        match self {
+            Self::ImportanceReliability => Box::new(ImportanceReliability),
+            Self::Fifo => Box::new(Fifo),
+            Self::Lru => Box::new(Lru),
+            Self::PriorityDecay => Box::new(PriorityDecay),
+            Self::RandomDrop => Box::new(RandomDrop),
         }
     }
 }
@@ -851,6 +882,7 @@ struct CorroborateResponse {
 struct BudgetResponse {
     dormanted: u64,
     deleted: u64,
+    policy: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -1172,7 +1204,9 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         Command::Corroborate { store, id, with } => {
             execute_corroborate_command(open_store(store)?, id, with, context.format)
         }
-        Command::Budget { store } => execute_budget_command(open_store(store)?, context.format),
+        Command::Budget { store, policy } => {
+            execute_budget_command(open_store(store)?, context.format, policy)
+        }
         Command::Correct {
             store,
             id,
@@ -3597,16 +3631,40 @@ fn execute_corroborate_command(
     Ok(ExitCode::SUCCESS)
 }
 
-fn execute_budget_command(ctx: StoreContext, format: OutputFormat) -> Result<ExitCode, CliError> {
-    let (dormanted, deleted) = ctx.store.enforce_budget()?;
+fn execute_budget_command(
+    ctx: StoreContext,
+    format: OutputFormat,
+    policy: Option<CliForgettingPolicy>,
+) -> Result<ExitCode, CliError> {
+    let (dormanted, deleted, policy_name) = match policy {
+        Some(cli_policy) => {
+            let policy = cli_policy.to_policy();
+            let (dormanted, deleted) = ctx.store.enforce_budget_with_policy(policy.as_ref())?;
+            (dormanted, deleted, Some(policy.name().to_string()))
+        }
+        None => {
+            let (dormanted, deleted) = ctx.store.enforce_budget()?;
+            (dormanted, deleted, None)
+        }
+    };
     match format {
         OutputFormat::Text => {
             println!("Budget enforcement complete");
             println!("  Dormanted: {dormanted}");
             println!("  Deleted: {deleted}");
+            if let Some(policy_name) = &policy_name {
+                println!("  Policy: {policy_name} (override)");
+            }
         }
         OutputFormat::Json => {
-            print_success_json("budget", &BudgetResponse { dormanted, deleted })?;
+            print_success_json(
+                "budget",
+                &BudgetResponse {
+                    dormanted,
+                    deleted,
+                    policy: policy_name,
+                },
+            )?;
         }
     }
     Ok(ExitCode::SUCCESS)

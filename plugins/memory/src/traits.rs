@@ -9,7 +9,7 @@ use crate::error::{
 use crate::types::{
     ConsolidationCandidate, ContradictionEntry, ExportFormat, Memory, MemoryCandidate,
     MemoryHealthReport, MemoryId, MemoryScope, MemoryState, MemoryType, ProvenanceLevel,
-    PurgeReport, ResolutionStatus, ScoredMemory, SearchQuery,
+    PurgeReport, ResolutionStatus, ScopeConfig, ScoredMemory, SearchQuery,
 };
 
 /// Patch operation for an optional metadata field.
@@ -351,4 +351,39 @@ pub trait MemoryObservability: Send + Sync {
 
     /// Purge all data for a specific scope through the observability surface.
     fn purge_scope(&self, scope: MemoryScope) -> Result<PurgeReport, ObservabilityError>;
+}
+
+/// Aggregates over the candidate set being ranked for eviction, computed once
+/// per [`ForgettingPolicy::retention_score`] call site rather than per memory.
+///
+/// `total_memories` and `recent_writes_30d` are computed in Rust from the
+/// already-loaded candidate slice, not via a dedicated SQL query — no such
+/// query exists in the storage layer today, and `created_at` is stored as
+/// RFC3339 text, which makes a SQL range comparison fragile across offset
+/// representations. Computing both from the same loaded population also
+/// keeps the numerator and denominator self-consistent.
+#[derive(Debug, Clone, Copy)]
+pub struct RetentionContext<'a> {
+    /// Reference time used for age and recency calculations.
+    pub now: chrono::DateTime<chrono::Utc>,
+    /// The scope's current configuration (decay lambda, etc).
+    pub scope_config: &'a ScopeConfig,
+    /// Size of the candidate set this score is being computed within.
+    pub total_memories: u64,
+    /// Count of candidates created within the last 30 days.
+    pub recent_writes_30d: u64,
+}
+
+/// Pluggable eviction ranking for [`crate::storage::SqliteMemoryStore::enforce_budget`].
+///
+/// A policy is a pure function over a [`Memory`] already loaded from storage —
+/// no I/O, hence a sync (not `#[async_trait]`) trait, unlike the gate,
+/// consolidator, and embedding provider traits. Eviction takes the lowest
+/// scores first; ties break on `memory.id` for determinism.
+pub trait ForgettingPolicy: Send + Sync {
+    /// Retention score for one memory — higher means keep longer.
+    fn retention_score(&self, memory: &Memory, context: &RetentionContext<'_>) -> f64;
+
+    /// Stable identifier used for CLI selection, logging, and display.
+    fn name(&self) -> &'static str;
 }

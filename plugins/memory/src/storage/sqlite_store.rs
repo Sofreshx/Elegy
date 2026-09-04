@@ -16,9 +16,13 @@ use super::schema::{init_database, vec_memories_uses_native_module};
 use crate::{
     decay,
     embedding::{prepare_embedding_input, EmbeddingTask},
+    forgetting::{Fifo, ImportanceReliability, Lru, PriorityDecay, RandomDrop},
     gate::DefaultSalienceGate,
     similarity::cosine_similarity,
-    traits::{EmbeddingProvider, MemoryObservability, MemoryStore, SalienceGate},
+    traits::{
+        EmbeddingProvider, ForgettingPolicy, MemoryObservability, MemoryStore, RetentionContext,
+        SalienceGate,
+    },
     types::{
         ContradictionEntry, CorrectionDisposition, CorrectionRecord, ElegyArchive, ExportFormat,
         GraphNode, GraphTraversalResult, Memory, MemoryCandidate, MemoryContextConfig,
@@ -1081,169 +1085,33 @@ impl SqliteMemoryStore {
         })
     }
 
-    /// Enforce the active memory budget and storage cap for this scope.
+    /// Enforce the active memory budget and storage cap for this scope, using
+    /// the persisted `forgetting_policy` scope-config key (defaulting to
+    /// [`ImportanceReliability`] — today's behavior — when unset). Fails
+    /// loudly if the persisted value names an unknown policy.
     ///
     /// When the number of active memories exceeds `budget_active_max` from the
     /// scope configuration, the lowest-scoring active memories are transitioned
-    /// to dormant. When total storage exceeds the storage cap, the lowest-scoring
+    /// to dormant. When live storage exceeds the storage cap, the lowest-scoring
     /// dormant memories are hard-deleted.
     ///
     /// Returns the number of memories made dormant and the number hard-deleted.
     pub fn enforce_budget(&self) -> Result<(u64, u64), StoreError> {
         self.with_connection(|connection| {
-            let scope = self.scope;
-
-            // Load budget_active_max with scope-appropriate defaults
-            let configured_budget = load_config_value(connection, "budget_active_max")?;
-            let budget_active_max: u64 = match configured_budget {
-                Some(value) => value.parse::<u64>().map_err(|error| {
-                    StoreError::Serialization(format!(
-                        "invalid budget_active_max config `{value}`: {error}"
-                    ))
-                })?,
-                None => match scope {
-                    MemoryScope::Workspace => DEFAULT_WORKSPACE_BUDGET as u64,
-                    MemoryScope::User => DEFAULT_USER_BUDGET as u64,
-                    MemoryScope::Agent => DEFAULT_AGENT_BUDGET as u64,
-                    MemoryScope::Session => 0,
-                },
-            };
-
-            // Load storage_cap_mb (default 512 MB)
-            let configured_cap = load_config_value(connection, "storage_cap_mb")?;
-            let storage_cap_mb: u64 = match configured_cap {
-                Some(value) => value.parse::<u64>().map_err(|error| {
-                    StoreError::Serialization(format!(
-                        "invalid storage_cap_mb config `{value}`: {error}"
-                    ))
-                })?,
-                None => 512,
-            };
-
-            let mut dormant_count: u64 = 0;
-            let mut deleted_count: u64 = 0;
-
-            // Phase 1: Enforce active budget
-            if budget_active_max > 0 {
-                let active_count = count_memories_by_state(connection, scope, MemoryState::Active)?;
-                if active_count > 0 {
-                    let active_u64 = active_count as u64;
-                    if active_u64 > budget_active_max {
-                        let excess = active_u64 - budget_active_max;
-                        let mut active_memories = load_search_memories(
-                            connection,
-                            &[scope],
-                            MemoryState::Active,
-                            None,
-                            None,
-                        )?;
-                        // Sort ascending by composite score (lowest first = eviction candidates)
-                        active_memories.sort_by(|a, b| {
-                            let score_a = a.importance_score * a.reliability_score;
-                            let score_b = b.importance_score * b.reliability_score;
-                            score_a
-                                .partial_cmp(&score_b)
-                                .unwrap_or(std::cmp::Ordering::Equal)
-                                .then_with(|| a.id.cmp(&b.id))
-                        });
-
-                        let to_demote = excess.min(active_memories.len() as u64) as usize;
-                        let now = Utc::now();
-                        let transaction = connection.transaction()?;
-                        for memory in active_memories.iter().take(to_demote) {
-                            let mut dormant = memory.clone();
-                            dormant.state = MemoryState::Dormant;
-                            dormant.updated_at = now;
-                            persist_memory(&transaction, &dormant)?;
-                            dormant_count += 1;
-                        }
-                        transaction.commit()?;
-                    }
-                }
-            }
-
-            // Phase 2: Enforce storage cap
-            let page_count: u64 =
-                connection.query_row("SELECT page_count FROM pragma_page_count", [], |row| {
-                    row.get(0)
-                })?;
-            let page_size: u64 =
-                connection.query_row("SELECT page_size FROM pragma_page_size", [], |row| {
-                    row.get(0)
-                })?;
-            let current_bytes = page_count * page_size;
-            let cap_bytes = storage_cap_mb * 1024 * 1024;
-
-            if current_bytes > cap_bytes {
-                let mut dormant_memories =
-                    load_search_memories(connection, &[scope], MemoryState::Dormant, None, None)?;
-                // Sort ascending by composite score (lowest first = deletion candidates)
-                dormant_memories.sort_by(|a, b| {
-                    let score_a = a.importance_score * a.reliability_score;
-                    let score_b = b.importance_score * b.reliability_score;
-                    score_a
-                        .partial_cmp(&score_b)
-                        .unwrap_or(std::cmp::Ordering::Equal)
-                        .then_with(|| a.id.cmp(&b.id))
-                });
-
-                for memory in &dormant_memories {
-                    let transaction = connection.transaction()?;
-                    let row_id = require_memory_rowid(&transaction, &memory.id)?;
-
-                    let vec_rowid: Option<i64> = transaction
-                        .query_row(
-                            "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
-                            [memory.id.to_string()],
-                            |row| row.get(0),
-                        )
-                        .optional()?;
-
-                    delete_fts_entry(&transaction, row_id, memory)?;
-
-                    if let Some(vec_rowid) = vec_rowid {
-                        transaction
-                            .execute("DELETE FROM vec_memories WHERE rowid = ?1", [vec_rowid])?;
-                    }
-                    transaction.execute(
-                        "DELETE FROM memory_embeddings WHERE memory_id = ?1",
-                        [memory.id.to_string()],
-                    )?;
-                    transaction.execute(
-                        "DELETE FROM memory_versions WHERE memory_id = ?1",
-                        [memory.id.to_string()],
-                    )?;
-                    transaction.execute(
-                        "DELETE FROM memory_links WHERE source_id = ?1 OR target_id = ?1",
-                        [memory.id.to_string()],
-                    )?;
-                    transaction.execute(
-                        "DELETE FROM contradictions WHERE memory_a_id = ?1 OR memory_b_id = ?1",
-                        [memory.id.to_string()],
-                    )?;
-                    transaction.execute(
-                        "DELETE FROM memories WHERE id = ?1",
-                        [memory.id.to_string()],
-                    )?;
-
-                    transaction.commit()?;
-                    deleted_count += 1;
-
-                    // Re-check storage after each deletion
-                    let new_page_count: u64 = connection.query_row(
-                        "SELECT page_count FROM pragma_page_count",
-                        [],
-                        |row| row.get(0),
-                    )?;
-                    let new_bytes = new_page_count * page_size;
-                    if new_bytes <= cap_bytes {
-                        break;
-                    }
-                }
-            }
-
-            Ok((dormant_count, deleted_count))
+            let policy = resolve_configured_forgetting_policy(connection)?;
+            run_enforce_budget(connection, self.scope, policy.as_ref())
         })
+    }
+
+    /// Same as [`Self::enforce_budget`], but with an explicit policy that
+    /// overrides the persisted `forgetting_policy` scope-config key for this
+    /// call only. Used by the CLI's `--policy` flag; there is currently no
+    /// way to persist a policy choice through the store's public API.
+    pub fn enforce_budget_with_policy(
+        &self,
+        policy: &dyn ForgettingPolicy,
+    ) -> Result<(u64, u64), StoreError> {
+        self.with_connection(|connection| run_enforce_budget(connection, self.scope, policy))
     }
 
     /// Delete a link between two memories by its unique identifier.
@@ -4385,6 +4253,226 @@ fn load_config_value(connection: &Connection, key: &str) -> Result<Option<String
         )
         .optional()
         .map_err(StoreError::from)
+}
+
+/// Resolve a [`ForgettingPolicy`] by its stable [`ForgettingPolicy::name`].
+///
+/// Returns an error rather than silently falling back for an unrecognized
+/// name, matching `load_config_value`'s callers' parse-or-error contract.
+fn forgetting_policy_from_name(name: &str) -> Result<Box<dyn ForgettingPolicy>, StoreError> {
+    match name {
+        "importance-reliability" => Ok(Box::new(ImportanceReliability)),
+        "fifo" => Ok(Box::new(Fifo)),
+        "lru" => Ok(Box::new(Lru)),
+        "priority-decay" => Ok(Box::new(PriorityDecay)),
+        "random-drop" => Ok(Box::new(RandomDrop)),
+        other => Err(StoreError::Serialization(format!(
+            "unknown forgetting_policy `{other}`"
+        ))),
+    }
+}
+
+/// Load the `forgetting_policy` scope-config key and resolve it, defaulting
+/// to [`ImportanceReliability`] (today's behavior) when the key is unset.
+fn resolve_configured_forgetting_policy(
+    connection: &Connection,
+) -> Result<Box<dyn ForgettingPolicy>, StoreError> {
+    match load_config_value(connection, "forgetting_policy")? {
+        Some(name) => forgetting_policy_from_name(&name),
+        None => Ok(Box::new(ImportanceReliability)),
+    }
+}
+
+/// Compute the aggregates a [`RetentionContext`] needs from an already-loaded
+/// candidate set, rather than issuing a dedicated `created_at` range query.
+fn retention_context_for<'a>(
+    now: DateTime<Utc>,
+    scope_config: &'a ScopeConfig,
+    candidates: &[Memory],
+) -> RetentionContext<'a> {
+    let thirty_days_ago = now - chrono::Duration::days(30);
+    let recent_writes_30d = candidates
+        .iter()
+        .filter(|memory| memory.created_at >= thirty_days_ago)
+        .count() as u64;
+    RetentionContext {
+        now,
+        scope_config,
+        total_memories: candidates.len() as u64,
+        recent_writes_30d,
+    }
+}
+
+/// Live (reclaimable-adjusted) database size in bytes: `(page_count -
+/// freelist_count) * page_size`. Unlike raw `page_count * page_size` (which
+/// SQLite does not shrink on `DELETE` without `VACUUM`), this decreases as
+/// rows are deleted, because freed pages move onto the freelist. Used only by
+/// `enforce_budget`'s storage-cap enforcement; [`SqliteMemoryStore::health_report`]
+/// deliberately keeps reporting raw file size.
+fn live_storage_bytes(connection: &Connection) -> Result<u64, StoreError> {
+    let page_count: u64 =
+        connection.query_row("SELECT page_count FROM pragma_page_count", [], |row| {
+            row.get(0)
+        })?;
+    let page_size: u64 =
+        connection.query_row("SELECT page_size FROM pragma_page_size", [], |row| {
+            row.get(0)
+        })?;
+    let freelist_count: u64 = connection.query_row(
+        "SELECT freelist_count FROM pragma_freelist_count",
+        [],
+        |row| row.get(0),
+    )?;
+    Ok(page_count.saturating_sub(freelist_count) * page_size)
+}
+
+/// Core `enforce_budget` implementation, parameterized by eviction policy.
+/// Phase 1 demotes active memories over `budget_active_max` to dormant.
+/// Phase 2 hard-deletes dormant memories while live storage exceeds
+/// `storage_cap_mb`. Both phases rank ascending by `policy.retention_score`
+/// (lowest first) with a tie-break on `memory.id` for determinism.
+fn run_enforce_budget(
+    connection: &mut Connection,
+    scope: MemoryScope,
+    policy: &dyn ForgettingPolicy,
+) -> Result<(u64, u64), StoreError> {
+    // Load budget_active_max with scope-appropriate defaults
+    let configured_budget = load_config_value(connection, "budget_active_max")?;
+    let budget_active_max: u64 = match configured_budget {
+        Some(value) => value.parse::<u64>().map_err(|error| {
+            StoreError::Serialization(format!(
+                "invalid budget_active_max config `{value}`: {error}"
+            ))
+        })?,
+        None => match scope {
+            MemoryScope::Workspace => DEFAULT_WORKSPACE_BUDGET as u64,
+            MemoryScope::User => DEFAULT_USER_BUDGET as u64,
+            MemoryScope::Agent => DEFAULT_AGENT_BUDGET as u64,
+            MemoryScope::Session => 0,
+        },
+    };
+
+    // Load storage_cap_mb (default 512 MB)
+    let configured_cap = load_config_value(connection, "storage_cap_mb")?;
+    let storage_cap_mb: u64 = match configured_cap {
+        Some(value) => value.parse::<u64>().map_err(|error| {
+            StoreError::Serialization(format!("invalid storage_cap_mb config `{value}`: {error}"))
+        })?,
+        None => 512,
+    };
+
+    let mut dormant_count: u64 = 0;
+    let mut deleted_count: u64 = 0;
+
+    // Phase 1: Enforce active budget
+    if budget_active_max > 0 {
+        let active_count = count_memories_by_state(connection, scope, MemoryState::Active)?;
+        if active_count > 0 {
+            let active_u64 = active_count as u64;
+            if active_u64 > budget_active_max {
+                let excess = active_u64 - budget_active_max;
+                let mut active_memories =
+                    load_search_memories(connection, &[scope], MemoryState::Active, None, None)?;
+
+                let scope_config = load_scope_config(connection)?;
+                let now = Utc::now();
+                let context = retention_context_for(now, &scope_config, &active_memories);
+
+                // Sort ascending by policy score (lowest first = eviction candidates)
+                active_memories.sort_by(|a, b| {
+                    let score_a = policy.retention_score(a, &context);
+                    let score_b = policy.retention_score(b, &context);
+                    score_a
+                        .partial_cmp(&score_b)
+                        .unwrap_or(std::cmp::Ordering::Equal)
+                        .then_with(|| a.id.cmp(&b.id))
+                });
+
+                let to_demote = excess.min(active_memories.len() as u64) as usize;
+                let transaction = connection.transaction()?;
+                for memory in active_memories.iter().take(to_demote) {
+                    let mut dormant = memory.clone();
+                    dormant.state = MemoryState::Dormant;
+                    dormant.updated_at = now;
+                    persist_memory(&transaction, &dormant)?;
+                    dormant_count += 1;
+                }
+                transaction.commit()?;
+            }
+        }
+    }
+
+    // Phase 2: Enforce storage cap, measured on live (reclaimable-adjusted) bytes
+    let cap_bytes = storage_cap_mb * 1024 * 1024;
+    let current_live_bytes = live_storage_bytes(connection)?;
+
+    if current_live_bytes > cap_bytes {
+        let mut dormant_memories =
+            load_search_memories(connection, &[scope], MemoryState::Dormant, None, None)?;
+
+        let scope_config = load_scope_config(connection)?;
+        let now = Utc::now();
+        let context = retention_context_for(now, &scope_config, &dormant_memories);
+
+        // Sort ascending by policy score (lowest first = deletion candidates)
+        dormant_memories.sort_by(|a, b| {
+            let score_a = policy.retention_score(a, &context);
+            let score_b = policy.retention_score(b, &context);
+            score_a
+                .partial_cmp(&score_b)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.id.cmp(&b.id))
+        });
+
+        for memory in &dormant_memories {
+            let transaction = connection.transaction()?;
+            let row_id = require_memory_rowid(&transaction, &memory.id)?;
+
+            let vec_rowid: Option<i64> = transaction
+                .query_row(
+                    "SELECT vec_rowid FROM memory_embeddings WHERE memory_id = ?1",
+                    [memory.id.to_string()],
+                    |row| row.get(0),
+                )
+                .optional()?;
+
+            delete_fts_entry(&transaction, row_id, memory)?;
+
+            if let Some(vec_rowid) = vec_rowid {
+                transaction.execute("DELETE FROM vec_memories WHERE rowid = ?1", [vec_rowid])?;
+            }
+            transaction.execute(
+                "DELETE FROM memory_embeddings WHERE memory_id = ?1",
+                [memory.id.to_string()],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_versions WHERE memory_id = ?1",
+                [memory.id.to_string()],
+            )?;
+            transaction.execute(
+                "DELETE FROM memory_links WHERE source_id = ?1 OR target_id = ?1",
+                [memory.id.to_string()],
+            )?;
+            transaction.execute(
+                "DELETE FROM contradictions WHERE memory_a_id = ?1 OR memory_b_id = ?1",
+                [memory.id.to_string()],
+            )?;
+            transaction.execute(
+                "DELETE FROM memories WHERE id = ?1",
+                [memory.id.to_string()],
+            )?;
+
+            transaction.commit()?;
+            deleted_count += 1;
+
+            // Re-check live storage after each deletion
+            if live_storage_bytes(connection)? <= cap_bytes {
+                break;
+            }
+        }
+    }
+
+    Ok((dormant_count, deleted_count))
 }
 
 fn encode_embedding(embedding: &[f32]) -> Vec<u8> {
@@ -10592,5 +10680,485 @@ mod tests {
             "expected skip reason to mention higher visible scope, got {:?}",
             report.skipped_reasons
         );
+    }
+
+    // ── enforce_budget characterization tests ──────────────────────────
+    //
+    // enforce_budget had zero test coverage before this pass. These tests
+    // pin its behavior — including the Phase 2 over-deletion bug — so a
+    // later change to make eviction ranking pluggable (and to fix the
+    // storage-cap loop) shows up as an intentional, reviewable diff rather
+    // than silent drift.
+
+    #[tokio::test]
+    async fn enforce_budget_phase1_demotes_lowest_scoring_active_memories_first() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "3");
+
+        let mut scored_ids = Vec::new();
+        for i in 0..5u32 {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            memory.importance_score = 0.1 * (i + 1) as f32;
+            memory.reliability_score = 1.0;
+            let id = fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store active memory");
+            scored_ids.push((id, 0.1 * (i + 1) as f32));
+        }
+
+        let (dormanted, deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 2, "excess over budget_active_max=3 is 2");
+        assert_eq!(deleted, 0, "storage cap was not exceeded");
+
+        scored_ids.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        for (id, score) in scored_ids.iter().take(2) {
+            let memory = fixture
+                .store
+                .get(id)
+                .await
+                .expect("get memory")
+                .expect("memory exists");
+            assert_eq!(
+                memory.state,
+                MemoryState::Dormant,
+                "lowest-scoring memory (score={score}) should have been demoted"
+            );
+        }
+        for (id, score) in scored_ids.iter().skip(2) {
+            let memory = fixture
+                .store
+                .get(id)
+                .await
+                .expect("get memory")
+                .expect("memory exists");
+            assert_eq!(
+                memory.state,
+                MemoryState::Active,
+                "higher-scoring memory (score={score}) should remain active"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_phase1_is_a_noop_when_active_count_is_within_budget() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "10");
+
+        for _ in 0..3 {
+            let memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store active memory");
+        }
+
+        let (dormanted, deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 0);
+        assert_eq!(deleted, 0);
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_phase1_ranks_by_importance_times_reliability_not_importance_alone() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "1");
+
+        // Higher importance but much lower reliability should score lower
+        // than the reverse, under today's importance * reliability ranking.
+        let mut low_reliability =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        low_reliability.importance_score = 0.9;
+        low_reliability.reliability_score = 0.1;
+        let low_reliability_id = fixture
+            .store
+            .store(low_reliability)
+            .await
+            .expect("store low reliability memory");
+
+        let mut high_reliability =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        high_reliability.importance_score = 0.3;
+        high_reliability.reliability_score = 0.9;
+        let high_reliability_id = fixture
+            .store
+            .store(high_reliability)
+            .await
+            .expect("store high reliability memory");
+
+        let (dormanted, _deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 1);
+
+        let demoted = fixture
+            .store
+            .get(&low_reliability_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(
+            demoted.state,
+            MemoryState::Dormant,
+            "0.9*0.1=0.09 should score lower than 0.3*0.9=0.27 and be demoted"
+        );
+        let kept = fixture
+            .store
+            .get(&high_reliability_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(kept.state, MemoryState::Active);
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_phase2_deletes_every_dormant_memory_when_cap_is_unreachably_low() {
+        // A storage_cap_mb of 0 is unreachable regardless of ranking or
+        // measurement strategy: live bytes are never <= 0 while any schema
+        // or data exists. Both the pre-fix (raw page_count) and post-fix
+        // (live, freelist-adjusted) measurements delete the entire dormant
+        // set here, so this scenario does NOT distinguish the two — see
+        // `enforce_budget_phase2_stops_deleting_once_live_bytes_are_under_the_cap`
+        // for the test that actually exercises the fix.
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "storage_cap_mb", "0");
+
+        let mut dormant_ids = Vec::new();
+        for _ in 0..5 {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            memory.state = MemoryState::Dormant;
+            let id = fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store dormant memory");
+            dormant_ids.push(id);
+        }
+
+        let (dormanted, deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 0, "no active memories were seeded");
+        assert_eq!(
+            deleted, 5,
+            "current implementation deletes the entire dormant set once over cap"
+        );
+
+        for id in &dormant_ids {
+            let memory = fixture.store.get(id).await.expect("get memory");
+            assert!(
+                memory.is_none(),
+                "every dormant memory should have been hard-deleted"
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_phase2_stops_deleting_once_live_bytes_are_under_the_cap() {
+        // This is the assertion that changes from the pre-fix baseline: with
+        // a *reachable* cap, Phase 2 must stop once live bytes (page_count -
+        // freelist_count, not raw page_count) drop under it, rather than
+        // deleting the entire dormant set. Each memory's content is made
+        // large enough (well beyond storage_cap_mb's whole-MB resolution)
+        // that deleting one measurably frees pages back to the freelist.
+        let fixture = test_fixture();
+
+        const MEMORY_COUNT: u32 = 4;
+        const CONTENT_BYTES: usize = 3 * 1024 * 1024;
+
+        let mut scored_ids = Vec::new();
+        for i in 0..MEMORY_COUNT {
+            let mut memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+            memory.state = MemoryState::Dormant;
+            memory.importance_score = 0.1 * (i + 1) as f32;
+            memory.reliability_score = 1.0;
+            memory.content = "x".repeat(CONTENT_BYTES);
+            let id = fixture
+                .store
+                .store(memory)
+                .await
+                .expect("store dormant memory");
+            scored_ids.push((id, 0.1 * (i + 1) as f32));
+        }
+
+        let live_bytes_before = fixture
+            .store
+            .with_connection(|connection| super::live_storage_bytes(connection))
+            .expect("measure live bytes before enforcement");
+
+        // Set a cap comfortably below current usage but well above zero, so
+        // reaching it does not require deleting the whole dormant set.
+        let headroom_bytes = 2 * CONTENT_BYTES as u64;
+        assert!(
+            live_bytes_before > headroom_bytes,
+            "test data (before={live_bytes_before}) must exceed the chosen headroom ({headroom_bytes}) \
+             for the cap to be reachable without deleting everything"
+        );
+        let cap_mb = ((live_bytes_before - headroom_bytes) / (1024 * 1024)).max(1);
+        set_scope_config(&fixture.store, "storage_cap_mb", &cap_mb.to_string());
+
+        let (dormanted, deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 0, "no active memories were seeded");
+        assert!(
+            deleted > 0,
+            "cap was exceeded, so at least one deletion is expected"
+        );
+        assert!(
+            deleted < u64::from(MEMORY_COUNT),
+            "a reachable cap must not require deleting the entire dormant set \
+             (got deleted={deleted} of {MEMORY_COUNT}); this is the Phase 2 bug this test guards against"
+        );
+
+        let live_bytes_after = fixture
+            .store
+            .with_connection(|connection| super::live_storage_bytes(connection))
+            .expect("measure live bytes after enforcement");
+        assert!(
+            live_bytes_after <= cap_mb * 1024 * 1024,
+            "live bytes after enforcement ({live_bytes_after}) must be under the cap ({} bytes)",
+            cap_mb * 1024 * 1024
+        );
+
+        // Lowest-scoring memories are deleted first; the highest-scoring
+        // survivors must be exactly the top `MEMORY_COUNT - deleted` by score.
+        scored_ids.sort_by(|a, b| a.1.partial_cmp(&b.1).unwrap());
+        let deleted_count = deleted as usize;
+        for (id, score) in scored_ids.iter().take(deleted_count) {
+            let memory = fixture.store.get(id).await.expect("get memory");
+            assert!(
+                memory.is_none(),
+                "lowest-scoring dormant memory (score={score}) should have been deleted first"
+            );
+        }
+        for (id, score) in scored_ids.iter().skip(deleted_count) {
+            let memory = fixture
+                .store
+                .get(id)
+                .await
+                .expect("get memory")
+                .expect("higher-scoring memory should survive");
+            assert_eq!(
+                memory.state,
+                MemoryState::Dormant,
+                "higher-scoring memory (score={score}) should not have been deleted"
+            );
+        }
+    }
+
+    // ── ForgettingPolicy selection ──────────────────────────────────────
+
+    #[tokio::test]
+    async fn enforce_budget_default_reads_forgetting_policy_from_scope_config() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "1");
+        set_scope_config(&fixture.store, "forgetting_policy", "fifo");
+
+        let mut older = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        older.importance_score = 0.9;
+        older.reliability_score = 1.0;
+        older.created_at = Utc::now() - chrono::Duration::days(10);
+        older.updated_at = older.created_at;
+        let older_id = fixture
+            .store
+            .store(older)
+            .await
+            .expect("store older memory");
+
+        let mut newer = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        newer.importance_score = 0.1;
+        newer.reliability_score = 0.1;
+        newer.created_at = Utc::now();
+        newer.updated_at = newer.created_at;
+        let newer_id = fixture
+            .store
+            .store(newer)
+            .await
+            .expect("store newer memory");
+
+        // Under fifo, the older memory is demoted first even though it has
+        // the higher importance*reliability score.
+        let (dormanted, _deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 1);
+
+        let older_memory = fixture
+            .store
+            .get(&older_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(older_memory.state, MemoryState::Dormant);
+        let newer_memory = fixture
+            .store
+            .get(&newer_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(newer_memory.state, MemoryState::Active);
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_rejects_unknown_configured_forgetting_policy() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "forgetting_policy", "not-a-real-policy");
+
+        let memory = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        fixture.store.store(memory).await.expect("store memory");
+
+        let error = fixture
+            .store
+            .enforce_budget()
+            .expect_err("unknown policy name must fail loudly");
+        assert!(
+            matches!(error, crate::StoreError::Serialization(_)),
+            "expected a Serialization error for an unknown policy, got {error:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_with_policy_overrides_the_configured_default_for_this_call_only() {
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "1");
+        // Configured default stays importance-reliability; the call below
+        // overrides it with Fifo for this invocation only.
+
+        let mut older = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        older.importance_score = 0.9;
+        older.reliability_score = 1.0;
+        older.created_at = Utc::now() - chrono::Duration::days(10);
+        older.updated_at = older.created_at;
+        let older_id = fixture
+            .store
+            .store(older)
+            .await
+            .expect("store older memory");
+
+        let mut newer = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        newer.importance_score = 0.1;
+        newer.reliability_score = 0.1;
+        newer.created_at = Utc::now();
+        newer.updated_at = newer.created_at;
+        let newer_id = fixture
+            .store
+            .store(newer)
+            .await
+            .expect("store newer memory");
+
+        let (dormanted, _deleted) = fixture
+            .store
+            .enforce_budget_with_policy(&crate::Fifo)
+            .expect("enforce budget with fifo override");
+        assert_eq!(dormanted, 1);
+
+        let older_memory = fixture
+            .store
+            .get(&older_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(
+            older_memory.state,
+            MemoryState::Dormant,
+            "fifo override should demote the older memory despite its higher importance*reliability"
+        );
+        let newer_memory = fixture
+            .store
+            .get(&newer_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(newer_memory.state, MemoryState::Active);
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_with_priority_decay_differs_from_default_on_disagreement_corpus() {
+        // A corpus where recency and importance disagree: one memory is
+        // high-importance but stale and type-fast-decaying (Observation), the
+        // other is low-importance but freshly accessed. importance*reliability
+        // ranks the stale memory higher; priority-decay's exponential recency
+        // term should invert that ranking.
+        let fixture = test_fixture();
+        set_scope_config(&fixture.store, "budget_active_max", "1");
+        set_scope_config(&fixture.store, "decay_lambda_base", "0.5");
+
+        let now = Utc::now();
+
+        let mut stale_but_important =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        stale_but_important.memory_type = MemoryType::Observation;
+        stale_but_important.importance_score = 0.9;
+        stale_but_important.reliability_score = 1.0;
+        stale_but_important.updated_at = now - chrono::Duration::days(60);
+        stale_but_important.last_accessed_at = Some(now - chrono::Duration::days(60));
+        let stale_id = fixture
+            .store
+            .store(stale_but_important)
+            .await
+            .expect("store stale memory");
+
+        let mut fresh_but_minor =
+            sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+        fresh_but_minor.memory_type = MemoryType::Observation;
+        fresh_but_minor.importance_score = 0.3;
+        fresh_but_minor.reliability_score = 1.0;
+        fresh_but_minor.updated_at = now;
+        fresh_but_minor.last_accessed_at = Some(now);
+        let fresh_id = fixture
+            .store
+            .store(fresh_but_minor)
+            .await
+            .expect("store fresh memory");
+
+        let default_result = fixture
+            .store
+            .enforce_budget_with_policy(&crate::ImportanceReliability)
+            .expect("enforce budget with default policy");
+        assert_eq!(default_result.0, 1);
+        let demoted_by_default = fixture
+            .store
+            .get(&fresh_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(
+            demoted_by_default.state,
+            MemoryState::Dormant,
+            "importance*reliability demotes the lower-importance fresh memory"
+        );
+
+        // Reset both back to active for a clean second run.
+        set_scope_config(&fixture.store, "budget_active_max", "1");
+        fixture
+            .store
+            .with_connection(|connection| {
+                connection.execute(
+                    "UPDATE memories SET state = 'active' WHERE id = ?1",
+                    params![fresh_id.to_string()],
+                )?;
+                Ok(())
+            })
+            .expect("reset fresh memory to active");
+
+        let decay_result = fixture
+            .store
+            .enforce_budget_with_policy(&crate::PriorityDecay)
+            .expect("enforce budget with priority-decay policy");
+        assert_eq!(decay_result.0, 1);
+        let demoted_by_decay = fixture
+            .store
+            .get(&stale_id)
+            .await
+            .expect("get memory")
+            .expect("memory exists");
+        assert_eq!(
+            demoted_by_decay.state,
+            MemoryState::Dormant,
+            "priority-decay demotes the stale memory despite its higher importance, \
+             inverting the default policy's choice"
+        );
+    }
+
+    #[tokio::test]
+    async fn enforce_budget_returns_zero_zero_when_scope_is_empty() {
+        let fixture = test_fixture();
+        let (dormanted, deleted) = fixture.store.enforce_budget().expect("enforce budget");
+        assert_eq!(dormanted, 0);
+        assert_eq!(deleted, 0);
     }
 }
