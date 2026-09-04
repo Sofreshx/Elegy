@@ -1,6 +1,7 @@
 use std::{
     fs,
     path::Path,
+    sync::OnceLock,
     time::{Duration, Instant},
 };
 
@@ -56,7 +57,15 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 27] = [
 /// All schema and config migrations run inside a single SQLite transaction so source-of-truth
 /// memory rows remain preserve-only across upgrades. The only intentional mutations during
 /// initialization target derived, recalculable config entries such as bounded retrieval weights.
+/// Guards `elegy_sqlite_vec_init::register()` to a single call per process:
+/// `sqlite3_auto_extension` registers against every connection opened
+/// *afterward*, so this must run before the first `Connection::open` below,
+/// but only needs to run once regardless of how many stores get opened.
+static VEC_EXTENSION_REGISTERED: OnceLock<()> = OnceLock::new();
+
 pub fn init_database(path: &Path) -> Result<Connection, StoreError> {
+    VEC_EXTENSION_REGISTERED.get_or_init(elegy_sqlite_vec_init::register);
+
     if let Some(parent) = path.parent() {
         if !parent.as_os_str().is_empty() {
             fs::create_dir_all(parent).map_err(|source| {
@@ -284,16 +293,35 @@ fn create_schema(connection: &Connection) -> Result<(), StoreError> {
 
 fn ensure_vec_memories_object(connection: &Connection) -> Result<(), StoreError> {
     if schema_object_exists(connection, "vec_memories")? {
+        // A database created before elegy_sqlite_vec_init::register() existed
+        // (i.e. every database created before this change shipped) has the
+        // plain-table fallback below, not a real vec0 table, and stays on the
+        // fallback forever — ensure_vec_memories_object never re-runs its DDL
+        // once the object exists. Migrating those in place (copy every
+        // (rowid, embedding) row into a freshly created vec0 table) is real,
+        // tracked follow-up work; a fresh database always gets vec0 today.
         return Ok(());
     }
 
+    // `distance_metric=cosine` makes `v.distance` report cosine distance
+    // (1 - cosine_similarity, confirmed empirically: an identical vector
+    // yields distance 0, an orthogonal vector yields distance 1) rather than
+    // vec0's default L2 distance, matching the similarity semantics this
+    // crate's scoring model (similarity_weight * similarity + ...) expects.
     match connection.execute_batch(&format!(
-        "CREATE VIRTUAL TABLE vec_memories USING vec0(embedding float[{EMBEDDING_DIMENSIONS}]);"
+        "CREATE VIRTUAL TABLE vec_memories USING vec0(embedding float[{EMBEDDING_DIMENSIONS}] distance_metric=cosine);"
     )) {
         Ok(()) => Ok(()),
         Err(error) if is_missing_module_error(&error, SQLITE_VEC_MODULE_NAME) => {
-            // TODO(WU4/sqlite-vec): replace this rowid-compatible fallback with runtime sqlite-vec
-            // extension loading once the backend integration path is finalized for the workspace.
+            // Should not happen: elegy_sqlite_vec_init::register() is called
+            // unconditionally before any connection is opened (see
+            // init_database). Kept as a defensive fallback, not the expected
+            // path, so it's worth surfacing loudly if it ever fires.
+            tracing::warn!(
+                "sqlite-vec's vec0 module was unavailable despite registration; \
+                 falling back to a plain vec_memories table, so vector search \
+                 will fall back to a full-table Rust-side scan"
+            );
             connection.execute_batch(
                 r#"
                 CREATE TABLE vec_memories (
@@ -305,6 +333,22 @@ fn ensure_vec_memories_object(connection: &Connection) -> Result<(), StoreError>
         }
         Err(error) => Err(StoreError::from(error)),
     }
+}
+
+/// Whether `vec_memories` is a real `vec0` virtual table (accelerated KNN via
+/// `MATCH`/`ORDER BY distance`) or the plain-table fallback (requires a
+/// Rust-side scan). Checked via `sqlite_master.sql` rather than cached, since
+/// it only runs once per `search()`/`find_similar()` call and a schema object
+/// never changes type without `ensure_vec_memories_object` running again.
+pub(crate) fn vec_memories_uses_native_module(connection: &Connection) -> Result<bool, StoreError> {
+    let sql: Option<String> = connection
+        .query_row(
+            "SELECT sql FROM sqlite_master WHERE name = 'vec_memories'",
+            [],
+            |row| row.get(0),
+        )
+        .optional()?;
+    Ok(sql.is_some_and(|sql| sql.contains(SQLITE_VEC_MODULE_NAME)))
 }
 
 fn ensure_memory_embeddings_columns(connection: &Connection) -> Result<(), StoreError> {
@@ -2235,7 +2279,7 @@ mod tests {
         );
 
         let migration =
-            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "test-profile");
+            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 768], 768))), "test-profile");
         let txn = must(connection.transaction(), "begin txn");
         must(migration.run(&txn), "reembed run");
         must(migration.verify(&txn), "reembed verify");
@@ -2330,7 +2374,7 @@ mod tests {
         {
             let txn = must(connection.transaction(), "begin rollback txn");
             let migration =
-                ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 4], 4))), "rb-profile");
+                ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 768], 768))), "rb-profile");
             must(migration.run(&txn), "reembed run inside rollback");
             must(
                 txn.query_row("SELECT COUNT(*) FROM reembed_staging", [], |row| {
@@ -2394,7 +2438,7 @@ mod tests {
 
         // Stage manually, then simulate concurrent edit, then cutover
         let migration =
-            ReembedMigration::new(Box::new(|_| Ok((vec![3.0f32; 4], 4))), "course-profile");
+            ReembedMigration::new(Box::new(|_| Ok((vec![3.0f32; 768], 768))), "course-profile");
 
         let txn = must(connection.transaction(), "begin course txn");
         must(migration.run_staging(&txn), "staging phase");
@@ -2463,7 +2507,7 @@ mod tests {
 
         // First run with profile "v1" — populate staging
         let migration_v1 =
-            ReembedMigration::new(Box::new(|_| Ok((vec![4.0f32; 4], 4))), "profile-v1");
+            ReembedMigration::new(Box::new(|_| Ok((vec![4.0f32; 768], 768))), "profile-v1");
         let txn = must(connection.transaction(), "begin v1 txn");
         must(migration_v1.run(&txn), "reembed v1");
         must(txn.rollback(), "rollback v1 (simulate incomplete staging)");
@@ -2496,7 +2540,7 @@ mod tests {
 
         // Second run with profile "v2" — should detect orphan and clear it
         let migration_v2 =
-            ReembedMigration::new(Box::new(|_| Ok((vec![5.0f32; 4], 4))), "profile-v2");
+            ReembedMigration::new(Box::new(|_| Ok((vec![5.0f32; 768], 768))), "profile-v2");
         let txn = must(connection.transaction(), "begin v2 txn");
         must(migration_v2.run_staging(&txn), "run_staging with v2");
 
@@ -2624,7 +2668,7 @@ mod tests {
         );
 
         let migration =
-            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "runner-profile");
+            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 768], 768))), "runner-profile");
 
         let txn = must(connection.transaction(), "begin runner txn");
         must(
@@ -2749,7 +2793,7 @@ mod tests {
                         "embedding input must not be empty".into(),
                     ))
                 } else {
-                    Ok((vec![1.0f32; 4], 4))
+                    Ok((vec![1.0f32; 768], 768))
                 }
             }),
             "ne-profile",
@@ -2828,7 +2872,7 @@ mod tests {
         assert_eq!(staging_before, 1, "orphan staging must exist before run");
 
         let migration =
-            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "orphan-profile");
+            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 768], 768))), "orphan-profile");
         let txn = must(connection.transaction(), "begin orphan txn");
         must(migration.run_staging(&txn), "run_staging with orphans");
 
@@ -2888,7 +2932,7 @@ mod tests {
         assert_eq!(staging_before, 1, "one memory should be partially staged");
 
         let migration =
-            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "resume-profile");
+            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 768], 768))), "resume-profile");
 
         // Full run — should clear stale staging and re-stage both
         let txn = must(connection.transaction(), "begin resume txn");
@@ -2962,7 +3006,7 @@ mod tests {
                         "simulated mid-run provider failure".into(),
                     ))
                 } else {
-                    Ok((vec![1.0f32; 4], 4))
+                    Ok((vec![1.0f32; 768], 768))
                 }
             }),
             "mid-profile",
@@ -3037,7 +3081,7 @@ mod tests {
 
         // (c) Reprise OK au run suivant
         let migration_ok =
-            ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 4], 4))), "mid-profile-ok");
+            ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 768], 768))), "mid-profile-ok");
         let txn2 = must(connection.transaction(), "begin recovery txn");
         must(migration_ok.run(&txn2), "recovery reembed succeeds");
         must(txn2.commit(), "commit recovery");
@@ -3074,8 +3118,10 @@ mod tests {
         );
 
         // First reembed: model A
-        let migration_a =
-            ReembedMigration::new(Box::new(|_| Ok((vec![1.0f32; 4], 4))), "profile-model-a");
+        let migration_a = ReembedMigration::new(
+            Box::new(|_| Ok((vec![1.0f32; 768], 768))),
+            "profile-model-a",
+        );
         let txn = must(connection.transaction(), "begin model-a txn");
         must(migration_a.run(&txn), "model-a reembed");
         must(migration_a.verify(&txn), "model-a verify");
@@ -3098,8 +3144,10 @@ mod tests {
         );
 
         // Second reembed: model B — must EXECUTE (not silently skipped)
-        let migration_b =
-            ReembedMigration::new(Box::new(|_| Ok((vec![2.0f32; 4], 4))), "profile-model-b");
+        let migration_b = ReembedMigration::new(
+            Box::new(|_| Ok((vec![2.0f32; 768], 768))),
+            "profile-model-b",
+        );
         let txn = must(connection.transaction(), "begin model-b txn");
         must(migration_b.run(&txn), "model-b reembed");
         must(migration_b.verify(&txn), "model-b verify");

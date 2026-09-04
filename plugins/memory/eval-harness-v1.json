@@ -9,8 +9,8 @@
     "gate_accuracy_full": { "comparison": "gte", "value": 1.0 },
     "write_latency_p50_ms": { "comparison": "lte", "value": 200.0 },
     "write_latency_p95_ms": { "comparison": "lte", "value": 500.0 },
-    "retrieval_latency_p50_ms": { "comparison": "lte", "value": 450.0 },
-    "retrieval_latency_p95_ms": { "comparison": "lte", "value": 600.0 },
+    "retrieval_latency_p50_ms": { "comparison": "lte", "value": 100.0 },
+    "retrieval_latency_p95_ms": { "comparison": "lte", "value": 200.0 },
     "storage_efficiency_bytes_per_memory": { "comparison": "lte", "value": 4608.0 },
     "stale_embedding_ratio": { "comparison": "lte", "value": 0.05 }
   }

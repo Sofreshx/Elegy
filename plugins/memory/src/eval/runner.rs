@@ -423,13 +423,34 @@ fn measure_write_latencies_ms() -> Result<Vec<f64>, EvalError> {
     Ok(samples)
 }
 
+/// Output of `measure_retrieval_latencies_at_scale_ms`.
+struct ScaleMeasurement {
+    retrieval_latencies_ms: Vec<f64>,
+    /// Marginal bytes per memory — see the doc comment below for why this is
+    /// measured here rather than against the tiny golden corpus.
+    storage_efficiency_bytes_per_memory: f64,
+}
+
 /// Bulk-injects `RETRIEVAL_SCALE_MEMORY_COUNT` trivial memories (embeddings reused
 /// cyclically across a small set of axes — exact discrimination does not matter
-/// for a raw scale/latency measurement) and times
-/// `RETRIEVAL_SCALE_QUERY_COUNT` searches against them.
-fn measure_retrieval_latencies_at_scale_ms() -> Result<Vec<f64>, EvalError> {
+/// for a raw scale/latency measurement), times `RETRIEVAL_SCALE_QUERY_COUNT`
+/// searches against them, and measures marginal storage cost across the same
+/// bulk insert.
+///
+/// Storage efficiency is measured here, not against the ~28-memory golden
+/// corpus, because `vec0`'s chunked storage allocates space for a batch of
+/// rows at once — the first insert into an empty `vec_memories` table pays a
+/// one-time chunk-allocation cost that a tiny corpus divides by too few
+/// memories to be representative (confirmed empirically: the same
+/// baseline-subtraction technique that correctly isolated marginal cost
+/// against the plain-table fallback still measured >100 KB/memory against a
+/// real vec0 table at N=28, because one chunk's allocation dominates a
+/// 28-row sample). At `RETRIEVAL_SCALE_MEMORY_COUNT`, the same one-time cost
+/// amortizes across enough rows to reflect steady-state marginal cost.
+fn measure_retrieval_latencies_at_scale_ms() -> Result<ScaleMeasurement, EvalError> {
     let (_temp_dir, store) = fresh_store("retrieval-scale")?;
     let usable_axes = EVAL_EMBEDDING_DIMENSIONS - 1;
+    let baseline_storage_bytes = run_async(store.health_report())?.total_storage_bytes;
 
     for index in 0..RETRIEVAL_SCALE_MEMORY_COUNT {
         let memory = Memory {
@@ -461,6 +482,15 @@ fn measure_retrieval_latencies_at_scale_ms() -> Result<Vec<f64>, EvalError> {
         run_async(store.store_embedding(&id, &embedding))?;
     }
 
+    let health_after_insert = run_async(store.health_report())?;
+    let marginal_storage_bytes = health_after_insert
+        .total_storage_bytes
+        .saturating_sub(baseline_storage_bytes);
+    let storage_efficiency_bytes_per_memory = metrics::ratio(
+        marginal_storage_bytes,
+        health_after_insert.active_count.max(1),
+    );
+
     let mut samples = Vec::with_capacity(RETRIEVAL_SCALE_QUERY_COUNT);
     for query_index in 0..RETRIEVAL_SCALE_QUERY_COUNT {
         let search_query = SearchQuery {
@@ -479,7 +509,10 @@ fn measure_retrieval_latencies_at_scale_ms() -> Result<Vec<f64>, EvalError> {
         samples.push(started.elapsed().as_secs_f64() * 1000.0);
     }
 
-    Ok(samples)
+    Ok(ScaleMeasurement {
+        retrieval_latencies_ms: samples,
+        storage_efficiency_bytes_per_memory,
+    })
 }
 
 /// One computed metric, compared against its configured gate.
@@ -546,24 +579,10 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     };
 
     let (_temp_dir, store) = fresh_store("run")?;
-    // Baseline before any memory exists: `health_report().total_storage_bytes` is
-    // PRAGMA page_count * page_size for the *whole database file*, not scoped to
-    // active memories, so it includes 55+ fixed schema/index root pages that
-    // exist before the first write. Snapshotting this baseline and subtracting it
-    // below turns storage_efficiency into a marginal-cost metric (bytes an
-    // *additional* memory actually costs) instead of one dominated by fixed
-    // overhead at small corpus sizes — see the spec's Metrics section for the
-    // measured breakdown (fixed overhead was 67% of the number at N=28).
-    let baseline_storage_bytes = run_async(store.health_report())?.total_storage_bytes;
-
     let injected = inject_retrieval_corpus(&store, &retrieval_corpus)?;
     let retrieval_metrics = evaluate_retrieval_corpus(&store, &retrieval_corpus, &injected)?;
 
     let health = run_async(store.health_report())?;
-    let marginal_storage_bytes = health
-        .total_storage_bytes
-        .saturating_sub(baseline_storage_bytes);
-    let storage_efficiency = metrics::ratio(marginal_storage_bytes, health.active_count.max(1));
     let stale_embedding_ratio =
         metrics::ratio(health.stale_embeddings_count, health.active_count.max(1));
 
@@ -580,7 +599,8 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
     let full_gate_accuracy = metrics::accuracy(&full_gate_correctness);
 
     let write_latencies_ms = measure_write_latencies_ms()?;
-    let retrieval_latencies_ms = measure_retrieval_latencies_at_scale_ms()?;
+    let scale_measurement = measure_retrieval_latencies_at_scale_ms()?;
+    let retrieval_latencies_ms = &scale_measurement.retrieval_latencies_ms;
 
     let metric_results = vec![
         gate_metric(&thresholds, "recall_at_10", retrieval_metrics.recall_at_k)?,
@@ -611,34 +631,35 @@ pub(crate) fn run_eval(options: &EvalRunOptions) -> Result<EvalReport, EvalError
             "write_latency_p95_ms",
             metrics::percentile_ms(&write_latencies_ms, 95.0),
         )?,
-        // Calibrated gate (450/600ms), not the spec's aspirational 100/200ms at 10k
-        // memories. There is no KNN query anywhere in this crate today —
-        // load_vector_similarity_scores decodes every candidate embedding and
-        // computes cosine similarity in Rust regardless of whether sqlite-vec's
-        // vec0 module is available, so this is a brute-force scan either way.
-        // Tracked separately as real follow-up work (implement KNN), not a
-        // tuning problem this harness can fix. See
-        // docs/specs/eval-harness-v1/spec.md.
+        // load_vector_similarity_scores now issues a real vec0 KNN query
+        // (MATCH + k = ?) instead of decoding every candidate embedding and
+        // computing cosine similarity in Rust — see
+        // docs/specs/eval-harness-v1/spec.md for the measured before/after.
+        // This meets the spec's original aspirational 100/200ms target, so
+        // unlike storage efficiency below there is nothing calibrated here.
         gate_metric(
             &thresholds,
             "retrieval_latency_p50_ms",
-            metrics::percentile_ms(&retrieval_latencies_ms, 50.0),
+            metrics::percentile_ms(retrieval_latencies_ms, 50.0),
         )?,
         gate_metric(
             &thresholds,
             "retrieval_latency_p95_ms",
-            metrics::percentile_ms(&retrieval_latencies_ms, 95.0),
+            metrics::percentile_ms(retrieval_latencies_ms, 95.0),
         )?,
-        // Marginal cost, not whole-file bytes / count — see the
-        // baseline_storage_bytes computation above. A 768-dim f32 embedding
-        // (3072 B) plus SQLite's one-row-per-page behavior for a blob that
-        // size puts a hard floor of ~4096 B/memory on this metric regardless
-        // of corpus size; the spec's aspirational 2 KB target is unreachable
-        // without quantizing the stored embedding (tracked separately).
+        // Marginal cost, measured at RETRIEVAL_SCALE_MEMORY_COUNT rather than
+        // the golden corpus — see measure_retrieval_latencies_at_scale_ms's
+        // doc comment for why: vec0's chunked storage allocates space for a
+        // batch of rows on the first insert, and that one-time cost needs
+        // enough rows to amortize before the ratio is representative. Still
+        // calibrated well above the spec's aspirational 2 KB — real vec0
+        // storage overhead is substantially higher than the plain-table
+        // fallback's ~4 KB/memory floor, and reaching 2 KB needs quantizing
+        // the stored embedding regardless (tracked separately).
         gate_metric(
             &thresholds,
             "storage_efficiency_bytes_per_memory",
-            storage_efficiency,
+            scale_measurement.storage_efficiency_bytes_per_memory,
         )?,
         gate_metric(&thresholds, "stale_embedding_ratio", stale_embedding_ratio)?,
     ];
@@ -879,12 +900,20 @@ mod tests {
              similarity, well below their correct counterparts' 1.0 — none should ever \
              outrank the correct answer"
         );
-        assert_eq!(
-            metric_value("storage_efficiency_bytes_per_memory"),
-            4096.0,
-            "a 768-dim f32 embedding (3072 B) forces one row per 4096 B SQLite page; this \
-             exact value is a deterministic floor, not a measurement subject to timing noise \
-             — a change here means the encoding or page size changed, not drift"
+        // Real vec0 KNN, not the old Rust-side brute-force scan: comfortably
+        // under the spec's original aspirational target (100/200ms), not just
+        // a calibrated compromise. Bounded rather than pinned to an exact
+        // value, unlike storage efficiency below — this is a real timing
+        // measurement, not deterministic arithmetic.
+        assert!(
+            metric_value("retrieval_latency_p50_ms") < 100.0,
+            "measured {}",
+            metric_value("retrieval_latency_p50_ms")
+        );
+        assert!(
+            metric_value("retrieval_latency_p95_ms") < 200.0,
+            "measured {}",
+            metric_value("retrieval_latency_p95_ms")
         );
 
         assert!(

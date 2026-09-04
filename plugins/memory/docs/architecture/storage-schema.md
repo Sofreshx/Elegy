@@ -72,7 +72,11 @@ CREATE INDEX idx_memories_stale ON memories(embedding_stale) WHERE embedding_sta
 
 ```sql
 CREATE VIRTUAL TABLE vec_memories USING vec0(
-    embedding float[768]    -- Dimension depends on embedding model. 768 for all-MiniLM-L6-v2, 1536 for OpenAI ada-002
+    embedding float[768] distance_metric=cosine
+    -- Dimension depends on embedding model. 768 for all-MiniLM-L6-v2, 1536 for OpenAI ada-002.
+    -- distance_metric=cosine makes `v.distance` report cosine distance
+    -- (1 - cosine_similarity), matching this crate's scoring model; confirmed
+    -- empirically (identical vectors -> distance 0, orthogonal -> distance 1).
 );
 ```
 
@@ -86,7 +90,7 @@ CREATE TABLE vec_memories (
 
 This keeps the `rowid`-based mapping intact so that the rest of the schema can reference `vec_memories` uniformly.
 
-**Current status: this table's `rowid`/embedding storage is implemented, but the search path below is not.** `load_vector_similarity_scores` in `sqlite_store.rs` does not issue the KNN query shown below against either the `vec0` table or its fallback — it selects every embedding blob for candidate rows and computes cosine similarity in Rust. The KNN pattern below is the target design, not current behavior. `sqlite-vec` is also not currently a Cargo dependency of this crate (confirmed absent from `Cargo.lock`); the `vec0` branch of `ensure_vec_memories_object` is unreachable in a stock build today, so every build currently takes the fallback `BLOB` table.
+**Current status: implemented.** `sqlite-vec` is registered as a real Cargo dependency via `shared/sqlite-vec-init` (`elegy_sqlite_vec_init::register()`, called once per process before any connection opens), so every fresh database gets a real `vec0` table, declared with `distance_metric=cosine`. `load_vector_similarity_scores` in `sqlite_store.rs` issues the KNN query pattern below (`_via_knn`) whenever `vec_memories` is a real `vec0` table — checked via `vec_memories_uses_native_module`, which inspects `sqlite_master.sql` rather than assuming. The Rust-side full scan (`_via_scan`) is kept only as a defensive fallback for the case where the extension fails to register, which should not happen in a normal build. **Known gap:** a database created before this change has the plain-table fallback and never upgrades — `ensure_vec_memories_object` returns early once `vec_memories` exists, regardless of which variant it is. Migrating an existing installation in place is tracked follow-up work, not yet implemented.
 
 The `rowid` of `vec_memories` maps to a separate lookup. We maintain a mapping table:
 
@@ -102,18 +106,21 @@ CREATE INDEX idx_memory_embeddings_content_sha256
     WHERE content_sha256 IS NOT NULL;
 ```
 
-**KNN Query Pattern (target design — not implemented):**
+**KNN Query Pattern (implemented — `load_vector_similarity_scores_via_knn` in `sqlite_store.rs`):**
 ```sql
-SELECT m.*, v.distance
+SELECT m.id, v.distance
 FROM vec_memories v
 JOIN memory_embeddings me ON me.vec_rowid = v.rowid
 JOIN memories m ON m.id = me.memory_id
 WHERE v.embedding MATCH ?query_embedding
+  AND k = ?pool_limit
+  AND m.scope IN (...)
   AND m.state = 'active'
   AND m.embedding_stale = 0
-ORDER BY v.distance
-LIMIT ?k;
+ORDER BY v.distance;
 ```
+
+`k = ?pool_limit` is required, not optional decoration: vec0 raises `"A LIMIT or 'k = ?' constraint is required on vec0 knn queries"` as soon as the vec0 table is joined to another table — an outer `ORDER BY ... LIMIT` alone (the pattern this doc originally showed) is not sufficient once joins are involved. `pool_limit` is the caller's exact `limit` for a bounded call (e.g. `find_similar`), or `VECTOR_CANDIDATE_POOL_SIZE` (1,000) for the unbounded hybrid-search vector channel — see `docs/specs/eval-harness-v1/spec.md`'s retrieval-latency section for why an unbounded vector channel is itself a deliberate, standard hybrid-search bound rather than the literal "every positively-similar memory" the old Rust-side scan returned.
 
 Vector-backed retrieval now explicitly excludes stale embeddings. This matters after content mutations such as `update_content()`, `rollback_to_version()`, consolidation rewrites, and user corrections: the row can remain queryable by keyword / exact state inspection, but its old vector is ignored until a fresh embedding is stored.
 

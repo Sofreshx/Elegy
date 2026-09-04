@@ -17,6 +17,7 @@ async-trait.workspace = true
 clap.workspace = true
 chrono = { version = "0.4.44", features = ["serde"] }
 elegy-core = { version = "0.1.0", path = "../../shared/core" }
+elegy-sqlite-vec-init = { version = "0.1.0", path = "../../shared/sqlite-vec-init" }
 reqwest = { workspace = true, features = ["json"] }
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 serde.workspace = true

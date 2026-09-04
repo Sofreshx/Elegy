@@ -20,6 +20,7 @@ members = [
     "shared/plugin-sdk",
     "shared/policy",
     "shared/runtime",
+    "shared/sqlite-vec-init",
     "shared/tooling",
     "tools/codegraph",
     "tools/configuration",
@@ -61,6 +62,7 @@ chrono = { version = "0.4.41", features = ["serde"] }
 rand = "0.9.2"
 rusqlite = { version = "0.32.1", features = ["bundled"] }
 sha2 = "0.10.9"
+sqlite-vec = "0.1.9"
 uuid = { version = "1.17.0", features = ["v4", "serde"] }
 zeroize = { version = "1.8.1", features = ["derive"] }
 

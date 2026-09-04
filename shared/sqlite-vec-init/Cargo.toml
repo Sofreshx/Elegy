@@ -1,0 +1,22 @@
+[package]
+name = "elegy-sqlite-vec-init"
+version.workspace = true
+publish = false
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+authors.workspace = true
+repository.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+sqlite-vec.workspace = true
+
+# Deliberately not `[lints] workspace = true`: the workspace forbids
+# unsafe_code everywhere, and this crate exists to hold the one FFI
+# registration call that genuinely needs it (see src/lib.rs), in a single
+# reviewable place instead of inside elegy-memory. No other crate in the
+# workspace should ever need to opt out of the workspace lint block; if this
+# comment is being copied elsewhere, that is a sign to reconsider, not to copy.
+[lints.rust]
+unsafe_code = "allow"

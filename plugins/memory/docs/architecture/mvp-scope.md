@@ -15,7 +15,7 @@
 | Feature | Milestone | Notes |
 |---------|-----------|-------|
 | SQLite + rusqlite (bundled) | **MVP** | Single backend, all core tables created |
-| sqlite-vec virtual table | **MVP** | Table creation and fallback path implemented; the KNN search query itself is not — see storage-schema.md. `sqlite-vec` is not currently a Cargo dependency. |
+| sqlite-vec virtual table | **MVP** | Implemented: `sqlite-vec` is a real dependency (via `shared/sqlite-vec-init`), and vector search issues a real KNN query — see storage-schema.md. A database created before this landed keeps the plain-table fallback and does not auto-upgrade (tracked follow-up work). |
 | FTS5 virtual table | **MVP** | Keyword search working |
 | Hybrid search (vector + FTS5) | **MVP** | Vector similarity is blended ahead of final scoring |
 | `MemoryStore` trait definition | **MVP** | Full async CRUD/search/health contract |

@@ -12,7 +12,7 @@ use sha2::{Digest, Sha256};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
-use super::schema::init_database;
+use super::schema::{init_database, vec_memories_uses_native_module};
 use crate::{
     decay,
     embedding::{prepare_embedding_input, EmbeddingTask},
@@ -2490,6 +2490,7 @@ impl MemoryStore for SqliteMemoryStore {
                 None,
                 embedding,
                 threshold,
+                limit,
             )?;
             if similarity_scores.is_empty() {
                 return Ok(Vec::new());
@@ -4668,7 +4669,178 @@ fn build_fts_query(text: &str) -> Option<String> {
     }
 }
 
+/// Default candidate-pool size for the unbounded (`threshold ~ 0.0`) vector
+/// channel of hybrid search: rather than every positively-similar memory (the
+/// old full-scan behavior), request this many nearest neighbors via KNN and
+/// blend from that pool. `budget_active_max` defaults to 500 per scope, so in
+/// normal operation this bound is never actually reached; it only matters for
+/// a corpus deliberately kept above the configured budget.
+const VECTOR_CANDIDATE_POOL_SIZE: usize = 1_000;
+
+/// Loads vector similarity scores for candidates matching the given filters,
+/// via a real KNN query (`MATCH` + `ORDER BY distance`) when `vec_memories` is
+/// a native `vec0` table, or a Rust-side full scan on the plain-table
+/// fallback. See `vec_memories_uses_native_module` for why a database can be
+/// on either path. `pool_limit` bounds how many nearest neighbors the KNN
+/// path requests before applying `threshold` in Rust — irrelevant to the scan
+/// path, which already inspects every matching row.
+#[allow(clippy::too_many_arguments)]
 fn load_vector_similarity_scores(
+    connection: &Connection,
+    scopes: &[MemoryScope],
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
+    query_embedding: &[f32],
+    threshold: f32,
+    pool_limit: usize,
+) -> Result<HashMap<MemoryId, f32>, StoreError> {
+    let expected_dimensions = load_embedding_dimensions(connection)?;
+    validate_query_embedding(query_embedding, expected_dimensions)?;
+    if scopes.is_empty() || pool_limit == 0 {
+        return Ok(HashMap::new());
+    }
+    if let Some(type_filter) = type_filter {
+        if type_filter.is_empty() {
+            return Ok(HashMap::new());
+        }
+    }
+
+    if vec_memories_uses_native_module(connection)? {
+        load_vector_similarity_scores_via_knn(
+            connection,
+            scopes,
+            state,
+            type_filter,
+            agent_id_filter,
+            query_embedding,
+            threshold,
+            pool_limit,
+        )
+    } else {
+        load_vector_similarity_scores_via_scan(
+            connection,
+            scopes,
+            state,
+            type_filter,
+            agent_id_filter,
+            query_embedding,
+            threshold,
+        )
+    }
+}
+
+/// Builds the shared `WHERE` filter (scope/state/type/agent) for both vector
+/// similarity query strategies below, appending bind values to `params` and
+/// returning the SQL fragment. `state_param_index` is `params.len()` at the
+/// point the caller wants the state placeholder bound (the two strategies
+/// bind it at different points relative to the KNN `MATCH` parameter).
+fn vector_filter_clause(
+    scopes: &[MemoryScope],
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
+    params: &mut Vec<rusqlite::types::Value>,
+) -> String {
+    let mut clause = scope_in_clause("m.scope", scopes, params);
+    clause.push_str(&format!(" AND m.state = ?{}", params.len() + 1));
+    params.push(rusqlite::types::Value::from(state_to_db(state).to_string()));
+    clause.push_str(" AND m.embedding_stale = 0");
+
+    if let Some(type_filter) = type_filter {
+        clause.push_str(" AND m.memory_type IN (");
+        for (index, memory_type) in type_filter.iter().enumerate() {
+            if index > 0 {
+                clause.push_str(", ");
+            }
+            clause.push('?');
+            clause.push_str(&(params.len() + 1).to_string());
+            params.push(rusqlite::types::Value::from(
+                memory_type_to_db(*memory_type).to_string(),
+            ));
+        }
+        clause.push(')');
+    }
+
+    if let Some(agent_id) = agent_id_filter {
+        clause.push_str(" AND m.agent_id = ?");
+        clause.push_str(&(params.len() + 1).to_string());
+        params.push(rusqlite::types::Value::from(agent_id.to_string()));
+    }
+
+    clause
+}
+
+#[allow(clippy::too_many_arguments)]
+fn load_vector_similarity_scores_via_knn(
+    connection: &Connection,
+    scopes: &[MemoryScope],
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
+    query_embedding: &[f32],
+    threshold: f32,
+    pool_limit: usize,
+) -> Result<HashMap<MemoryId, f32>, StoreError> {
+    // vec0 requires an explicit `k = ?` constraint directly alongside `MATCH`
+    // on the vec0 table itself — an outer `ORDER BY ... LIMIT` alone raises
+    // "A LIMIT or 'k = ?' constraint is required on vec0 knn queries" as soon
+    // as the vec0 table is joined to another table (confirmed empirically:
+    // this crate's own test suite hit exactly that error before `k = ?2` was
+    // added here). `?1`/`?2` must stay first, in this order, for the same
+    // reason — vec0's query planner looks for its own constraints early.
+    let query_vector_param = rusqlite::types::Value::from(encode_embedding(query_embedding));
+    let k_param = rusqlite::types::Value::from(i64::try_from(pool_limit).unwrap_or(i64::MAX));
+    let mut params: Vec<rusqlite::types::Value> = vec![query_vector_param, k_param];
+    let filter_clause =
+        vector_filter_clause(scopes, state, type_filter, agent_id_filter, &mut params);
+
+    let sql = format!(
+        r#"
+        SELECT m.id, v.distance
+        FROM vec_memories v
+        JOIN memory_embeddings me ON me.vec_rowid = v.rowid
+        JOIN memories m ON m.id = me.memory_id
+        WHERE v.embedding MATCH ?1
+          AND k = ?2
+          AND {filter_clause}
+        ORDER BY v.distance
+        "#
+    );
+
+    let mut statement = connection.prepare(&sql)?;
+    let rows = statement.query_map(rusqlite::params_from_iter(params), |row| {
+        let raw_id: String = row.get(0)?;
+        Ok((
+            parse_uuid_for_sqlite(&raw_id)?,
+            row.get::<_, Option<f64>>(1)?,
+        ))
+    })?;
+
+    let mut similarity_scores = HashMap::new();
+    for row in rows {
+        let (id, cosine_distance) = row?;
+        // vec0 returns a NULL distance for a zero-magnitude stored vector —
+        // cosine similarity is undefined for the zero vector (0/0). The old
+        // Rust-side cosine_similarity treated that case as similarity 0.0
+        // (see similarity.rs); do the same here so a zero embedding still
+        // never matches, instead of erroring on the NULL.
+        let Some(cosine_distance) = cosine_distance else {
+            continue;
+        };
+        // distance_metric=cosine on the vec0 column reports cosine distance
+        // (1 - cosine_similarity); convert back to the similarity this
+        // crate's scoring model expects everywhere else.
+        let similarity = (1.0 - cosine_distance).clamp(-1.0, 1.0) as f32;
+        if similarity >= threshold && similarity > 0.0 {
+            similarity_scores.insert(id, similarity);
+        }
+    }
+
+    Ok(similarity_scores)
+}
+
+fn load_vector_similarity_scores_via_scan(
     connection: &Connection,
     scopes: &[MemoryScope],
     state: MemoryState,
@@ -4678,51 +4850,18 @@ fn load_vector_similarity_scores(
     threshold: f32,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
     let expected_dimensions = load_embedding_dimensions(connection)?;
-    validate_query_embedding(query_embedding, expected_dimensions)?;
-    if scopes.is_empty() {
-        return Ok(HashMap::new());
-    }
-
     let mut params: Vec<rusqlite::types::Value> = Vec::new();
-    let scope_clause = scope_in_clause("m.scope", scopes, &mut params);
-    let mut sql = format!(
+    let filter_clause =
+        vector_filter_clause(scopes, state, type_filter, agent_id_filter, &mut params);
+    let sql = format!(
         r#"
         SELECT m.id, v.embedding
         FROM memories m
         JOIN memory_embeddings me ON me.memory_id = m.id
         JOIN vec_memories v ON v.rowid = me.vec_rowid
-        WHERE {scope_clause}
-          AND m.state = ?{}
-          AND m.embedding_stale = 0
-        "#,
-        params.len() + 1
+        WHERE {filter_clause}
+        "#
     );
-    params.push(rusqlite::types::Value::from(state_to_db(state).to_string()));
-
-    if let Some(type_filter) = type_filter {
-        if type_filter.is_empty() {
-            return Ok(HashMap::new());
-        }
-
-        sql.push_str(" AND m.memory_type IN (");
-        for (index, memory_type) in type_filter.iter().enumerate() {
-            if index > 0 {
-                sql.push_str(", ");
-            }
-            sql.push('?');
-            sql.push_str(&(params.len() + 1).to_string());
-            params.push(rusqlite::types::Value::from(
-                memory_type_to_db(*memory_type).to_string(),
-            ));
-        }
-        sql.push(')');
-    }
-
-    if let Some(agent_id) = agent_id_filter {
-        sql.push_str(" AND m.agent_id = ?");
-        sql.push_str(&(params.len() + 1).to_string());
-        params.push(rusqlite::types::Value::from(agent_id.to_string()));
-    }
 
     let mut statement = connection.prepare(&sql)?;
     let rows = statement.query_map(rusqlite::params_from_iter(params), |row| {
@@ -4858,6 +4997,7 @@ fn rank_search_candidates(
             query.agent_id.as_deref(),
             embedding,
             0.0,
+            VECTOR_CANDIDATE_POOL_SIZE,
         )?,
         None => HashMap::new(),
     };
