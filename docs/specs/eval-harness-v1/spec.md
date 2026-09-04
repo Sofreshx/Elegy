@@ -12,7 +12,9 @@ An evaluation harness for regression-testing elegy-memory's write→store→retr
 
 **Implementation status (Phase A, complete)**: the full CI gate exists and runs with no network access: `plugins/memory/src/eval/` (corpus schema, deterministic embeddings, metrics, gate thresholds, the synthetic distractor generator, and the runner), the `eval run` / `eval list-corpora` / `eval sweep-threshold` / `eval export-labels` CLI subcommand, `plugins/memory/fixtures/eval/*.json` corpora, `plugins/memory/tests/eval.rs`, `plugins/memory/eval-harness-v1.json`, and the `memory-eval` CI job. `cargo run -p elegy-memory -- eval run --ci` exits non-zero on a gate miss; `cargo test -p elegy-memory --test eval` requires no network and no external download.
 
-**Not implemented (Phase B/C, follow-up)**: fetching the LoCoMo/LongMemEval corpora, importing their formats, and a MaRS-inspired local forgetting-policy suite. See Corpus below for why, and for what changed from the original design.
+**Implementation status (Phase C, feature half, complete)**: the pluggable `ForgettingPolicy` trait and five policies (`ImportanceReliability`/default, `Fifo`, `Lru`, `PriorityDecay`, `RandomDrop`) are implemented — `plugins/memory/src/traits.rs`, `plugins/memory/src/forgetting.rs`, wired into `SqliteMemoryStore::enforce_budget()`, selectable via the `forgetting_policy` scope-config key or CLI `budget --policy`. See `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md`. The comparative eval-scenario half — running a corpus through each policy and scoring retention quality against FiFA-style metrics — is separate follow-up work, not yet started.
+
+**Not implemented (Phase B, and Phase C's eval-scenario half, follow-up)**: fetching the LoCoMo/LongMemEval corpora, importing their formats, and a MaRS-inspired local forgetting-policy eval scenario suite. See Corpus below for why, and for what changed from the original design.
 
 Five deliberate deviations from the design below, each with a stated reason, are called out inline: the embedded-vs-fetched corpus split, the local FiFA/MaRS adaptation, `plugins/memory/src/eval/` replacing `test_harness/`, `plugins/memory/eval-harness-v1.json` replacing a repo-root file, and three gate thresholds calibrated to a measured baseline rather than the aspirational targets below.
 
@@ -25,7 +27,7 @@ Five deliberate deviations from the design below, each with a stated reason, are
 | Synthetic distractors | Write-time gating accuracy at 1:1, 4:1, 8:1 ratios | Locally adapted from the Write-Time Gating paper (arXiv 2603.15994) §4 | **Implemented, generated at runtime, CI-gated at 8:1** |
 | LoCoMo | Multi-session long-conversation recall | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
 | LongMemEval | Factual recall after distraction | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
-| FiFA (MaRS) | Forgetting policy quality | MaRS paper (arXiv 2512.12856) | Not implemented (Phase C) — see deviation below |
+| FiFA (MaRS) | Forgetting policy quality | MaRS paper (arXiv 2512.12856) | Policies implemented (Phase C, feature half); eval scenario suite not implemented — see deviation below |
 
 ### Deviation: corpus acquisition (fetch upstream, sha256-pinned; no CI-storage mirror)
 
@@ -35,9 +37,13 @@ The original design assumed "CI storage + `--download-corpus`" — a pipeline th
 - **LongMemEval** (`xiaowu0162/longmemeval-cleaned` on Hugging Face, `longmemeval_oracle.json`) is MIT-licensed and redistributable, but its oracle split is ~15 MB — too large to vendor as a fixture.
 - Both remain reachable via a future `eval fetch-corpus` (Phase B): pull from the original upstream URL into a gitignored cache, verified against a checked-in sha256 manifest. No such downloader exists yet; **Phase A ships no downloader and no import adapter for either format.**
 
-### Deviation: FiFA/MaRS has no public artifact — reimplement locally, don't import (Phase C, not started)
+### Deviation: FiFA/MaRS has no public artifact — reimplement locally, don't import (Phase C)
 
-arXiv 2512.12856 ("Forgetful but Faithful") has no GitHub repository, no Hugging Face dataset, and no supplementary-material link as of this writing. Its FiFA benchmark is a generative-agent simulation, not a downloadable annotated retrieval corpus — there is nothing to import. A future Phase C would reimplement the paper's six forgetting policies (FIFO, LRU, Priority Decay, Reflection-Summary, Random-Drop, Hybrid) as a locally generated scenario suite exercising `decay.rs`, explicitly **not** claiming benchmark parity with the paper.
+arXiv 2512.12856 ("Forgetful but Faithful") has no GitHub repository, no Hugging Face dataset, and no supplementary-material link as of this writing. Its FiFA benchmark is a generative-agent simulation, not a downloadable annotated retrieval corpus — there is nothing to import. Phase C reimplements the paper's six forgetting policies as local code rather than an imported benchmark, explicitly **not** claiming benchmark parity with the paper.
+
+Five of the six policies are implemented as the **feature half** (complete): `ImportanceReliability` (default), `Fifo`, `Lru`, `PriorityDecay` (reusing `decay::adaptive_retention`), and `RandomDrop` (deterministic hash, not RNG) — `plugins/memory/src/forgetting.rs`. Reflection-Summary is deferred (needs the consolidator and an LLM call) and Hybrid is deferred (needs cost-weighted budgeting and a sensitivity-retention decision neither of which this pass makes); both are recorded in `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md`.
+
+The **eval-scenario half** — a locally generated scenario suite that runs a corpus through each policy and scores retention quality — is not yet implemented. That suite is what would exercise these policies through the eval harness's gates; today they are covered by unit and characterization tests in `plugins/memory/src/forgetting.rs` and `plugins/memory/src/storage/sqlite_store.rs` instead.
 
 ### Synthetic Distractor Corpus (implemented, adapted)
 
@@ -185,7 +191,7 @@ Format: one JSON object per line, camelCase (matching every other JSON surface i
 - [x] CI runs the harness on every PR touching the file list under CI Gates, and a failing gate blocks merge the same way `cargo test` does today (the `memory-eval` job; see CI Gates above for why this criterion is also independently met by the existing `test` job).
 - [x] The corpus used by `cargo test -p elegy-memory --test eval` requires no network access and no external download — confirmed by construction: the harness never constructs an `EmbeddingProvider`, and every corpus it runs against is either `include_str!`-embedded or generated at runtime.
 
-Deferred to Phase B/C, not claimed as met: fetching or importing LoCoMo/LongMemEval, and a MaRS-inspired forgetting-policy suite. See Corpus above.
+Deferred, not claimed as met: fetching or importing LoCoMo/LongMemEval (Phase B), and the MaRS-inspired forgetting-policy eval-scenario suite (Phase C's remaining half — the policies themselves are implemented; see Corpus above).
 
 ## Validation
 

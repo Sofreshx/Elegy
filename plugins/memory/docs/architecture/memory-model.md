@@ -375,8 +375,10 @@ LLM consolidation degrades explicitly:
 Budget configuration exists and health reporting exposes `budget_usage_ratio`, and automatic enforcement is now implemented through `SqliteMemoryStore::enforce_budget()`:
 
 - when active memories exceed `budget_active_max`, the lowest-scoring active rows transition to `Dormant`
-- when storage exceeds the cap, the lowest-scoring dormant rows are hard-deleted
+- when live storage (page count minus reclaimable freelist pages, not raw file size) exceeds the cap, the lowest-scoring dormant rows are hard-deleted until back under the target
 - the CLI `budget` command surfaces the resulting dormant / deleted counts
+
+"Lowest-scoring" is now a pluggable ranking rather than a fixed formula. A `ForgettingPolicy` trait (`plugins/memory/src/traits.rs`) is implemented by five policies (`plugins/memory/src/forgetting.rs`): `ImportanceReliability` (the default, `importance_score * reliability_score`, reproducing prior behavior exactly), `Fifo`, `Lru`, `PriorityDecay` (MaRS-style, reusing `decay::adaptive_retention`), and `RandomDrop` (deterministic hash-based). The active policy is selected via the `forgetting_policy` scope-config key, with a per-run `budget --policy <name>` CLI override. See `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md` for the full rationale, including why sensitivity-weighted retention and cost-weighted budgeting are deferred.
 
 ## Memory States
 

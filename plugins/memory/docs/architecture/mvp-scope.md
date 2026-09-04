@@ -158,7 +158,7 @@
 | `promote` | **v1** | Implemented now for automatic and manual scope promotion |
 | `rollback` | **v1** | Implemented now; restores a memory to a specific version |
 | `corroborate` | **v1** | Implemented now; records corroboration and boosts reliability |
-| `budget` | **v1** | Implemented now; enforces active/dormant budget limits |
+| `budget` | **v1** | Implemented now; enforces active/dormant budget limits, with an optional `--policy` flag overriding the configured eviction ranking for one run |
 | `correct` | **v2** | Implemented now; gate-aware user correction with version tracking, disposition reporting (`applied` / `archived` / `merged` / `contradiction`), related-memory details, contradiction journaling, and reliability bump |
 | `feedback` | **v2** | Implemented now; records retrieval relevance feedback and immediately refreshes the live `scope_config` scoring weights |
 | `weights` | **v2** | Implemented now; reports current live weight mode (`defaults` vs `learned`), sample counts, confidence, and effective `scope_config` values |
@@ -184,7 +184,11 @@
 |---------|-----------|-------|
 | Budget config per scope | **MVP** | Present in configuration / health usage ratio |
 | Automatic dormant transition at budget | **v1** | Implemented now via `enforce_budget()` — lowest-scoring active memories transition to dormant |
-| Hard delete at storage cap | **v1** | Implemented now via `enforce_budget()` — lowest-scoring dormant memories hard-deleted when over cap |
+| Hard delete at storage cap | **v1** | Implemented now via `enforce_budget()` — lowest-scoring dormant memories hard-deleted when over cap, measured on live (freelist-adjusted) bytes so the loop actually stops at the target |
+| `ForgettingPolicy` trait | **v2** | Implemented now (`plugins/memory/src/traits.rs`); pluggable eviction ranking used by both budget phases |
+| Forgetting policies: `ImportanceReliability`, `Fifo`, `Lru`, `PriorityDecay`, `RandomDrop` | **v2** | Implemented now (`plugins/memory/src/forgetting.rs`); default reproduces prior behavior exactly, selected via the `forgetting_policy` scope-config key or CLI `budget --policy` |
+| Reflection-Summary / Hybrid policies | **v2** | Still future; see `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md` |
+| Cost-weighted budgeting, sensitivity-weighted retention | **v2** | Still future; deferred pending schema changes and a dedicated privacy-retention decision |
 
 ### Security
 
