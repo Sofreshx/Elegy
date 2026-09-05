@@ -112,6 +112,13 @@ jobs:
       - name: cargo test --workspace --all-targets --all-features
         working-directory: .
         run: cargo test --workspace --all-targets --all-features --target ${{ matrix.target }}
+      - name: elegy-run preflight (repo root)
+        working-directory: .
+        # Mirrors .elegy/checks.json's elegy-run-preflight local check: fail
+        # loudly in CI if the repo root's own descriptor configuration ever
+        # breaks again, instead of only surfacing as a silent MCP disconnect
+        # loop in a downstream host.
+        run: cargo run --target ${{ matrix.target }} -p elegy-host-mcp --bin elegy-run -- --project . --preflight
 
   packaging-smoke:
     name: packaging smoke
