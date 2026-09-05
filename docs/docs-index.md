@@ -201,6 +201,17 @@
     },
     {
       "authorityClass": "current",
+      "created": "2026-09-05",
+      "docKind": "adr",
+      "freshness": "unknown",
+      "path": "docs/adr/2026-09-05-mcp-host-descriptor-contract.md",
+      "sourceOfTruth": "current-canon",
+      "status": "accepted",
+      "summary": "No ADR or spec governed `elegy.toml`'s `[descriptors]` contract or the",
+      "title": "MCP host descriptor contract and degraded-mode startup"
+    },
+    {
+      "authorityClass": "current",
       "created": "2026-05-29",
       "docKind": "adr",
       "freshness": "unknown",
@@ -558,6 +569,7 @@
     "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
     "docs/adr/2026-08-02-adopt-capability-packages-as-authority.md",
     "docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md",
+    "docs/adr/2026-09-05-mcp-host-descriptor-contract.md",
     "docs/adr/README.md",
     "docs/specs/README.md",
     "docs/specs/capability-catalog-v1.md",

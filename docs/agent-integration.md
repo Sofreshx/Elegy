@@ -51,20 +51,30 @@ runtime resolver.
 
 ## MCP interfaces
 
-MCP-native clients can start the stdio host:
+MCP-native clients can start the stdio host against a project that resolves
+descriptors:
 
 ```bash
-elegy-run
+elegy-run --project /path/to/a/project/with/elegy.toml
 ```
 
-The host serves declared MCP resources and tools. The same side-effect rule
-applies: side-effecting tools are blocked unless the call is an explicit dry
-run or the host is started with side-effect execution enabled by a surrounding
-approval policy.
+The host serves declared MCP **resources**; `list_tools`/`call_tool` are
+intentionally inert (empty list / always-erroring), so `--allow-side-effects`
+below currently has no observable effect:
 
 ```bash
-elegy-run --allow-side-effects
+elegy-run --project /path/to/project --allow-side-effects
 ```
+
+If the project's `elegy.toml` has no descriptor matching
+`descriptors.include` (default `elegy.resources.d/*.toml`), the host still
+answers `initialize` but starts in a degraded mode that serves only a single
+`elegy://host/diagnostics` resource naming the failing check (e.g.
+`DESC-CONFIG-002`). Use `elegy-run --project <path> --preflight` in a local
+check or CI step to catch that before it ever reaches an MCP client — this is
+what broke the `elegy-planning` Claude Desktop registration for several days
+when the repo root's own descriptor file was deleted with nothing checking
+for it (see `elegy.resources.d/README.md`).
 
 Use MCP when the capability declares an MCP resource or tool and the host
 supports that protocol. CLI invocation remains the default integration contract
