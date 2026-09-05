@@ -2,3 +2,11 @@ version = 1
 
 [project]
 name = "elegy"
+
+[descriptors]
+include = ["elegy.resources.d/*.toml"]
+
+[policy.filesystem]
+roots = ["docs", "distribution"]
+max_file_size_bytes = 1048576
+allow_symlinks = false
