@@ -57,6 +57,13 @@ fixtures, archives, and generated projections do not establish usability.
 
 Run from repo root: `cargo test -p <crate>`, `cargo run -p elegy-core --bin elegy-contracts -- --project . contracts validate`. When capability behavior changes, verify both the Rust implementation and the governed fixture/projection.
 
+## Git Push Authorization
+
+The user authorizes automatic pushes of validated commits on `codex/*` task
+branches to the existing `origin` at `https://github.com/Sofreshx/Elegy.git`.
+Before each push, verify the account, public destination, new commit metadata,
+and the private Git identity denylist. Do not force-push or auto-merge.
+
 ## Rust Style
 
 - `snake_case` functions/variables, `PascalCase` types/traits, `SCREAMING_SNAKE_CASE` constants.
