@@ -10,6 +10,16 @@ The current crate uses one SQLite database file per configured CLI/store target.
 
 ## File Layout
 
+Contextual recall opens this source file read-only and performs no migrations.
+Its separately configured journal uses SQLite `application_id = 0x45475243`
+and `user_version = 1`, with `events`, `items` and `suppressed` tables.
+It retains at most 1,000 events and 3,000 suppression entries for seven days.
+Event items contain identifiers, version hashes and selection-time features;
+raw prompts, transcripts and memory text are never copied into that journal.
+The journal is not part of the portable memory archive. Unknown journal
+versions and existing non-journal databases are rejected without migration.
+See [Contextual recall v1](../../../../docs/specs/memory-contextual-recall-v1/spec.md).
+
 ```
 {chosen_db_path}             # One SQLite database file
 └── memories(scope=...)      # session / workspace / user / agent rows share the file

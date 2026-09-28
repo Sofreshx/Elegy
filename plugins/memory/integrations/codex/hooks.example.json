@@ -1,0 +1,18 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ABSOLUTE_PYTHON ABSOLUTE_PATH/plugins/memory/integrations/codex/recall_hook.py --config ABSOLUTE_CONFIG --executable ABSOLUTE_EXECUTABLE",
+            "commandWindows": "ABSOLUTE_PYTHON ABSOLUTE_PATH\\plugins\\memory\\integrations\\codex\\recall_hook.py --config ABSOLUTE_CONFIG --executable ABSOLUTE_EXECUTABLE",
+            "timeout": 1,
+            "additionalContextLimit": 600
+          }
+        ]
+      }
+    ]
+  }
+}

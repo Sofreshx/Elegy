@@ -20,6 +20,16 @@ Five deliberate deviations from the design below, each with a stated reason, are
 
 ## Corpus
 
+Contextual recall has a complementary deterministic selection corpus at
+`plugins/memory/fixtures/eval/contextual-recall-v1.json`, executed by
+`cargo test -p elegy-memory --test contextual_recall`. It covers explicit and
+indirect prompts, current-context duplication, topic changes, empty input and
+negative queries. The same test target covers source immutability, scope and
+owner restrictions, semantic retrieval, event feedback and opt-in learning.
+This corpus supplements the existing `eval run --ci` gates; it does not claim
+to measure improvements to model answers. With/without-recall answer evaluation
+and installed-host latency remain separate qualification work before rollout.
+
 | Source | Use | Reference | Status |
 |---|---|---|---|
 | Golden retrieval corpus | recall/precision/NDCG/hallucination | Hand-authored, `plugins/memory/fixtures/eval/golden-v1.json` | **Implemented, embedded, CI-gated** |

@@ -139,7 +139,28 @@ Current learner behavior:
 
 The `weights` CLI now reports whether the store is still using defaults or has switched into learned mode, along with sample counts, confidence, and the current effective live values.
 
-### Context Window Budget
+### Contextual recall and event-bound feedback
+
+The opt-in `contextual-recall` command reuses retrieval scoring through a
+read-only source connection, with explicit exact scopes and ownership and
+sensitivity predicates. It does not touch access counters, refresh recency,
+promote scopes, or update source weights. The existing `search`, `feedback`
+and `weights` behavior above remains unchanged.
+
+A trusted local binding names one approved confidentiality-domain database.
+Legacy learned weights are database-wide, not authorization-scoped; separate
+privacy domains therefore require separate files. Contextual learning is keyed
+to the binding and stored separately. Exposure and silence never count as
+feedback. Only explicit `useful`/`irrelevant` judgments about injected events
+are eligible; `dismiss` suppresses within the session and `needs_correction`
+requires the existing correction workflow. Feature values are captured at
+selection time; later edits do not reinterpret previous judgments.
+
+See [Contextual recall v1](../../../../docs/specs/memory-contextual-recall-v1/spec.md)
+for the disabled/observe/inject rollout and its strict serialized-context cap.
+That cap is separate from the legacy proportional budget below.
+
+### Legacy context window budget
 
 Prompt injection still uses remaining-context budgeting:
 

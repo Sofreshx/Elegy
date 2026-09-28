@@ -62,7 +62,7 @@ const DEFAULT_SCOPE_CONFIG: [(&str, &str); 28] = [
 /// `sqlite3_auto_extension` registers against every connection opened
 /// *afterward*, so this must run before the first `Connection::open` below,
 /// but only needs to run once regardless of how many stores get opened.
-static VEC_EXTENSION_REGISTERED: OnceLock<()> = OnceLock::new();
+pub(super) static VEC_EXTENSION_REGISTERED: OnceLock<()> = OnceLock::new();
 
 pub fn init_database(path: &Path) -> Result<Connection, StoreError> {
     VEC_EXTENSION_REGISTERED.get_or_init(elegy_sqlite_vec_init::register);

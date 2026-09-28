@@ -105,6 +105,16 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Select historical context through an explicit local binding; request JSON on stdin.
+    ContextualRecall {
+        #[arg(long)]
+        config: PathBuf,
+    },
+    /// Record an event-bound relevance judgment without mutating source memories.
+    RecallFeedback {
+        #[arg(long)]
+        config: PathBuf,
+    },
     /// Add a memory to the store.
     Add {
         #[command(flatten)]
@@ -1093,6 +1103,12 @@ where
 fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
     let context = current_machine_context()?;
     match cli.command {
+        Command::ContextualRecall { config } => {
+            execute_contextual_recall(config, false, context.format)
+        }
+        Command::RecallFeedback { config } => {
+            execute_contextual_recall(config, true, context.format)
+        }
         Command::Add {
             store,
             content,
@@ -1266,6 +1282,57 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
     }
 }
 
+fn execute_contextual_recall(
+    path: PathBuf,
+    feedback: bool,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    use crate::recall::{
+        contextual_recall, record_recall_feedback, RecallConfig, RecallFeedbackRequest,
+        RecallRequest, MAX_RECALL_INPUT_BYTES,
+    };
+    fn bounded_read(input: impl Read) -> Result<Vec<u8>, CliError> {
+        let mut bytes = Vec::new();
+        input
+            .take(MAX_RECALL_INPUT_BYTES + 1)
+            .read_to_end(&mut bytes)?;
+        if bytes.len() as u64 > MAX_RECALL_INPUT_BYTES {
+            return Err(CliError::Validation(
+                "recall input exceeds 64 KiB".to_owned(),
+            ));
+        }
+        Ok(bytes)
+    }
+    // Do not echo raw JSON, prompts, source paths or provider details on failure.
+    let config: RecallConfig = serde_json::from_slice(&bounded_read(fs::File::open(path)?)?)
+        .map_err(|_| CliError::Validation("invalid contextual recall configuration".to_owned()))?;
+    let input = bounded_read(io::stdin().lock())?;
+    let (name, value) = if feedback {
+        let request: RecallFeedbackRequest = serde_json::from_slice(&input)
+            .map_err(|_| CliError::Validation("invalid contextual feedback input".to_owned()))?;
+        (
+            "recall-feedback",
+            serde_json::to_value(record_recall_feedback(&config, &request).map_err(|_| {
+                CliError::Validation("contextual feedback rejected or unavailable".to_owned())
+            })?)?,
+        )
+    } else {
+        let request: RecallRequest = serde_json::from_slice(&input)
+            .map_err(|_| CliError::Validation("invalid contextual recall input".to_owned()))?;
+        (
+            "contextual-recall",
+            serde_json::to_value(contextual_recall(&config, &request).map_err(|_| {
+                CliError::Validation("contextual recall rejected or unavailable".to_owned())
+            })?)?,
+        )
+    };
+    match format {
+        OutputFormat::Json => print_success_json(name, &value)?,
+        OutputFormat::Text => println!("{}", serde_json::to_string_pretty(&value)?),
+    }
+    Ok(ExitCode::SUCCESS)
+}
+
 fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
     if json {
         OutputFormat::Json
@@ -1276,6 +1343,8 @@ fn resolve_output_format(json: bool, format: OutputFormat) -> OutputFormat {
 
 fn command_name(command: &Command) -> &'static str {
     match command {
+        Command::ContextualRecall { .. } => "contextual-recall",
+        Command::RecallFeedback { .. } => "recall-feedback",
         Command::Add { .. } => "add",
         Command::Search { .. } => "search",
         Command::List { .. } => "list",
