@@ -63,5 +63,25 @@ identity violation or a new requirement to exercise private user data/providers.
   corrections to rebuild guidance, default-policy identity, execution-time
   provenance and bounded runtime diagnostics.
 
-Saved experiment receipts and remote durability are still pending. Test
-fixtures are not installed-host qualification evidence.
+## Saved qualification evidence
+
+Both experiments ran on clean source commit
+`64175e0dc0d5821ca5d6cd327ccddbcf1c1d1c43`, using Memory 0.1.0 on Windows x86-64.
+Executable SHA-256:
+`bfed6f83d67f50eabfab7cdb75f85f7515d12debdf6d64eedc8f1f32480be372`.
+
+- [`recall.contract` receipt](../../plugins/memory/evidence/qualification/receipts/42a53d7b-cbf0-477d-9e1b-3e8a0f647652.json):
+  satisfied, 16 checks, including isolated dismiss suppression and journal identity.
+- [`forgetting.retention` receipt](../../plugins/memory/evidence/qualification/receipts/ac79a402-c03f-44ec-9e9c-0ea73f19635a.json):
+  satisfied, seven checks. Every policy enforced the two-memory budget. Default,
+  LRU and priority-decay retained both labelled facts; FIFO and random-drop
+  retained neither. This is a measured counterexample within a six-memory fixture,
+  not a universal policy ranking.
+
+The receipts and their ledger are kept together in the default evidence directory.
+Actual cross-session MCP use, agent isolation on an installed host and paired
+answer quality remain `unverified`. No readiness artifact was promoted.
+
+Remote durability verification remains the final delivery checkpoint. Test
+fixtures and the same-session navigation-pointer check are not installed-host
+qualification evidence.
