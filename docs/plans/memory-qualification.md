@@ -1,6 +1,6 @@
 ---
 title: Resumable Memory qualification implementation plan
-status: active
+status: completed
 owner: Elegy Memory
 doc_kind: planning
 ---
@@ -29,7 +29,7 @@ stale evidence. Existing metric evaluations remain compatible.
 - [x] Wire CLI commands and integration tests; preserve legacy eval flags.
 - [x] Update spec/guide/index and execute focused tests, formatting, docs and
   contract checks. Review source/binary binding and artifact corruption paths.
-- [ ] Commit coherent slices, verify publication identity and authorized origin,
+- [x] Commit coherent slices, verify publication identity and authorized origin,
   push the current task branch and re-read the remote SHA.
 
 Success: an agent can ask what remains, execute a known experiment, see failures
@@ -82,6 +82,8 @@ The receipts and their ledger are kept together in the default evidence director
 Actual cross-session MCP use, agent isolation on an installed host and paired
 answer quality remain `unverified`. No readiness artifact was promoted.
 
-Remote durability verification remains the final delivery checkpoint. Test
-fixtures and the same-session navigation-pointer check are not installed-host
-qualification evidence.
+Implementation and evidence were pushed to the authorized
+`origin/codex/memory-contextual-recall`; the remote SHA was independently re-read
+as `adff2ae9278e1da7bed9486350e8e8989814b2b4`. The tree was clean at that checkpoint.
+This completion record changes no qualified source input. Test fixtures and the
+same-session navigation-pointer check are not installed-host qualification evidence.

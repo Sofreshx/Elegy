@@ -356,7 +356,7 @@
       "freshness": "unknown",
       "path": "docs/plans/memory-qualification.md",
       "sourceOfTruth": "planning-non-canon",
-      "status": "active",
+      "status": "completed",
       "summary": "Goal: make Memory claims resumable, falsifiable and bound to durable evidence.",
       "title": "Resumable Memory qualification implementation plan"
     },
