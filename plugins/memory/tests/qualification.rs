@@ -390,3 +390,22 @@ fn observation_schema_enforces_claim_specific_experiment_requirements() {
         assert_eq!(validator.is_valid(&observation), expected, "{name}");
     }
 }
+
+#[test]
+fn mutable_bookkeeping_cannot_be_registered_as_external_evidence() {
+    for name in ["ledger.json", ".writer.lock"] {
+        let f = Fixture::new();
+        let mut observation = f.observation();
+        fs::write(f.evidence.path().join(name), b"[]").expect("bookkeeping fixture");
+        observation["evidence"] =
+            json!([{"path":name,"sha256":format!("{:x}", Sha256::digest(b"[]"))}]);
+        let result = f.record(&observation);
+        assert!(!result.status.success());
+        assert!(String::from_utf8_lossy(&result.stdout).contains("bookkeeping"));
+        assert!(!f.evidence.path().join("receipts").exists());
+        assert_eq!(
+            fs::read(f.evidence.path().join(name)).expect("unchanged bookkeeping"),
+            b"[]"
+        );
+    }
+}

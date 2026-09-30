@@ -50,6 +50,10 @@ identity violation or a new requirement to exercise private user data/providers.
   removing an unnecessary owned path comparison.
 - Observation JSON Schema: ten accept/reject cases passed with the real Rust
   validator; the same cases are now a durable qualification integration test.
+- Final qualification target: all eight tests passed after adding schema
+  coverage. An additional targeted regression passed for rejecting the ledger
+  and writer lock as external evidence; both bookkeeping files remain unchanged.
+- Final Clippy and formatting checks: passed after the bookkeeping guard.
 - Documentation inspect/map/check: passed; existing freshness warning for
   `docs/roadmaps/observation-substrate-roadmap.md` remains.
 - Ten local Markdown links in changed guides/spec/routes: resolved.
@@ -59,6 +63,5 @@ identity violation or a new requirement to exercise private user data/providers.
   corrections to rebuild guidance, default-policy identity, execution-time
   provenance and bounded runtime diagnostics.
 
-The final qualification target rerun (now eight tests), saved experiment
-receipts and remote durability are still pending. Test fixtures are not
-installed-host qualification evidence.
+Saved experiment receipts and remote durability are still pending. Test
+fixtures are not installed-host qualification evidence.

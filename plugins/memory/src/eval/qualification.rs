@@ -64,7 +64,7 @@ pub(crate) const CLAIMS: &[Claim] = &[
         prerequisite_checks: &["same-database", "owner-can-recall", "cleanup"],
         limits: "Reported namespace isolation for the tested installation; not multi-tenant certification." },
     Claim { id: "recall.answer-quality", promise: "Recall increases mean predeclared rubric score on this paired sample while recording latency and cost.",
-        falsifier: "Mean paired improvement is zero or negative, or experimental controls cannot be established.", protocol_version: 1, executor: "external-observation",
+        falsifier: "Mean paired improvement is zero or negative while the experimental controls hold.", protocol_version: 1, executor: "external-observation",
         protocol: &["Freeze at least ten cases, including irrelevant/contradictory-memory controls, expected answers and rubric before running.", "Use the same model, configuration and inputs in fresh isolated with/without-recall sessions; counterbalance order.", "Have an independent blinded assessor or deterministic rubric score normalized 0..1 outcomes.", "Record paired scores, latency milliseconds and cost in the same declared unit; attach protocol and assessment evidence."],
         required_checks: &["paired-inputs", "fixed-model-config", "predeclared-rubric", "independent-scoring", "negative-controls"],
         prerequisite_checks: &["paired-inputs", "fixed-model-config", "predeclared-rubric", "independent-scoring", "negative-controls"],
@@ -310,12 +310,14 @@ impl Repository {
             || path.is_absolute()
             || item.path.contains('\\')
             || !path.components().all(|c| matches!(c, Component::Normal(_)))
-            || path
-                .components()
-                .next()
-                .is_some_and(|c| c.as_os_str() == "receipts")
+            || path.components().next().is_some_and(|c| {
+                matches!(
+                    c.as_os_str().to_str(),
+                    Some("receipts" | "ledger.json" | ".writer.lock")
+                )
+            })
         {
-            return Err("external evidence requires a relative path beneath the evidence directory and a SHA-256".into());
+            return Err("external evidence requires a relative path beneath the evidence directory, outside receipts/ and bookkeeping files, and a SHA-256".into());
         }
         let root = self.evidence.canonicalize().map_err(|e| e.to_string())?;
         let mut next = root.clone();

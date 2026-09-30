@@ -106,7 +106,8 @@ steps. For answer quality, include 10–1000 unique `pairedCases` and `costUnit`
 the CLI computes the mean improvement itself from scores normalized to 0–1.
 
 Evidence entries contain a portable relative `path` and its `sha256`. Place
-reviewed evidence beneath the evidence directory, outside `receipts/`.
+reviewed evidence beneath the evidence directory, outside `receipts/`,
+`ledger.json`, and `.writer.lock`.
 Paths with parent traversal, symlinks or Windows reparse points are rejected.
 Hash the file before recording; every subsequent history/status read verifies it.
 The maximum is sixteen files, eight MiB each. Raw prompts, transcripts, memory

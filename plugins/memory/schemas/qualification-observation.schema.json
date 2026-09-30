@@ -117,7 +117,7 @@
           "path": {
             "type": "string",
             "minLength": 1,
-            "description": "Portable relative regular-file path beneath --evidence-dir, outside receipts/. No parent traversal, links or reparse points."
+            "description": "Portable relative regular-file path beneath --evidence-dir, outside receipts/, ledger.json and .writer.lock. No parent traversal, links or reparse points."
           },
           "sha256": {
             "$ref": "#/$defs/digest"
