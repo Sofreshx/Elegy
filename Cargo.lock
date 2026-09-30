@@ -834,6 +834,7 @@ dependencies = [
  "clap",
  "elegy-core",
  "elegy-sqlite-vec-init",
+ "jsonschema",
  "reqwest",
  "rusqlite",
  "serde",

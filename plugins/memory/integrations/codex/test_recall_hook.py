@@ -103,6 +103,24 @@ class RecallHookTests(unittest.TestCase):
         event = {"hook_event_name": "UserPromptSubmit", "cwd": str(self.root.parent), "session_id": "s", "turn_id": "t", "prompt": "p", "transcript_path": ""}
         self.assertEqual(self.run_hook(event).stdout, b"{}")
 
+    def test_valid_request_with_failing_child_fails_open(self):
+        self.write_config()
+        marker = self.root / "child-received-request.json"
+        self.write_child(f"""
+            import json, sys
+            from pathlib import Path
+            request = json.loads(sys.stdin.read())
+            Path({str(marker)!r}).write_text(json.dumps(request), encoding="utf-8")
+            print(json.dumps({{"status":"ok","data":{{"schemaVersion":"memory-contextual-recall/v1","mode":"inject","status":"selected","additionalContext":"must be discarded"}}}}))
+            print("synthetic child failure", file=sys.stderr)
+            raise SystemExit(9)
+        """)
+        result = self.run_hook()
+        self.assertEqual(json.loads(marker.read_text(encoding="utf-8"))["sessionId"], "session-1")
+        self.assertEqual(result.returncode, 0)
+        self.assertEqual(result.stdout, b"{}")
+        self.assertEqual(result.stderr, b"")
+
     def test_shell_like_prompt_is_data(self):
         self.write_config()
         self.write_child("import json,sys; request=json.loads(sys.stdin.read()); print(json.dumps({'status':'ok','data':{'schemaVersion':'memory-contextual-recall/v1','mode':'inject','status':'selected','additionalContext':request['prompt']}}))")

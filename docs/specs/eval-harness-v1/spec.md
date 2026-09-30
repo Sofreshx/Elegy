@@ -8,13 +8,114 @@ owner: Elegy Memory
 
 ## Contract
 
+### Resumable qualification (approved 2026-09-30)
+
+`eval status`, `eval next`, and `eval history` expose an exact, deterministic
+inventory of Memory claims. `eval run --claim ID` executes an allowlisted,
+offline experiment and persists a receipt. Existing `eval run --ci` remains
+the metric regression harness. `eval record --claim ID --observation FILE`
+records externally performed host experiments with explicit reported provenance.
+See the [implementation plan](../../plans/memory-qualification.md) for the current delivery checkpoints.
+
+The initial claims are `recall.contract`, `forgetting.retention`,
+`host.cross-session`, `host.agent-isolation`, and `recall.answer-quality`.
+Each has a bounded promise, falsifier, protocol, acceptance criteria, and
+next action. Host claims require actual client/session observations; answer
+quality requires paired with/without-recall cases and predeclared scoring.
+The first two execute against disposable synthetic stores; the other three
+provide protocols and accept observations, never masquerading as automated proof.
+
+The canonical inventory is the typed `Claim` table in
+`plugins/memory/src/eval/qualification.rs`, exposed as
+`memory-claim-inventory/v1`. Each protocol SHA-256 covers the inventory version
+and complete serialized claim. Its named prerequisite checks must succeed
+before a failed hypothesis check can count as a refutation. `status`/`next`
+return exact check names, protocol steps, stale reasons, receipt paths, and
+process argument arrays preserving `--project` and `--evidence-dir`.
+These options belong to qualification subcommands; project defaults to cwd,
+relative evidence directories resolve against project, and input observation
+paths resolve against cwd. Source qualification requires the Elegy checkout.
+
+Receipts are append-only JSON files under an explicit evidence directory
+(default `plugins/memory/evidence/qualification` in `--project`). They include
+claim/protocol identity, UTC timestamp, source and executable SHA-256, build
+source fingerprint, Git revision and dirty flag, OS/architecture, duration,
+checks, outcome and provenance. Inputs and evidence files are content-addressed;
+raw memory content, prompts, transcripts, credentials and personal filesystem
+paths are not automatically captured. Reports contain synthetic measurements
+or operator-reviewed external observations only. External evidence files must
+be regular files beneath the evidence directory and are verified on each read.
+Receipts use create-new writes; historical receipts are never overwritten.
+A create-new writer lock serializes appends. A same-directory atomic hard link
+publishes each complete UUID receipt; atomic replacement updates `ledger.json`.
+The ledger's monotonic sequence orders history and detects missing receipts.
+A crash between those operations fails closed on the next inventory read.
+Readers reject malformed evidence across the entire inventory; lock recovery
+requires confirming the previous writer has stopped and preserving its files.
+Missing, malformed, modified or incompatible receipts fail closed rather than
+silently producing a successful or empty status. Digests detect accidental
+drift; these local files are not a tamper-proof attestation system.
+
+Outcomes are `satisfied`, `refuted`, and `inconclusive`; status also represents
+`unverified` and `stale`. External status uses `reported-satisfied`,
+`reported-refuted`, and `reported-inconclusive` plus `reviewRequired`.
+A protocol/runtime failure is inconclusive; failed
+acceptance checks refute only the stated bounded claim. External observations
+are always labelled `external-observation`, including a reported success.
+No outcome automatically promotes ecosystem readiness. Status compares the
+current source, protocol, executable and environment to the last receipt;
+`next` deterministically prioritizes refuted, stale, inconclusive and unverified
+claims. Older conclusive outcomes remain visible in history. A source/binary
+build mismatch prevents new automated qualification. Unrelated Git commits
+alone do not invalidate unchanged source fingerprints.
+
+The shared build/runtime fingerprint algorithm lives in
+`plugins/memory/src/eval/fingerprint.rs`: sorted relative paths and exact file
+bytes are length-prefixed into SHA-256 over its explicit `INPUTS` list and
+source-like extensions. This includes Memory source, tests, fixtures, schemas,
+integration, thresholds, manifests/lock, shared code and the relevant specs;
+it excludes generated binaries and evidence. Source changes during a run make
+that attempt inconclusive. Executable SHA-256 binds actual build options;
+OS/architecture are compared separately. No compiler-to-artifact attestation
+or multi-user tamper resistance is claimed.
+
+External observations use the strict
+`plugins/memory/schemas/qualification-observation.schema.json` contract.
+The recorder context is separate from the tested subject's artifact/configuration
+digests and host/version. At least two distinct non-personal session/client
+pseudonyms, chronological UTC timestamps, exact named checks and reviewed evidence
+digests are required. The runtime additionally validates digests, evidence paths,
+finite metrics, unique paired-case IDs and protocol prerequisites. The CLI cannot
+automatically recheck the external subject; it always exposes that limitation.
+It derives paired answer improvement from normalized with/without scores rather
+than accepting a caller's verdict. Files containing raw private material must
+be reviewed/redacted before sharing; no transcript is loaded automatically.
+
+Memory recall may carry a short pointer to a claim and its evidence directory;
+the authoritative open-claim inventory does not depend on semantic search,
+consolidation, learning, salience or forgetting. Scheduling and ownership stay
+with the host/Planning. This slice adds no MCP execution tools or scheduler.
+
+Acceptance for resumable qualification:
+
+- Exact lookup and deterministic next-work selection survive a fresh CLI process.
+  → verify: `cargo test -p elegy-memory --test qualification`.
+- Receipt corruption, missing evidence, source/binary drift and changed protocols cannot retain a current successful status.
+  → verify: qualification integration tests and fingerprint unit tests.
+- Real recall boundaries and all five forgetting policies execute against isolated stores; a failed check and a runner error yield different outcomes.
+  → verify: scenario unit tests and the two `eval run --claim` commands.
+- External sessions and paired answer assessments retain their provenance and evidence; synthetic success cannot certify a host claim.
+  → verify: external observation validation tests.
+- Existing metric CLI behavior remains compatible, readiness artifacts remain unchanged, and documentation links resolve.
+  → verify: `cargo test -p elegy-memory --test eval` and `elegy-documentation check --project . --json`.
+
 An evaluation harness for regression-testing elegy-memory's write→store→retrieve pipeline. Anchored on a hand-authored embedded corpus plus a synthetic distractor corpus, with the three academic benchmarks reachable as advisory, non-gating extensions (see Corpus). Metrics gate production readiness of threshold changes, decay parameter changes, and scoring weight changes.
 
 **Implementation status (Phase A, complete)**: the full CI gate exists and runs with no network access: `plugins/memory/src/eval/` (corpus schema, deterministic embeddings, metrics, gate thresholds, the synthetic distractor generator, and the runner), the `eval run` / `eval list-corpora` / `eval sweep-threshold` / `eval export-labels` CLI subcommand, `plugins/memory/fixtures/eval/*.json` corpora, `plugins/memory/tests/eval.rs`, `plugins/memory/eval-harness-v1.json`, and the `memory-eval` CI job. `cargo run -p elegy-memory -- eval run --ci` exits non-zero on a gate miss; `cargo test -p elegy-memory --test eval` requires no network and no external download.
 
-**Implementation status (Phase C, feature half, complete)**: the pluggable `ForgettingPolicy` trait and five policies (`ImportanceReliability`/default, `Fifo`, `Lru`, `PriorityDecay`, `RandomDrop`) are implemented — `plugins/memory/src/traits.rs`, `plugins/memory/src/forgetting.rs`, wired into `SqliteMemoryStore::enforce_budget()`, selectable via the `forgetting_policy` scope-config key or CLI `budget --policy`. See `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md`. The comparative eval-scenario half — running a corpus through each policy and scoring retention quality against FiFA-style metrics — is separate follow-up work, not yet started.
+**Implementation status (Phase C)**: the pluggable `ForgettingPolicy` trait and five policies (`ImportanceReliability`/default, `Fifo`, `Lru`, `PriorityDecay`, `RandomDrop`) are implemented — `plugins/memory/src/traits.rs`, `plugins/memory/src/forgetting.rs`, wired into `SqliteMemoryStore::enforce_budget()`, selectable via the `forgetting_policy` scope-config key or CLI `budget --policy`. See `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md`. A bounded six-memory, two-slot comparative scenario is available through `eval run --claim forgetting.retention`; it records retained IDs and labelled precision/recall for every policy. The broader FiFA-style evaluation suite remains follow-up work; the local scenario does not claim benchmark parity.
 
-**Not implemented (Phase B, and Phase C's eval-scenario half, follow-up)**: fetching the LoCoMo/LongMemEval corpora, importing their formats, and a MaRS-inspired local forgetting-policy eval scenario suite. See Corpus below for why, and for what changed from the original design.
+**Remaining follow-up (Phase B and broader Phase C evaluation)**: fetching the LoCoMo/LongMemEval corpora, importing their formats, and expanding the bounded retention scenario into a MaRS-inspired scenario suite. See Corpus below for the limits of the current implementation.
 
 Five deliberate deviations from the design below, each with a stated reason, are called out inline: the embedded-vs-fetched corpus split, the local FiFA/MaRS adaptation, `plugins/memory/src/eval/` replacing `test_harness/`, `plugins/memory/eval-harness-v1.json` replacing a repo-root file, and three gate thresholds calibrated to a measured baseline rather than the aspirational targets below.
 
@@ -37,7 +138,7 @@ and installed-host latency remain separate qualification work before rollout.
 | Synthetic distractors | Write-time gating accuracy at 1:1, 4:1, 8:1 ratios | Locally adapted from the Write-Time Gating paper (arXiv 2603.15994) §4 | **Implemented, generated at runtime, CI-gated at 8:1** |
 | LoCoMo | Multi-session long-conversation recall | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
 | LongMemEval | Factual recall after distraction | Hindsight paper (arXiv 2512.12818) | Not implemented (Phase B) — see deviation below |
-| FiFA (MaRS) | Forgetting policy quality | MaRS paper (arXiv 2512.12856) | Policies implemented (Phase C, feature half); eval scenario suite not implemented — see deviation below |
+| FiFA (MaRS) | Forgetting policy quality | MaRS paper (arXiv 2512.12856) | Five policies and a bounded local retention scenario implemented; broader scenario suite deferred — see deviation below |
 
 ### Deviation: corpus acquisition (fetch upstream, sha256-pinned; no CI-storage mirror)
 
@@ -53,7 +154,7 @@ arXiv 2512.12856 ("Forgetful but Faithful") has no GitHub repository, no Hugging
 
 Five of the six policies are implemented as the **feature half** (complete): `ImportanceReliability` (default), `Fifo`, `Lru`, `PriorityDecay` (reusing `decay::adaptive_retention`), and `RandomDrop` (deterministic hash, not RNG) — `plugins/memory/src/forgetting.rs`. Reflection-Summary is deferred (needs the consolidator and an LLM call) and Hybrid is deferred (needs cost-weighted budgeting and a sensitivity-retention decision neither of which this pass makes); both are recorded in `docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md`.
 
-The **eval-scenario half** — a locally generated scenario suite that runs a corpus through each policy and scores retention quality — is not yet implemented. That suite is what would exercise these policies through the eval harness's gates; today they are covered by unit and characterization tests in `plugins/memory/src/forgetting.rs` and `plugins/memory/src/storage/sqlite_store.rs` instead.
+The **eval-scenario half** now has one bounded qualification protocol in `plugins/memory/src/eval/scenarios.rs`: six labelled memories, a two-memory active budget, actual budget enforcement under all five policies, and recorded retention precision/recall. It supplements the unit and characterization tests in `plugins/memory/src/forgetting.rs` and `plugins/memory/src/storage/sqlite_store.rs`. Multiple scenario families and benchmark-scale gates remain deferred; this single fixture establishes only its declared claim.
 
 ### Synthetic Distractor Corpus (implemented, adapted)
 
@@ -201,7 +302,7 @@ Format: one JSON object per line, camelCase (matching every other JSON surface i
 - [x] CI runs the harness on every PR touching the file list under CI Gates, and a failing gate blocks merge the same way `cargo test` does today (the `memory-eval` job; see CI Gates above for why this criterion is also independently met by the existing `test` job).
 - [x] The corpus used by `cargo test -p elegy-memory --test eval` requires no network access and no external download — confirmed by construction: the harness never constructs an `EmbeddingProvider`, and every corpus it runs against is either `include_str!`-embedded or generated at runtime.
 
-Deferred, not claimed as met: fetching or importing LoCoMo/LongMemEval (Phase B), and the MaRS-inspired forgetting-policy eval-scenario suite (Phase C's remaining half — the policies themselves are implemented; see Corpus above).
+Deferred, not claimed as met: fetching or importing LoCoMo/LongMemEval (Phase B), and the broader MaRS-inspired forgetting-policy scenario suite (Phase C — five policies and one bounded retention qualification protocol are implemented; see Corpus above).
 
 ## Validation
 

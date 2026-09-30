@@ -155,10 +155,30 @@ fn contextual_feedback_is_idempotent_and_does_not_change_legacy_memory() {
     let before = f.snapshot();
     let result = f.call("contextual-recall", f.request("one", "Apollo"));
     let feedback = json!({"cwd":f.dir.path(),"sessionId":"session-a","eventId":result["eventId"],"memoryId":id,"judgment":"dismiss"});
+    let journal = Connection::open(f.dir.path().join("recall.db")).expect("journal");
+    // Injection itself suppresses returned versions. Remove only this fixture's
+    // suppression so this assertion isolates the effect of explicit dismissal.
+    assert_eq!(
+        journal
+            .execute("DELETE FROM suppressed", [])
+            .expect("clear"),
+        1
+    );
     let first = f.call("recall-feedback", feedback.clone());
     let second = f.call("recall-feedback", feedback);
     assert_eq!(first["recorded"], true);
     assert_eq!(second["recorded"], false);
+    assert_eq!(
+        journal
+            .query_row("SELECT COUNT(*) FROM suppressed", [], |r| r
+                .get::<_, i64>(0))
+            .expect("count"),
+        1
+    );
+    assert_eq!(
+        f.call("contextual-recall", f.request("two", "Apollo"))["status"],
+        "empty"
+    );
     assert_eq!(before, f.snapshot());
     let db = Connection::open(f.config["dbPath"].as_str().expect("db")).expect("open");
     assert_eq!(
@@ -391,6 +411,12 @@ fn existing_memory_database_cannot_be_used_as_a_journal() {
         serde_json::from_value(f.request("one", "Apollo")).expect("request");
     assert!(contextual_recall(&config, &request).is_err());
     assert_eq!(before, f.snapshot());
+    // A distinct path spelling must not bypass source/journal separation.
+    let nested = f.dir.path().join("nested");
+    fs::create_dir(&nested).expect("nested directory");
+    config.state_path = nested.join("..").join("memory.db");
+    assert!(contextual_recall(&config, &request).is_err());
+    assert_eq!(before, f.snapshot());
     config.state_path = f.dir.path().join("other.db");
     let other = Connection::open(&config.state_path).expect("other");
     other
@@ -407,6 +433,104 @@ fn existing_memory_database_cannot_be_used_as_a_journal() {
             .expect("count"),
         1
     );
+}
+
+#[test]
+fn conflicting_feedback_preserves_the_original_judgment() {
+    use elegy_memory::recall::{record_recall_feedback, RecallConfig, RecallFeedbackRequest};
+    let f = Fixture::new("inject");
+    let id = f.seed("workspace", "Apollo decision.");
+    let before = f.snapshot();
+    let result = f.call("contextual-recall", f.request("one", "Apollo"));
+    let mut feedback = json!({"cwd":f.dir.path(),"sessionId":"session-a","eventId":result["eventId"],"memoryId":id,"judgment":"useful"});
+    assert_eq!(
+        f.call("recall-feedback", feedback.clone())["recorded"],
+        true
+    );
+    feedback["judgment"] = json!("irrelevant");
+    let config: RecallConfig = serde_json::from_value(f.config.clone()).expect("config");
+    let request: RecallFeedbackRequest = serde_json::from_value(feedback).expect("feedback");
+    let error = record_recall_feedback(&config, &request).expect_err("conflicting judgment");
+    assert!(error.to_string().contains("different judgment"));
+    let journal = Connection::open(f.dir.path().join("recall.db")).expect("journal");
+    let judgment: String = journal
+        .query_row(
+            "SELECT judgment FROM items WHERE event_id=?1 AND memory_id=?2",
+            rusqlite::params![request.event_id, request.memory_id],
+            |r| r.get(0),
+        )
+        .expect("judgment");
+    assert_eq!(judgment, "useful");
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn journal_identity_and_version_are_checked_without_reinitialization() {
+    use elegy_memory::recall::{contextual_recall, RecallConfig, RecallRequest};
+    let f = Fixture::new("inject");
+    f.seed("workspace", "Apollo decision.");
+    f.call("contextual-recall", f.request("one", "Apollo"));
+    let journal = Connection::open(f.dir.path().join("recall.db")).expect("journal");
+    let identity: i32 = journal
+        .pragma_query_value(None, "application_id", |r| r.get(0))
+        .expect("identity");
+    let version: i32 = journal
+        .pragma_query_value(None, "user_version", |r| r.get(0))
+        .expect("version");
+    assert_eq!(identity, 0x45475243);
+    assert_eq!(version, 1);
+    let config: RecallConfig = serde_json::from_value(f.config.clone()).expect("config");
+    let request: RecallRequest =
+        serde_json::from_value(f.request("two", "Apollo")).expect("request");
+    for (application, schema_version) in [(identity, 2), (1234, 1)] {
+        journal
+            .pragma_update(None, "application_id", application)
+            .expect("set identity");
+        journal
+            .pragma_update(None, "user_version", schema_version)
+            .expect("set version");
+        assert!(contextual_recall(&config, &request).is_err());
+        assert_eq!(
+            journal
+                .pragma_query_value(None, "application_id", |r| r.get::<_, i32>(0))
+                .expect("identity"),
+            application
+        );
+        assert_eq!(
+            journal
+                .pragma_query_value(None, "user_version", |r| r.get::<_, i32>(0))
+                .expect("version"),
+            schema_version
+        );
+        assert_eq!(
+            journal
+                .query_row("SELECT COUNT(*) FROM events", [], |r| r.get::<_, i64>(0))
+                .expect("events"),
+            1
+        );
+    }
+}
+
+#[test]
+fn multibyte_context_obeys_the_complete_envelope_byte_budget() {
+    let mut f = Fixture::new("inject");
+    let text = format!("Apollo {}", "é".repeat(20));
+    f.seed("workspace", &text);
+    let result = f.call("contextual-recall", f.request("one", "Apollo"));
+    assert_eq!(result["status"], "selected");
+    let context = result["additionalContext"].as_str().expect("context");
+    assert!(context.len() <= 600);
+    assert!(context.len() > context.chars().count());
+    let envelope: Value =
+        serde_json::from_str(context.split_once('\n').expect("envelope").1).expect("json");
+    assert_eq!(envelope["records"][0]["text"], text);
+    // One byte less than the measured complete envelope cannot fit this record.
+    f.config["maxContextTokens"] = json!(context.len() - 1);
+    let mut request = f.request("two", "Apollo");
+    request["sessionId"] = json!("session-b");
+    let rejected = f.call("contextual-recall", request);
+    assert_eq!(rejected["status"], "empty");
+    assert_eq!(rejected["additionalContext"], "");
 }
 
 #[test]

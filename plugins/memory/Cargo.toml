@@ -31,7 +31,12 @@ tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt"] }
 uuid = { version = "1.18.1", features = ["serde", "v4"] }
 
 [dev-dependencies]
+jsonschema = { version = "0.46.5", default-features = false }
 tempfile = "3.16.0"
 tokio = { workspace = true, features = ["macros", "rt-multi-thread"] }
+
+[build-dependencies]
+sha2 = "0.10.9"
+
 [lints]
 workspace = true

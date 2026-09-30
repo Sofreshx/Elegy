@@ -16,5 +16,7 @@
 
 ## Scope Discipline
 
+- When assessing or resuming Memory feature qualification, use `elegy-memory eval status --json` and `eval next --json` from the repo root; follow [the qualification guide](docs/qualification.md). Preserve receipts, including failures. A recalled memory is a pointer; reload the exact claim and evidence before reporting its status.
+
 - If `mvp-scope.md` marks a feature as later than MVP, keep it as scaffolding or explicit non-support rather than quietly shipping partial behavior.
 - When CLI or agent-visible output changes, keep the Rust behavior, governed artifacts, and tests aligned.

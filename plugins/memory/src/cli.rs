@@ -480,6 +480,11 @@ enum ContradictionsAction {
 enum EvalCommand {
     /// Run the eval harness against the embedded golden corpus (or --corpus) and report metric results.
     Run {
+        /// Execute a bounded qualification claim and append a durable evidence receipt.
+        #[arg(long, conflicts_with_all = ["corpus", "thresholds", "output"])]
+        claim: Option<String>,
+        #[command(flatten)]
+        qualification: QualificationArgs,
         /// Path to a custom retrieval corpus JSON file. Defaults to the embedded golden corpus.
         #[arg(long)]
         corpus: Option<PathBuf>,
@@ -494,6 +499,32 @@ enum EvalCommand {
         /// Exit with a non-zero status if any metric misses its gate.
         #[arg(long)]
         ci: bool,
+    },
+    /// Show every qualification claim, current evidence and next action.
+    Status {
+        #[command(flatten)]
+        qualification: QualificationArgs,
+    },
+    /// Select the next unresolved qualification claim deterministically.
+    Next {
+        #[command(flatten)]
+        qualification: QualificationArgs,
+    },
+    /// Read immutable qualification history, optionally for one exact claim.
+    History {
+        #[command(flatten)]
+        qualification: QualificationArgs,
+        #[arg(long)]
+        claim: Option<String>,
+    },
+    /// Record reviewed external observations without certifying installed readiness.
+    Record {
+        #[command(flatten)]
+        qualification: QualificationArgs,
+        #[arg(long)]
+        claim: String,
+        #[arg(long)]
+        observation: PathBuf,
     },
     /// List every corpus the eval harness can run against.
     ListCorpora,
@@ -514,6 +545,22 @@ enum EvalCommand {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+}
+
+#[derive(Args, Debug)]
+struct QualificationArgs {
+    /// Elegy source repository against which evidence freshness is checked.
+    #[arg(long, default_value = ".")]
+    project: PathBuf,
+    /// Evidence directory (relative paths are relative to --project).
+    #[arg(long)]
+    evidence_dir: Option<PathBuf>,
+}
+impl QualificationArgs {
+    fn repository(&self) -> Result<crate::eval::qualification::Repository, CliError> {
+        crate::eval::qualification::Repository::new(&self.project, self.evidence_dir.as_deref())
+            .map_err(CliError::Validation)
+    }
 }
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq, ValueEnum)]
@@ -1266,11 +1313,77 @@ fn dispatch(cli: Cli) -> Result<ExitCode, CliError> {
         }
         Command::Eval { action } => match action {
             EvalCommand::Run {
+                claim,
+                qualification,
                 corpus,
                 output,
                 thresholds,
                 ci,
-            } => execute_eval_run_command(corpus, output, thresholds, ci, context.format),
+            } => {
+                if let Some(id) = claim {
+                    let receipt = qualification
+                        .repository()?
+                        .run(&id)
+                        .map_err(CliError::Eval)?;
+                    let passed = receipt.outcome == crate::eval::qualification::Outcome::Satisfied;
+                    emit_qualification("eval.run", &receipt, context.format)?;
+                    Ok(if passed {
+                        ExitCode::SUCCESS
+                    } else {
+                        ExitCode::FAILURE
+                    })
+                } else {
+                    if qualification.evidence_dir.is_some()
+                        || qualification.project != std::path::Path::new(".")
+                    {
+                        return Err(CliError::Validation(
+                            "--project/--evidence-dir on eval run require --claim".into(),
+                        ));
+                    }
+                    execute_eval_run_command(corpus, output, thresholds, ci, context.format)
+                }
+            }
+            EvalCommand::Status { qualification } => emit_qualification(
+                "eval.status",
+                &qualification
+                    .repository()?
+                    .status()
+                    .map_err(CliError::Eval)?,
+                context.format,
+            ),
+            EvalCommand::Next { qualification } => emit_qualification(
+                "eval.next",
+                &qualification.repository()?.next().map_err(CliError::Eval)?,
+                context.format,
+            ),
+            EvalCommand::History {
+                qualification,
+                claim,
+            } => emit_qualification(
+                "eval.history",
+                &qualification
+                    .repository()?
+                    .history(claim.as_deref())
+                    .map_err(CliError::Eval)?,
+                context.format,
+            ),
+            EvalCommand::Record {
+                qualification,
+                claim,
+                observation,
+            } => {
+                let receipt = qualification
+                    .repository()?
+                    .record(&claim, &observation)
+                    .map_err(CliError::Eval)?;
+                let passed = receipt.outcome == crate::eval::qualification::Outcome::Satisfied;
+                emit_qualification("eval.record", &receipt, context.format)?;
+                Ok(if passed {
+                    ExitCode::SUCCESS
+                } else {
+                    ExitCode::FAILURE
+                })
+            }
             EvalCommand::ListCorpora => execute_eval_list_corpora_command(context.format),
             EvalCommand::SweepThreshold { param, range } => {
                 execute_eval_sweep_threshold_command(param, range, context.format)
@@ -1373,6 +1486,10 @@ fn command_name(command: &Command) -> &'static str {
         Command::ShareImport { .. } => "share-import",
         Command::Eval { action } => match action {
             EvalCommand::Run { .. } => "eval.run",
+            EvalCommand::Status { .. } => "eval.status",
+            EvalCommand::Next { .. } => "eval.next",
+            EvalCommand::History { .. } => "eval.history",
+            EvalCommand::Record { .. } => "eval.record",
             EvalCommand::ListCorpora => "eval.list-corpora",
             EvalCommand::SweepThreshold { .. } => "eval.sweep-threshold",
             EvalCommand::ExportLabels { .. } => "eval.export-labels",
@@ -4225,6 +4342,18 @@ fn execute_share_import_command(
         )?,
     }
 
+    Ok(ExitCode::SUCCESS)
+}
+
+fn emit_qualification(
+    action: &'static str,
+    data: &impl Serialize,
+    format: OutputFormat,
+) -> Result<ExitCode, CliError> {
+    match format {
+        OutputFormat::Json => print_success_json(action, data)?,
+        OutputFormat::Text => println!("{}", serde_json::to_string_pretty(data)?),
+    }
     Ok(ExitCode::SUCCESS)
 }
 

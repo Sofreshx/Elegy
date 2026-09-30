@@ -1103,6 +1103,16 @@ impl SqliteMemoryStore {
         })
     }
 
+    /// Resolve the same configured policy used by budget enforcement for local
+    /// qualification diagnostics, without changing the store configuration.
+    pub(crate) fn configured_forgetting_policy_name(&self) -> Result<String, StoreError> {
+        self.with_connection(|connection| {
+            Ok(resolve_configured_forgetting_policy(connection)?
+                .name()
+                .to_owned())
+        })
+    }
+
     /// Same as [`Self::enforce_budget`], but with an explicit policy that
     /// overrides the persisted `forgetting_policy` scope-config key for this
     /// call only. Used by the CLI's `--policy` flag; there is currently no
