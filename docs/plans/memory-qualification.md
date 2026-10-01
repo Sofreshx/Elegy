@@ -87,3 +87,22 @@ Implementation and evidence were pushed to the authorized
 as `adff2ae9278e1da7bed9486350e8e8989814b2b4`. The tree was clean at that checkpoint.
 This completion record changes no qualified source input. Test fixtures and the
 same-session navigation-pointer check are not installed-host qualification evidence.
+
+### Refreshed evidence after delivery fixes
+
+The dependency security update and portable test-fixture corrections changed the
+qualification fingerprint. Both local scenarios were rerun against source commit
+`c22043c431f01c374b695c02f6f04260bd2af739` on Windows x86-64:
+
+- [Recall receipt](../../plugins/memory/evidence/qualification/receipts/e021213a-24bc-4213-90c6-2ab1ed565a82.json):
+  satisfied, 16 checks.
+- [Forgetting receipt](../../plugins/memory/evidence/qualification/receipts/d10b96dd-37a5-425b-82f9-5c87466892ee.json):
+  satisfied, seven checks.
+
+Both record matching source/build SHA-256
+`63ab7b0eb0f2e9fa6e11985c8a7765844b0252d49940c1bfec0493d5ebd892e3`
+and executable SHA-256
+`d4484b9e879dbfb9a9176be953048143baece41114891514b8472ae21d32862c`.
+The first run records a clean tree; the second records a dirty tree because the
+first receipt and ledger update were then uncommitted. Qualified source bytes
+were unchanged. Earlier receipts remain available as historical evidence.
