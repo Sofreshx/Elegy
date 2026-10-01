@@ -375,12 +375,18 @@ async fn gate_safety_yields_only_accept_merge_or_archive_and_warns_in_likely_dup
         )
         .await
         .expect("evaluate likely-duplicate candidate");
-    assert_eq!(
-        likely_duplicate,
-        GateDecision::Accept {
-            similar_to: Some(existing_id),
-            similarity: Some(0.82),
-        }
+    let GateDecision::Accept {
+        similar_to,
+        similarity,
+    } = likely_duplicate
+    else {
+        panic!("expected accept decision for likely duplicate");
+    };
+    assert_eq!(similar_to, Some(existing_id));
+    let similarity = similarity.expect("likely duplicate should include similarity");
+    assert!(
+        (similarity - 0.82).abs() <= f32::EPSILON,
+        "similarity should be within one f32 epsilon of 0.82, got {similarity}"
     );
 }
 

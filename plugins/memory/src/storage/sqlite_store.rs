@@ -1103,6 +1103,16 @@ impl SqliteMemoryStore {
         })
     }
 
+    /// Resolve the same configured policy used by budget enforcement for local
+    /// qualification diagnostics, without changing the store configuration.
+    pub(crate) fn configured_forgetting_policy_name(&self) -> Result<String, StoreError> {
+        self.with_connection(|connection| {
+            Ok(resolve_configured_forgetting_policy(connection)?
+                .name()
+                .to_owned())
+        })
+    }
+
     /// Same as [`Self::enforce_budget`], but with an explicit policy that
     /// overrides the persisted `forgetting_policy` scope-config key for this
     /// call only. Used by the CLI's `--policy` flag; there is currently no
@@ -4602,6 +4612,24 @@ fn load_search_memories(
     type_filter: Option<&[MemoryType]>,
     agent_id_filter: Option<&str>,
 ) -> Result<Vec<Memory>, StoreError> {
+    load_search_memories_with_access(
+        connection,
+        scopes,
+        state,
+        type_filter,
+        agent_id_filter,
+        None,
+    )
+}
+
+fn load_search_memories_with_access(
+    connection: &Connection,
+    scopes: &[MemoryScope],
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
+    access: Option<&recall_store::RecallAccess<'_>>,
+) -> Result<Vec<Memory>, StoreError> {
     if scopes.is_empty() {
         return Ok(Vec::new());
     }
@@ -4638,6 +4666,9 @@ fn load_search_memories(
         params.push(rusqlite::types::Value::from(agent_id.to_string()));
     }
 
+    if let Some(access) = access {
+        access.append_sql(&mut sql, &mut params, "");
+    }
     sql.push_str(" ORDER BY updated_at DESC, rowid DESC");
 
     let mut statement = connection.prepare(&sql)?;
@@ -4649,15 +4680,21 @@ fn load_search_memories(
     Ok(memories)
 }
 
-fn load_keyword_scores(
+fn load_keyword_scores_with_access(
     connection: &Connection,
     scopes: &[MemoryScope],
     state: MemoryState,
     type_filter: Option<&[MemoryType]>,
     agent_id_filter: Option<&str>,
     text: &str,
+    access: Option<&recall_store::RecallAccess<'_>>,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
-    let Some(fts_query) = build_fts_query(text) else {
+    let fts_query = if access.is_some() {
+        recall_store::recall_fts_query(text)
+    } else {
+        build_fts_query(text)
+    };
+    let Some(fts_query) = fts_query else {
         return Ok(HashMap::new());
     };
     if scopes.is_empty() {
@@ -4704,6 +4741,9 @@ fn load_keyword_scores(
         params.push(rusqlite::types::Value::from(agent_id.to_string()));
     }
 
+    if let Some(access) = access {
+        access.append_sql(&mut sql, &mut params, "m.");
+    }
     sql.push_str(" ORDER BY bm25_score ASC, m.updated_at DESC");
 
     let mut statement = connection.prepare(&sql)?;
@@ -4783,6 +4823,31 @@ fn load_vector_similarity_scores(
     threshold: f32,
     pool_limit: usize,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
+    load_vector_similarity_scores_with_access(
+        connection,
+        scopes,
+        state,
+        type_filter,
+        agent_id_filter,
+        query_embedding,
+        threshold,
+        pool_limit,
+        None,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn load_vector_similarity_scores_with_access(
+    connection: &Connection,
+    scopes: &[MemoryScope],
+    state: MemoryState,
+    type_filter: Option<&[MemoryType]>,
+    agent_id_filter: Option<&str>,
+    query_embedding: &[f32],
+    threshold: f32,
+    pool_limit: usize,
+    access: Option<&recall_store::RecallAccess<'_>>,
+) -> Result<HashMap<MemoryId, f32>, StoreError> {
     let expected_dimensions = load_embedding_dimensions(connection)?;
     validate_query_embedding(query_embedding, expected_dimensions)?;
     if scopes.is_empty() || pool_limit == 0 {
@@ -4804,6 +4869,7 @@ fn load_vector_similarity_scores(
             query_embedding,
             threshold,
             pool_limit,
+            access,
         )
     } else {
         load_vector_similarity_scores_via_scan(
@@ -4814,6 +4880,7 @@ fn load_vector_similarity_scores(
             agent_id_filter,
             query_embedding,
             threshold,
+            access,
         )
     }
 }
@@ -4869,6 +4936,7 @@ fn load_vector_similarity_scores_via_knn(
     query_embedding: &[f32],
     threshold: f32,
     pool_limit: usize,
+    access: Option<&recall_store::RecallAccess<'_>>,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
     // vec0 requires an explicit `k = ?` constraint directly alongside `MATCH`
     // on the vec0 table itself — an outer `ORDER BY ... LIMIT` alone raises
@@ -4880,8 +4948,11 @@ fn load_vector_similarity_scores_via_knn(
     let query_vector_param = rusqlite::types::Value::from(encode_embedding(query_embedding));
     let k_param = rusqlite::types::Value::from(i64::try_from(pool_limit).unwrap_or(i64::MAX));
     let mut params: Vec<rusqlite::types::Value> = vec![query_vector_param, k_param];
-    let filter_clause =
+    let mut filter_clause =
         vector_filter_clause(scopes, state, type_filter, agent_id_filter, &mut params);
+    if let Some(access) = access {
+        access.append_sql(&mut filter_clause, &mut params, "m.");
+    }
 
     let sql = format!(
         r#"
@@ -4928,6 +4999,7 @@ fn load_vector_similarity_scores_via_knn(
     Ok(similarity_scores)
 }
 
+#[allow(clippy::too_many_arguments)]
 fn load_vector_similarity_scores_via_scan(
     connection: &Connection,
     scopes: &[MemoryScope],
@@ -4936,11 +5008,15 @@ fn load_vector_similarity_scores_via_scan(
     agent_id_filter: Option<&str>,
     query_embedding: &[f32],
     threshold: f32,
+    access: Option<&recall_store::RecallAccess<'_>>,
 ) -> Result<HashMap<MemoryId, f32>, StoreError> {
     let expected_dimensions = load_embedding_dimensions(connection)?;
     let mut params: Vec<rusqlite::types::Value> = Vec::new();
-    let filter_clause =
+    let mut filter_clause =
         vector_filter_clause(scopes, state, type_filter, agent_id_filter, &mut params);
+    if let Some(access) = access {
+        access.append_sql(&mut filter_clause, &mut params, "m.");
+    }
     let sql = format!(
         r#"
         SELECT m.id, v.embedding
@@ -5032,6 +5108,9 @@ struct RetrievalScoreBreakdown {
     secondary_fade_factor: f32,
 }
 
+#[path = "recall_store.rs"]
+pub(crate) mod recall_store;
+
 type RankedSearchCandidate = (ScoredMemory, RetrievalScoreBreakdown);
 
 fn rank_search_candidates(
@@ -5041,8 +5120,35 @@ fn rank_search_candidates(
     derived_query_embedding: Option<&[f32]>,
     scoring_mode: RetrievalScoringMode,
 ) -> Result<Vec<RankedSearchCandidate>, StoreError> {
-    let scope_config = load_scope_config(connection)?;
-    let visible_scopes = query.scope.visible_scopes();
+    rank_search_candidates_with_access(
+        connection,
+        query,
+        trimmed_text,
+        derived_query_embedding,
+        scoring_mode,
+        None,
+        None,
+    )
+}
+
+fn rank_search_candidates_with_access(
+    connection: &Connection,
+    query: &SearchQuery,
+    trimmed_text: &str,
+    derived_query_embedding: Option<&[f32]>,
+    scoring_mode: RetrievalScoringMode,
+    access: Option<&recall_store::RecallAccess<'_>>,
+    weights: Option<LearnedWeightValues>,
+) -> Result<Vec<RankedSearchCandidate>, StoreError> {
+    let mut scope_config = load_scope_config(connection)?;
+    if let Some(weights) = weights {
+        scope_config.similarity_weight = weights.similarity_weight as f32;
+        scope_config.recency_weight = weights.recency_weight as f32;
+        scope_config.access_weight = weights.access_weight as f32;
+        scope_config.priority_weight = weights.priority_weight as f32;
+    }
+    let visible_scopes =
+        access.map_or_else(|| query.scope.visible_scopes(), |access| access.scopes);
     let requested_state = query.state_filter.unwrap_or(MemoryState::Active);
     let query_embedding = match query.embedding.as_deref() {
         Some(embedding) => {
@@ -5066,18 +5172,19 @@ fn rank_search_candidates(
     let mut keyword_scores = if trimmed_text.is_empty() {
         HashMap::new()
     } else {
-        load_keyword_scores(
+        load_keyword_scores_with_access(
             connection,
             visible_scopes,
             requested_state,
             query.type_filter.as_deref(),
             query.agent_id.as_deref(),
             trimmed_text,
+            access,
         )?
     };
 
     let mut vector_scores = match query_embedding {
-        Some(embedding) => load_vector_similarity_scores(
+        Some(embedding) => load_vector_similarity_scores_with_access(
             connection,
             visible_scopes,
             requested_state,
@@ -5086,6 +5193,7 @@ fn rank_search_candidates(
             embedding,
             0.0,
             VECTOR_CANDIDATE_POOL_SIZE,
+            access,
         )?,
         None => HashMap::new(),
     };
@@ -5099,12 +5207,13 @@ fn rank_search_candidates(
         return Ok(Vec::new());
     }
 
-    let candidate_memories = load_search_memories(
+    let candidate_memories = load_search_memories_with_access(
         connection,
         visible_scopes,
         requested_state,
         query.type_filter.as_deref(),
         query.agent_id.as_deref(),
+        access,
     )?;
     let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
         .into_iter()
@@ -5388,15 +5497,19 @@ fn compact_retrieval_log_value(value: &str, limit: usize) -> String {
 fn compute_learned_weights_report(
     connection: &Connection,
 ) -> Result<LearnedWeightsReport, StoreError> {
-    let default_weights = LearnedWeightValues::defaults();
     let scope_config = load_scope_config(connection)?;
     let samples = load_feedback_learning_samples(connection, &scope_config)?;
+    Ok(learn_from_samples(&samples))
+}
+
+fn learn_from_samples(samples: &[RetrievalFeedbackSample]) -> LearnedWeightsReport {
+    let default_weights = LearnedWeightValues::defaults();
     let sample_size = samples.len();
     let relevant_samples = samples.iter().filter(|sample| sample.relevant).count();
     let irrelevant_samples = sample_size.saturating_sub(relevant_samples);
 
     if sample_size < LEARNING_MIN_TOTAL_FEEDBACK {
-        return Ok(LearnedWeightsReport {
+        return LearnedWeightsReport {
             sample_size,
             relevant_samples,
             irrelevant_samples,
@@ -5407,13 +5520,13 @@ fn compute_learned_weights_report(
             ),
             effective_weights: default_weights,
             default_weights,
-        });
+        };
     }
 
     if relevant_samples < LEARNING_MIN_CLASS_FEEDBACK
         || irrelevant_samples < LEARNING_MIN_CLASS_FEEDBACK
     {
-        return Ok(LearnedWeightsReport {
+        return LearnedWeightsReport {
             sample_size,
             relevant_samples,
             irrelevant_samples,
@@ -5424,13 +5537,13 @@ fn compute_learned_weights_report(
             ),
             effective_weights: default_weights,
             default_weights,
-        });
+        };
     }
 
-    let similarity_signal = feature_separation(&samples, |sample| sample.similarity_signal);
-    let recency_signal = feature_separation(&samples, |sample| sample.recency_signal);
-    let access_signal = feature_separation(&samples, |sample| sample.access_signal);
-    let priority_signal = feature_separation(&samples, |sample| sample.priority_signal);
+    let similarity_signal = feature_separation(samples, |sample| sample.similarity_signal);
+    let recency_signal = feature_separation(samples, |sample| sample.recency_signal);
+    let access_signal = feature_separation(samples, |sample| sample.access_signal);
+    let priority_signal = feature_separation(samples, |sample| sample.priority_signal);
 
     let strongest_signal = similarity_signal
         .abs()
@@ -5438,7 +5551,7 @@ fn compute_learned_weights_report(
         .max(access_signal.abs())
         .max(priority_signal.abs());
     if strongest_signal < 0.10 {
-        return Ok(LearnedWeightsReport {
+        return LearnedWeightsReport {
             sample_size,
             relevant_samples,
             irrelevant_samples,
@@ -5449,7 +5562,7 @@ fn compute_learned_weights_report(
                     .to_string(),
             effective_weights: default_weights,
             default_weights,
-        });
+        };
     }
 
     let confidence = learning_confidence(sample_size, relevant_samples, irrelevant_samples);
@@ -5461,7 +5574,7 @@ fn compute_learned_weights_report(
     );
     let effective_weights = default_weights.blend(learned_weights, confidence);
 
-    Ok(LearnedWeightsReport {
+    LearnedWeightsReport {
         sample_size,
         relevant_samples,
         irrelevant_samples,
@@ -5470,7 +5583,7 @@ fn compute_learned_weights_report(
         status_detail: "live scoring weights are being updated from retrieval feedback".to_string(),
         effective_weights,
         default_weights,
-    })
+    }
 }
 
 fn load_feedback_learning_samples(

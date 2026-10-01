@@ -1,0 +1,240 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Memory qualification external observation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "claimId",
+    "protocolVersion",
+    "subject",
+    "sessions",
+    "startedAt",
+    "completedAt",
+    "checks",
+    "evidence"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "memory-observation/v1"
+    },
+    "claimId": {
+      "enum": [
+        "host.cross-session",
+        "host.agent-isolation",
+        "recall.answer-quality"
+      ]
+    },
+    "protocolVersion": {
+      "const": 1
+    },
+    "subject": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "artifactSha256",
+        "host",
+        "hostVersion",
+        "configurationSha256"
+      ],
+      "properties": {
+        "artifactSha256": {
+          "$ref": "#/$defs/digest"
+        },
+        "host": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "hostVersion": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "configurationSha256": {
+          "$ref": "#/$defs/digest"
+        }
+      }
+    },
+    "sessions": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2000,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1,
+        "maxLength": 128
+      }
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "completedAt": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "checks": {
+      "type": "array",
+      "maxItems": 32,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "passed",
+          "detail"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "passed": {
+            "type": "boolean"
+          },
+          "detail": {
+            "type": "string",
+            "maxLength": 2048
+          }
+        }
+      }
+    },
+    "evidence": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Portable relative regular-file path beneath --evidence-dir, outside receipts/, ledger.json and .writer.lock. No parent traversal, links or reparse points."
+          },
+          "sha256": {
+            "$ref": "#/$defs/digest"
+          }
+        }
+      }
+    },
+    "pairedCases": {
+      "type": "array",
+      "maxItems": 1000,
+      "default": [],
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "scoreWith",
+          "scoreWithout",
+          "latencyWithMs",
+          "latencyWithoutMs",
+          "costWith",
+          "costWithout"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          },
+          "scoreWith": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "scoreWithout": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "latencyWithMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "latencyWithoutMs": {
+            "type": "number",
+            "minimum": 0
+          },
+          "costWith": {
+            "type": "number",
+            "minimum": 0
+          },
+          "costWithout": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "costUnit": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 64,
+      "default": null
+    },
+    "error": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "minLength": 1,
+      "maxLength": 2048,
+      "default": null
+    }
+  },
+  "$defs": {
+    "digest": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "claimId": {
+            "const": "recall.answer-quality"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "pairedCases",
+          "costUnit"
+        ],
+        "properties": {
+          "pairedCases": {
+            "minItems": 10
+          },
+          "costUnit": {
+            "type": "string"
+          }
+        }
+      },
+      "else": {
+        "properties": {
+          "pairedCases": {
+            "maxItems": 0
+          },
+          "costUnit": {
+            "type": "null"
+          }
+        }
+      }
+    }
+  ],
+  "description": "Runtime additionally checks exact protocol check names, nonblank labels, unique paired case IDs, chronological nonfuture timestamps, finite measurements and evidence SHA-256. Outcomes are derived; callers cannot submit a verdict."
+}

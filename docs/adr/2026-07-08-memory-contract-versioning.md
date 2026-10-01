@@ -101,6 +101,13 @@ Today, compatibility is enforced only by `verify_schema_version()` failing close
 
 ## Consequences
 
+Contextual recall v1 adds a separate, disposable event journal with its own
+SQLite `application_id` and `user_version`, as specified in
+[Contextual recall v1](../specs/memory-contextual-recall-v1/spec.md).
+It does not migrate the source memory database, change the legacy scoring
+formula or extend `.elegy` archives. Unknown journal versions fail closed;
+future journal evolution must version and migrate that journal independently.
+
 1. `.elegy` files include self-describing version info, enabling cross-version import validation.
 2. A DB whose stored `schema_version` does not match the running engine's `CURRENT_SCHEMA_VERSION` fails to open with a clear error, rather than silently misreading rows.
 3. The scoring version lets a migration distinguish "older formula, needs re-clamping" from "current formula" without re-deriving history.

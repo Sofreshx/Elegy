@@ -351,6 +351,16 @@
       "title": "Automation Portability Handoff"
     },
     {
+      "authorityClass": "planning",
+      "docKind": "planning",
+      "freshness": "unknown",
+      "path": "docs/plans/memory-qualification.md",
+      "sourceOfTruth": "planning-non-canon",
+      "status": "completed",
+      "summary": "Goal: make Memory claims resumable, falsifiable and bound to durable evidence.",
+      "title": "Resumable Memory qualification implementation plan"
+    },
+    {
       "authorityClass": "other",
       "docKind": "generated",
       "freshness": "unknown",
@@ -481,8 +491,18 @@
       "path": "docs/specs/eval-harness-v1/spec.md",
       "sourceOfTruth": "current-canon",
       "status": "active",
-      "summary": "An evaluation harness for regression-testing elegy-memory's write→store→retrieve pipeline. Anchored on a hand-authored embedded corpus plus a synthetic distractor corpus, with the three academic benchmarks reachable as advisory, non-gating extensions (see Corpus). Metrics gate production readiness of threshold changes, decay parameter changes, and scoring weight changes.",
+      "summary": "`eval status`, `eval next`, and `eval history` expose an exact, deterministic",
       "title": "Eval harness v1"
+    },
+    {
+      "authorityClass": "current",
+      "docKind": "spec",
+      "freshness": "unknown",
+      "path": "docs/specs/memory-contextual-recall-v1/spec.md",
+      "sourceOfTruth": "current-canon",
+      "status": "active",
+      "summary": "Contextual recall is an opt-in, local adapter boundary over the existing",
+      "title": "Memory contextual recall v1"
     },
     {
       "authorityClass": "current",
@@ -566,12 +586,14 @@
     "docs/specs/elegy-lock-v1.md",
     "docs/specs/elegy-sbom-v1.md",
     "docs/specs/eval-harness-v1/spec.md",
+    "docs/specs/memory-contextual-recall-v1/spec.md",
     "docs/specs/memory-mcp-v1/spec.md",
     "docs/specs/plugin-connections-v1.md",
     "docs/specs/plugin-marketplace-v2.md",
     "docs/specs/readiness-v1.md",
     "docs/architecture/README.md",
     "docs/plans/automation-portability-handoff.md",
+    "docs/plans/memory-qualification.md",
     "docs/roadmaps/observation-substrate-roadmap.md",
     "docs/research/historical-monetization-infrastructure.md",
     "docs/research/openclaw-orchestration-gap-roadmap.md",

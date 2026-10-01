@@ -9,9 +9,12 @@
 
 mod corpus;
 mod embedding;
+mod fingerprint;
 mod gates;
 mod metrics;
+pub(crate) mod qualification;
 mod runner;
+mod scenarios;
 mod synthetic;
 
 // Consumed by the `eval` CLI subcommand in `src/cli.rs`.

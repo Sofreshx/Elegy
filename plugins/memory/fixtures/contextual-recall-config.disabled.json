@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "projectRoot": "C:\\ABSOLUTE\\PROJECT",
+  "dbPath": "C:\\ABSOLUTE\\PROJECT\\.elegy\\memory.sqlite3",
+  "statePath": "C:\\ABSOLUTE\\PROJECT\\.elegy\\recall-journal.sqlite3",
+  "domain": "example-project",
+  "scopes": ["Workspace"],
+  "mode": "off",
+  "agentId": null,
+  "maxSensitivity": "Low",
+  "maxContextTokens": 600,
+  "minSimilarity": 0.2,
+  "learningEnabled": false,
+  "includeRecentContext": false
+}

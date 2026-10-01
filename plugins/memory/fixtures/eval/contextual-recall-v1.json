@@ -1,0 +1,16 @@
+{
+  "schemaVersion": "memory-contextual-recall-eval/v1",
+  "description": "Synthetic local selection checks. These labels do not measure downstream model answers.",
+  "cases": [
+    {"name":"explicit decision", "prompt":"Quelle décision pour Apollo ?", "recentContext":[], "expected":"selected"},
+    {"name":"indirect continuation", "prompt":"Et ça ?", "recentContext":["Apollo"], "expected":"selected"},
+    {"name":"no useful memory", "prompt":"Volcano geology", "recentContext":[], "expected":"empty"},
+    {"name":"topic change", "prompt":"Volcano geology", "recentContext":["Apollo"], "expected":"empty"},
+    {"name":"already in context", "prompt":"Apollo", "recentContext":["Apollo uses SQLite."], "expected":"empty"},
+    {"name":"empty turn", "prompt":"", "recentContext":[], "expected":"empty"},
+    {"name":"punctuation only", "prompt":"???", "recentContext":[], "expected":"empty"},
+    {"name":"plain English", "prompt":"What about Apollo?", "recentContext":[], "expected":"selected"},
+    {"name":"plain French", "prompt":"Reprenons Apollo", "recentContext":[], "expected":"selected"},
+    {"name":"SQL-shaped query", "prompt":"'; DROP TABLE memories; --", "recentContext":[], "expected":"empty"}
+  ]
+}
