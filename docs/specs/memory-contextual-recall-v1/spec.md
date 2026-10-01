@@ -135,6 +135,12 @@ embeddings are permitted. The p95 target is under 500 ms for the library path,
 and the host hook has a one-second outer cutoff; these are targets and safety
 budgets, not measured guarantees in this document.
 
+The library returns eligible candidates already computed even when elapsed time
+exceeds the latency target; it reports that duration rather than silently
+discarding results after ranking. The hard wall-clock cutoff belongs to the host
+hook. Count, envelope-size, access and journal protections remain independent of
+that cutoff.
+
 ## Acceptance criteria
 
 - Configurations validate against the strict schema and the Rust binding; unknown fields, non-v1 versions, missing required fields, invalid scopes, non-absolute paths, source/journal aliasing, and out-of-project requests are rejected.

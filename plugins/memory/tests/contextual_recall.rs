@@ -2,22 +2,11 @@ use std::{
     fs,
     io::Write,
     process::{Command, Stdio},
-    sync::{Mutex, MutexGuard},
 };
 
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use tempfile::TempDir;
-
-// Keep CLI behavior tests within the production recall deadline while avoiding
-// contention between child processes started by the parallel test harness.
-static PROCESS_LOCK: Mutex<()> = Mutex::new(());
-
-fn process_lock() -> MutexGuard<'static, ()> {
-    PROCESS_LOCK
-        .lock()
-        .unwrap_or_else(|poisoned| poisoned.into_inner())
-}
 
 fn assert_process_success(command: &str, output: &std::process::Output) {
     assert!(
@@ -42,7 +31,6 @@ impl Fixture {
         Self { dir, config }
     }
     fn seed(&self, scope: &str, text: &str) -> String {
-        let _process_guard = process_lock();
         let output = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
             .args([
                 "add",
@@ -67,7 +55,6 @@ impl Fixture {
         json!({"cwd":self.dir.path(),"sessionId":"session-a","turnId":turn,"prompt":prompt,"recentContext":[]})
     }
     fn call(&self, command: &str, request: Value) -> Value {
-        let _process_guard = process_lock();
         let path = self.dir.path().join("config.json");
         fs::write(&path, serde_json::to_vec(&self.config).expect("config")).expect("write");
         let mut child = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))

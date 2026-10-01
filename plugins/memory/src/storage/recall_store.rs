@@ -393,7 +393,14 @@ pub(crate) fn contextual_recall(
     config: &RecallConfig,
     request: &RecallRequest,
 ) -> Result<RecallResponse, StoreError> {
-    let started = Instant::now();
+    contextual_recall_with_start(config, request, Instant::now())
+}
+
+fn contextual_recall_with_start(
+    config: &RecallConfig,
+    request: &RecallRequest,
+    started: Instant,
+) -> Result<RecallResponse, StoreError> {
     validate_config_shape(config)?;
     if config.mode == RecallMode::Off {
         return Ok(RecallResponse::empty(config.mode, "disabled"));
@@ -505,9 +512,6 @@ pub(crate) fn contextual_recall(
     ));
     let mut contents = HashSet::new();
     for (scored, features) in candidates {
-        if started.elapsed() >= Duration::from_millis(750) {
-            break;
-        }
         if scored.similarity < config.min_similarity {
             continue;
         }
@@ -641,4 +645,89 @@ pub(crate) fn record_recall_feedback(
         learning_samples: report.sample_size,
         learning_active: config.learning_enabled && !report.using_defaults,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use std::{collections::HashMap, time::Duration};
+
+    use chrono::Utc;
+    use tempfile::TempDir;
+    use uuid::Uuid;
+
+    use super::*;
+    use crate::{
+        runtime, Memory, MemoryScope, MemoryState, MemoryStore, MemoryType, ProvenanceLevel,
+        SensitivityLevel, SqliteMemoryStore,
+    };
+
+    #[test]
+    fn overdue_recall_still_returns_ranked_candidate() {
+        let temp_dir = TempDir::new().expect("tempdir");
+        let db_path = temp_dir.path().join("memory.db");
+        let state_path = temp_dir.path().join("recall.db");
+        let store = SqliteMemoryStore::new(&db_path, MemoryScope::Workspace).expect("store");
+        let now = Utc::now();
+        runtime::block_on(store.store(Memory {
+            id: Uuid::new_v4(),
+            content: "Apollo uses SQLite.".into(),
+            summary: None,
+            scope: MemoryScope::Workspace,
+            memory_type: MemoryType::Fact,
+            provenance: ProvenanceLevel::UserStated,
+            importance_score: 0.8,
+            reliability_score: ProvenanceLevel::UserStated.base_reliability(),
+            sensitivity: SensitivityLevel::Low,
+            state: MemoryState::Active,
+            tags: Vec::new(),
+            status: None,
+            custom_metadata: HashMap::new(),
+            access_count: 0,
+            corroboration_count: 0,
+            embedding_stale: false,
+            created_at: now,
+            updated_at: now,
+            last_accessed_at: None,
+            tenant_id: None,
+            user_id: None,
+            agent_id: None,
+        }))
+        .expect("store memory")
+        .expect("store memory result");
+
+        let config = RecallConfig {
+            version: 1,
+            project_root: temp_dir.path().to_path_buf(),
+            db_path,
+            state_path,
+            domain: "test-domain".into(),
+            scopes: vec![MemoryScope::Workspace],
+            mode: RecallMode::Inject,
+            agent_id: None,
+            max_sensitivity: SensitivityLevel::Low,
+            max_context_tokens: 600,
+            min_similarity: 0.2,
+            learning_enabled: false,
+            include_recent_context: false,
+            transcript_root: None,
+        };
+        let request = RecallRequest {
+            cwd: temp_dir.path().to_path_buf(),
+            session_id: "session-a".into(),
+            turn_id: "turn-a".into(),
+            prompt: "Apollo".into(),
+            recent_context: Vec::new(),
+            embedding: None,
+        };
+
+        let response = contextual_recall_with_start(
+            &config,
+            &request,
+            Instant::now() - Duration::from_secs(1),
+        )
+        .expect("overdue recall");
+        assert_eq!(response.status, "selected");
+        assert_eq!(response.recalls.len(), 1);
+        assert!(response.elapsed_ms >= 1_000);
+    }
 }
