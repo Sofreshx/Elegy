@@ -972,11 +972,12 @@ mod tests {
     #[test]
     fn old_protocol_is_visible_as_stale_and_failed_history_is_preserved() {
         let evidence = tempfile::tempdir().expect("evidence");
+        let evidence_path = evidence.path().canonicalize().expect("evidence path");
         let project = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../..")
             .canonicalize()
             .expect("project");
-        let repo = Repository::new(&project, Some(evidence.path())).expect("repository");
+        let repo = Repository::new(&project, Some(&evidence_path)).expect("repository");
         let c = claim("recall.contract").expect("claim");
         let receipt = Receipt {
             schema_version: SCHEMA.into(),

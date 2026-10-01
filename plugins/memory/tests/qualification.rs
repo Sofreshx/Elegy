@@ -10,13 +10,17 @@ use tempfile::TempDir;
 
 struct Fixture {
     evidence: TempDir,
+    evidence_path: PathBuf,
     project: PathBuf,
 }
 
 impl Fixture {
     fn new() -> Self {
+        let evidence = tempfile::tempdir().expect("evidence directory");
+        let evidence_path = evidence.path().canonicalize().expect("evidence path");
         Self {
-            evidence: tempfile::tempdir().expect("evidence directory"),
+            evidence,
+            evidence_path,
             project: PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                 .join("../..")
                 .canonicalize()
@@ -32,7 +36,7 @@ impl Fixture {
             .arg("--project")
             .arg(&self.project)
             .arg("--evidence-dir")
-            .arg(self.evidence.path())
+            .arg(&self.evidence_path)
             .output()
             .expect("qualification process")
     }
@@ -50,7 +54,7 @@ impl Fixture {
 
     fn observation(&self) -> Value {
         let bytes = b"Synthetic observation fixture: session A wrote marker; session B recalled marker; marker removed.\n";
-        fs::write(self.evidence.path().join("observation.txt"), bytes).expect("evidence");
+        fs::write(self.evidence_path.join("observation.txt"), bytes).expect("evidence");
         let checks = ["installed-client", "stored-via-mcp", "fresh-session-recall", "same-namespace", "cleanup"]
             .into_iter()
             .map(|name| json!({"name":name,"passed":true,"detail":"Synthetic fixture observation, not installed-host proof."}))
@@ -66,7 +70,7 @@ impl Fixture {
     }
 
     fn record(&self, observation: &Value) -> Output {
-        let path = self.evidence.path().join("input.json");
+        let path = self.evidence_path.join("input.json");
         fs::write(
             &path,
             serde_json::to_vec(observation).expect("observation JSON"),
@@ -108,7 +112,7 @@ fn inventory_is_complete_and_next_is_deterministic_without_writing_evidence() {
     let next = f.ok(&["next"]);
     assert_eq!(next, f.ok(&["next"]));
     assert_eq!(next["next"]["claim"]["id"], "forgetting.retention");
-    assert!(!f.evidence.path().join("receipts").exists());
+    assert!(!f.evidence_path.join("receipts").exists());
 }
 
 #[test]
@@ -180,7 +184,7 @@ fn unknown_claims_external_execution_and_mixed_legacy_flags_are_rejected() {
     ] {
         assert!(!f.call(&args).status.success(), "{args:?}");
     }
-    assert!(!f.evidence.path().join("receipts").exists());
+    assert!(!f.evidence_path.join("receipts").exists());
 }
 
 #[test]
@@ -206,11 +210,8 @@ fn external_success_is_reported_with_provenance_and_remains_review_required() {
         f.ok(&["history", "--claim", "host.cross-session"])[0],
         receipt
     );
-    fs::write(
-        f.evidence.path().join("observation.txt"),
-        b"changed evidence",
-    )
-    .expect("change fixture");
+    fs::write(f.evidence_path.join("observation.txt"), b"changed evidence")
+        .expect("change fixture");
     for args in [vec!["status"], vec!["next"], vec!["history"]] {
         assert!(
             !f.call(&args).status.success(),
@@ -276,7 +277,7 @@ fn incomplete_or_misattributed_observations_cannot_create_receipts() {
             "invalid observation accepted: {value}"
         );
     }
-    assert!(!f.evidence.path().join("receipts").exists());
+    assert!(!f.evidence_path.join("receipts").exists());
 }
 
 #[test]
@@ -396,15 +397,15 @@ fn mutable_bookkeeping_cannot_be_registered_as_external_evidence() {
     for name in ["ledger.json", ".writer.lock"] {
         let f = Fixture::new();
         let mut observation = f.observation();
-        fs::write(f.evidence.path().join(name), b"[]").expect("bookkeeping fixture");
+        fs::write(f.evidence_path.join(name), b"[]").expect("bookkeeping fixture");
         observation["evidence"] =
             json!([{"path":name,"sha256":format!("{:x}", Sha256::digest(b"[]"))}]);
         let result = f.record(&observation);
         assert!(!result.status.success());
         assert!(String::from_utf8_lossy(&result.stdout).contains("bookkeeping"));
-        assert!(!f.evidence.path().join("receipts").exists());
+        assert!(!f.evidence_path.join("receipts").exists());
         assert_eq!(
-            fs::read(f.evidence.path().join(name)).expect("unchanged bookkeeping"),
+            fs::read(f.evidence_path.join(name)).expect("unchanged bookkeeping"),
             b"[]"
         );
     }
