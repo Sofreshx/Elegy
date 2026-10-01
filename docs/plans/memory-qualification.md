@@ -106,3 +106,11 @@ and executable SHA-256
 The first run records a clean tree; the second records a dirty tree because the
 first receipt and ledger update were then uncommitted. Qualified source bytes
 were unchanged. Earlier receipts remain available as historical evidence.
+
+The subsequent macOS cosine-rounding test correction changed the source
+fingerprint again. The final rerun against
+`74b2f34abd63e9a01c741b6d476e4604a7d27e2b` produced
+[16 satisfied recall checks](../../plugins/memory/evidence/qualification/receipts/e22f8f98-1617-4483-8cc0-eafab9631bc3.json)
+and [seven satisfied forgetting checks](../../plugins/memory/evidence/qualification/receipts/201bf934-1fba-4110-a931-2ee3c5446b7e.json).
+Both receipts record matching source/build fingerprints and the same executable;
+the clean-first-run and evidence-only-dirty-second-run distinction also applies.
