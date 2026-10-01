@@ -2,11 +2,32 @@ use std::{
     fs,
     io::Write,
     process::{Command, Stdio},
+    sync::{Mutex, MutexGuard},
 };
 
 use rusqlite::Connection;
 use serde_json::{json, Value};
 use tempfile::TempDir;
+
+// Keep CLI behavior tests within the production recall deadline while avoiding
+// contention between child processes started by the parallel test harness.
+static PROCESS_LOCK: Mutex<()> = Mutex::new(());
+
+fn process_lock() -> MutexGuard<'static, ()> {
+    PROCESS_LOCK
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+}
+
+fn assert_process_success(command: &str, output: &std::process::Output) {
+    assert!(
+        output.status.success(),
+        "{command}: status={}\nstdout={}\nstderr={}",
+        output.status,
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+}
 
 struct Fixture {
     dir: TempDir,
@@ -21,6 +42,7 @@ impl Fixture {
         Self { dir, config }
     }
     fn seed(&self, scope: &str, text: &str) -> String {
+        let _process_guard = process_lock();
         let output = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
             .args([
                 "add",
@@ -35,11 +57,7 @@ impl Fixture {
             ])
             .output()
             .expect("add");
-        assert!(
-            output.status.success(),
-            "{}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert_process_success("add", &output);
         serde_json::from_slice::<Value>(&output.stdout).expect("json")["data"]["memory"]["id"]
             .as_str()
             .expect("id")
@@ -49,6 +67,7 @@ impl Fixture {
         json!({"cwd":self.dir.path(),"sessionId":"session-a","turnId":turn,"prompt":prompt,"recentContext":[]})
     }
     fn call(&self, command: &str, request: Value) -> Value {
+        let _process_guard = process_lock();
         let path = self.dir.path().join("config.json");
         fs::write(&path, serde_json::to_vec(&self.config).expect("config")).expect("write");
         let mut child = Command::new(env!("CARGO_BIN_EXE_elegy-memory"))
@@ -66,11 +85,7 @@ impl Fixture {
             .write_all(&serde_json::to_vec(&request).expect("request"))
             .expect("write");
         let output = child.wait_with_output().expect("wait");
-        assert!(
-            output.status.success(),
-            "{command}: {}",
-            String::from_utf8_lossy(&output.stderr)
-        );
+        assert_process_success(command, &output);
         serde_json::from_slice::<Value>(&output.stdout).expect("response")["data"].clone()
     }
     fn snapshot(&self) -> String {
@@ -143,7 +158,11 @@ fn observe_does_not_inject_or_suppress_and_off_does_not_create_databases() {
     f.seed("workspace", "Apollo uses SQLite.");
     for turn in ["one", "two"] {
         let r = f.call("contextual-recall", f.request(turn, "Apollo"));
-        assert_eq!(r["status"], "selected");
+        assert_eq!(
+            r["status"], "selected",
+            "observe response (elapsedMs={}): {r}",
+            r["elapsedMs"]
+        );
         assert_eq!(r["additionalContext"], "");
     }
 }
