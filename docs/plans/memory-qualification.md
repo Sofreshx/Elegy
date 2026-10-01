@@ -108,9 +108,18 @@ first receipt and ledger update were then uncommitted. Qualified source bytes
 were unchanged. Earlier receipts remain available as historical evidence.
 
 The subsequent macOS cosine-rounding test correction changed the source
-fingerprint again. The final rerun against
+fingerprint again. A rerun against
 `74b2f34abd63e9a01c741b6d476e4604a7d27e2b` produced
 [16 satisfied recall checks](../../plugins/memory/evidence/qualification/receipts/e22f8f98-1617-4483-8cc0-eafab9631bc3.json)
 and [seven satisfied forgetting checks](../../plugins/memory/evidence/qualification/receipts/201bf934-1fba-4110-a931-2ee3c5446b7e.json).
 Both receipts record matching source/build fingerprints and the same executable;
 the clean-first-run and evidence-only-dirty-second-run distinction also applies.
+
+After isolating CLI test subprocesses from parallel-harness contention, both
+scenarios were rerun against `9e95e08ecbf0033e4aa24a7f9c311a80f7bed4a3`:
+[recall: 16 satisfied checks](../../plugins/memory/evidence/qualification/receipts/88658f98-a6d8-48ee-a469-0375378b3d0a.json)
+and [forgetting: seven satisfied checks](../../plugins/memory/evidence/qualification/receipts/96191fda-eb5a-4a5c-8c33-5c7152b90519.json).
+The receipts share matching source/build fingerprints and one executable hash,
+with the same clean-first/evidence-only-dirty-second distinction. The production
+750 ms recall budget is unchanged; these functional checks are not a latency
+guarantee under load.
