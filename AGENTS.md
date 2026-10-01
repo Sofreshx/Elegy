@@ -62,7 +62,16 @@ Run from repo root: `cargo test -p <crate>`, `cargo run -p elegy-core --bin eleg
 The user authorizes automatic pushes of validated commits on `codex/*` task
 branches to the existing `origin` at `https://github.com/Sofreshx/Elegy.git`.
 Before each push, verify the account, public destination, new commit metadata,
-and the private Git identity denylist. Do not force-push or auto-merge.
+and the publication exclusions below. Do not force-push or auto-merge.
+
+For this repository, use the configured Git identity; a separate identity
+denylist is not required. Read the private publication exclusions from
+`$CODEX_HOME/private/publication-exclusions/elegy.json` (default:
+`~/.codex/private/publication-exclusions/elegy.json`). Before committing or
+pushing, check the excluded terms case-insensitively in file contents, paths,
+ref names, and all reachable history, including commit and tag metadata.
+Any match blocks publication. Keep the excluded values outside this repository
+and shared reports; never rewrite published history without authorization.
 
 ## Rust Style
 
