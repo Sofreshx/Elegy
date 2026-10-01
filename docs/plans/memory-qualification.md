@@ -123,3 +123,25 @@ The receipts share matching source/build fingerprints and one executable hash,
 with the same clean-first/evidence-only-dirty-second distinction. The production
 750 ms recall budget is unchanged; these functional checks are not a latency
 guarantee under load.
+
+### Deterministic latency-discard regression
+
+Serializing test subprocesses did not eliminate Windows failures. Review found
+that the internal 750 ms check happened after candidate ranking: it discarded
+completed results without bounding the expensive work and journaled an empty
+attempt. The private-start-time regression
+`storage::recall_store::tests::overdue_recall_still_returns_ranked_candidate`
+failed with `empty` while that check remained, then passed with `selected`, one
+recall and reported duration at least 1000 ms after its removal. Its start time
+is simulated; this is behavioral evidence, not a latency benchmark.
+
+Source commit `86b1b0d0e5f3223865abd5caa642c05b01fd2dd1` removes that check and
+the temporary test mutex. The 25 contextual tests passed with normal parallelism;
+the 14 hook tests passed with the one-second external cutoff unchanged.
+The revised specification retains count, envelope and access protections.
+
+Fresh receipts on those sources:
+[recall: 16 satisfied checks](../../plugins/memory/evidence/qualification/receipts/0f739dd5-e258-425d-8171-f85261e33a51.json)
+and [forgetting: seven satisfied checks](../../plugins/memory/evidence/qualification/receipts/ffc1e506-8c7f-48f9-bd53-2b9808651792.json).
+Their source/build fingerprints match, their executable hash is identical, and
+the clean-first/evidence-only-dirty-second distinction still applies.
