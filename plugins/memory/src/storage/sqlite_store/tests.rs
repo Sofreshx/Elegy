@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     env, fs,
     path::PathBuf,
     sync::{Arc, Mutex},
@@ -450,6 +450,55 @@ async fn search_uses_keyword_fts_and_updates_access_tracking() {
 }
 
 #[tokio::test]
+async fn keyword_search_does_not_decode_unrelated_malformed_memory() {
+    let fixture = test_fixture();
+    let mut valid = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    valid.content = "Apollo bounded candidate".to_string();
+    let valid_id = valid.id;
+    fixture
+        .store
+        .store(valid)
+        .await
+        .expect("store valid memory");
+
+    let malformed = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    fixture
+        .store
+        .store(malformed.clone())
+        .await
+        .expect("store malformed memory");
+    fixture
+        .store
+        .with_connection(|connection| {
+            connection.execute(
+                "UPDATE memories SET tags = 'not-json' WHERE id = ?1",
+                [malformed.id.to_string()],
+            )?;
+            Ok(())
+        })
+        .expect("corrupt unrelated tags");
+
+    let results = fixture
+        .store
+        .search(SearchQuery {
+            text: "apollo".to_string(),
+            embedding: None,
+            scope: MemoryScope::Workspace,
+            state_filter: None,
+            type_filter: None,
+            max_results: 5,
+            context_config: None,
+            session_id: None,
+            agent_id: None,
+        })
+        .await
+        .expect("run keyword search");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, valid_id);
+}
+
+#[tokio::test]
 async fn find_similar_returns_active_embedding_matches_without_touching_access() {
     let fixture = test_fixture();
 
@@ -511,6 +560,202 @@ async fn find_similar_returns_active_embedding_matches_without_touching_access()
         .expect("active match exists");
     assert_eq!(persisted.access_count, 0);
     assert!(persisted.last_accessed_at.is_none());
+}
+
+#[tokio::test]
+async fn find_similar_does_not_decode_unrelated_malformed_memory() {
+    let fixture = test_fixture();
+    let valid = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    let valid_id = valid.id;
+    fixture
+        .store
+        .store(valid)
+        .await
+        .expect("store valid memory");
+    fixture
+        .store
+        .store_embedding(&valid_id, &[1.0; 768])
+        .await
+        .expect("store valid embedding");
+
+    let malformed = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    fixture
+        .store
+        .store(malformed.clone())
+        .await
+        .expect("store malformed memory");
+    fixture
+        .store
+        .with_connection(|connection| {
+            connection.execute(
+                "UPDATE memories SET created_at = 'not-a-timestamp' WHERE id = ?1",
+                [malformed.id.to_string()],
+            )?;
+            Ok(())
+        })
+        .expect("corrupt unrelated timestamp");
+
+    let results = fixture
+        .store
+        .find_similar(&[1.0; 768], 0.95, 5)
+        .await
+        .expect("find similar");
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].memory.id, valid_id);
+}
+
+#[tokio::test]
+async fn load_search_memories_empty_candidate_subset_returns_empty() {
+    let fixture = test_fixture();
+    fixture
+        .store
+        .store(sample_memory(
+            MemoryScope::Workspace,
+            ProvenanceLevel::UserStated,
+        ))
+        .await
+        .expect("seed memory outside empty subset");
+    let candidates = HashSet::new();
+    let loaded = fixture
+        .store
+        .with_connection(|connection| {
+            super::load_search_memories_with_access(
+                connection,
+                &[MemoryScope::Workspace],
+                MemoryState::Active,
+                None,
+                None,
+                None,
+                Some(&candidates),
+            )
+        })
+        .expect("load empty subset");
+
+    assert!(loaded.is_empty());
+}
+
+#[tokio::test]
+async fn load_search_memories_candidate_subset_preserves_filters() {
+    let fixture = test_fixture();
+    let matching = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    let matching_id = matching.id;
+    fixture
+        .store
+        .store(matching)
+        .await
+        .expect("store matching memory");
+
+    let mut wrong_state = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    wrong_state.state = MemoryState::Dormant;
+    let wrong_state_id = wrong_state.id;
+    fixture
+        .store
+        .store(wrong_state)
+        .await
+        .expect("store wrong state");
+    let mut wrong_type = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    wrong_type.memory_type = MemoryType::Decision;
+    let wrong_type_id = wrong_type.id;
+    fixture
+        .store
+        .store(wrong_type)
+        .await
+        .expect("store wrong type");
+    let mut wrong_agent = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    wrong_agent.agent_id = Some("other-agent".to_string());
+    let wrong_agent_id = wrong_agent.id;
+    fixture
+        .store
+        .store(wrong_agent)
+        .await
+        .expect("store wrong agent");
+    let wrong_scope = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    let wrong_scope_id = wrong_scope.id;
+    fixture
+        .store
+        .store(wrong_scope.clone())
+        .await
+        .expect("store wrong scope");
+    fixture
+        .store
+        .with_connection(|connection| {
+            connection.execute(
+                "UPDATE memories SET scope = 'user' WHERE id = ?1",
+                [wrong_scope.id.to_string()],
+            )?;
+            Ok(())
+        })
+        .expect("set wrong scope");
+    let outside = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    let outside_id = outside.id;
+    fixture
+        .store
+        .store(outside)
+        .await
+        .expect("store outside candidate");
+
+    let candidates = [
+        matching_id,
+        wrong_state_id,
+        wrong_type_id,
+        wrong_agent_id,
+        wrong_scope_id,
+    ]
+    .into_iter()
+    .collect::<HashSet<_>>();
+    let loaded = fixture
+        .store
+        .with_connection(|connection| {
+            super::load_search_memories_with_access(
+                connection,
+                &[MemoryScope::Workspace],
+                MemoryState::Active,
+                Some(&[MemoryType::Fact]),
+                Some("agent-1"),
+                None,
+                Some(&candidates),
+            )
+        })
+        .expect("load filtered subset");
+
+    assert_eq!(
+        loaded.iter().map(|memory| memory.id).collect::<Vec<_>>(),
+        vec![matching_id]
+    );
+    assert!(!candidates.contains(&outside_id));
+}
+
+#[tokio::test]
+async fn load_search_memories_candidate_subset_accepts_more_than_thousand_ids() {
+    let fixture = test_fixture();
+    let matching = sample_memory(MemoryScope::Workspace, ProvenanceLevel::UserStated);
+    let matching_id = matching.id;
+    fixture
+        .store
+        .store(matching)
+        .await
+        .expect("store matching memory");
+
+    let mut candidates = (0..1_100).map(|_| Uuid::new_v4()).collect::<HashSet<_>>();
+    candidates.insert(matching_id);
+    let loaded = fixture
+        .store
+        .with_connection(|connection| {
+            super::load_search_memories_with_access(
+                connection,
+                &[MemoryScope::Workspace],
+                MemoryState::Active,
+                None,
+                None,
+                None,
+                Some(&candidates),
+            )
+        })
+        .expect("load large candidate subset");
+
+    assert_eq!(loaded.len(), 1);
+    assert_eq!(loaded[0].id, matching_id);
 }
 
 #[tokio::test]

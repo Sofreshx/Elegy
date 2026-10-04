@@ -178,6 +178,13 @@ Combine vector and keyword results into a blended similarity signal (see [Memory
 blended_similarity = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
 ```
 
+The keyword and vector channels first select candidate IDs. The store loads
+full memory records only for that union, then applies the existing ranking and
+context budget. The SQL read retains scope, state, type, agent and recall-access
+filters. Candidate IDs use one JSON-array parameter, so large keyword result
+sets do not exhaust SQLite's bind-parameter limit. `find_similar()` uses the
+same bounded record loading for its vector candidates.
+
 ### Table: memory_links (Proto-Graph)
 
 ```sql

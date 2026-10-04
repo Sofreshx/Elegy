@@ -2375,17 +2375,20 @@ impl MemoryStore for SqliteMemoryStore {
             if similarity_scores.is_empty() {
                 return Ok(Vec::new());
             }
+            let candidate_ids = similarity_scores.keys().copied().collect::<HashSet<_>>();
 
-            let memories_by_id: HashMap<MemoryId, Memory> =
-                load_search_memories(connection, visible_scopes, MemoryState::Active, None, None)?
-                    .into_iter()
-                    .filter_map(|memory| {
-                        similarity_scores
-                            .get(&memory.id)
-                            .copied()
-                            .map(|_| (memory.id, memory))
-                    })
-                    .collect();
+            let memories_by_id: HashMap<MemoryId, Memory> = load_search_memories_with_access(
+                connection,
+                visible_scopes,
+                MemoryState::Active,
+                None,
+                None,
+                None,
+                Some(&candidate_ids),
+            )?
+            .into_iter()
+            .map(|memory| (memory.id, memory))
+            .collect();
 
             let mut results = similarity_scores
                 .into_iter()
@@ -4621,6 +4624,7 @@ fn load_search_memories(
         type_filter,
         agent_id_filter,
         None,
+        None,
     )
 }
 
@@ -4631,6 +4635,7 @@ fn load_search_memories_with_access(
     type_filter: Option<&[MemoryType]>,
     agent_id_filter: Option<&str>,
     access: Option<&recall_store::RecallAccess<'_>>,
+    candidate_ids: Option<&HashSet<MemoryId>>,
 ) -> Result<Vec<Memory>, StoreError> {
     if scopes.is_empty() {
         return Ok(Vec::new());
@@ -4670,6 +4675,21 @@ fn load_search_memories_with_access(
 
     if let Some(access) = access {
         access.append_sql(&mut sql, &mut params, "");
+    }
+    if let Some(candidate_ids) = candidate_ids {
+        if candidate_ids.is_empty() {
+            return Ok(Vec::new());
+        }
+        // Keep large candidate sets in one bind parameter; json_each avoids SQLite's
+        // variable limit while filtering before row decoding.
+        sql.push_str(" AND id IN (SELECT value FROM json_each(?");
+        sql.push_str(&(params.len() + 1).to_string());
+        sql.push_str("))");
+        let ids = candidate_ids
+            .iter()
+            .map(ToString::to_string)
+            .collect::<Vec<_>>();
+        params.push(rusqlite::types::Value::from(serialize_json(&ids)?));
     }
     sql.push_str(" ORDER BY updated_at DESC, rowid DESC");
 
@@ -5216,10 +5236,10 @@ fn rank_search_candidates_with_access(
         query.type_filter.as_deref(),
         query.agent_id.as_deref(),
         access,
+        Some(&candidate_ids),
     )?;
     let candidate_memories_by_id: HashMap<MemoryId, Memory> = candidate_memories
         .into_iter()
-        .filter(|memory| candidate_ids.contains(&memory.id))
         .map(|memory| (memory.id, memory))
         .collect();
 
