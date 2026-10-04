@@ -1,0 +1,38 @@
+[
+  {
+    "observation": "host-run-02-cross-session",
+    "claim": "host.cross-session",
+    "exitCode": 1,
+    "outcome": "inconclusive",
+    "provenance": "external-observation",
+    "receiptId": "1a5ac02d-aaaf-42b3-8813-8f3f6967e3e1",
+    "sequence": 1
+  },
+  {
+    "observation": "host-run-03-cross-session",
+    "claim": "host.cross-session",
+    "exitCode": 0,
+    "outcome": "satisfied",
+    "provenance": "external-observation",
+    "receiptId": "d2e0f633-b2d7-4a5a-ae2c-7ca672772194",
+    "sequence": 2
+  },
+  {
+    "observation": "second-host-isolation-blocked",
+    "claim": "host.agent-isolation",
+    "exitCode": 1,
+    "outcome": "inconclusive",
+    "provenance": "external-observation",
+    "receiptId": "cfa93e81-aa37-448c-866f-1b7b8b060cba",
+    "sequence": 3
+  },
+  {
+    "observation": "timed-answer-quality",
+    "claim": "recall.answer-quality",
+    "exitCode": 0,
+    "outcome": "satisfied",
+    "provenance": "external-observation",
+    "receiptId": "a8fed2a6-3bcf-43ef-b0ff-d44d98baa5aa",
+    "sequence": 4
+  }
+]

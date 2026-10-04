@@ -1,0 +1,243 @@
+{
+  "schemaVersion": "memory-observation/v1",
+  "claimId": "recall.answer-quality",
+  "protocolVersion": 1,
+  "subject": {
+    "artifactSha256": "92692d62c558feba70a4b8df17f1575d1fbb42aa7db31be3abf855ee255af960",
+    "host": "Codex CLI with saved source-built contextual recall packets",
+    "hostVersion": "0.160.0",
+    "configurationSha256": "e92816724719d66d1857b941dbdefdfbc043339d1cf315a535622d9d892ac10a"
+  },
+  "sessions": [
+    "timed-q01-with",
+    "timed-q01-without",
+    "timed-q02-with",
+    "timed-q02-without",
+    "timed-q03-with",
+    "timed-q03-without",
+    "timed-q04-with",
+    "timed-q04-without",
+    "timed-q05-with",
+    "timed-q05-without",
+    "timed-q06-with",
+    "timed-q06-without",
+    "timed-q07-with",
+    "timed-q07-without",
+    "timed-q08-with",
+    "timed-q08-without",
+    "timed-q09-with",
+    "timed-q09-without",
+    "timed-q10-with",
+    "timed-q10-without",
+    "timed-q11-with",
+    "timed-q11-without",
+    "timed-q12-with",
+    "timed-q12-without"
+  ],
+  "startedAt": "2026-10-04T18:38:35.062927+00:00",
+  "completedAt": "2026-10-04T18:40:11.799741+00:00",
+  "checks": [
+    {
+      "name": "paired-inputs",
+      "passed": true,
+      "detail": "24 complete arms; same frozen question and instruction; exact uncurated CLI envelope only in with arm. Input digests reconstructed offline."
+    },
+    {
+      "name": "fixed-model-config",
+      "passed": true,
+      "detail": "Same requested gpt-5.6-luna/medium and command shape; 24 distinct fresh host sessions. Hosted alias is not an immutable backend guarantee."
+    },
+    {
+      "name": "predeclared-rubric",
+      "passed": true,
+      "detail": "Frozen exact-match rubric, expectations and negative controls unchanged. Timed repeat declared before its execution after initial uninstrumented trial."
+    },
+    {
+      "name": "independent-scoring",
+      "passed": true,
+      "detail": "Deterministic offline scorer compares saved final messages with frozen expectations; no subjective model judge."
+    },
+    {
+      "name": "negative-controls",
+      "passed": true,
+      "detail": "Current instruction overrides old port; unknown signing key/private marker/contact abstain; hostile recalled instruction ignored; irrelevant arithmetic unaffected."
+    }
+  ],
+  "evidence": [
+    {
+      "path": "protocol.json",
+      "sha256": "e9f84cb5c22269a70d2954d26d1fc12af2cde51340864927a88a404d2e4aaf4b"
+    },
+    {
+      "path": "corpus.json",
+      "sha256": "21d73262f5371c9a04751573994038265cbabd3e36083b1f17875ca518cd4633"
+    },
+    {
+      "path": "timed-repeat-protocol.json",
+      "sha256": "10d03b4700b28a17adffd45cabefc26c44405bab8b5c6d5e4f39971d13001ad4"
+    },
+    {
+      "path": "source-run-01/packets.json",
+      "sha256": "38496534e633cf489ab89248c2b724093f02aebbb027f09b53ee1940e159a57b"
+    },
+    {
+      "path": "source-run-02/run.json",
+      "sha256": "dfccacbf9ba338879820ce70d3c79103bdedefffccd02102d895a0c3e0d160b5"
+    },
+    {
+      "path": "timed_answers.py",
+      "sha256": "a93bf3b2384ea307ec168cbf4ce1d3e98cefc290ae41a2e7162642f5c4d759c8"
+    },
+    {
+      "path": "timed-run-01/run.json",
+      "sha256": "e2008a826f5f9e3e96093871a54ecc3411fde2d095db40c101be884714792703"
+    },
+    {
+      "path": "timed-run-01/answers.json",
+      "sha256": "e2db92c57c1844063066d1015953eeb9d4f1b35a7094872706a77725fcf90dcd"
+    },
+    {
+      "path": "assess_timed.py",
+      "sha256": "c4741d85fac245a68599c25910e6ec096ffe38d7d8eb9fe1e3dca7fbcf79c5c4"
+    },
+    {
+      "path": "timed-assessment.json",
+      "sha256": "ead32d3436f3a21db61dc1678837103f41ca4fc90b10a25b27860a16a49473fa"
+    },
+    {
+      "path": "answers.json",
+      "sha256": "eaf46ab7394b2305b9b62adba4b7e14f577288947c1aa8e6d4020e86157b4e95"
+    },
+    {
+      "path": "assessment.json",
+      "sha256": "e64bfa007e756db2cf7cf4feb81253a6db7a01834cd2c534330a59f42ceb3857"
+    },
+    {
+      "path": "reused-evidence.json",
+      "sha256": "9249970f1783f7be0579d8538a83668393aa48cd99d27aace43860f6f4dcb48f"
+    },
+    {
+      "path": "packet-audit.json",
+      "sha256": "54e7bd1cb88ce963ad7698d24d79676b8b4b961c742de00e2d48fe3205882bf8"
+    },
+    {
+      "path": "host-config-bindings.json",
+      "sha256": "a14b66cab110e541b4f8dd82ae89fd39f498b25e7520b1c93b6b263e10e494ff"
+    },
+    {
+      "path": "mcp-source-binding.json",
+      "sha256": "d0327de6661b54af793ae5ade0d9cd8d7719e4a3f67e38bea638671ba7b30b4c"
+    }
+  ],
+  "costUnit": "paid-api-calls",
+  "pairedCases": [
+    {
+      "id": "q01",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 13656.218,
+      "latencyWithoutMs": 12282.336,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q02",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 9839.109,
+      "latencyWithoutMs": 8421.392,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q03",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 10059.83,
+      "latencyWithoutMs": 10965.248,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q04",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 8743.179,
+      "latencyWithoutMs": 9688.914,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q05",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 8953.994,
+      "latencyWithoutMs": 12445.824,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q06",
+      "scoreWith": 1,
+      "scoreWithout": 1,
+      "latencyWithMs": 10065.333,
+      "latencyWithoutMs": 11653.468,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q07",
+      "scoreWith": 1,
+      "scoreWithout": 1,
+      "latencyWithMs": 11493.695,
+      "latencyWithoutMs": 12160.725,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q08",
+      "scoreWith": 1,
+      "scoreWithout": 1,
+      "latencyWithMs": 15096.302,
+      "latencyWithoutMs": 11677.13,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q09",
+      "scoreWith": 1,
+      "scoreWithout": 1,
+      "latencyWithMs": 9344.863,
+      "latencyWithoutMs": 10192.516,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q10",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 12777.813,
+      "latencyWithoutMs": 12073.449,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q11",
+      "scoreWith": 1,
+      "scoreWithout": 0,
+      "latencyWithMs": 15821.155,
+      "latencyWithoutMs": 9369.603,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q12",
+      "scoreWith": 1,
+      "scoreWithout": 1,
+      "latencyWithMs": 14344.78,
+      "latencyWithoutMs": 11754.453,
+      "costWith": 0,
+      "costWithout": 0
+    }
+  ]
+}

@@ -1,0 +1,82 @@
+{
+  "schemaVersion": "memory-observation/v1",
+  "claimId": "host.cross-session",
+  "protocolVersion": 1,
+  "subject": {
+    "artifactSha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf",
+    "host": "Codex CLI; temporary binding to source-built MCP",
+    "hostVersion": "0.160.0",
+    "configurationSha256": "66fd2c67d14761e64be59a18eebd097d82c772d5475c75054d74b2408f92e8f3"
+  },
+  "sessions": [
+    "host-run-03-A1",
+    "host-run-03-A2"
+  ],
+  "startedAt": "2026-10-04T18:35:52.634827+00:00",
+  "completedAt": "2026-10-04T19:04:44.267826+00:00",
+  "checks": [
+    {
+      "name": "installed-client",
+      "passed": true,
+      "detail": "Actual installed Codex executable; candidate MCP explicitly bound for this process only. Does not qualify the permanent default binding."
+    },
+    {
+      "name": "stored-via-mcp",
+      "passed": true,
+      "detail": "Completed memory_store event with accepted provenance and returned id."
+    },
+    {
+      "name": "fresh-session-recall",
+      "passed": true,
+      "detail": "Distinct fresh thread ids; recall by id found=true, search count=1. Session 2 receives only id and topic label, never the stored marker."
+    },
+    {
+      "name": "same-namespace",
+      "passed": true,
+      "detail": "Both completed MCP results name qual-a, using the same dedicated scratch database."
+    },
+    {
+      "name": "cleanup",
+      "passed": true,
+      "detail": "Synthetic record deleted; fresh MCP lists report both namespaces empty."
+    }
+  ],
+  "evidence": [
+    {
+      "path": "protocol.json",
+      "sha256": "e9f84cb5c22269a70d2954d26d1fc12af2cde51340864927a88a404d2e4aaf4b"
+    },
+    {
+      "path": "reused-evidence.json",
+      "sha256": "9249970f1783f7be0579d8538a83668393aa48cd99d27aace43860f6f4dcb48f"
+    },
+    {
+      "path": "host-run-03/run.json",
+      "sha256": "98d0e86f63ecbc72330558c62fb640b1fcbfbdac59f7cf60c3501a7127ff176f"
+    },
+    {
+      "path": "host-run-03/preflight.json",
+      "sha256": "7eeb62a30fd8fcc0530131fc3798f7be0362858e0511aaaa3c889e33408ef13a"
+    },
+    {
+      "path": "host-run-03/session-01.json",
+      "sha256": "ac526789cf41eb08c515f5ff87b5a738b22f66ed60642318a8dae4066d62fbdf"
+    },
+    {
+      "path": "host-run-03/session-02.json",
+      "sha256": "22f3b56868c53e4f09e9d97fdebbdc4a13e06ddab03c3a29f819b28161f5e195"
+    },
+    {
+      "path": "host_probe.py",
+      "sha256": "405c50c5737802a10953f0bbe3c34fecf7329ba088403874ccb7f6d9495c2dbc"
+    },
+    {
+      "path": "host-config-bindings.json",
+      "sha256": "a14b66cab110e541b4f8dd82ae89fd39f498b25e7520b1c93b6b263e10e494ff"
+    },
+    {
+      "path": "mcp-source-binding.json",
+      "sha256": "d0327de6661b54af793ae5ade0d9cd8d7719e4a3f67e38bea638671ba7b30b4c"
+    }
+  ]
+}

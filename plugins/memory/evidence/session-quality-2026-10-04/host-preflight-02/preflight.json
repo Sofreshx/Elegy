@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "memory-host-preflight-summary/v1",
+  "rawSha256": "6d7dc2d4307ab4b7bfc1b6411c6b9facfa15d66365b4435b7dc9376566222e3d",
+  "checks": [
+    {
+      "name": "opencode-config-memory-only",
+      "passed": true
+    },
+    {
+      "name": "codex-config-memory-only",
+      "passed": false
+    },
+    {
+      "name": "opencode-resolved-config",
+      "passed": true
+    },
+    {
+      "name": "opencode-free-model-listed",
+      "passed": true
+    },
+    {
+      "name": "codex-chatgpt-auth",
+      "passed": true
+    }
+  ],
+  "limits": "Second initial diagnostic repeats ambient MCP metadata. Raw stays local and ignored. The failed mcp-list isolation check is preserved; actual exec isolation is checked separately in host-run preflights. No model call occurred."
+}

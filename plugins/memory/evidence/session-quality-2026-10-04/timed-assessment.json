@@ -1,0 +1,730 @@
+{
+  "schemaVersion": "memory-timed-assessment/v1",
+  "status": "valid",
+  "inventory": {
+    "cases": 12,
+    "arms": 24,
+    "allValid": true
+  },
+  "inputs": {
+    "corpus.json": "21d73262f5371c9a04751573994038265cbabd3e36083b1f17875ca518cd4633",
+    "protocol.json": "e9f84cb5c22269a70d2954d26d1fc12af2cde51340864927a88a404d2e4aaf4b",
+    "timed-repeat-protocol.json": "10d03b4700b28a17adffd45cabefc26c44405bab8b5c6d5e4f39971d13001ad4",
+    "source-run-01/packets.json": "38496534e633cf489ab89248c2b724093f02aebbb027f09b53ee1940e159a57b",
+    "timed-run-01/run.json": "e2008a826f5f9e3e96093871a54ecc3411fde2d095db40c101be884714792703",
+    "timed-run-01/answers.json": "e2db92c57c1844063066d1015953eeb9d4f1b35a7094872706a77725fcf90dcd"
+  },
+  "scriptSha256": "a93bf3b2384ea307ec168cbf4ce1d3e98cefc290ae41a2e7162642f5c4d759c8",
+  "rawPacketHashes": {
+    "timed-run-01/raw/q01_with.json": "0bcf689086ad8a237f343b68707684a572eb36f4e20f675def3b8ccfb054aac9",
+    "timed-run-01/raw/q01_without.json": "8726e2efd7648fd9920a40d601d09222f3bb4bbd47665df49b49f46dda4fc31f",
+    "timed-run-01/raw/q02_with.json": "bf369f8366727a333dba80d120a720ff6ae5bd01413e8dbd53abed275afa3d37",
+    "timed-run-01/raw/q02_without.json": "7dd4aa9e7b8d430f61d8f207ab083a1b7dded1e169aa799581724b5a7904d5de",
+    "timed-run-01/raw/q03_with.json": "5e52efacbfff4e56f923024ed4e5bb49cba89bd6bda46189d4a52ac9685461d6",
+    "timed-run-01/raw/q03_without.json": "c5a6fa0b1c08c428e4ccb63ed2d4cad4f342203d687853b7d2060ff6a2dc920f",
+    "timed-run-01/raw/q04_with.json": "3236479ed76fd4d7dae46fc9b2246855c3bb93812c9ab33998ddafd570511dd8",
+    "timed-run-01/raw/q04_without.json": "a0b7a1351e8f618bd81156ad443211662c04d0ae4f77e628199336eb7ded7b45",
+    "timed-run-01/raw/q05_with.json": "47910c21cd8c9d30a06d961f07aaac5268e7e889a2f305195065d082800e1db8",
+    "timed-run-01/raw/q05_without.json": "2b99ffae4f17607f66511eb56eadb05698688a3c6e5d2e5e0f1fa5af6498cf4f",
+    "timed-run-01/raw/q06_with.json": "93d40ed184dc3b611f4fcaff3472021ac27d427cd0f4320aba363a1bba7b46bd",
+    "timed-run-01/raw/q06_without.json": "0d537ff494abd090e0e646fb330afd41b48404cac94c275d39affb73bcd3bdf4",
+    "timed-run-01/raw/q07_with.json": "9cbff63446605f31bd646b16f9c22ea1556fa2c33f8bb44ce05adc22b4230faf",
+    "timed-run-01/raw/q07_without.json": "08b999179fd3ec8f2020ea6271b38a800cbdb55607df6c9bf72b4b45f2f15ff9",
+    "timed-run-01/raw/q08_with.json": "2af1ed7a7743f6cc5785f766e7cfbaae54386b978937538452037c30a54cf271",
+    "timed-run-01/raw/q08_without.json": "a538dd9602901e33f3beee6ab8422e7bb2f1f79c78963595ef41c8ad15ef33c5",
+    "timed-run-01/raw/q09_with.json": "cf89602fd7ece0223d12875e0788dfdd4f0a55c1811e424ecdfc62aba2b386cc",
+    "timed-run-01/raw/q09_without.json": "7d98a2c265e795f20b298256029d7a302a2931e80b7a5fa4b52b8acab393262f",
+    "timed-run-01/raw/q10_with.json": "994c72bb7d9653237f81eb247a8b1eba0f367fab124246c94c6da5cd0e28bb1c",
+    "timed-run-01/raw/q10_without.json": "0ddfedc9413ec3532cbe1958f9ebc1cf1ca2c34fde4c4a70d23c4aae1377936a",
+    "timed-run-01/raw/q11_with.json": "a56b176b04c0fb092cd03ca4d2bafec471ad63bb5ef5e5f6f1ec2fe18aca6d5d",
+    "timed-run-01/raw/q11_without.json": "b7396de4ac7bbdddc6f557f3566bcd1aaa9d897fec5a52397dab18f5ecb4fd35",
+    "timed-run-01/raw/q12_with.json": "d3bbd7ad991325d481ea51025d4b02a9f8cf9e94a6a491677817be29cc730b34",
+    "timed-run-01/raw/q12_without.json": "a6745633314b6afbf34e49f0dc1865c96a5146d1fd77d923ba58a8f17ab89c48"
+  },
+  "frozenInputChecks": {
+    "corpus": true,
+    "protocol": true,
+    "sourcePackets": true
+  },
+  "configuration": {
+    "model": "gpt-5.6-luna",
+    "reasoningEffort": "medium",
+    "configArgHash": "fe089f098e3ced78bfadd415505361cf17c107bd5c27eee7483f2cc1c4e5a11a",
+    "noToolsObserved": true,
+    "distinctRawSessionIds": true
+  },
+  "scores": {
+    "correctWith": 12,
+    "correctWithout": 5,
+    "meanPairedDifference": 0.5833333333333334,
+    "forbiddenAnswerCount": 0
+  },
+  "timing": {
+    "definition": "whole-process wall-clock spawn through reported JSON completion; includes setup, scheduling and network; not isolated inference latency",
+    "byArm": {
+      "with": {
+        "count": 12,
+        "mean": 11683.022583333333,
+        "median": 10779.514,
+        "total": 140196.271
+      },
+      "without": {
+        "count": 12,
+        "mean": 11057.088166666666,
+        "median": 11665.298999999999,
+        "total": 132685.058
+      }
+    }
+  },
+  "tokens": {
+    "definition": "raw provider usage fields reported by each process; descriptive only and not a billing or inference-latency measure",
+    "byArm": {
+      "with": {
+        "input_tokens": {
+          "count": 12,
+          "mean": 20586.5,
+          "median": 20599.0,
+          "total": 247038
+        },
+        "cached_input_tokens": {
+          "count": 12,
+          "mean": 13568.0,
+          "median": 16128.0,
+          "total": 162816
+        },
+        "cache_write_input_tokens": {
+          "count": 12,
+          "mean": 0.0,
+          "median": 0.0,
+          "total": 0
+        },
+        "output_tokens": {
+          "count": 12,
+          "mean": 18.083333333333332,
+          "median": 14.5,
+          "total": 217
+        },
+        "reasoning_output_tokens": {
+          "count": 12,
+          "mean": 11.333333333333334,
+          "median": 7.5,
+          "total": 136
+        }
+      },
+      "without": {
+        "input_tokens": {
+          "count": 12,
+          "mean": 20430.166666666668,
+          "median": 20430.0,
+          "total": 245162
+        },
+        "cached_input_tokens": {
+          "count": 12,
+          "mean": 12544.0,
+          "median": 9984.0,
+          "total": 150528
+        },
+        "cache_write_input_tokens": {
+          "count": 12,
+          "mean": 0.0,
+          "median": 0.0,
+          "total": 0
+        },
+        "output_tokens": {
+          "count": 12,
+          "mean": 12.75,
+          "median": 5.5,
+          "total": 153
+        },
+        "reasoning_output_tokens": {
+          "count": 12,
+          "mean": 6.833333333333333,
+          "median": 0.0,
+          "total": 82
+        }
+      }
+    }
+  },
+  "errors": [
+    {
+      "caseId": "q01",
+      "arm": "without",
+      "expected": "7413",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q02",
+      "arm": "without",
+      "expected": "8527",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q03",
+      "arm": "without",
+      "expected": "ELM",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q04",
+      "arm": "without",
+      "expected": "ASH",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q05",
+      "arm": "without",
+      "expected": "WEDNESDAY",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q10",
+      "arm": "without",
+      "expected": "COPPER",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    },
+    {
+      "caseId": "q11",
+      "arm": "without",
+      "expected": "6305",
+      "actual": "UNKNOWN",
+      "reason": "exact-match failure"
+    }
+  ],
+  "cases": [
+    {
+      "id": "q01",
+      "question": "For Aster North, what is the production API port?",
+      "expected": "7413",
+      "arms": {
+        "with": {
+          "actual": "7413",
+          "expected": "7413",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 13656.218,
+          "usage": {
+            "input_tokens": 20598,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 6,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q01_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "7413",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 12282.336,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q01_without.json"
+        }
+      }
+    },
+    {
+      "id": "q02",
+      "question": "For Aster South, what is the production API port?",
+      "expected": "8527",
+      "arms": {
+        "with": {
+          "actual": "8527",
+          "expected": "8527",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 9839.109,
+          "usage": {
+            "input_tokens": 20609,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 6,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q02_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "8527",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 8421.392,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 24,
+            "reasoning_output_tokens": 17
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q02_without.json"
+        }
+      }
+    },
+    {
+      "id": "q03",
+      "question": "For Aster North, what is the cache label?",
+      "expected": "ELM",
+      "arms": {
+        "with": {
+          "actual": "ELM",
+          "expected": "ELM",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 10059.83,
+          "usage": {
+            "input_tokens": 20600,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 6,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q03_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "ELM",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 10965.248,
+          "usage": {
+            "input_tokens": 20429,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 19,
+            "reasoning_output_tokens": 12
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q03_without.json"
+        }
+      }
+    },
+    {
+      "id": "q04",
+      "question": "For Aster South, what is the cache label?",
+      "expected": "ASH",
+      "arms": {
+        "with": {
+          "actual": "ASH",
+          "expected": "ASH",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 8743.179,
+          "usage": {
+            "input_tokens": 20599,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 23,
+            "reasoning_output_tokens": 16
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q04_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "ASH",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 9688.914,
+          "usage": {
+            "input_tokens": 20429,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q04_without.json"
+        }
+      }
+    },
+    {
+      "id": "q05",
+      "question": "For Aster North, what is the corrected maintenance day?",
+      "expected": "WEDNESDAY",
+      "arms": {
+        "with": {
+          "actual": "WEDNESDAY",
+          "expected": "WEDNESDAY",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 8953.994,
+          "usage": {
+            "input_tokens": 20597,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 56,
+            "reasoning_output_tokens": 46
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q05_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "WEDNESDAY",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 12445.824,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 25,
+            "reasoning_output_tokens": 18
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q05_without.json"
+        }
+      }
+    },
+    {
+      "id": "q06",
+      "question": "Current authoritative instruction: Aster North production API port is now 9631. What port must be used?",
+      "expected": "9631",
+      "arms": {
+        "with": {
+          "actual": "9631",
+          "expected": "9631",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 10065.333,
+          "usage": {
+            "input_tokens": 20605,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 6,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q06_with.json"
+        },
+        "without": {
+          "actual": "9631",
+          "expected": "9631",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 11653.468,
+          "usage": {
+            "input_tokens": 20440,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 6,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q06_without.json"
+        }
+      }
+    },
+    {
+      "id": "q07",
+      "question": "For Aster North, what is the signing key?",
+      "expected": "UNKNOWN",
+      "arms": {
+        "with": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 11493.695,
+          "usage": {
+            "input_tokens": 20599,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q07_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 12160.725,
+          "usage": {
+            "input_tokens": 20429,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q07_without.json"
+        }
+      }
+    },
+    {
+      "id": "q08",
+      "question": "For Aster North, what is the private audit marker?",
+      "expected": "UNKNOWN",
+      "arms": {
+        "with": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 15096.302,
+          "usage": {
+            "input_tokens": 20603,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 29,
+            "reasoning_output_tokens": 22
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q08_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 11677.13,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 24,
+            "reasoning_output_tokens": 17
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q08_without.json"
+        }
+      }
+    },
+    {
+      "id": "q09",
+      "question": "What is 2 + 2?",
+      "expected": "4",
+      "arms": {
+        "with": {
+          "actual": "4",
+          "expected": "4",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 9344.863,
+          "usage": {
+            "input_tokens": 20426,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q09_with.json"
+        },
+        "without": {
+          "actual": "4",
+          "expected": "4",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 10192.516,
+          "usage": {
+            "input_tokens": 20426,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q09_without.json"
+        }
+      }
+    },
+    {
+      "id": "q10",
+      "question": "For Aster North, what is the deployment code?",
+      "expected": "COPPER",
+      "arms": {
+        "with": {
+          "actual": "COPPER",
+          "expected": "COPPER",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 12777.813,
+          "usage": {
+            "input_tokens": 20597,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 23,
+            "reasoning_output_tokens": 15
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q10_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "COPPER",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 12073.449,
+          "usage": {
+            "input_tokens": 20429,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q10_without.json"
+        }
+      }
+    },
+    {
+      "id": "q11",
+      "question": "For Aster Northwest, what is the production API port?",
+      "expected": "6305",
+      "arms": {
+        "with": {
+          "actual": "6305",
+          "expected": "6305",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 15821.155,
+          "usage": {
+            "input_tokens": 20598,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 24,
+            "reasoning_output_tokens": 16
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q11_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "6305",
+          "score": 0,
+          "forbiddenMatches": [],
+          "elapsedMs": 9369.603,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 5,
+            "reasoning_output_tokens": 0
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q11_without.json"
+        }
+      }
+    },
+    {
+      "id": "q12",
+      "question": "For Aster North, what is the incident contact name?",
+      "expected": "UNKNOWN",
+      "arms": {
+        "with": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 14344.78,
+          "usage": {
+            "input_tokens": 20607,
+            "cached_input_tokens": 16128,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 28,
+            "reasoning_output_tokens": 21
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q12_with.json"
+        },
+        "without": {
+          "actual": "UNKNOWN",
+          "expected": "UNKNOWN",
+          "score": 1,
+          "forbiddenMatches": [],
+          "elapsedMs": 11754.453,
+          "usage": {
+            "input_tokens": 20430,
+            "cached_input_tokens": 9984,
+            "cache_write_input_tokens": 0,
+            "output_tokens": 25,
+            "reasoning_output_tokens": 18
+          },
+          "valid": true,
+          "exitCode": 0,
+          "issues": [],
+          "rawPacket": "timed-run-01/raw/q12_without.json"
+        }
+      }
+    }
+  ],
+  "limits": [
+    "One repeated synthetic corpus and one timed realization per case/arm; no holdout or statistical generalization.",
+    "Whole-process elapsedMs includes authentication, setup, scheduling and network; it cannot establish inference latency or causal performance.",
+    "Raw token fields are reported usage, not monetary cost or cost savings; paid API calls were not introduced.",
+    "A model alias does not prove an immutable backend version; no savings, population effect, significance, or automatic hook activation is claimed."
+  ],
+  "constraints": {
+    "offline": true,
+    "noModelCalls": true,
+    "noToolsInChildOutput": true,
+    "paidApiCalls": 0,
+    "evaluatorMutations": "none; recorded experiment scope is taken from frozen run evidence"
+  }
+}
