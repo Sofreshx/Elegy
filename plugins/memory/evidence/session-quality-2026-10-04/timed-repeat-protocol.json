@@ -1,0 +1,16 @@
+{
+  "schemaVersion":"memory-timed-repeat-protocol/v1",
+  "reason":"Native child callbacks do not expose exact execution duration. Their answer comparison remains preserved as the first observation; it is not used as inference latency.",
+  "frozenBeforeTimedExecution":true,
+  "inputs":"Unchanged corpus.json, rubric/instruction from protocol.json and uncurated source-run-01/packets.json envelopes.",
+  "host":"Already installed Codex CLI 0.160.0, ChatGPT account authentication; no API key, paid API, installation, MCP server or permanent config.",
+  "model":"gpt-5.6-luna",
+  "effort":"medium",
+  "session":"One fresh --ephemeral --ignore-user-config process per question/condition, 24 total; no tools or previous conversation.",
+  "ordering":"Odd IDs without then with, even IDs with then without. Up to three independent pairs overlap; each pair remains sequential.",
+  "timing":"Whole-process wall clock, launch through completed JSON output, including authentication, setup and network. This is not isolated inference time. Retrieval latency reported separately.",
+  "controls":"Reject tool use, missing answer, process/model error. Deterministic unchanged exact-match scoring. Report both trials and every failure, never choose the better answer.",
+  "costUnit":"paid-api-calls",
+  "cost":"0 new paid API calls; native token usage when exposed is separate from billing, and monetary cost remains unmeasured.",
+  "limitations":"Repeated use of one synthetic corpus after seeing first-trial answers. No holdout, significance, causal population effect, savings or immutable hosted backend version claimed."
+}

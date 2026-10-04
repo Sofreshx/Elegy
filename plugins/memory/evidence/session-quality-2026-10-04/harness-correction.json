@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "memory-session-quality-harness-correction/v1",
+  "timestamp": "2026-10-04",
+  "reason": "A read-only SQLite contextual recall can create an empty WAL and SHM sidecar without changing durable memory data.",
+  "change": "Compare the main database and substantive WAL data for sourceUnchanged; report physical sidecar changes separately and ignore SHM administrative bytes for the invariant.",
+  "scope": "run_probe.py",
+  "validation": "test_probe.py"
+}
