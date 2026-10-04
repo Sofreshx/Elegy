@@ -1,64 +1,60 @@
-# Elegy — Architecture Documentation
+---
+title: Elegy Memory architecture
+status: active
+owner: Elegy Memory
+doc_kind: index
+---
 
-> Last updated: 2026-07-25 | Status: MVP complete; v1 and v2 features implemented, with future work focused on knowledge-graph migration and PostgreSQL
+# Elegy Memory architecture
 
-## What is Elegy?
+Memory is a local Rust memory engine and CLI backed by SQLite. Its source
+implements storage, retrieval, salience gating, correction, consolidation and
+evaluation. Its current readiness is **implemented**, not agent-routable;
+source tests do not prove installed-host value or live-provider operation.
+See the [readiness manifest](../../readiness.json) and
+[qualification guide](../qualification.md) for evidence.
 
-Elegy is a modular AI agent infrastructure project. It provides independent systems (Rust crates) that help LLM agents remember, learn, and improve over time. Each system is usable standalone or composed with others.
+For development commands and source/test ownership start with
+[CONTRIBUTING.md](../../CONTRIBUTING.md). This page explains the boundaries
+needed to choose the right implementation path.
 
-## Active Systems
+## Three persistence paths
 
-| System | Crate | Status | Description |
-|--------|-------|--------|-------------|
-| **elegy-memory** | `plugins/memory/` | 🟢 MVP complete + implemented v1/v2 features | Memory engine for LLM agents — storage, retrieval, scoring, decay, consolidation, corrections, learning, sharing, and safety workflows |
+| Path | Owner | Purpose and boundary |
+| --- | --- | --- |
+| SQLite memory engine | [`SqliteMemoryStore`](../../src/storage/sqlite_store.rs), [`schema.rs`](../../src/storage/schema.rs) | Stores `Memory` rows, embeddings, versions, links and learned retrieval data in an explicitly selected database. A store has one write scope; search visibility can include broader scopes. |
+| Governed JSON artifacts | [`artifacts.rs`](../../src/artifacts.rs), [`LocalMemoryStore`](../../src/local_store.rs) | Validated summary-only envelopes, provenance, lifecycle and deterministic projections stored as local JSON artifacts. This is separate from the SQLite retrieval engine. Existing public types are re-exported from `lib.rs`. |
+| Contextual-recall journal | [`recall.rs`](../../src/recall.rs), [`recall_store.rs`](../../src/storage/recall_store.rs) | Reads the source database without migration and records bounded events/feedback in a separate journal. It does not modify source memories or persist raw prompts/transcripts. |
 
-## Design Philosophy
+## Runtime flow
 
-1. **Trait-first.** Core behaviors are traits. Implementations are pluggable. Switch SQLite for PostgreSQL, OpenAI embeddings for Ollama, without touching business logic.
-2. **Write-time quality.** Filter at write time, not read time. Bad memories never enter the active store. This is structurally superior to read-time filtering (validated by research: write-time gating maintains 100% accuracy at 8:1 distractor ratios where read-time collapses to 0%).
-3. **Archive, don't delete.** Memories are deprioritized (dormant), not destroyed. Biological memory works the same way — forgetting is deprioritization, not erasure. Hard deletes only at storage caps.
-4. **Provenance is truth.** Every memory carries its origin (user-stated, agent-observed, agent-inferred, consolidated, imported). Provenance determines trust. A user's direct statement always outweighs an agent's inference.
-5. **Scopes isolate context.** Session, Workspace, User, and Agent memories live in separate stores. No cross-contamination. Explicit APIs for cross-scope queries.
-6. **Grand public, not personal tool.** Elegy targets developers, techniciens, and non-technical professionals. It must be embeddable (SQLite for local), scalable (PostgreSQL for cloud), privacy-compliant (GDPR purge), and ergonomic.
+The [CLI](../../src/cli.rs) parses commands, chooses the explicit database and
+scope, wires optional providers, and formats output. Write workflows use the
+[salience gate](../../src/gate.rs) before applying their documented
+disposition. The [store](../../src/storage/sqlite_store.rs) owns persistence,
+retrieval ranking, corrections and feedback learning; the [model](memory-model.md)
+explains their semantics. Do not mistake the lower-level `MemoryStore::store`
+method for the complete gate-aware write workflow.
 
-## Architecture Docs
+Embeddings and optional LLM calls sit behind [traits](traits-and-interfaces.md).
+Provider failures must preserve the documented write/fallback behavior.
+SQLite is the implemented storage backend; no PostgreSQL store is present.
 
-Read these in order for a complete understanding:
+[`hosts/memory-mcp`](../../../../hosts/memory-mcp/AGENTS.md) owns the optional
+MCP transport and host-specific authorization. The Python
+[Codex hook](../../integrations/codex/README.md) invokes the existing recall CLI.
+Neither boundary is required for core Memory development.
 
-### 1. [Memory Model](memory-model.md)
-Core concepts: what is a memory, what are scopes, how scoring works, how decay works, the confidence score system, memory types, provenance hierarchy, write-time gating, and the contradiction journal.
+## Read only what the change needs
 
-### 2. [Storage Schema](storage-schema.md)
-SQLite schema with all tables, columns, indexes, FTS5 setup, sqlite-vec virtual tables, and the migration strategy. Also covers the PostgreSQL schema for v1.
+- [Feature matrix](mvp-scope.md): implemented, deferred and unsupported work.
+- [Memory model](memory-model.md): scopes, ranking, confidence, decay and writes.
+- [Storage schema](storage-schema.md): SQLite tables, vector layout and journal.
+- [Migration framework](migration-framework.md): preservation and cutover rules.
+- [Interface map](traits-and-interfaces.md): traits, concrete APIs and source symbols.
+- [Contextual recall spec](../../../../docs/specs/memory-contextual-recall-v1/spec.md): binding, selection, privacy and event-bound feedback.
+- [Eval spec](../../../../docs/specs/eval-harness-v1/spec.md) and
+  [qualification guide](../qualification.md): regression checks and durable claims.
 
-### 3. [Traits and Interfaces](traits-and-interfaces.md)
-Every Rust trait definition with method signatures, contracts, error types, and implementation notes. This is the API contract between components.
-
-### 4. [MVP Scope](mvp-scope.md)
-The feature matrix and current baseline summary. It distinguishes the MVP baseline from v1/v2 maturity labels while also calling out what is already implemented in the current crate. **This is the source of truth for what to build and how the present implementation maps to those milestones.**
-
-## Key Research References
-
-This architecture is informed by peer-reviewed research and state-of-the-art systems:
-
-- **Mem0** (Chhikara et al., 2025) — Two-phase extract/update pipeline, CRUD operations, LOCOMO benchmark
-- **A-MEM** (Xu et al., 2025, NeurIPS 2025) — Zettelkasten-inspired dynamic memory organization
-- **Letta/MemGPT** (Packer et al., 2023) — OS-inspired memory hierarchy, sleep-time compute for consolidation
-- **Write-Time Gating** (arXiv 2603.15994, March 2025) — Salience gate with hierarchical archiving, 100% accuracy vs 13% ungated
-- **MaRS** (arXiv 2512.12856, December 2025) — Sensitivity-weighted retention, privacy-aware budgeting
-- **Hindsight** (arXiv 2512.12818, January 2026) — Four logical networks separating facts/experiences/opinions/observations
-- **Zep/Graphiti** (Rasmussen et al., 2025) — Temporal knowledge graph for agent memory
-- **Ebbinghaus Forgetting Curve** — Exponential decay modulated by importance and recall frequency
-
-## Original Contributions
-
-These concepts are novel to Elegy, not found as-is in existing literature:
-
-- **Scope Promotion** — Automatic promotion of memories from session→workspace→user based on cross-scope recurrence
-- **Adaptive Decay Rate** — λ adjusts to user activity frequency, preventing premature forgetting for infrequent users
-- **Contradiction Journal** — Explicit log of detected contradictions for human or agent resolution
-- **Confidence Score Bidirectionnel** — importance (LLM-assigned) × reliability (system-computed from provenance, corroboration, contradiction)
-- **Memory Type-Modulated Decay** — Decay rate varies by memory type (facts don't decay; observations do)
-- **Memory Portability Format** — `.elegy` export/import format with selective scope inclusion
-- **Embedding Staleness Detection** — Flag + batch re-embed on content mutation
-
+These local explanations follow the [repository architecture authority](../../../../docs/architecture/README.md),
+ADRs and applicable specs. They do not grant a new milestone or readiness level.
