@@ -11,17 +11,20 @@ An agent starts with the exact inventory, runs a bounded experiment, and
 resumes its evidence in the next session. Run from an Elegy source checkout:
 
 ```text
-cargo build -p elegy-memory
-elegy-memory eval status --json
-elegy-memory eval next --json
-elegy-memory eval run --claim recall.contract --json
-elegy-memory eval run --claim forgetting.retention --json
-elegy-memory eval history --claim recall.contract --json
+cargo run --locked -p elegy-memory -- eval status --json
+cargo run --locked -p elegy-memory -- eval next --json
+cargo run --locked -p elegy-memory -- eval run --claim recall.contract --json
+cargo run --locked -p elegy-memory -- eval run --claim forgetting.retention --json
+cargo run --locked -p elegy-memory -- eval history --claim recall.contract --json
 ```
 
-Use the just-built executable (`target/debug/elegy-memory`, with `.exe` on
-Windows) if a PATH installation is older. Every qualification command accepts
-`--project ABSOLUTE_REPO` and `--evidence-dir DIRECTORY`. Relative evidence paths
+Cargo builds and runs the current checkout. After building, the same commands
+can use `target/debug/elegy-memory` (with `.exe` on Windows) directly; a PATH
+installation may be older. See the [contributor guide](../CONTRIBUTING.md) for
+setup and disposable experiments. The evidence-backed `status`, `next`,
+`history`, `record`, and claim-specific `run` commands accept
+`--project ABSOLUTE_REPO` and `--evidence-dir DIRECTORY`. Corpus listing,
+threshold sweeps and label exports use their own arguments. Relative evidence paths
 resolve against the project; the default is
 `plugins/memory/evidence/qualification`. Observation input paths resolve against
 the caller's working directory. Qualification currently requires the source

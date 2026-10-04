@@ -1,4 +1,17 @@
+---
+title: Memory model
+status: active
+owner: Elegy Memory
+doc_kind: guide
+---
+
 # Memory Model
+
+This guide explains the SQLite engine's behavior. For exact data fields use
+[types.rs](../../src/types.rs); for implementation and regression-test ownership
+use the [contributor map](../../CONTRIBUTING.md#find-the-change-owner).
+The separate governed JSON artifact model is mapped in the
+[architecture overview](ARCHITECTURE.md).
 
 ## What is a Memory?
 

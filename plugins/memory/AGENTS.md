@@ -1,22 +1,30 @@
-# Elegy Memory
+# Developing Elegy Memory
 
-## Start Here
+Follow the repository [authority chain](../../AGENTS.md). This file is the
+Memory routing entrypoint; it does not define a second behavior contract.
 
-- Read `plugins/memory/docs/architecture/mvp-scope.md` before implementing memory behavior.
-- Read `plugins/memory/docs/architecture/memory-model.md` when changing scopes, scoring, decay, confidence, provenance, or state transitions.
-- Read `plugins/memory/docs/architecture/storage-schema.md` before changing persistence.
+## Start with the task
 
-## Boundaries
+Read [CONTRIBUTING.md](CONTRIBUTING.md) for setup, a scratch-database example,
+and the **change → contract → source → tests** map. Read only the relevant
+row and its owning documents before editing.
 
-- This crate owns bounded local memory behavior and persistence, including retrieval scoring and ranking (`search()`'s similarity/recency/access/priority blend) — that lives here and is regression-tested by `docs/specs/eval-harness-v1/spec.md`'s eval harness. Host-level policy such as approval, promotion, and freshness/currentness stays outside this crate.
-- Store distilled memories only. Never persist raw transcripts.
-- Every memory needs provenance; do not create bypass writes around provenance or salience.
-- Keep session, workspace, user, and agent scopes isolated unless an explicit API requests cross-scope behavior.
-- Embedding work can fail or be unavailable; do not block memory writes on provider-backed embedding.
+- Behavior or scope: [feature matrix](docs/architecture/mvp-scope.md) and
+  [memory model](docs/architecture/memory-model.md).
+- Persistence: [storage schema](docs/architecture/storage-schema.md) and
+  [migration framework](docs/architecture/migration-framework.md).
+- API extension: [interface map](docs/architecture/traits-and-interfaces.md).
+- Recall binding or feedback: [contextual recall spec](../../docs/specs/memory-contextual-recall-v1/spec.md).
+- Qualification: [qualification guide](docs/qualification.md); run
+  `cargo run --locked -p elegy-memory -- eval status --json` and
+  `cargo run --locked -p elegy-memory -- eval next --json` from the repo root.
 
-## Scope Discipline
+## Before finishing
 
-- When assessing or resuming Memory feature qualification, use `elegy-memory eval status --json` and `eval next --json` from the repo root; follow [the qualification guide](docs/qualification.md). Preserve receipts, including failures. A recalled memory is a pointer; reload the exact claim and evidence before reporting its status.
+Use the [validation matrix](CONTRIBUTING.md#validate-the-change). Preserve the
+public crate re-exports, CLI envelopes and governed fixtures when reorganizing
+code. Keep contract changes aligned with their Rust implementation and tests.
+Source tests do not establish installed-host or live-provider readiness.
 
-- If `mvp-scope.md` marks a feature as later than MVP, keep it as scaffolding or explicit non-support rather than quietly shipping partial behavior.
-- When CLI or agent-visible output changes, keep the Rust behavior, governed artifacts, and tests aligned.
+For transport, authentication or host policy, follow
+[`hosts/memory-mcp/AGENTS.md`](../../hosts/memory-mcp/AGENTS.md).

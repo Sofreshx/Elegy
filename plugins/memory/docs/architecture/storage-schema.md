@@ -1,4 +1,16 @@
+---
+title: Memory storage schema
+status: active
+owner: Elegy Memory
+doc_kind: guide
+---
+
 # Storage Schema
+
+The executable schema is [schema.rs](../../src/storage/schema.rs); the SQL
+below explains the core layout rather than serving as a migration script.
+For changes, follow the [migration framework](migration-framework.md) and
+its [schema tests](../../src/storage/schema/tests.rs).
 
 ## Overview
 
@@ -45,22 +57,22 @@ CREATE TABLE memories (
     reliability_score REAL NOT NULL DEFAULT 0.5,  -- System-computed, 0.0-1.0
     sensitivity       TEXT NOT NULL DEFAULT 'low', -- 'low' | 'medium' | 'high' | 'critical'
     state             TEXT NOT NULL DEFAULT 'active', -- 'active' | 'dormant' | 'deleted'
-    
+
     -- Metadata (JSON for extensibility)
     tags              TEXT DEFAULT '[]',           -- JSON array of strings
     status            TEXT,                        -- Optional workflow status ('planned', 'in_progress', 'completed', etc.)
     custom_metadata   TEXT DEFAULT '{}',           -- JSON object for extensible key-value pairs
-    
+
     -- Tracking
     access_count      INTEGER NOT NULL DEFAULT 0,
     corroboration_count INTEGER NOT NULL DEFAULT 0,
     embedding_stale   INTEGER NOT NULL DEFAULT 1,  -- Boolean: 1 = needs re-embedding
-    
+
     -- Timestamps
     created_at        TEXT NOT NULL,               -- ISO 8601 / RFC 3339
     updated_at        TEXT NOT NULL,               -- ISO 8601
     last_accessed_at  TEXT,                        -- ISO 8601, NULL if never accessed
-    
+
     -- Multi-tenant (NULL for single-user mode)
     tenant_id         TEXT,
     user_id           TEXT,
@@ -83,7 +95,8 @@ CREATE INDEX idx_memories_stale ON memories(embedding_stale) WHERE embedding_sta
 ```sql
 CREATE VIRTUAL TABLE vec_memories USING vec0(
     embedding float[768] distance_metric=cosine
-    -- Dimension depends on embedding model. 768 for all-MiniLM-L6-v2, 1536 for OpenAI ada-002.
+    -- Fresh vec0 tables currently use the schema's fixed 768 dimensions.
+    -- A provider setting alone does not resize this virtual table.
     -- distance_metric=cosine makes `v.distance` report cosine distance
     -- (1 - cosine_similarity), matching this crate's scoring model; confirmed
     -- empirically (identical vectors -> distance 0, orthogonal -> distance 1).
@@ -165,6 +178,13 @@ Combine vector and keyword results into a blended similarity signal (see [Memory
 blended_similarity = 0.7 * (1.0 - vector_distance) + 0.3 * bm25_score
 ```
 
+The keyword and vector channels first select candidate IDs. The store loads
+full memory records only for that union, then applies the existing ranking and
+context budget. The SQL read retains scope, state, type, agent and recall-access
+filters. Candidate IDs use one JSON-array parameter, so large keyword result
+sets do not exhaust SQLite's bind-parameter limit. `find_similar()` uses the
+same bounded record loading for its vector candidates.
+
 ### Table: memory_links (Proto-Graph)
 
 ```sql
@@ -175,7 +195,7 @@ CREATE TABLE memory_links (
     relation_type TEXT NOT NULL,    -- 'related' | 'supersedes' | 'contradicts' | 'corroborates' | 'promotes_from'
     weight        REAL DEFAULT 1.0,
     created_at    TEXT NOT NULL,
-    
+
     UNIQUE(source_id, target_id, relation_type)
 );
 
@@ -195,7 +215,7 @@ CREATE TABLE memory_versions (
     changed_at      TEXT NOT NULL,
     changed_by      TEXT NOT NULL,         -- 'user' | 'agent:{agent_id}' | 'system:consolidation' | 'system:contradiction_resolution'
     change_reason   TEXT,
-    
+
     UNIQUE(memory_id, version_number)
 );
 
@@ -318,7 +338,7 @@ CREATE TABLE scope_config (
 -- 'decay_lambda_base' → '0.10'
 -- 'similarity_weight' → '0.40'
 -- 'recency_weight' → '0.25'
--- 'access_weight' → '0.15'
+-- 'access_weight' → '0.05'
 -- 'priority_weight' → '0.20'
 -- 'memory_context_ratio' → '0.10'
 -- 'response_reserve' → '4096'
@@ -354,13 +374,28 @@ The four retrieval-weight keys are also the live parameter-learning write-back s
 
 `feedback` persists those exact keys, and `search()` reloads them directly from `scope_config` before scoring results.
 
+## Internal migration tables
+
+`migration_runs` records successful named migrations. `reembed_staging` holds
+derived vectors and source-content hashes before cutover;
+`reembed_pending_retry` tracks provider failures for later recovery. Their
+current columns are defined in `create_schema` in
+[schema.rs](../../src/storage/schema.rs). They are internal migration state,
+not portable memory records. See [staging and cutover](migration-framework.md).
+
 ## Migration Strategy
 
-Schema version is tracked in `scope_config` with key `schema_version`. The current implementation still uses additive, idempotent `CREATE TABLE IF NOT EXISTS` / `ALTER TABLE` initialization at open time rather than an external migration runner.
+Schema version is tracked in `scope_config` with key `schema_version`.
+`init_database` performs additive initialization and invokes the in-process
+`run_migrations` runner inside a transaction. Named migrations declare
+capabilities and run verification before being recorded in `migration_runs`.
+Source-memory preservation, rollback and re-embedding are described in the
+[migration framework](migration-framework.md).
 
-## PostgreSQL Schema (v1)
+## PostgreSQL (not implemented)
 
-The v1 `PgMemoryStore` uses the same logical schema with these adaptations:
+There is no `PgMemoryStore` in this crate. The following are historical design
+ideas, not supported configuration or an accepted implementation recipe:
 - `TEXT` UUIDs become `UUID` type
 - `REAL` becomes `DOUBLE PRECISION`
 - sqlite-vec becomes `pgvector` extension with `vector(768)` column type

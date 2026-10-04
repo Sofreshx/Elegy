@@ -1,364 +1,75 @@
-# Traits and Interfaces
-
-This document mirrors the current Rust contracts in `src/traits.rs` and the key types they depend on.
-
-Important boundary: the public trait surface is currently smaller than the full implemented capability surface of `SqliteMemoryStore`. `MemoryStore` is the core CRUD/search/lifecycle/contradiction contract. Several advanced implemented features still remain concrete `SqliteMemoryStore` methods rather than public traits:
-
-- correction history and correction application
-- feedback learning and learned-weight reporting
-- poisoning detection and remediation
-- share export and share-import review flow
-
-## Core Traits
-
-### `MemoryStore`
-
-`MemoryStore` is the stable baseline contract for:
-
-- CRUD and metadata updates
-- hybrid retrieval
-- embedding persistence / stale-embedding discovery
-- lifecycle transitions
-- contradiction recording and resolution status updates
-- health reporting and purge operations
-
-It is **not** yet the whole feature surface of the crate. The current SQLite implementation also exposes concrete advanced APIs for the Session 8 areas listed above.
-
-```rust
-#[async_trait]
-pub trait MemoryStore: Send + Sync {
-    fn scope(&self) -> MemoryScope;
-
-    async fn store(&self, memory: Memory) -> Result<MemoryId, StoreError>;
-
-    async fn update_content(
-        &self,
-        id: &MemoryId,
-        new_content: &str,
-        changed_by: &str,
-        reason: &str,
-    ) -> Result<(), StoreError>;
-
-    async fn update_metadata(
-        &self,
-        id: &MemoryId,
-        updates: MetadataUpdate,
-    ) -> Result<(), StoreError>;
-
-    async fn get(&self, id: &MemoryId) -> Result<Option<Memory>, StoreError>;
-    async fn get_raw(&self, id: &MemoryId) -> Result<Option<Memory>, StoreError>;
-    async fn list(&self, filter: MemoryFilter) -> Result<Vec<Memory>, StoreError>;
-
-    async fn search(&self, query: SearchQuery) -> Result<Vec<ScoredMemory>, StoreError>;
-
-    async fn find_similar(
-        &self,
-        embedding: &[f32],
-        threshold: f32,
-        limit: usize,
-    ) -> Result<Vec<ScoredMemory>, StoreError>;
-
-    async fn store_embedding(&self, id: &MemoryId, embedding: &[f32]) -> Result<(), StoreError>;
-    async fn get_stale_embeddings(&self, limit: usize) -> Result<Vec<MemoryId>, StoreError>;
-
-    async fn make_dormant(&self, id: &MemoryId) -> Result<(), StoreError>;
-    async fn reactivate(&self, id: &MemoryId) -> Result<(), StoreError>;
-    async fn hard_delete(&self, id: &MemoryId) -> Result<(), StoreError>;
-
-    async fn purge_user(&self, user_id: &str) -> Result<PurgeReport, StoreError>;
-    async fn purge_all(&self) -> Result<PurgeReport, StoreError>;
-
-    async fn health_report(&self) -> Result<MemoryHealthReport, StoreError>;
-
-    async fn list_contradictions(
-        &self,
-        status: Option<ResolutionStatus>,
-    ) -> Result<Vec<ContradictionEntry>, StoreError>;
-
-    async fn record_contradiction(
-        &self,
-        a_id: &MemoryId,
-        b_id: &MemoryId,
-        description: &str,
-    ) -> Result<(), StoreError>;
-
-    async fn update_contradiction_status(
-        &self,
-        contradiction_id: &str,
-        status: ResolutionStatus,
-        note: Option<&str>,
-    ) -> Result<(), StoreError>;
-}
-```
-
-Supporting request types used by the trait:
-
-```rust
-pub enum OptionalFieldUpdate<T> {
-    Set(T),
-    Clear,
-}
-
-pub struct MetadataUpdate {
-    pub tags: Option<Vec<String>>,
-    pub status: Option<OptionalFieldUpdate<String>>,
-    pub custom_metadata: Option<HashMap<String, String>>,
-    pub importance_score: Option<f32>,
-    pub reliability_score: Option<f32>,
-    pub state: Option<MemoryState>,
-}
-
-pub struct MemoryFilter {
-    pub scope: Option<MemoryScope>,
-    pub state: Option<MemoryState>,
-    pub memory_types: Option<Vec<MemoryType>>,
-    pub provenance_levels: Option<Vec<ProvenanceLevel>>,
-    pub tags: Option<Vec<String>>,
-    pub status: Option<String>,
-    pub tenant_id: Option<String>,
-    pub user_id: Option<String>,
-    pub agent_id: Option<String>,
-    pub limit: Option<usize>,
-}
-```
-
-### `EmbeddingProvider`
-
-```rust
-#[async_trait]
-pub trait EmbeddingProvider: Send + Sync {
-    async fn embed(&self, text: &str) -> Result<Vec<f32>, EmbeddingError>;
-
-    async fn embed_batch(&self, texts: &[&str]) -> Result<Vec<Vec<f32>>, EmbeddingError> {
-        let mut results = Vec::with_capacity(texts.len());
-        for text in texts {
-            results.push(self.embed(text).await?);
-        }
-        Ok(results)
-    }
-
-    fn dimensions(&self) -> usize;
-    fn model_id(&self) -> &str;
-}
-```
-
-Current provider implementations in the crate:
-
-- `OllamaEmbeddingProvider`
-- `OpenAiEmbeddingProvider`
-
-### `LlmProvider`
-
-```rust
-#[async_trait]
-pub trait LlmProvider: Send + Sync {
-    async fn complete(&self, prompt: &str) -> Result<String, LlmError>;
-    fn name(&self) -> &str;
-    fn model(&self) -> &str;
-}
-```
-
-Current provider implementations in the crate:
-
-- `OllamaLlmProvider` (`/api/generate`, default model `qwen3:8b`)
-- `OpenAiLlmProvider` (`/v1/chat/completions`, default model `gpt-4.1-mini`)
-
-### `SalienceGate`
-
-`SalienceGate::evaluate` is async and returns structured decisions that the CLI/store can act on directly.
-
-```rust
-#[async_trait]
-pub trait SalienceGate: Send + Sync {
-    async fn evaluate(
-        &self,
-        candidate: &MemoryCandidate,
-        store: &dyn MemoryStore,
-    ) -> Result<GateDecision, GateError>;
-}
-
-pub enum GateDecision {
-    Accept {
-        similar_to: Option<MemoryId>,
-        similarity: Option<f32>,
-    },
-    Archive,
-    Merge {
-        target_id: MemoryId,
-        enriched_content: String,
-        promote_to: Option<MemoryScope>,
-    },
-    Contradiction {
-        conflicting_id: MemoryId,
-        description: String,
-    },
-    Reject {
-        reason: String,
-    },
-}
-```
-
-`DefaultSalienceGate` currently uses scope-configured thresholds with conservative semantics plus scope-aware precedence:
-
-- warn at `0.80`
-- merge at `0.85`
-- duplicate threshold constant `0.99`
-- archive below salience `0.20`
-- archive low-importance `AgentInferred` below `0.50`
-- reject near-duplicates that already exist in a broader visible scope
-- surface `promote_to` when a merge should lift the canonical result into a broader scope
-- when an `LlmProvider` is configured, ask the LLM to classify high-similarity pairs as `AGREE`, `CONTRADICT`, or `UNRELATED` before falling back to the heuristic contradiction checks
-- degrade visibly to the heuristic path when the LLM provider fails or returns an unusable verdict
-
-### `MemoryConsolidator`
-
-```rust
-#[async_trait]
-pub trait MemoryConsolidator: Send + Sync {
-    async fn consolidate(
-        &self,
-        memories: &[ConsolidationCandidate],
-    ) -> Result<Vec<ConsolidationAction>, ConsolidationError>;
-}
-
-pub enum ConsolidationAction {
-    Merged {
-        source_ids: Vec<MemoryId>,
-        result: Memory,
-    },
-    Summarized {
-        source_id: MemoryId,
-        new_summary: String,
-    },
-    MadeDormant {
-        id: MemoryId,
-        reason: String,
-    },
-    Linked {
-        source_id: MemoryId,
-        target_id: MemoryId,
-        relation: String,
-    },
-    Contradiction {
-        memory_a_id: MemoryId,
-        memory_b_id: MemoryId,
-        description: String,
-    },
-}
-```
-
-`SimpleConsolidator` still provides the default implementation. It now supports:
-
-- same-scope-only consolidation by default
-- optional cross-scope consolidation, where merged results take the highest scope in the pair
-- optional pair-limit capping for CLI `--consolidate-limit`
-
-`LlmConsolidator` is now the optional Tier 2 implementation:
-
-- candidate pairs are still selected by embedding cosine similarity
-- each qualifying pair is sent to an `LlmProvider` with a constrained consolidation prompt
-- `CONTRADICTION: ...` responses become `ConsolidationAction::Contradiction`
-- empty / garbled / failed LLM calls visibly fall back to the same merge semantics as `SimpleConsolidator`
-
-## Promotion Engine
-
-The crate now exposes a lightweight `PromotionEngine` helper around `SqliteMemoryStore`:
-
-- `run(store, limit, trigger_session_id)` evaluates automatic promotions
-- `promote_to(store, id, to_scope, changed_by, reason, trigger_session_id)` applies a manual override
-
-### `MemoryObservability`
-
-```rust
-pub trait MemoryObservability: Send + Sync {
-    fn health_report(&self, scope: MemoryScope) -> Result<MemoryHealthReport, ObservabilityError>;
-
-    fn list_contradictions(
-        &self,
-        status: Option<ResolutionStatus>,
-    ) -> Result<Vec<ContradictionEntry>, ObservabilityError>;
-
-    fn export_memories(
-        &self,
-        scope: MemoryScope,
-        format: ExportFormat,
-    ) -> Result<Vec<u8>, ObservabilityError>;
-
-    fn purge_user(&self, user_id: &str) -> Result<PurgeReport, ObservabilityError>;
-    fn purge_scope(&self, scope: MemoryScope) -> Result<PurgeReport, ObservabilityError>;
-}
-```
-
-`SqliteMemoryStore` now provides a concrete `MemoryObservability` implementation for the synchronous health / contradiction / export / purge facade on top of the same SQLite backing store.
-
-## Key Types
-
-```rust
-pub type MemoryId = uuid::Uuid;
-
-pub struct MemoryCandidate {
-    pub content: String,
-    pub summary: Option<String>,
-    pub memory_type: MemoryType,
-    pub provenance: ProvenanceLevel,
-    pub importance_score: f32,
-    pub sensitivity: SensitivityLevel,
-    pub tags: Vec<String>,
-    pub custom_metadata: HashMap<String, String>,
-    pub embedding: Option<Vec<f32>>,
-}
-
-pub struct ScoredMemory {
-    pub memory: Memory,
-    pub score: f32,
-    pub similarity: f32,
-}
-
-pub struct MemoryHealthReport {
-    pub scope: MemoryScope,
-    pub active_count: u64,
-    pub dormant_count: u64,
-    pub total_storage_bytes: u64,
-    pub budget_usage_ratio: f32,
-    pub unresolved_contradictions: u64,
-    pub stale_embeddings_count: u64,
-    pub last_consolidation: Option<DateTime<Utc>>,
-    pub oldest_active_memory: Option<DateTime<Utc>>,
-    pub newest_memory: Option<DateTime<Utc>>,
-}
-
-pub struct ContradictionEntry {
-    pub id: String,
-    pub memory_a_id: MemoryId,
-    pub memory_b_id: MemoryId,
-    pub detected_at: DateTime<Utc>,
-    pub description: String,
-    pub resolution_status: ResolutionStatus,
-    pub resolved_at: Option<DateTime<Utc>>,
-    pub resolution_note: Option<String>,
-}
-```
-
-`MemoryHealthReport` is the base store-facing type. The CLI now derives additional presentation fields on top of it, including average importance, stale-memory previews, contradiction previews, oldest age, most-accessed memory, and human-readable database size.
-
-## Scope Configuration Surface
-
-The store loads these tuning values from `scope_config`:
-
-```rust
-pub struct ScopeConfig {
-    pub decay_lambda_base: f32,
-    pub similarity_weight: f32,
-    pub recency_weight: f32,
-    pub access_weight: f32,
-    pub priority_weight: f32,
-    pub memory_context_ratio: f32,
-    pub response_reserve: u32,
-    pub salience_threshold: f32,
-    pub novelty_doubt_threshold: f32,
-    pub merge_similarity_threshold: f32,
-    pub duplicate_similarity_threshold: f32,
-    pub agent_inferred_importance_threshold: f32,
-}
-```
-
+---
+title: Memory interfaces and extension points
+status: active
+owner: Elegy Memory
+doc_kind: guide
+---
+
+# Memory interfaces and extension points
+
+The signatures live in [traits.rs](../../src/traits.rs), the data model in
+[types.rs](../../src/types.rs), and failures in [error.rs](../../src/error.rs).
+This guide explains which boundary to extend instead of maintaining a second
+copy of the Rust declarations. Generate searchable API documentation with
+`cargo doc --locked -p elegy-memory --no-deps` from the repository root.
+
+## Traits
+
+| Trait | Responsibility | Current implementations / source |
+| --- | --- | --- |
+| `MemoryStore` | Scoped CRUD, metadata patches, retrieval, embeddings, lifecycle, contradictions, health and purge | [`SqliteMemoryStore`](../../src/storage/sqlite_store.rs) |
+| `EmbeddingProvider` | Embedding generation, batch fallback, dimensions and model identity | [embedding module](../../src/embedding/mod.rs), OpenAI/Ollama adapters and circuit breaker |
+| `LlmProvider` | Optional completion for contradiction classification and consolidation | [LLM module](../../src/llm/mod.rs), OpenAI/Ollama adapters |
+| `SalienceGate` | Return an explicit write disposition for a candidate and existing store | [`DefaultSalienceGate`](../../src/gate.rs) |
+| `MemoryConsolidator` | Propose consolidation actions | [`SimpleConsolidator` / `LlmConsolidator`](../../src/consolidator.rs) |
+| `MemoryObservability` | Synchronous host-facing health, contradictions, export and purge | [`SqliteMemoryStore`](../../src/storage/sqlite_store.rs) |
+| `ForgettingPolicy` | Rank memories for budget eviction using `RetentionContext` | [forgetting policies](../../src/forgetting.rs); budget execution stays in the store |
+
+`MemoryStore::get` tracks retrieval; `get_raw` is the non-tracking lookup.
+`list` is an exact-scope inventory; search and duplicate detection use the
+visibility rules in the [memory model](memory-model.md). A trait method is
+not automatically a complete CLI write workflow: keep salience/provenance
+handling in the caller path that owns the operation.
+
+`MetadataUpdate` distinguishes an omitted field from `OptionalFieldUpdate::Clear`
+and `Set(value)`. `MemoryFilter` is the list filter; `SearchQuery` is the
+retrieval query. `GateDecision` and `ConsolidationAction` encode outcomes
+rather than assuming every input becomes a new active memory.
+
+## Concrete SQLite APIs
+
+These capabilities are implemented on `SqliteMemoryStore`, not on the
+`MemoryStore` trait. Use their [source](../../src/storage/sqlite_store.rs)
+and [unit tests](../../src/storage/sqlite_store/tests.rs) when changing them.
+Avoid expanding a shared trait solely to mirror the concrete implementation.
+
+| Capability | Symbols to find | Additional validation |
+| --- | --- | --- |
+| Correction and history | `correct_memory`, `list_corrections`, `list_versions`, `rollback_to_version` | `--test cli`, `--test integration` |
+| Corroboration and scope promotion | `corroborate`, `promote_memory_to`, `run_promotion_pass` | `--test cli`, `--test integration` |
+| Feedback and learned weights | `record_feedback`, `compute_learned_weights`, `scope_config` | `--test cli`, `--test eval` |
+| Budget and eviction policy | `enforce_budget`, `enforce_budget_with_policy` | `--test qualification`, `--test cli` |
+| Links and graph traversal | `record_link`, `list_links`, `delete_link`, `traverse_links` | `--test cli` |
+| Poisoning detection | `detect_poisoning`; CLI quarantine orchestration is in [cli.rs](../../src/cli.rs) | `--test cli` |
+| Sharing | `export_for_sharing`, `import_shared` | `--test cli` |
+
+CLI output types can contain presentation fields beyond the store's core types.
+Changes to JSON envelopes also require [conformance tests](../../tests/conformance.rs).
+Provider defaults and timeout values are defined next to each adapter, not here.
+
+## Separate artifact and recall interfaces
+
+[artifacts.rs](../../src/artifacts.rs) owns summary-only envelopes, governed
+records, provenance, local lifecycle, validation and deterministic projections.
+[local_store.rs](../../src/local_store.rs) persists those JSON artifacts.
+They do not implement SQLite retrieval or the `MemoryStore` trait. Root
+re-exports keep existing `elegy_memory::…` import paths stable.
+
+[recall.rs](../../src/recall.rs) and [recall_store.rs](../../src/storage/recall_store.rs)
+implement the separate contextual-recall source reader and event journal;
+the [recall spec](../../../../docs/specs/memory-contextual-recall-v1/spec.md)
+owns their contract. Do not reuse legacy `record_feedback` for event-bound
+recall feedback: the latter must not mutate source memories or learned weights.
+
+Use the [contributor validation matrix](../../CONTRIBUTING.md#validate-the-change)
+to select the command, then run the full Memory suite for a Rust/API change.

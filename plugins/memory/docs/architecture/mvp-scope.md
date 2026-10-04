@@ -1,12 +1,23 @@
+---
+title: Memory implementation scope
+status: active
+owner: Elegy Memory
+doc_kind: guide
+---
+
 # MVP Scope
 
-> Milestone labels describe target product maturity, not just whether code exists. Session 4 landed several first-pass v1 features in the codebase; those rows now call out current implementation status explicitly.
+Milestone labels group the original scope; the Notes column describes current
+implementation. None of these labels establishes readiness. Memory remains
+`implemented`; use the [qualification guide](../qualification.md) for the
+evidence behind a specific claim and the [contributor guide](../../CONTRIBUTING.md)
+to find its source and tests.
 
 ## Milestone Definitions
 
-- **MVP** — required baseline behavior; implemented and expected to work in the current codebase.
-- **v1** — beyond the original MVP bar. A feature may already have a first implementation, but it is still treated as v1-grade behavior rather than finished platform baseline.
-- **v2** — documented future direction; not part of the current implementation baseline.
+- **MVP** — original baseline scope; consult each row for current limitations.
+- **v1** — extensions beyond the original baseline, some implemented and some deferred.
+- **v2** — later extensions, some implemented and some deferred; this is not a release or quality verdict.
 
 ## Feature Matrix
 
@@ -210,12 +221,16 @@
 
 ## Current Baseline Summary
 
-The codebase has a complete MVP core plus the full v1 and v2 feature set. Only Knowledge Graph migration and PostgreSQL backend remain as future work. Current implementation includes:
+The crate contains the baseline and many v1/v2 extensions listed below.
+Deferred or incomplete work includes PostgreSQL, end-to-end tenant isolation,
+upgrading legacy plain vector tables, additional forgetting policies,
+cost/sensitivity-weighted retention and knowledge-graph migration. Consult the
+matrix rows rather than treating a milestone heading as a completion claim.
 
 **MVP baseline:**
 - SQLite storage, hybrid search (vector + FTS5), working gate, versioning, export, re-embedding, and CLI flows
 
-**v1 features (all implemented):**
+**Implemented v1 features:**
 - OpenAI and Ollama embedding providers
 - OpenAI and Ollama LLM providers
 - JSON import with gate bypass
@@ -233,7 +248,7 @@ The codebase has a complete MVP core plus the full v1 and v2 feature set. Only K
 - SQLite and `.elegy` portable export formats
 - Manual link creation and deletion
 
-**v2 features (all implemented except Knowledge Graph migration):**
+**Implemented v2 features:**
 - Graph traversal (BFS with depth limit and relation filter)
 - Memory poisoning detection (4 heuristics)
 - User correction feedback loop with gate-aware dispositions, contradiction journaling, inspectable history, and vector refresh / stale exclusion
