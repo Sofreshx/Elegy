@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "memory-tokio-lock-preparation/v1",
+  "baseRevision": "8dfca7c0aaabea46403445f5709ab0e90de14b40",
+  "cargoUpdateRawSha256": "032a730bd7f9be114387be47f253265e14a16b1af51ed2f067c82fd3166ef5c3",
+  "minimalLockSha256": "a71884b0352fe4f0785669670f4cd37e718559ebec5f8bf81c7de2e951f494b7",
+  "operation": "Restore unrelated windows-sys edges from base; retain only Tokio version/checksum update. Locked cargo validation required.",
+  "unrelatedEdgesRestored": 8,
+  "changedPackage": "tokio",
+  "before": "1.52.3",
+  "after": "1.53.3"
+}

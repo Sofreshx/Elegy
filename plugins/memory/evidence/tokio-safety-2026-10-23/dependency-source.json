@@ -1,0 +1,24 @@
+{
+  "package": "tokio",
+  "version": "1.53.3",
+  "upstreamRustVersion": "1.71",
+  "workspaceRustVersion": "1.88",
+  "downloadedCrateSha256": "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e",
+  "registryChecksumMatches": true,
+  "lockedTree": {
+    "argv": [
+      "cargo",
+      "tree",
+      "--locked",
+      "-p",
+      "tokio"
+    ],
+    "exitCode": 0,
+    "durationSeconds": 4.328,
+    "lockBefore": "a71884b0352fe4f0785669670f4cd37e718559ebec5f8bf81c7de2e951f494b7",
+    "lockAfter": "a71884b0352fe4f0785669670f4cd37e718559ebec5f8bf81c7de2e951f494b7",
+    "lockUnchanged": true,
+    "logSha256": "24df38780328adcc01e8a18107cf3f9fd1b58ce86d10868367692df33323b591"
+  },
+  "treeWrapperPreparationError": "Tree command passed with unchanged lock. Its outer Python printer then failed under cp1252; raw command output and exitCode were already captured."
+}

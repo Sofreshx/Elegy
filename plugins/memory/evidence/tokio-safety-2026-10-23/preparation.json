@@ -1,0 +1,38 @@
+{
+  "schemaVersion": "memory-tokio-preparation/v1",
+  "observedAt": "2026-10-23T15:33:49.765824+00:00",
+  "expectedHarnessTests": 25,
+  "priorCampaign": "../ci-integration-2026-10-23/README.md",
+  "modelCallsBeforeFreeze": 0,
+  "nativeRegression": {
+    "red": "native-validation/path-normalizer-red.json",
+    "green": "native-validation/path-normalizer-green.json"
+  },
+  "preparationErrors": [
+    {
+      "step": "cargo-tree wrapper",
+      "commandExit": 0,
+      "wrapperExit": 1,
+      "cause": "Printer UnicodeEncodeError under cp1252 after command/log/exit capture; dependency resolution itself passed unchanged."
+    },
+    {
+      "step": "first audit summary",
+      "commandExit": "not captured",
+      "wrapperExit": 1,
+      "cause": "Nullable advisory metadata in yanked warning; raw JSON retained locally. Second capture saves process result before parsing and passes."
+    },
+    {
+      "step": "first regression harness",
+      "cause": "A patch referred to absent run_native.sys; invalid RED proof retained locally, test repaired to patch sys.executable."
+    },
+    {
+      "step": "second regression harness",
+      "cause": "Used older Q6 campaign function. Superseded for exact-source binding by preserved third Q7 run and public reproducible Q7 run."
+    },
+    {
+      "step": "preflight before subject preparation",
+      "cause": "Worker diagnostic full test_campaign run has one missing subject.json preflight error. It is not a passing full-suite claim; actual final25-test run still required."
+    }
+  ],
+  "limits": "No product behavior/prompt/corpus change. Local raw traces remain runtime-only; public RED JSON is a path-neutralized derivative with raw output hash. Fresh source/build/freeze/model/recorder/CI gates remain pending."
+}

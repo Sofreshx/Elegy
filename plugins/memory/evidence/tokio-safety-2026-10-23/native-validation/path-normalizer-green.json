@@ -1,0 +1,22 @@
+{
+  "argv": [
+    "<python>",
+    "-m",
+    "unittest",
+    "test_campaign.CampaignTests.test_public_normalizes_windows_paths_recursively_with_boundaries",
+    "test_campaign.CampaignTests.test_run_native_public_normalizes_windows_paths_with_boundaries",
+    "test_campaign.CampaignTests.test_public_functions_preserve_posix_case_and_boundaries",
+    "-v"
+  ],
+  "cwd": "<qualification>",
+  "startedAt": "2026-10-23T15:33:49.009389+00:00",
+  "completedAt": "2026-10-23T15:33:49.456488+00:00",
+  "exitCode": 0,
+  "testsRun": 3,
+  "logSha256": "0eaca2798bda323575d68a7a36db238d9c3435ab92a574a49ca66191c5d8c98a",
+  "testSourceSha256": "cdf5113875cfaaf267c02182d8ed1c5749dd674cda6647078bd3333aed2b74e8",
+  "sourceSha256": {
+    "campaign.py": "79787d7960a169bd6ac0a687e4d8cacc3dac7fde558378074f298e86d0a2bf4b",
+    "run_native.py": "39123b542f33c1ef01140322a375581432cd6dd4d904445a78c13ccecf26c13a"
+  }
+}

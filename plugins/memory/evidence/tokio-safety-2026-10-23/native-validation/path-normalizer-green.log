@@ -1,0 +1,10 @@
+
+--- stderr ---
+test_public_normalizes_windows_paths_recursively_with_boundaries (test_campaign.CampaignTests.test_public_normalizes_windows_paths_recursively_with_boundaries) ... ok
+test_run_native_public_normalizes_windows_paths_with_boundaries (test_campaign.CampaignTests.test_run_native_public_normalizes_windows_paths_with_boundaries) ... ok
+test_public_functions_preserve_posix_case_and_boundaries (test_campaign.CampaignTests.test_public_functions_preserve_posix_case_and_boundaries) ... ok
+
+----------------------------------------------------------------------
+Ran 3 tests in 0.002s
+
+OK

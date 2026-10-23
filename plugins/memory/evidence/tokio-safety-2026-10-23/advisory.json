@@ -1,0 +1,21 @@
+{
+  "id": "RUSTSEC-2026-0386",
+  "url": "https://github.com/rustsec/advisory-db/blob/main/crates/tokio/RUSTSEC-2026-0386.md",
+  "blobSha1": "fac2eb554bb4c6f6113945bb878606803bf9eea7",
+  "bodySha256": "f92ab63fc1641af590f81babf9f211d77bdd7db14b82cb53a3a756a16864b520",
+  "observedAt": "2026-10-23T15:28:23.963877+00:00",
+  "databaseCommit": "84d943a6deeb8cc6c6f632531aaf4f1c62275239",
+  "databaseCommittedAt": "2026-10-23T14:42:16Z",
+  "affectedLockedVersion": "1.52.3",
+  "selectedPatchedVersion": "1.53.3",
+  "patchRanges": [
+    ">=1.51.6, <1.52.0",
+    ">=1.53.3"
+  ],
+  "classification": "unsound",
+  "trigger": "Safe AsyncFd constructors may retain invalid or replaced raw file descriptors; application has no direct AsyncFd use, dependency is nevertheless patched.",
+  "priorPrDenyPassedAt": "2026-10-23T14:36:51Z",
+  "pr49Merge": "8dfca7c0aaabea46403445f5709ab0e90de14b40",
+  "mainFailedRun": 39973132096,
+  "mainFailedJob": 120480737966
+}

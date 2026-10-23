@@ -399,3 +399,76 @@ and a separate198file public proof bundle. Public receipt3b103385-f0a9-4961-a12a
 is reported-satisfied on the same84answers and scores, with no new model calls.
 The original488792f5 receipt remains historical; its raw path-bearing inputs are
 local only. No published history was rewritten.
+
+## Tokio advisory follow-up after PR49
+
+PR49 merged as `8dfca7c` after all 19 exact-head PR checks passed. RustSec
+published RUSTSEC-2026-0386 in its database while those checks were finishing:
+the PR cargo-deny job had already passed, but the main-branch job subsequently
+failed. Its earlier successful qualification remains evidence for its exact
+source and binaries. Keep every earlier campaign and failed CI result intact.
+
+Authority and scope remain unchanged: the user selected installed Codex
+`gpt-6.1-sol / max`, excluded the other software host, and authorized push and
+merge after applicable checks. Use a separate ignored worktree and evidence
+folder `plugins/memory/evidence/tokio-safety-2026-10-23`. No real Memory,
+permanent configuration, new tool/host installation, paid API or persistent
+access is permitted.
+
+The smallest repair is Tokio 1.52.3 to 1.53.3 in Cargo.lock, without advisory
+exemptions or application changes. Restore unrelated resolver changes to
+Windows dependency edges and require a successful `cargo tree --locked`
+without further lock changes. Verify the downloaded crate checksum, upstream
+MSRV and fresh advisory database. cargo-deny is unavailable locally and must
+pass in CI; do not install it just for this task.
+
+Before freezing Q8, observe a failing fictitious-path regression on both
+publication wrappers, then repair Windows slash/case matching and separator
+boundaries. Preserve POSIX case sensitivity and unrelated arguments. Load the
+new test suite to record its exact discovered count, then require that count
+with zero errors/failures after the new replays; do not estimate the count.
+The final pre-freeze loader observes 25 tests, including the three new path
+regressions. Require all 25 after replay; the first pre-subject diagnostic error
+remains a preparation failure and is never counted as a full-suite pass.
+Freeze the source commit, source-lock 149/18 inventory, newly built CLI/MCP
+hashes, unchanged corpus/rubric and qualification scripts before model calls.
+
+Q8 acceptance reuses the frozen Q7 questions and strict rubric: 50 primary,
+24 transfer and 10 critical-repeat observations, all 84 distinct new threads,
+37 complete pairs, and all 47 with-recall paragraphs complete, grounded and
+format/control-correct. All three trials for each q08/q09/q11/q17/q18 must
+pass separately. Without recall, distinguish safe abstention from task
+completion. Any missing observation, selective rerun, source drift, unsupported
+fact or contamination blocks acceptance. Keep original lexical scores and
+report individual false negatives and review/preparation errors. Two
+independent 42-row prose reviews and the parent's 84-row acceptance remain
+required. Recheck all 37 reopened packets, 42 controls, source immutability
+and empty namespace cleanup on the new binaries.
+
+Run fresh contextual-recall and MCP checks on the new lockfile and capture
+the exact commands, counts and outputs. Reuse the 408 Memory, 151 patched
+consumer and 14 hook tests only within their historical source scope; the
+final CI provides fresh workspace coverage. Use child-only absolute scratch
+paths on D: for temporary files. Inspect the exact public tree, paths, logs,
+status/history, metadata and manifests before the first Q8 `eval record`.
+Use a single isolated public recorder after that gate; never seal a known
+path-bearing raw input and subsequently replace it. Local raw runtime files
+remain outside the public store.
+
+The exact final PR head must pass all applicable controls equivalent to the
+19 PR49 checks: contracts bundle export, installer bootstrap packaging,
+contracts validation/repository boundaries, fmt, Clippy, Rust 1.88 MSRV,
+workspace tests on Ubuntu/Windows/macOS, packaging smoke, authoritative docs
+check, release Memory eval, cargo-deny, cargo-audit, Gitleaks, CodeQL workflow
+and analysis, Zizmor workflow and analysis. Observe every check rather than
+requiring a guessed total if GitHub changes the presentation. Verify the
+target/diff, conflicts, private tree/history/metadata/ref gates and existing
+main-snapshot automation before normal push and a merge commit preserving the
+qualified source object. Observe postmerge CI and publication results.
+
+Stop and reassess on an unpatched advisory, unnecessary dependency drift,
+path normalization failure, proof/hash mismatch, missing or failing answer,
+new privacy boundary or failed applicable CI. No ignore, weaker criterion,
+readiness promotion, global gain or monetary saving is authorized by this
+follow-up. The reviewed plan's count and full-gate clarifications are included
+above; the exact count and binding values will be recorded before Q8 freeze.
