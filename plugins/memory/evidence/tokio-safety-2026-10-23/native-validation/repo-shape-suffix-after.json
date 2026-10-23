@@ -1,0 +1,21 @@
+{
+  "schemaVersion": "elegy-repo-shape-suffix-evidence/v1",
+  "phase": "green",
+  "command": "pwsh -NoProfile -File scripts/test-check-repo-shape.ps1",
+  "exitCode": 0,
+  "stdout": "check-repo-shape fixture tests passed",
+  "stderr": "",
+  "sourceHashes": {
+    "scripts/check-repo-shape.ps1": "8d604a6ce56d27b8972140892d9fb3c0d63c24a6",
+    "scripts/test-check-repo-shape.ps1": "13b1de618d68cf1b4931047efabf913f7081c735"
+  },
+  "assertions": {
+    "blockingLocalPathIssueCount": 4,
+    "windowsSuffixMisclassified": false,
+    "plainLinuxRejected": true,
+    "quotedLinuxRejected": true,
+    "fileUriLinuxRejected": true,
+    "emptyTrackedFileAccepted": true,
+    "unreadableTrackedFileReported": true
+  }
+}

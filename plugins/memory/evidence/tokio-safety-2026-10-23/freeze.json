@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "memory-tokio-freeze/v1",
+  "freezeRevision": "ce49cd4a8e473fc11f40f54005a7fbebe73a8074",
+  "observedAt": "2026-10-23T15:57:33.333999+00:00",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "subjectSha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+  "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+  "modelOutputDirectoriesAbsent": true,
+  "expectedModelThreads": 84,
+  "expectedHarnessTests": 25,
+  "qualificationCodeFiles": 11,
+  "firstCommitAttempt": "Hook inspection failed generically during concurrent compiler allocation failures; no commit made. Exact same staged content/message passed both hooks after compilation ended. Cause of generic hook error is not independently established; no hook/config changes."
+}

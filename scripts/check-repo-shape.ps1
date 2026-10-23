@@ -56,7 +56,7 @@ foreach ($file in $trackedFiles) {
 $windowsUsersPathPattern = 'C:' + '[/\\]' + 'Users'
 $appDataPathPattern = 'AppData' + '[/\\]' + 'Local'
 $macUsersPathPattern = '/' + 'Users' + '/[^/\s]+'
-$linuxHomePathPattern = '/' + 'home' + '/[^/\s]+'
+$linuxHomePathPattern = '(?<![A-Za-z0-9_.-])/' + 'home' + '/[^/\s]+'
 $localPathPattern = @(
     $windowsUsersPathPattern,
     $appDataPathPattern,

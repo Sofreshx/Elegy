@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "memory-generic-replay/v1",
+  "startedAt": "2026-10-23T15:59:08.182192+00:00",
+  "status": "completed",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "cliSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+  "mcpSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+  "corpusSha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893",
+  "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "nacre",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "6386c749407e7273031d5bd9c7b26be6d3fd75cbe72cf24642f92d2ff3485fa3",
+      "error": null
+    },
+    {
+      "id": "quartz",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "b7f31670194ea4e58ad78c3dc12dee7c6eb3f4bf9a9c9d15452953ccb61e9e4c",
+      "error": null
+    },
+    {
+      "id": "brume",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "dfc79256ea6766def223abb0f9b185a82f3eb817d6d8e105a4333491caceb559",
+      "error": null
+    },
+    {
+      "id": "mistral",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "3a751e7f0f74acc4c5d62acfdb887406f9f6d186ddd33099ef4c35ae20908dfe",
+      "error": null
+    }
+  ],
+  "completedAt": "2026-10-23T15:59:34.874950+00:00",
+  "cliSha256After": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+  "mcpSha256After": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+}

@@ -1,0 +1,181 @@
+{
+  "schemaVersion": "memory-q8-final-bundle-review/v1",
+  "scope": "Read-only final audit of the Q8 recorder bundle and its immutable campaign evidence.",
+  "verdict": "APPROVED",
+  "reviewedAt": "2026-10-23",
+  "evidenceRoot": "plugins/memory/evidence/tokio-safety-2026-10-23",
+  "checks": [
+    {
+      "id": "proof-manifest",
+      "status": "PASS",
+      "path": "proof-manifest.json",
+      "sha256": "373c6f3dd7a3024024f032aa55f3954013e6a3879c9050794ab09cbeab71ecf2",
+      "fileCount": 193,
+      "verified": "Every listed campaign-root file exists with the listed SHA-256 and byte length. No listed path starts recorder/ or Q8/. The manifest copy under recorder/inputs is byte-identical and retains campaign-root paths, as declared by copyResolution."
+    },
+    {
+      "id": "answer-quality-attachments",
+      "status": "PASS",
+      "path": "answer-quality-observation.json",
+      "sha256": "42c7568d30bc47ed36015d553cdad5c21c6acfde22ff1499c58e3bcaa31042ae",
+      "attachmentCount": 16,
+      "verified": "Each of the 16 declared evidence hashes matches the unique campaign-root original and the corresponding recorder/inputs copy, including exact byte size."
+    },
+    {
+      "id": "assessment-reconstruction",
+      "status": "PASS",
+      "path": "assessment.json",
+      "sha256": "437d2f4b5ad331f2b734719c52ae29c221215a8145b9db77acd00ca4cade870a",
+      "sessions": {
+        "assessmentRecords": 84,
+        "uniqueThreadIds": 84,
+        "observationSessions": 84,
+        "sessionSetEqual": true
+      },
+      "pairedCases": {
+        "assessmentCaseIds": 37,
+        "observationPairedCases": 37,
+        "caseSetEqual": true,
+        "trialValues": [1, 2, 3],
+        "armCounts": {
+          "withRecall": 47,
+          "withoutRecall": 37
+        },
+        "trial1ScoresAndLatenciesReconstructed": true
+      },
+      "assessmentStatus": "qualified-selected-configuration",
+      "assessmentErrors": [],
+      "verified": "The paired cases and sessions were reconstructed from actual assessment records; the aggregate status was not used as the sole proof."
+    },
+    {
+      "id": "subject-source-freeze-binaries",
+      "status": "PASS",
+      "paths": ["subject.json", "protocol.json", "source-lock.json", "freeze.json", "pinned-binaries.json", "pre-freeze-check.json", "execution-checks.json"],
+      "hashes": {
+        "subject.json": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+        "protocol.json": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+        "source-lock.json": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+        "freeze.json": "5ed82786604ec3fba3c795211f19da79ba04874556671e39a6af284960d79ff7",
+        "pinned-binaries.json": "c8061d856ba33f742f47af78af529e14b820236528870d75d36648c39abcd46f"
+      },
+      "bindings": {
+        "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+        "sourceSha256": "a0c84881c88fb048d80539b3773453b636ba4e6798c3aa9a44cb976d72b05bcd",
+        "cliSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+        "mcpSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+        "buildMatchesSource": true,
+        "rebuildRequired": false,
+        "freezeExpectedModelThreads": 84
+      },
+      "protocolDigests": {
+        "campaignProtocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+        "recorderClaimProtocolSha256": "dc53bc58625e00a30abbe63fdb37e0597339860d6be48a1f901803709b3b1e07",
+        "recorderClaimDigestPropagation": true
+      },
+      "verified": "Source, source lock, freeze, pinned CLI/MCP, subject, execution checks and pre-freeze checks bind consistently. The recorder protocol digest is the qualification-claim digest defined by the native qualification code; it is distinct from the campaign protocol file hash."
+    },
+    {
+      "id": "pre-record-ordering",
+      "status": "PASS",
+      "path": "pre-record-gate.json",
+      "sha256": "91c0ebeb59a9df673a389c1c9111a923faa4f30398661731779bb6acebb7d7a1",
+      "gate": {
+        "status": "PASS",
+        "observedAt": "2026-10-23T18:43:52.665286+02:00",
+        "firstQ8RecorderCallStillPending": true,
+        "manifestFiles": 193,
+        "attachmentCount": 16,
+        "publicFilesScanned": 213,
+        "markdownLinksChecked": 112
+      },
+      "ordering": {
+        "observationCompletedAt": "2026-10-23T16:10:58.549644Z",
+        "gateObservedAt": "2026-10-23T16:43:52.665286Z",
+        "receiptCreatedAt": "2026-10-23T16:44:44.993837500Z",
+        "gateBeforeReceipt": true
+      }
+    },
+    {
+      "id": "recorder-chain",
+      "status": "PASS",
+      "receipt": {
+        "id": "1d5c9a69-c8ae-4863-9117-a59b2615891f",
+        "path": "recorder/receipts/1d5c9a69-c8ae-4863-9117-a59b2615891f.json",
+        "fileSha256": "f35f626bae20c19fc7981d9aec01d65673604ae5001f7d6e4bcdc290617d5c48",
+        "internalSha256": "dce7aef13908a3ff036d1e7628fae6ba9987c95e92fa1285f1828e0eb814610c",
+        "ledgerInternalSha256Matches": true,
+        "outcome": "satisfied",
+        "sessionCount": 84,
+        "pairedCaseCount": 37,
+        "evidenceCount": 16
+      },
+      "files": {
+        "receipt-summary.json": "131a2f851cac7163cc41d89ff1afa8714dda052d8bf743878d9f55aa72275188",
+        "record-output.json": "9747ef5b57dae47d273b3d129d1848780f183a31c113125d25737f1aa58fbc10",
+        "record-execution.json": "5fb522eeb18e8aa87e915b56514803ec36b8421af9805ed70394b52b76867f10",
+        "qualification-status.json": "cfac361bb27bfb5df5be3c3d89a59ce471d3e5b3169d54fcd7c59fee0a163d76",
+        "qualification-history.json": "95cdfe8207bc8a8f6f373d62d06e454f8b81c3686515321fab6f8642ca9d2bd4",
+        "recorder/ledger.json": "50820e6b5fbc850f411c0fa7fcb3d338fb5ec1092e515c1a07079a2c169a8fd5"
+      },
+      "concordance": {
+        "summaryFileHashMatchesReceipt": true,
+        "summaryIdMatchesReceipt": true,
+        "recordOutputIdClaimOutcomeMatch": true,
+        "recordOutputProtocolDigestMatchesReceipt": true,
+        "statusLatestReceiptMatches": true,
+        "historyCount": 1,
+        "historyIdMatchesReceipt": true,
+        "recordExecutionExitCodes": [0, 0, 0]
+      }
+    },
+    {
+      "id": "qualification-flags",
+      "status": "PASS",
+      "values": {
+        "status": "reported-satisfied",
+        "reviewRequired": true,
+        "externalSubjectRequiresRecheck": true,
+        "staleReasons": [],
+        "buildMatchesSource": true,
+        "rebuildRequired": false,
+        "readinessPromotion": false,
+        "newModelCalls": 0,
+        "modelOutputsChanged": 0,
+        "scoresChanged": 0
+      },
+      "verified": "The answer-quality claim is reported as satisfied with the required review and external-subject recheck flags. Other inventory claims remain unverified and are not promoted by this receipt."
+    },
+    {
+      "id": "review-preservation",
+      "status": "PASS",
+      "files": {
+        "review-batch-a.json": "374956ff229c49b01f075e9b849b77050616f13cce04a5c5409c61c7b7bc4694",
+        "review-batch-b.json": "dbcabd675d27c8fa2798c2f0793b649d8e92a6b3fe63504cae44e9abb71c60ea",
+        "review-batch-a-addendum.json": "c7bc7867d8c581ec51c68339fcec9f76aba31a56242a5a05543db2221af2c072",
+        "review-batch-b-addendum.json": "bdd371d6bfe98bf3ae9046a4b4089c13cf28999b70bdd36f6ebb344a617167c7",
+        "semantic-review.json": "8bed0aee3c22640113d77ed488dfef666b519bb44138e2e1d0f56f9530947448",
+        "parent-review.json": "14521612be6216d06f9d47b2c38755f7689ad09da42a201d08127b3916982ed9",
+        "review-corrections-audit.json": "a439ca4b259c621b74e9411e5261d776fde3bee70b06b56ce78603d26a05952b",
+        "review-relocation.json": "ec4e1c84ea25156b4f608b1ec2156dedb61237eaf15659ef796088b180cdfab8"
+      },
+      "falseNegativeControls": {
+        "count": 6,
+        "unchanged": true
+      },
+      "verified": "The current originals, two addenda, consolidated review, correction audit and relocation record are present with stable hashes. The recorded receipt reports zero model-output and score changes; no report was rewritten by this audit."
+    },
+    {
+      "id": "readme-integration-reproduction",
+      "status": "PASS",
+      "path": "README.md",
+      "sha256": "8f40b2c6408e17a2cff724197848d58233a1a3f99193c839f4da9f1ae238cee1",
+      "verified": "The current README integration/reproduction sections were read. They describe the 193-file pre-record manifest, 16 exact recorder copies, receipt/status/history links, explicit review-required flags, no readiness promotion, and separate future CI/publication validation."
+    }
+  ],
+  "limits": [
+    "The recorder context records dirty=true at git revision 14e972247b654c02f61474782f509244addbe87c; this audit preserves that recorded fact and does not treat it as a clean-tree proof.",
+    "This approval is for bundle integrity and evidence-chain coherence. It is not a readiness promotion, a fresh external-subject recheck, a new model evaluation, or proof of future CI, merge, publication, or main-snapshot results.",
+    "The receipt is an external observation for the finite installed Codex CLI lexical configuration; backend/model aliases and full Desktop settings remain outside qualification.",
+    "Current hashes and the recorded scoresChanged/modelOutputsChanged zeros preserve the declared review evidence; no separate pre-receipt baseline hash for every review file was supplied for an independent historical diff."
+  ]
+}

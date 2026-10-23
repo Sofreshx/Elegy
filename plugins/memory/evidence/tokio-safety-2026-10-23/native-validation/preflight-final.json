@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "<python>",
+    "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/campaign.py",
+    "--phase",
+    "preflight"
+  ],
+  "startedAt": "2026-10-23T16:41:25.548181+00:00",
+  "completedAt": "2026-10-23T16:41:30.570613+00:00",
+  "durationSeconds": 5.015,
+  "exitCode": 0,
+  "log": "preflight-final.log",
+  "logSha256": "7bb0dacb68b5cf3422d0ecd76814d306f3b805fc77ba8ca9f8a7009125772650",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadBefore": "14e972247b654c02f61474782f509244addbe87c",
+  "gitHeadAfter": "14e972247b654c02f61474782f509244addbe87c",
+  "sourceLockSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+  "sourceSnapshotBeforeSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceSnapshotAfterSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

@@ -1,0 +1,924 @@
+{
+  "schemaVersion": "memory-build-resource-samples/v1",
+  "startedAt": "2026-10-23T15:56:58.510416+00:00",
+  "completedAt": "2026-10-23T16:01:53.725130+00:00",
+  "argv": [
+    "<python>",
+    "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/run_native.py",
+    "--name",
+    "mcp-final-02",
+    "--",
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-memory-mcp",
+    "-j",
+    "2"
+  ],
+  "exitCode": 0,
+  "samplingIntervalSeconds": 2,
+  "samples": [
+    {
+      "at": "2026-10-23T15:56:58.509418+00:00",
+      "committedBytes": 19472171008,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4717637632
+    },
+    {
+      "at": "2026-10-23T15:57:00.514839+00:00",
+      "committedBytes": 20791021568,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4554539008
+    },
+    {
+      "at": "2026-10-23T15:57:02.524842+00:00",
+      "committedBytes": 20463071232,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4116471808
+    },
+    {
+      "at": "2026-10-23T15:57:04.530205+00:00",
+      "committedBytes": 20680306688,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3999543296
+    },
+    {
+      "at": "2026-10-23T15:57:06.535404+00:00",
+      "committedBytes": 20634050560,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3931693056
+    },
+    {
+      "at": "2026-10-23T15:57:08.539137+00:00",
+      "committedBytes": 20641435648,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3862048768
+    },
+    {
+      "at": "2026-10-23T15:57:10.543220+00:00",
+      "committedBytes": 20246925312,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4104495104
+    },
+    {
+      "at": "2026-10-23T15:57:12.554937+00:00",
+      "committedBytes": 20232445952,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4307173376
+    },
+    {
+      "at": "2026-10-23T15:57:14.555828+00:00",
+      "committedBytes": 21082914816,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4201250816
+    },
+    {
+      "at": "2026-10-23T15:57:16.569556+00:00",
+      "committedBytes": 20558581760,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4202049536
+    },
+    {
+      "at": "2026-10-23T15:57:18.575676+00:00",
+      "committedBytes": 20644986880,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4128489472
+    },
+    {
+      "at": "2026-10-23T15:57:20.587599+00:00",
+      "committedBytes": 20814409728,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3995787264
+    },
+    {
+      "at": "2026-10-23T15:57:22.592122+00:00",
+      "committedBytes": 20820369408,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3902832640
+    },
+    {
+      "at": "2026-10-23T15:57:24.592482+00:00",
+      "committedBytes": 20588494848,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4170354688
+    },
+    {
+      "at": "2026-10-23T15:57:26.595342+00:00",
+      "committedBytes": 21431988224,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4085620736
+    },
+    {
+      "at": "2026-10-23T15:57:28.599552+00:00",
+      "committedBytes": 21540261888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3977662464
+    },
+    {
+      "at": "2026-10-23T15:57:30.614562+00:00",
+      "committedBytes": 21528539136,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3973316608
+    },
+    {
+      "at": "2026-10-23T15:57:32.630361+00:00",
+      "committedBytes": 21547372544,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3966640128
+    },
+    {
+      "at": "2026-10-23T15:57:34.636932+00:00",
+      "committedBytes": 21936226304,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3565604864
+    },
+    {
+      "at": "2026-10-23T15:57:36.639576+00:00",
+      "committedBytes": 21762789376,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3715268608
+    },
+    {
+      "at": "2026-10-23T15:57:38.651305+00:00",
+      "committedBytes": 21006639104,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3704721408
+    },
+    {
+      "at": "2026-10-23T15:57:40.656527+00:00",
+      "committedBytes": 20966297600,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3782279168
+    },
+    {
+      "at": "2026-10-23T15:57:42.662709+00:00",
+      "committedBytes": 21029683200,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3730669568
+    },
+    {
+      "at": "2026-10-23T15:57:44.664345+00:00",
+      "committedBytes": 20958916608,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3792891904
+    },
+    {
+      "at": "2026-10-23T15:57:46.670297+00:00",
+      "committedBytes": 20235157504,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3891949568
+    },
+    {
+      "at": "2026-10-23T15:57:48.672193+00:00",
+      "committedBytes": 20272734208,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3868815360
+    },
+    {
+      "at": "2026-10-23T15:57:50.684198+00:00",
+      "committedBytes": 20519571456,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3633688576
+    },
+    {
+      "at": "2026-10-23T15:57:52.696923+00:00",
+      "committedBytes": 20684484608,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3573297152
+    },
+    {
+      "at": "2026-10-23T15:57:54.699769+00:00",
+      "committedBytes": 20639981568,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3598569472
+    },
+    {
+      "at": "2026-10-23T15:57:56.707798+00:00",
+      "committedBytes": 20634632192,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3593400320
+    },
+    {
+      "at": "2026-10-23T15:57:58.722961+00:00",
+      "committedBytes": 20636086272,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3598426112
+    },
+    {
+      "at": "2026-10-23T15:58:00.736451+00:00",
+      "committedBytes": 20641067008,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3596201984
+    },
+    {
+      "at": "2026-10-23T15:58:02.740199+00:00",
+      "committedBytes": 20697116672,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3579658240
+    },
+    {
+      "at": "2026-10-23T15:58:04.740419+00:00",
+      "committedBytes": 20689010688,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3575615488
+    },
+    {
+      "at": "2026-10-23T15:58:06.740925+00:00",
+      "committedBytes": 20712751104,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3554369536
+    },
+    {
+      "at": "2026-10-23T15:58:08.755276+00:00",
+      "committedBytes": 20688711680,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3563024384
+    },
+    {
+      "at": "2026-10-23T15:58:10.770440+00:00",
+      "committedBytes": 20689141760,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3577884672
+    },
+    {
+      "at": "2026-10-23T15:58:12.781927+00:00",
+      "committedBytes": 20745977856,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3541393408
+    },
+    {
+      "at": "2026-10-23T15:58:14.787034+00:00",
+      "committedBytes": 20745748480,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3536613376
+    },
+    {
+      "at": "2026-10-23T15:58:16.796188+00:00",
+      "committedBytes": 20733812736,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3555463168
+    },
+    {
+      "at": "2026-10-23T15:58:18.802323+00:00",
+      "committedBytes": 20718555136,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3550269440
+    },
+    {
+      "at": "2026-10-23T15:58:20.814125+00:00",
+      "committedBytes": 20718751744,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3560148992
+    },
+    {
+      "at": "2026-10-23T15:58:22.826765+00:00",
+      "committedBytes": 20724289536,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3557851136
+    },
+    {
+      "at": "2026-10-23T15:58:24.830628+00:00",
+      "committedBytes": 20725227520,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3568082944
+    },
+    {
+      "at": "2026-10-23T15:58:26.842982+00:00",
+      "committedBytes": 20695293952,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3562848256
+    },
+    {
+      "at": "2026-10-23T15:58:28.853820+00:00",
+      "committedBytes": 20704755712,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3567132672
+    },
+    {
+      "at": "2026-10-23T15:58:30.859621+00:00",
+      "committedBytes": 20637601792,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3605282816
+    },
+    {
+      "at": "2026-10-23T15:58:32.871822+00:00",
+      "committedBytes": 20647550976,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3594346496
+    },
+    {
+      "at": "2026-10-23T15:58:34.874608+00:00",
+      "committedBytes": 20623765504,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3596345344
+    },
+    {
+      "at": "2026-10-23T15:58:36.888067+00:00",
+      "committedBytes": 20624592896,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3603394560
+    },
+    {
+      "at": "2026-10-23T15:58:38.901286+00:00",
+      "committedBytes": 20648108032,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3588681728
+    },
+    {
+      "at": "2026-10-23T15:58:40.913806+00:00",
+      "committedBytes": 20747378688,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3509063680
+    },
+    {
+      "at": "2026-10-23T15:58:42.926302+00:00",
+      "committedBytes": 20749910016,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3484061696
+    },
+    {
+      "at": "2026-10-23T15:58:44.938671+00:00",
+      "committedBytes": 20718657536,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3508391936
+    },
+    {
+      "at": "2026-10-23T15:58:46.945847+00:00",
+      "committedBytes": 20775755776,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3481690112
+    },
+    {
+      "at": "2026-10-23T15:58:48.949826+00:00",
+      "committedBytes": 20917207040,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3368591360
+    },
+    {
+      "at": "2026-10-23T15:58:50.952889+00:00",
+      "committedBytes": 20867661824,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3368423424
+    },
+    {
+      "at": "2026-10-23T15:58:52.960408+00:00",
+      "committedBytes": 20769701888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3458232320
+    },
+    {
+      "at": "2026-10-23T15:58:54.972878+00:00",
+      "committedBytes": 21083488256,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3276685312
+    },
+    {
+      "at": "2026-10-23T15:58:56.982060+00:00",
+      "committedBytes": 20974899200,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3311157248
+    },
+    {
+      "at": "2026-10-23T15:58:58.995170+00:00",
+      "committedBytes": 20927238144,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3363586048
+    },
+    {
+      "at": "2026-10-23T15:59:01.006392+00:00",
+      "committedBytes": 21042753536,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3278548992
+    },
+    {
+      "at": "2026-10-23T15:59:03.020753+00:00",
+      "committedBytes": 21126565888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3187126272
+    },
+    {
+      "at": "2026-10-23T15:59:05.021926+00:00",
+      "committedBytes": 20929146880,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3317751808
+    },
+    {
+      "at": "2026-10-23T15:59:07.025397+00:00",
+      "committedBytes": 20912373760,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3353628672
+    },
+    {
+      "at": "2026-10-23T15:59:09.039373+00:00",
+      "committedBytes": 20744687616,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3488411648
+    },
+    {
+      "at": "2026-10-23T15:59:11.045018+00:00",
+      "committedBytes": 20645924864,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3584503808
+    },
+    {
+      "at": "2026-10-23T15:59:13.048998+00:00",
+      "committedBytes": 20209680384,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3906994176
+    },
+    {
+      "at": "2026-10-23T15:59:15.052084+00:00",
+      "committedBytes": 20175396864,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4010754048
+    },
+    {
+      "at": "2026-10-23T15:59:17.052926+00:00",
+      "committedBytes": 20175396864,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4043898880
+    },
+    {
+      "at": "2026-10-23T15:59:19.062615+00:00",
+      "committedBytes": 20256104448,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4112297984
+    },
+    {
+      "at": "2026-10-23T15:59:21.076087+00:00",
+      "committedBytes": 20482334720,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4362743808
+    },
+    {
+      "at": "2026-10-23T15:59:23.076554+00:00",
+      "committedBytes": 20410912768,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4498776064
+    },
+    {
+      "at": "2026-10-23T15:59:25.077380+00:00",
+      "committedBytes": 20426711040,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4494327808
+    },
+    {
+      "at": "2026-10-23T15:59:27.090548+00:00",
+      "committedBytes": 20450971648,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4415787008
+    },
+    {
+      "at": "2026-10-23T15:59:29.095360+00:00",
+      "committedBytes": 21264175104,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4376973312
+    },
+    {
+      "at": "2026-10-23T15:59:31.105645+00:00",
+      "committedBytes": 21220560896,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4397793280
+    },
+    {
+      "at": "2026-10-23T15:59:33.117509+00:00",
+      "committedBytes": 21311410176,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4277907456
+    },
+    {
+      "at": "2026-10-23T15:59:35.123176+00:00",
+      "committedBytes": 21459374080,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4123938816
+    },
+    {
+      "at": "2026-10-23T15:59:37.133289+00:00",
+      "committedBytes": 21841121280,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3748904960
+    },
+    {
+      "at": "2026-10-23T15:59:39.141553+00:00",
+      "committedBytes": 21402259456,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4156268544
+    },
+    {
+      "at": "2026-10-23T15:59:41.141914+00:00",
+      "committedBytes": 21422104576,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4137504768
+    },
+    {
+      "at": "2026-10-23T15:59:43.152332+00:00",
+      "committedBytes": 21415141376,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4133339136
+    },
+    {
+      "at": "2026-10-23T15:59:45.163544+00:00",
+      "committedBytes": 20515745792,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4289490944
+    },
+    {
+      "at": "2026-10-23T15:59:47.178424+00:00",
+      "committedBytes": 20546334720,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4270395392
+    },
+    {
+      "at": "2026-10-23T15:59:49.190835+00:00",
+      "committedBytes": 20989046784,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3935264768
+    },
+    {
+      "at": "2026-10-23T15:59:51.194296+00:00",
+      "committedBytes": 21004374016,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3902947328
+    },
+    {
+      "at": "2026-10-23T15:59:53.200661+00:00",
+      "committedBytes": 20915310592,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3925041152
+    },
+    {
+      "at": "2026-10-23T15:59:55.206284+00:00",
+      "committedBytes": 20931678208,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3875045376
+    },
+    {
+      "at": "2026-10-23T15:59:57.207696+00:00",
+      "committedBytes": 20004929536,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4013989888
+    },
+    {
+      "at": "2026-10-23T15:59:59.212302+00:00",
+      "committedBytes": 20112650240,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4034654208
+    },
+    {
+      "at": "2026-10-23T16:00:01.215628+00:00",
+      "committedBytes": 20088811520,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4113498112
+    },
+    {
+      "at": "2026-10-23T16:00:03.217711+00:00",
+      "committedBytes": 20103761920,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4135919616
+    },
+    {
+      "at": "2026-10-23T16:00:05.233164+00:00",
+      "committedBytes": 20840681472,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3735904256
+    },
+    {
+      "at": "2026-10-23T16:00:07.235586+00:00",
+      "committedBytes": 20608135168,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3872706560
+    },
+    {
+      "at": "2026-10-23T16:00:09.248488+00:00",
+      "committedBytes": 20643909632,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3768299520
+    },
+    {
+      "at": "2026-10-23T16:00:11.257589+00:00",
+      "committedBytes": 20715806720,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3701096448
+    },
+    {
+      "at": "2026-10-23T16:00:13.266369+00:00",
+      "committedBytes": 20639178752,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3831889920
+    },
+    {
+      "at": "2026-10-23T16:00:15.277616+00:00",
+      "committedBytes": 20205989888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4271513600
+    },
+    {
+      "at": "2026-10-23T16:00:17.279117+00:00",
+      "committedBytes": 20964364288,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4224221184
+    },
+    {
+      "at": "2026-10-23T16:00:19.292563+00:00",
+      "committedBytes": 21064925184,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4105207808
+    },
+    {
+      "at": "2026-10-23T16:00:21.304753+00:00",
+      "committedBytes": 21019926528,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4129226752
+    },
+    {
+      "at": "2026-10-23T16:00:23.309086+00:00",
+      "committedBytes": 21068230656,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3844104192
+    },
+    {
+      "at": "2026-10-23T16:00:25.322022+00:00",
+      "committedBytes": 20975882240,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3908435968
+    },
+    {
+      "at": "2026-10-23T16:00:27.325513+00:00",
+      "committedBytes": 21006110720,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3855364096
+    },
+    {
+      "at": "2026-10-23T16:00:29.333728+00:00",
+      "committedBytes": 21012910080,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3855945728
+    },
+    {
+      "at": "2026-10-23T16:00:31.344225+00:00",
+      "committedBytes": 20714512384,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4075057152
+    },
+    {
+      "at": "2026-10-23T16:00:33.354110+00:00",
+      "committedBytes": 19778748416,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4353482752
+    },
+    {
+      "at": "2026-10-23T16:00:35.368272+00:00",
+      "committedBytes": 19817189376,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4319232000
+    },
+    {
+      "at": "2026-10-23T16:00:37.376506+00:00",
+      "committedBytes": 20171542528,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4045848576
+    },
+    {
+      "at": "2026-10-23T16:00:39.379642+00:00",
+      "committedBytes": 20208349184,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3989499904
+    },
+    {
+      "at": "2026-10-23T16:00:41.387263+00:00",
+      "committedBytes": 20202409984,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3986251776
+    },
+    {
+      "at": "2026-10-23T16:00:43.396135+00:00",
+      "committedBytes": 20199006208,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3986853888
+    },
+    {
+      "at": "2026-10-23T16:00:45.405953+00:00",
+      "committedBytes": 20297199616,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3903512576
+    },
+    {
+      "at": "2026-10-23T16:00:47.409273+00:00",
+      "committedBytes": 20368908288,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3834068992
+    },
+    {
+      "at": "2026-10-23T16:00:49.421036+00:00",
+      "committedBytes": 20153602048,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4038230016
+    },
+    {
+      "at": "2026-10-23T16:00:51.435929+00:00",
+      "committedBytes": 20163751936,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4024352768
+    },
+    {
+      "at": "2026-10-23T16:00:53.438964+00:00",
+      "committedBytes": 20218896384,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3963707392
+    },
+    {
+      "at": "2026-10-23T16:00:55.445156+00:00",
+      "committedBytes": 20337295360,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3867521024
+    },
+    {
+      "at": "2026-10-23T16:00:57.453088+00:00",
+      "committedBytes": 20396613632,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3823509504
+    },
+    {
+      "at": "2026-10-23T16:00:59.459787+00:00",
+      "committedBytes": 20579053568,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3631624192
+    },
+    {
+      "at": "2026-10-23T16:01:01.466282+00:00",
+      "committedBytes": 20721975296,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3487485952
+    },
+    {
+      "at": "2026-10-23T16:01:03.476472+00:00",
+      "committedBytes": 20327997440,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3840258048
+    },
+    {
+      "at": "2026-10-23T16:01:05.490773+00:00",
+      "committedBytes": 20334526464,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 3773751296
+    },
+    {
+      "at": "2026-10-23T16:01:07.494699+00:00",
+      "committedBytes": 19919966208,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4114251776
+    },
+    {
+      "at": "2026-10-23T16:01:09.502849+00:00",
+      "committedBytes": 19861782528,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4320063488
+    },
+    {
+      "at": "2026-10-23T16:01:11.504703+00:00",
+      "committedBytes": 19713519616,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4482580480
+    },
+    {
+      "at": "2026-10-23T16:01:13.517021+00:00",
+      "committedBytes": 19751399424,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4444372992
+    },
+    {
+      "at": "2026-10-23T16:01:15.526274+00:00",
+      "committedBytes": 19866370048,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4363694080
+    },
+    {
+      "at": "2026-10-23T16:01:17.535546+00:00",
+      "committedBytes": 19764523008,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4462403584
+    },
+    {
+      "at": "2026-10-23T16:01:19.548167+00:00",
+      "committedBytes": 19745128448,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4465651712
+    },
+    {
+      "at": "2026-10-23T16:01:21.562281+00:00",
+      "committedBytes": 19776626688,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4444454912
+    },
+    {
+      "at": "2026-10-23T16:01:23.577292+00:00",
+      "committedBytes": 19774222336,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4467355648
+    },
+    {
+      "at": "2026-10-23T16:01:25.583862+00:00",
+      "committedBytes": 19751862272,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4465659904
+    },
+    {
+      "at": "2026-10-23T16:01:27.590525+00:00",
+      "committedBytes": 19735904256,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4506071040
+    },
+    {
+      "at": "2026-10-23T16:01:29.598244+00:00",
+      "committedBytes": 19743436800,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4504555520
+    },
+    {
+      "at": "2026-10-23T16:01:31.609287+00:00",
+      "committedBytes": 19922292736,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4381560832
+    },
+    {
+      "at": "2026-10-23T16:01:33.614659+00:00",
+      "committedBytes": 19751288832,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4487811072
+    },
+    {
+      "at": "2026-10-23T16:01:35.625478+00:00",
+      "committedBytes": 19717009408,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4495372288
+    },
+    {
+      "at": "2026-10-23T16:01:37.637861+00:00",
+      "committedBytes": 19709423616,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4495855616
+    },
+    {
+      "at": "2026-10-23T16:01:39.642368+00:00",
+      "committedBytes": 19790794752,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4439846912
+    },
+    {
+      "at": "2026-10-23T16:01:41.655360+00:00",
+      "committedBytes": 19696869376,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4507897856
+    },
+    {
+      "at": "2026-10-23T16:01:43.665748+00:00",
+      "committedBytes": 19690229760,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4539449344
+    },
+    {
+      "at": "2026-10-23T16:01:45.669141+00:00",
+      "committedBytes": 19726757888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4505714688
+    },
+    {
+      "at": "2026-10-23T16:01:47.683690+00:00",
+      "committedBytes": 19706023936,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4530106368
+    },
+    {
+      "at": "2026-10-23T16:01:49.697250+00:00",
+      "committedBytes": 20032016384,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4490252288
+    },
+    {
+      "at": "2026-10-23T16:01:51.709311+00:00",
+      "committedBytes": 20171685888,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4497317888
+    },
+    {
+      "at": "2026-10-23T16:01:53.719597+00:00",
+      "committedBytes": 19688574976,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4554629120
+    },
+    {
+      "at": "2026-10-23T16:01:53.724121+00:00",
+      "committedBytes": 19679834112,
+      "commitLimitBytes": 27279486976,
+      "physicalAvailableBytes": 4562067456
+    }
+  ],
+  "minimumSampledCommitHeadroomBytes": 5343260672,
+  "maximumSampledCommittedBytes": 21936226304,
+  "minimumSampledPhysicalAvailableBytes": 3187126272,
+  "reason": "First default-parallel MCP compilation reported allocation failures. Retry is separated from Git/privacy scanning and uses a temporary two-job argument under measured available commit headroom. No permanent settings/process termination; sampled values are not a continuous peak guarantee. First result retained."
+}

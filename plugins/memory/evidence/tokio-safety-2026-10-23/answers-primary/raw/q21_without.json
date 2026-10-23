@@ -1,0 +1,43 @@
+{
+  "answer": "Le budget monétaire mensuel approuvé pour Vesper-West est inconnu dans les données fournies. Aucune documentation fournie ne permet d’en confirmer le montant.",
+  "threadId": "01a16983-83b9-7360-8894-b64ecd118d15",
+  "usage": {
+    "input_tokens": 26327,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 256,
+    "reasoning_output_tokens": 216
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16983-83b9-7360-8894-b64ecd118d15\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le budget monétaire mensuel approuvé pour Vesper-West est inconnu dans les données fournies. Aucune documentation fournie ne permet d’en confirmer le montant.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26327,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":256,\"reasoning_output_tokens\":216}}\n",
+  "stderr": "2026-10-23T16:06:29.067936Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q21",
+  "arm": "without",
+  "startedAt": "2026-10-23T16:06:28.629295+00:00",
+  "completedAt": "2026-10-23T16:06:44.077761+00:00",
+  "elapsedMs": 15448.209,
+  "promptSha256": "954aac633af3fac9c6599892cb4a8cd0d0f3bb8ba880a975d64e9a854abc747e",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

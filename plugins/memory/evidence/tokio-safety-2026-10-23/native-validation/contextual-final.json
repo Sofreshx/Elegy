@@ -1,0 +1,30 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-memory",
+    "--test",
+    "contextual_recall"
+  ],
+  "startedAt": "2026-10-23T15:44:08.292825+00:00",
+  "completedAt": "2026-10-23T15:46:39.721736+00:00",
+  "durationSeconds": 151.422,
+  "exitCode": 0,
+  "log": "contextual-final.log",
+  "logSha256": "bf905c21c1d525eba14dc753060d245f1b551ba3bf6b81ef68acc2cd472b9dea",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadBefore": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadAfter": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "sourceLockSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+  "sourceSnapshotBeforeSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceSnapshotAfterSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

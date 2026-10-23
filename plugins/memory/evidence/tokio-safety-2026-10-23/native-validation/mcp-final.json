@@ -1,0 +1,35 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-memory-mcp"
+  ],
+  "startedAt": "2026-10-23T15:46:40.068281+00:00",
+  "completedAt": "2026-10-23T15:49:30.097686+00:00",
+  "durationSeconds": 170.032,
+  "exitCode": 101,
+  "log": "mcp-final.log",
+  "logSha256": "9a7e28d5639d57b0a57eaea4162c10248c07ce1f5523a27483e5ebdb8f769826",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadBefore": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadAfter": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "sourceLockSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+  "sourceSnapshotBeforeSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceSnapshotAfterSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18,
+  "publication": {
+    "rawLogSha256": "0e59ac552937309198622a39d9d2f9ecadba8b292509b5b537e942b4a4e88e1e",
+    "rawRecordSha256": "832a50b754d3e208b4c0ca9cc8e4017d683daec834a42a8084b4bc62e1bda4f3",
+    "publicLogSha256": "9a7e28d5639d57b0a57eaea4162c10248c07ce1f5523a27483e5ebdb8f769826",
+    "transformation": "Replace only current home path prefixes, slash/case variants, with <home>; source/arguments/diagnostics/exit result unchanged.",
+    "originals": "runtime/raw-native/; local only; before any Q8 receipt"
+  }
+}

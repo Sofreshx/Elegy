@@ -1,0 +1,77 @@
+{
+  "schemaVersion": "memory-source-review/v1",
+  "verdict": "APPROVED",
+  "status": "passed-static-review",
+  "reviewer": "Read-only source/native audit; no model, recorder, CI, Git, or configuration mutation.",
+  "productSourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "baselineRevision": "8dfca7c0aaabea46403445f5709ab0e90de14b40",
+  "qualificationFreezeRevision": "ce49cd4a8e473fc11f40f54005a7fbebe73a8074",
+  "findings": [],
+  "checks": [
+    {
+      "name": "production-diff",
+      "result": "passed",
+      "observed": "The production diff from baseline is one path, Cargo.lock, with only Tokio 1.52.3 -> 1.53.3 and checksum 8fc7f01b389ac15039e4dc9531aa973a135d7a4135281b12d7c1bc79fd57fffe -> ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e."
+    },
+    {
+      "name": "source-lock-and-fingerprint",
+      "result": "passed",
+      "record": "source-lock.json",
+      "recordSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+      "sourceFiles": 149,
+      "mcpSourceFiles": 18,
+      "cliSourceSha256": "a0c84881c88fb048d80539b3773453b636ba4e6798c3aa9a44cb976d72b05bcd",
+      "verification": "verify_source.py --with-binaries returned status passed; Git blobs and permitted EOL conversions reconstruct the locked bytes."
+    },
+    {
+      "name": "qualification-source-scripts",
+      "result": "passed",
+      "count": 11,
+      "binding": "All 11 actual SHA-256 values match subject.json qualificationSourceFiles; no script drift observed."
+    },
+    {
+      "name": "q7-corpus-and-rubric-comparison",
+      "result": "passed",
+      "q8CorpusSha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411",
+      "q7CorpusSha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411",
+      "transferCorpusSha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893",
+      "q8ProtocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+      "q7ProtocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+      "observed": "Corpus and transfer bytes match Q7; rubric fields compare equal. Protocol hash differs only because Q8 source/lineage and approved-design metadata are updated."
+    },
+    {
+      "name": "pinned-binaries",
+      "result": "passed",
+      "record": "pinned-binaries.json",
+      "recordSha256": "c8061d856ba33f742f47af78af529e14b820236528870d75d36648c39abcd46f",
+      "buildMatchesSource": true,
+      "cliSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+      "mcpSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+    },
+    {
+      "name": "advisory-and-msrv",
+      "result": "passed-with-limits",
+      "advisory": "RUSTSEC-2026-0386; locked Tokio 1.53.3 selected; upstream Rust 1.71 <= workspace Rust 1.88.",
+      "audit": "cargo-audit preparation exitCode 0, vulnerabilityCount 0, database commit 84d943a6deeb8cc6c6f632531aaf4f1c62275239.",
+      "warnings": "Existing unsafe-libyaml unmaintained and chacha20/clipboard-win yanked warnings are recorded.",
+      "cargoDeny": "Unavailable locally; final CI remains required."
+    }
+  ],
+  "reviewedFiles": [
+    {"path": "subject.json", "sha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93"},
+    {"path": "protocol.json", "sha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685"},
+    {"path": "source-lock.json", "sha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232"},
+    {"path": "pinned-binaries.json", "sha256": "c8061d856ba33f742f47af78af529e14b820236528870d75d36648c39abcd46f"},
+    {"path": "pre-freeze-check.json", "sha256": "3386495b29c86ccceeabf3ab5c41f38c0a51f5ac7fe870c9f03d703bf4c4e018"},
+    {"path": "freeze.json", "sha256": "5ed82786604ec3fba3c795211f19da79ba04874556671e39a6af284960d79ff7"},
+    {"path": "advisory.json", "sha256": "bafec17bd95942b8b8d454bfa8aee0921e681d1ac083bd218be4ef67984c99e1"},
+    {"path": "dependency-source.json", "sha256": "46ce48a9b94aa95152d917447acc5973c5d43f92962a18afb9a8fb3e7eaa6c41"},
+    {"path": "cargo-audit-preparation.json", "sha256": "20a5e5b69a364ec82d2ec6c13f13b2d260cfbce4f8a296f2e92b4e7268386449"},
+    {"path": "lock-preparation.json", "sha256": "db134bb3b91ed742993287496bae2db8a6e24f12d683e38018516a27d76288db"}
+  ],
+  "limits": [
+    "This review does not establish model-answer quality, recorder success, remote CI, merge, automatic Desktop hooks, another software host, or global/economic/unattended-use claims.",
+    "The freeze record states model output directories were absent at freeze; active campaign outputs were not read.",
+    "The first generic hook inspection failure is preserved; the cause was not independently proven. The same index/message later passed both hooks, with no hook/config changes observed."
+  ]
+}

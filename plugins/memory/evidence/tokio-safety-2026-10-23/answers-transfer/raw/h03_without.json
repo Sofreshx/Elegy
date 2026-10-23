@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant exact du snapshot à restaurer pour Nacre n’est pas disponible dans les données fournies.",
+  "threadId": "01a16984-b160-7440-868c-d3f1c58e079d",
+  "usage": {
+    "input_tokens": 27172,
+    "cached_input_tokens": 13696,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 194,
+    "reasoning_output_tokens": 166
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16984-b160-7440-868c-d3f1c58e079d\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant exact du snapshot à restaurer pour Nacre n’est pas disponible dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":27172,\"cached_input_tokens\":13696,\"cache_write_input_tokens\":0,\"output_tokens\":194,\"reasoning_output_tokens\":166}}\n",
+  "stderr": "2026-10-23T16:07:46.298592Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h03",
+  "arm": "without",
+  "startedAt": "2026-10-23T16:07:45.695082+00:00",
+  "completedAt": "2026-10-23T16:07:59.946492+00:00",
+  "elapsedMs": 14250.939,
+  "promptSha256": "2142c4ac1dac044fc90dd0ade6768f858a6b6b217e01ff697fccd4f54b70736a",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

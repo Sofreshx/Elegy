@@ -1,0 +1,43 @@
+{
+  "answer": "Pour la release Lumen, le rôle auquel transmettre la validation est inconnu. Le preflight à rappeler n’est pas précisé dans les données fournies.",
+  "threadId": "01a16980-dc6e-7bd0-8745-5ca114b019a4",
+  "usage": {
+    "input_tokens": 26325,
+    "cached_input_tokens": 7296,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 242,
+    "reasoning_output_tokens": 204
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16980-dc6e-7bd0-8745-5ca114b019a4\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour la release Lumen, le rôle auquel transmettre la validation est inconnu. Le preflight à rappeler n’est pas précisé dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26325,\"cached_input_tokens\":7296,\"cache_write_input_tokens\":0,\"output_tokens\":242,\"reasoning_output_tokens\":204}}\n",
+  "stderr": "2026-10-23T16:03:35.165054Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q05",
+  "arm": "without",
+  "startedAt": "2026-10-23T16:03:34.576372+00:00",
+  "completedAt": "2026-10-23T16:03:48.111382+00:00",
+  "elapsedMs": 13534.934,
+  "promptSha256": "d95acc828e734d0572ae6701c0052d23c9be82a57d48b68f8b341a47269ea99c",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

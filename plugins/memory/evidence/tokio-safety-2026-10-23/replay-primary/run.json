@@ -1,0 +1,76 @@
+{
+  "schemaVersion": "memory-generic-replay/v1",
+  "startedAt": "2026-10-23T15:57:45.367952+00:00",
+  "status": "completed",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "cliSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+  "mcpSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+  "corpusSha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411",
+  "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "cedar",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "e3e2910ef95bc0488117cc389757ef5fe7d0fad9df4ed9e9b24f4bfeb78b52ea",
+      "error": null
+    },
+    {
+      "id": "lumen",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "b9e29e2a59e4c459c26f1db292eb1ba826d847aad02c592250f5da666130e8e4",
+      "error": null
+    },
+    {
+      "id": "ares",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "003058ce327b2768292eaac4e32a50437fff6f5213fc80bc22231839d001190d",
+      "error": null
+    },
+    {
+      "id": "sable",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "a757df53193bd4086b2e698fa4d73284090053b53d9c81d6f2896664b6f1d9f4",
+      "error": null
+    },
+    {
+      "id": "galen",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "e27c84bc59d86c49bc4e76a6f94a3378aa1ba3ca5e100ac8c1dd5f4ebab7403c",
+      "error": null
+    },
+    {
+      "id": "harbor",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "3258eb1fe659e0945d0709643e5f472e1e3fcccc475be73227082b49277a77c0",
+      "error": null
+    },
+    {
+      "id": "vesper",
+      "status": "completed",
+      "stageCount": 4,
+      "reportSha256": "1c29d1a72917decb4de6a4960d70f48c2a2330a2f5c25a54f7f6691ce4e84237",
+      "error": null
+    },
+    {
+      "id": "quill",
+      "status": "completed",
+      "stageCount": 3,
+      "reportSha256": "8f2b7154f13278ec3ce448bb2eb4d7a89b693095c3b992116288f01ddb119e64",
+      "error": null
+    }
+  ],
+  "completedAt": "2026-10-23T15:58:59.781708+00:00",
+  "cliSha256After": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+  "mcpSha256After": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+}

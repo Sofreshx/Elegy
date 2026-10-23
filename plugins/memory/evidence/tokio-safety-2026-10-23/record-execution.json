@@ -1,0 +1,64 @@
+{
+  "schemaVersion": "memory-isolated-recorder-execution/v1",
+  "records": [
+    {
+      "name": "record-output",
+      "exitCode": 0,
+      "argv": [
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "eval",
+        "record",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/recorder",
+        "--claim",
+        "recall.answer-quality",
+        "--observation",
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/answer-quality-observation.json",
+        "--json"
+      ],
+      "stdoutSha256": "9747ef5b57dae47d273b3d129d1848780f183a31c113125d25737f1aa58fbc10",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "qualification-status",
+      "exitCode": 0,
+      "argv": [
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "eval",
+        "status",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/recorder",
+        "--json"
+      ],
+      "stdoutSha256": "cfac361bb27bfb5df5be3c3d89a59ce471d3e5b3169d54fcd7c59fee0a163d76",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "name": "qualification-history",
+      "exitCode": 0,
+      "argv": [
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "eval",
+        "history",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/recorder",
+        "--claim",
+        "recall.answer-quality",
+        "--json"
+      ],
+      "stdoutSha256": "95cdfe8207bc8a8f6f373d62d06e454f8b81c3686515321fab6f8642ca9d2bd4",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  ],
+  "evidenceDirectory": "recorder",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "cliSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+  "newModelCalls": 0,
+  "purpose": "First Q8 receipt after public-tree and attachment scans; actual84answers unchanged."
+}

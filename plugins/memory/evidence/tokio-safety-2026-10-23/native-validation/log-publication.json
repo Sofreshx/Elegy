@@ -1,0 +1,14 @@
+{
+  "schemaVersion": "memory-native-log-publication/v1",
+  "records": [
+    {
+      "log": "native-validation/mcp-final.log",
+      "rawLogSha256": "0e59ac552937309198622a39d9d2f9ecadba8b292509b5b537e942b4a4e88e1e",
+      "rawRecordSha256": "832a50b754d3e208b4c0ca9cc8e4017d683daec834a42a8084b4bc62e1bda4f3",
+      "publicLogSha256": "9a7e28d5639d57b0a57eaea4162c10248c07ce1f5523a27483e5ebdb8f769826",
+      "transformation": "Replace only current home path prefixes, slash/case variants, with <home>; source/arguments/diagnostics/exit result unchanged.",
+      "originals": "runtime/raw-native/; local only; before any Q8 receipt"
+    }
+  ],
+  "claim": "This is a public derivative of a failed compilation log before first recording; original raw stream and original metadata are retained locally. No model answer or existing Q7 evidence changed."
+}
