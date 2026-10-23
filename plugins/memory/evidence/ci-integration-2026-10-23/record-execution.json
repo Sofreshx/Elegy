@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "memory-isolated-recorder-execution/v1",
+  "records": [
+    {
+      "name": "record-output",
+      "exitCode": 1,
+      "commandStatus": "invalid",
+      "stdoutSha256": "1ba50949c9764f9b0bb82ac9fe1907624b04bf7d511d1eb69c06793978a8bc42",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "record",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23",
+        "--claim",
+        "recall.answer-quality",
+        "--observation",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\answer-quality-observation.json",
+        "--json"
+      ]
+    }
+  ],
+  "evidenceDirectoryRelativeToRepository": "plugins/memory/evidence/ci-integration-2026-10-23",
+  "realMemoryAccessed": false,
+  "pinnedCliSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
+}

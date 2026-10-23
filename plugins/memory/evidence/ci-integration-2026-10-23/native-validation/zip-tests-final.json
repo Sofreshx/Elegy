@@ -1,0 +1,46 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-tooling",
+    "-p",
+    "elegy-plugin-sdk",
+    "-p",
+    "elegy-core",
+    "-p",
+    "elegy-accounts"
+  ],
+  "startedAt": "2026-10-23T13:15:52.692080+00:00",
+  "completedAt": "2026-10-23T13:21:46.752312+00:00",
+  "durationSeconds": 354.063,
+  "exitCode": 101,
+  "log": "zip-tests-final.log",
+  "logSha256": "90bc30b429456f4b47f3759c37501d480f57d9dfe669c328e01712da3a461895",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "gitHeadBefore": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "gitHeadAfter": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "sourceLockSha256": "475ad859fb87a79ce7111dfbe2e4bfc736a3f4bbaa591794c3d8a3cfb931d02d",
+  "sourceSnapshotBeforeSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceSnapshotAfterSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18,
+  "logKind": "sanitized-public-derivative",
+  "rawLogSha256": "d2f19ec437358cc43a4455c1d0576abe0f7e22056f33d6cd8ca565228fef5105",
+  "logTransformation": {
+    "source": "../sanitize_evidence.py",
+    "sourceSha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29",
+    "function": "sanitize_bytes",
+    "replacementCounts": {
+      "windows_absolute_path": 10,
+      "neutralized_appdata_fragment": 0
+    },
+    "preserved": "Exit status, timing, source snapshots and all non-path output bytes. Exact raw copy retained in ignored runtime/raw-native."
+  }
+}

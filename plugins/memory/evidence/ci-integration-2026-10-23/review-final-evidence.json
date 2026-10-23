@@ -1,0 +1,112 @@
+{
+  "schemaVersion": "memory-final-proof-review/v1",
+  "reviewer": "Independent ci_integration_review, read-only; not human. Parent retained report and acceptance.",
+  "status": "approved",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "observedHead": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "findings": [],
+  "reviewedFiles": [
+    {
+      "path": "assessment.json",
+      "sha256": "0285f487f49285c20270b0b54e4f1312f0525274aed7ad5c0eee6ced2af5039b"
+    },
+    {
+      "path": "subject.json",
+      "sha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f"
+    },
+    {
+      "path": "protocol.json",
+      "sha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76"
+    },
+    {
+      "path": "semantic-review.json",
+      "sha256": "25959ae05380c5d332c6c7c23e386b34fd0896730f7f2c927f0c69857b69bb17"
+    },
+    {
+      "path": "parent-review.json",
+      "sha256": "ad4bf32a412614b9a6cb86fc57ec25954016b5ddd4ac9ba43644b4f8a569a3a8"
+    },
+    {
+      "path": "independent-review-a.json",
+      "sha256": "3942ae8ff631c06003f90145752a6500b96495ca85bbc715d68d84fb449ebf4e"
+    },
+    {
+      "path": "independent-review-b.json",
+      "sha256": "d6e6181197cd92d1c376ebc7eccc94e48c3b287c2d441870746aea67d2c657cb"
+    },
+    {
+      "path": "independent-review-a-addendum.json",
+      "sha256": "cdbbfa28f1ed2523980f37da7c64653d85d48a6290a4de3fd17de3510a7b47d8"
+    },
+    {
+      "path": "independent-review-b-addendum.json",
+      "sha256": "d4fee536ae7ab35187c0fdce416399071ddf3eaf874eae57c7c19366f6c261f3"
+    },
+    {
+      "path": "proof-manifest.json",
+      "sha256": "e4c39b0f92e386806fa141075830212508239bee9cab48aaa3f466581cdfcae0"
+    },
+    {
+      "path": "answer-quality-observation.json",
+      "sha256": "82e3c67db30a15ba683afbefe399af5250b83d031375e1a61a161dc9f20d679b"
+    },
+    {
+      "path": "record-output-02.json",
+      "sha256": "2fcbed5412193091274ca1d43236ef7d678c3c47507f7fb61c884ac2ef773e4e"
+    },
+    {
+      "path": "qualification-status.json",
+      "sha256": "d2c329fe652c4c1481eb2efc6c74c2d96cc6e42edae4111eec13f625f5b68914"
+    },
+    {
+      "path": "qualification-history.json",
+      "sha256": "4ef41fc49ff064c9e1d9731b004e95002c5621ab35e71e2ab5894ce234382686"
+    },
+    {
+      "path": "ledger.json",
+      "sha256": "8bef9a47850a264162cdf1639a03ec158ba29269b0532f4cc533a4ccd3c5a955"
+    },
+    {
+      "path": "receipt-summary.json",
+      "sha256": "dfa5e969213bd71ee2ef2f624a1bc9a11a1b0584706fe78aca1d50ebc6533574"
+    },
+    {
+      "path": "native-validation/log-publication.json",
+      "sha256": "bead578cd3d187c0f16e32b9cf8f026d480f8067fb3f035c20dce7a9fd28d65b"
+    },
+    {
+      "path": "native-validation/temp-space-clarification.json",
+      "sha256": "10dbcaf7389879573958498c528d9c2618be3ea37ae232792033af2c16438727"
+    }
+  ],
+  "verified": {
+    "rawModelOutputs": 84,
+    "uniqueThreads": 84,
+    "pairedQuestions": 37,
+    "extraCriticalRepeats": 10,
+    "withRecallComplete": 47,
+    "replayPackets": 37,
+    "sourceUnchanged": 37,
+    "namespaceCleanup": 24,
+    "controls": 42,
+    "proofSnapshotFiles": 195,
+    "receiptAttachments": 16,
+    "independentRows": [
+      42,
+      42
+    ],
+    "parentRows": 84,
+    "preservedReviewerAddendumCorrections": 5
+  },
+  "notes": [
+    "All raw output paths and hashes checked byte for byte; critical q08/q09/q11/q17/q18 have three with-recall trials each.",
+    "Unknown, hostile, privacy, distinct-agent and forgetting cases covered; lexical zero scores retained separately from prose verdict.",
+    "Only five taskComplete classifications change under unchanged predeclared unknown/hostile rubric; original hashes and reviews retained, no rerun.",
+    "Source Git ancestry and149/18 immutable input binding and pinned CLI/MCP checked.",
+    "All195 proof snapshot and16 attached-file hashes match; status/history/ledger/receipt coherent.",
+    "Receipt claim inventory digest and external campaign protocol digest are distinct and used correctly.",
+    "Three raw/public native log derivatives reproduce exactly; temp path correction confirms actual earlier process values and87 scratch files retained after completion.",
+    "First sandbox recorder attempt failed before any receipt/ledger/lock; normal-access attempt succeeded on same observation."
+  ],
+  "limits": "Final remote exact-head CI and merge were not run or presumed passing by this review. Markdown reports are derived; later README/report clarifications and link checks are parent-owned."
+}

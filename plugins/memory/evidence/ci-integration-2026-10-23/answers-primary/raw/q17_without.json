@@ -1,0 +1,43 @@
+{
+  "answer": "La durée de TTL corrigée et la stratégie du replay cache à appliquer pour Harbor sont inconnues : aucune donnée historique n’a été fournie.",
+  "threadId": "01a168f8-7d81-79c1-bf0d-ba54af0f8dae",
+  "usage": {
+    "input_tokens": 26313,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 221,
+    "reasoning_output_tokens": 186
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a168f8-7d81-79c1-bf0d-ba54af0f8dae\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La durée de TTL corrigée et la stratégie du replay cache à appliquer pour Harbor sont inconnues : aucune donnée historique n’a été fournie.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26313,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":221,\"reasoning_output_tokens\":186}}\n",
+  "stderr": "2026-10-23T13:34:37.967830Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q17",
+  "arm": "without",
+  "startedAt": "2026-10-23T13:34:37.568646+00:00",
+  "completedAt": "2026-10-23T13:34:50.640368+00:00",
+  "elapsedMs": 13070.748,
+  "promptSha256": "039f2fc6c930b455f297ad1447f228b182241b15999158c29f7817b2bd852c65",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

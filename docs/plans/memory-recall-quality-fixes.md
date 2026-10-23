@@ -360,3 +360,42 @@ No failed CI run or prior model answer is discarded. Dependency updates change
 the conservative Memory source fingerprint; the successful Q6 proof remains
 historical until the final source/binaries receive their own qualification.
 Push/merge authorization and the excluded second-host scope remain unchanged.
+
+### Final-source Q7 qualification accepted
+
+Security/ZIP/repo-shape prerequisite source is5eb34e0; protocol and eight
+qualification scripts were frozen in90094e9 before the84new actual Codex
+contexts. New pinned CLI/MCP and source149/18 bindings pass. The same full
+Q6 corpus/rubric is reused without weakening criteria or rewriting old results.
+
+All47with-recall paragraphs pass, including10critical repeats; without recall
+14/37are complete and23safely abstain or remain partial. Five lexical false
+negatives retain original scores. Five independent review classification errors
+were corrected under the predeclared unknown/hostile rubric in preserved addenda;
+no model answer was replaced or rerun. Paired lexical means are0.9459459459
+and0.3738738739, finite-sample delta0.5720720721, with no global/economy claim.
+
+Final-source151patched-consumer tests,31contextual tests,27harness checks,
+formatting and build pass. Six first-attempt Accounts tests failed from full
+C-drive temporary storage; the same command passed using child-only Dtemp.
+The recorder first hit sandbox Access denied before creating state, then the
+same observation succeeded with normal filesystem access. Both failures remain
+recorded. Receipt488792f5-fcb6-426b-b151-8b23716ae0f6 is reported-satisfied,
+with16intact attachments,195proof snapshot files and no readiness promotion.
+
+Independent final proof review passes. See [Q7 verdicts and reproducible protocol](../../plugins/memory/evidence/ci-integration-2026-10-23/README.md),
+[84 individual answers](../../plugins/memory/evidence/ci-integration-2026-10-23/results.md),
+and [individual errors](../../plugins/memory/evidence/ci-integration-2026-10-23/errors.md).
+The authorized delivery still requires final exact-head CI, confidentiality
+checks, verified normal push and merge preserving source Git objects; PR49
+metadata owns that subsequent integration state. No second software host,
+automatic Desktop/full-settings or daily-use readiness is claimed.
+
+Publication packaging follow-up: the final path gate found a Python executable
+path in sealed harness metadata. Preserve original recorder and195inputs in two
+local private copies, with original ledger/receipt archived together. Normalize
+only that metadata token; record a separate public store with16input copies
+and a separate198file public proof bundle. Public receipt3b103385-f0a9-4961-a12a-103a8318a2ff
+is reported-satisfied on the same84answers and scores, with no new model calls.
+The original488792f5 receipt remains historical; its raw path-bearing inputs are
+local only. No published history was rewritten.

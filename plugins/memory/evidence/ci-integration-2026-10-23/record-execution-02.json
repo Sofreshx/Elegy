@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "memory-isolated-recorder-execution/v1",
+  "records": [
+    {
+      "name": "record-output-02",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "2fcbed5412193091274ca1d43236ef7d678c3c47507f7fb61c884ac2ef773e4e",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "record",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23",
+        "--claim",
+        "recall.answer-quality",
+        "--observation",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\answer-quality-observation.json",
+        "--json"
+      ]
+    },
+    {
+      "name": "qualification-status",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "d2c329fe652c4c1481eb2efc6c74c2d96cc6e42edae4111eec13f625f5b68914",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "status",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23",
+        "--json"
+      ]
+    },
+    {
+      "name": "qualification-history",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "4ef41fc49ff064c9e1d9731b004e95002c5621ab35e71e2ab5894ce234382686",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "history",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23",
+        "--claim",
+        "recall.answer-quality",
+        "--json"
+      ]
+    }
+  ],
+  "evidenceDirectoryRelativeToRepository": "plugins/memory/evidence/ci-integration-2026-10-23",
+  "realMemoryAccessed": false,
+  "pinnedCliSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+  "preparationErrorRetained": "record-output.json",
+  "executionLane": "normal filesystem access; first sandbox attempt failed before creating receipt/ledger/lock"
+}

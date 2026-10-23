@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "pwsh",
+    "-NoProfile",
+    "-File",
+    "scripts/check-repo-shape.ps1",
+    "-Project",
+    ".",
+    "-Json",
+    "-FailOnIssues"
+  ],
+  "startedAt": "2026-10-23T14:25:46.200663+00:00",
+  "completedAt": "2026-10-23T14:25:55.322383+00:00",
+  "durationSeconds": 9.125,
+  "exitCode": 0,
+  "log": "repo-shape-public-final.log",
+  "logSha256": "9d732c221103a316e2ced2c8017be929442ee9231e557d3165bd0fa37805486b",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "gitHeadBefore": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "gitHeadAfter": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "sourceLockSha256": "475ad859fb87a79ce7111dfbe2e4bfc736a3f4bbaa591794c3d8a3cfb931d02d",
+  "sourceSnapshotBeforeSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceSnapshotAfterSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

@@ -1,0 +1,43 @@
+{
+  "answer": "Pour cette intervention Cedar-North uniquement, le port API à appliquer est 8339. Le transport à conserver est inconnu : il n’est pas précisé dans les données fournies.",
+  "threadId": "01a168f6-47d8-7392-800d-d7db219e68c4",
+  "usage": {
+    "input_tokens": 27176,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 311,
+    "reasoning_output_tokens": 267
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a168f6-47d8-7392-800d-d7db219e68c4\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour cette intervention Cedar-North uniquement, le port API à appliquer est 8339. Le transport à conserver est inconnu : il n’est pas précisé dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":27176,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":311,\"reasoning_output_tokens\":267}}\n",
+  "stderr": "2026-10-23T13:32:13.163013Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q03",
+  "arm": "without",
+  "startedAt": "2026-10-23T13:32:12.314517+00:00",
+  "completedAt": "2026-10-23T13:32:28.723495+00:00",
+  "elapsedMs": 16408.344,
+  "promptSha256": "5e0ab630573e8f5f0b5b8022d211845735f165f1fc5dbbcc891a9f8c1f61f58f",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

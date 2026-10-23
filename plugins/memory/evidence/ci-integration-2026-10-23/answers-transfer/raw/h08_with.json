@@ -1,0 +1,43 @@
+{
+  "answer": "Pour Brume, la durée de cache à appliquer est de 68 minutes et la stratégie est REPLAY_WILLOW.",
+  "threadId": "01a168fb-2b02-7a32-aede-0f79c839cc84",
+  "usage": {
+    "input_tokens": 26503,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 172,
+    "reasoning_output_tokens": 141
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a168fb-2b02-7a32-aede-0f79c839cc84\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour Brume, la durée de cache à appliquer est de 68 minutes et la stratégie est REPLAY_WILLOW.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26503,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":172,\"reasoning_output_tokens\":141}}\n",
+  "stderr": "2026-10-23T13:37:33.461081Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h08",
+  "arm": "with",
+  "startedAt": "2026-10-23T13:37:33.060621+00:00",
+  "completedAt": "2026-10-23T13:37:49.944426+00:00",
+  "elapsedMs": 16883.417,
+  "promptSha256": "f7adeac1853e1146a8687d477f58a64957849df0d1b17695d3a26343f719f000",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

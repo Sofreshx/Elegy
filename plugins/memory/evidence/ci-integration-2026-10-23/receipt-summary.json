@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "memory-final-recorder-summary/v1",
+  "receiptId": "488792f5-fcb6-426b-b151-8b23716ae0f6",
+  "receiptPath": "receipts/488792f5-fcb6-426b-b151-8b23716ae0f6.json",
+  "receiptSha256": "16041cad4cac43bebcf52af3f2a75e9aba4876e8ed06cf8639bf5eb82635d8f5",
+  "receiptOutcome": "satisfied",
+  "status": "reported-satisfied",
+  "reviewRequired": true,
+  "externalSubjectRequiresRecheck": true,
+  "staleReasons": [],
+  "buildMatchesSource": true,
+  "rebuildRequired": false,
+  "readinessPromotion": false,
+  "attachedFilesVerified": 16,
+  "snapshotFilesVerified": 195,
+  "historyReceiptCount": 1,
+  "campaignProtocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "claimInventoryProtocolSha256": "dc53bc58625e00a30abbe63fdb37e0597339860d6be48a1f901803709b3b1e07",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "preparationFailure": {
+    "path": "record-output.json",
+    "exitCode": 1,
+    "reason": "Access denied in sandbox; no receipt/ledger/lock created. Same pinned binary and observation succeeded with normal filesystem access, without new model calls."
+  },
+  "executionEvidence": "record-execution-02.json"
+}

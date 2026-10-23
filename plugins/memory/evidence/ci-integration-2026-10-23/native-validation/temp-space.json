@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "memory-native-temp-space/v1",
+  "chosenChildTempRelativePath": "runtime/native-temp",
+  "freeBytesBefore": {
+    "C": 1118621696,
+    "D": 46452412416
+  },
+  "freeBytesAfter": {
+    "C": 1077735424,
+    "D": 45773594624
+  },
+  "completedCommands": 3,
+  "returnCodes": [
+    0,
+    0,
+    0
+  ]
+}

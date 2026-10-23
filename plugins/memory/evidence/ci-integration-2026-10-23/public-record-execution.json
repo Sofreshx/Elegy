@@ -1,0 +1,67 @@
+{
+  "schemaVersion": "memory-public-recorder-execution/v1",
+  "records": [
+    {
+      "name": "public-record-output",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "e96b96e6c873063803aa230cd14aec84ad1ca605aef42da539215b99cb61c95d",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "record",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\recorder-public",
+        "--claim",
+        "recall.answer-quality",
+        "--observation",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\public-answer-quality-observation.json",
+        "--json"
+      ]
+    },
+    {
+      "name": "public-qualification-status",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "e936e220bd9d49b40b63890d806a664f0ef1685d719ea2bfd0ebc192cb81503c",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "status",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\recorder-public",
+        "--json"
+      ]
+    },
+    {
+      "name": "public-qualification-history",
+      "exitCode": 0,
+      "commandStatus": "ok",
+      "stdoutSha256": "f4a6b351ce28857f7c49e9b622cfd182130adc3b9d0218b9c8869af90254efe0",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "argv": [
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\runtime\\qualified-binaries\\elegy-memory.exe",
+        "eval",
+        "history",
+        "--project",
+        "<repo>",
+        "--evidence-dir",
+        "<repo>\\plugins\\memory\\evidence\\ci-integration-2026-10-23\\recorder-public",
+        "--claim",
+        "recall.answer-quality",
+        "--json"
+      ]
+    }
+  ],
+  "evidenceDirectory": "recorder-public",
+  "purpose": "New public qualification store for the same observed84answers, after publication-only metadata normalization. Original recorder retained separately.",
+  "newModelCalls": 0,
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "cliSha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
+}

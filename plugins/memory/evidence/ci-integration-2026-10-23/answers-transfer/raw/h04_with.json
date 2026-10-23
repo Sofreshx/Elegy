@@ -1,0 +1,43 @@
+{
+  "answer": "La maintenance Quartz débute à 03:25 UTC. Le groupe d’escalade est OPS_JADE.",
+  "threadId": "01a168fa-b1cb-7780-8a71-d26b95c72b5c",
+  "usage": {
+    "input_tokens": 26503,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 130,
+    "reasoning_output_tokens": 101
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a168fa-b1cb-7780-8a71-d26b95c72b5c\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La maintenance Quartz débute à 03:25 UTC. Le groupe d’escalade est OPS_JADE.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26503,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":130,\"reasoning_output_tokens\":101}}\n",
+  "stderr": "2026-10-23T13:37:02.426767Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h04",
+  "arm": "with",
+  "startedAt": "2026-10-23T13:37:02.051657+00:00",
+  "completedAt": "2026-10-23T13:37:13.985306+00:00",
+  "elapsedMs": 11934.246,
+  "promptSha256": "e3d581c21ec9dcfb88362d2d0fc30dce3af6652163aa54baf9d007dab84bdabd",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

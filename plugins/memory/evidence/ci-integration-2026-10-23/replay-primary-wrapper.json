@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "memory-codex-campaign-wrapper/v1",
+  "phase": "replay-primary",
+  "startedAt": "2026-10-23T13:27:34.868072+00:00",
+  "endedAt": "2026-10-23T13:28:23.797194+00:00",
+  "exitCode": 0,
+  "status": "completed",
+  "before": {
+    "checks": {
+      "sourceRevision": true,
+      "fixedSourceRevision": true,
+      "sourceLockSha256": true,
+      "cliSourceSha256": true,
+      "fixedCliSourceSha256": true,
+      "subjectBinaryHashes": true,
+      "protocolSha256": true,
+      "model": true,
+      "reasoningEffort": true,
+      "corpusProvenance": true,
+      "sourceFiles": true,
+      "sourceGitObjects": true,
+      "sourceFileCount": true,
+      "sourceFileErrors": [],
+      "binaries": true,
+      "installedClient": true,
+      "clientVersionRecorded": true,
+      "harnessManifest": true,
+      "harnessSourceFiles": true,
+      "harnessSourceErrors": [],
+      "qualificationSourceFiles": true,
+      "pathsInsideRepo": true,
+      "all": true
+    },
+    "binaries": {
+      "cli": {
+        "path": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "sha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+        "insideRepo": true,
+        "expected": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
+      },
+      "mcp": {
+        "path": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe",
+        "sha256": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b",
+        "insideRepo": true,
+        "expected": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
+      }
+    },
+    "subjectSha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f",
+    "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76"
+  },
+  "after": {
+    "checks": {
+      "sourceRevision": true,
+      "fixedSourceRevision": true,
+      "sourceLockSha256": true,
+      "cliSourceSha256": true,
+      "fixedCliSourceSha256": true,
+      "subjectBinaryHashes": true,
+      "protocolSha256": true,
+      "model": true,
+      "reasoningEffort": true,
+      "corpusProvenance": true,
+      "sourceFiles": true,
+      "sourceGitObjects": true,
+      "sourceFileCount": true,
+      "sourceFileErrors": [],
+      "binaries": true,
+      "installedClient": true,
+      "clientVersionRecorded": true,
+      "harnessManifest": true,
+      "harnessSourceFiles": true,
+      "harnessSourceErrors": [],
+      "qualificationSourceFiles": true,
+      "pathsInsideRepo": true,
+      "all": true
+    },
+    "binaries": {
+      "cli": {
+        "path": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "sha256": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6",
+        "insideRepo": true,
+        "expected": "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
+      },
+      "mcp": {
+        "path": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe",
+        "sha256": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b",
+        "insideRepo": true,
+        "expected": "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
+      }
+    },
+    "subjectSha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f",
+    "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76"
+  },
+  "selfSha256Before": "1c29a47ba3c6bde5e096b82ba52edcc3e4c66c3248fea4ef38df248406c38435",
+  "selfSha256After": "1c29a47ba3c6bde5e096b82ba52edcc3e4c66c3248fea4ef38df248406c38435",
+  "subjectSha256": "ffc6ae4b11d55cc19a8ac075a4800bc9de779343ca72a6d903f81c7818e6888f",
+  "protocolSha256": "1f42dfc566ce2d2cf525ddb0021fb3fc9da8ee845fb78306b2ad74efddbd6a76",
+  "argv": [
+    "<python>",
+    "plugins/memory/evidence/answer-grounding-2026-10-23/qualification_runner.py",
+    "replay",
+    "--corpus",
+    "plugins/memory/evidence/ci-integration-2026-10-23/corpus.json",
+    "--protocol",
+    "plugins/memory/evidence/ci-integration-2026-10-23/protocol.json",
+    "--output",
+    "plugins/memory/evidence/ci-integration-2026-10-23/replay-primary",
+    "--cli",
+    "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+    "--mcp",
+    "plugins/memory/evidence/ci-integration-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe"
+  ]
+}

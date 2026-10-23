@@ -1,0 +1,43 @@
+{
+  "answer": "Le runbook de la sauvegarde Nacre n’est pas disponible dans les données fournies. Sa rétention en jours est inconnue.",
+  "threadId": "01a168fa-4e30-7f61-9377-a63a84dc276a",
+  "usage": {
+    "input_tokens": 26317,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 271,
+    "reasoning_output_tokens": 237
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a168fa-4e30-7f61-9377-a63a84dc276a\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le runbook de la sauvegarde Nacre n’est pas disponible dans les données fournies. Sa rétention en jours est inconnue.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26317,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":271,\"reasoning_output_tokens\":237}}\n",
+  "stderr": "2026-10-23T13:36:36.930313Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h01",
+  "arm": "without",
+  "startedAt": "2026-10-23T13:36:36.430793+00:00",
+  "completedAt": "2026-10-23T13:36:51.403301+00:00",
+  "elapsedMs": 14972.781,
+  "promptSha256": "5a872b2b1d388d9e754ad1a25d550cc5880f2ba04121fe8594717b0f08cbd13f",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

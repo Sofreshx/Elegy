@@ -1,0 +1,582 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-documentation-21492-1792764167415926100",
+  "command": [
+    "check"
+  ],
+  "status": "ok",
+  "data": {
+    "schemaVersion": "documentation-check-result/v1",
+    "projectRoot": ".",
+    "configFound": true,
+    "configPath": ".elegy/docs.yaml",
+    "config": {
+      "schemaVersion": "elegy-documentation/v2",
+      "compatibilityMode": "v2",
+      "authorityRoots": {
+        "current": [
+          "docs/architecture",
+          "docs/adr",
+          "docs/specs"
+        ],
+        "planning": [
+          "docs/plans",
+          "docs/roadmaps"
+        ],
+        "research": [
+          "docs/research"
+        ],
+        "generated": [
+          "docs/ai"
+        ]
+      },
+      "entrypoints": [
+        "README.md"
+      ],
+      "derivedSurfaces": {
+        "sidebars": [],
+        "manifests": [],
+        "llms": [],
+        "bundles": [
+          "docs/docs-index.md"
+        ]
+      },
+      "requiredFrontmatter": [
+        "title",
+        "status",
+        "owner"
+      ],
+      "freshnessWarnings": {
+        "currentDays": 120,
+        "planningDays": 45,
+        "researchDays": 90
+      },
+      "localExceptions": [
+        "docs/architecture/codex-plugin-projection.md",
+        "docs/specs/codex-plugin-compatibility.md",
+        "docs/specs/documentation-practices-skill-and-cli.md",
+        "docs/specs/obsidian-skill-and-cli.md"
+      ]
+    },
+    "valid": true,
+    "filesChecked": 49,
+    "documentCount": 48,
+    "documents": [
+      {
+        "path": "docs/adr/2026-05-25-centralize-documentation-practices-doctrine.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Centralize documentation practices doctrine",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "- Elegy needs one shared doctrine for deciding when changes require ADRs, specs,",
+        "created": "2026-05-25",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-06-15-adopt-elegy-planning-graph-core.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt elegy-planning graph core",
+        "status": "proposed",
+        "docKind": "adr",
+        "summary": "`elegy-planning` currently models durable planning through a mostly linear",
+        "created": "2026-06-15",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-06-15-block-crates-io-publishing.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Block all crates.io publishing; keep advisory crate smoke test",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Elegy distributes through GitHub Releases, binary artifacts, wrapper",
+        "created": "2026-06-15",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-01-adopt-static-plugin-marketplace.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt a static plugin marketplace",
+        "status": "superseded",
+        "docKind": "adr",
+        "summary": "> Superseded on 2026-07-30 by marketplace v2 and the Codex-parity ADR. This",
+        "created": "2026-07-01",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-07-adopt-repo-surface-taxonomy.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt Repo Surface Taxonomy",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Accepted.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-08-adopt-capability-kind-taxonomy.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt Capability-Kind Taxonomy",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Accepted.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-08-memory-contract-versioning.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Memory contract versioning",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "`elegy-memory` persists to a SQLite file, computes retrieval scores with a",
+        "created": "2026-07-08",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-08-production-posture-local-single-user.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Production posture — local single-user",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "`elegy-memory` runs as a local CLI and MCP host, invoked by a single agent",
+        "created": "2026-07-08",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-20-retire-central-skill-registry.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Retire the central skill registry and resolver",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Adapters may own optional Agent Skills, while standalone skills use host-native",
+        "created": "2026-07-20",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-30-adopt-codex-parity-and-delegated-authentication.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt Codex-parity packages and delegated authentication",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Elegy's v1/v2 abstraction renamed or omitted native Codex package behavior and",
+        "created": "2026-07-30",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-07-30-adopt-evidence-backed-readiness-and-plugin-boundary.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt evidence-backed readiness and a system-adapter plugin boundary",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Elegy documentation and discovery previously treated several different facts as if they proved the same thing:",
+        "created": "2026-07-30",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-08-02-adopt-capability-packages-as-authority.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt capability packages as the portable authority",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "Elegy has accumulated Codex plugin envelopes, MCP hosts, skills, and local",
+        "created": "2026-08-02",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/2026-09-04-adopt-pluggable-forgetting-policies.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Adopt pluggable forgetting policies",
+        "status": "accepted",
+        "docKind": "adr",
+        "summary": "`SqliteMemoryStore::enforce_budget()` demotes active memories to dormant when",
+        "created": "2026-09-04",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/adr/README.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "ADRs",
+        "status": "active",
+        "docKind": "adr",
+        "summary": "Store durable architecture and governance decisions here. Create new records with `elegy-documentation new adr --title \"...\"`.",
+        "created": "2026-05-29",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/agent-integration.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "Agent Integration",
+        "status": "active",
+        "docKind": "guide",
+        "summary": "Elegy is designed for AI-agent hosts that can run local subprocesses or speak",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/ai/checks-demo-report.md",
+        "authorityClass": "generated",
+        "sourceOfTruth": "generated-derived",
+        "title": "Agent-Ready Repo Pack Demo",
+        "status": "active",
+        "docKind": "generated",
+        "summary": "**Generated:** 2026-07-08",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/README.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Architecture Docs",
+        "status": "active",
+        "docKind": "index",
+        "summary": "This directory contains the current architectural guidance for the Elegy repo.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/documentation-practices.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Documentation Practices",
+        "status": "active",
+        "docKind": "guide",
+        "summary": "This document defines the current documentation doctrine for Elegy.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/ecosystem-topology.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Elegy ecosystem topology",
+        "status": "current",
+        "docKind": "system",
+        "summary": "Elegy is a Rust toolkit and evidence-gated distribution layer for reusable",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/mcp-skill-tooling-placement.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "MCP, Skill, and Tooling Placement",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "Capability packages are the host-neutral authority. MCP authoring and",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/shared-crate-boundaries.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Shared Crate Boundaries",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "Shared crates stay separate only when they own a real boundary: cross-surface",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/skill-core-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Skill placement",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "Agent skills are standard `SKILL.md` instruction packages.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/substrate-governance.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Elegy Substrate Governance",
+        "status": "active",
+        "docKind": "system",
+        "summary": "This document defines the active dependency and ownership rules for the current",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/architecture/terminology.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Elegy Terminology",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "This glossary defines the canonical terms used across the Elegy umbrella repo.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/deprecations.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "Elegy deprecations and reclassification",
+        "status": "current",
+        "docKind": "reference",
+        "summary": "This page records labels and distribution forms that agents must no longer",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/distribution.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "Distribution and downstream consumption",
+        "status": "active",
+        "docKind": "guide",
+        "summary": "Elegy ships release assets through GitHub Releases, not package feeds or",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/ops/main-ruleset.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "main-protection Branch Ruleset",
+        "status": "draft",
+        "docKind": "reference",
+        "summary": "Status: **artifact**. Not yet applied. Apply after `reconcile/main-roro` merges CI-green.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/plans/automation-portability-handoff.md",
+        "authorityClass": "planning",
+        "sourceOfTruth": "planning-non-canon",
+        "title": "Automation Portability Handoff",
+        "status": "superseded",
+        "docKind": "planning",
+        "summary": "This handoff is preserved as historical evidence from 2026-07-15. The current",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/plans/memory-qualification.md",
+        "authorityClass": "planning",
+        "sourceOfTruth": "planning-non-canon",
+        "title": "Resumable Memory qualification implementation plan",
+        "status": "completed",
+        "docKind": "planning",
+        "summary": "Goal: make Memory claims resumable, falsifiable and bound to durable evidence.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/plans/memory-recall-quality-fixes.md",
+        "authorityClass": "planning",
+        "sourceOfTruth": "planning-non-canon",
+        "title": "Memory recall quality corrections",
+        "status": "active",
+        "docKind": "planning",
+        "summary": "Goal: correct the retrieval failure found by the 23 October controlled session",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/readiness.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "Elegy ecosystem readiness",
+        "status": "current",
+        "docKind": "generated",
+        "summary": "This file is generated from the release catalog, adapter manifests, and canonical readiness artifacts. `surface class` states what a component is; `kind` only controls build mechanics. `implemented` means source behavior and tests exist, not that a clean installation is usable. Default agent discovery includes only `usable` and `production` active adapter plugins.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/repo-layout.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "Repository Layout",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "Elegy records every distributed surface's role in",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/research/historical-monetization-infrastructure.md",
+        "authorityClass": "research",
+        "sourceOfTruth": "research-non-canon",
+        "title": "Historical monetization infrastructure proposal",
+        "status": "exploratory",
+        "docKind": "research",
+        "summary": "> This is retained research, not current architecture or distribution policy.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/research/openclaw-orchestration-gap-roadmap.md",
+        "authorityClass": "research",
+        "sourceOfTruth": "research-non-canon",
+        "title": "Research OpenClaw orchestration gap roadmap",
+        "status": "exploratory",
+        "docKind": "research",
+        "summary": "Updated: 2026-03-25",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/roadmaps/observation-substrate-roadmap.md",
+        "authorityClass": "planning",
+        "sourceOfTruth": "planning-non-canon",
+        "title": "Observation Substrate Roadmap",
+        "status": "active",
+        "docKind": "planning",
+        "summary": "Define the reusable observation and recording substrate that Elegy should own for downstream hosts such as Holon without absorbing host-local consent, policy, evidence, or product UX.",
+        "created": "2026-05-13",
+        "updated": "2026-06-30",
+        "freshness": "warning"
+      },
+      {
+        "path": "docs/spec-baseline.md",
+        "authorityClass": "other",
+        "sourceOfTruth": "unclassified",
+        "title": "MCP Spec Baseline",
+        "status": "active",
+        "docKind": "reference",
+        "summary": "Record the protocol baseline Elegy is targeting so governed contracts, exported bundles, and Rust tooling do not drift implicitly.",
+        "created": "2026-03-19",
+        "updated": "2026-06-30",
+        "freshness": "n/a"
+      },
+      {
+        "path": "docs/specs/README.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Specs",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "Store implementation-facing behavior specs here. Create new records with `elegy-documentation new spec --title \"...\"`.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/capability-catalog-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Capability Catalog V1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "> Current authoring authority: [Capability Catalog V2](capability-catalog-v2.md).",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/capability-catalog-v2.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Capability Catalog V2",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "`elegy-capability-catalog/v2` is the current authority for the interface that",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/capability-package-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Capability package v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "`elegy-package/v1` is the host-neutral package manifest. It is stored at",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/elegy-lock-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Elegy lock v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "`elegy-lock/v1` is the exact reviewed package selection for one agent setup.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/elegy-sbom-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Elegy SBOM v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "`elegy-sbom/v1` is a deterministic sidecar for one packaged archive. It binds",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/eval-harness-v1/spec.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Eval harness v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "`eval status`, `eval next`, and `eval history` expose an exact, deterministic",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/memory-contextual-recall-v1/spec.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Memory contextual recall v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "Contextual recall is an opt-in, local adapter boundary over the existing",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/memory-mcp-v1/spec.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Memory MCP v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "MCP transport adapters exposing `elegy-memory` capabilities. Two binaries exist (`elegy-memory-mcp-stdio` and `elegy-memory-mcp-http`) and this spec documents the production-ready surface. The MCP layer adapts — it does not define new memory authority, salience, correction, or scope behavior.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/plugin-connections-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Plugin connections and authentication",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "Authentication is not one boundary.",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/plugin-marketplace-v2.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Plugin marketplace v2",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "The canonical index is `.elegy/marketplace.json` with",
+        "freshness": "unknown"
+      },
+      {
+        "path": "docs/specs/readiness-v1.md",
+        "authorityClass": "current",
+        "sourceOfTruth": "current-canon",
+        "title": "Evidence-backed readiness v1",
+        "status": "active",
+        "docKind": "spec",
+        "summary": "Each distributed surface owns one JSON artifact with `schemaVersion: elegy-readiness/v1`. Plugin manifests reference it through `readiness`; standalone entries reference it from `distribution/surfaces.json`.",
+        "created": "2026-07-30",
+        "freshness": "unknown"
+      }
+    ],
+    "derivedSurfaces": [
+      {
+        "path": "docs/docs-index.md",
+        "surfaceKind": "bundle",
+        "exists": true,
+        "driftStatus": "current"
+      }
+    ],
+    "issues": [
+      {
+        "code": "DOCS-CHECK-009",
+        "severity": "warning",
+        "path": "docs/roadmaps/observation-substrate-roadmap.md",
+        "message": "document appears stale relative to configured freshness warning defaults"
+      }
+    ]
+  }
+}
+
+--- stderr ---

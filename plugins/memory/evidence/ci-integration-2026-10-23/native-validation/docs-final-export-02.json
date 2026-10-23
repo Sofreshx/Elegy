@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "D:/Projets/Elegy/target/qualification-oct23/debug/elegy-documentation.exe",
+    "export",
+    "bundle",
+    "--project",
+    ".",
+    "--output",
+    "docs/docs-index.md",
+    "--json"
+  ],
+  "startedAt": "2026-10-23T14:03:57.765403+00:00",
+  "completedAt": "2026-10-23T14:03:58.005689+00:00",
+  "durationSeconds": 0.234,
+  "exitCode": 0,
+  "log": "docs-final-export-02.log",
+  "logSha256": "ac81b3b018f6b48217ed3ecd59e616288977969195d550735b58fd9b374e14e4",
+  "sourceRevision": "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1",
+  "gitHeadBefore": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "gitHeadAfter": "90094e9147824fe9a70c9b45ee29e3d92fb74b25",
+  "sourceLockSha256": "475ad859fb87a79ce7111dfbe2e4bfc736a3f4bbaa591794c3d8a3cfb931d02d",
+  "sourceSnapshotBeforeSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceSnapshotAfterSha256": "6640a155d249e583ae7d1067ec17a35db96186d7fe991cb56edc37499f2d5a1f",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

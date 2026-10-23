@@ -1,0 +1,54 @@
+{
+  "schemaVersion": "memory-native-public-logs/v1",
+  "transformSource": "../sanitize_evidence.py",
+  "transformSha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29",
+  "function": "sanitize_bytes",
+  "method": "Deterministic absolute-path neutralization only; run records retain both raw and public hashes. Original native audit bound raw hashes.",
+  "files": [
+    {
+      "name": "zip-tests-final",
+      "rawSha256": "d2f19ec437358cc43a4455c1d0576abe0f7e22056f33d6cd8ca565228fef5105",
+      "publicSha256": "90bc30b429456f4b47f3759c37501d480f57d9dfe669c328e01712da3a461895",
+      "replacementCounts": {
+        "windows_absolute_path": 10,
+        "neutralized_appdata_fragment": 0
+      }
+    },
+    {
+      "name": "zip-tests-final-02",
+      "rawSha256": "4ba6e73ebedfb0c7c7601754516a45baba1946348ce09a1cdb4bd77b893ef9e0",
+      "publicSha256": "75749c41dfc9cf198d4213c26d815afbd39f090f78139c469c4bd0f2cd31d5a4",
+      "replacementCounts": {
+        "windows_absolute_path": 16,
+        "neutralized_appdata_fragment": 0
+      }
+    },
+    {
+      "name": "contextual-final",
+      "rawSha256": "a4fcb9211ce8f898684c6f8b9ba7d357a45b69a66462f9a3844d6a496a7a484f",
+      "publicSha256": "4735b98356db7e4093dbd32d818a0db5ff3ddf28718da604101e1f1b5b42d24c",
+      "replacementCounts": {
+        "windows_absolute_path": 5,
+        "neutralized_appdata_fragment": 0
+      }
+    },
+    {
+      "name": "format-final",
+      "rawSha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+      "publicSha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+      "replacementCounts": {
+        "windows_absolute_path": 0,
+        "neutralized_appdata_fragment": 0
+      }
+    },
+    {
+      "name": "harness-final",
+      "rawSha256": "9d7462f9ce55def7029c6801748764a6dba4018152caceb04ce5f4d938d28772",
+      "publicSha256": "9d7462f9ce55def7029c6801748764a6dba4018152caceb04ce5f4d938d28772",
+      "replacementCounts": {
+        "windows_absolute_path": 0,
+        "neutralized_appdata_fragment": 0
+      }
+    }
+  ]
+}

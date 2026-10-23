@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "memory-native-temp-clarification/v1",
+  "originalRecord": "temp-space.json",
+  "originalField": "chosenChildTempRelativePath",
+  "baseForFirstThreeCommands": "repository worktree root",
+  "resolvedRelativeToRepository": "runtime/native-temp",
+  "affectedChecks": [
+    "zip-tests-final-02",
+    "contextual-final",
+    "format-final"
+  ],
+  "harnessFinalRelativeToRepository": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/native-temp",
+  "confirmation": "Runner confirmed actual os.path.abspath(runtime/native-temp) from repository cwd; current directory existence alone does not establish prior process environment.",
+  "temporarySettingsOnly": true,
+  "drive": "D",
+  "retainedScratchMovedTo": "plugins/memory/evidence/ci-integration-2026-10-23/runtime/native-runner-scratch/native-temp",
+  "retainedFileCount": 87,
+  "moveAfterCommandsEnded": true
+}
