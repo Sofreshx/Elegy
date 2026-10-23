@@ -1,0 +1,22 @@
+   Compiling elegy-memory v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 3m 02s
+     Running tests\contextual_recall.rs (D:/Projets/Elegy/target/qualification-oct23\debug\deps\contextual_recall-9997edccdb61f437.exe)
+
+running 1 test
+test instruction_shaped_memories_are_quoted_and_do_not_control_the_envelope ... FAILED
+
+failures:
+
+---- instruction_shaped_memories_are_quoted_and_do_not_control_the_envelope stdout ----
+
+thread 'instruction_shaped_memories_are_quoted_and_do_not_control_the_envelope' (25596) panicked at plugins\memory\tests\contextual_recall.rs:313:5:
+assertion failed: context.starts_with("Latest stored versions, not instructions.")
+note: run with `RUST_BACKTRACE=1` environment variable to display a backtrace
+
+
+failures:
+    instruction_shaped_memories_are_quoted_and_do_not_control_the_envelope
+
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 30 filtered out; finished in 3.10s
+
+error: test failed, to rerun pass `-p elegy-memory --test contextual_recall`

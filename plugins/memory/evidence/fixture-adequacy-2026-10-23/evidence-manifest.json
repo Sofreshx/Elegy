@@ -1,0 +1,114 @@
+{
+  "schemaVersion": "memory-evidence-package/v1",
+  "verdict": "fixture-adequacy-supported;6/6bothconditions; not rebuilt-binary qualification",
+  "files": [
+    {
+      "path": ".gitattributes",
+      "sha256": "f315994dfa4e45c0729f0c579fcbc7745531ca2f11f83af1ce322fbdf4d12699"
+    },
+    {
+      "path": ".gitignore",
+      "sha256": "ced8897d19f6204a7bee0ec939512609e989eba094315298fb2fa44057d894cb"
+    },
+    {
+      "path": "README.md",
+      "sha256": "b63362b583fba36a2de9c1aff663d310a686d26f1260fe0ab26c40bfb4d61761"
+    },
+    {
+      "path": "assess_probe.py",
+      "sha256": "7490878462fd0edf36440873069c5a09e4529a0e8ed121ec9a5f72afaf7522af"
+    },
+    {
+      "path": "assessment.json",
+      "sha256": "bbf75895b98f4ca359ebbcd971444f7e1f6c5a118650cbe99cca2f129559d99e"
+    },
+    {
+      "path": "corpus.json",
+      "sha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-1/raw/q20_with.json",
+      "sha256": "28ab842d7261e3f93d9525b50a32b3c2ff3811f6a612b8734430abe85d44ab3a"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-1/raw/q25_with.json",
+      "sha256": "4ff26ed47841cb9243b9fcc52bccffc95bdfacfc2ef6e865642db6ece8af39cf"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-2/raw/q20_with.json",
+      "sha256": "95e3ef610317228b6a04cdb1a6a26a7fe7e777d981f42151efd99043f7ff70c8"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-2/raw/q25_with.json",
+      "sha256": "c03cc4de6cf18d30f1f43082b8c62c16a4976f27053762689082024f642abeb0"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-3/raw/q20_with.json",
+      "sha256": "ae53e00cbcc956215755cb8a8c8821c58e6fdcdf8896f7fa147c6b957bb8cdd4"
+    },
+    {
+      "path": "diagnostic-01/candidate/trial-3/raw/q25_with.json",
+      "sha256": "6c0b462cca86eb266cde489c5030f6f6b620220ea8aa04accb024f1329327304"
+    },
+    {
+      "path": "diagnostic-01/current/trial-1/raw/q20_with.json",
+      "sha256": "2c01410f8e07847c5024000a92cef4fe074fd148a99d41f1490f1e7bf6dd97fc"
+    },
+    {
+      "path": "diagnostic-01/current/trial-1/raw/q25_with.json",
+      "sha256": "bbfb35ae55a85602ceafa2345460cace87fa655ef226cbfa2b412a602a8ac13a"
+    },
+    {
+      "path": "diagnostic-01/current/trial-2/raw/q20_with.json",
+      "sha256": "697fc42744e8e4ffc2faaad633154c5f2645f65b1ae2561031a7691dc3997a09"
+    },
+    {
+      "path": "diagnostic-01/current/trial-2/raw/q25_with.json",
+      "sha256": "2574ca778a72cb2ddb9a59209661a3d9567d1a76235651d1ae32025d817a8f9b"
+    },
+    {
+      "path": "diagnostic-01/current/trial-3/raw/q20_with.json",
+      "sha256": "0e8abbb005e467257e76b3a6f499754bbbc4592cfdde445d7ff2937f9806f472"
+    },
+    {
+      "path": "diagnostic-01/current/trial-3/raw/q25_with.json",
+      "sha256": "eb098068385274426d02f88f74395fdbdaf209d27db2665f2026a9d585a5f93b"
+    },
+    {
+      "path": "diagnostic-01/run.json",
+      "sha256": "2e82361ac0ce2aa725b65b72f9e1c9b2861d8dfc89856c4c60feda37975bd3b2"
+    },
+    {
+      "path": "independent-review.json",
+      "sha256": "eb3c20e4c375e248f16ebf9a79d834d4a41a1bdd31800290e0bc2ae36878815c"
+    },
+    {
+      "path": "inputs.json",
+      "sha256": "cd388ebfb631590d28cebc36f6ff09d49cd98250a57cc979c01acbba7502bcb9"
+    },
+    {
+      "path": "probe.py",
+      "sha256": "27e2c24dbe7befff90f7775c0be7fa2311a4a6b835bb168c179c4e821b6e1b27"
+    },
+    {
+      "path": "protocol.json",
+      "sha256": "c523bc7fbf2206d1828678f5ceebeb11755a2a44ff39abb4bbdb6c228bf0acb6"
+    },
+    {
+      "path": "review-inputs.json",
+      "sha256": "925769a25fe2724e4d802fe1ca5b84ac7340956174e13b735b3d9018608e86ae"
+    },
+    {
+      "path": "review-map.json",
+      "sha256": "98ea3d67070ed9603c624ad1fb9579dfbf8aaf0a12adff0ed5885b5db06a8388"
+    },
+    {
+      "path": "test_probe.py",
+      "sha256": "31e761ec21f9c111ebfae37c8b7864f59748cf6c0a1723e309fd6943fff8c594"
+    },
+    {
+      "path": "transfer-corpus.json",
+      "sha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893"
+    }
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "records": [
+    {
+      "id": "1514453912e1137e",
+      "condition": "candidate",
+      "caseId": "q25",
+      "trial": 3
+    },
+    {
+      "id": "3d7c4c56d65b6a61",
+      "condition": "current",
+      "caseId": "q25",
+      "trial": 3
+    },
+    {
+      "id": "404a9e70d057c7f8",
+      "condition": "current",
+      "caseId": "q20",
+      "trial": 2
+    },
+    {
+      "id": "59b1d3e247bb6390",
+      "condition": "candidate",
+      "caseId": "q25",
+      "trial": 1
+    },
+    {
+      "id": "5e036c6818635757",
+      "condition": "current",
+      "caseId": "q25",
+      "trial": 2
+    },
+    {
+      "id": "8ac637e0221494f2",
+      "condition": "current",
+      "caseId": "q25",
+      "trial": 1
+    },
+    {
+      "id": "b11a340ba9168b76",
+      "condition": "candidate",
+      "caseId": "q20",
+      "trial": 1
+    },
+    {
+      "id": "c6588185658f26d0",
+      "condition": "current",
+      "caseId": "q20",
+      "trial": 3
+    },
+    {
+      "id": "cafe8ca39b01534c",
+      "condition": "candidate",
+      "caseId": "q25",
+      "trial": 2
+    },
+    {
+      "id": "cdae6afdc48df2e8",
+      "condition": "candidate",
+      "caseId": "q20",
+      "trial": 3
+    },
+    {
+      "id": "f0707b779a87ce42",
+      "condition": "current",
+      "caseId": "q20",
+      "trial": 1
+    },
+    {
+      "id": "fe1a98cc595e39a1",
+      "condition": "candidate",
+      "caseId": "q20",
+      "trial": 2
+    }
+  ]
+}

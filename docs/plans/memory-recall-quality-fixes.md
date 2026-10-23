@@ -286,3 +286,14 @@ transfer pairs,10 critical repeats. All37 with-recall questions and all repeats
 must pass; without-recall abstention and completeness remain separate. Stop on
 new unsupported conclusions or missing available facts; do not tune another
 prefix variant or hide the rejected comparison.
+
+Q5 supports the repaired fixture: all12 actual paragraphs pass,6/6 under each
+unchanged prefix. It measures question adequacy, not an additional label gain.
+The parent accepts the independent review and keeps the Q4 rejection intact.
+The source label is now changed by22bytes only; the existing envelope regression
+first failed on old behavior (exit101, one expected assertion), then all31
+contextual-recall tests passed. Logs bind both exact source-file states.
+The spec limits stored-version meaning to the source snapshot and explicitly
+excludes outside-world freshness or approval. Complete Memory validation,
+new binary/source bindings and the prospective84-context actual campaign still
+remain required before any publication or merge.

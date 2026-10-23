@@ -1,0 +1,27 @@
+{
+  "schemaVersion": "memory-native-focused-validation/v1",
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-memory",
+    "--test",
+    "contextual_recall"
+  ],
+  "startedAt": "2026-10-23T10:05:39.497629+00:00",
+  "completedAt": "2026-10-23T10:07:06.751401+00:00",
+  "durationSeconds": 87.253,
+  "exitCode": 0,
+  "log": "contextual-recall.log",
+  "logSha256": "c890c8465068938c26e168a9f5ec5edc24fa8d48e9537021578ce77b4635efe9",
+  "gitHead": "337ee88546cab7c10f5e4a62575309fe95e8e8fd",
+  "sourceFiles": {
+    "plugins/memory/src/storage/recall_store.rs": "023f7db3be10c900561a786b65815ede154b79c0294748ed34bafe1aa575fb75",
+    "plugins/memory/tests/contextual_recall.rs": "5055f8f63caf26935ae5780b3f00eb39c32b06ba2a9b1301ff06b30f90e2e63d"
+  },
+  "sourceState": "Candidate label and regression assertion in worktree; await result before source commit."
+}

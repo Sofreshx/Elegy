@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "memory-native-red-test/v1",
+  "argv": [
+    "cargo",
+    "test",
+    "--offline",
+    "--locked",
+    "--target-dir",
+    "D:/Projets/Elegy/target/qualification-oct23",
+    "-p",
+    "elegy-memory",
+    "--test",
+    "contextual_recall",
+    "instruction_shaped_memories_are_quoted_and_do_not_control_the_envelope",
+    "--",
+    "--exact"
+  ],
+  "startedAt": "2026-10-23T09:59:46.235401+00:00",
+  "completedAt": "2026-10-23T10:02:56.848465+00:00",
+  "durationSeconds": 190.613,
+  "exitCode": 101,
+  "log": "red.log",
+  "logSha256": "730a46f82897b5afbae834897bad233fc2f43199b409632846544f324ac2e03c",
+  "gitHead": "337ee88546cab7c10f5e4a62575309fe95e8e8fd",
+  "sourceFiles": {
+    "plugins/memory/src/storage/recall_store.rs": "a1b9ed187108668fdbd311101afecdac5f362042f38a210b4427f86e0499f50d",
+    "plugins/memory/tests/contextual_recall.rs": "5055f8f63caf26935ae5780b3f00eb39c32b06ba2a9b1301ff06b30f90e2e63d"
+  },
+  "sourceState": "Only existing envelope assertion updated; library still uses Historical label.",
+  "concurrencyCheck": "Get-Process: zero cargo/rustc/ld/lld before execution; CIM precheck unavailable, no build had run."
+}
