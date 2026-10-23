@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "elegy.cli/v1",
+  "correlationId": "elegy-documentation-23872-1792773698330247100",
+  "command": [
+    "export",
+    "bundle"
+  ],
+  "status": "ok",
+  "data": {
+    "schemaVersion": "documentation-export-result/v1",
+    "projectRoot": ".",
+    "configPath": ".elegy/docs.yaml",
+    "exportKind": "bundle",
+    "outputPath": "docs/docs-index.md",
+    "documentCount": 48,
+    "sourceCount": 49,
+    "generatedAt": "2026-10-23T16:41:39.1390908Z",
+    "authorityPosture": "derived output; source files remain authoritative",
+    "driftDetected": false
+  }
+}
+
+--- stderr ---

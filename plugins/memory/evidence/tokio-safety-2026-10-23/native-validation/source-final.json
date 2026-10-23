@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "<python>",
+    "<repo>/plugins/memory/evidence/tokio-safety-2026-10-23/verify_source.py",
+    "--with-binaries"
+  ],
+  "startedAt": "2026-10-23T16:41:31.023318+00:00",
+  "completedAt": "2026-10-23T16:41:33.351379+00:00",
+  "durationSeconds": 2.328,
+  "exitCode": 0,
+  "log": "source-final.log",
+  "logSha256": "85ac1d94ff4b9fa78e502bea766748f397c9d2942ac0bfbbfbd009baf8e2065e",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadBefore": "14e972247b654c02f61474782f509244addbe87c",
+  "gitHeadAfter": "14e972247b654c02f61474782f509244addbe87c",
+  "sourceLockSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+  "sourceSnapshotBeforeSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceSnapshotAfterSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

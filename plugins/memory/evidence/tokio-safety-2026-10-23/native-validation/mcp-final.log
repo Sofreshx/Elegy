@@ -1,0 +1,167 @@
+
+--- stderr ---
+   Compiling process-wrap v9.1.0
+   Compiling rmcp v1.8.0
+   Compiling elegy-memory-mcp v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\hosts\memory-mcp)
+memory allocation of 2097152 bytes failed
+
+stack backtrace:
+thread 'optimize module 1c8yphalog2dxb6mcx09vtod1' (31864) has overflowed its stack
+rustc-LLVM ERROR: out of memory
+   0:     0x7ffd96ec7dbf - <unknown>
+Allocation failed
+   1:     0x7ffd96f07671 - <unknown>
+   2:     0x7ffd96ed7ff2 - <unknown>
+   3:     0x7ffd96eb7c31 - <unknown>
+   4:     0x7ffd96e971ac - <unknown>
+   5:     0x7ffd96e8d44f - <unknown>
+   6:     0x7ffd96eb7cbb - <unknown>
+   7:     0x7ffd96e98228 - <unknown>
+   8:     0x7ffd96efb3ed - <unknown>
+   9:     0x7ffd96efb40a - <unknown>
+  10:     0x7ffd3cea08e8 - <unknown>
+  11:     0x7ffd3c60bc48 - <unknown>
+  12:     0x7ffd3ba2b40d - <unknown>
+  13:     0x7ffd3ba30b22 - <unknown>
+  14:     0x7ffd3ba431e5 - <unknown>
+  15:     0x7ffd3bca8b41 - <unknown>
+  16:     0x7ffd3bc9f7b1 - <unknown>
+  17:     0x7ffd3bcab7c8 - <unknown>
+  18:     0x7ffd3bcb0c1d - <unknown>
+  19:     0x7ffd3b9b6a50 - <unknown>
+  20:     0x7ffd3bc3a544 - <unknown>
+  21:     0x7ffd3bc37dc9 - <unknown>
+  22:     0x7ffd3bb812e6 - <unknown>
+  23:     0x7ffd3bb997a3 - <unknown>
+  24:     0x7ffd3ba2d5de - <unknown>
+  25:     0x7ffd3ba6339e - <unknown>
+  26:     0x7ffd3bb768e0 - <unknown>
+  27:     0x7ffd3bc3bce7 - <unknown>
+  28:     0x7ffd3bc37dc9 - <unknown>
+  29:     0x7ffd3bb812e6 - <unknown>
+  30:     0x7ffd3bb997a3 - <unknown>
+  31:     0x7ffd3ba2d5d1 - <unknown>
+  32:     0x7ffd3ba6339e - <unknown>
+  33:     0x7ffd3bb768e0 - <unknown>
+  34:     0x7ffd3bc3bce7 - <unknown>
+  35:     0x7ffd3bc37dc9 - <unknown>
+  36:     0x7ffd3a5b025a - <unknown>
+  37:     0x7ffd3a51d33b - <unknown>
+  38:     0x7ffd3b3e149b - <unknown>
+  39:     0x7ffd3b1dd964 - <unknown>
+  40:     0x7ffd3b1337ec - <unknown>
+  41:     0x7ffd3b411456 - <unknown>
+  42:     0x7ffd3bb81f62 - <unknown>
+  43:     0x7ffd3bb99d5b - <unknown>
+  44:     0x7ffd3bba8689 - <unknown>
+  45:     0x7ffd3ba658df - <unknown>
+  46:     0x7ffd3bb99cf1 - <unknown>
+  47:     0x7ffd3ba2ea0f - <unknown>
+  48:     0x7ffd3ba656e7 - <unknown>
+  49:     0x7ffd3bb99cf1 - <unknown>
+  50:     0x7ffd3bba8abb - <unknown>
+  51:     0x7ffd3ba65609 - <unknown>
+  52:     0x7ffd3bb99cf1 - <unknown>
+  53:     0x7ffd3bba8abb - <unknown>
+  54:     0x7ffd3ba65609 - <unknown>
+  55:     0x7ffd3bb99cf1 - <unknown>
+  56:     0x7ffd392c3f17 - <unknown>
+  57:     0x7ffd391dd770 - <unknown>
+  58:     0x7ffd39295507 - <unknown>
+  59:     0x7ffd3b3e180b - <unknown>
+  60:     0x7ffd3b1d8f02 - <unknown>
+  61:     0x7ffd3b125850 - <unknown>
+  62:     0x7ffd3b494c06 - <unknown>
+  63:     0x7ffd3c81117e - <unknown>
+  64:     0x7ffd3c818d57 - <unknown>
+  65:     0x7ffd39cc0795 - <unknown>
+  66:     0x7ffd39c6f1ce - <unknown>
+  67:     0x7ffd39cacab0 - <unknown>
+  68:     0x7ffd39c8159e - <unknown>
+  69:     0x7ffd39c98b1b - <unknown>
+  70:     0x7ffd39cb22b6 - <unknown>
+  71:     0x7ffd39c6b908 - <unknown>
+  72:     0x7ffd3b368173 - <unknown>
+  73:     0x7ffd3b1f8923 - <unknown>
+  74:     0x7ffd3b1f821e - <unknown>
+  75:     0x7ffd3b1ec5a2 - <unknown>
+  76:     0x7ffd3b17a003 - <unknown>
+  77:     0x7ffd3b48be72 - <unknown>
+  78:     0x7ffd39c6a21f - <unknown>
+  79:     0x7ffd39c6b267 - <unknown>
+  80:     0x7ffd39c6b267 - <unknown>
+  81:     0x7ffd39c6b267 - <unknown>
+  82:     0x7ffd39c6b267 - <unknown>
+  83:     0x7ffd39c6b267 - <unknown>
+  84:     0x7ffd39c6b267 - <unknown>
+  85:     0x7ffd39c6b267 - <unknown>
+  86:     0x7ffd39c6b267 - <unknown>
+  87:     0x7ffd39c6b267 - <unknown>
+  88:     0x7ffd39c6b267 - <unknown>
+  89:     0x7ffd39c6b267 - <unknown>
+  90:     0x7ffd39c6b267 - <unknown>
+  91:     0x7ffd39c6b267 - <unknown>
+  92:     0x7ffd39c6b267 - <unknown>
+  93:     0x7ffd39c6b267 - <unknown>
+  94:     0x7ffd39c6b267 - <unknown>
+  95:     0x7ffd39c6b267 - <unknown>
+  96:     0x7ffd39c6b267 - <unknown>
+  97:     0x7ffd39c6b267 - <unknown>
+  98:     0x7ffd39c6b267 - <unknown>
+  99:     0x7ffd39c6b267 - <unknown>
+ 100:     0x7ffd39c6b267 - <unknown>
+ 101:     0x7ffd39c6b267 - <unknown>
+ 102:     0x7ffd39c6b267 - <unknown>
+ 103:     0x7ffd39c6b267 - <unknown>
+ 104:     0x7ffd39c6b267 - <unknown>
+ 105:     0x7ffd39c6b267 - <unknown>
+ 106:     0x7ffd39c6b267 - <unknown>
+ 107:     0x7ffd39c6cc6b - <unknown>
+ 108:     0x7ffd39c9273a - <unknown>
+ 109:     0x7ffd39c91b5b - <unknown>
+ 110:     0x7ffd39c6e143 - <unknown>
+ 111:     0x7ffd39c77e07 - <unknown>
+ 112:     0x7ffd3b328bb3 - <unknown>
+ 113:     0x7ffd3b1d3f16 - <unknown>
+ 114:     0x7ffd3b1157a0 - <unknown>
+ 115:     0x7ffd3b493fbe - <unknown>
+ 116:     0x7ffd394289e0 - <unknown>
+ 117:     0x7ffd392115b6 - <unknown>
+ 118:     0x7ffd3928a102 - <unknown>
+ 119:     0x7ffd3922b6c6 - <unknown>
+ 120:     0x7ffd38fadae7 - <unknown>
+ 121:     0x7ffd38f638f5 - <unknown>
+ 122:     0x7ffd38f79b30 - <unknown>
+ 123:     0x7ffd38fbbd82 - <unknown>
+ 124:     0x7ffd38ff71a4 - <unknown>
+ 125:     0x7ffd38fdd24f - <unknown>
+ 126:     0x7ffd96ec521d - <unknown>
+ 127:     0x7ffe0ac4cd87 - <unknown>
+ 128:     0x7ffe0bfacaec - <unknown>
+memory allocation of 2097152 bytes failed
+stack backtrace:
+memory allocation of 1572864 bytes failed
+skipping backtrace printing to avoid potential recursion
+rustc-LLVM ERROR: out of memory
+Allocation failed
+error: could not compile `elegy-memory-mcp` (bin "elegy-memory-mcp-stdio")
+
+Caused by:
+  process didn't exit successfully: `<home>\.rustup\toolchains\1.96.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name elegy_memory_mcp_stdio --edition=2021 hosts\memory-mcp\src\stdio_main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::unwrap_used --forbid=unsafe_code --deny=clippy::todo --deny=clippy::dbg_macro --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=ede55491740b7bd1 -C extra-filename=-19731cf86b07ff91 --out-dir D:/Projets/Elegy/target/qualification-oct23\debug\deps -C incremental=D:/Projets/Elegy/target/qualification-oct23\debug\incremental -L dependency=D:/Projets/Elegy/target/qualification-oct23\debug\deps --extern anyhow=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libanyhow-6a7d924f1cec733f.rlib --extern axum=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libaxum-e25521c756a47c8a.rlib --extern base64=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libbase64-8e88a2638431bfc7.rlib --extern elegy_memory=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory-061703dcf24bee8e.rlib --extern elegy_memory_mcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory_mcp-cbc6797da8d9bd8e.rlib --extern jsonwebtoken=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libjsonwebtoken-4ca0c199331a6215.rlib --extern regex=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libregex-bb03c7e649568e5f.rlib --extern reqwest=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libreqwest-a929d40c483dddd3.rlib --extern rmcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\librmcp-2d6a65e8a21f5e4a.rlib --extern serde=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde-ac3cca89e46c9929.rlib --extern serde_json=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde_json-823ecc730827e5c8.rlib --extern thiserror=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libthiserror-45c07c6363eb21d1.rlib --extern time=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtime-4c987b6c3a618347.rlib --extern tokio=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtokio-13184c7b388de1be.rlib --extern tracing=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing-21570c08ff70954f.rlib --extern tracing_subscriber=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing_subscriber-8d28469498c91f4c.rlib --extern url=D:/Projets/Elegy/target/qualification-oct23\debug\deps\liburl-a78367616b32db0d.rlib --extern uuid=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libuuid-04f3f8a1791149e8.rlib -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\ring-52bef096b1a8fddd\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\libsqlite3-sys-f792531fd0dc7833\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\sqlite-vec-721c09a67f2b3f5d\out` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+warning: build failed, waiting for other jobs to finish...
+error: could not compile `elegy-memory-mcp` (bin "elegy-memory-mcp-http")
+
+Caused by:
+  process didn't exit successfully: `<home>\.rustup\toolchains\1.96.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name elegy_memory_mcp_http --edition=2021 hosts\memory-mcp\src\main.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --crate-type bin --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::unwrap_used --forbid=unsafe_code --deny=clippy::todo --deny=clippy::dbg_macro --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=e1bc0400cb1818fc -C extra-filename=-a1fd8bc1ba11e054 --out-dir D:/Projets/Elegy/target/qualification-oct23\debug\deps -C incremental=D:/Projets/Elegy/target/qualification-oct23\debug\incremental -L dependency=D:/Projets/Elegy/target/qualification-oct23\debug\deps --extern anyhow=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libanyhow-6a7d924f1cec733f.rlib --extern axum=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libaxum-e25521c756a47c8a.rlib --extern base64=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libbase64-8e88a2638431bfc7.rlib --extern elegy_memory=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory-061703dcf24bee8e.rlib --extern elegy_memory_mcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory_mcp-cbc6797da8d9bd8e.rlib --extern jsonwebtoken=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libjsonwebtoken-4ca0c199331a6215.rlib --extern regex=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libregex-bb03c7e649568e5f.rlib --extern reqwest=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libreqwest-a929d40c483dddd3.rlib --extern rmcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\librmcp-2d6a65e8a21f5e4a.rlib --extern serde=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde-ac3cca89e46c9929.rlib --extern serde_json=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde_json-823ecc730827e5c8.rlib --extern thiserror=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libthiserror-45c07c6363eb21d1.rlib --extern time=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtime-4c987b6c3a618347.rlib --extern tokio=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtokio-13184c7b388de1be.rlib --extern tracing=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing-21570c08ff70954f.rlib --extern tracing_subscriber=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing_subscriber-8d28469498c91f4c.rlib --extern url=D:/Projets/Elegy/target/qualification-oct23\debug\deps\liburl-a78367616b32db0d.rlib --extern uuid=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libuuid-04f3f8a1791149e8.rlib -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\ring-52bef096b1a8fddd\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\libsqlite3-sys-f792531fd0dc7833\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\sqlite-vec-721c09a67f2b3f5d\out` (exit code: 0xc0000409, STATUS_STACK_BUFFER_OVERRUN)
+error: could not compile `elegy-memory-mcp` (test "large_corpus_bench")
+
+Caused by:
+  process didn't exit successfully: `<home>\.rustup\toolchains\1.96.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name large_corpus_bench --edition=2021 hosts\memory-mcp\tests\large_corpus_bench.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::unwrap_used --forbid=unsafe_code --deny=clippy::todo --deny=clippy::dbg_macro --test --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=d503124b23699336 -C extra-filename=-258a9b511ddad326 --out-dir D:/Projets/Elegy/target/qualification-oct23\debug\deps -C incremental=D:/Projets/Elegy/target/qualification-oct23\debug\incremental -L dependency=D:/Projets/Elegy/target/qualification-oct23\debug\deps --extern anyhow=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libanyhow-6a7d924f1cec733f.rlib --extern async_trait=D:/Projets/Elegy/target/qualification-oct23\debug\deps\async_trait-55db9f1d8e327569.dll --extern axum=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libaxum-e25521c756a47c8a.rlib --extern base64=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libbase64-8e88a2638431bfc7.rlib --extern elegy_memory=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory-061703dcf24bee8e.rlib --extern elegy_memory_mcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory_mcp-cbc6797da8d9bd8e.rlib --extern jsonwebtoken=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libjsonwebtoken-4ca0c199331a6215.rlib --extern regex=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libregex-bb03c7e649568e5f.rlib --extern reqwest=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libreqwest-a929d40c483dddd3.rlib --extern rmcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\librmcp-2d6a65e8a21f5e4a.rlib --extern serde=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde-ac3cca89e46c9929.rlib --extern serde_json=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde_json-823ecc730827e5c8.rlib --extern tempfile=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtempfile-a7b1d9eac4bf8d55.rlib --extern thiserror=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libthiserror-45c07c6363eb21d1.rlib --extern time=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtime-4c987b6c3a618347.rlib --extern tokio=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtokio-13184c7b388de1be.rlib --extern tracing=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing-21570c08ff70954f.rlib --extern tracing_subscriber=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing_subscriber-8d28469498c91f4c.rlib --extern url=D:/Projets/Elegy/target/qualification-oct23\debug\deps\liburl-a78367616b32db0d.rlib --extern uuid=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libuuid-04f3f8a1791149e8.rlib -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\ring-52bef096b1a8fddd\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\libsqlite3-sys-f792531fd0dc7833\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\sqlite-vec-721c09a67f2b3f5d\out` (exit code: 0xc00000fd, STATUS_STACK_OVERFLOW)
+error: could not compile `elegy-memory-mcp` (lib test)
+
+Caused by:
+  process didn't exit successfully: `<home>\.rustup\toolchains\1.96.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name elegy_memory_mcp --edition=2021 hosts\memory-mcp\src\lib.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::unwrap_used --forbid=unsafe_code --deny=clippy::todo --deny=clippy::dbg_macro --test --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=8e6668ff2976ad87 -C extra-filename=-653ceb86b088dee2 --out-dir D:/Projets/Elegy/target/qualification-oct23\debug\deps -C incremental=D:/Projets/Elegy/target/qualification-oct23\debug\incremental -L dependency=D:/Projets/Elegy/target/qualification-oct23\debug\deps --extern anyhow=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libanyhow-6a7d924f1cec733f.rlib --extern async_trait=D:/Projets/Elegy/target/qualification-oct23\debug\deps\async_trait-55db9f1d8e327569.dll --extern axum=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libaxum-e25521c756a47c8a.rlib --extern base64=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libbase64-8e88a2638431bfc7.rlib --extern elegy_memory=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory-061703dcf24bee8e.rlib --extern jsonwebtoken=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libjsonwebtoken-4ca0c199331a6215.rlib --extern regex=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libregex-bb03c7e649568e5f.rlib --extern reqwest=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libreqwest-a929d40c483dddd3.rlib --extern rmcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\librmcp-2d6a65e8a21f5e4a.rlib --extern serde=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde-ac3cca89e46c9929.rlib --extern serde_json=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde_json-823ecc730827e5c8.rlib --extern tempfile=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtempfile-a7b1d9eac4bf8d55.rlib --extern thiserror=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libthiserror-45c07c6363eb21d1.rlib --extern time=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtime-4c987b6c3a618347.rlib --extern tokio=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtokio-13184c7b388de1be.rlib --extern tracing=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing-21570c08ff70954f.rlib --extern tracing_subscriber=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing_subscriber-8d28469498c91f4c.rlib --extern url=D:/Projets/Elegy/target/qualification-oct23\debug\deps\liburl-a78367616b32db0d.rlib --extern uuid=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libuuid-04f3f8a1791149e8.rlib -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\ring-52bef096b1a8fddd\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\libsqlite3-sys-f792531fd0dc7833\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\sqlite-vec-721c09a67f2b3f5d\out` (exit code: 3)
+error: could not compile `elegy-memory-mcp` (test "stdio_bootstrap")
+
+Caused by:
+  process didn't exit successfully: `<home>\.rustup\toolchains\1.96.1-x86_64-pc-windows-gnu\bin\rustc.exe --crate-name stdio_bootstrap --edition=2021 hosts\memory-mcp\tests\stdio_bootstrap.rs --error-format=json --json=diagnostic-rendered-ansi,artifacts,future-incompat --emit=dep-info,link -C embed-bitcode=no -C debuginfo=2 --deny=clippy::unwrap_used --forbid=unsafe_code --deny=clippy::todo --deny=clippy::dbg_macro --test --check-cfg cfg(docsrs,test) --check-cfg "cfg(feature, values())" -C metadata=e106b2be23607f38 -C extra-filename=-81a97ef7638a7b0d --out-dir D:/Projets/Elegy/target/qualification-oct23\debug\deps -C incremental=D:/Projets/Elegy/target/qualification-oct23\debug\incremental -L dependency=D:/Projets/Elegy/target/qualification-oct23\debug\deps --extern anyhow=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libanyhow-6a7d924f1cec733f.rlib --extern async_trait=D:/Projets/Elegy/target/qualification-oct23\debug\deps\async_trait-55db9f1d8e327569.dll --extern axum=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libaxum-e25521c756a47c8a.rlib --extern base64=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libbase64-8e88a2638431bfc7.rlib --extern elegy_memory=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory-061703dcf24bee8e.rlib --extern elegy_memory_mcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libelegy_memory_mcp-cbc6797da8d9bd8e.rlib --extern jsonwebtoken=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libjsonwebtoken-4ca0c199331a6215.rlib --extern regex=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libregex-bb03c7e649568e5f.rlib --extern reqwest=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libreqwest-a929d40c483dddd3.rlib --extern rmcp=D:/Projets/Elegy/target/qualification-oct23\debug\deps\librmcp-2d6a65e8a21f5e4a.rlib --extern serde=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde-ac3cca89e46c9929.rlib --extern serde_json=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libserde_json-823ecc730827e5c8.rlib --extern tempfile=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtempfile-a7b1d9eac4bf8d55.rlib --extern thiserror=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libthiserror-45c07c6363eb21d1.rlib --extern time=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtime-4c987b6c3a618347.rlib --extern tokio=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtokio-13184c7b388de1be.rlib --extern tracing=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing-21570c08ff70954f.rlib --extern tracing_subscriber=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libtracing_subscriber-8d28469498c91f4c.rlib --extern url=D:/Projets/Elegy/target/qualification-oct23\debug\deps\liburl-a78367616b32db0d.rlib --extern uuid=D:/Projets/Elegy/target/qualification-oct23\debug\deps\libuuid-04f3f8a1791149e8.rlib -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\ring-52bef096b1a8fddd\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\libsqlite3-sys-f792531fd0dc7833\out -L native=D:/Projets/Elegy/target/qualification-oct23\debug\build\sqlite-vec-721c09a67f2b3f5d\out` (exit code: 3)

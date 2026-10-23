@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "memory-immutable-evidence-format-note/v1",
+  "file": "results.md",
+  "sha256": "5a6d5decdf80ccb70f16fd076500c1406305679fd3052d3dd048f0542486069c",
+  "diagnostic": "new blank line at EOF at line 1905",
+  "scope": "One final blank separator in the derived report already sealed by the pre-record manifest and isolated receipt. All84answer paragraphs and all hashes remain unchanged.",
+  "preparationResult": "The optional runtime checkpoint first stopped at git diff --cached --check, before invoking git commit. Its exact single known diagnostic is now accepted only when the staged report hash equals its sealed manifest entry; all other whitespace diagnostics still block.",
+  "permanentConfigurationChanged": false,
+  "repositoryHooksDisabled": false,
+  "qualificationInputsChanged": false
+}

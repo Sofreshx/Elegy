@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "memory-review-report-relocation/v1",
+  "reason": "Worker interpreted Q8 as a literal child directory. Parent relocated its new post-receipt integration report without modifying any bytes.",
+  "sourcePath": "Q8/review-final-bundle.json",
+  "destinationPath": "review-final-bundle.json",
+  "sha256Before": "d85024338cdb3d3973cd56bd1c700bfb59028506dff3ae3786823a6db79289c5",
+  "sha256After": "d85024338cdb3d3973cd56bd1c700bfb59028506dff3ae3786823a6db79289c5",
+  "reportContentsChanged": false,
+  "sealedCampaignFilesChanged": false,
+  "preparationError": "First helper moved the report successfully, then its attempt to remove the parent directory stopped because pre-existing ignored runtime data remained. No recursive removal was attempted; those local data are preserved. The second invocation verified the already relocated report and wrote this note.",
+  "ignoredRuntimePreserved": true
+}

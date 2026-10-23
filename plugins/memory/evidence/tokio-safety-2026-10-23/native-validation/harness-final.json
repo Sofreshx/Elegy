@@ -1,0 +1,29 @@
+{
+  "schemaVersion": "memory-final-native-check/v1",
+  "argv": [
+    "<python>",
+    "-m",
+    "unittest",
+    "discover",
+    "-s",
+    "plugins/memory/evidence/tokio-safety-2026-10-23",
+    "-p",
+    "test_*.py",
+    "-v"
+  ],
+  "startedAt": "2026-10-23T16:00:57.416582+00:00",
+  "completedAt": "2026-10-23T16:01:10.315290+00:00",
+  "durationSeconds": 12.89,
+  "exitCode": 0,
+  "log": "harness-final.log",
+  "logSha256": "3901951b5a6a9461dfe944e79ee3e2fc6751c82aff1863fd9fb06ae0c149e45a",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "gitHeadBefore": "ce49cd4a8e473fc11f40f54005a7fbebe73a8074",
+  "gitHeadAfter": "ce49cd4a8e473fc11f40f54005a7fbebe73a8074",
+  "sourceLockSha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232",
+  "sourceSnapshotBeforeSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceSnapshotAfterSha256": "d665fc403d5574e4f39bbfdaf729e0c1ed3dbe830c3b6c5842898e7b1f63ff2a",
+  "sourceUnchanged": true,
+  "sourceFiles": 149,
+  "mcpSourceFiles": 18
+}

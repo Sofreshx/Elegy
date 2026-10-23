@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "memory-tokio-replay-checks/v1",
+  "status": "passed",
+  "packets": 37,
+  "expectedPackets": 37,
+  "controls": 42,
+  "expectedControls": 42,
+  "emptyNamespaces": 24,
+  "expectedEmptyNamespaces": 24,
+  "sourceUnchangedPackets": 37,
+  "errors": [],
+  "qualificationCodeSealed": 11,
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "scope": "Same installed software host and computer; reopened CLI/MCP clients, not a second software host."
+}

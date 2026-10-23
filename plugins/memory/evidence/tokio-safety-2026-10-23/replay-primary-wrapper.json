@@ -1,0 +1,113 @@
+{
+  "schemaVersion": "memory-codex-campaign-wrapper/v1",
+  "phase": "replay-primary",
+  "startedAt": "2026-10-23T15:57:33.500218+00:00",
+  "endedAt": "2026-10-23T15:59:03.118123+00:00",
+  "exitCode": 0,
+  "status": "completed",
+  "before": {
+    "checks": {
+      "sourceRevision": true,
+      "fixedSourceRevision": true,
+      "sourceLockSha256": true,
+      "cliSourceSha256": true,
+      "fixedCliSourceSha256": true,
+      "subjectBinaryHashes": true,
+      "protocolSha256": true,
+      "model": true,
+      "reasoningEffort": true,
+      "corpusProvenance": true,
+      "sourceFiles": true,
+      "sourceGitObjects": true,
+      "sourceFileCount": true,
+      "sourceFileErrors": [],
+      "binaries": true,
+      "installedClient": true,
+      "clientVersionRecorded": true,
+      "harnessManifest": true,
+      "harnessSourceFiles": true,
+      "harnessSourceErrors": [],
+      "qualificationSourceFiles": true,
+      "pathsInsideRepo": true,
+      "all": true
+    },
+    "binaries": {
+      "cli": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "sha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+        "insideRepo": true,
+        "expected": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3"
+      },
+      "mcp": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe",
+        "sha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+        "insideRepo": true,
+        "expected": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+      }
+    },
+    "subjectSha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+    "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685"
+  },
+  "after": {
+    "checks": {
+      "sourceRevision": true,
+      "fixedSourceRevision": true,
+      "sourceLockSha256": true,
+      "cliSourceSha256": true,
+      "fixedCliSourceSha256": true,
+      "subjectBinaryHashes": true,
+      "protocolSha256": true,
+      "model": true,
+      "reasoningEffort": true,
+      "corpusProvenance": true,
+      "sourceFiles": true,
+      "sourceGitObjects": true,
+      "sourceFileCount": true,
+      "sourceFileErrors": [],
+      "binaries": true,
+      "installedClient": true,
+      "clientVersionRecorded": true,
+      "harnessManifest": true,
+      "harnessSourceFiles": true,
+      "harnessSourceErrors": [],
+      "qualificationSourceFiles": true,
+      "pathsInsideRepo": true,
+      "all": true
+    },
+    "binaries": {
+      "cli": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+        "sha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+        "insideRepo": true,
+        "expected": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3"
+      },
+      "mcp": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe",
+        "sha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+        "insideRepo": true,
+        "expected": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+      }
+    },
+    "subjectSha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+    "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685"
+  },
+  "selfSha256Before": "2b6ca50382434dd84ca9249e7632c9e8fa6972a1526dc7a99f7f75274e06b1a0",
+  "selfSha256After": "2b6ca50382434dd84ca9249e7632c9e8fa6972a1526dc7a99f7f75274e06b1a0",
+  "subjectSha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+  "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685",
+  "argv": [
+    "<python>",
+    "plugins/memory/evidence/answer-grounding-2026-10-23/qualification_runner.py",
+    "replay",
+    "--corpus",
+    "plugins/memory/evidence/tokio-safety-2026-10-23/corpus.json",
+    "--protocol",
+    "plugins/memory/evidence/tokio-safety-2026-10-23/protocol.json",
+    "--output",
+    "plugins/memory/evidence/tokio-safety-2026-10-23/replay-primary",
+    "--cli",
+    "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+    "--mcp",
+    "plugins/memory/evidence/tokio-safety-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe"
+  ]
+}

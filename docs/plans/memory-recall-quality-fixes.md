@@ -472,3 +472,41 @@ new privacy boundary or failed applicable CI. No ignore, weaker criterion,
 readiness promotion, global gain or monetary saving is authorized by this
 follow-up. The reviewed plan's count and full-gate clarifications are included
 above; the exact count and binding values will be recorded before Q8 freeze.
+
+
+### Q8 observed qualification and publication boundary
+
+Source2a351a3 and freezece49cd4 bind the new binaries and all11qualification
+scripts before84fresh Codex gpt-6.1-sol/max contexts. All37reopened packets,
+42controls,24empty namespaces,31contextual,67MCP and25harness checks pass.
+The first MCP package compile hit allocation failures; a separated temporary
+two-job retry passes with sampled memory headroom recorded. One generic hook
+inspection failed during that earlier phase; the exact same staged content and
+message later passed both unchanged hooks. Neither failure is discarded or
+assigned a stronger causal explanation than the observed evidence supports.
+
+All47with-recall responses satisfy the frozen target. Without recall14/37targets
+are satisfied (4current/arithmetic and10abstention controls);23ordinary requests
+remain safely incomplete. Six lexical false negatives retain their scores.
+Ten independent-review completeness mistakes are corrected in separate addenda
+under predeclared unknown/hostile/forgetting rules; an independent audit accepts
+each correction and the original84answers and reports remain intact. No model
+answer is rerun or replaced. The finite paired lexical means are0.9369369369
+and0.3738738739, without a global or economic claim.
+
+The publication check found a validator false positive on a fictitious home
+suffix in Windows fixture text. A one-line root-token boundary correction and
+regressions preserve detection of plain/quoted/URI Unix homes and Windows user
+paths. These scripts are outside the149/18Memory source inventory, which stays
+unchanged. Original/accurately rebound RED/GREEN metadata are distinguished.
+
+The [Q8 report](../../plugins/memory/evidence/tokio-safety-2026-10-23/README.md)
+owns per-guarantee verdicts, all84paragraphs, individual errors, source/binary
+bindings and reproducible commands. The exact public bundle passed its path and
+private-content scan before its first Q8 isolated receipt. Its193campaign-file
+manifest and16attachments verify; receipt1d5c9a69-c8ae-4863-9117-a59b2615891f
+reports satisfied without staleness, with matching build/source and both review
+and external-subject recheck still required. No readiness is promoted. Retain
+Git source ancestry through the authorized normal push and merge after exact
+final-head CI. Remote integration and existing main-snapshot publication are
+separate observed delivery results, never inferred from the qualification.

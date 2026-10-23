@@ -1,0 +1,18 @@
+{
+  "schemaVersion": "memory-review-location-correction/v1",
+  "reason": "Both workers interpreted Q8 shorthand as a literal child directory; report contents moved unchanged to the intended evidence root before consolidation/recording.",
+  "records": [
+    {
+      "from": "Q8/review-batch-a.json",
+      "to": "review-batch-a.json",
+      "sha256": "374956ff229c49b01f075e9b849b77050616f13cce04a5c5409c61c7b7bc4694",
+      "unchangedBytes": true
+    },
+    {
+      "from": "Q8/review-batch-b.json",
+      "to": "review-batch-b.json",
+      "sha256": "dbcabd675d27c8fa2798c2f0793b649d8e92a6b3fe63504cae44e9abb71c60ea",
+      "unchangedBytes": true
+    }
+  ]
+}

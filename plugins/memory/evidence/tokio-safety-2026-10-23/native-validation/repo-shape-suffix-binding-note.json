@@ -1,0 +1,10 @@
+{
+  "schemaVersion": "repo-shape-capture-conventions/v1",
+  "initialCapture": "repo-shape-suffix-before.json is retained but mistakenly labels baseline test blob rather than executed new regression. Use red-02/green-02 for actual execution bindings.",
+  "argvPathBases": {
+    "scripts/": "repository root",
+    "runtime/": "evidence root"
+  },
+  "sourceLabels": "sourceSha256 keys are logical owning filenames. RED executes the copied immutable old checker identified by argv and Git blob, alongside the current regression test.",
+  "rawStreams": "Raw streams are local only under evidence runtime; neutral publicLog is a summary, not an exact raw-stream claim. Actual stream hashes/sizes are recorded."
+}

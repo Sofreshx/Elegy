@@ -1,0 +1,97 @@
+{
+  "schemaVersion": "memory-native-evidence-review/v1",
+  "verdict": "APPROVED",
+  "status": "approved",
+  "reviewer": "Read-only source/native evidence audit; no model output or future CI result inferred.",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "qualificationFreezeRevision": "ce49cd4a8e473fc11f40f54005a7fbebe73a8074",
+  "findings": [
+    {
+      "id": "mcp-default-allocation-failure",
+      "severity": "observed-preserved",
+      "record": "native-validation/mcp-final.json",
+      "exitCode": 101,
+      "recordSha256": "327b0e379cc4e6e4f4711d3e9bb7c71211aec69460a9c76f396032d845133529",
+      "publicLogSha256": "9a7e28d5639d57b0a57eaea4162c10248c07ce1f5523a27483e5ebdb8f769826",
+      "rawLogSha256": "0e59ac552937309198622a39d9d2f9ecadba8b292509b5b537e942b4a4e88e1e",
+      "assessment": "Default-parallel MCP compilation hit allocation failures; the raw stream, raw metadata, and path-only public derivative are retained."
+    }
+  ],
+  "checks": [
+    {
+      "name": "build-final",
+      "recordSha256": "c55419569742679edd16dd0eff77bed01fc69a0bd5c58fe23ecfd1302c3bfd64",
+      "logSha256": "746d2c3bab9a1b3834e1c2c0141911075df88df6daad4ca941c46961df9dca9d",
+      "exitCode": 0,
+      "durationSeconds": 149.141,
+      "sourceUnchanged": true,
+      "sourceFiles": 149,
+      "mcpSourceFiles": 18
+    },
+    {
+      "name": "contextual-final",
+      "recordSha256": "3abaf69ec2f3b1b61e763bbbac34a143903db125bf2fd5c040daf15b9bd9da78",
+      "logSha256": "bf905c21c1d525eba14dc753060d245f1b551ba3bf6b81ef68acc2cd472b9dea",
+      "exitCode": 0,
+      "durationSeconds": 151.422,
+      "testTotals": {"passed": 31, "failed": 0, "ignored": 0},
+      "sourceUnchanged": true
+    },
+    {
+      "name": "mcp-final-02",
+      "recordSha256": "f1c0e221d99c7589f8fa9f6b5dbb646c3038eb75ea9e86b7597bc72516022281",
+      "logSha256": "817026166b1cb26b3c9da5e829dce428566f4e5e763c466fdc697ed3dd037720",
+      "exitCode": 0,
+      "durationSeconds": 294.828,
+      "testTotals": {"passed": 67, "failed": 0, "ignored": 0},
+      "resourceSamplesSha256": "984d6fab0f75af5497840f636947df786fbd02ced13d01b5891658eaf5455d23",
+      "sourceUnchanged": true
+    },
+    {
+      "name": "harness-final",
+      "recordSha256": "12e77d7ad8784f7163d1bf4a4c43771249660a7402241b771bb222c74db13623",
+      "logSha256": "3901951b5a6a9461dfe944e79ee3e2fc6751c82aff1863fd9fb06ae0c149e45a",
+      "exitCode": 0,
+      "observedTests": 25,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "format-final",
+      "recordSha256": "a43073bae5b368d25d15ee06ec9c17add528338053e0b94104259862d22e05d7",
+      "logSha256": "d8760763be63067f00789fcf42648cb7e89259b37690e733415676ec0b8b6596",
+      "exitCode": 0,
+      "sourceUnchanged": true
+    },
+    {
+      "name": "path-normalizer-regression",
+      "redRecordSha256": "344707a62584ceea9b4e9ef22ca86bbe2b0c916e58015cfcbdfddf8d605c3eeb",
+      "greenRecordSha256": "86cd07144677a6a680cb60afadc8550ba3a596ded08031c9db987a08f1ab044c",
+      "observed": "Q7 wrappers fail the three Windows path boundary tests; Q8 reproduction passes all three after the wrapper repair."
+    },
+    {
+      "name": "pre-freeze-binding",
+      "recordSha256": "3386495b29c86ccceeabf3ab5c41f38c0a51f5ac7fe870c9f03d703bf4c4e018",
+      "result": "allChecksPassed",
+      "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+      "subjectSha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93",
+      "protocolSha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685"
+    },
+    {
+      "name": "replay-checks",
+      "recordSha256": "6c1a3e226c7baa01e83a5bf6b089768e144adffd0ad970d84a7796b050353307",
+      "observed": "37 packets, 42 controls, 24 empty namespaces, 37 source-unchanged packets; all observed counts match their declared expected counts."
+    }
+  ],
+  "logPublication": {
+    "record": "native-validation/log-publication.json",
+    "recordSha256": "3fc840f1ddaf20aaae8ed578357e5d3158f38f207674a1547d33d3fc74b2ec19",
+    "rawNativeRecordSha256": "832a50b754d3e208b4c0ca9cc8e4017d683daec834a42a8084b4bc62e1bda4f3",
+    "publicRecordSha256": "327b0e379cc4e6e4f4711d3e9bb7c71211aec69460a9c76f396032d845133529",
+    "scope": "Path-prefix neutralization only; raw stream and metadata remain local."
+  },
+  "limits": [
+    "These checks cover source binding and local native validation only; they do not establish model-answer quality, recorder success, remote exact-head CI, merge, or publication.",
+    "The successful MCP result uses temporary -j 2 after the preserved default-parallel allocation failure; sampled resource values are evidence for that run, not a continuous peak guarantee.",
+    "cargo-deny is unavailable locally and final CI is required; existing cargo-audit warnings remain recorded."
+  ]
+}

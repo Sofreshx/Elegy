@@ -1,0 +1,78 @@
+{
+  "schemaVersion": "repo-shape-integration-review/v1",
+  "reviewedCommit": {
+    "sha1": "14e972247b654c02f61474782f509244addbe87c",
+    "subject": "fix(tooling): distinguish home roots from path suffixes"
+  },
+  "verdict": "APPROVED",
+  "scope": {
+    "changedScripts": [
+      {
+        "path": "scripts/check-repo-shape.ps1",
+        "gitBlobSha1": "8d604a6ce56d27b8972140892d9fb3c0d63c24a6",
+        "sha256": "6041756880c728ad427e62df38f0a2782fa539a31ca80a2560871076e1dcc467",
+        "review": "one pattern change: negative lookbehind for ASCII path-word characters before /home"
+      },
+      {
+        "path": "scripts/test-check-repo-shape.ps1",
+        "gitBlobSha1": "13b1de618d68cf1b4931047efabf913f7081c735",
+        "sha256": "c50d03bca01bbe2c5283cfb6336982dee44288a5584d17f4059f4f8f82d864d0",
+        "review": "assembled regression fixtures and per-file assertions; no unrelated behavior change"
+      }
+    ],
+    "commitChangedPaths": [
+      "scripts/check-repo-shape.ps1",
+      "scripts/test-check-repo-shape.ps1",
+      "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-before.json",
+      "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-after.json",
+      "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-red-02.json",
+      "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-green-02.json"
+    ]
+  },
+  "behaviorReview": {
+    "plainLinuxHomeShapeRejected": true,
+    "quotedLinuxHomeShapeRejected": true,
+    "fileUriLinuxHomeShapeRejected": true,
+    "fictitiousWindowsHomeSuffixAccepted": true,
+    "existingCUsersDetectionPreserved": true,
+    "emptyTrackedFileAccepted": true,
+    "unreadableTrackedFileReported": true,
+    "evidence": {
+      "red02": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-red-02.json",
+        "returnCode": 1,
+        "checkerGitBlobSha1": "431a280dfe14c2d2bf2d4378ba5d96c26ad9c831",
+        "testGitBlobSha1": "13b1de618d68cf1b4931047efabf913f7081c735",
+        "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "stderrSha256": "baf78e2fe17cb4e4873f872b06cb4d4e6c4d9e60684d1a0895fc7fb9a64ddcca"
+      },
+      "green02": {
+        "path": "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-green-02.json",
+        "returnCode": 0,
+        "checkerGitBlobSha1": "8d604a6ce56d27b8972140892d9fb3c0d63c24a6",
+        "testGitBlobSha1": "13b1de618d68cf1b4931047efabf913f7081c735",
+        "stdoutSha256": "4bf75c3903ce925977e950bc5d4cc1f37d0e914f392132d054caf9c182ac760e",
+        "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "sourceLockReview": {
+    "sourceLockPath": "plugins/memory/evidence/tokio-safety-2026-10-23/source-lock.json",
+    "sourceFileCount": 149,
+    "mcpSourceFileCount": 18,
+    "scriptsCheckRepoShapeInSourceLock": false,
+    "scriptsTestCheckRepoShapeInSourceLock": false,
+    "memoryRequalificationRequiredForThisChange": false
+  },
+  "bindingNoteReview": {
+    "path": "plugins/memory/evidence/tokio-safety-2026-10-23/native-validation/repo-shape-suffix-binding-note.json",
+    "present": true,
+    "honest": true,
+    "assessment": "It explicitly retains the first metadata capture, identifies its mistaken baseline test blob, and points to red-02/green-02 for actual execution bindings."
+  },
+  "findings": [],
+  "limits": [
+    "Review was read-only and did not launch a new campaign.",
+    "The fixture uses fictitious assembled path strings; it verifies path shape rather than any real personal path."
+  ]
+}

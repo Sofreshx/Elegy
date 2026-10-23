@@ -1,0 +1,529 @@
+{
+  "schemaVersion": "memory-observation/v1",
+  "claimId": "recall.answer-quality",
+  "protocolVersion": 1,
+  "subject": {
+    "artifactSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+    "host": "Installed Codex CLI; gpt-6.1-sol/max; explicit isolated lexical Memory packets",
+    "hostVersion": "codex-cli 0.163.0-alpha.11",
+    "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6"
+  },
+  "sessions": [
+    "01a16980-5d7b-73f0-b055-0582a0da4761",
+    "01a16980-9fd6-7bf1-9cc8-6131b85ec756",
+    "01a16980-5d78-7981-89e7-9fb752a60e57",
+    "01a16980-a14d-7840-8021-59b23eff2013",
+    "01a16980-5d7b-7472-8d83-17a7a253bbef",
+    "01a16980-9cc0-77d3-bd54-c6feaaaac62a",
+    "01a16980-dc6e-7bd0-8745-5ca114b019a4",
+    "01a16981-10a4-7d12-8491-35f511353c01",
+    "01a16980-d908-7b63-b791-8814f1fe6435",
+    "01a16981-15c7-7572-96de-950f32a4d1b0",
+    "01a16980-e436-7be0-aef1-5fe068882c73",
+    "01a16981-2831-7210-b22a-0e8d628e8fb6",
+    "01a16981-4257-7f82-b5cb-bf5cb82fc202",
+    "01a16981-89b3-7040-8046-4fae4b7dca9a",
+    "01a16981-6430-7673-aced-3e09c815b428",
+    "01a16981-a77a-7db3-b061-ec6bb731f18a",
+    "01a16981-60c1-7c21-9bb3-03eb6f5ff0ed",
+    "01a16981-9600-7082-9e23-43f2703a3697",
+    "01a16981-c749-7280-afff-92f4abd332f3",
+    "01a16981-ffcd-7aa2-b06a-0f8c5aa9ae03",
+    "01a16981-d89d-7631-b679-187e664431b2",
+    "01a16982-1637-7a12-a81f-05d996b9ebd8",
+    "01a16981-da57-72e3-a9f8-4fa53ccf48d3",
+    "01a16982-29fc-7502-980d-31213d288054",
+    "01a16982-4a6c-7483-bfa4-fcd156ad1285",
+    "01a16982-781b-7c93-bdd5-eb50355682cb",
+    "01a16982-5823-7923-9152-72669744cc17",
+    "01a16982-85f5-7cc3-a0e9-0b6e4a743245",
+    "01a16982-6cae-7171-babd-88a7e82e9408",
+    "01a16982-a601-7751-aada-961b9215d1a1",
+    "01a16982-a92b-7f43-87e9-ef52ed6a21d9",
+    "01a16982-e684-79d1-9b71-4f2a6df5e19f",
+    "01a16982-c7a6-7d83-8187-76cc41b77d05",
+    "01a16982-ff76-7fd3-a251-0f97d6a2db65",
+    "01a16982-e86e-79c3-8b16-db384dd320a7",
+    "01a16983-17fa-7113-9fec-c28346a8f9a6",
+    "01a16983-1d02-7f81-8300-83d24b1225dc",
+    "01a16983-515f-7850-a24b-69e185834bb7",
+    "01a16983-37c8-7841-9c64-a9d0a949c5a0",
+    "01a16983-660a-7a40-b325-f91f6d89ff4b",
+    "01a16983-539f-7ac0-9a68-17e19028a790",
+    "01a16983-85ab-7842-993e-818467a559e7",
+    "01a16983-83b9-7360-8894-b64ecd118d15",
+    "01a16983-bfeb-73d0-850d-dd3be6bde1d2",
+    "01a16983-a00a-7353-bfd8-a18916660483",
+    "01a16983-d84c-7383-8eec-541251ed8057",
+    "01a16983-e87d-7420-8439-4945f1ffea97",
+    "01a16984-21d4-7f91-8746-eec741b34ebe",
+    "01a16984-069a-7590-9de0-01a72bee050c",
+    "01a16984-3fc7-75b2-9031-936b97bd4de1",
+    "01a16984-b12a-70d0-a34a-94f10fb23caa",
+    "01a16984-dd85-7bf2-9737-6c978f073806",
+    "01a16984-b160-7440-868c-d3f1c58e079d",
+    "01a16984-e8c9-7ed1-9fc0-2d3a914841e9",
+    "01a16984-b155-7783-9f31-06c5ce86fb5b",
+    "01a16984-fb5b-7253-93a2-0a5f5ae43a93",
+    "01a16985-0f47-7493-8fc1-e79fdc0e99c0",
+    "01a16985-3bdd-7c03-bae6-2fecfd17e55a",
+    "01a16985-18d7-7bd1-afa3-e04d5f3b026e",
+    "01a16985-4c15-7c01-a216-689f3e112322",
+    "01a16985-2f2a-7930-b5bb-0eb78aa2c191",
+    "01a16985-76ad-78b2-b247-686f3c3c4a79",
+    "01a16985-71bf-72c1-a2ca-42269dea2bc0",
+    "01a16985-a5cc-7a21-b325-0884107a198c",
+    "01a16985-7e2b-7d61-b636-78e327d289ec",
+    "01a16985-b590-7080-8697-0c349e8b55c0",
+    "01a16985-b31d-7710-ab43-c2a900bf4b2f",
+    "01a16985-f76f-74a0-bba4-7cad83379412",
+    "01a16985-da52-7b61-b035-2c1d160f251e",
+    "01a16986-0a14-79c3-b8f9-22b4092b734f",
+    "01a16985-ec88-7583-9b9e-97cbb48b6d0a",
+    "01a16986-1aa2-7592-8c37-07b2b1e0171a",
+    "01a16986-25f0-7f80-9c1b-f9eecb62db26",
+    "01a16986-627c-7f60-87fd-f167014f6b5b",
+    "01a16986-c382-7b00-b3da-a2cbf0c28000",
+    "01a16986-c3c9-7d23-aab0-72f5960c30ee",
+    "01a16986-c3b6-7462-9815-931b992969ba",
+    "01a16986-fcff-7732-af7d-08e3dbcbb89a",
+    "01a16987-16fe-7233-923c-a2b2933ff959",
+    "01a16987-18e7-71e3-8dcc-aed3d07d4caf",
+    "01a16987-2667-74c1-85fe-d919d277d6af",
+    "01a16987-4bba-7930-9a61-5b6a7de8a2ba",
+    "01a16987-5158-7761-a5ce-910ce83d0c97",
+    "01a16987-6592-7501-82d6-52bf34d620cf"
+  ],
+  "startedAt": "2026-10-23T16:03:01.891330+00:00",
+  "completedAt": "2026-10-23T16:10:58.549644+00:00",
+  "checks": [
+    {
+      "name": "paired-inputs",
+      "passed": true,
+      "detail": "37 predeclared paired questions (25 primary, 12 transfer), plus 10 critical with-recall repeats; 84 unique ephemeral threads with no answer rerun or substitution."
+    },
+    {
+      "name": "fixed-model-config",
+      "passed": true,
+      "detail": "Installed client SHA unchanged, gpt-6.1-sol/max requested in all arms with identical isolated configuration. Existing ChatGPT allocation, no new paid API calls. Backend/model alias not sealed; full Desktop settings not qualified."
+    },
+    {
+      "name": "predeclared-rubric",
+      "passed": true,
+      "detail": "Source 2a351a3, source-lock and new pinned CLI/MCP are bound. Freeze ce49cd4 sealed the Q8 subject/protocol and all 11 qualification scripts before every answer. Q7 corpora/rubric unchanged; adverse earlier results retained."
+    },
+    {
+      "name": "independent-scoring",
+      "passed": true,
+      "detail": "Two masked 42-row machine reviews and parent read all 84 actual paragraphs. Ten abstention-target completeness errors corrected by addenda under the already frozen rubric; originals, exact hashes and independent correction audit retained. Six original lexical false negatives unchanged; no human review."
+    },
+    {
+      "name": "negative-controls",
+      "passed": true,
+      "detail": "All 47 with-recall outputs satisfy grounded/complete/control/format targets. Without recall 14/37 targets satisfied, 23 ordinary historical requests safely incomplete. Unknown, hostile, deletion, corrections and close contexts pass. 37 unchanged durable sources, 42 isolation controls, 24 empty cleaned namespaces."
+    }
+  ],
+  "evidence": [
+    {
+      "path": "inputs/subject.json",
+      "sha256": "4a3a40e96fdc9ea614311c93ff8060d04328767e877f11d06503a3b182ffbd93"
+    },
+    {
+      "path": "inputs/assessment.json",
+      "sha256": "437d2f4b5ad331f2b734719c52ae29c221215a8145b9db77acd00ca4cade870a"
+    },
+    {
+      "path": "inputs/protocol.json",
+      "sha256": "b22258930437faecf73bc18660c1d88fdaf11d07067d94bc3cbd0316e2a87685"
+    },
+    {
+      "path": "inputs/corpus.json",
+      "sha256": "a8772a6a9f65d14f271ed2a359832f769fce6234c052fc849284a07729f3e411"
+    },
+    {
+      "path": "inputs/transfer-corpus.json",
+      "sha256": "6987ed6bb624648d73dad0272de3d602c47b20af5b868017a76aaa4b06a7e893"
+    },
+    {
+      "path": "inputs/source-lock.json",
+      "sha256": "d91b6d0a803f9fe9fc7b47a3f2afb486e05c6c2e957dc1ee109ac84faeb26232"
+    },
+    {
+      "path": "inputs/pinned-binaries.json",
+      "sha256": "c8061d856ba33f742f47af78af529e14b820236528870d75d36648c39abcd46f"
+    },
+    {
+      "path": "inputs/replay-checks.json",
+      "sha256": "6c1a3e226c7baa01e83a5bf6b089768e144adffd0ad970d84a7796b050353307"
+    },
+    {
+      "path": "inputs/execution-checks.json",
+      "sha256": "f666054d9904b30f0b26c65385a43f1394af718793bd2914d30ef78354c92923"
+    },
+    {
+      "path": "inputs/semantic-review.json",
+      "sha256": "8bed0aee3c22640113d77ed488dfef666b519bb44138e2e1d0f56f9530947448"
+    },
+    {
+      "path": "inputs/parent-review.json",
+      "sha256": "14521612be6216d06f9d47b2c38755f7689ad09da42a201d08127b3916982ed9"
+    },
+    {
+      "path": "inputs/source-review.json",
+      "sha256": "dc2824320afaacfe2942a45089568d96100f27f350a5791f50ceb9591d3a0eed"
+    },
+    {
+      "path": "inputs/review-final-native.json",
+      "sha256": "af6f38baa0a7a4bdc25ce54422ec9ed2313c223f7fc833c18aca71235add858e"
+    },
+    {
+      "path": "inputs/review-inputs.json",
+      "sha256": "599b0f93befd37dd407ab813038bb782154262ae7724719df4c1e675e18b6f5d"
+    },
+    {
+      "path": "inputs/proof-manifest.json",
+      "sha256": "373c6f3dd7a3024024f032aa55f3954013e6a3879c9050794ab09cbeab71ecf2"
+    },
+    {
+      "path": "inputs/harness-final.json",
+      "sha256": "12e77d7ad8784f7163d1bf4a4c43771249660a7402241b771bb222c74db13623"
+    }
+  ],
+  "pairedCases": [
+    {
+      "id": "h01",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 12722.38,
+      "latencyWithoutMs": 11467.502,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h02",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 19117.728,
+      "latencyWithoutMs": 13245.803,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h03",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 12372.98,
+      "latencyWithoutMs": 14250.939,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h04",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 11420.51,
+      "latencyWithoutMs": 13789.965,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h05",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 12809.595,
+      "latencyWithoutMs": 13126.424,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h06",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 18274.278,
+      "latencyWithoutMs": 15453.953,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h07",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 13426.971,
+      "latencyWithoutMs": 13279.555,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h08",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 14143.679,
+      "latencyWithoutMs": 14044.42,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h09",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 11892.507,
+      "latencyWithoutMs": 17474.169,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h10",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 12202.785,
+      "latencyWithoutMs": 13842.602,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h11",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 11377.729,
+      "latencyWithoutMs": 11783.134,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "h12",
+      "scoreWith": 0.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 15486.376,
+      "latencyWithoutMs": 13704.923,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q01",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 18018.539,
+      "latencyWithoutMs": 16481.534,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q02",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 17411.036,
+      "latencyWithoutMs": 15225.265,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q03",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.5,
+      "latencyWithMs": 14726.542,
+      "latencyWithoutMs": 17148.927,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q04",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 15396.844,
+      "latencyWithoutMs": 19376.247,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q05",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 12672.341,
+      "latencyWithoutMs": 13534.934,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q06",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 17646.158,
+      "latencyWithoutMs": 15306.464,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q07",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 15739.282,
+      "latencyWithoutMs": 18276.442,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q08",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 13643.101,
+      "latencyWithoutMs": 17443.361,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q09",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 12398.046,
+      "latencyWithoutMs": 17173.27,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q10",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 14405.079,
+      "latencyWithoutMs": 19136.109,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q11",
+      "scoreWith": 0.6666666666666666,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 16823.309,
+      "latencyWithoutMs": 15983.6,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q12",
+      "scoreWith": 0.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 20396.833,
+      "latencyWithoutMs": 17063.456,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q13",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 12476.512,
+      "latencyWithoutMs": 11647.153,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q14",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 11769.712,
+      "latencyWithoutMs": 16750.4,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q15",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 16977.688,
+      "latencyWithoutMs": 14650.751,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q16",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 15776.993,
+      "latencyWithoutMs": 13881.396,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q17",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 14312.092,
+      "latencyWithoutMs": 14325.233,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q18",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 12145.064,
+      "latencyWithoutMs": 15247.578,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q19",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 12823.118,
+      "latencyWithoutMs": 13434.145,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q20",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 11876.6,
+      "latencyWithoutMs": 14832.101,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q21",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 18060.898,
+      "latencyWithoutMs": 15448.209,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q22",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 14406.164,
+      "latencyWithoutMs": 14801.484,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q23",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 10142.431,
+      "latencyWithoutMs": 14698.41,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q24",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 14649.022,
+      "latencyWithoutMs": 17917.281,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    },
+    {
+      "id": "q25",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 25399.363,
+      "latencyWithoutMs": 12659.51,
+      "costWith": 0.0,
+      "costWithout": 0.0
+    }
+  ],
+  "costUnit": "paid-api-calls",
+  "error": null
+}
