@@ -1,0 +1,43 @@
+{
+  "answer": "La durée de TTL corrigée est de 75 minutes et la stratégie à appliquer est REPLAY_PINE.",
+  "threadId": "01a16768-e7fe-7d70-b648-c509ca0e3c5d",
+  "usage": {
+    "input_tokens": 20870,
+    "cached_input_tokens": 16512,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 54,
+    "reasoning_output_tokens": 26
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16768-e7fe-7d70-b648-c509ca0e3c5d\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La durée de TTL corrigée est de 75 minutes et la stratégie à appliquer est REPLAY_PINE.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20870,\"cached_input_tokens\":16512,\"cache_write_input_tokens\":0,\"output_tokens\":54,\"reasoning_output_tokens\":26}}\n",
+  "stderr": "2026-10-23T06:18:10.839443Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q17",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:18:05.110004+00:00",
+  "completedAt": "2026-10-23T06:18:19.623864+00:00",
+  "elapsedMs": 14513.256,
+  "promptSha256": "922e863099309c0a9297240da160205a8f14f6eaa3b50148b6f15a7fc8ab1761",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

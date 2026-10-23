@@ -1,0 +1,43 @@
+{
+  "answer": "Conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+  "threadId": "01a16768-e761-7e01-9fbd-f1a2ee155756",
+  "usage": {
+    "input_tokens": 20878,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 47,
+    "reasoning_output_tokens": 23
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16768-e761-7e01-9fbd-f1a2ee155756\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20878,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":47,\"reasoning_output_tokens\":23}}\n",
+  "stderr": "2026-10-23T06:18:10.678750Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T06:18:18.781133Z  WARN codex_core_plugins::manager: failed to refresh cached remote plugin catalog error=failed to send remote plugin catalog request to https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJzZWNvbmRhcnkiLCJxdWVyeV9pZCI6InJzNjo5MGU0YmEyNi03MjM4LTRmOTItODc3NS04ZTM2YzlkNjQxODI6TnBSSUZZeTowOmxlYWYtMTA4MzRmNjEtYTA1MS00MzZiLTk1OTgtMTg5OTZmNzUzZWE1IiwiY3Vyc29yIjoiWkg2OWRYQzRnTHRKNVZrRG0wSUpQUXhJd0N1NTgtVHdjQzNuLUpRM1l3dEg4cWVBZDlqRnFFMFM0MlVybmpkcGowRVJjOElZV1RkXy1MWXFETEhXUUJId3pLTHhkSzJvNWVpaXpqYXRONkt5MGVtVnc3TkVMTktiUWpDaV9xMzBRWWQ5NktnN3hYRDQ0VHNJcVRUNnA5TEhIWk1xRnEwaHpSbW9oYVJRVmhvMmdKWE9Jbnh5azJVZGtsX1lORDdLM2RsOUgzVTNuQVE9In19: error sending request for url (https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJzZWNvbmRhcnkiLCJxdWVyeV9pZCI6InJzNjo5MGU0YmEyNi03MjM4LTRmOTItODc3NS04ZTM2YzlkNjQxODI6TnBSSUZZeTowOmxlYWYtMTA4MzRmNjEtYTA1MS00MzZiLTk1OTgtMTg5OTZmNzUzZWE1IiwiY3Vyc29yIjoiWkg2OWRYQzRnTHRKNVZrRG0wSUpQUXhJd0N1NTgtVHdjQzNuLUpRM1l3dEg4cWVBZDlqRnFFMFM0MlVybmpkcGowRVJjOElZV1RkXy1MWXFETEhXUUJId3pLTHhkSzJvNWVpaXpqYXRONkt5MGVtVnc3TkVMTktiUWpDaV9xMzBRWWQ5NktnN3hYRDQ0VHNJcVRUNnA5TEhIWk1xRnEwaHpSbW9oYVJRVmhvMmdKWE9Jbnh5azJVZGtsX1lORDdLM2RsOUgzVTNuQVE9In19) scope=Global\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q18",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:18:05.997989+00:00",
+  "completedAt": "2026-10-23T06:18:18.876446+00:00",
+  "elapsedMs": 12878.24,
+  "promptSha256": "71f641c8a55979be1ab5e29d18798f2b3213de05a206be3163df8c1daf3ae277",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

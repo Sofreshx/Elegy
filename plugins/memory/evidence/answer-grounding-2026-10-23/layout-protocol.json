@@ -1,0 +1,44 @@
+{
+  "schemaVersion": "memory-layout-diagnostic/v1",
+  "predeclared": true,
+  "baseProductRevision": "51974d469157532bca541b96ed872c67f55abe76",
+  "purpose": "Discriminate interference from dense technical metadata versus inability to bind attributes, after the wording-only hypothesis failed. No product change is selected in advance.",
+  "cases": [
+    {
+      "id": "q08",
+      "trials": 3
+    },
+    {
+      "id": "q09",
+      "trials": 3
+    },
+    {
+      "id": "q11",
+      "trials": 3
+    },
+    {
+      "id": "q17",
+      "trials": 1
+    },
+    {
+      "id": "q18",
+      "trials": 1
+    }
+  ],
+  "conditions": [
+    "current",
+    "text-first",
+    "text-only"
+  ],
+  "totalContexts": 33,
+  "variables": "Use original fixed prefix and same facts, instruction, question, client, model and effort. text-first preserves every JSON field and value but moves text first within each record. text-only keeps just records/text as a causal ablation.",
+  "productEligibility": {
+    "current": true,
+    "text-first": "Only if all targeted trials, controls and independent prose review pass; still requires rebuilt-binary qualification.",
+    "text-only": false
+  },
+  "limits": "text-only removes provenance/feedback refs and is never a deployable fix. A pass there can diagnose metadata effects but never satisfy product acceptance. No score-only conclusion; retain and review all answers.",
+  "integrity": "All33 threads unique; no tool calls, paid API, real memory, config changes, answer replacement or model substitution.",
+  "ordering": "Rotate conditions per case/trial; at most3 independent groups overlap.",
+  "interpretation": "Failures on q08/q09/q11 must be inspected individually. A hypothesis is weakened if the same field error persists in the text-only ablation. No predetermined success outcome."
+}
