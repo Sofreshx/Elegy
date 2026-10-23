@@ -64,7 +64,7 @@ def recall_check(client, identifier, text, namespace):
     return result
 
 
-def episode(subject, cli, mcp, episode, out):
+def episode(subject, cli, mcp, episode, out, baseline_cli=None):
     folder = out / episode['id']
     folder.mkdir()
     runtime = folder / 'runtime'
@@ -161,6 +161,23 @@ def episode(subject, cli, mcp, episode, out):
                 'response': response, 'elapsedMs': elapsed, 'exitCode': proc.returncode, 'stderr': proc.stderr,
                 'sourceBefore': before, 'sourceAfter': after, 'sourceUnchanged': True,
                 'configuration': {**config, 'projectRoot': '<runtime>', 'dbPath': '<source.sqlite>', 'statePath': f'<journal-{case["agent"]}>'}}
+            if baseline_cli is not None:
+                baseline_config = {**config, 'statePath': str((runtime / f'baseline-journal-{case["agent"]}.sqlite').resolve())}
+                baseline_cfg = runtime / f'baseline-config-{case["id"]}.json'
+                save(baseline_cfg, baseline_config)
+                baseline_before = source_snapshot(db)
+                baseline_proc = subprocess.run([str(baseline_cli), '--json', '--non-interactive', 'contextual-recall', '--config', str(baseline_cfg.resolve())],
+                    input=json.dumps(request), encoding='utf-8', capture_output=True, timeout=90, env=child_env(db.resolve(), case['agent']))
+                baseline_after = source_snapshot(db)
+                stage['baselinePacket'] = {'request': {**request, 'cwd': '<runtime>'},
+                    'exitCode': baseline_proc.returncode, 'stdout': baseline_proc.stdout, 'stderr': baseline_proc.stderr,
+                    'sourceBefore': baseline_before, 'sourceAfter': baseline_after,
+                    'sourceUnchanged': invariant(baseline_before, baseline_after)}
+                assert baseline_proc.returncode == 0, 'Baseline recall CLI failed'
+                baseline_response = json.loads(baseline_proc.stdout)
+                stage['baselinePacket']['response'] = baseline_response
+                assert baseline_response['status'] == 'ok' and invariant(baseline_before, baseline_after), 'Baseline recall failed or changed source'
+                assert all(m['id'] in own_ids and m['scope'] == 'Agent' for m in baseline_response['data']['recalls']), 'Foreign or deleted baseline record'
             report['stages'].append(stage)
             report['mappings'] = mappings
             save(folder / 'run.json', clean(report))
@@ -202,6 +219,7 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument('--cli', type=Path, required=True)
     ap.add_argument('--mcp', type=Path, required=True)
+    ap.add_argument('--baseline-cli', type=Path)
     ap.add_argument('--output', type=Path, required=True)
     args = ap.parse_args()
     assert not args.output.exists(), 'Use a new output directory; preserve previous attempts'
@@ -212,14 +230,15 @@ def main():
     start = now()
     episodes = []
     for item in corpus['episodes']:
-        report = episode(protocol, args.cli.resolve(), args.mcp.resolve(), item, args.output.resolve())
+        report = episode(protocol, args.cli.resolve(), args.mcp.resolve(), item, args.output.resolve(), args.baseline_cli.resolve() if args.baseline_cli else None)
         episodes.append({'id': item['id'], 'status': report['status'], 'stageCount': len(report['stages']), 'error': report.get('error')})
         print(json.dumps(episodes[-1]), flush=True)
     result = {'schemaVersion': 'memory-realistic-replay/v1', 'startedAt': start, 'completedAt': now(),
         'sourceRevision': protocol['sourceRevision'], 'cliSha256': sha(args.cli), 'mcpSha256': sha(args.mcp),
         'corpusSha256': sha(ROOT / 'corpus.json'), 'protocolSha256': sha(ROOT / 'protocol.json'),
         'runnerSha256': sha(__file__), 'supportSha256': sha(ROOT / 'rpc_support.py'), 'episodes': episodes,
-        'status': 'completed' if all(e['status'] == 'completed' and e['stageCount'] == 3 for e in episodes) else 'failed'}
+        'status': 'completed' if all(e['status'] == 'completed' and e['stageCount'] == 3 for e in episodes) else 'failed',
+        'baselineCliSha256': sha(args.baseline_cli) if args.baseline_cli else None}
     save(args.output / 'run.json', result)
     return int(result['status'] != 'completed')
 

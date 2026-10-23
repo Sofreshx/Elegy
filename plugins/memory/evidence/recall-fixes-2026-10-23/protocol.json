@@ -1,6 +1,6 @@
 {
   "schemaVersion": "memory-realistic-protocol/v1",
-  "sourceRevision": "pending-source-checkpoint",
+  "sourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
   "authority": [
     "AGENTS.md",
     "plugins/memory/AGENTS.md",
