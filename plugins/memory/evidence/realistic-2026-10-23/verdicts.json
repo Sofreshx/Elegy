@@ -1,0 +1,180 @@
+{
+  "schemaVersion": "memory-realistic-acceptance/v1",
+  "status": "blocked",
+  "executionErrors": [],
+  "criticalAnswerErrors": [
+    {
+      "caseId": "q09",
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "actual": "L’identifiant précis indiqué pour les sauvegardes Ares est `BACKUP_COPAL`. Aucun point de restauration plus spécifique n’est disponible pour cet incident non documenté.",
+      "rawPath": "raw\\q09_with.json"
+    },
+    {
+      "caseId": "q17",
+      "forbiddenMentions": [
+        "30",
+        "REPLAY_BIRCH"
+      ],
+      "actual": "La durée de TTL corrigée est de 30 minutes. La stratégie à appliquer est `REPLAY_BIRCH`.",
+      "rawPath": "raw\\q17_with.json"
+    },
+    {
+      "caseId": "q18",
+      "forbiddenMentions": [
+        "30",
+        "REPLAY_BIRCH"
+      ],
+      "actual": "Dans Harbor, conserver ces traces pendant 30 minutes et utiliser le mécanisme REPLAY_BIRCH.",
+      "rawPath": "raw\\q18_with.json"
+    }
+  ],
+  "answersToReview": [
+    {
+      "caseId": "q08",
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q09",
+      "missingGroups": [],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q10",
+      "missingGroups": [
+        [
+          "14:20"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q11",
+      "missingGroups": [
+        [
+          "14:50"
+        ],
+        [
+          "OPS_IVORY"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q15",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q17",
+      "missingGroups": [
+        [
+          "75"
+        ],
+        [
+          "REPLAY_PINE"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q18",
+      "missingGroups": [
+        [
+          "75"
+        ],
+        [
+          "REPLAY_PINE"
+        ]
+      ],
+      "formatErrors": []
+    },
+    {
+      "caseId": "q24",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "formatErrors": []
+    }
+  ],
+  "limits": "Rule-bound one-shot test gate, not a continuous monitor or general semantic/hallucination detector. Frozen lexical metrics retained separately.",
+  "assessmentSha256": "3c641db55809b310b7b649d6e06fe3935c5b429fe7446ad4db06651abc6512ef"
+}

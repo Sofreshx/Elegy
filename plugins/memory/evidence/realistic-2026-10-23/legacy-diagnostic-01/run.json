@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "memory-legacy-diagnostic/v1",
+  "sourceRevision": "acc6b4e22625841ce0fdde55226472cd416728f1",
+  "cliSha256": "92692d62c558feba70a4b8df17f1575d1fbb42aa7db31be3abf855ee255af960",
+  "mcpSha256": "901361065cedcd54091f828a96f77768283e596ee980f18372eac86d13246eaf",
+  "runnerSha256": "7c75b033edda96063a5f71e2f95d7b2c3d685e25d6dbd39fbaf3eb5518da0d26",
+  "diagnosticSha256": "674993a1f02b81d2d7d7546a39646ded4767c20fd665381d63f6c07189f3e379",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "status": "completed",
+  "modelCalls": 0,
+  "scope": "Only Harbor; exploratory diagnostic after primary retrieval, not a preregistered full-version comparison.",
+  "retrieval": [
+    {
+      "caseId": "q16",
+      "texts": [
+        "Harbor payment webhook replay cache TTL is 90 minutes; deduplication strategy is REPLAY_PINE."
+      ]
+    },
+    {
+      "caseId": "q17",
+      "texts": [
+        "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH."
+      ]
+    },
+    {
+      "caseId": "q18",
+      "texts": [
+        "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH."
+      ]
+    }
+  ]
+}

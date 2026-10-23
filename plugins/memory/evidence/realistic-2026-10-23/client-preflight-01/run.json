@@ -1,0 +1,48 @@
+{
+  "schemaVersion": "memory-realistic-answers/v1",
+  "startedAt": "2026-10-23T03:06:28.526949+00:00",
+  "status": "completed",
+  "model": "gpt-5.6-luna",
+  "reasoningEffort": "medium",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-5.6-luna",
+      "-c",
+      "model_reasoning_effort=\"medium\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "corpusSha256": "1116360a7b2f2cb77c812d56a2b59ebc01dd825994695d8b2911c0f59af0887e",
+  "protocolSha256": "d012b6e6f8c60dd8c26f9cab13ce7d9e95cc0f37c8f1fcd3d0f0d279a3591edc",
+  "runnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "answers": [
+    {
+      "caseId": "preflight",
+      "arm": "without",
+      "valid": true,
+      "elapsedMs": 7227.274,
+      "issues": []
+    }
+  ],
+  "completedAt": "2026-10-23T03:06:36.985114+00:00"
+}

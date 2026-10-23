@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "memory-realistic-environment/v1",
+  "platform": "Windows",
+  "architecture": "AMD64",
+  "python": "3.12.10",
+  "tools": {
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)",
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)"
+  },
+  "sourceRevision": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "knownLimit": "Local environment captured at close; provider backend and temperature not sealed."
+}

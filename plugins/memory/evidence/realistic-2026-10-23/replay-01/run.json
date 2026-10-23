@@ -1,0 +1,87 @@
+{
+  "schemaVersion": "memory-realistic-replay/v1",
+  "startedAt": "2026-10-23T03:17:00.763726+00:00",
+  "completedAt": "2026-10-23T03:17:25.539604+00:00",
+  "sourceRevision": "619f5dd705e6383a12b7d806369633df291fc1a3",
+  "cliSha256": "b04723bc90d79a825a310a9cb4705e120bf52a1ed5d3d999b5cb27a3370fb4e0",
+  "mcpSha256": "23022345d59989b8668f341b8ad6801280d79c6047ec8e1a9077cb6a57ad9501",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "d012b6e6f8c60dd8c26f9cab13ce7d9e95cc0f37c8f1fcd3d0f0d279a3591edc",
+  "runnerSha256": "cda4a23bc04723f816a7e1eff028dd5160571a4a25a9519564bdc2de70c567ac",
+  "supportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "episodes": [
+    {
+      "id": "cedar",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "lumen",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "ares",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "sable",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "galen",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "harbor",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "vesper",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    },
+    {
+      "id": "quill",
+      "status": "failed",
+      "stageCount": 0,
+      "error": {
+        "type": "AssertionError",
+        "message": "Recall CLI failed"
+      }
+    }
+  ],
+  "status": "failed"
+}

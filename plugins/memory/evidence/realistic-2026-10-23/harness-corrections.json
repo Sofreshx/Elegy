@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "memory-realistic-harness-correction/v1",
+  "beforeAnyCorpusAnswers": true,
+  "issue": "Protocol requested1800, but current recall contract validates a maximum of600; all8 recall stages rejected before model calls.",
+  "owner": "qualification harness only",
+  "codeEvidence": "plugins/memory/src/storage/recall_store.rs:75",
+  "change": "Use maximum600 and reject invalid protocol before any writes; preserve CLI failure diagnostics. Questions, factual expectations and scoring unchanged.",
+  "previousProtocolSha256": "d012b6e6f8c60dd8c26f9cab13ce7d9e95cc0f37c8f1fcd3d0f0d279a3591edc",
+  "correctedProtocolSha256": "df253c5683deb07bac3b28f89bf80bbaef6fce21ea6a9086fed95f461e2acc4b",
+  "previousAttempt": "replay-01",
+  "cleanup": "All8 episodes report qual-a and qual-b empty by API.",
+  "secondAttempt": {
+    "attempt": "replay-02",
+    "budget": 600,
+    "result": "All8 recall CLI calls still rejected under workspace sandbox; all namespaces cleaned.",
+    "diagnosis": "Same configured synthetic recall succeeds when run with reviewed process escalation; exact underlying file denial not established.",
+    "treatment": "Keep corpus, questions, model and rubric unchanged; run replay-03 with approved process permissions; no permanent configuration or new access."
+  }
+}

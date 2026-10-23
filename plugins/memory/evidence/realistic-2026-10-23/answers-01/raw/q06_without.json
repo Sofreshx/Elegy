@@ -1,0 +1,43 @@
+{
+  "answer": "La clé de signature de la release Lumen n’est pas disponible dans les informations fournies.",
+  "threadId": "01a166ca-add7-76a0-a878-777112a5b9b9",
+  "usage": {
+    "input_tokens": 20513,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 44,
+    "reasoning_output_tokens": 19
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a166ca-add7-76a0-a878-777112a5b9b9\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La clé de signature de la release Lumen n’est pas disponible dans les informations fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20513,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":44,\"reasoning_output_tokens\":19}}\n",
+  "stderr": "2026-10-23T03:25:21.256094Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q06",
+  "arm": "without",
+  "startedAt": "2026-10-23T03:25:20.858468+00:00",
+  "completedAt": "2026-10-23T03:25:26.501804+00:00",
+  "elapsedMs": 5642.673,
+  "promptSha256": "947d87e7dc5be2b708db5863d99abbd364e1a1726419c7cac8d03ec8e5aea557",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}
