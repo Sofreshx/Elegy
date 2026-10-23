@@ -1,0 +1,6 @@
+{
+  "phase": "before first replay or corpus answer",
+  "reason": "Complete French morphological abstention aliases before execution; instruction, questions and all factual expectations unchanged. Availability preflight used READY only.",
+  "previousCorpusSha256": "1116360a7b2f2cb77c812d56a2b59ebc01dd825994695d8b2911c0f59af0887e",
+  "frozenCorpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+}
