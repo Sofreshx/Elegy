@@ -1,0 +1,26 @@
+
+--- stderr ---
+test_all_normalized_recall_configuration_fields_are_bound (test_evidence_binding.EvidenceBindingTests.test_all_normalized_recall_configuration_fields_are_bound) ... ERROR
+test_review_binds_the_actual_question_and_context (test_evidence_binding.EvidenceBindingTests.test_review_binds_the_actual_question_and_context) ... ERROR
+
+======================================================================
+ERROR: test_all_normalized_recall_configuration_fields_are_bound (test_evidence_binding.EvidenceBindingTests.test_all_normalized_recall_configuration_fields_are_bound)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\stored-version-qualification-2026-10-23\test_evidence_binding.py", line 32, in test_all_normalized_recall_configuration_fields_are_bound
+    self.assertTrue(assess.recall_configuration_matches(config, request, case, protocol))
+                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+AttributeError: module 'assess' has no attribute 'recall_configuration_matches'
+
+======================================================================
+ERROR: test_review_binds_the_actual_question_and_context (test_evidence_binding.EvidenceBindingTests.test_review_binds_the_actual_question_and_context)
+----------------------------------------------------------------------
+Traceback (most recent call last):
+  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\stored-version-qualification-2026-10-23\test_evidence_binding.py", line 15, in test_review_binds_the_actual_question_and_context
+    assess.check_review_binding(item, record, key, errors, question, context)
+TypeError: check_review_binding() takes 4 positional arguments but 6 were given
+
+----------------------------------------------------------------------
+Ran 2 tests in 0.002s
+
+FAILED (errors=2)

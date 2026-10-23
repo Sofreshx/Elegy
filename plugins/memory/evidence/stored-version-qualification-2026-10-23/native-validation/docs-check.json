@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "D:/Projets/Elegy/target/qualification-oct23/debug/elegy-documentation.exe",
+    "check",
+    "--project",
+    ".",
+    "--json"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-10-23T10:25:49.493161+00:00",
+  "completedAt": "2026-10-23T10:26:04.795589+00:00",
+  "durationSeconds": 15.302,
+  "log": "docs-check.log",
+  "logSha256": "c3045db380e0289b5674445e41dcaa4e51aaf9024a5fbcdd9081649842752663"
+}

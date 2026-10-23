@@ -1,0 +1,15 @@
+{
+  "argv": [
+    "D:/Projets/Elegy/target/qualification-oct23/debug/elegy-contracts.exe",
+    "--project",
+    ".",
+    "contracts",
+    "validate"
+  ],
+  "exitCode": 0,
+  "startedAt": "2026-10-23T10:25:51.298659+00:00",
+  "completedAt": "2026-10-23T10:25:55.824180+00:00",
+  "durationSeconds": 4.525,
+  "log": "contracts-check.log",
+  "logSha256": "c69d7adc38356dc940cce69ed7c9b4a63b1a924b98354b2b564e217053372ea3"
+}

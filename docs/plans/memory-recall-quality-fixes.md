@@ -297,3 +297,21 @@ The spec limits stored-version meaning to the source snapshot and explicitly
 excludes outside-world freshness or approval. Complete Memory validation,
 new binary/source bindings and the prospective84-context actual campaign still
 remain required before any publication or merge.
+
+
+### Prospective actual-binary campaign on source95bf15b
+
+Full Memory validation now passes408 tests with0failed/ignored;31 contextual
+cases are included, not added again. Fmt and Clippy pass. The corrected explicit
+dual-package build passes, with unchanged149CLI/18MCP inputs and HEAD95bf15b;
+wrong wrapper/package/version commands remain preserved as preparation errors.
+Pinned CLI/MCP hashes and an observed buildMatchesSource=true status now exist.
+
+Independent harness review found missing local-code sealing, prose input binding,
+and complete normalized recall configuration checks. Those are corrected before
+any new model call and the follow-up read-only review passes. Nineteen pre-replay
+tests pass; all22 tests will run after local replay, including3 checks requiring
+new replay evidence. Freeze the Q6 protocol/subject/harness next, then replay
+and verify all37 packets, run the full harness checks, and only then collect84
+predeclared contexts. All47 with-recall paragraphs must pass independently;
+no Q3/Q4 failure is rerated.
