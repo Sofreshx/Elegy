@@ -1,0 +1,25 @@
+
+--- stderr ---
+   Compiling tokio v1.53.3
+   Compiling elegy-descriptor v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\descriptor)
+   Compiling elegy-policy v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\policy)
+   Compiling elegy-mcp v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\plugins\mcp)
+   Compiling elegy-memory v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\plugins\memory)
+   Compiling elegy-sqlite-vec-init v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\sqlite-vec-init)
+   Compiling hyper v1.10.1
+   Compiling tower v0.5.3
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-util v0.1.20
+   Compiling tokio-util v0.7.18
+   Compiling tokio-stream v0.1.18
+   Compiling tower-http v0.6.11
+   Compiling rmcp v1.8.0
+   Compiling elegy-adapter-fs v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\adapter-fs)
+   Compiling hyper-rustls v0.27.9
+   Compiling axum v0.8.9
+   Compiling reqwest v0.12.28
+   Compiling elegy-adapter-http v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\adapter-http)
+   Compiling elegy-runtime v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\runtime)
+   Compiling elegy-core v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\shared\core)
+   Compiling elegy-memory-mcp v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-tokio-safety\hosts\memory-mcp)
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 2m 28s

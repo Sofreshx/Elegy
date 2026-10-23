@@ -104,7 +104,8 @@ class CampaignTests(unittest.TestCase):
         targets = [campaign.REPO / lock["sourceFiles"][0]["path"],
                    Path(control["binaries"]["cli"]["path"]),
                    campaign.ROOT / "corpus.json", campaign.PROTOCOL,
-                   campaign.Q2 / "qualification_runner.py", campaign.ROOT / "assess.py", campaign.ROOT / "verify_source.py"]
+                   campaign.Q2 / "qualification_runner.py", campaign.ROOT / "assess.py", campaign.ROOT / "verify_source.py",
+                   campaign.ROOT / "run_native.py"]
         for target in targets:
             with self.subTest(target=target.name):
                 def changed_sha(path):

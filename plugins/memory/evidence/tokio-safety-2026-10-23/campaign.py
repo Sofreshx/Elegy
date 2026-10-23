@@ -18,13 +18,14 @@ Q1 = ROOT  # Current immutable source proof; old campaigns stay sealed.
 SUBJECT = ROOT / "subject.json"
 PROTOCOL = ROOT / "protocol.json"
 
-EXPECTED_CLI = "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
-EXPECTED_MCP = "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
-EXPECTED_SOURCE_REVISION = "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1"
-EXPECTED_CLI_SOURCE = "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba"
+EXPECTED_CLI = "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3"
+EXPECTED_MCP = "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
+EXPECTED_SOURCE_REVISION = "2a351a33124cd87d479f8f44ee274a131c84dff9"
+EXPECTED_CLI_SOURCE = "a0c84881c88fb048d80539b3773453b636ba4e6798c3aa9a44cb976d72b05bcd"
 EXPECTED_CLIENT = "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c"
 QUALIFICATION_SOURCES = ("campaign.py", "assess.py", "prepare_review.py", "verify_source.py",
-                         "test_campaign.py", "test_assess.py", "test_verify_source.py", "test_evidence_binding.py")
+                         "test_campaign.py", "test_assess.py", "test_verify_source.py", "test_evidence_binding.py",
+                         "run_native.py", "capture_source.py", "reproduce_path_regression.py")
 sys.path.insert(0, str(Q2))
 
 def sha(path: Path) -> str:

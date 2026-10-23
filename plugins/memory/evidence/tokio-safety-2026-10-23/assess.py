@@ -18,8 +18,8 @@ from qualification_runner import campaign_hashes, replay_contexts, validate_corp
 
 SUBJECT = ROOT / "subject.json"
 PROTOCOL = ROOT / "protocol.json"
-CLI_SHA = "55b76918b44dc1e556a027f444d0c47c8e1175bae6d3d7a59df1fc274917afd6"
-MCP_SHA = "ad5e338e9733a0dd1516e9fec28b99f625fe63246c0b52cf929ddc9b1cf83c7b"
+CLI_SHA = "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3"
+MCP_SHA = "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361"
 CLIENT_SHA = "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c"
 CASES = ("q08", "q09", "q11", "q17", "q18")
 MODEL_PHASES = ("answers-primary", "answers-transfer", "repeats")
@@ -298,9 +298,9 @@ def main(argv=None) -> int:
             errors.append("subject/protocol binding")
         from verify_source import verify
         verify()
-        if (subject["sourceRevision"] != "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1"
+        if (subject["sourceRevision"] != "2a351a33124cd87d479f8f44ee274a131c84dff9"
                 or subject["sourceRevision"] != protocol["sourceRevision"]
-                or subject["cliSourceSha256"] != "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba"):
+                or subject["cliSourceSha256"] != "a0c84881c88fb048d80539b3773453b636ba4e6798c3aa9a44cb976d72b05bcd"):
             errors.append("fixed source subject binding")
         lock = ROOT / subject["sourceProof"]
         if sha(lock) != subject["sourceLockSha256"] or load(lock)["productSourceRevision"] != subject["sourceRevision"]:

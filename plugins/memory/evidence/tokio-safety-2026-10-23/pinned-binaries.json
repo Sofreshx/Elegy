@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "memory-pinned-binaries/v2",
+  "sourceRevision": "2a351a33124cd87d479f8f44ee274a131c84dff9",
+  "buildEvidence": "native-validation/build-final.json",
+  "buildEvidenceSha256": "c55419569742679edd16dd0eff77bed01fc69a0bd5c58fe23ecfd1302c3bfd64",
+  "records": [
+    {
+      "name": "elegy-memory.exe",
+      "sourceSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+      "pinnedSha256": "0b469e0954a28bc75be9d01c8b422d594ce4bb952f9a0ec23e89816c67ef69a3",
+      "path": "runtime/qualified-binaries/elegy-memory.exe"
+    },
+    {
+      "name": "elegy-memory-mcp-stdio.exe",
+      "sourceSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+      "pinnedSha256": "cd06ddfc2dca7aa92c13553e65be3876b8e1a858de5918901bb64343de6e7361",
+      "path": "runtime/qualified-binaries/elegy-memory-mcp-stdio.exe"
+    }
+  ],
+  "buildMatchesSource": true,
+  "rebuildRequired": false,
+  "memoryVersion": "0.1.0",
+  "versionSource": "Committed Cargo.toml workspace.package.version; CLI --version unsupported.",
+  "statusSha256": "624791187e47026e80fc64dc92a855cd14907e220cbb7b270fad43a5b287354a",
+  "pinning": "Copies made once; source/copy hashes verified before and after. No executable installation/publication; build cache may subsequently rebuild."
+}

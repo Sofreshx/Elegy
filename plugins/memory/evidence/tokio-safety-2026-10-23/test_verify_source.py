@@ -12,8 +12,8 @@ class ImmutableSourceTests(unittest.TestCase):
     def test_committed_source_restores_exact_compiled_bytes(self):
         result = verify_source.verify()
         self.assertEqual(result["status"], "passed")
-        self.assertEqual(result["productSourceRevision"], "5eb34e0b32034a4bd254c6d775e5179dd2e4a1e1")
-        self.assertEqual(result["cliSourceSha256"], "1742beff51d26ca32749e7b70ef7cce365f6ed4d3636f5c5e7116a4ecd0783ba")
+        self.assertEqual(result["productSourceRevision"], "2a351a33124cd87d479f8f44ee274a131c84dff9")
+        self.assertEqual(result["cliSourceSha256"], "a0c84881c88fb048d80539b3773453b636ba4e6798c3aa9a44cb976d72b05bcd")
 
     def test_mutated_git_and_checkout_bindings_are_rejected(self):
         original = json.loads((verify_source.ROOT / "source-lock.json").read_text(encoding="utf-8"))
