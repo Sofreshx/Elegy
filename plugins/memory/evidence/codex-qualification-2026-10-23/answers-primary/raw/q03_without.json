@@ -1,0 +1,43 @@
+{
+  "answer": "Pour cette intervention Cedar-North uniquement, applique le port API **8339**. Le transport à conserver est inconnu : il n’est pas renseigné dans les données fournies.",
+  "threadId": "01a167f6-e7ec-74b3-9a40-71e05a257141",
+  "usage": {
+    "input_tokens": 27178,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 227,
+    "reasoning_output_tokens": 184
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a167f6-e7ec-74b3-9a40-71e05a257141\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour cette intervention Cedar-North uniquement, applique le port API **8339**. Le transport à conserver est inconnu : il n’est pas renseigné dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":27178,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":227,\"reasoning_output_tokens\":184}}\n",
+  "stderr": "2026-10-23T08:53:17.029268Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T08:53:17.902944Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"DELETE FROM logs WHERE …\" db.statement=\"\\n\\nDELETE FROM logs WHERE ts < ?\\n\" rows_affected=0 rows_returned=0 elapsed=1.5519387s elapsed_secs=1.5519387 slow_threshold=1s\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q03",
+  "arm": "without",
+  "startedAt": "2026-10-23T08:53:15.841640+00:00",
+  "completedAt": "2026-10-23T08:53:31.278611+00:00",
+  "elapsedMs": 15436.608,
+  "promptSha256": "5e0ab630573e8f5f0b5b8022d211845735f165f1fc5dbbcc891a9f8c1f61f58f",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

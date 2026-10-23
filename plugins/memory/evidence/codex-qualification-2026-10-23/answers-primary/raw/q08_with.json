@@ -1,0 +1,43 @@
+{
+  "answer": "Le runbook indiqué pour Ares est BACKUP_COPAL. La rétention corrigée n’est pas disponible dans les données fournies.",
+  "threadId": "01a167f7-c0bf-7983-aaa0-5932feaefc1a",
+  "usage": {
+    "input_tokens": 26517,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 532,
+    "reasoning_output_tokens": 497
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a167f7-c0bf-7983-aaa0-5932feaefc1a\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le runbook indiqué pour Ares est BACKUP_COPAL. La rétention corrigée n’est pas disponible dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26517,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":532,\"reasoning_output_tokens\":497}}\n",
+  "stderr": "2026-10-23T08:54:12.433872Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q08",
+  "arm": "with",
+  "startedAt": "2026-10-23T08:54:11.721060+00:00",
+  "completedAt": "2026-10-23T08:54:36.632873+00:00",
+  "elapsedMs": 24912.259,
+  "promptSha256": "99a09dd0b251c18608b2c363e747da82b2be9b84b3d95c2a7acaa81f6ce99ec8",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

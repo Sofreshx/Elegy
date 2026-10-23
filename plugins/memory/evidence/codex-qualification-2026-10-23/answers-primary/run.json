@@ -1,0 +1,1306 @@
+{
+  "schemaVersion": "memory-generic-answers/v1",
+  "status": "execution-valid",
+  "startedAt": "2026-10-23T08:53:15.834111+00:00",
+  "protocolSha256": "1c1f25e1fe83b513f78e54c05bb1809bfd945f5546110ec1c2163fb10e2d4908",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "replayRunSha256": "4ceb9a89be4d0a677155ccb28155807d61f23b14096f71f7d0768f22bdcbd36c",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-6.1-sol",
+      "-c",
+      "model_reasoning_effort=\"max\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "clientSha256Before": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "records": [
+    {
+      "caseId": "q02",
+      "arm": "with",
+      "answer": "En production, Cedar-North utilise le port API **7223** et le transport **mTLS**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f6-e810-7511-8e46-9f162c75c507",
+      "rawPath": "raw/q02_with.json",
+      "rawSha256": "b2f2009ae1ac2fb57f88dc66d950437498c72cd0be4841f556c908cba882eb54",
+      "promptSha256": "6501f89fdc7bda2722d29a55c4afb8c98d98bd45d5f5b5d0f66107a25c1cec02",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "bc4abb621df1e62375faa34669abf5edf8e8f070f2b6d4bdf0069f66b6511866",
+      "usage": {
+        "input_tokens": 27353,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 136,
+        "reasoning_output_tokens": 108
+      },
+      "elapsedMs": 12757.717
+    },
+    {
+      "caseId": "q02",
+      "arm": "without",
+      "answer": "Pour Cedar-North, le port API actuel et le transport en production sont inconnus : aucune donnée historique n’a été fournie pour les établir.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "7223"
+        ],
+        [
+          "mTLS"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-1790-7751-bac7-e4d246ada5f0",
+      "rawPath": "raw/q02_without.json",
+      "rawSha256": "74a8005c86587bba39a0d68a5681c810b42a77aa4304705ea6b44fef983cc04e",
+      "promptSha256": "868c53ea7e2b2bfa706b5af888c950bc0445e72391ef7d8348b1f7f5630bded3",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26322,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 306,
+        "reasoning_output_tokens": 270
+      },
+      "elapsedMs": 16168.324
+    },
+    {
+      "caseId": "q01",
+      "arm": "without",
+      "answer": "Pour Cedar-North, le port API et le mode de transport à utiliser en production sont inconnus : aucune donnée historique n’a été fournie.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "6117"
+        ],
+        [
+          "mTLS"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f6-e7ec-7bc2-b886-5580811eca19",
+      "rawPath": "raw/q01_without.json",
+      "rawSha256": "ff3bb83b9b485e5e77b6ac1d77111db0fa33ebbb745268aff791c7e5b41fad82",
+      "promptSha256": "e7af94b3c38759895f442d1b59f5f13d0e4aca81c7fa4cae14e36d4643325898",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 27170,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 236,
+        "reasoning_output_tokens": 200
+      },
+      "elapsedMs": 15515.835
+    },
+    {
+      "caseId": "q01",
+      "arm": "with",
+      "answer": "En production, Cedar-North utilise le port API **6117** et le mode de transport **mTLS**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-2288-71c2-aaab-325af872fb37",
+      "rawPath": "raw/q01_with.json",
+      "rawSha256": "a4034c72a957d3619cf1c05a6a69f48ec12b0728133fa3892a131cf84d315aa0",
+      "promptSha256": "103f5b681014828876b33ddb7695d2800ff73113653e6565960e058fecfc7a4e",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "bfe8f8219ede57647ead618a0fa07bce3afec4922608602e43fc27756eb960ca",
+      "usage": {
+        "input_tokens": 27356,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 137,
+        "reasoning_output_tokens": 107
+      },
+      "elapsedMs": 14048.057
+    },
+    {
+      "caseId": "q03",
+      "arm": "without",
+      "answer": "Pour cette intervention Cedar-North uniquement, applique le port API **8339**. Le transport à conserver est inconnu : il n’est pas renseigné dans les données fournies.",
+      "score": 0.5,
+      "missingGroups": [
+        [
+          "mTLS"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f6-e7ec-74b3-9a40-71e05a257141",
+      "rawPath": "raw/q03_without.json",
+      "rawSha256": "79de1cd760e43ef7753de2d8449488a894bf38167536ea4a938274db09885c0a",
+      "promptSha256": "5e0ab630573e8f5f0b5b8022d211845735f165f1fc5dbbcc891a9f8c1f61f58f",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 27178,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 227,
+        "reasoning_output_tokens": 184
+      },
+      "elapsedMs": 15436.608
+    },
+    {
+      "caseId": "q03",
+      "arm": "with",
+      "answer": "Pour cette intervention Cedar-North seulement, applique le port API 8339 et conserve le transport connu mTLS.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-2287-78b1-bb6b-038d63077feb",
+      "rawPath": "raw/q03_with.json",
+      "rawSha256": "e40336aa78945f0eafd64d6682e5c70058ec3c1713e29b6365ec2260a3af0787",
+      "promptSha256": "582f7add2955d80c12d94aef1e202277ac70a67c4d361ee776f1c631f82fbc33",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a8c6a11225b95e110842f7aded58410514d21a4a5ff95a9e9fd11527f9d8f5f1",
+      "usage": {
+        "input_tokens": 27362,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 170,
+        "reasoning_output_tokens": 141
+      },
+      "elapsedMs": 14443.541
+    },
+    {
+      "caseId": "q06",
+      "arm": "with",
+      "answer": "La clé de signature de la release Lumen est inconnue : cette information n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-5cb2-72e0-82ea-33c8a2fdcb96",
+      "rawPath": "raw/q06_with.json",
+      "rawSha256": "11417f34b93bce3ed533ddbb0833a8c21cf764baa808621516358722efd691ad",
+      "promptSha256": "f18b3fe1052804a797cf57bfc2f87d8476040c97ffdfb73a7b564f542cca7e5c",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "b5d95c663d2d83d1020979a38d1a9a90e409d430b7f8d5effc3ceec07622a7b2",
+      "usage": {
+        "input_tokens": 26512,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 157,
+        "reasoning_output_tokens": 126
+      },
+      "elapsedMs": 11463.152
+    },
+    {
+      "caseId": "q06",
+      "arm": "without",
+      "answer": "La clé de signature de la release Lumen n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-878a-7513-b483-6b88c06b4424",
+      "rawPath": "raw/q06_without.json",
+      "rawSha256": "ed7cf2e845db9af2bd60eddb333fe068b1e5675237bf784b759158a66f18359c",
+      "promptSha256": "947d87e7dc5be2b708db5863d99abbd364e1a1726419c7cac8d03ec8e5aea557",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26318,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 210,
+        "reasoning_output_tokens": 185
+      },
+      "elapsedMs": 13235.038
+    },
+    {
+      "caseId": "q04",
+      "arm": "with",
+      "answer": "Pour la release Lumen, le rôle approbateur est ROLE_KITE. La vérification préalable exigée est CHECK_DELTA.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-574f-78a2-9f24-2cc24ba37a9c",
+      "rawPath": "raw/q04_with.json",
+      "rawSha256": "02f9c27bcb0da7676e0f83841d5e8136ac50607ee7dcccba50f67f7665d0d55b",
+      "promptSha256": "aa327d76cad91e8c77528094398dcf5d278fbf98b8c0290cd2dc90d4ed7ffe66",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "84a6509796297b8f3d795172d07dc7af3560cf511eb9509c2927f85e38fd0931",
+      "usage": {
+        "input_tokens": 26514,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 182,
+        "reasoning_output_tokens": 149
+      },
+      "elapsedMs": 13072.566
+    },
+    {
+      "caseId": "q04",
+      "arm": "without",
+      "answer": "Pour la release Lumen, le rôle chargé de l’approbation est inconnu. La vérification préalable exigée n’est pas précisée dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "ROLE_KITE"
+        ],
+        [
+          "CHECK_DELTA"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-89ea-7eb0-838d-3c332bfd310f",
+      "rawPath": "raw/q04_without.json",
+      "rawSha256": "fc081a6a23ef688822314b4d6aefc183cd79a9e5164dc26902e4da117ca5b6b8",
+      "promptSha256": "fd704d9ed5b5bf1fdd31e7faa86171d3e309e2363db99de48c7ba021ed79ce69",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26322,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 327,
+        "reasoning_output_tokens": 286
+      },
+      "elapsedMs": 13782.025
+    },
+    {
+      "caseId": "q05",
+      "arm": "without",
+      "answer": "Pour la release Lumen, le rôle auquel transmettre la validation est inconnu. Le preflight à rappeler n’est pas disponible dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "ROLE_MOSS"
+        ],
+        [
+          "CHECK_DELTA"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-5c86-7401-80ff-6be58f4946a0",
+      "rawPath": "raw/q05_without.json",
+      "rawSha256": "27d640bd76d7af9aafa6eb58d6b53892ab5353195193cc130a40528ac310310d",
+      "promptSha256": "d95acc828e734d0572ae6701c0052d23c9be82a57d48b68f8b341a47269ea99c",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26319,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 277,
+        "reasoning_output_tokens": 240
+      },
+      "elapsedMs": 17228.216
+    },
+    {
+      "caseId": "q05",
+      "arm": "with",
+      "answer": "Pour la release Lumen, transmets la validation à ROLE_MOSS. Le preflight requis est CHECK_DELTA.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-9cc4-7152-aa09-b0c88b211206",
+      "rawPath": "raw/q05_with.json",
+      "rawSha256": "7551f608fa8570b097d7ad62297462bd47cc48e42d944cc1799459172c64ab23",
+      "promptSha256": "8ec780833d14a4319ef70c7c79109fcd95c88ade091d926f95882986d97ac992",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e99fbb74f2222eca6875d64235be279fb8e26d155a9dfab7db06ecc9b365df36",
+      "usage": {
+        "input_tokens": 26516,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 294,
+        "reasoning_output_tokens": 264
+      },
+      "elapsedMs": 16594.596
+    },
+    {
+      "caseId": "q07",
+      "arm": "without",
+      "answer": "Le runbook de sauvegarde Ares et le nombre de jours de rétention prévus ne sont pas renseignés dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "BACKUP_COPAL"
+        ],
+        [
+          "17"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-bb62-7053-a523-08d277ffdce0",
+      "rawPath": "raw/q07_without.json",
+      "rawSha256": "c82f42871cd2d8cd4c98b9f21157e278178ca0f3a19ecb2cf0c49f3c4fc88adf",
+      "promptSha256": "7f8e319a25f00101d12d5393e362c8dfba02a8f637534387e341918b9e9cae43",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26321,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 201,
+        "reasoning_output_tokens": 166
+      },
+      "elapsedMs": 12175.351
+    },
+    {
+      "caseId": "q07",
+      "arm": "with",
+      "answer": "Le runbook de sauvegarde Ares est **BACKUP_COPAL**, avec une rétention de **17 jours**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-eb77-7f81-a47b-017468fd66cd",
+      "rawPath": "raw/q07_with.json",
+      "rawSha256": "07ccbf69f8596bb43f9d00eef69700dabc76ffd1878e8f353ec2f348a8e8a760",
+      "promptSha256": "de653e17e5d9d100848459e2fa8992b8d583d03a9c76657a22cd3e4a854a9e33",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "34365482a508506e4c90300f45a4eecea34600af7622fb757ce877b1fee74c6e",
+      "usage": {
+        "input_tokens": 26509,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 151,
+        "reasoning_output_tokens": 119
+      },
+      "elapsedMs": 11834.675
+    },
+    {
+      "caseId": "q09",
+      "arm": "without",
+      "answer": "L’identifiant précis de la sauvegarde Ares à restaurer est inconnu : aucune donnée sur cet incident n’est fournie.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-de0d-7ab3-b428-de91e4e1551b",
+      "rawPath": "raw/q09_without.json",
+      "rawSha256": "be98b524fccee1bad1ba5fb9bf444687b282fdc7c0f269d33d2eea44cb361935",
+      "promptSha256": "b97b46f13bff9a2880464967811b1e3267c4e96ab9324f79f48f23ff71791748",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26318,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 293,
+        "reasoning_output_tokens": 260
+      },
+      "elapsedMs": 15284.374
+    },
+    {
+      "caseId": "q09",
+      "arm": "with",
+      "answer": "L’identifiant précis de la sauvegarde Ares à restaurer pour cet incident n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-19d5-7a81-809e-3f256161cfa9",
+      "rawPath": "raw/q09_with.json",
+      "rawSha256": "f7168dde515d818574a2bf3313f04b03b656462c2c821d3bab816a59485dbdbc",
+      "promptSha256": "b6d5d8a1b7630568761d8d0cad7acccbb4f14997f34ecf1bd3d4559f6f40bd5b",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "1bc24c7ab4ac9f16fec8cdb6eec601eacdbe7341c1f21adfd9f47bcfa81e8143",
+      "usage": {
+        "input_tokens": 26514,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 385,
+        "reasoning_output_tokens": 353
+      },
+      "elapsedMs": 16272.196
+    },
+    {
+      "caseId": "q08",
+      "arm": "with",
+      "answer": "Le runbook indiqué pour Ares est BACKUP_COPAL. La rétention corrigée n’est pas disponible dans les données fournies.",
+      "score": 0.5,
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f7-c0bf-7983-aaa0-5932feaefc1a",
+      "rawPath": "raw/q08_with.json",
+      "rawSha256": "05d1b8aba73ad3b30c5f933589c13099919458cb236e763eafa3bdbb22d5b45d",
+      "promptSha256": "99a09dd0b251c18608b2c363e747da82b2be9b84b3d95c2a7acaa81f6ce99ec8",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "b25edea7d2984b99ba98e92003dc4b9443e96712683b325a47212014068b7e29",
+      "usage": {
+        "input_tokens": 26517,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 532,
+        "reasoning_output_tokens": 497
+      },
+      "elapsedMs": 24912.259
+    },
+    {
+      "caseId": "q08",
+      "arm": "without",
+      "answer": "Le runbook des sauvegardes Ares et la rétention corrigée ne sont pas disponibles dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "BACKUP_COPAL"
+        ],
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-211c-79e0-94d5-89645b6a8aa5",
+      "rawPath": "raw/q08_without.json",
+      "rawSha256": "d86f4a232e451240005219e4ca0dd35653f7b6a5724e95c720c330ba45e1db10",
+      "promptSha256": "ddb85321e7d4e90e7809d69c39009b57c4e4d9ea6b025c587f382d4b9c69ad32",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26319,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 281,
+        "reasoning_output_tokens": 250
+      },
+      "elapsedMs": 17412.456
+    },
+    {
+      "caseId": "q10",
+      "arm": "with",
+      "answer": "La maintenance de l’incident Sable commence à 14:20 UTC. Le groupe d’escalade est OPS_IVORY.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-18f3-7933-8efa-457d2c86ff23",
+      "rawPath": "raw/q10_with.json",
+      "rawSha256": "02fb9ce879abb50cf7fcbd1dcbc48b3f16cd450a78cb19f83666d86769cad645",
+      "promptSha256": "4d1b726fc4438e5a3633e454f3180e7ca9232f526a0eac3b4814508f8d82da2f",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "4e3bdf0e1a5135e89797d8d3c0942bdc29e64cfc79a58f0b56da3d6f8fca06cd",
+      "usage": {
+        "input_tokens": 26517,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 202,
+        "reasoning_output_tokens": 169
+      },
+      "elapsedMs": 13419.809
+    },
+    {
+      "caseId": "q10",
+      "arm": "without",
+      "answer": "Passage de relais pour la maintenance de l’incident Sable : l’heure UTC et le groupe d’escalade ne sont pas disponibles dans les données fournies.",
+      "score": 0.3333333333333333,
+      "missingGroups": [
+        [
+          "14:20"
+        ],
+        [
+          "OPS_IVORY"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-4d6a-7031-8a23-28da64859d28",
+      "rawPath": "raw/q10_without.json",
+      "rawSha256": "ff0046b3c880969687d063dcb2a1ecb2059caefb69041241ed2912d5c7b55e7b",
+      "promptSha256": "d154833284968951e422ca792c349bd7391d573b3b5eb4f51c963af8ef7f2489",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26323,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 311,
+        "reasoning_output_tokens": 271
+      },
+      "elapsedMs": 19909.804
+    },
+    {
+      "caseId": "q11",
+      "arm": "without",
+      "answer": "L’horaire UTC actualisé et le groupe à utiliser pour la maintenance de l’incident Sable ne sont pas disponibles dans les données fournies.",
+      "score": 0.3333333333333333,
+      "missingGroups": [
+        [
+          "14:50"
+        ],
+        [
+          "OPS_IVORY"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-59af-7cf1-ba69-a985d2648648",
+      "rawPath": "raw/q11_without.json",
+      "rawSha256": "e07c0bf2cb68d45712b4864ede2e577bf616862872010b36f2edebbd5d260d5f",
+      "promptSha256": "67487e23d0c771b8fd6c6ba44d7dafb5f8304bd13a9a7abc2661c673f976e18e",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26323,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 261,
+        "reasoning_output_tokens": 224
+      },
+      "elapsedMs": 15141.767
+    },
+    {
+      "caseId": "q11",
+      "arm": "with",
+      "answer": "La maintenance de l’incident Sable commence à 14:50 UTC. Le groupe d’escalade à utiliser est OPS_IVORY.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-94b6-7682-a035-2469f918aa4e",
+      "rawPath": "raw/q11_with.json",
+      "rawSha256": "9a56c943c84784a724a228c2677373238c9475b503279882c643e3e6b471aa46",
+      "promptSha256": "c14ff3628597fa93897b5ad472feafb044d3ddf0621c6cc7ddfa1dca13604f45",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "9bf6d5b9f02f635e0f8c428a7d338b39d67037e1c61b054ca43f200ad2646989",
+      "usage": {
+        "input_tokens": 26509,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 203,
+        "reasoning_output_tokens": 168
+      },
+      "elapsedMs": 11565.593
+    },
+    {
+      "caseId": "q12",
+      "arm": "with",
+      "answer": "Les données fournies ne précisent aucune cause racine établie pour l’incident Sable. Elle reste donc inconnue ici.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-6528-72f2-a263-0dc1154e3d30",
+      "rawPath": "raw/q12_with.json",
+      "rawSha256": "13984cbdc2e11ff161ed6d625916e2c5973ec7d8512f78ea4a4bd3d0147d01b2",
+      "promptSha256": "6b637c9a3cc608965bc2c30ed4fd0e88d4c751a9893a05cb35220e8f2428310e",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "de03179ddb7fdc156e835577963218e34180e59a9f343ddb61a540f56af2d710",
+      "usage": {
+        "input_tokens": 26517,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 164,
+        "reasoning_output_tokens": 130
+      },
+      "elapsedMs": 12190.945
+    },
+    {
+      "caseId": "q12",
+      "arm": "without",
+      "answer": "La cause racine de l’incident Sable n’est pas renseignée dans les données fournies. Aucun diagnostic établi ne peut donc être rapporté.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-953e-7303-bee4-216c8015281a",
+      "rawPath": "raw/q12_without.json",
+      "rawSha256": "65cb4c44afaa53ffc72bd5621181666f273659fae9b9f002e6b06f53a1b7ef17",
+      "promptSha256": "a61abc74506ee8e5bdbbe538b5c20cbc37bd4ffa2c214ca6f9a1cfa79d4558ca",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26320,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 251,
+        "reasoning_output_tokens": 214
+      },
+      "elapsedMs": 12949.941
+    },
+    {
+      "caseId": "q13",
+      "arm": "without",
+      "answer": "Pour l’équipe Galen, le label de routage de l’endpoint n’est pas renseigné dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "ENDPOINT_TULIP"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-9b74-7552-adca-144f0e174434",
+      "rawPath": "raw/q13_without.json",
+      "rawSha256": "f6a586717851454f720792a380d3340581a053da028e9de1c91c9fe30fa96fd8",
+      "promptSha256": "5a172dad5801c451818948423266750830f184f424ecc9d809df583dc4403a28",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26321,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 235,
+        "reasoning_output_tokens": 203
+      },
+      "elapsedMs": 17902.777
+    },
+    {
+      "caseId": "q13",
+      "arm": "with",
+      "answer": "Pour l’équipe Galen, le label de routage de l’endpoint est ENDPOINT_TULIP.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-e1a2-7753-8833-5af54176633d",
+      "rawPath": "raw/q13_with.json",
+      "rawSha256": "da22ab734ed4a8e388c387ff06271d1bea4e6545ab7ce1d2776ee9ff10410799",
+      "promptSha256": "4ea6a67bce83f3690028e82de764510f25b57fa1181987307f6ca1d7d21a4a93",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "29eeb82eebf71c71f18b99fde82ea3b9a61ff2f803224f98c46665ae1def5c36",
+      "usage": {
+        "input_tokens": 26508,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 203,
+        "reasoning_output_tokens": 175
+      },
+      "elapsedMs": 12529.215
+    },
+    {
+      "caseId": "q15",
+      "arm": "without",
+      "answer": "Je n’ai pas accès au code d’audit privé de l’autre équipe dans Galen. Il n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-c7b0-7203-a10f-898c1c8ebff1",
+      "rawPath": "raw/q15_without.json",
+      "rawSha256": "e51f506b9d768ab09197791aa2e832fca6f48c39aba04b7c0b7c2d1f0113e60d",
+      "promptSha256": "bc3742d6b531b7559f70e0cb14b834fd41047b5c19095b6baf3fba2c59bf5070",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26324,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 272,
+        "reasoning_output_tokens": 236
+      },
+      "elapsedMs": 12584.773
+    },
+    {
+      "caseId": "q15",
+      "arm": "with",
+      "answer": "Je n’ai pas accès au code d’audit privé de l’autre équipe dans Galen. Il n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-f95a-7fa3-9881-fa979c2d646d",
+      "rawPath": "raw/q15_with.json",
+      "rawSha256": "a9a336c54ddfdb1c162b9a59e7be8ed7010a52643dae5a308295ae60e40bbaa4",
+      "promptSha256": "e44a2a1d47f742c9e980b1227a4245d590e8c9024598abac1c921b2e7b44e4d8",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "c2e0d0ef210ba915c3e1081f307dd2adc53feda718f247fd0329e0c0d59c534f",
+      "usage": {
+        "input_tokens": 26512,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 332,
+        "reasoning_output_tokens": 296
+      },
+      "elapsedMs": 16425.966
+    },
+    {
+      "caseId": "q14",
+      "arm": "with",
+      "answer": "Pour l’équipe Galen, le label de routage de l’endpoint est ENDPOINT_CROCUS.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f8-c245-76f3-94c6-1d2635a99ddd",
+      "rawPath": "raw/q14_with.json",
+      "rawSha256": "dcc14651550015015a4cf664da0dd8a4a958bcc4dc6422722a7b4fa414cbe626",
+      "promptSha256": "5bcb01a894fb2f902db20a6e4341d181328cfe09c6a5445e757101cd63461b0e",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "ae631ded1525519d9da1a7e069b236dbbd5643c2f8c37eb4d9e5c162a19a66d0",
+      "usage": {
+        "input_tokens": 26504,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 173,
+        "reasoning_output_tokens": 145
+      },
+      "elapsedMs": 19567.725
+    },
+    {
+      "caseId": "q14",
+      "arm": "without",
+      "answer": "Pour l’équipe Galen, le label de routage de l’endpoint n’est pas disponible dans les informations fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "ENDPOINT_CROCUS"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-0e7e-7853-bb30-7d206bfdffc6",
+      "rawPath": "raw/q14_without.json",
+      "rawSha256": "702baa157045d14c87f9c8dcfa154168ae5300e6d3ab53ebd7645ec744bcbfe1",
+      "promptSha256": "5a172dad5801c451818948423266750830f184f424ecc9d809df583dc4403a28",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26321,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 223,
+        "reasoning_output_tokens": 192
+      },
+      "elapsedMs": 13956.781
+    },
+    {
+      "caseId": "q16",
+      "arm": "with",
+      "answer": "Pour les webhooks de paiement Harbor, le cache anti-rejeu a une durée de vie de 90 minutes. La stratégie de déduplication s’appelle REPLAY_PINE.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-130e-7673-9ceb-ca547ca8d24d",
+      "rawPath": "raw/q16_with.json",
+      "rawSha256": "e08f1a01c3a447608f5ec46d0980ed9f6bdc15df059b768df3075980b9fcc21c",
+      "promptSha256": "2c6a3f5fc709ba2383b8823baea7ff474a8f45e14b80fa3dad9be8663f776781",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "fe035f219a9b755d5bfec1ff8cd54bb5e91de880676a4ab73913d6cc0b1454e8",
+      "usage": {
+        "input_tokens": 26515,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 205,
+        "reasoning_output_tokens": 162
+      },
+      "elapsedMs": 16370.564
+    },
+    {
+      "caseId": "q16",
+      "arm": "without",
+      "answer": "Pour les webhooks de paiement Harbor, la durée du cache anti-rejeu et le nom de la stratégie de déduplication ne sont pas disponibles dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "90"
+        ],
+        [
+          "REPLAY_PINE"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-5276-7540-9bf7-d6d880bb444d",
+      "rawPath": "raw/q16_without.json",
+      "rawSha256": "c20900f452bef0b9e7b416f9adf14ccaac6c7b5d433cf61e70dc32063761893a",
+      "promptSha256": "825698771bdf23d829f6e651439e035dd2e049d668985cdd0f6521c85a2d3cbf",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26324,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 231,
+        "reasoning_output_tokens": 190
+      },
+      "elapsedMs": 14367.936
+    },
+    {
+      "caseId": "q17",
+      "arm": "without",
+      "answer": "La durée de TTL corrigée et la stratégie du replay cache à appliquer pour Harbor ne sont pas disponibles dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "75"
+        ],
+        [
+          "REPLAY_PINE"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-391f-79e0-b602-b18897ad8824",
+      "rawPath": "raw/q17_without.json",
+      "rawSha256": "c1e6f145745c340a4d7a561982ba61a12798c33c552b45165afdf629d60b3c85",
+      "promptSha256": "039f2fc6c930b455f297ad1447f228b182241b15999158c29f7817b2bd852c65",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26315,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 323,
+        "reasoning_output_tokens": 291
+      },
+      "elapsedMs": 13330.882
+    },
+    {
+      "caseId": "q17",
+      "arm": "with",
+      "answer": "Pour Harbor, le TTL corrigé du replay cache est de **75 minutes** et la stratégie de déduplication à appliquer est **REPLAY_PINE**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-6f1a-7aa1-b1f5-cf5f3657e18a",
+      "rawPath": "raw/q17_with.json",
+      "rawSha256": "009d2b5b87fa3daa600d98251b59661cf3b4068bece1a79d063944799406382f",
+      "promptSha256": "bcdfb81b2d3c149880598bf12aae2e490a7106a83c395f1fec92755e3123b6d2",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a919634360dc4dac678eec193ca78c62e26cd0ebde2d7f503f79dba89d99ed14",
+      "usage": {
+        "input_tokens": 26501,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 274,
+        "reasoning_output_tokens": 235
+      },
+      "elapsedMs": 13326.022
+    },
+    {
+      "caseId": "q18",
+      "arm": "with",
+      "answer": "Dans Harbor, conserve ces traces pendant **75 minutes** et utilise le mécanisme de déduplication **REPLAY_PINE**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-44e9-7050-909e-144c4e28f6b2",
+      "rawPath": "raw/q18_with.json",
+      "rawSha256": "6cd887aa5b37847bd7d357ea7e169e5e519dba731c2582e2e1490923cd1e5b53",
+      "promptSha256": "893996812c7847e12ada830cc9ea8a30e2fcbb4340719c2d239cc559ef203ef6",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "398b19cdd28917e0e363531b467d8f9ce56a22dbf4d068830b08d16f1bf8c44f",
+      "usage": {
+        "input_tokens": 26511,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 244,
+        "reasoning_output_tokens": 211
+      },
+      "elapsedMs": 14486.045
+    },
+    {
+      "caseId": "q18",
+      "arm": "without",
+      "answer": "Les données fournies ne précisent ni la durée de conservation en minutes ni le nom du mécanisme à utiliser dans Harbor.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "75"
+        ],
+        [
+          "REPLAY_PINE"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-7d89-74a2-a16d-8ed55d9ac8fc",
+      "rawPath": "raw/q18_without.json",
+      "rawSha256": "a05a8d3748ad9ecf2c1a9121bb809c39577778845b21e7f2021eaa1a45e00d6c",
+      "promptSha256": "c3d44f88438619b987412841649a7911b655c0a75bc6fe0868f5981910de2a06",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26322,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 273,
+        "reasoning_output_tokens": 242
+      },
+      "elapsedMs": 16386.377
+    },
+    {
+      "caseId": "q19",
+      "arm": "without",
+      "answer": "La région cible de production de Vesper-West et le tag prévu en cas de rollback ne sont pas renseignés dans les données fournies.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "REGION_AMBER"
+        ],
+        [
+          "ROLLBACK_LARCH"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-8a9f-78d3-9842-f706f732b046",
+      "rawPath": "raw/q19_without.json",
+      "rawSha256": "fe7dce56415f0fbdd9d2a60662e571af840ba18fecc05b88bdd9b027c530cabf",
+      "promptSha256": "e441fbe2f880889e94d2149db43f0d0f997d4ddcfa9d7cc7d52b21cd5ffd108b",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26320,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 238,
+        "reasoning_output_tokens": 204
+      },
+      "elapsedMs": 13763.322
+    },
+    {
+      "caseId": "q19",
+      "arm": "with",
+      "answer": "Pour Vesper-West en production, la région cible est **REGION_AMBER** et le tag de rollback prévu est **ROLLBACK_LARCH**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-c0e5-7391-97ac-ba5e1eed5acb",
+      "rawPath": "raw/q19_with.json",
+      "rawSha256": "4fc540f048a77b57e6c982479f30adb9e2b7095615d984d38fe2ffddef1d454c",
+      "promptSha256": "f8b2f99ffe12566f746592b62801bbc24f33aad3ec514cb3733768b962fe96bc",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "f9f06fa117fd4db1d8ed4f4cf86afc7f55fc9dca07823f4bd4a6d6eaecf51ea4",
+      "usage": {
+        "input_tokens": 26515,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 196,
+        "reasoning_output_tokens": 159
+      },
+      "elapsedMs": 13014.995
+    },
+    {
+      "caseId": "q20",
+      "arm": "with",
+      "answer": "Pour Vesper-West en production, la région est REGION_AMBER et le tag de rollback indiqué est ROLLBACK_CEDRAN. Son approbation actuelle n’est pas précisée dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-a14f-7fb2-8a59-35be7b6c3708",
+      "rawPath": "raw/q20_with.json",
+      "rawSha256": "2eb60a5fcf9458e8983c3cfd47cc3e0a516f26a51569b585dc2a61fda99cd8ba",
+      "promptSha256": "891b0d94f3da11346dcd1e10c55b09b7d8d50ce726300a58f118a2c348090824",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "cfd27104b54ad1b176b1f49484df6fe3b31d92698b0273bb0a42843d2dd622cf",
+      "usage": {
+        "input_tokens": 26511,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 482,
+        "reasoning_output_tokens": 431
+      },
+      "elapsedMs": 21159.949
+    },
+    {
+      "caseId": "q20",
+      "arm": "without",
+      "answer": "Les données fournies ne précisent ni la région ni le tag de rollback actuellement approuvé pour Vesper-West production.",
+      "score": 0.0,
+      "missingGroups": [
+        [
+          "REGION_AMBER"
+        ],
+        [
+          "ROLLBACK_CEDRAN"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-f55c-7c61-ace5-584795c2261d",
+      "rawPath": "raw/q20_without.json",
+      "rawSha256": "e3f28b60fd1b282a2c7138418e72428d88ec7d29bec4c70d679fe6396a7397da",
+      "promptSha256": "73e2078789f505d0e38e8aa8b124b7cb9b7ec49a729b31b056e0c9b762dc99c2",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26317,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 245,
+        "reasoning_output_tokens": 215
+      },
+      "elapsedMs": 12529.739
+    },
+    {
+      "caseId": "q21",
+      "arm": "without",
+      "answer": "Le budget monétaire mensuel approuvé pour Vesper-West est inconnu. Les données fournies ne permettent pas non plus de confirmer si ce montant est documenté.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-bd9f-7960-ad11-9e81a763ebd7",
+      "rawPath": "raw/q21_without.json",
+      "rawSha256": "4ba17ce10c219582f4ee7634ec7e0028744c58661191d4a3f00397ace28a2908",
+      "promptSha256": "954aac633af3fac9c6599892cb4a8cd0d0f3bb8ba880a975d64e9a854abc747e",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26321,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 427,
+        "reasoning_output_tokens": 387
+      },
+      "elapsedMs": 22640.152
+    },
+    {
+      "caseId": "q21",
+      "arm": "with",
+      "answer": "Le budget monétaire mensuel approuvé pour Vesper-West est inconnu. Aucun montant n’est documenté dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-1689-7273-92fd-5128a8201403",
+      "rawPath": "raw/q21_with.json",
+      "rawSha256": "f300f4479f0f97a2a04ce51096c05c9844e715896de4d8e0cce80c00da309ace",
+      "promptSha256": "db804b0385a212677c7364e5d8bb333d438803fffeed554e7e44793afa99cdda",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "fe99ec0ac405a100910507479d7fc9de64d05f4eade7aaef5e28440d32a1d5f1",
+      "usage": {
+        "input_tokens": 26513,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 279,
+        "reasoning_output_tokens": 245
+      },
+      "elapsedMs": 13583.427
+    },
+    {
+      "caseId": "q22",
+      "arm": "with",
+      "answer": "Quill doit expédier **21 caisses au total** : 7 caisses par service × 3 services = 21.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167f9-f545-7c61-9586-32fbb19c978a",
+      "rawPath": "raw/q22_with.json",
+      "rawSha256": "cac57fc42d5ebb412b8c795295e508a025ab62a352cda3d7c0d712a52158db96",
+      "promptSha256": "bc29de553c5e07661fb6c479a61a1564a6fc51871d9add351d6653e1357e2b5c",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a8f92be4b650e0ad37673900517e492aedddb93ef41a640b30f691eaa5ca34c2",
+      "usage": {
+        "input_tokens": 26513,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 259,
+        "reasoning_output_tokens": 225
+      },
+      "elapsedMs": 15077.443
+    },
+    {
+      "caseId": "q22",
+      "arm": "without",
+      "answer": "Quill doit expédier **21 caisses** au total : 7 caisses par service × 3 services = 21 caisses.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-2ef4-7012-9f98-d77e6a646a09",
+      "rawPath": "raw/q22_without.json",
+      "rawSha256": "6cc5f754315ca4de6a750a6d8ddfb625c2fc24de6fb8329078a1c1f04a8f5281",
+      "promptSha256": "4044aceaa751bd28ccc2f3d82bfecf22c5fb33ec51391439b7e0dff24a9e2a40",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26330,
+        "cached_input_tokens": 13696,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 141,
+        "reasoning_output_tokens": 105
+      },
+      "elapsedMs": 12619.355
+    },
+    {
+      "caseId": "q23",
+      "arm": "without",
+      "answer": "Pour cet envoi, utilisez le label de routage BAG_AZURE pour le sac Quill.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-25b4-74f3-8b5a-5e8dcc5cb5db",
+      "rawPath": "raw/q23_without.json",
+      "rawSha256": "4ed12a9920225913bab1706c42bc23c900897e5fd4b146473fd5fb49611277a0",
+      "promptSha256": "15c35b2049502c67397bc54616b40e649ee9ad76d633732a56bbef31cd6284e8",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26329,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 192,
+        "reasoning_output_tokens": 165
+      },
+      "elapsedMs": 13653.694
+    },
+    {
+      "caseId": "q23",
+      "arm": "with",
+      "answer": "Pour cet envoi, utilisez le label de routage BAG_AZURE pour le sac Quill.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-5abd-7941-94fb-2b69887c9511",
+      "rawPath": "raw/q23_with.json",
+      "rawSha256": "f5c50e124cc0004f56eaff4c4d89ac3328517492f278c9f3334c1990538d9684",
+      "promptSha256": "1b45bd755e7daf4cd8becafc5cd80f7291b2ed4fb431964c7c28189223884e37",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "3d6809139f364f81748d3885970ae511e897fbf6e52e7c88bc05bd651b0753aa",
+      "usage": {
+        "input_tokens": 26515,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 141,
+        "reasoning_output_tokens": 114
+      },
+      "elapsedMs": 11549.91
+    },
+    {
+      "caseId": "q24",
+      "arm": "with",
+      "answer": "Le label de routage du sac enregistré pour Quill n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-4b57-7780-b32e-921640205a81",
+      "rawPath": "raw/q24_with.json",
+      "rawSha256": "8b9bc56976b396edcd239b29892d69bf315ce4836539b54233a33da2336496c0",
+      "promptSha256": "1a0ee763569fecda1f0da74fc7443a101baa7beeff810d2d62bfa8c39d5c8f4d",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26327,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 278,
+        "reasoning_output_tokens": 251
+      },
+      "elapsedMs": 14823.983
+    },
+    {
+      "caseId": "q24",
+      "arm": "without",
+      "answer": "Le label de routage du sac enregistré pour Quill n’est pas disponible dans les données fournies.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fa-8540-70e0-b482-5b6245ce2ecb",
+      "rawPath": "raw/q24_without.json",
+      "rawSha256": "96a33c9719fc5c271fbad3ff9ce74e14b40663aac3dbf7722e2b13c37dfdc999",
+      "promptSha256": "1a0ee763569fecda1f0da74fc7443a101baa7beeff810d2d62bfa8c39d5c8f4d",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "usage": {
+        "input_tokens": 26327,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 288,
+        "reasoning_output_tokens": 261
+      },
+      "elapsedMs": 16150.254
+    }
+  ],
+  "errors": [],
+  "clientSha256After": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "completedAt": "2026-10-23T08:57:30.875397+00:00"
+}

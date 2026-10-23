@@ -1,0 +1,43 @@
+{
+  "answer": "Passage de relais pour la maintenance de l’incident Sable : l’heure UTC et le groupe d’escalade ne sont pas disponibles dans les données fournies.",
+  "threadId": "01a167f8-4d6a-7031-8a23-28da64859d28",
+  "usage": {
+    "input_tokens": 26323,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 311,
+    "reasoning_output_tokens": 271
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a167f8-4d6a-7031-8a23-28da64859d28\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Passage de relais pour la maintenance de l’incident Sable : l’heure UTC et le groupe d’escalade ne sont pas disponibles dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26323,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":311,\"reasoning_output_tokens\":271}}\n",
+  "stderr": "2026-10-23T08:54:48.444757Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T08:55:07.843101Z  WARN codex_core_plugins::manager: failed to refresh cached remote plugin catalog error=failed to send remote plugin catalog request to https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJwcmltYXJ5IiwicXVlcnlfaWQiOiJyczQ6YTcxNDEyZjAtYjEyOS00ODMxLWJjMmQtYWFiMzY2NmE4N2ZiOnlHSEZmVHE6MDpsZWFmLTFmMzFkZTdiLTU5YWUtNDA4NS05MTY2LTg0MzBhMjU1OGQ3YyIsImN1cnNvciI6IlpINjlkWEM0Z0x2dmVITHBoSlVLNmZqaTJOR2pQTlMwR3NWQ3BKVlpnX3ZVTmVFRmNaNWNkalM0Q0pncFJaWmdSMXo2WW9JMl9aSWdJUXJheUE2UnRsZnlSR0dLbTI0MGRiRnAyZktaSkxTV1E1MEM0eWwzeHREbVpGREE4Z1RvQzJjenRSNXhRcGhxWUZRZkFmM3hTa1FqUDlDc0Zrd25HWkdkeXV1OGszNWZDeThNX3J2SnZHS2lGOEFvZGlidTNBd1RSNk0yMGNFPSJ9fQ: error sending request for url (https://chatgpt.com/backend-api/ps/plugins/list?scope=GLOBAL&limit=200&pageToken=eyJzY29wZSI6IkdMT0JBTCIsIndvcmtzcGFjZV9pZCI6bnVsbCwiY3JlYXRvcl9hY2NvdW50X3VzZXJfaWQiOm51bGwsImNvbGxlY3Rpb24iOm51bGwsImluY2x1ZGVfdW5saXN0ZWRfZ2xvYmFsX3BsdWdpbnMiOnRydWUsImVsaWdpYmxlX3BsYW5fdHlwZSI6InByb2xpdGUiLCJlbmZvcmNlX3BsYW5fZWxpZ2liaWxpdHkiOmZhbHNlLCJyYW5rX2J5X3BvcHVsYXJpdHkiOnRydWUsImNvbnRpbnVhdGlvbiI6eyJkZXBsb3ltZW50X3R5cGUiOiJwcmltYXJ5IiwicXVlcnlfaWQiOiJyczQ6YTcxNDEyZjAtYjEyOS00ODMxLWJjMmQtYWFiMzY2NmE4N2ZiOnlHSEZmVHE6MDpsZWFmLTFmMzFkZTdiLTU5YWUtNDA4NS05MTY2LTg0MzBhMjU1OGQ3YyIsImN1cnNvciI6IlpINjlkWEM0Z0x2dmVITHBoSlVLNmZqaTJOR2pQTlMwR3NWQ3BKVlpnX3ZVTmVFRmNaNWNkalM0Q0pncFJaWmdSMXo2WW9JMl9aSWdJUXJheUE2UnRsZnlSR0dLbTI0MGRiRnAyZktaSkxTV1E1MEM0eWwzeHREbVpGREE4Z1RvQzJjenRSNXhRcGhxWUZRZkFmM3hTa1FqUDlDc0Zrd25HWkdkeXV1OGszNWZDeThNX3J2SnZHS2lGOEFvZGlidTNBd1RSNk0yMGNFPSJ9fQ) scope=Global\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q10",
+  "arm": "without",
+  "startedAt": "2026-10-23T08:54:47.999648+00:00",
+  "completedAt": "2026-10-23T08:55:07.909465+00:00",
+  "elapsedMs": 19909.804,
+  "promptSha256": "d154833284968951e422ca792c349bd7391d573b3b5eb4f51c963af8ef7f2489",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

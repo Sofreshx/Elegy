@@ -1,0 +1,43 @@
+{
+  "answer": "Pour Vesper-West en production, la région cible est **REGION_AMBER** et le tag de rollback prévu est **ROLLBACK_LARCH**.",
+  "threadId": "01a167f9-c0e5-7391-97ac-ba5e1eed5acb",
+  "usage": {
+    "input_tokens": 26515,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 196,
+    "reasoning_output_tokens": 159
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a167f9-c0e5-7391-97ac-ba5e1eed5acb\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour Vesper-West en production, la région cible est **REGION_AMBER** et le tag de rollback prévu est **ROLLBACK_LARCH**.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26515,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":196,\"reasoning_output_tokens\":159}}\n",
+  "stderr": "2026-10-23T08:56:23.542243Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q19",
+  "arm": "with",
+  "startedAt": "2026-10-23T08:56:23.048650+00:00",
+  "completedAt": "2026-10-23T08:56:36.064237+00:00",
+  "elapsedMs": 13014.995,
+  "promptSha256": "f8b2f99ffe12566f746592b62801bbc24f33aad3ec514cb3733768b962fe96bc",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

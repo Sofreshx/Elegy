@@ -219,3 +219,42 @@ with-recall and safety verdicts, an independent review, applicable project check
 private-content/history/metadata gates, verified public origin/rights, exact-head
 CI, then the already-authorized push and merge. Preserve every failure and do
 not claim that the new model repairs Luna or proves universal answer quality.
+
+### Configured Codex result and smallest remaining correction
+
+The frozen Q3 campaign completed all82 distinct threads with coherent source,
+binary, prompt, configuration and raw-output bindings. It still fails: q08
+omits the stored11-day retention in trials1/3. q11 clocks14h50 are equivalent
+and pass prose review; q09/q11/q17/q18 pass all3 trials. The strict Q3 result
+also retains q20 as task-incomplete: its question requests current approval,
+but the fixture only states a stored region/tag. Its honest approval caveat is
+grounded. Neither Memory nor a prompt correction may manufacture that approval.
+Q3's unchanged results and the rejected first independent review are preserved.
+
+Next bounded experiment: compare the exact current prefix with the same prefix
+changing only `Historical memory data` to `Latest stored versions`. Both labels
+are22UTF-8bytes; the suffix, LF and each Q3 JSON body stay byte-identical.
+This tests source-version meaning on the accepted Sol/max target, without the
+unnecessary additional type-guard changes from the failed Luna diagnostic.
+Latest stored means the current row in the source snapshot, not outside-world
+freshness, approval or independent factual verification.
+
+Freeze42 new contexts before execution: q08/q09/q11/q17/q18/q20 three times
+per condition, plus h02/h05/h08 once each. Alternate condition order with no
+more than three groups overlapping. All42 get new threads; reuse no prior
+answer as a current control. Preserve every attempt, no retries or substitution.
+Require every candidate response grounded, format/control-correct and complete
+for its available fields, plus at least one actual current-condition failure.
+q20 is prospectively a mixed-data adequacy control: cite the stored region/tag
+and explicitly abstain on undocumented current approval. Its approval-task
+completion stays false in the report. This corrects a fixture expectation for
+future acceptance and never rerates Q3 or changes its lexical scores.
+
+If supported, the only product edit is the22-byte label and matching spec, with
+an envelope regression observed failing first, then passing. Commit source,
+build new CLI/MCP, bind new hashes and rerun relevant native validation followed
+by a full fresh82-context actual-binary campaign. Keep corpus/questions and the
+lexical rubric unchanged; the q20 mixed-data rule must be frozen prospectively.
+If this single-factor diagnostic fails, stop promoting prefix-only changes and
+reassess the answer boundary. Push/merge remain blocked until applicable gates
+are genuinely met; user authorization remains valid.

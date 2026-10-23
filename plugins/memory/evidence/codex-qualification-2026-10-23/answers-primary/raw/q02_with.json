@@ -1,0 +1,43 @@
+{
+  "answer": "En production, Cedar-North utilise le port API **7223** et le transport **mTLS**.",
+  "threadId": "01a167f6-e810-7511-8e46-9f162c75c507",
+  "usage": {
+    "input_tokens": 27353,
+    "cached_input_tokens": 0,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 136,
+    "reasoning_output_tokens": 108
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a167f6-e810-7511-8e46-9f162c75c507\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"En production, Cedar-North utilise le port API **7223** et le transport **mTLS**.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":27353,\"cached_input_tokens\":0,\"cache_write_input_tokens\":0,\"output_tokens\":136,\"reasoning_output_tokens\":108}}\n",
+  "stderr": "2026-10-23T08:53:17.032305Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T08:53:17.919230Z  WARN sqlx::query: slow statement: execution time exceeded alert threshold summary=\"DELETE FROM logs WHERE …\" db.statement=\"\\n\\nDELETE FROM logs WHERE ts < ?\\n\" rows_affected=0 rows_returned=0 elapsed=1.5679931s elapsed_secs=1.5679931 slow_threshold=1s\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q02",
+  "arm": "with",
+  "startedAt": "2026-10-23T08:53:15.841640+00:00",
+  "completedAt": "2026-10-23T08:53:28.599199+00:00",
+  "elapsedMs": 12757.717,
+  "promptSha256": "6501f89fdc7bda2722d29a55c4afb8c98d98bd45d5f5b5d0f66107a25c1cec02",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

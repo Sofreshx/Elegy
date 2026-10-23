@@ -1,0 +1,320 @@
+{
+  "schemaVersion": "memory-generic-repeats/v1",
+  "status": "execution-valid",
+  "startedAt": "2026-10-23T09:00:15.157131+00:00",
+  "protocolSha256": "1c1f25e1fe83b513f78e54c05bb1809bfd945f5546110ec1c2163fb10e2d4908",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "runnerSha256": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+  "answerRunnerSha256": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+  "runReplaySha256": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+  "gradeSha256": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+  "rpcSupportSha256": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+  "replayRunSha256": "4ceb9a89be4d0a677155ccb28155807d61f23b14096f71f7d0768f22bdcbd36c",
+  "configuration": {
+    "argv": [
+      "<codex>",
+      "exec",
+      "--ignore-user-config",
+      "--ephemeral",
+      "--sandbox",
+      "read-only",
+      "--skip-git-repo-check",
+      "--json",
+      "-C",
+      "<scratch-case>",
+      "-m",
+      "gpt-6.1-sol",
+      "-c",
+      "model_reasoning_effort=\"max\"",
+      "-c",
+      "project_doc_max_bytes=0",
+      "-"
+    ],
+    "executableSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+    "environment": "API keys/endpoints/Memory bindings removed; existing ChatGPT login only"
+  },
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11",
+  "clientSha256Before": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "ordinaryChatGPTAuth": true,
+  "paidApiCalls": 0,
+  "cases": [
+    "q08",
+    "q09",
+    "q11",
+    "q17",
+    "q18"
+  ],
+  "trials": [
+    2,
+    3
+  ],
+  "records": [
+    {
+      "caseId": "q11",
+      "arm": "with",
+      "answer": "La fenêtre de maintenance de l’incident Sable débute à 14 h 50 UTC. Le groupe d’escalade à utiliser est OPS_IVORY.",
+      "score": 0.6666666666666666,
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-4c3b-7451-bc74-d6ab77baf65b",
+      "rawPath": "trial-2/raw/q11_with.json",
+      "rawSha256": "95ba26b4673bbb3733fbdb06ceefe5f51b2de18cd098662c794800deb6bcd0ef",
+      "promptSha256": "c14ff3628597fa93897b5ad472feafb044d3ddf0621c6cc7ddfa1dca13604f45",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "9bf6d5b9f02f635e0f8c428a7d338b39d67037e1c61b054ca43f200ad2646989",
+      "usage": {
+        "input_tokens": 26519,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 309,
+        "reasoning_output_tokens": 270
+      },
+      "elapsedMs": 17735.254,
+      "trial": 2
+    },
+    {
+      "caseId": "q09",
+      "arm": "with",
+      "answer": "L’identifiant précis de la sauvegarde Ares à restaurer est inconnu : les données fournies ne désignent aucune sauvegarde pour cet incident.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-4c18-7a43-a3b6-54e7881e1efa",
+      "rawPath": "trial-2/raw/q09_with.json",
+      "rawSha256": "1182d297433b1d779077151531b618e8ebe0a9b82747a69133a6f0cc36076996",
+      "promptSha256": "b6d5d8a1b7630568761d8d0cad7acccbb4f14997f34ecf1bd3d4559f6f40bd5b",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "1bc24c7ab4ac9f16fec8cdb6eec601eacdbe7341c1f21adfd9f47bcfa81e8143",
+      "usage": {
+        "input_tokens": 27372,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 235,
+        "reasoning_output_tokens": 198
+      },
+      "elapsedMs": 17759.099,
+      "trial": 2
+    },
+    {
+      "caseId": "q08",
+      "arm": "with",
+      "answer": "Le runbook de sauvegarde Ares est **BACKUP_COPAL**, avec une rétention de **11 jours**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-4c3b-7a01-81d9-4a3dc269faf3",
+      "rawPath": "trial-2/raw/q08_with.json",
+      "rawSha256": "e5d977ad6cea07703263c2a216b9b8ddff9e08b7395a4ac8f2178649194ed174",
+      "promptSha256": "99a09dd0b251c18608b2c363e747da82b2be9b84b3d95c2a7acaa81f6ce99ec8",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "b25edea7d2984b99ba98e92003dc4b9443e96712683b325a47212014068b7e29",
+      "usage": {
+        "input_tokens": 26527,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 329,
+        "reasoning_output_tokens": 297
+      },
+      "elapsedMs": 19031.135,
+      "trial": 2
+    },
+    {
+      "caseId": "q18",
+      "arm": "with",
+      "answer": "Dans Harbor, conserve ces traces pendant **75 minutes** et utilise le mécanisme de déduplication **REPLAY_PINE**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-9102-7d21-8b14-b2b5bccfa9ae",
+      "rawPath": "trial-2/raw/q18_with.json",
+      "rawSha256": "f48e512a8e717dab6d1b8be6cffe83f569d1d3b3e8088769c119a52859a72fed",
+      "promptSha256": "893996812c7847e12ada830cc9ea8a30e2fcbb4340719c2d239cc559ef203ef6",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "398b19cdd28917e0e363531b467d8f9ce56a22dbf4d068830b08d16f1bf8c44f",
+      "usage": {
+        "input_tokens": 26521,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 187,
+        "reasoning_output_tokens": 154
+      },
+      "elapsedMs": 12317.02,
+      "trial": 2
+    },
+    {
+      "caseId": "q08",
+      "arm": "with",
+      "answer": "Le runbook des sauvegardes Ares est `BACKUP_COPAL`. La rétention corrigée n’est pas disponible dans les données fournies.",
+      "score": 0.5,
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-9609-7160-be7a-6d726daf883c",
+      "rawPath": "trial-3/raw/q08_with.json",
+      "rawSha256": "7555a8518de51ca8190c2d343a691eb6eee9ed1922b1e2661e0c1359da8321af",
+      "promptSha256": "99a09dd0b251c18608b2c363e747da82b2be9b84b3d95c2a7acaa81f6ce99ec8",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "b25edea7d2984b99ba98e92003dc4b9443e96712683b325a47212014068b7e29",
+      "usage": {
+        "input_tokens": 26527,
+        "cached_input_tokens": 13696,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 420,
+        "reasoning_output_tokens": 382
+      },
+      "elapsedMs": 21613.786,
+      "trial": 3
+    },
+    {
+      "caseId": "q09",
+      "arm": "with",
+      "answer": "L’identifiant précis de la sauvegarde Ares à restaurer est inconnu : les données fournies n’associent aucune sauvegarde à cet incident.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-c0f6-76c2-962b-6cbb95c80dd4",
+      "rawPath": "trial-3/raw/q09_with.json",
+      "rawSha256": "2ba1486084f64f180d5c2ed060bac7f463d66be6143cf229c014143af3610c83",
+      "promptSha256": "b6d5d8a1b7630568761d8d0cad7acccbb4f14997f34ecf1bd3d4559f6f40bd5b",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "1bc24c7ab4ac9f16fec8cdb6eec601eacdbe7341c1f21adfd9f47bcfa81e8143",
+      "usage": {
+        "input_tokens": 26524,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 294,
+        "reasoning_output_tokens": 256
+      },
+      "elapsedMs": 19378.466,
+      "trial": 3
+    },
+    {
+      "caseId": "q17",
+      "arm": "with",
+      "answer": "Pour Harbor, le TTL corrigé du replay cache est de 75 minutes et la stratégie à appliquer est REPLAY_PINE.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-9106-71c3-9afd-7c0454342233",
+      "rawPath": "trial-2/raw/q17_with.json",
+      "rawSha256": "3ec661a6ae3dbf98dbf677c330fcb500740464f498701ca4635d1ce346ed2447",
+      "promptSha256": "bcdfb81b2d3c149880598bf12aae2e490a7106a83c395f1fec92755e3123b6d2",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a919634360dc4dac678eec193ca78c62e26cd0ebde2d7f503f79dba89d99ed14",
+      "usage": {
+        "input_tokens": 27359,
+        "cached_input_tokens": 7296,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 180,
+        "reasoning_output_tokens": 148
+      },
+      "elapsedMs": 38039.263,
+      "trial": 2
+    },
+    {
+      "caseId": "q11",
+      "arm": "with",
+      "answer": "La maintenance de l’incident Sable commence à 14 h 50 UTC. Le groupe d’escalade à utiliser est OPS_IVORY.",
+      "score": 0.6666666666666666,
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fd-ea93-72b0-b220-b75999abaea5",
+      "rawPath": "trial-3/raw/q11_with.json",
+      "rawSha256": "18693042594e1c11c470c4ea134023ccc851911a1e98b34694331478a200a922",
+      "promptSha256": "c14ff3628597fa93897b5ad472feafb044d3ddf0621c6cc7ddfa1dca13604f45",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "9bf6d5b9f02f635e0f8c428a7d338b39d67037e1c61b054ca43f200ad2646989",
+      "usage": {
+        "input_tokens": 26519,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 322,
+        "reasoning_output_tokens": 286
+      },
+      "elapsedMs": 15263.464,
+      "trial": 3
+    },
+    {
+      "caseId": "q17",
+      "arm": "with",
+      "answer": "Pour Harbor, appliquer un TTL de **75 minutes** et la stratégie de déduplication **REPLAY_PINE** au replay cache.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fe-0cf0-7ca3-aaee-33ea76c7cd07",
+      "rawPath": "trial-3/raw/q17_with.json",
+      "rawSha256": "47eb218b6c0b42fe97e219152496a4897aa2ea6a509a10562fbe982713ae8a18",
+      "promptSha256": "bcdfb81b2d3c149880598bf12aae2e490a7106a83c395f1fec92755e3123b6d2",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "a919634360dc4dac678eec193ca78c62e26cd0ebde2d7f503f79dba89d99ed14",
+      "usage": {
+        "input_tokens": 26511,
+        "cached_input_tokens": 0,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 254,
+        "reasoning_output_tokens": 220
+      },
+      "elapsedMs": 16450.996,
+      "trial": 3
+    },
+    {
+      "caseId": "q18",
+      "arm": "with",
+      "answer": "Dans Harbor, conserve les traces pendant **75 minutes** et utilise le mécanisme de déduplication **REPLAY_PINE**.",
+      "score": 1.0,
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "threadId": "01a167fe-25e5-76e2-b562-59653248aaf3",
+      "rawPath": "trial-3/raw/q18_with.json",
+      "rawSha256": "304b08109bb9e8fdb8ca8ef6dc747818f3d2790ea839d6996ab565523e937ccb",
+      "promptSha256": "893996812c7847e12ada830cc9ea8a30e2fcbb4340719c2d239cc559ef203ef6",
+      "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+      "contextSha256": "398b19cdd28917e0e363531b467d8f9ce56a22dbf4d068830b08d16f1bf8c44f",
+      "usage": {
+        "input_tokens": 26521,
+        "cached_input_tokens": 21504,
+        "cache_write_input_tokens": 0,
+        "output_tokens": 213,
+        "reasoning_output_tokens": 180
+      },
+      "elapsedMs": 13774.702,
+      "trial": 3
+    }
+  ],
+  "errors": [],
+  "clientSha256After": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "completedAt": "2026-10-23T09:01:26.711434+00:00"
+}
