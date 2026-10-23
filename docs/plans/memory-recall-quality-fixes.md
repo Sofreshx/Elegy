@@ -315,3 +315,35 @@ new replay evidence. Freeze the Q6 protocol/subject/harness next, then replay
 and verify all37 packets, run the full harness checks, and only then collect84
 predeclared contexts. All47 with-recall paragraphs must pass independently;
 no Q3/Q4 failure is rerated.
+
+
+### Selected Codex qualification accepted
+
+Q6 completed all84 fresh threads on the predeclared source95bf15b and pinned
+CLI/MCP/client. All37 replay packets preserve source data;42 identity/search/list
+and recall controls pass;24 namespaces are empty after cleanup. All22 harness
+checks pass on the actual new replays. No model call was retried or substituted.
+
+Independent42+42 prose reviews and parent84-row review accept all47 with-recall
+answers, including every critical trial. Without recall14/37 are complete and23
+safely abstain or remain appropriately partial. Five lexical false negatives
+remain unchanged and individually reported. One review error on q24 availability
+was corrected in an addendum, with original review retained and no model rerun.
+Mean paired lexical scores are0.9099099099 with and0.4009009009 without recall;
+this is finite-sample evidence, not a global quality/economy/causal claim.
+
+The isolated recorder accepts receiptc784eaac-12fb-4de3-9268-ab004d36de9f as
+reported-satisfied with reviewRequired=true. Fresh status/history verify its
+attached files and buildMatchesSource=true. No readiness artifact is promoted.
+See the [qualification report](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/README.md),
+[84 individual answers](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/results.md)
+and [individual score/review/preparation errors](../../plugins/memory/evidence/stored-version-qualification-2026-10-23/errors.md).
+
+Local implementation and qualification gates are met. The user has explicitly
+authorized push and merge after applicable checks. Remote integration must
+verify the unchanged public origin/account/rights, full private-content gate,
+exact final diff/target, PR checks, remote SHA and the existing main-snapshot
+publication effect. Preserve the source95bf15b object with a merge commit so the
+Git-bound compiled-source proof remains reachable. Another software host was
+excluded by the user; automatic Desktop integration and unattended daily use
+are not claimed by this campaign.

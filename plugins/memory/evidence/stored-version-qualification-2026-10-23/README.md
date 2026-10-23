@@ -1,74 +1,39 @@
 ---
 title: Qualification Codex des versions stockées
-status: in-progress
-owner: memory
+status: completed
+owner: Elegy Memory
 ---
 
-# Qualification prospective des binaires corrigés
+# Résultat de la qualification ciblée
 
-Cette campagne vise le Codex installé `gpt-6.1-sol / max`, choisi par l'utilisateur.
-Elle reste en cours : aucun verdict de qualité ni autorisation de fusion ne se
-déduit des tests natifs. Le [protocole](protocol.json), les
-[25 questions primaires](corpus.json), les [12 questions de transfert](transfer-corpus.json)
-et le [sujet exécuté](subject.json) sont fixés avant les nouveaux appels modèle.
+Les **47 réponses avec rappel sont complètes et étayées**, dont les dix répétitions critiques. Les 84 réponses sont conservées et relues individuellement par deux agents puis par le parent. Le [protocole figé](protocol.json) passe ses critères ; le [calcul vérifiable](assessment.json) ne contient aucune erreur de preuve ni de réponse bloquante.
 
-Le code produit est `95bf15ba2afa8e7655c45a8127b6a060893b695a`. Le
-[verrou des sources](source-lock.json) relie 149 entrées CLI et 18 entrées MCP aux
-objets Git et aux octets compilés, avec conversions de fins de ligne explicites.
-Les [copies exécutables](pinned-binaries.json) sont isolées du répertoire Cargo.
-Le [statut du CLI](pinned-status.json) confirme `buildMatchesSource=true`.
+| Garantie | Verdict et preuve | Portée |
+|---|---|---|
+| Reprise entre sessions | Observée : 37 paquets après fermeture/réouverture des clients, puis 84 sessions Codex distinctes. [Contrôles](replay-checks.json) | Même ordinateur et même logiciel hôte ; rappel fourni explicitement. |
+| Isolation des agents | 42 contrôles positifs/négatifs, 37 sources inchangées ; 24 espaces vérifiés vides après nettoyage. | ID, recherche, liste et contexte sur les bases fictives partagées. |
+| Autre logiciel hôte installé | Non qualifié ; volet exclu par l'utilisateur. | L'ancien blocage OpenCode reste dans les preuves historiques. |
+| Qualité des réponses | Avec rappel : 37/37 paires complètes et 10/10 répétitions. Sans rappel : 14/37 complètes, 23 abstentions sûres ou réponses partielles. [84 réponses](results.md) | Codex installé `gpt-6.1-sol / max`, corpus fictif fini. |
 
-Le seul changement produit depuis la réparation de fixture est le libellé
-`Latest stored versions` à la place de `Historical memory data` : même longueur,
-même suffixe et même budget. Il désigne les versions des lignes de la base source,
-sans certifier une fraîcheur ou une approbation extérieure. Le correctif antérieur
-de classement des noms proches reste inclus dans le code testé.
+Le score lexical figé moyen est **0,9099 avec rappel contre 0,4009 sans rappel** sur 37 paires. Il ne mesure pas à lui seul la justesse : [cinq faux négatifs lexicaux](errors.md) et une erreur de classification du réviseur sont documentés, sans modifier les réponses ni les scores. Les durées enregistrées portent sur des processus complets ; elles ne prouvent pas un gain de latence d'inférence. Zéro nouvel appel à une API payante ; l'allocation ChatGPT existante a été utilisée. Aucune économie monétaire ou amélioration globale n'est revendiquée.
 
-Les 408 tests Memory passent sur cette source, sans échec ni test ignoré ; les
-31 tests contextual-recall en font partie. Formatage et Clippy passent. La
-[validation native](native-validation/memory.json) et les logs conservent aussi
-le rouge/vert ciblé, les erreurs de capture et de commande de build, puis le
-[build corrigé](native-validation/build-02.json). Les suites MCP/hook inchangées
-peuvent réutiliser la [preuve précédente](../recall-fixes-2026-10-23/native-validation/run.json).
+Le code produit est `95bf15ba2afa8e7655c45a8127b6a060893b695a`, descendant du `main` `619f5dd` incluant la PR48. Le [verrou](source-lock.json) relie les 149 entrées CLI et 18 entrées MCP aux objets Git et aux octets compilés, avec conversions de fins de ligne explicites. Le [sujet](subject.json) et les [copies exécutées](pinned-binaries.json) donnent toutes les empreintes : CLI `b9c6e9de1175…`, MCP `9083f13f079e…`, client Codex `00c0f1e40992…`. Le gel prospectif du protocole et du harnais est `2d4f788285a3b42ae905e9d73bb2b28910bb8a84`.
 
-Le harnais Q2 scellé est réutilisé. La revue statique exige aussi les empreintes
-des huit fichiers de qualification, la reconstruction exacte des inputs de
-revue et les liens question/contexte/réponse, ainsi que la configuration normalisée
-complète du rappel. Dix-neuf tests du harnais passent avant le replay ; trois
-contrôles nécessitant les nouveaux fichiers de replay doivent encore passer
-avant le premier appel modèle. L'erreur de dépendance du premier lancement
-est [conservée et expliquée](native-validation/harness-preflight-deferred.json).
+Deux corrections produit sont incluses : le classement contextualisé distingue les noms proches et évalue le texte réellement livré ; le préfixe indique les dernières **versions stockées**, avec priorité aux instructions actuelles et abstention si l'attribut manque. Le delta final de libellé remplace 22 octets par 22 octets ; il ne certifie jamais une approbation ou une fraîcheur extérieure. La spec et six régressions couvrent le classement ; l'assertion du préfixe a été observée rouge puis verte.
 
-La campagne prévue comprend 84 sessions éphémères : 37 paires avec/sans rappel,
-puis dix répétitions critiques supplémentaires. Les 47 réponses avec rappel
-doivent toutes être complètes et étayées ; chaque erreur bloque le verdict.
-Les abstentions sûres sans rappel restent distinctes des réponses complètes.
+Les [408 tests Rust Memory](native-validation/memory.json) passent sans échec ni test ignoré, dont 31 tests contextual-recall. Formatage, Clippy et build passent. Les suites MCP (67 tests) et hook (14 tests) sont [réutilisées depuis Q1](../recall-fixes-2026-10-23/native-validation/run.json), leurs fichiers restant inchangés ; les [22 tests du harnais](native-validation/harness-final.json) passent sur les nouveaux replays. Les checks de la PR et ses métadonnées de fusion portent l’état de livraison, séparé de cette campagne.
 
-Les [échecs Luna](../recall-fixes-2026-10-23/README.md),
-[échecs Codex initiaux](../codex-qualification-2026-10-23/README.md),
-[diagnostic de libellé rejeté](../sol-version-label-2026-10-23/README.md) et
-[réparation de fixture](../fixture-adequacy-2026-10-23/README.md) restent intacts.
-q20 demande désormais région/tag enregistrés ; q25 demande l'approbation absente
-et impose l'abstention. Aucun fait d'approbation n'a été ajouté.
+Le [reçu local](record-output.json) est `c784eaac-12fb-4de3-9268-ab004d36de9f`, résultat `reported-satisfied`, avec `reviewRequired=true` et sujet externe à revérifier. [Statut relu](qualification-status.json) et [historique relu](qualification-history.json) vérifient les empreintes ; aucune readiness n'est promue automatiquement.
 
-Pour reproduire les contrôles locaux depuis ce dossier :
+Les [échecs Luna](../recall-fixes-2026-10-23/README.md), [diagnostics de réponses](../answer-grounding-2026-10-23/README.md), [Q3 Codex échoué](../codex-qualification-2026-10-23/README.md), [Q4 rejeté](../sol-version-label-2026-10-23/README.md) et [Q5 de réparation de fixture](../fixture-adequacy-2026-10-23/README.md) restent intacts. Q20 demande les faits enregistrés ; Q25 demande l'approbation absente et impose l'abstention. Q5 mesure l'adéquation de la question, pas un gain causal supplémentaire.
+
+Pour vérifier les preuves hors ligne, depuis ce dossier :
 
 ```text
-python verify_source.py --with-binaries
-python campaign.py --phase preflight
-python campaign.py --phase replay-primary
-python campaign.py --phase replay-transfer
-python -m unittest test_campaign test_assess test_verify_source test_evidence_binding -v
+python verify_source.py
+python assess.py --output verification-neuve.json
 ```
 
-Les exécutables sont reconstruits hors ligne depuis le commit produit avec
-`cargo build --offline --locked -p elegy-memory -p elegy-memory-mcp --bin elegy-memory --bin elegy-memory-mcp-stdio`.
-Un autre build peut avoir une empreinte binaire différente ; ne pas substituer
-ses fichiers aux copies historiquement qualifiées. Les phases refusent les
-sorties existantes ; utiliser un nouveau dossier pour une nouvelle campagne.
+`verify_source.py --with-binaries` vérifie en plus les copies locales conservées. Une nouvelle campagne exige un nouveau dossier, les sources/outils/binaires liés et une allocation ChatGPT existante ; les phases refusent tout écrasement. La commande de build réellement réussie est dans [build-02.json](native-validation/build-02.json). Les réponses peuvent varier ; une reconstruction ne remplace pas les empreintes des exécutables historiques.
 
-Les bases, journaux et configurations sont jetables. Ni mémoire réelle, ni
-configuration permanente, ni API payante, ni installation ou accès persistant.
-Il s'agit de nouvelles sessions sur un même logiciel hôte installé, avec rappel
-explicite. Le hook automatique Desktop, un autre hôte logiciel (exclu à la demande
-de l'utilisateur), l'usage quotidien et une amélioration globale ne sont pas établis.
+Ni mémoire réelle, ni configuration permanente, installation supplémentaire ou accès persistant n'ont été créés/modifiés. Le hook automatique Desktop, tous les réglages utilisateur, un autre hôte et l'usage quotidien restent hors preuve. Les noms de modèles et leur backend ne sont pas scellés.

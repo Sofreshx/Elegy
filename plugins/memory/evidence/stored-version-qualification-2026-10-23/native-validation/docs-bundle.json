@@ -1,0 +1,16 @@
+{
+  "argv": [
+    "<existing-documentation-cli>",
+    "export",
+    "bundle",
+    "--project",
+    ".",
+    "--output",
+    "docs/docs-index.md",
+    "--json"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 33.873,
+  "log": "docs-bundle.log",
+  "logSha256": "143aac91238dbed9a2994482e77b48ae03a35076ad12f2b13a6151a3a346767c"
+}

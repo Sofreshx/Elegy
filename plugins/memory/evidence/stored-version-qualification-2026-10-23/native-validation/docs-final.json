@@ -1,0 +1,23 @@
+{
+  "argv": [
+    "<existing-documentation-cli>",
+    "check",
+    "--project",
+    ".",
+    "--json"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 5.826,
+  "log": "docs-final.log",
+  "logSha256": "ddca3314620259b4c6522014c34d3466f25ae6f62d5c1c4c2184690fe5024754",
+  "valid": true,
+  "filesChecked": 49,
+  "issues": [
+    {
+      "code": "DOCS-CHECK-009",
+      "severity": "warning",
+      "path": "docs/roadmaps/observation-substrate-roadmap.md",
+      "message": "document appears stale relative to configured freshness warning defaults"
+    }
+  ]
+}

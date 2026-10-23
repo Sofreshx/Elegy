@@ -1,0 +1,43 @@
+{
+  "answer": "L’horaire UTC actualisé et le groupe à utiliser pour la maintenance de l’incident Sable ne sont pas disponibles dans les données fournies.",
+  "threadId": "01a1686d-787a-7a02-b62f-21ad7ac161c5",
+  "usage": {
+    "input_tokens": 26323,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 343,
+    "reasoning_output_tokens": 306
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1686d-787a-7a02-b62f-21ad7ac161c5\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’horaire UTC actualisé et le groupe à utiliser pour la maintenance de l’incident Sable ne sont pas disponibles dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26323,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":343,\"reasoning_output_tokens\":306}}\n",
+  "stderr": "2026-10-23T11:02:47.177476Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q11",
+  "arm": "without",
+  "startedAt": "2026-10-23T11:02:46.792047+00:00",
+  "completedAt": "2026-10-23T11:03:00.070459+00:00",
+  "elapsedMs": 13278.752,
+  "promptSha256": "67487e23d0c771b8fd6c6ba44d7dafb5f8304bd13a9a7abc2661c673f976e18e",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

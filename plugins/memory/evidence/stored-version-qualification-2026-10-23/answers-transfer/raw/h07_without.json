@@ -1,0 +1,43 @@
+{
+  "answer": "Pour les paiements Brume, la durée du cache et le nom de la stratégie anti-rejeu ne sont pas disponibles dans les données fournies.",
+  "threadId": "01a16871-47f1-7041-980b-5aa07f9b8b56",
+  "usage": {
+    "input_tokens": 26318,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 367,
+    "reasoning_output_tokens": 331
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16871-47f1-7041-980b-5aa07f9b8b56\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Pour les paiements Brume, la durée du cache et le nom de la stratégie anti-rejeu ne sont pas disponibles dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26318,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":367,\"reasoning_output_tokens\":331}}\n",
+  "stderr": "2026-10-23T11:06:56.899720Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h07",
+  "arm": "without",
+  "startedAt": "2026-10-23T11:06:56.475845+00:00",
+  "completedAt": "2026-10-23T11:07:13.709985+00:00",
+  "elapsedMs": 17234.33,
+  "promptSha256": "4cf2ab8f1fee45ff9e83cdde0a728581d21142e7d8a9526eae7f8f021dcd2574",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

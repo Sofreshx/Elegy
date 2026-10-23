@@ -1,0 +1,43 @@
+{
+  "answer": "Le diagnostic de Quartz n’est pas fourni ; je m’abstiens donc d’attribuer une cause racine.",
+  "threadId": "01a16871-4ba0-7df3-a9e1-58478ea0bb2d",
+  "usage": {
+    "input_tokens": 26315,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 218,
+    "reasoning_output_tokens": 188
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16871-4ba0-7df3-a9e1-58478ea0bb2d\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le diagnostic de Quartz n’est pas fourni ; je m’abstiens donc d’attribuer une cause racine.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26315,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":218,\"reasoning_output_tokens\":188}}\n",
+  "stderr": "2026-10-23T11:06:57.854320Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "h06",
+  "arm": "without",
+  "startedAt": "2026-10-23T11:06:57.373384+00:00",
+  "completedAt": "2026-10-23T11:07:09.813834+00:00",
+  "elapsedMs": 12440.724,
+  "promptSha256": "ce1576f4a81154da08889be25579972b227480fa18bc798cf8131bc7307d0c56",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

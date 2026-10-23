@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "<python>",
+    "-m",
+    "unittest",
+    "test_campaign",
+    "test_assess",
+    "test_verify_source",
+    "test_evidence_binding",
+    "-v"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 33.368,
+  "log": "harness-final.log",
+  "logSha256": "7ae9d955a013d9f0bd11ea46de40aec29bddcb7348506b7bb1500caccd736473",
+  "subjectSha256": "01d2d162639b7aace41503649d18e3517c5ef1ddf81fc2266f42214ed7fd1d8c",
+  "sourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a",
+  "gitHeadBefore": "2d4f788285a3b42ae905e9d73bb2b28910bb8a84",
+  "gitHeadAfter": "2d4f788285a3b42ae905e9d73bb2b28910bb8a84",
+  "excludedChecks": []
+}
