@@ -330,6 +330,200 @@ fn duplicate_content_and_content_already_in_context_are_not_repeated() {
 }
 
 #[test]
+fn contextual_recall_keeps_competing_harbor_workspace_memories_separate() {
+    let f = Fixture::new("inject");
+    let harbor = f.seed(
+        "workspace",
+        "Harbor payment webhook replay cache TTL is 75 minutes; deduplication strategy is REPLAY_PINE.",
+    );
+    f.seed(
+        "workspace",
+        "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+    );
+    let before = f.snapshot();
+
+    let mut request = f.request(
+        "harbor-one",
+        "Reprise Harbor : quelle durée de TTL corrigée et quelle stratégie du replay cache appliquer ?",
+    );
+    request["sessionId"] = json!("harbor-session-one");
+    let first = f.call("contextual-recall", request);
+    assert_eq!(first["status"], "selected");
+    assert_eq!(first["recalls"][0]["id"], harbor);
+    assert!(first["recalls"]
+        .as_array()
+        .expect("recalls")
+        .iter()
+        .all(|recall| recall["content"]
+            != "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH."));
+
+    let mut request = f.request(
+        "harbor-two",
+        "Dans Harbor, combien de minutes conserver les traces empêchant de traiter deux fois un paiement, et quel mécanisme nommé utiliser ?",
+    );
+    request["sessionId"] = json!("harbor-session-two");
+    let second = f.call("contextual-recall", request);
+    assert_eq!(second["status"], "selected");
+    assert_eq!(second["recalls"][0]["id"], harbor);
+    assert!(second["recalls"]
+        .as_array()
+        .expect("recalls")
+        .iter()
+        .all(|recall| recall["content"]
+            != "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH."));
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn contextual_recall_prefers_explicit_harbor_sandbox_name() {
+    let f = Fixture::new("inject");
+    f.seed(
+        "workspace",
+        "Harbor payment webhook replay cache TTL is 75 minutes; deduplication strategy is REPLAY_PINE.",
+    );
+    let sandbox = f.seed(
+        "workspace",
+        "Harbor-Sandbox replay cache TTL is 30 minutes; strategy is REPLAY_BIRCH.",
+    );
+    let before = f.snapshot();
+
+    let mut request = f.request(
+        "sandbox-one",
+        "Harbor-Sandbox replay cache TTL: quelle durée et quelle stratégie ?",
+    );
+    request["sessionId"] = json!("sandbox-session-one");
+    let result = f.call("contextual-recall", request);
+    assert_eq!(result["status"], "selected");
+    assert_eq!(result["recalls"][0]["id"], sandbox);
+    assert!(result["recalls"]
+        .as_array()
+        .expect("recalls")
+        .iter()
+        .all(|recall| recall["content"]
+            != "Harbor payment webhook replay cache TTL is 75 minutes; deduplication strategy is REPLAY_PINE."));
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn contextual_recall_preserves_compound_atlas_names() {
+    let f = Fixture::new("inject");
+    let atlas = f.seed(
+        "workspace",
+        "Atlas uses REPLAY_PINE for payment deduplication.",
+    );
+    f.seed(
+        "workspace",
+        "Atlas-Lab uses REPLAY_BIRCH for sandbox payment deduplication.",
+    );
+    let before = f.snapshot();
+
+    let mut request = f.request("atlas-lab", "Quelle stratégie utilise Atlas-Lab ?");
+    request["sessionId"] = json!("atlas-lab-session");
+    let lab = f.call("contextual-recall", request);
+    assert_eq!(lab["status"], "selected");
+    assert_ne!(lab["recalls"][0]["id"], atlas);
+    assert!(lab["recalls"][0]["content"]
+        .as_str()
+        .expect("content")
+        .contains("Atlas-Lab"));
+
+    let mut request = f.request("atlas", "Quelle stratégie utilise Atlas ?");
+    request["sessionId"] = json!("atlas-session");
+    let exact = f.call("contextual-recall", request);
+    assert_eq!(exact["status"], "selected");
+    assert_eq!(exact["recalls"][0]["id"], atlas);
+    assert!(exact["recalls"][0]["content"]
+        .as_str()
+        .expect("content")
+        .contains("Atlas uses REPLAY_PINE"));
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn contextual_recall_ignores_content_matches_hidden_by_explicit_summaries() {
+    let mut f = Fixture::new("inject");
+    let first = f.seed("workspace", "Atlas deployment uses the blue environment.");
+    let second = f.seed("workspace", "Atlas deployment uses the green environment.");
+    let db = Connection::open(f.config["dbPath"].as_str().expect("db")).expect("open");
+    db.execute(
+        "UPDATE memories SET summary=?1 WHERE id=?2",
+        ["Blue environment deployment", first.as_str()],
+    )
+    .expect("summary");
+    db.execute(
+        "UPDATE memories SET summary=?1 WHERE id=?2",
+        ["Green environment deployment", second.as_str()],
+    )
+    .expect("summary");
+    db.execute(
+        "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+        [],
+    )
+    .expect("rebuild fts");
+    f.config["minSimilarity"] = json!(0.0);
+    let before = f.snapshot();
+
+    let mut request = f.request("summary-only", "Atlas");
+    request["sessionId"] = json!("summary-only-session");
+    let result = f.call("contextual-recall", request);
+    assert_eq!(result["status"], "empty");
+    assert_eq!(result["additionalContext"], "");
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn contextual_recall_ignores_tag_only_matches_outside_injected_text() {
+    let mut f = Fixture::new("inject");
+    let id = f.seed("workspace", "Payment replay uses a bounded cache.");
+    let db = Connection::open(f.config["dbPath"].as_str().expect("db")).expect("open");
+    db.execute(
+        "UPDATE memories SET tags=?1 WHERE id=?2",
+        [r#"["InvisibleAtlasTag"]"#, id.as_str()],
+    )
+    .expect("tags");
+    db.execute(
+        "INSERT INTO memories_fts(memories_fts) VALUES('rebuild')",
+        [],
+    )
+    .expect("rebuild fts");
+    f.config["minSimilarity"] = json!(0.0);
+    let before = f.snapshot();
+
+    let mut request = f.request("tag-only", "InvisibleAtlasTag");
+    request["sessionId"] = json!("tag-only-session");
+    let result = f.call("contextual-recall", request);
+    assert_eq!(result["status"], "empty");
+    assert_eq!(result["additionalContext"], "");
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
+fn contextual_recall_keeps_atlas_lab_compound_names_distinct_from_spaces() {
+    let f = Fixture::new("inject");
+    let id = f.seed("workspace", "Atlas-Lab uses SQLite.");
+    let before = f.snapshot();
+
+    for (turn, session, prompt) in [
+        ("uppercase", "atlas-lab-uppercase", "ATLAS-LAB"),
+        ("punctuated", "atlas-lab-punctuated", "-Atlas-Lab-"),
+        ("repeated", "atlas-lab-repeated", "Atlas-Lab Atlas-Lab"),
+    ] {
+        let mut request = f.request(turn, prompt);
+        request["sessionId"] = json!(session);
+        let result = f.call("contextual-recall", request);
+        assert_eq!(result["status"], "selected", "prompt={prompt}");
+        assert_eq!(result["recalls"][0]["id"], id, "prompt={prompt}");
+    }
+
+    let mut request = f.request("spaced", "Atlas Lab");
+    request["sessionId"] = json!("atlas-lab-spaced");
+    let spaced = f.call("contextual-recall", request);
+    assert_eq!(spaced["status"], "empty");
+    assert_eq!(spaced["additionalContext"], "");
+    assert_eq!(before, f.snapshot());
+}
+
+#[test]
 fn governed_contextual_recall_corpus_matches_labels() {
     let corpus: Value =
         serde_json::from_str(include_str!("../fixtures/eval/contextual-recall-v1.json"))
