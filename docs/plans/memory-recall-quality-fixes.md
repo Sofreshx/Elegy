@@ -114,3 +114,40 @@ See [the correction qualification report](../../plugins/memory/evidence/recall-f
 and its individual answers, source/binary bindings and reproducible adverse gate.
 Safe local checkpoints remain authorized; the user's conditional publication
 authorization has not been satisfied.
+
+## Resumed correction — evidence-use envelope
+
+The user now explicitly asks to resolve the three answer failures and then push
+and merge after all applicable checks pass. The second software host is excluded
+by that same user's direction; preserve its historical result without making it
+a gate for this resumed slice.
+
+The prior source and all failed answers remain immutable. Correct facts were
+transmitted in q08/q11; q09's requested snapshot identifier was absent. A fresh
+controlled comparison will vary only the fixed envelope prefix: require matching
+context and field, extracting all requested values and never substituting a
+different field's value. This is a testable hypothesis, not yet an accepted fix.
+The candidate is 197 bytes, within the prior envelope's budget, and contains no
+corpus labels or answers. No product source is changed before the comparison.
+
+1. Freeze the diagnostic protocol and run 30 fresh contexts: five cases, three
+   trials, current versus candidate prefix with identical JSON records.
+2. Require all fifteen candidate answers to pass and at least one current
+   control failure; retain every trial and inspect actual prose independently.
+3. If supported, apply the single envelope change, align the existing spec,
+   run focused and full checks, and commit exact source before new binaries.
+4. Qualify actual rebuilt outputs with the unchanged 24 paired questions, three
+   realizations of all five critical cases, and twelve frozen transfer questions
+   using new fictional labels and values. The transfer sample is synthetic,
+   structurally related coverage, not an independent real-world benchmark.
+5. Require each critical answer in all three trials, all transfer with-recall
+   answers and all safety/abstention/override controls to pass. No test weakening,
+   answer replacement, model substitution or economic claim.
+6. Verify source/binary/evidence bindings, independent review, publication gates
+   and exact-head CI before push/merge. Existing main-snapshot automation is
+   already disclosed and authorized by the requested merge.
+
+Diagnostic and final acceptance remain separate. If the candidate fails, use
+the retained errors to reassess the mechanism rather than promoting simulated
+packets or repeating trials until they pass. All execution stays in disposable
+stores, journals and model contexts; existing ChatGPT quota only.
