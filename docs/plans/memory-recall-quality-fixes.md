@@ -174,3 +174,25 @@ factors separately, including adverse interactions; these simulations never
 replace qualification against a rebuilt executable. Before that final campaign,
 make the transfer corpus executable without editing either frozen corpus and
 require per-answer prose verdicts alongside the unchanged lexical rubric.
+
+### Resumed diagnostic result and target decision
+
+All 129 prospective diagnostic contexts completed without execution/provider
+errors: wording 30, layout 33, semantic factors 44, paragraph placement 22.
+None supports a production fix for the retained response failures. The latest/
+typed prefix passes 8/11 prose checks; separate paragraph placement passes 6/11
+under strict review, including one ambiguous time answer counted as failure.
+Every trial remains available, including false lexical negatives for `14 h 50`
+and a lexical false positive that mentions the time but disclaims an updated one.
+
+No new Rust behavior was changed. The validated ranking correction and its
+408 Memory / 67 MCP tests remain the product source under test. Do not rerun
+those unchanged suites merely to replace the adverse response result.
+
+The installed normal Codex configuration is `gpt-6.1-sol` / `max`, whereas this
+controlled answer proxy uses `gpt-5.6-luna` / `medium`. This is an observed target
+mismatch, not proof that the configured model would succeed. A user clarification
+is pending: qualify the actual configured host/model in a separate prospective
+cohort while keeping Luna failures, or require Luna too and design a different
+caller/answer-validation boundary. Do not silently substitute models or weaken
+the original acceptance. Push and merge remain conditional and unperformed.

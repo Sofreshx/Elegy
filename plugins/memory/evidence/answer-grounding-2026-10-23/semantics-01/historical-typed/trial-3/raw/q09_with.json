@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant précis de sauvegarde Ares à restaurer est inconnu ou non disponible dans les données fournies.",
+  "threadId": "01a1677c-1628-7092-88e4-77c067b26e0b",
+  "usage": {
+    "input_tokens": 20724,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 28,
+    "reasoning_output_tokens": 0
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1677c-1628-7092-88e4-77c067b26e0b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant précis de sauvegarde Ares à restaurer est inconnu ou non disponible dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20724,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":28,\"reasoning_output_tokens\":0}}\n",
+  "stderr": "2026-10-23T06:39:07.838588Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q09",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:39:07.264297+00:00",
+  "completedAt": "2026-10-23T06:39:14.246149+00:00",
+  "elapsedMs": 6982.515,
+  "promptSha256": "1da9928a6bac02630e900ea4b3692357bb0c8296e79945bc18e8cf09a22eb42a",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

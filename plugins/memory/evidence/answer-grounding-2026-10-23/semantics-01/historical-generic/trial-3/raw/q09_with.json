@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant précis à restaurer est `BACKUP_COPAL`.",
+  "threadId": "01a1677b-f618-7d01-b68b-f76a621e70db",
+  "usage": {
+    "input_tokens": 20724,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 60,
+    "reasoning_output_tokens": 39
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1677b-f618-7d01-b68b-f76a621e70db\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant précis à restaurer est `BACKUP_COPAL`.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20724,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":60,\"reasoning_output_tokens\":39}}\n",
+  "stderr": "2026-10-23T06:38:59.626523Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q09",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:38:58.942277+00:00",
+  "completedAt": "2026-10-23T06:39:07.219109+00:00",
+  "elapsedMs": 8277.9,
+  "promptSha256": "63b95fdf151599a68f2d3c40d62cf16fac9d60bd9409d1a4ea3adbff0ab2e737",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "memory-harness-checks/v1",
+  "observedAt": "2026-10-23T06:56:41.302225+00:00",
+  "method": "Parent observed native tool execution, exit0, Ran22tests, OK. Not a ledger-cached result; no model, Memory database or network call.",
+  "command": [
+    "<python>",
+    "-m",
+    "unittest",
+    "test_qualification_runner",
+    "test_grade",
+    "test_replay",
+    "-v"
+  ],
+  "cwd": "<evidence-root>",
+  "exitCode": 0,
+  "tests": 22,
+  "sourceSha256": {
+    "qualification_runner.py": "4fa54ea77f59c3ba9964d2ae2b0a19629a6a4b6a34ac921f6765af78238302c6",
+    "test_qualification_runner.py": "47cbfcff37888e3fe0d27cf1b6eddaea8c2a915ee6ec06f6d156b140fedda8c9",
+    "answer_runner.py": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+    "run_replay.py": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+    "grade.py": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54",
+    "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+    "test_grade.py": "1c6aec9ffbfa5557343c6a33d2c51527ae20a577ac000dc7657f101b54213404",
+    "test_replay.py": "d28d71f36fada67ffbfac1358937c91402bb85eef318cc2ce951963e24f9ff81"
+  },
+  "preparationFailures": [
+    {
+      "action": "local checkpoint",
+      "result": "blocked by git diff --cached --check",
+      "reason": "Trailing whitespace in newly introduced synthetic test fixture line; fixed before commit. No commit or publication performed by the failed attempt."
+    }
+  ]
+}
