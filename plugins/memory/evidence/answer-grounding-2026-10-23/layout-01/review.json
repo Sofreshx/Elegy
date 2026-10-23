@@ -1,0 +1,31 @@
+{
+  "schemaVersion": "memory-layout-review/v1",
+  "status": "no-layout-remedy-supported",
+  "runSha256": "cc5314291ae5b02dd7793dbc5aaee8e11084474140b1985eba9ddb83bd7d7666",
+  "productSourceChanged": false,
+  "method": "Orchestrator inspected all33 responses. text-only is a nondeployable causal ablation, not a proposed production fix.",
+  "counts": {
+    "current": {
+      "lexicalFull": 5,
+      "total": 11
+    },
+    "text-first": {
+      "lexicalFull": 5,
+      "total": 11
+    },
+    "text-only": {
+      "lexicalFull": 4,
+      "total": 11
+    }
+  },
+  "lexicalFalseNegative": [
+    {
+      "condition": "text-first",
+      "caseId": "q11",
+      "trial": 3,
+      "detail": "14 h 50 UTC equals 14:50 UTC; preserve original lexical score, mark this value present semantically."
+    }
+  ],
+  "finding": "Missing fields and incorrect attribute substitution persist even with text-only records. Removing technical metadata does not establish a cure. Some replies explicitly distinguish historical from updated values, supporting a stored-version semantics probe.",
+  "scope": "These are diagnostic outputs only; no product acceptance or merged fix is claimed."
+}

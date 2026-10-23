@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant précis de sauvegarde à restaurer est inconnu et n’est pas disponible dans les données fournies.",
+  "threadId": "01a16772-2815-78f1-aacd-04e6a9d6d0e9",
+  "usage": {
+    "input_tokens": 20590,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 103,
+    "reasoning_output_tokens": 73
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16772-2815-78f1-aacd-04e6a9d6d0e9\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant précis de sauvegarde à restaurer est inconnu et n’est pas disponible dans les données fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20590,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":103,\"reasoning_output_tokens\":73}}\n",
+  "stderr": "2026-10-23T06:28:17.065009Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q09",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:28:16.624174+00:00",
+  "completedAt": "2026-10-23T06:28:23.524175+00:00",
+  "elapsedMs": 6899.531,
+  "promptSha256": "b09b1b7818c1aa253ceafbcb26f5904e6064c3fca50c060e421728f1ed1d6550",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

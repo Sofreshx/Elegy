@@ -1,0 +1,43 @@
+{
+  "answer": "Le TTL corrigé du replay cache Harbor est de 75 minutes. La stratégie à appliquer est `REPLAY_PINE`.",
+  "threadId": "01a16772-cee5-7691-a688-999bb4f56caf",
+  "usage": {
+    "input_tokens": 20592,
+    "cached_input_tokens": 10496,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 98,
+    "reasoning_output_tokens": 67
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a16772-cee5-7691-a688-999bb4f56caf\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le TTL corrigé du replay cache Harbor est de 75 minutes. La stratégie à appliquer est `REPLAY_PINE`.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20592,\"cached_input_tokens\":10496,\"cache_write_input_tokens\":0,\"output_tokens\":98,\"reasoning_output_tokens\":67}}\n",
+  "stderr": "2026-10-23T06:28:59.769585Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q17",
+  "arm": "with",
+  "startedAt": "2026-10-23T06:28:59.294197+00:00",
+  "completedAt": "2026-10-23T06:29:05.876022+00:00",
+  "elapsedMs": 6582.227,
+  "promptSha256": "7e8768e9ccec4644773e1c5177d0ba85a4b7c5c26776ce9d4e78bdaa720fb27e",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

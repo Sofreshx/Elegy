@@ -151,3 +151,26 @@ Diagnostic and final acceptance remain separate. If the candidate fails, use
 the retained errors to reassess the mechanism rather than promoting simulated
 packets or repeating trials until they pass. All execution stays in disposable
 stores, journals and model contexts; existing ChatGPT quota only.
+
+### Diagnostic decisions retained
+
+The generic 197-byte wording hypothesis is rejected: both conditions passed
+10/15 lexical checks, with actual q08 omissions and q09 substitutions. Changing
+record order also failed; removing metadata is an ineligible ablation and did
+not reliably recover the corrected values. Preserve every answer and the
+semantic exception for the valid `14h50` spelling in the layout review.
+
+The next predeclared diagnostic separates two observed ambiguities in a 2x2
+design: historical data versus latest stored versions, and generic field
+substitution versus method-name/instance-ID confusion. Only the fixed prefix
+varies; JSON record bodies remain byte-identical. The proposed latest/typed
+prefix is 202 bytes, the same length as the current product prefix, with no
+corpus labels or answer values. "Latest stored" describes row version selection
+inside the source snapshot, never independently verified real-world freshness.
+
+Run all 44 declared contexts once and retain each result. Acceptance requires
+all eleven proposed-prefix answers and independent prose review. Report both
+factors separately, including adverse interactions; these simulations never
+replace qualification against a rebuilt executable. Before that final campaign,
+make the transfer corpus executable without editing either frozen corpus and
+require per-answer prose verdicts alongside the unchanged lexical rubric.
