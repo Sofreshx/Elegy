@@ -196,3 +196,26 @@ is pending: qualify the actual configured host/model in a separate prospective
 cohort while keeping Luna failures, or require Luna too and design a different
 caller/answer-validation boundary. Do not silently substitute models or weaken
 the original acceptance. Push and merge remain conditional and unperformed.
+
+### Accepted target — configured Codex
+
+The user explicitly selected qualification on `gpt-6.1-sol` / `max`, preserving
+the Luna failures and limiting the verdict to the tested configuration. The
+prospective [Codex protocol](../../plugins/memory/evidence/codex-qualification-2026-10-23/protocol.json)
+freezes 82 fresh contexts: 24 original paired questions, 12 transfer paired
+questions, and with-recall trials2/3 of each of the five critical cases. Every
+with-recall answer must pass grounded prose review; without-recall safety and
+task completeness are reported separately. Scores and questions stay unchanged.
+
+Reuse the committed source `b828223` and its pinned CLI/MCP binaries and source
+lock. Run actual new MCP/CLI replays in separate scratch stores, followed by the
+committed generic harness from `7054fd5`. Do not apply any rejected prefix or
+layout probe. No source rebuild is needed while the product inputs are unchanged.
+The isolated CLI matches the selected model/effort, not every desktop setting;
+explicit context injection does not establish automatic hook activation.
+
+Before publication: require complete source/binary/raw/episode bindings, all
+with-recall and safety verdicts, an independent review, applicable project checks,
+private-content/history/metadata gates, verified public origin/rights, exact-head
+CI, then the already-authorized push and merge. Preserve every failure and do
+not claim that the new model repairs Luna or proves universal answer quality.

@@ -1,0 +1,34 @@
+{
+  "schemaVersion": "memory-codex-qualified-subject/v1",
+  "sourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
+  "evidencePreparationRevision": "7054fd53dbf2d8d6453fb04a13219ffa0bd68367",
+  "sourceLockSha256": "6c27a0c675ec6d642fc92535c64ca6f0ce897849bf21f7d2b08d00f003c525fe",
+  "cliSourceSha256": "52f9318b24099cdafb5a7aca6ec1dbac16cf5e6dd05f1352b72801ec9ebece70",
+  "cliSha256": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+  "mcpSha256": "d93610c224af1549708bc7f3fff2b51b9b4601bc4bfc480fdf0588748ba86f93",
+  "buildMatchesSource": true,
+  "memoryVersion": "0.1.0",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "1c1f25e1fe83b513f78e54c05bb1809bfd945f5546110ec1c2163fb10e2d4908",
+  "buildProvenance": "Completed Cargo test builds in this isolated source checkout; pinned source fingerprint verified by eval status and immutable executable copies hashed before/copy/after. Full native validation is recorded separately; no suite pass is inferred here.",
+  "limits": "Model aliases/backend unsealed; one installed software host; lexical mode; complete context cap600; synthetic explicit ingestion and fresh processes, not unattended daily usage.",
+  "model": "gpt-6.1-sol",
+  "reasoningEffort": "max",
+  "priorSubjectSha256": "6910f9495d474b8ff36c6a2ccd1861cdbc13a60f6d3cb9b74f09b0b0eba94c54",
+  "binaryPaths": {
+    "cli": "../recall-fixes-2026-10-23/runtime/qualified-binaries/elegy-memory.exe",
+    "mcp": "../recall-fixes-2026-10-23/runtime/qualified-binaries/elegy-memory-mcp-stdio.exe"
+  },
+  "sourceProof": "../recall-fixes-2026-10-23/source-lock.json",
+  "harnessProof": "../answer-grounding-2026-10-23/evidence-manifest.json",
+  "harnessManifestSha256": "0a3b1f2e07dd430b2281355e43575fe3efff7f3c03c1da78ad97600377ddaddb",
+  "harnessSourceFiles": {
+    "qualification_runner.py": "0af3c61bd27151e9b2e2d8c2a92b8925411f35cdc0e548a747576dc9dd045c30",
+    "answer_runner.py": "9bd417a00518bccc0d61e75908996e0bdc80b62db9a6b96e8e278f831994ae0b",
+    "run_replay.py": "1581b08a921e4dca1bec1207ceed384d883f6061319c3edc519d25a97eed4d1f",
+    "rpc_support.py": "41707eb52ee717d32f41165b7ad9034ac07f46e02a0324a24150836f6bb56759",
+    "grade.py": "bf330b80fa97bc734f73e4a8c3c9257201ba12fb0ecbc52277b2e46bbb78cf54"
+  },
+  "codexSha256": "00c0f1e4099246fddcd67ec620ca8ed50827c7d70e113b7224f7a2933cf2d67c",
+  "codexVersion": "codex-cli 0.163.0-alpha.11"
+}
