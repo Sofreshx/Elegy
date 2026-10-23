@@ -1,0 +1,116 @@
+{
+  "schemaVersion": "ci-integration-local-checks/v2",
+  "checks": [
+    {
+      "argv": [
+        "pwsh",
+        "-NoProfile",
+        "-File",
+        "scripts/test-check-repo-shape.ps1"
+      ],
+      "startedAt": "2026-10-23T12:16:02.162697+00:00",
+      "completedAt": "2026-10-23T12:16:10.228192+00:00",
+      "durationSeconds": 8.065,
+      "exitCode": 0,
+      "timedOut": false,
+      "log": "repo-shape-regression-02.log",
+      "logSha256": "25c3136bf20a4267d63c6be29ed909ba36dfe36d1ff6b20559746e3bea854475",
+      "stdoutSha256": "cf59fb17efd164d94dd19d46a0f0996fe5552abb0653ecc85c90c647e052e58b",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 38,
+      "stderrBytes": 0,
+      "rawLogSha256": "e279e57ee8bed0238e17488ccf005d11bf5d0876f8e864eac249660e6777c5ef",
+      "logNormalization": "Remove recorder-added trailing blank lines only; original stdout/stderr stream hashes unchanged."
+    },
+    {
+      "argv": [
+        "<python>",
+        "-m",
+        "unittest",
+        "discover",
+        "-s",
+        "plugins/memory/evidence/ci-integration-2026-10-23",
+        "-p",
+        "test_sanitize_evidence.py",
+        "-v"
+      ],
+      "startedAt": "2026-10-23T12:16:10.253823+00:00",
+      "completedAt": "2026-10-23T12:16:12.363529+00:00",
+      "durationSeconds": 2.11,
+      "exitCode": 0,
+      "timedOut": false,
+      "log": "sanitizer-tests-02.log",
+      "logSha256": "e165ae7ba6bde17d20e636d4b5a27e2e3eebf45632ae2d540704f8ee22e16150",
+      "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stderrSha256": "0e73dfc86913eb391d64bbc5181edc67e4e47df0ee7024f50889c0abab5cf5bd",
+      "stdoutBytes": 0,
+      "stderrBytes": 757,
+      "rawLogSha256": "dcbc1cd15557676ede3ecf73731a42ea4a1579dcbcc2ce2cae90859d69429f76",
+      "logNormalization": "Remove recorder-added trailing blank lines only; original stdout/stderr stream hashes unchanged."
+    },
+    {
+      "argv": [
+        "<python>",
+        "plugins/memory/evidence/ci-integration-2026-10-23/sanitize_evidence.py"
+      ],
+      "startedAt": "2026-10-23T12:16:12.870959+00:00",
+      "completedAt": "2026-10-23T12:16:14.929546+00:00",
+      "durationSeconds": 2.059,
+      "exitCode": 0,
+      "timedOut": false,
+      "log": "sanitizer-verify-02.log",
+      "logSha256": "143f4746facb8dac60147f2d66e5b3ff764572eba833a7cd06b3b8744cefd506",
+      "stdoutSha256": "371208391a6813d34204e19d0314c57b53a70d7b3d3c420f71a342404bd5b4ec",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 32,
+      "stderrBytes": 0,
+      "rawLogSha256": "5e83b2a9363e704d936e112f444c3b1f6cbe40a81248302c13ccc34ac7696fdf",
+      "logNormalization": "Remove recorder-added trailing blank lines only; original stdout/stderr stream hashes unchanged."
+    },
+    {
+      "argv": [
+        "<python>",
+        "plugins/memory/evidence/stored-version-qualification-2026-10-23/verify_source.py",
+        "--with-binaries"
+      ],
+      "startedAt": "2026-10-23T12:16:14.945627+00:00",
+      "completedAt": "2026-10-23T12:16:18.057005+00:00",
+      "durationSeconds": 3.111,
+      "exitCode": 0,
+      "timedOut": false,
+      "log": "q6-source-02.log",
+      "logSha256": "668c77378fa97b41ad9b76fa0ea7eb5896517f74097fa42adc695f62899fa805",
+      "stdoutSha256": "2246b17b4b0dbb78faf5611e3c65788c19c94e61a23129ca4d23a87586ea6399",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 241,
+      "stderrBytes": 0,
+      "rawLogSha256": "102b15f7f00a04d4c4553272a9818a7b895ce40ee3a8bdcc20cf52ccf7a236c7",
+      "logNormalization": "Remove recorder-added trailing blank lines only; original stdout/stderr stream hashes unchanged."
+    },
+    {
+      "argv": [
+        "<python>",
+        "plugins/memory/evidence/stored-version-qualification-2026-10-23/assess.py",
+        "--output",
+        "plugins/memory/evidence/fixture-adequacy-2026-10-23/native-validation/q6-recheck-02.json"
+      ],
+      "startedAt": "2026-10-23T12:16:18.078641+00:00",
+      "completedAt": "2026-10-23T12:16:43.057332+00:00",
+      "durationSeconds": 24.978,
+      "exitCode": 0,
+      "timedOut": false,
+      "log": "q6-assess-02.log",
+      "logSha256": "8fda6796818fe71f5cb24457b8b0110258eaad0ecff92ab42be6c465de478c46",
+      "stdoutSha256": "a9f18bc54f93543fcf70b58fb11e5a6f3278323e8af95efffa83e320b4f23720",
+      "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "stdoutBytes": 1666,
+      "stderrBytes": 0,
+      "rawLogSha256": "c45bfb154d0d4e6e4c55308a832c3e6f9487e540cfa8e4e19752c6b93f8b11f2",
+      "logNormalization": "Remove recorder-added trailing blank lines only; original stdout/stderr stream hashes unchanged."
+    }
+  ],
+  "preservedPriorAttempt": {
+    "path": "plugins/memory/evidence/stored-version-qualification-2026-10-23/runtime/ci-triage/runner-attempt1",
+    "note": "Prior public capture attempt preserved in ignored runtime; it is not evidence for this run."
+  }
+}

@@ -37,3 +37,7 @@ python assess.py --output verification-neuve.json
 `verify_source.py --with-binaries` vérifie en plus les copies locales conservées. Une nouvelle campagne exige un nouveau dossier, les sources/outils/binaires liés et une allocation ChatGPT existante ; les phases refusent tout écrasement. La commande de build réellement réussie est dans [build-02.json](native-validation/build-02.json). Les réponses peuvent varier ; une reconstruction ne remplace pas les empreintes des exécutables historiques.
 
 Ni mémoire réelle, ni configuration permanente, installation supplémentaire ou accès persistant n'ont été créés/modifiés. Le hook automatique Desktop, tous les réglages utilisateur, un autre hôte et l'usage quotidien restent hors preuve. Les noms de modèles et leur backend ne sont pas scellés.
+
+## Copies publiques de journaux
+
+Trois copies de logs Q1/Q6 contenant des chemins locaux sont neutralisées après la première CI de PR49. Les résultats, réponses, protocoles, reçus et leurs entrées scellées ne changent pas. Les anciens manifestes décrivent le snapshot original du commit `a753b4b5f4bddf553a5b11255b3532957291d9c2`, et non ces trois dérivés publics. Le [registre de neutralisation](../ci-integration-2026-10-23/redactions.json) lie les objets Git originaux, leurs SHA-256, les nouveaux octets et la transformation reproductible. Les erreurs initiales restent visibles.

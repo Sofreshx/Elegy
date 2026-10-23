@@ -1,0 +1,11 @@
+{
+  "schemaVersion": "memory-native-toolchain/v1",
+  "versions": {
+    "rustc": "rustc 1.96.1 (31fca3adb 2026-06-26)\nbinary: rustc\ncommit-hash: 31fca3adb283cc9dfd56b49cdee9a96eb9c96ffd\ncommit-date: 2026-06-26\nhost: x86_64-pc-windows-gnu\nrelease: 1.96.1\nLLVM version: 22.1.2",
+    "cargo": "cargo 1.96.1 (356927216 2026-06-26)"
+  },
+  "buildProfile": "debug",
+  "target": "x86_64-pc-windows-gnu",
+  "buildCache": "D:/Projets/Elegy/target/qualification-oct23",
+  "installations": "Existing tools and ordinary locked project dependencies only; no host/tool installation or permanent configuration change."
+}

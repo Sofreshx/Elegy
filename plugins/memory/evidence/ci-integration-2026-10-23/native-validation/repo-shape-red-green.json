@@ -1,0 +1,24 @@
+{
+  "schemaVersion": "repo-shape-red-green/v1",
+  "oldRevision": "a753b4b5f4bddf553a5b11255b3532957291d9c2",
+  "oldPath": "scripts/check-repo-shape.ps1",
+  "oldBlob": "579c203c6b52d1ac1029b1f5e8c0c4d105777741",
+  "red": {
+    "exitCode": 1,
+    "log": "repo-shape-red.log",
+    "logSha256": "133977b705d2667328441f9740ddc66b95947c15ba61439ec994989a59cc5b68",
+    "observed": "Regex.Match rejects null from empty tracked file",
+    "rawLogSha256": "60ea13f04a959f4c0e442ad38ae8635e72fe39e08b10c899fd687f75bc4bbbc8",
+    "publicTransform": {
+      "script": "../sanitize_evidence.py",
+      "scriptSha256": "17b5048e26043444f59c68e561e97c29b5c86fb92ad969e3a8f51e138e05df29",
+      "replacementCounts": {
+        "windows_absolute_path": 2,
+        "neutralized_appdata_fragment": 0
+      },
+      "retained": "Error messages, line count, exit code and test assertion remain; workspace paths become neutral placeholders. Original local capture remains in ignored runtime."
+    }
+  },
+  "green": "local-checks-02.json",
+  "reproduce": "Extract old checker from oldRevision:oldPath to a scratch file, then pwsh -NoProfile -File scripts/test-check-repo-shape.ps1 -CheckerScript SCRATCH. It must fail; default checker must pass all fixtures."
+}

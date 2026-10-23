@@ -1,0 +1,48 @@
+{
+  "status": "formatting-only",
+  "files": [
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/repo-shape-regression-02.log",
+      "beforeSha256": "e279e57ee8bed0238e17488ccf005d11bf5d0876f8e864eac249660e6777c5ef",
+      "afterSha256": "25c3136bf20a4267d63c6be29ed909ba36dfe36d1ff6b20559746e3bea854475",
+      "change": "recorder trailing blank lines"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/sanitizer-tests-02.log",
+      "beforeSha256": "dcbc1cd15557676ede3ecf73731a42ea4a1579dcbcc2ce2cae90859d69429f76",
+      "afterSha256": "e165ae7ba6bde17d20e636d4b5a27e2e3eebf45632ae2d540704f8ee22e16150",
+      "change": "recorder trailing blank lines"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/sanitizer-verify-02.log",
+      "beforeSha256": "5e83b2a9363e704d936e112f444c3b1f6cbe40a81248302c13ccc34ac7696fdf",
+      "afterSha256": "143f4746facb8dac60147f2d66e5b3ff764572eba833a7cd06b3b8744cefd506",
+      "change": "recorder trailing blank lines"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/q6-source-02.log",
+      "beforeSha256": "102b15f7f00a04d4c4553272a9818a7b895ce40ee3a8bdcc20cf52ccf7a236c7",
+      "afterSha256": "668c77378fa97b41ad9b76fa0ea7eb5896517f74097fa42adc695f62899fa805",
+      "change": "recorder trailing blank lines"
+    },
+    {
+      "path": "plugins/memory/evidence/ci-integration-2026-10-23/native-validation/q6-assess-02.log",
+      "beforeSha256": "c45bfb154d0d4e6e4c55308a832c3e6f9487e540cfa8e4e19752c6b93f8b11f2",
+      "afterSha256": "8fda6796818fe71f5cb24457b8b0110258eaad0ecff92ab42be6c465de478c46",
+      "change": "recorder trailing blank lines"
+    },
+    {
+      "path": "shared/tooling/Cargo.toml",
+      "beforeSha256": "762d8cc741e8ef7d81f1f5b9ac7f8085a1bf09ee1a7aeabaa8de5bc46baf4e32",
+      "afterSha256": "20042ae722fb97b6d660ecffb69a2e752f9c0974263dfd2c24526569b327dc50",
+      "change": "one added zip declaration CRLF normalized to LF; text unchanged"
+    },
+    {
+      "path": "shared/plugin-sdk/Cargo.toml",
+      "beforeSha256": "55a1b99e9fcc41811b6c51d76305209804ff7a53e8d9125741bc30a3b22101e5",
+      "afterSha256": "d23fd59d3f2e6e26f67dfc49e9a4475da25ad518b4b00b135afbed53b6ff8745",
+      "change": "one added zip declaration CRLF normalized to LF; text unchanged"
+    }
+  ],
+  "limits": "Prior worker source hashes and tests remain historical before these two manifest EOL changes. Fresh committed-source native checks follow; no product semantic change."
+}

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "evidence-redactions/v1",
+  "originalCommit": "a753b4b5f4bddf553a5b11255b3532957291d9c2",
+  "files": [
+    {
+      "path": "plugins/memory/evidence/recall-fixes-2026-10-23/second-host-01/paths.stdout",
+      "originalBlob": "147209d00643eb7906babf718743219f222fa10a",
+      "originalSha256": "c182498f24b55f85f7709259f8e27e4bf44caad49833e00cce2d6fd3c9eb7aa2",
+      "currentSha256": "26b602a443a0fdc6e80cd4d3a5df4b786b901d3e73e580cd86f9ec072e4b9ca8",
+      "replacementCounts": {
+        "windows_absolute_path": 0,
+        "neutralized_appdata_fragment": 1
+      },
+      "transforms": [
+        "replace single or doubled Windows absolute path tokens with <local-path>",
+        "replace the neutralized home-local-data fragment with the local-appdata placeholder",
+        "preserve UTF-8 bytes, line endings, and non-path evidence text"
+      ]
+    },
+    {
+      "path": "plugins/memory/evidence/recall-fixes-2026-10-23/validation-preparation/05-python-integrations.log",
+      "originalBlob": "3a2df8d64ae89c9cb148109382bdbbd7ad7e13f6",
+      "originalSha256": "da7db6ebfb4ec09e3780a1bc48cec52d8561f122a42cb53e6baf3e56e378cc13",
+      "currentSha256": "abf35c91dcf73fad496e3cd4e4b89e24c60a94204e1d148b9a0c6545c5600c76",
+      "replacementCounts": {
+        "windows_absolute_path": 222,
+        "neutralized_appdata_fragment": 0
+      },
+      "transforms": [
+        "replace single or doubled Windows absolute path tokens with <local-path>",
+        "replace the neutralized home-local-data fragment with the local-appdata placeholder",
+        "preserve UTF-8 bytes, line endings, and non-path evidence text"
+      ]
+    },
+    {
+      "path": "plugins/memory/evidence/stored-version-qualification-2026-10-23/native-validation/harness-preflight.log",
+      "originalBlob": "b614fe4316c9e6064fb48edb650537b2a12b15a6",
+      "originalSha256": "c900d80d65a33a9e3ddc8131323e6a78dea21c4265e92bec7829cb8e0b91bb0f",
+      "currentSha256": "e570e8a256708d12686271b30a6e31c2402a74cbc5affa9c5bd87484e6035130",
+      "replacementCounts": {
+        "windows_absolute_path": 7,
+        "neutralized_appdata_fragment": 0
+      },
+      "transforms": [
+        "replace single or doubled Windows absolute path tokens with <local-path>",
+        "replace the neutralized home-local-data fragment with the local-appdata placeholder",
+        "preserve UTF-8 bytes, line endings, and non-path evidence text"
+      ]
+    }
+  ]
+}

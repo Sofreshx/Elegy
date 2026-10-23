@@ -1,0 +1,21 @@
+{
+  "argv": [
+    "<python>",
+    "plugins/memory/evidence/stored-version-qualification-2026-10-23/verify_source.py",
+    "--with-binaries"
+  ],
+  "startedAt": "2026-10-23T12:16:14.945627+00:00",
+  "completedAt": "2026-10-23T12:16:18.057005+00:00",
+  "durationSeconds": 3.111,
+  "exitCode": 0,
+  "timedOut": false,
+  "log": "q6-source-02.log",
+  "logSha256": "102b15f7f00a04d4c4553272a9818a7b895ce40ee3a8bdcc20cf52ccf7a236c7",
+  "stdoutSha256": "2246b17b4b0dbb78faf5611e3c65788c19c94e61a23129ca4d23a87586ea6399",
+  "stderrSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+  "stdoutBytes": 241,
+  "stderrBytes": 0,
+  "schemaVersion": "old-q6-source-validation/v2",
+  "stdout": "",
+  "stderr": ""
+}

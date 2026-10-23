@@ -1,0 +1,5 @@
+observed-summary-not-raw=true
+command=cargo test --locked -p elegy-tooling --bin elegy-plugin-packaging installer::tests::install_rejects_malformed_entry_filename_before_writing -- --exact --nocapture
+exitCode=0
+resultCounts=1 passed, 0 failed, 17 filtered
+rawLogAvailable=false

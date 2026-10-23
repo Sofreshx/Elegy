@@ -347,3 +347,16 @@ publication effect. Preserve the source95bf15b object with a merge commit so the
 Git-bound compiled-source proof remains reachable. Another software host was
 excluded by the user; automatic Desktop integration and unattended daily use
 are not claimed by this campaign.
+
+## PR49 integration prerequisites
+
+The first PR49 CI at a753b4b passed workspace tests on all three platforms,
+MSRV, release Memory eval, Clippy and docs. Integration remains blocked by
+an empty-file repo-shape defect, ten verified source-hash Gitleaks false
+positives, and fourteen new advisories in the unchanged main lockfile.
+The [CI integration record](../../plugins/memory/evidence/ci-integration-2026-10-23/README.md)
+owns the minimal fixes, original-result preservation and final-source recheck.
+No failed CI run or prior model answer is discarded. Dependency updates change
+the conservative Memory source fingerprint; the successful Q6 proof remains
+historical until the final source/binaries receive their own qualification.
+Push/merge authorization and the excluded second-host scope remain unchanged.

@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "elegy-repo-shape-report/v1",
+  "project": "<repo>",
+  "generatedAt": "2026-10-23T12:30:58.6354138Z",
+  "mode": "blocking",
+  "issueCount": 0,
+  "issues": [],
+  "argv": [
+    "pwsh",
+    "-NoProfile",
+    "-File",
+    "scripts/check-repo-shape.ps1",
+    "-Project",
+    ".",
+    "-Json",
+    "-FailOnIssues"
+  ],
+  "exitCode": 0,
+  "durationSeconds": 34.766
+}

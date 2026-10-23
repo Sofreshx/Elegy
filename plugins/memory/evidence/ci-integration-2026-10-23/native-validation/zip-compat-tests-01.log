@@ -1,0 +1,5 @@
+observed-summary-not-raw=true
+command=cargo test --locked -p elegy-tooling -p elegy-plugin-sdk -p elegy-core -p elegy-accounts
+exitCode=0
+resultCounts=elegy-accounts:21; elegy-core:8; elegy-plugin-sdk:84; elegy-tooling:38; total=151 passed, 0 failed
+rawLogAvailable=false

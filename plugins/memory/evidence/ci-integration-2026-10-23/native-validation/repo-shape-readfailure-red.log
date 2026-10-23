@@ -1,0 +1,6 @@
+Exception: <local-path>
+Line |
+  91 |  … unreadable.txt") { throw "unreadable tracked file was not reported" }
+     |                       ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+     | unreadable tracked file was not reported
+exit=1

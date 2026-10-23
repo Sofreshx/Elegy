@@ -1,0 +1,6 @@
+=== COMMAND ===
+["pwsh", "-NoProfile", "-File", "scripts/test-check-repo-shape.ps1"]
+=== STDOUT ===
+check-repo-shape fixture tests passed
+
+=== STDERR ===

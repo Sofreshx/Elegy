@@ -1,0 +1,44 @@
+[
+  {
+    "argv": [
+      "<documentation-binary>",
+      "inspect",
+      "--project",
+      ".",
+      "--json"
+    ],
+    "binarySha256": "27c72b6a18f53ced911372dd311914b898d07fdd5e8cb1ef89d789373fec3d60",
+    "exitCode": 0,
+    "durationSeconds": 6.016,
+    "report": "docs-inspect-01.json",
+    "reportSha256": "4f2bd61a1e9f78e54970f7764ebbe9056d2af3f9527b91c5b1ed3751eb405b40"
+  },
+  {
+    "argv": [
+      "<documentation-binary>",
+      "map",
+      "--project",
+      ".",
+      "--json"
+    ],
+    "binarySha256": "27c72b6a18f53ced911372dd311914b898d07fdd5e8cb1ef89d789373fec3d60",
+    "exitCode": 0,
+    "durationSeconds": 0.454,
+    "report": "docs-map-01.json",
+    "reportSha256": "9b9f9d180cc7ec4c563138b066ababf54febc47969357e2e2588d3612c2ff1c9"
+  },
+  {
+    "argv": [
+      "<documentation-binary>",
+      "check",
+      "--project",
+      ".",
+      "--json"
+    ],
+    "binarySha256": "27c72b6a18f53ced911372dd311914b898d07fdd5e8cb1ef89d789373fec3d60",
+    "exitCode": 0,
+    "durationSeconds": 0.547,
+    "report": "docs-check-01.json",
+    "reportSha256": "80ca88fb26e82f7207cd5c384e49a7e2a0a6e9e0b5c16c03ff72f922a3e0e0be"
+  }
+]

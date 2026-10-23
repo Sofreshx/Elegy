@@ -25,25 +25,25 @@ test_review_binds_the_actual_question_and_context (test_evidence_binding.Evidenc
 ERROR: test_bindings_require_exact_inputs_and_unchanged_client (test_assess.AssessTests.test_bindings_require_exact_inputs_and_unchanged_client)
 ----------------------------------------------------------------------
 Traceback (most recent call last):
-  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\stored-version-qualification-2026-10-23\test_assess.py", line 78, in test_bindings_require_exact_inputs_and_unchanged_client
+  File "<local-path>", line 78, in test_bindings_require_exact_inputs_and_unchanged_client
     manifest = assess.expected_manifest_bindings("answers-primary", protocol, subject)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\stored-version-qualification-2026-10-23\assess.py", line 51, in expected_manifest_bindings
+  File "<local-path>", line 51, in expected_manifest_bindings
     expected = campaign_hashes(Q2, corpus_path(phase), PROTOCOL, replay)
                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\answer-grounding-2026-10-23\qualification_runner.py", line 68, in campaign_hashes
+  File "<local-path>", line 68, in campaign_hashes
     hashes["replayRunSha256"] = sha(replay_path)
                                 ^^^^^^^^^^^^^^^^
-  File "D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory\evidence\answer-grounding-2026-10-23\run_replay.py", line 19, in sha
+  File "<local-path>", line 19, in sha
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
                           ^^^^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\User\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1019, in read_bytes
+  File "<local-path>", line 1019, in read_bytes
     with self.open(mode='rb') as f:
          ^^^^^^^^^^^^^^^^^^^^
-  File "C:\Users\User\AppData\Local\Programs\Python\Python312\Lib\pathlib.py", line 1013, in open
+  File "<local-path>", line 1013, in open
     return io.open(self, mode, buffering, encoding, errors, newline)
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-FileNotFoundError: [Errno 2] No such file or directory: 'D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\plugins\\memory\\evidence\\stored-version-qualification-2026-10-23\\replay-primary\\run.json'
+FileNotFoundError: [Errno 2] No such file or directory: '<local-path>'
 
 ----------------------------------------------------------------------
 Ran 20 tests in 34.759s

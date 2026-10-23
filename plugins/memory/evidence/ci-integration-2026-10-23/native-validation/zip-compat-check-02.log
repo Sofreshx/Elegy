@@ -1,0 +1,5 @@
+observed-summary-not-raw=true
+command=cargo check --locked -p elegy-tooling -p elegy-plugin-sdk -p elegy-core -p elegy-accounts
+exitCode=0
+result=Finished dev profile; four requested packages checked successfully.
+rawLogAvailable=false

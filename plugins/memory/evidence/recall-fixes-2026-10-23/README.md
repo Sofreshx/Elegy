@@ -139,3 +139,7 @@ automatique de l'application. Aucune économie, amélioration globale ou garanti
 d'autonomie n'est déduite de cet échantillon. Le cas à 66 secondes est conservé ;
 les durées incluent le démarrage complet du client et ne mesurent pas uniquement
 le rappel. Les coûts monétaires ne sont pas mesurés.
+
+## Copies publiques de journaux
+
+Trois copies de logs Q1/Q6 contenant des chemins locaux sont neutralisées après la première CI de PR49. Les résultats, réponses, protocoles, reçus et leurs entrées scellées ne changent pas. Les anciens manifestes décrivent le snapshot original du commit `a753b4b5f4bddf553a5b11255b3532957291d9c2`, et non ces trois dérivés publics. Le [registre de neutralisation](../ci-integration-2026-10-23/redactions.json) lie les objets Git originaux, leurs SHA-256, les nouveaux octets et la transformation reproductible. Les erreurs initiales restent visibles.

@@ -1,0 +1,24 @@
+{
+  "argv": [
+    "<python>",
+    "-O",
+    "plugins\\memory\\evidence\\ci-integration-2026-10-23\\capture_source.py",
+    "0000000000000000000000000000000000000000"
+  ],
+  "exitCode": 1,
+  "explicitGuardRejected": true,
+  "sourceLockCreated": false,
+  "scriptSha256": "c0e6fb460c97e95e8480e718fcc5c71983cab3f1e2c7bb4210fd6d2095603d19",
+  "reason": "Wrong source revision must fail even when Python assertions are disabled.",
+  "dirtySourceCheck": {
+    "argv": [
+      "<python>",
+      "-O",
+      "plugins/memory/evidence/ci-integration-2026-10-23/capture_source.py",
+      "a753b4b5f4bddf553a5b11255b3532957291d9c2"
+    ],
+    "exitCode": 1,
+    "explicitGuardRejected": true,
+    "sourceLockCreated": false
+  }
+}

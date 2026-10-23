@@ -1,0 +1,6 @@
+=== COMMAND ===
+["<python>", "plugins/memory/evidence/ci-integration-2026-10-23/sanitize_evidence.py"]
+=== STDOUT ===
+{"status":"verified","files":3}
+
+=== STDERR ===

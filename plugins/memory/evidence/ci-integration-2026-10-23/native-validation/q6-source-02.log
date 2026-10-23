@@ -1,0 +1,6 @@
+=== COMMAND ===
+["<python>", "plugins/memory/evidence/stored-version-qualification-2026-10-23/verify_source.py", "--with-binaries"]
+=== STDOUT ===
+{"binaries": "passed", "cliSourceSha256": "1fe80e6ccdd04e20e64d1647758b1fd5209f81a1ae1afc779e1d5c2ffea598bc", "mcpSourceFiles": 18, "productSourceRevision": "95bf15ba2afa8e7655c45a8127b6a060893b695a", "sourceFiles": 149, "status": "passed"}
+
+=== STDERR ===

@@ -5404,6 +5404,7 @@ fn write_plugin_archive(
     })?;
     let mut zip_writer = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
+        .system(zip::System::Unix)
         .compression_method(zip::CompressionMethod::Deflated);
     let mut buffer = Vec::new();
     for (entry_path, relative_str) in &entries {
@@ -5618,6 +5619,7 @@ pub fn pack_plugin_v1_with_binary(
 
     let mut zip_writer = zip::ZipWriter::new(file);
     let options = zip::write::SimpleFileOptions::default()
+        .system(zip::System::Unix)
         .compression_method(zip::CompressionMethod::Deflated);
 
     let mut buffer = Vec::new();
@@ -6619,7 +6621,7 @@ mod tests {
         import_codex_plugin_v1, import_codex_plugin_v3, inspect_plugin_v1,
         is_safe_package_relative_path, load_capability_catalog,
         migrate_capability_catalog_v1_to_v2, pack_plugin_v1, pack_plugin_v1_with_binary,
-        pack_plugin_v3, project_codex_plugin_v3, select_marketplace_artifact,
+        pack_plugin_v3_with_binary, project_codex_plugin_v3, select_marketplace_artifact,
         validate_elegy_capability_catalog_v1, validate_elegy_capability_catalog_v2,
         validate_elegy_marketplace_v1, validate_elegy_marketplace_v2, validate_elegy_plugin_v1,
         validate_elegy_plugin_v3, verify_plugin_v1, verify_plugin_v3, AuthorMcpDescriptorRequest,
@@ -8333,7 +8335,13 @@ mod tests {
         let mut zip = zip::ZipArchive::new(file).expect("read archive");
         let mut names = Vec::new();
         for i in 0..zip.len() {
-            names.push(zip.by_index(i).expect("zip entry").name().to_string());
+            names.push(
+                zip.by_index(i)
+                    .expect("zip entry")
+                    .name()
+                    .expect("zip entry name")
+                    .into_owned(),
+            );
         }
         names.sort();
 
@@ -9538,12 +9546,28 @@ mod tests {
         let plugin = repo.join("plugins/accounts");
         let temp = unique_temp_dir("pack-plugin-v3");
         let archive = temp.join("accounts.zip");
+        let binary = temp.join("accounts.exe");
+        fs::write(&binary, b"binary-bytes").expect("write binary");
 
-        pack_plugin_v3(&plugin, &archive).expect("pack v3");
+        pack_plugin_v3_with_binary(
+            &plugin,
+            &archive,
+            Some(PluginArchiveBinary {
+                source_path: &binary,
+                archive_path: "bin/accounts.exe".to_string(),
+            }),
+        )
+        .expect("pack v3");
         let file = fs::File::open(&archive).expect("open archive");
         let mut zip = zip::ZipArchive::new(file).expect("read archive");
         let names = (0..zip.len())
-            .map(|index| zip.by_index(index).expect("zip entry").name().to_string())
+            .map(|index| {
+                zip.by_index(index)
+                    .expect("zip entry")
+                    .name()
+                    .expect("zip entry name")
+                    .into_owned()
+            })
             .collect::<Vec<_>>();
         assert!(names.iter().any(|name| name == "plugin.json"));
         assert!(names.iter().any(|name| name == "capability-catalog.json"));
@@ -9551,6 +9575,20 @@ mod tests {
             .iter()
             .any(|name| name == "ui/account-center/index.html"));
         assert!(names.iter().any(|name| name == "providers/google.json"));
+        assert_eq!(
+            zip.by_name("bin/accounts.exe")
+                .expect("binary entry")
+                .unix_mode()
+                .map(|mode| mode & 0o777),
+            Some(0o755)
+        );
+        assert_eq!(
+            zip.by_name("plugin.json")
+                .expect("manifest entry")
+                .unix_mode()
+                .map(|mode| mode & 0o777),
+            Some(0o644)
+        );
         fs::remove_dir_all(temp).ok();
     }
 }
