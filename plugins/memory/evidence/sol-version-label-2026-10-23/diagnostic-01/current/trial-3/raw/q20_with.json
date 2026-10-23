@@ -1,0 +1,43 @@
+{
+  "answer": "La région de production Vesper-West est REGION_AMBER. Le tag de rollback renseigné est ROLLBACK_CEDRAN ; son approbation actuelle n’est pas précisée.",
+  "threadId": "01a1681a-63c2-7290-8b3e-026a1ab0e15b",
+  "usage": {
+    "input_tokens": 26525,
+    "cached_input_tokens": 21504,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 400,
+    "reasoning_output_tokens": 355
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1681a-63c2-7290-8b3e-026a1ab0e15b\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La région de production Vesper-West est REGION_AMBER. Le tag de rollback renseigné est ROLLBACK_CEDRAN ; son approbation actuelle n’est pas précisée.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":26525,\"cached_input_tokens\":21504,\"cache_write_input_tokens\":0,\"output_tokens\":400,\"reasoning_output_tokens\":355}}\n",
+  "stderr": "2026-10-23T09:32:02.385935Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q20",
+  "arm": "with",
+  "startedAt": "2026-10-23T09:32:01.983140+00:00",
+  "completedAt": "2026-10-23T09:32:19.560120+00:00",
+  "elapsedMs": 17576.308,
+  "promptSha256": "891b0d94f3da11346dcd1e10c55b09b7d8d50ce726300a58f118a2c348090824",
+  "configurationSha256": "ac7fdef380763850e5f8f74ff16c5a478164d065cb4c1fc8c2e701507aeecec6",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-6.1-sol",
+    "-c",
+    "model_reasoning_effort=\"max\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

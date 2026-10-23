@@ -258,3 +258,31 @@ lexical rubric unchanged; the q20 mixed-data rule must be frozen prospectively.
 If this single-factor diagnostic fails, stop promoting prefix-only changes and
 reassess the answer boundary. Push/merge remain blocked until applicable gates
 are genuinely met; user authorization remains valid.
+
+### Diagnostic result and fixture adequacy repair
+
+Q4 completed42 fresh threads with consistent bindings, then failed its own gate:
+candidate20/21, current19/21. q08 is complete3/3 under the candidate versus1/3
+under the current label. Both current failures falsely deny the supplied11-day
+retention. Candidate q20/trial2 instead gives region plus honest unknown approval
+but omits the stored tag. All6 q20 outputs correctly decline undocumented current
+approval. Q4 remains rejected; no product edit follows from treating20/21 as21/21.
+
+The fixture mixes a stored tag with an absent approval attribute. Prospectively
+split those demands: v2 q20 asks the stored region/tag, with original actions and
+expected values unchanged; new q25 explicitly asks whether approval is documented
+and requires abstention. All24 other original questions and the12 transfer cases
+stay unchanged. The new control adds no stored fact and forbids inventing approval.
+This is an adequacy correction, not a retrospective rerating of Q3/Q4.
+
+Freeze12 new simulated contexts, q20v2/q25 three times under each unchanged Q4
+prefix. Use the same exact Q3 Vesper JSON body and client/model/configuration.
+Require all6 candidate outputs grounded, complete and control/format-correct;
+report all6 current outputs without requiring a current failure in this fixture
+follow-up. The q08 comparison stays Q4's separate finite evidence. If supported,
+apply only the candidate label/spec with an observed failing envelope regression,
+commit/build fresh binaries, then run84 actual contexts:25 primary pairs,12
+transfer pairs,10 critical repeats. All37 with-recall questions and all repeats
+must pass; without-recall abstention and completeness remain separate. Stop on
+new unsupported conclusions or missing available facts; do not tune another
+prefix variant or hide the rejected comparison.
