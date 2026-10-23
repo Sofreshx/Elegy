@@ -1,0 +1,9 @@
+{
+  "argv": "cargo test --offline --locked --target-dir D:/Projets/Elegy/target/qualification-oct23 -p elegy-memory-mcp",
+  "exit": 0,
+  "duration_seconds": 811.126,
+  "test_result_lines": 11,
+  "tests_passed": 67,
+  "tests_failed": 0,
+  "log": "plugins/memory/evidence/recall-fixes-2026-10-23/runtime/full-validation/02-cargo-test-elegy-memory-mcp.log"
+}

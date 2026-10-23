@@ -65,6 +65,8 @@ class FixtureHandler(http.server.BaseHTTPRequestHandler):
         try:
             payload = json.loads(body.decode("utf-8"))
             inputs = payload.get("input")
+            if isinstance(inputs, str):
+                inputs = [inputs]
             if not isinstance(inputs, list) or not all(isinstance(item, str) for item in inputs):
                 raise ValueError("embedding input must be a list of strings")
         except (ValueError, json.JSONDecodeError) as exc:
@@ -214,6 +216,7 @@ def _main_impl(args: argparse.Namespace, output: Path, report: dict[str, Any]) -
             with sqlite3.connect(seed_db) as connection:
                 connection.execute("UPDATE memories SET agent_id='other-agent' WHERE content LIKE 'Cobalt %'")
                 connection.commit()
+            connection.close()
 
         with socketserver.ThreadingTCPServer(("127.0.0.1", 0), FixtureHandler) as server:
             server.daemon_threads = True

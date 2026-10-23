@@ -1,0 +1,9 @@
+home       <user-home>
+data       <isolated-host-state>\xdg_data_home\opencode
+bin        <isolated-host-state>\xdg_cache_home\opencode\bin
+log        <isolated-host-state>\xdg_data_home\opencode\log
+repos      <isolated-host-state>\xdg_data_home\opencode\repos
+cache      <isolated-host-state>\xdg_cache_home\opencode
+config     <isolated-host-state>\xdg_config_home\opencode
+state      <isolated-host-state>\xdg_state_home\opencode
+tmp        <user-home>\AppData\Local\Temp\opencode

@@ -1,0 +1,44 @@
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 4.70s
+     Running `D:/Projets/Elegy/target/qualification-oct23\debug\elegy-contracts.exe --project . contracts validate`
+{
+  "compatibility": {
+    "message": "compatibility manifest not found: failed to read D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\manifests\\compatibility-manifest.json: The system cannot find the path specified. (os error 3)",
+    "status": "warning"
+  },
+  "export": {
+    "archivePath": null,
+    "files": [
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\mcp\\fixtures\\mcp-analysis-result.parity.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\mcp\\fixtures\\mcp-server-descriptor.parity.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\fixtures\\contextual-recall-config.disabled.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\fixtures\\eval\\contextual-recall-v1.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\fixtures\\eval\\gate-decisions-v1.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\fixtures\\eval\\golden-v1.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\fixtures\\summary-only-session-context-envelope.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\schemas\\contextual-recall-config.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\schemas\\qualification-observation.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\memory\\schemas\\summary-only-session-context-envelope.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\observe\\fixtures\\observation-event.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\observe\\fixtures\\observation-session.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\observe\\fixtures\\observation-summary.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\observe\\schemas\\observation-session.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\planning\\schemas\\orchestrator-dispatch.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\planning\\schemas\\orchestrator-worker-result.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\planning\\schemas\\planning-manifest.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\plugins\\planning\\schemas\\planning-result.schema.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\agent-capability-profile.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\agent-event-envelope.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\agent-request-envelope.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\agent-response-envelope.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\execution-event.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\invocation-request.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\invocation-response.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\mcp-analysis-result.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\mcp-server-descriptor.minimal.json",
+      "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts\\shared\\core\\fixtures\\structured-failure.minimal.json"
+    ],
+    "outputPath": "D:\\Projets\\Elegy\\.tmp\\llm-work\\memory-fixes\\shared\\core\\..\\..\\artifacts\\contracts",
+    "packageVersion": "1.0.0",
+    "schemaVersion": "1.0.0"
+  }
+}

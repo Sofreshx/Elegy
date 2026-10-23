@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "memory-review-record/v1",
+  "staticCodeReview": {
+    "reviewer": "Independent native reviewer",
+    "status": "approved",
+    "base": "619f5dd705e6383a12b7d806369633df291fc1a3",
+    "productSourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
+    "scope": [
+      "recall tokenizer and delivered text scorer",
+      "SQLite access filters and normalization order",
+      "hybrid/vector and ordinary search distinction",
+      "snapshot transaction and source invariant",
+      "regression tests/spec/plan"
+    ],
+    "materialFindings": [],
+    "limits": "Static inspection only; native execution recorded separately."
+  },
+  "semanticReview": {
+    "status": "needs-revision",
+    "answersInspected": 58,
+    "failedCases": [
+      "q08",
+      "q09",
+      "q11"
+    ],
+    "detail": "Safe abstention in without arms is not counted as full completion when required facts are absent. This distinction corrects the reviewer shorthand."
+  }
+}

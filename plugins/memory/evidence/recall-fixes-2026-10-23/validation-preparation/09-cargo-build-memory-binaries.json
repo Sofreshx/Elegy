@@ -1,0 +1,7 @@
+{
+  "argv": "cargo build --offline --locked --target-dir D:/Projets/Elegy/target/qualification-oct23 -p elegy-memory -p elegy-memory-mcp --bin elegy-memory --bin elegy-memory-mcp-stdio",
+  "note": "Blocked waiting for file lock on build directory; interrupted after confirmed stall.",
+  "file": "09-cargo-build-memory-binaries",
+  "status": "TIMEOUT",
+  "exit": 1
+}

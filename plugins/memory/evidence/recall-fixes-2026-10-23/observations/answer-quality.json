@@ -1,0 +1,386 @@
+{
+  "schemaVersion": "memory-observation/v1",
+  "claimId": "recall.answer-quality",
+  "protocolVersion": 1,
+  "subject": {
+    "artifactSha256": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+    "host": "Installed Codex CLI; explicit isolated Memory replay packets; lexical mode",
+    "hostVersion": "codex-cli 0.163.0-alpha.11",
+    "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888"
+  },
+  "sessions": [
+    "01a1671b-6503-74e0-9fed-bde62e312188",
+    "01a1671b-4783-7992-90de-a0796eb962e4",
+    "01a1671b-4790-7002-a099-008651979311",
+    "01a1671b-6c8f-78d2-8cea-705ac0c27c21",
+    "01a1671b-667f-7f30-8cc0-7ba12c276e01",
+    "01a1671b-4790-7120-b383-8feeeee7c449",
+    "01a1671b-7e82-7f72-b673-8b1efdd0b4ba",
+    "01a1671b-9ce1-7cf1-ada5-f748b4633aa4",
+    "01a1671b-9dbe-74e1-b54b-9b01d672ff34",
+    "01a1671b-803b-7023-a9c4-bc5804621602",
+    "01a1671b-85d6-7b13-8d87-94b091f4050c",
+    "01a1671c-876a-75e0-8c65-ce32fe7cc9f3",
+    "01a1671b-eea2-79e3-887d-7b2442a451ac",
+    "01a1671b-b8d5-79a3-8f80-fdf1496e37c8",
+    "01a1671b-b891-73c0-8cf1-c26662797478",
+    "01a1671b-eea5-77d1-b390-7f12d9344986",
+    "01a1671c-343f-7672-bee7-1f8b144fad01",
+    "01a1671c-148e-78b3-9aef-5cb097482ccd",
+    "01a1671c-16a3-70f0-a8dd-ced4a087ca73",
+    "01a1671c-3603-70f3-8986-3bff9745cf73",
+    "01a1671c-6e23-7a82-999b-9e17d2eb7d86",
+    "01a1671c-52b5-7072-8887-c8db196cbb10",
+    "01a1671c-58f6-7b40-8cf8-60369cdfaeeb",
+    "01a1671c-739b-77d2-abda-179acdcbc391",
+    "01a1671c-a886-7d90-962e-6e117dcc4bee",
+    "01a1671c-8a6b-7641-babd-ab6eb649e5a5",
+    "01a1671c-903d-74a2-84b5-49c0e578e570",
+    "01a1671c-aec1-7320-93c4-2578b2844951",
+    "01a1671c-c400-7a93-9307-dd112a165840",
+    "01a1671c-a4e0-7940-bc50-3da84e174e8b",
+    "01a1671c-c85f-7013-a185-6217b5ebf3dc",
+    "01a1671c-e3e3-70e2-8e68-c87a4b4faef1",
+    "01a1671c-eef3-70b1-af37-40ea632e003d",
+    "01a1671c-ca87-7ec2-9b90-76d1e007fd56",
+    "01a1671c-e372-7bc3-be2c-613dbe802323",
+    "01a1671d-0374-7253-b0f5-34484edc5b81",
+    "01a1671d-21c4-7073-9883-fd4de236dc89",
+    "01a1671d-0372-7312-915c-70a6996eb970",
+    "01a1671d-1490-7492-bc07-b3f8601bf9de",
+    "01a1671d-32ba-7751-ac27-c44e09008111",
+    "01a1671d-47f4-7050-842c-9353880ea4f4",
+    "01a1671d-28c3-73f0-a3f2-aa011cb5f0cd",
+    "01a1671d-43ef-7572-beb5-06486446e3af",
+    "01a1671d-6354-7cd1-821a-be9ce67d22a8",
+    "01a1671d-6f9f-7782-9e47-3f27e1bad15f",
+    "01a1671d-4ef7-7540-b6ca-ec338e7f0c02",
+    "01a1671d-6690-7af3-b0b0-30d74703c75c",
+    "01a1671d-83b5-7fa3-b4aa-0e8ae93b8585",
+    "01a16724-fdd7-70c0-84f5-758444c108da",
+    "01a16725-0003-71f1-932a-5baf197508e1",
+    "01a16724-feed-7593-a15b-8bbba68bbde4",
+    "01a16725-2103-7b10-a760-85977d883d81",
+    "01a16725-23dd-79d2-a0e7-6e4b91751827",
+    "01a16725-2574-7151-b9b2-9473d6b7407d",
+    "01a16725-410a-79f2-b4da-ec2855e9ec9f",
+    "01a16725-48f3-7663-96b6-d12f95e5671c",
+    "01a16725-4a8b-7e22-b27c-2fd1e6a6e57d",
+    "01a16725-658f-7230-af78-a1b74c89b4a7"
+  ],
+  "startedAt": "2026-10-23T04:53:20.801269+00:00",
+  "completedAt": "2026-10-23T05:04:34.129687+00:00",
+  "checks": [
+    {
+      "name": "paired-inputs",
+      "passed": true,
+      "detail": "24 questions / 48 fresh contexts; same instruction and question, only exact additionalContext differs. Ten extra target contexts retained separately."
+    },
+    {
+      "name": "fixed-model-config",
+      "passed": true,
+      "detail": "Same installed client/configuration SHA, gpt-5.6-luna / medium in all 58 contexts. Backend and temperature unsealed."
+    },
+    {
+      "name": "predeclared-rubric",
+      "passed": true,
+      "detail": "Frozen corpus and lexical rubric; five cases require all three realizations. No answer replacement or tuning after observation."
+    },
+    {
+      "name": "independent-scoring",
+      "passed": true,
+      "detail": "Offline lexical scoring plus independent semantic review of all 58 actual answers, with task completion separated from safe abstention."
+    },
+    {
+      "name": "negative-controls",
+      "passed": false,
+      "detail": "q09 substitutes a runbook for an unknown backup identifier in all three realizations. q08/q11 omit present facts on three trials. Harbor q17/q18, hostile, foreign-owner, current-override and deletion controls pass within this finite sample."
+    }
+  ],
+  "evidence": [
+    {
+      "path": "protocol.json",
+      "sha256": "58f9c5c1c614480f01646fef0d543401bf45d52e265da4286e032c80c31eac8a"
+    },
+    {
+      "path": "corpus.json",
+      "sha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b"
+    },
+    {
+      "path": "subject.json",
+      "sha256": "6910f9495d474b8ff36c6a2ccd1861cdbc13a60f6d3cb9b74f09b0b0eba94c54"
+    },
+    {
+      "path": "source-lock.json",
+      "sha256": "6c27a0c675ec6d642fc92535c64ca6f0ce897849bf21f7d2b08d00f003c525fe"
+    },
+    {
+      "path": "assessment.json",
+      "sha256": "2bed4cc92fd2a5e1b2670a5b5fb5f189afcd8684f40e0182bf41b4ea75f4081f"
+    },
+    {
+      "path": "semantic-review.json",
+      "sha256": "7f5e7a855f4a5b2a0d761b2bbb54602861dfe01ba7b931c3f796568adcefd7e2"
+    },
+    {
+      "path": "verdicts.json",
+      "sha256": "3b93c0211197167e28f310da7afe161dd581316d7a1466ecd819e99d821f8494"
+    },
+    {
+      "path": "repeats-01/run.json",
+      "sha256": "f25fb2661d0612588678b64b9fe8bc4f6f80569cec2cfc0f2e13552681aac321"
+    },
+    {
+      "path": "answers-01/run.json",
+      "sha256": "e149f73962847c4dec1c8c93080071e28735cf46868a0efc657e995dc7c0fc85"
+    },
+    {
+      "path": "replay-01/run.json",
+      "sha256": "1ce2851e158b7e3bc6cfa630daa921f7d4a04ae5d08e515837dd0df7618828aa"
+    },
+    {
+      "path": "packet-checks.json",
+      "sha256": "0b7896097978129c6a77509afd03815382a4eb85cfc016f131168d12723b743d"
+    },
+    {
+      "path": "compatibility-02/run.json",
+      "sha256": "6f9b12dc1bcfd5c3a73a704807305f470a9cc6f49909a3ef68458e34824e7749"
+    },
+    {
+      "path": "second-host-summary.json",
+      "sha256": "e55a92bd005f165f053dd0043d2f240b8e82f8ccd41a1219267bca51de3958c0"
+    },
+    {
+      "path": "second-host-02/run.json",
+      "sha256": "a0f88d272abde2f25c47a5886b3bcb1d089cf7b6cd9dedf96d659b17b7e3d7a4"
+    },
+    {
+      "path": "evidence-manifest.json",
+      "sha256": "7efeed1d07143f046adbbf1e17c0339f26e8e347b1f066524cd66d533778d087"
+    },
+    {
+      "path": "check_results.py",
+      "sha256": "5a82d1b100ca42eea7267ca81cd0dfdc5048f183515e924808c144863b3bab5a"
+    }
+  ],
+  "pairedCases": [
+    {
+      "id": "q01",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 6337.158,
+      "latencyWithoutMs": 8194.975,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q02",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 9747.633,
+      "latencyWithoutMs": 6657.539,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q03",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.5,
+      "latencyWithMs": 6400.185,
+      "latencyWithoutMs": 8553.737,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q04",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7698.132,
+      "latencyWithoutMs": 6509.982,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q05",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 6738.919,
+      "latencyWithoutMs": 7703.378,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q06",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 66040.312,
+      "latencyWithoutMs": 7407.144,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q07",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 14091.445,
+      "latencyWithoutMs": 10652.671,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q08",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 11455.778,
+      "latencyWithoutMs": 12336.74,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q09",
+      "scoreWith": 0.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 7808.397,
+      "latencyWithoutMs": 7889.693,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q10",
+      "scoreWith": 0.6666666666666666,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 7924.874,
+      "latencyWithoutMs": 8134.849,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q11",
+      "scoreWith": 0.6666666666666666,
+      "scoreWithout": 0.3333333333333333,
+      "latencyWithMs": 7166.771,
+      "latencyWithoutMs": 7047.869,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q12",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 6836.179,
+      "latencyWithoutMs": 7340.697,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q13",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7516.131,
+      "latencyWithoutMs": 7601.515,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q14",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7149.657,
+      "latencyWithoutMs": 7284.998,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q15",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 8380.199,
+      "latencyWithoutMs": 7503.885,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q16",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7483.411,
+      "latencyWithoutMs": 8039.938,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q17",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 9844.735,
+      "latencyWithoutMs": 9167.675,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q18",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 8205.459,
+      "latencyWithoutMs": 9646.996,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q19",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 8172.193,
+      "latencyWithoutMs": 7598.189,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q20",
+      "scoreWith": 1.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7664.973,
+      "latencyWithoutMs": 7282.254,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q21",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 7444.846,
+      "latencyWithoutMs": 7882.76,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q22",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 8453.84,
+      "latencyWithoutMs": 7095.699,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q23",
+      "scoreWith": 1.0,
+      "scoreWithout": 1.0,
+      "latencyWithMs": 7325.376,
+      "latencyWithoutMs": 8376.764,
+      "costWith": 0,
+      "costWithout": 0
+    },
+    {
+      "id": "q24",
+      "scoreWith": 0.0,
+      "scoreWithout": 0.0,
+      "latencyWithMs": 7529.117,
+      "latencyWithoutMs": 7425.41,
+      "costWith": 0,
+      "costWithout": 0
+    }
+  ],
+  "costUnit": "paid-api-calls",
+  "error": "Quality acceptance failed: q08, q09 and q11 do not pass every retained realization. Keep the observation inconclusive and block push/merge; no global reliability or efficiency claim."
+}

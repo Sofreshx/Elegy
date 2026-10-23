@@ -1,0 +1,43 @@
+{
+  "answer": "Le runbook et la rétention corrigée des sauvegardes Ares ne sont pas disponibles dans les données fournies. Je ne peux donc pas les rappeler de façon fiable.",
+  "threadId": "01a1671b-eea5-77d1-b390-7f12d9344986",
+  "usage": {
+    "input_tokens": 20520,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 75,
+    "reasoning_output_tokens": 33
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1671b-eea5-77d1-b390-7f12d9344986\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"Le runbook et la rétention corrigée des sauvegardes Ares ne sont pas disponibles dans les données fournies. Je ne peux donc pas les rappeler de façon fiable.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20520,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":75,\"reasoning_output_tokens\":33}}\n",
+  "stderr": "2026-10-23T04:54:06.260145Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n2026-10-23T04:54:08.565328Z ERROR codex_models_manager::manager: failed to refresh available models: request timed out\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q08",
+  "arm": "without",
+  "startedAt": "2026-10-23T04:54:03.170490+00:00",
+  "completedAt": "2026-10-23T04:54:15.506934+00:00",
+  "elapsedMs": 12336.74,
+  "promptSha256": "ddb85321e7d4e90e7809d69c39009b57c4e4d9ea6b025c587f382d4b9c69ad32",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

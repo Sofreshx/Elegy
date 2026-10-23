@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "memory-recall-fix-subject/v1",
+  "sourceRevision": "b828223bd9897c559a4ed9ed39f3c17f34284033",
+  "evidencePreparationRevision": "1d71d3c",
+  "sourceLockSha256": "6c27a0c675ec6d642fc92535c64ca6f0ce897849bf21f7d2b08d00f003c525fe",
+  "cliSourceSha256": "52f9318b24099cdafb5a7aca6ec1dbac16cf5e6dd05f1352b72801ec9ebece70",
+  "cliSha256": "4f6fdaa80b0c8809af8b217a786232b0d71cfa30f5130f0fc1323e1513cae833",
+  "mcpSha256": "d93610c224af1549708bc7f3fff2b51b9b4601bc4bfc480fdf0588748ba86f93",
+  "buildMatchesSource": true,
+  "memoryVersion": "0.1.0",
+  "corpusSha256": "19b9f8ca683f778ab16ff27f966774b6adbb667d4f5270dd3df5c5fc80fa7a5b",
+  "protocolSha256": "58f9c5c1c614480f01646fef0d543401bf45d52e265da4286e032c80c31eac8a",
+  "buildProvenance": "Completed Cargo test builds in this isolated source checkout; pinned source fingerprint verified by eval status and immutable executable copies hashed before/copy/after. Full native validation is recorded separately; no suite pass is inferred here.",
+  "limits": "Model aliases/backend unsealed; one installed software host; lexical mode; complete context cap600; synthetic explicit ingestion and fresh processes, not unattended daily usage."
+}

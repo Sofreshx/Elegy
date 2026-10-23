@@ -1,0 +1,15 @@
+{
+  "schemaVersion": "memory-harness-review/v1",
+  "status": "addressed",
+  "readOnlyReviewRounds": 2,
+  "findingsAddressed": [
+    "Format errors explicitly block target acceptance.",
+    "Compatibility ties old/new executable hashes to subjects and verifies exact named checks plus raw search/vector/hybrid projections.",
+    "Executed second-host runner and catalog retained; captured text hashes and summary are verified.",
+    "Verifier emits failure artifacts on exceptions; future host probes preserve early failures without overwriting an existing run.",
+    "Git source comparison distinguishes raw checkout binding from CRLF/LF conversion and uses one cat-file batch."
+  ],
+  "execution": "Offline verifier reproduces saved primary/repeated results and expected adverse acceptance; no new model calls.",
+  "limitations": "Evidence verification is not tamper-proof attestation. Compatibility source snapshots are assertions of the recorded producing script; replay preserves before/after durable hashes separately.",
+  "pythonCompileFileCount": 12
+}

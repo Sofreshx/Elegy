@@ -1,0 +1,7 @@
+{
+  "argv": "cargo clippy --offline --locked --target-dir D:/Projets/Elegy/target/qualification-oct23 -p elegy-memory --all-targets -- -D warnings",
+  "note": "Blocked waiting for file lock on build directory; interrupted after confirmed stall.",
+  "file": "03-cargo-clippy-elegy-memory",
+  "status": "TIMEOUT",
+  "exit": 1
+}

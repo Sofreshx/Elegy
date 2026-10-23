@@ -1,0 +1,19 @@
+{
+  "schemaVersion": "memory-recall-fix-packet-check/v1",
+  "status": "passed",
+  "sameRecordFieldsAndOrder": {
+    "q08": true,
+    "q11": true
+  },
+  "harborSelectionCorrected": [
+    "q17",
+    "q18"
+  ],
+  "hostileActuallyRecalled": true,
+  "foreignSecretNotRecalled": true,
+  "deletedRecordNotRecalled": true,
+  "episodes": 8,
+  "stages": 24,
+  "newAndOldSourceInvariants": 48,
+  "allSyntheticNamespacesCleaned": true
+}

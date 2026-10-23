@@ -1,0 +1,43 @@
+{
+  "answer": "L’identifiant précis disponible pour les sauvegardes Ares est `BACKUP_COPAL`. Le jeu de sauvegarde exact à restaurer pour cet incident non documenté n’est pas disponible.",
+  "threadId": "01a1671c-343f-7672-bee7-1f8b144fad01",
+  "usage": {
+    "input_tokens": 20706,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 169,
+    "reasoning_output_tokens": 123
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1671c-343f-7672-bee7-1f8b144fad01\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"L’identifiant précis disponible pour les sauvegardes Ares est `BACKUP_COPAL`. Le jeu de sauvegarde exact à restaurer pour cet incident non documenté n’est pas disponible.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20706,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":169,\"reasoning_output_tokens\":123}}\n",
+  "stderr": "2026-10-23T04:54:24.082419Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q09",
+  "arm": "with",
+  "startedAt": "2026-10-23T04:54:23.634085+00:00",
+  "completedAt": "2026-10-23T04:54:31.442601+00:00",
+  "elapsedMs": 7808.397,
+  "promptSha256": "3b042a3b536857977d752496095b1fc96560aac72ee8396fff2ab206d2a921f3",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

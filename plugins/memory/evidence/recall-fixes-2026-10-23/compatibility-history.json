@@ -1,0 +1,20 @@
+{
+  "schemaVersion": "memory-compatibility-harness-history/v1",
+  "attempts": [
+    {
+      "path": "compatibility-01/run.json",
+      "status": "failed",
+      "harnessRevision": "1d71d3c",
+      "cause": "Local stub rejected legal string embedding input; Python SQLite connection context did not close file handle before temporary-directory cleanup. No product change."
+    },
+    {
+      "path": "compatibility-02/run.json",
+      "status": "passed",
+      "scriptSha256": "7003436b8c00344116efe38456c784b3d473edd7261bd64fe55cea53cb88bdb9",
+      "repair": "Normalize string/list input in localhost-only stub and explicitly close seed SQLite connection. Expected comparisons unchanged."
+    }
+  ],
+  "ordinarySearchComparison": "CLI projected id/preview/similarity/score; full seeded short content fits in preview. Not a general all-fields comparison.",
+  "modelAnswersRetuned": false,
+  "productRustChanged": false
+}

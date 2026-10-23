@@ -1,0 +1,8 @@
+{
+  "schemaVersion": "memory-validation-environment-incident/v1",
+  "pid": 18120,
+  "elapsedSeconds": 673.3586667,
+  "reason": "Confirmed stalled unit-test process: over 600 seconds, zero CPU delta, loopback listeners still waiting; fixture unbounded accept/join under restricted execution",
+  "action": "Stop only exact owned test binary; preserve logs; allow active builds to finish",
+  "priorReportCorrection": "Worker wrapper lost completion and left active children; file-lock messages alone were not a stall proof"
+}

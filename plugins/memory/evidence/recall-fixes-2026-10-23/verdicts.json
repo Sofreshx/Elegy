@@ -1,0 +1,503 @@
+{
+  "schemaVersion": "memory-recall-fix-acceptance/v1",
+  "status": "blocked",
+  "criterion": "Each of five target cases passes all three retained trials; no replacement or retuning.",
+  "executionErrors": [],
+  "cases": [
+    {
+      "caseId": "q08",
+      "passedTrials": 2,
+      "requiredTrials": 3,
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "passedTrials": 0,
+      "requiredTrials": 3,
+      "passed": false
+    },
+    {
+      "caseId": "q11",
+      "passedTrials": 1,
+      "requiredTrials": 3,
+      "passed": false
+    },
+    {
+      "caseId": "q17",
+      "passedTrials": 3,
+      "requiredTrials": 3,
+      "passed": true
+    },
+    {
+      "caseId": "q18",
+      "passedTrials": 3,
+      "requiredTrials": 3,
+      "passed": true
+    }
+  ],
+  "trials": [
+    {
+      "caseId": "q08",
+      "trial": "primary",
+      "score": 1.0,
+      "answer": "Le runbook Ares utilise `BACKUP_COPAL`. La rétention indiquée est de 11 jours.",
+      "rawPath": "answers-01/raw/q08_with.json",
+      "rawSha256": "c44b629bf2e9b0622cd71f838ae73c7ca96c2fd98ccf1a1b9acabb30d6abe816",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q08",
+      "trial": "trial-2",
+      "score": 0.5,
+      "answer": "Le runbook de sauvegarde Ares utilise `BACKUP_COPAL`. La rétention corrigée n’est pas disponible dans les informations fournies.",
+      "rawPath": "repeats-01/trial-2/raw/q08_with.json",
+      "rawSha256": "f2fcba73552a2fab53160d3972f305783b95fd5e2a80de3a848f5234d284b957",
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q08",
+      "trial": "trial-3",
+      "score": 1.0,
+      "answer": "Le runbook de sauvegarde Ares utilise `BACKUP_COPAL`. La rétention corrigée est de 11 jours.",
+      "rawPath": "repeats-01/trial-3/raw/q08_with.json",
+      "rawSha256": "10c868dc11362f1e12754386d09169648b505994f23063da98febb8c75e42b95",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q09",
+      "trial": "primary",
+      "score": 0.0,
+      "answer": "L’identifiant précis disponible pour les sauvegardes Ares est `BACKUP_COPAL`. Le jeu de sauvegarde exact à restaurer pour cet incident non documenté n’est pas disponible.",
+      "rawPath": "answers-01/raw/q09_with.json",
+      "rawSha256": "947f11e1dad67710b3ec8fa91c225b2477acdd94c7aee364fd57421fcc21caf9",
+      "missingGroups": [],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-2",
+      "score": 0.0,
+      "answer": "L’identifiant de sauvegarde Ares disponible est `BACKUP_COPAL`. Aucun identifiant spécifique à l’incident n’est documenté.",
+      "rawPath": "repeats-01/trial-2/raw/q09_with.json",
+      "rawSha256": "b72ccb4a876e0c6964cde141f41311f099fdefdbb51a2e6d21aecb0110996187",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-3",
+      "score": 0.0,
+      "answer": "L’identifiant précis de sauvegarde Ares à restaurer est `BACKUP_COPAL`.",
+      "rawPath": "repeats-01/trial-3/raw/q09_with.json",
+      "rawSha256": "4c8ad523b8da174412c3727605e7d7a088f20e68751840e5bd06b42182123a9d",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q11",
+      "trial": "primary",
+      "score": 0.6666666666666666,
+      "answer": "L’horaire UTC actualisé est inconnu ; le groupe à utiliser est OPS_IVORY.",
+      "rawPath": "answers-01/raw/q11_with.json",
+      "rawSha256": "894781170b7c80f58760885871ce0d2aeaab1bbed723ae99c98c2ce0998f45c2",
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q11",
+      "trial": "trial-2",
+      "score": 1.0,
+      "answer": "L’horaire UTC disponible est 14:50. Le groupe à utiliser est OPS_IVORY.",
+      "rawPath": "repeats-01/trial-2/raw/q11_with.json",
+      "rawSha256": "3d9143b7118c66ad7a7279cc0dfdc8626d25bcd9d6705ad26cb1f0c2f1524faf",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q11",
+      "trial": "trial-3",
+      "score": 0.6666666666666666,
+      "answer": "L’horaire UTC actualisé n’est pas disponible ; le groupe à utiliser est OPS_IVORY.",
+      "rawPath": "repeats-01/trial-3/raw/q11_with.json",
+      "rawSha256": "b68ad3f604ee07bbd5cd26551219771ef0759326f4206603bedf1d872e6b532d",
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q17",
+      "trial": "primary",
+      "score": 1.0,
+      "answer": "Pour Harbor, le TTL corrigé du replay cache est de 75 minutes et la stratégie de déduplication à appliquer est `REPLAY_PINE`.",
+      "rawPath": "answers-01/raw/q17_with.json",
+      "rawSha256": "ef9083fe3685f2e31e64500a2767de7ba29b0105f5633ed466c60d73497b8771",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q17",
+      "trial": "trial-2",
+      "score": 1.0,
+      "answer": "Pour Harbor, le TTL corrigé du replay cache est de 75 minutes et la stratégie à appliquer est `REPLAY_PINE`.",
+      "rawPath": "repeats-01/trial-2/raw/q17_with.json",
+      "rawSha256": "f72aa5f0c4dc5314e286e7b9b32f9e9f83e7531be1c5c3cecd8bf4eba40f0843",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q17",
+      "trial": "trial-3",
+      "score": 1.0,
+      "answer": "Pour la reprise Harbor, le TTL corrigé du replay cache est de 75 minutes. La stratégie de déduplication à appliquer est REPLAY_PINE.",
+      "rawPath": "repeats-01/trial-3/raw/q17_with.json",
+      "rawSha256": "8eced6c5e3f261760e6f6d34a7f38656866bf69ebd2d989bee67ed1c8269d828",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q18",
+      "trial": "primary",
+      "score": 1.0,
+      "answer": "Conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+      "rawPath": "answers-01/raw/q18_with.json",
+      "rawSha256": "f564a6a15b0dd7b885203d4a8bb06f305fe9aa556b058a7ddb1adb13f24e5d9a",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q18",
+      "trial": "trial-2",
+      "score": 1.0,
+      "answer": "Conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+      "rawPath": "repeats-01/trial-2/raw/q18_with.json",
+      "rawSha256": "53dfdedd7a4925d8bffd295bc4b4da59e0473c0a6f7e81a9306b539a34498646",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    },
+    {
+      "caseId": "q18",
+      "trial": "trial-3",
+      "score": 1.0,
+      "answer": "Dans Harbor, conserver les traces pendant 75 minutes et utiliser le mécanisme REPLAY_PINE.",
+      "rawPath": "repeats-01/trial-3/raw/q18_with.json",
+      "rawSha256": "f8adf00807ff491cf66016c732a5a2e4731dd924462e30abbb0f369c215c06b9",
+      "missingGroups": [],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": true
+    }
+  ],
+  "individualFailures": [
+    {
+      "caseId": "q08",
+      "trial": "trial-2",
+      "score": 0.5,
+      "answer": "Le runbook de sauvegarde Ares utilise `BACKUP_COPAL`. La rétention corrigée n’est pas disponible dans les informations fournies.",
+      "rawPath": "repeats-01/trial-2/raw/q08_with.json",
+      "rawSha256": "f2fcba73552a2fab53160d3972f305783b95fd5e2a80de3a848f5234d284b957",
+      "missingGroups": [
+        [
+          "11"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "trial": "primary",
+      "score": 0.0,
+      "answer": "L’identifiant précis disponible pour les sauvegardes Ares est `BACKUP_COPAL`. Le jeu de sauvegarde exact à restaurer pour cet incident non documenté n’est pas disponible.",
+      "rawPath": "answers-01/raw/q09_with.json",
+      "rawSha256": "947f11e1dad67710b3ec8fa91c225b2477acdd94c7aee364fd57421fcc21caf9",
+      "missingGroups": [],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-2",
+      "score": 0.0,
+      "answer": "L’identifiant de sauvegarde Ares disponible est `BACKUP_COPAL`. Aucun identifiant spécifique à l’incident n’est documenté.",
+      "rawPath": "repeats-01/trial-2/raw/q09_with.json",
+      "rawSha256": "b72ccb4a876e0c6964cde141f41311f099fdefdbb51a2e6d21aecb0110996187",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q09",
+      "trial": "trial-3",
+      "score": 0.0,
+      "answer": "L’identifiant précis de sauvegarde Ares à restaurer est `BACKUP_COPAL`.",
+      "rawPath": "repeats-01/trial-3/raw/q09_with.json",
+      "rawSha256": "4c8ad523b8da174412c3727605e7d7a088f20e68751840e5bd06b42182123a9d",
+      "missingGroups": [
+        [
+          "inconnu",
+          "inconnue",
+          "pas renseign",
+          "pas indiqu",
+          "pas disponible",
+          "ne sais pas",
+          "non document",
+          "non fourni",
+          "aucune information",
+          "impossible de déterminer",
+          "pas renseigné",
+          "pas renseignée",
+          "pas indiqué",
+          "pas indiquée",
+          "non documenté",
+          "non documentée",
+          "non fourni",
+          "non fournie",
+          "pas documenté",
+          "pas documentée",
+          "pas fourni",
+          "pas fournie",
+          "non disponible",
+          "pas accessible",
+          "ne figure pas",
+          "aucune donnée",
+          "je ne dispose pas",
+          "je n'ai pas",
+          "n'apparaît pas",
+          "aucun élément",
+          "non communiqué",
+          "non communiquée",
+          "pas communiqué",
+          "pas communiquée"
+        ]
+      ],
+      "forbiddenMentions": [
+        "BACKUP_COPAL"
+      ],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q11",
+      "trial": "primary",
+      "score": 0.6666666666666666,
+      "answer": "L’horaire UTC actualisé est inconnu ; le groupe à utiliser est OPS_IVORY.",
+      "rawPath": "answers-01/raw/q11_with.json",
+      "rawSha256": "894781170b7c80f58760885871ce0d2aeaab1bbed723ae99c98c2ce0998f45c2",
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    },
+    {
+      "caseId": "q11",
+      "trial": "trial-3",
+      "score": 0.6666666666666666,
+      "answer": "L’horaire UTC actualisé n’est pas disponible ; le groupe à utiliser est OPS_IVORY.",
+      "rawPath": "repeats-01/trial-3/raw/q11_with.json",
+      "rawSha256": "b68ad3f604ee07bbd5cd26551219771ef0759326f4206603bedf1d872e6b532d",
+      "missingGroups": [
+        [
+          "14:50"
+        ]
+      ],
+      "forbiddenMentions": [],
+      "formatErrors": [],
+      "executionErrors": [],
+      "passed": false
+    }
+  ],
+  "assessmentSha256": "2bed4cc92fd2a5e1b2670a5b5fb5f189afcd8684f40e0182bf41b4ea75f4081f",
+  "repetitionsSha256": "f25fb2661d0612588678b64b9fe8bc4f6f80569cec2cfc0f2e13552681aac321",
+  "pushAndMergeAllowed": false,
+  "limits": "Finite synthetic acceptance; no universal reliability, cost, or daily-use claim."
+}

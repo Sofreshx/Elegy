@@ -1,0 +1,43 @@
+{
+  "answer": "La région et le tag de rollback approuvé sont inconnus dans les informations fournies.",
+  "threadId": "01a1671d-32ba-7751-ac27-c44e09008111",
+  "usage": {
+    "input_tokens": 20518,
+    "cached_input_tokens": 16384,
+    "cache_write_input_tokens": 0,
+    "output_tokens": 59,
+    "reasoning_output_tokens": 35
+  },
+  "exitCode": 0,
+  "stdout": "{\"type\":\"thread.started\",\"thread_id\":\"01a1671d-32ba-7751-ac27-c44e09008111\"}\n{\"type\":\"turn.started\"}\n{\"type\":\"item.completed\",\"item\":{\"id\":\"item_0\",\"type\":\"agent_message\",\"text\":\"La région et le tag de rollback approuvé sont inconnus dans les informations fournies.\"}}\n{\"type\":\"turn.completed\",\"usage\":{\"input_tokens\":20518,\"cached_input_tokens\":16384,\"cache_write_input_tokens\":0,\"output_tokens\":59,\"reasoning_output_tokens\":35}}\n",
+  "stderr": "2026-10-23T04:55:29.227262Z  WARN codex_core::shell_snapshot: Failed to create shell snapshot for powershell: Shell snapshot not supported yet for PowerShell\n",
+  "issues": [],
+  "valid": true,
+  "schemaVersion": "memory-realistic-answer/v1",
+  "caseId": "q20",
+  "arm": "without",
+  "startedAt": "2026-10-23T04:55:28.647094+00:00",
+  "completedAt": "2026-10-23T04:55:35.929649+00:00",
+  "elapsedMs": 7282.254,
+  "promptSha256": "73e2078789f505d0e38e8aa8b124b7cb9b7ec49a729b31b056e0c9b762dc99c2",
+  "configurationSha256": "31991ee8b5bae160f0cae7adec517e9cf47b91debc4756be9304fbd1028a9888",
+  "command": [
+    "<codex>",
+    "exec",
+    "--ignore-user-config",
+    "--ephemeral",
+    "--sandbox",
+    "read-only",
+    "--skip-git-repo-check",
+    "--json",
+    "-C",
+    "<scratch-case>",
+    "-m",
+    "gpt-5.6-luna",
+    "-c",
+    "model_reasoning_effort=\"medium\"",
+    "-c",
+    "project_doc_max_bytes=0",
+    "-"
+  ]
+}

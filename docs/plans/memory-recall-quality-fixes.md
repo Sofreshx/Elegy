@@ -62,17 +62,17 @@ recalled content and order mechanically before interpreting answer differences.
 
 ## Work and acceptance
 
-- [ ] Add integration regressions first: Harbor q17/q18, explicit Sandbox query,
+- [x] Add integration regressions first: Harbor q17/q18, explicit Sandbox query,
   independent Atlas/Atlas-Lab pair, unchanged source. Observe the intended red
   result before changing production code.
-- [ ] Review the plan, then implement the smallest correction and align the
+- [x] Review the plan, then implement the smallest correction and align the
   existing recall spec. No database migration or new provider/dependency.
-- [ ] Run focused regressions, complete Memory and MCP suites, hook tests,
+- [x] Run focused regressions, complete Memory and MCP suites, hook tests,
   formatting, Clippy, governed contracts and documentation checks. Preserve all
   failures; attribute base/environment failures before changing unrelated code.
-- [ ] Commit exact source before qualifying new executables; record source and
+- [x] Commit exact source before qualifying new executables; record source and
   binary hashes. Use isolated fictitious stores and fresh model contexts only.
-- [ ] Reuse the frozen 24-question corpus and rubric. Compare exact old/new recall
+- [x] Reuse the frozen 24-question corpus and rubric. Compare exact old/new recall
   packets. For answer quality, retain all trials: three realizations of q08, q09,
   q11, q17 and q18, one realization of other controls. No prompt tuning after
   seeing these answers and no retry that replaces an adverse result.
@@ -80,7 +80,7 @@ recalled content and order mechanically before interpreting answer differences.
   trial. There is no three-of-five threshold. q08/q11 already have the correct
   recalled text; any improvement there can only be attributed to the answer
   guidance/model behavior, not repaired candidate generation.
-- [ ] Report lexical score separately from semantic reading and each unsupported
+- [x] Report lexical score separately from semantic reading and each unsupported
   answer/omission. No new contamination, secret leak or hostile instruction use;
   explicitly distinguish passed finite controls from general reliability.
 - [ ] Inspect exact final diff, independent review, private-content/metadata gates,
@@ -94,3 +94,23 @@ not turn failed answer controls into a passing autonomous-use claim.
 
 Rollback: revert the isolated correction commits; keep previous proofs and failed
 trials. No published-history rewriting or force push.
+
+## Qualification checkpoint — 23 October
+
+**Blocked for push and merge.** Product source `b828223` fixes the Harbor
+selection regression, and q17/q18 each pass all three retained answer trials.
+The frozen acceptance criterion fails for q08, q09 and q11: one retention
+omission, three runbook/snapshot substitutions and two time omissions across
+the 15 target answers. Do not retune this corpus or discard adverse trials.
+The guidance change is not qualified as a remedy for those model failures.
+
+The full Memory suite passes (408 tests, including 31 contextual recall tests),
+as do all 67 MCP tests, 14 hook tests, 14 evidence tests, Clippy, formatting,
+contracts, documentation checks and the CLI/MCP build. The actual second
+software host preflight is blocked by HTTP 403 from its advertised free provider;
+no paid fallback or permanent configuration was introduced.
+
+See [the correction qualification report](../../plugins/memory/evidence/recall-fixes-2026-10-23/README.md)
+and its individual answers, source/binary bindings and reproducible adverse gate.
+Safe local checkpoints remain authorized; the user's conditional publication
+authorization has not been satisfied.

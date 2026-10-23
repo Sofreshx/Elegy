@@ -1,0 +1,24 @@
+{
+  "agent": {},
+  "mode": {},
+  "plugin": [],
+  "command": {},
+  "autoupdate": false,
+  "share": "disabled",
+  "snapshot": false,
+  "enabled_providers": [
+    "opencode"
+  ],
+  "model": "opencode/big-pickle",
+  "small_model": "opencode/big-pickle",
+  "mcp": {},
+  "permission": {
+    "*": "deny"
+  },
+  "lsp": false,
+  "formatter": false,
+  "username": "unknown",
+  "compaction": {
+    "prune": false
+  }
+}

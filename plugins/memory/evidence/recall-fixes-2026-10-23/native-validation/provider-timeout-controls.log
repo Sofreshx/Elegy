@@ -1,0 +1,10 @@
+   Compiling elegy-memory v0.1.0 (D:\Projets\Elegy\.tmp\llm-work\memory-fixes\plugins\memory)
+    Finished `test` profile [unoptimized + debuginfo] target(s) in 2m 30s
+     Running unittests src\lib.rs (D:/Projets/Elegy/target/qualification-oct23\debug\deps\elegy_memory-c7a2b45042dcc1b2.exe)
+
+running 2 tests
+test embedding::ollama::tests::ollama_offline_timeout_returns_clear_error ... ok
+test embedding::openai::tests::embed_offline_timeout_returns_clear_error ... ok
+
+test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 281 filtered out; finished in 0.52s
+
