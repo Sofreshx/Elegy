@@ -1,0 +1,13 @@
+{
+  "schemaVersion": "elegy-repo-shape-suffix-evidence/v1",
+  "phase": "red",
+  "command": "pwsh -NoProfile -File scripts/test-check-repo-shape.ps1",
+  "exitCode": 1,
+  "stdout": "",
+  "stderr": "PowerShell exception: local-path detection count failed",
+  "sourceHashes": {
+    "scripts/check-repo-shape.ps1": "431a280dfe14c2d2bf2d4378ba5d96c26ad9c831",
+    "scripts/test-check-repo-shape.ps1": "f1a7193d075707fd77dd49d8a9e5b6d384aadec4"
+  },
+  "note": "The old checker misclassified the assembled fictitious Windows home suffix."
+}

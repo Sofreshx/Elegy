@@ -65,15 +65,26 @@ try {
     Set-Content -LiteralPath (Join-Path $fixture "plain.txt") -Value "ordinary fixture text" -NoNewline
     $fakeLocalPath = "C:" + "/" + "Users" + "/" + "fixture-user" + "/" + "AppData" + "/" + "Local"
     Set-Content -LiteralPath (Join-Path $fixture "bad.txt") -Value $fakeLocalPath -NoNewline
+    $linuxPath = "/" + "home" + "/" + "fictitious-user" + "/" + "item"
+    Set-Content -LiteralPath (Join-Path $fixture "linux-plain.txt") -Value $linuxPath -NoNewline
+    Set-Content -LiteralPath (Join-Path $fixture "linux-quoted.txt") -Value ('"' + $linuxPath + '"') -NoNewline
+    Set-Content -LiteralPath (Join-Path $fixture "linux-uri.txt") -Value ("file://" + $linuxPath) -NoNewline
+    $windowsSuffixPath = "X:" + "/" + "fixture" + $linuxPath
+    Set-Content -LiteralPath (Join-Path $fixture "windows-suffix.txt") -Value $windowsSuffixPath -NoNewline
     Invoke-GitChecked @("-c", "core.hooksPath=NUL", "init", "--quiet", "--", $fixture)
-    Invoke-GitChecked @("-c", "core.hooksPath=NUL", "-C", $fixture, "add", "empty.txt", "plain.txt", "bad.txt")
+    Invoke-GitChecked @("-c", "core.hooksPath=NUL", "-C", $fixture, "add", "empty.txt", "plain.txt", "bad.txt", "linux-plain.txt", "linux-quoted.txt", "linux-uri.txt", "windows-suffix.txt")
 
     $json = & pwsh -NoProfile -File $CheckerScript -Project $fixture -Json -FailOnIssues
     $checkerExit = $LASTEXITCODE
     if ($checkerExit -ne 1) { throw "expected blocking local-path issue exit 1, got $checkerExit" }
     $report = $json | ConvertFrom-Json
     $localIssue = @($report.issues | Where-Object code -eq "content.local_path")
-    if ($localIssue.Count -ne 1 -or $localIssue[0].path -ne "bad.txt") { throw "real non-empty local-path detection failed" }
+    if ($localIssue.Count -ne 4) { throw "local-path detection count failed" }
+    $expectedIssuePaths = @("bad.txt", "linux-plain.txt", "linux-quoted.txt", "linux-uri.txt")
+    foreach ($expectedPath in $expectedIssuePaths) {
+        if (@($localIssue | Where-Object path -eq $expectedPath).Count -ne 1) { throw "local-path detection case failed" }
+    }
+    if (@($localIssue | Where-Object path -eq "windows-suffix.txt").Count -ne 0) { throw "Windows suffix path was misclassified" }
     if (@($report.issues | Where-Object path -eq "empty.txt").Count -ne 0) { throw "empty tracked file produced an issue" }
 
     $unreadablePath = Join-Path $fixture "unreadable.txt"

@@ -1,0 +1,32 @@
+{
+  "schemaVersion": "elegy-repo-shape-suffix-evidence/v2",
+  "phase": "red",
+  "argv": [
+    "pwsh",
+    "-NoProfile",
+    "-File",
+    "scripts/test-check-repo-shape.ps1",
+    "-CheckerScript",
+    "runtime/shape-suffix/old-checker.ps1"
+  ],
+  "returnCode": 1,
+  "rawStreams": {
+    "stdoutSha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "stderrSha256": "baf78e2fe17cb4e4873f872b06cb4d4e6c4d9e60684d1a0895fc7fb9a64ddcca",
+    "stdoutBytes": 0,
+    "stderrBytes": 693,
+    "rawFiles": [
+      "runtime/shape-suffix/red-02.stdout",
+      "runtime/shape-suffix/red-02.stderr"
+    ]
+  },
+  "sourceSha256": {
+    "scripts/check-repo-shape.ps1": "bd08061238ec35f99754031d8a2be17f09da3ffd4b7d3b70ec715f59e18563ee",
+    "scripts/test-check-repo-shape.ps1": "c50d03bca01bbe2c5283cfb6336982dee44288a5584d17f4059f4f8f82d864d0"
+  },
+  "gitBlobSha1": {
+    "scripts/check-repo-shape.ps1": "431a280dfe14c2d2bf2d4378ba5d96c26ad9c831",
+    "scripts/test-check-repo-shape.ps1": "13b1de618d68cf1b4931047efabf913f7081c735"
+  },
+  "publicLog": "RED: old checker rejected regression expectation"
+}
